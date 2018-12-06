@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="ENABLE_EXPR_REWRITES Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="enable_expr_rewrites" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>ENABLE_EXPR_REWRITES Query Option</title>
+</head>
+<body id="enable_expr_rewrites">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">ENABLE_EXPR_REWRITES Query Option</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">ENABLE_EXPR_REWRITES</code> query option controls whether to enable or
+      disable the query compile time optimizations. These optimizations rewrite the expression
+      trees to a more compact and optimized form that helps avoid redundant expression
+      evaluation at run time. Performance optimizations controlled by this query option include:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        Constant folding (added in <span class="keyword">)</span>
+      </li>
+
+
+      <li class="li">
+        Extracting common conjuncts from disjunctions (added in
+        <span class="keyword">)</span>
+      </li>
+
+
+      <li class="li">
+        Simplify conditionals with constant conditions (added in
+        <span class="keyword">)</span>
+      </li>
+
+    </ul>
+
+
+    <p class="p">
+      Set the option to <code class="ph codeph">false</code> or <code class="ph codeph">0</code> to disable the performance
+      optimizations.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type: </strong><code class="ph codeph">boolean</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">true</code> (<code class="ph codeph">1</code>)
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.8</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

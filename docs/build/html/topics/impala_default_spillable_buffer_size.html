@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="default_spillable_buffer_size"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</title></head><body id="default_spillable_buffer_size"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DEFAULT_SPILLABLE_BUFFER_SIZE Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="default_spillable_buffer_size" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</title>
+</head>
+<body id="default_spillable_buffer_size">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</h1>
+
   
   
 
@@ -15,18 +35,22 @@
       a large table with no statistics, or large join operations.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Type:</strong> integer
       </p>
 
 
 
+
     <p class="p">
         <strong class="ph b">Default:</strong>
       </p>
+
     <p class="p">
       <code class="ph codeph">2097152</code> (2 MB)
     </p>
+
 
     <p class="p">
         <strong class="ph b">Units:</strong> A numeric argument represents a size in bytes; you can also use a suffix of <code class="ph codeph">m</code>
@@ -34,18 +58,22 @@
         specify a value with unrecognized formats, subsequent queries fail with an error.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.10.0</span>
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
     <p class="p">
       This query option sets an upper bound on the size of the internal
       buffer size that can be used during spill-to-disk operations. The
       actual size of the buffer is chosen by the query planner.
     </p>
+
     <p class="p">
       If overall query performance is limited by the time needed for spilling,
       consider increasing the <code class="ph codeph">DEFAULT_SPILLABLE_BUFFER_SIZE</code> setting.
@@ -53,10 +81,12 @@
       devices, which might result in higher throughput, particularly on rotational
       disks.
     </p>
+
     <p class="p">
       The tradeoff with a large value for this setting is increased memory usage during
       spill-to-disk operations. Reducing this value may reduce memory consumption.
     </p>
+
     <p class="p">
       To determine if the value for this setting is having an effect by capping the
       spillable buffer size, you can see the buffer size chosen by the query planner for
@@ -64,9 +94,11 @@
       <code class="ph codeph">EXPLAIN_LEVEL=2</code> is in effect.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>
 set default_spillable_buffer_size=4MB;
@@ -76,6 +108,7 @@ set default_spillable_buffer_size=4MB;
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
     <p class="p">
       <a class="xref" href="impala_buffer_pool_limit.html">BUFFER_POOL_LIMIT Query Option</a>,
       <a class="xref" href="impala_max_row_size.html">MAX_ROW_SIZE Query Option</a>,
@@ -83,5 +116,12 @@ set default_spillable_buffer_size=4MB;
       <a class="xref" href="impala_scalability.html">Scalability Considerations for Impala</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

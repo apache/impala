@@ -1,324 +1,759 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="math_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Mathematical Functions</title></head><body id="math_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Mathematical Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="math_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Mathematical Functions</title>
+</head>
+<body id="math_functions">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Mathematical Functions</h1>
+
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      Mathematical functions, or arithmetic functions, perform numeric calculations that are typically more complex
-      than basic addition, subtraction, multiplication, and division. For example, these functions include
-      trigonometric, logarithmic, and base conversion operations.
+      Mathematical functions, or arithmetic functions, perform numeric calculations that are
+      typically more complex than basic addition, subtraction, multiplication, and division. For
+      example, these functions include trigonometric, logarithmic, and base conversion
+      operations.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-      In Impala, exponentiation uses the <code class="ph codeph">pow()</code> function rather than an exponentiation operator
-      such as <code class="ph codeph">**</code>.
+
+    <div class="note note"><span class="notetitle">Note:</span>
+      In Impala, exponentiation uses the <code class="ph codeph">pow()</code> function rather than an
+      exponentiation operator such as <code class="ph codeph">**</code>.
     </div>
+
 
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
-      The mathematical functions operate mainly on these data types: <a class="xref" href="impala_int.html#int">INT Data Type</a>,
-      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>,
-      <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>, <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>,
-      <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>, and <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 1.4 or higher only)</a>. For the operators that
-      perform the standard operations such as addition, subtraction, multiplication, and division, see
+      The mathematical functions operate mainly on these data types:
+      <a class="xref" href="impala_int.html#int">INT Data Type</a>, <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
+      <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+      <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>, <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>, and
+      <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 3.0 or higher only)</a>. For the operators that perform the standard
+      operations such as addition, subtraction, multiplication, and division, see
       <a class="xref" href="impala_operators.html#arithmetic_operators">Arithmetic Operators</a>.
     </p>
 
+
     <p class="p">
-      Functions that perform bitwise operations are explained in <a class="xref" href="impala_bit_functions.html#bit_functions">Impala Bit Functions</a>.
+      Functions that perform bitwise operations are explained in
+      <a class="xref" href="impala_bit_functions.html#bit_functions">Impala Bit Functions</a>.
     </p>
+
 
     <p class="p">
       <strong class="ph b">Function reference:</strong>
     </p>
 
+
     <p class="p">
       Impala supports the following mathematical functions:
     </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="#math_functions__abs">ABS</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__acos">ACOS</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__asin">ASIN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__atan">ATAN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__atan2">ATAN2</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__bin">BIN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__ceil">CEIL, CEILING, DCEIL</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__conv">CONV</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__cos">COS</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__cosh">COSH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__cot">COT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__degrees">DEGREES</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__e">E</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__exp">EXP</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__factorial">FACTORIAL</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__floor">FLOOR, DFLOOR</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__fmod">FMOD</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__fnv_hash">FNV_HASH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__greatest">GREATEST</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__hex">HEX</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__is_inf">IS_INF</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__is_nan">IS_NAN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__least">LEAST</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__ln">LN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__log">LOG</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__log10">LOG10</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__log2">LOG2</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__max_int">MAX_INT, MAX_TINYINT, MAX_SMALLINT,
+        MAX_BIGINT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__min_int">MIN_INT, MIN_TINYINT, MIN_SMALLINT,
+        MIN_BIGINT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__mod">MOD</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__murmur_hash">MURMUR_HASH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__negative">NEGATIVE</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__pi">PI</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__pmod">PMOD</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__positive">POSITIVE</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__pow">POW, POWER, DPOW, FPOW</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__precision">PRECISION</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__quotient">QUOTIENT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__radians">RADIANS</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__rand">RAND, RANDOM</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__round">ROUND, DROUND</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__scale">SCALE</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__sign">SIGN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__sin">SIN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__sinh">SINH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__sqrt">SQRT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__tan">TAN</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__tanh">TANH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__truncate">TRUNCATE, DTRUNC, TRUNC</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__unhex">UNHEX</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#math_functions__width_bucket">WIDTH_BUCKET</a>
+      </li>
+
+    </ul>
+
 
     <dl class="dl">
       
 
         <dt class="dt dlterm" id="math_functions__abs">
-          <code class="ph codeph">abs(numeric_type a)</code>
-
+          ABS(numeric_type a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the absolute value of the argument.
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Use this function to ensure all return values are positive. This is different than
-            the <code class="ph codeph">positive()</code> function, which returns its argument unchanged (even if the argument
-            was negative).
+            <strong class="ph b">Usage notes:</strong> Use this function to ensure all return values are positive. This
+            is different than the <code class="ph codeph">POSITIVE()</code> function, which returns its
+            argument unchanged (even if the argument was negative).
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__acos">
-          <code class="ph codeph">acos(double a)</code>
+          ACOS(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the arccosine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__asin">
-          <code class="ph codeph">asin(double a)</code>
+          ASIN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the arcsine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__atan">
-          <code class="ph codeph">atan(double a)</code>
+          ATAN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the arctangent of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__atan2">
-          <code class="ph codeph">atan2(double a, double b)</code>
+          ATAN2(DOUBLE a, DOUBLE b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the arctangent of the two arguments, with the signs of the arguments used to determine the
-          quadrant of the result.
+          <strong class="ph b">Purpose:</strong> Returns the arctangent of the two arguments, with the signs of the
+          arguments used to determine the quadrant of the result.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__bin">
-          <code class="ph codeph">bin(bigint a)</code>
+          BIN(BIGINT a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the binary representation of an integer value, that is, a string of 0 and 1
-          digits.
+          <strong class="ph b">Purpose:</strong> Returns the binary representation of an integer value, that is, a
+          string of 0 and 1 digits.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__ceil">
-          <code class="ph codeph">ceil(double a)</code>,
-          <code class="ph codeph">ceil(decimal(p,s) a)</code>,
-          <code class="ph codeph" id="math_functions__ceiling">ceiling(double a)</code>,
-          <code class="ph codeph">ceiling(decimal(p,s) a)</code>,
-          <code class="ph codeph" id="math_functions__dceil">dceil(double a)</code>,
-          <code class="ph codeph">dceil(decimal(p,s) a)</code>
+          CEIL(DOUBLE a), CEIL(DECIMAL(p,s) a), CEILING(DOUBLE a), CEILING(DECIMAL(p,s) a),
+          DCEIL(DOUBLE a), DCEIL(DECIMAL(p,s) a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the smallest integer that is greater than or equal to the argument.
+          <strong class="ph b">Purpose:</strong> Returns the smallest integer that is greater than or equal to the
+          argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code> or <code class="ph codeph">decimal(p,s)</code> depending on the type of the
-            input argument
+            <strong class="ph b">Return type:</strong> Same as the input value
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__conv">
-          <code class="ph codeph">conv(bigint num, int from_base, int to_base), conv(string num, int from_base, int
-          to_base)</code>
+          CONV(BIGINT n, INT from_base, INT to_base), CONV(STRING s, INT from_base, INT to_base)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a string representation of an integer value in a particular base. The input value
-          can be a string, for example to convert a hexadecimal number such as <code class="ph codeph">fce2</code> to decimal. To
-          use the return value as a number (for example, when converting to base 10), use <code class="ph codeph">CAST()</code>
-          to convert to the appropriate type.
+          <strong class="ph b">Purpose:</strong> Returns a string representation of the first argument converted from
+          <code class="ph codeph">from_base</code> to <code class="ph codeph">to_base</code>. The first argument can be
+          specified as a number or a string. For example, <code class="ph codeph">CONV(100, 2, 10)</code> and
+          <code class="ph codeph">CONV('100', 2, 10)</code> both return <code class="ph codeph">'4'</code>.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            If <code class="ph codeph">to_base</code> is negative, the first argument is treated as signed,
+            and otherwise, it is treated as unsigned. For example:
+          </p>
+
+          <ul class="ul">
+            <li class="li">
+              <code class="ph codeph">conv(-17, 10, -2) </code>returns <code class="ph codeph">'-10001'</code>,<code class="ph codeph">
+              -17</code> in base 2.
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">conv(-17, 10, 10)</code> returns
+              <code class="ph codeph">'18446744073709551599'</code>. <code class="ph codeph">-17</code> is interpreted as an
+              unsigned, 2^64-17, and then the value is returned in base 10.
+            </li>
+
+          </ul>
+
+          <p class="p">
+            The function returns <code class="ph codeph">NULL</code> when the following illegal arguments are
+            specified:
+          </p>
+
+          <ul class="ul">
+            <li class="li">
+              Any argument is <code class="ph codeph">NULL</code>.
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">from_base</code> or <code class="ph codeph">to_base</code> is below
+              <code class="ph codeph">-36</code> or above <code class="ph codeph">36</code>.
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">from_base</code> or <code class="ph codeph">to_base</code> is <code class="ph codeph">-1</code>,
+              <code class="ph codeph">0</code>, or <code class="ph codeph">1</code>.
+            </li>
+
+
+            <li class="li">
+              The first argument represents a positive number and <code class="ph codeph">from_base</code> is
+              a negative number.
+            </li>
+
+          </ul>
+
+          <p class="p">
+            If the first argument represents a negative number and <code class="ph codeph">from_base</code> is
+            a negative number, the function returns <code class="ph codeph">0</code>.
+          </p>
+
+
+          <p class="p">
+            If the first argument represents a number larger than the maximum
+            <code class="ph codeph">bigint</code>, the function returns:
+          </p>
+
+          <ul class="ul">
+            <li class="li">
+              The string representation of -1 in <code class="ph codeph">to_base</code> if
+              <code class="ph codeph">to_base</code> is negative.
+            </li>
+
+
+            <li class="li">
+              The string representation of 18446744073709551615' (2^64 - 1) in
+              <code class="ph codeph">to_base</code> if <code class="ph codeph">to_base</code> is positive.
+            </li>
+
+          </ul>
+
+          <p class="p">
+            If the first argument does not represent a valid number in
+            <code class="ph codeph">from_base</code>, e.g. 3 in base 2 or '1a23' in base 10, the digits in the
+            first argument are evaluated from left-to-right and used if a valid digit in
+            <code class="ph codeph">from_base</code>. The invalid digit and the digits to the right are
+            ignored.
+          </p>
+
+
+          <div class="p">
+            For example:
+            <ul class="ul">
+              <li class="li">
+                <code class="ph codeph"> conv(445, 5, 10)</code> is converted to <code class="ph codeph">conv(44, 5,
+                10)</code> and returns <code class="ph codeph">'24'</code>.
+              </li>
+
+
+              <li class="li">
+                <code class="ph codeph"> conv('1a23', 10, 16)</code> is converted to <code class="ph codeph">conv('1', 10 ,
+                16)</code> and returns <code class="ph codeph">'1'</code>.
+              </li>
+
+            </ul>
+
+          </div>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__cos">
-          <code class="ph codeph">cos(double a)</code>
+          COS(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the cosine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__cosh">
-          <code class="ph codeph">cosh(double a)</code>
+          COSH(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the hyperbolic cosine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__cot">
-          <code class="ph codeph">cot(double a)</code>
+          COT(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the cotangent of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__degrees">
-          <code class="ph codeph">degrees(double a)</code>
+          DEGREES(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Converts argument value from radians to degrees.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__e">
-          <code class="ph codeph">e()</code>
+          E()
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the
           <a class="xref" href="https://en.wikipedia.org/wiki/E_(mathematical_constant" target="_blank">mathematical
           constant e</a>.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__exp">
-          <code class="ph codeph">exp(double a)</code>,
-          <code class="ph codeph" id="math_functions__dexp">dexp(double a)</code>
+          EXP(DOUBLE a), DEXP(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the
           <a class="xref" href="https://en.wikipedia.org/wiki/E_(mathematical_constant" target="_blank">mathematical
           constant e</a> raised to the power of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__factorial">
-          <code class="ph codeph">factorial(integer_type a)</code>
+          FACTORIAL(integer_type a)
         </dt>
+
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Computes the <a class="xref" href="https://en.wikipedia.org/wiki/Factorial" target="_blank">factorial</a> of an integer value.
-          It works with any integer type.
+          <strong class="ph b">Purpose:</strong> Computes the
+          <a class="xref" href="https://en.wikipedia.org/wiki/Factorial" target="_blank">factorial</a>
+          of an integer value. It works with any integer type.
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> You can use either the <code class="ph codeph">factorial()</code> function or the <code class="ph codeph">!</code> operator.
-            The factorial of 0 is 1. Likewise, the <code class="ph codeph">factorial()</code> function returns 1 for any negative value.
-            The maximum positive value for the input argument is 20; a value of 21 or greater overflows the
+            <strong class="ph b">Usage notes:</strong> You can use either the <code class="ph codeph">factorial()</code> function or
+            the <code class="ph codeph">!</code> operator. The factorial of 0 is 1. Likewise, the
+            <code class="ph codeph">factorial()</code> function returns 1 for any negative value. The maximum
+            positive value for the input argument is 20; a value of 21 or greater overflows the
             range for a <code class="ph codeph">BIGINT</code> and causes an error.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">bigint</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
 <pre class="pre codeblock"><code>select factorial(5);
 +--------------+
 | factorial(5) |
@@ -349,61 +784,73 @@ select factorial(-100);
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__floor">
-          <code class="ph codeph">floor(double a)</code>,
-          <code class="ph codeph">floor(decimal(p,s) a)</code>,
-          <code class="ph codeph" id="math_functions__dfloor">dfloor(double a)</code>,
-          <code class="ph codeph">dfloor(decimal(p,s) a)</code>
+          FLOOR(DOUBLE a), FLOOR(DECIMAL(p,s) a), DFLOOR(DOUBLE a), DFLOOR(DECIMAL(p,s) a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the largest integer that is less than or equal to the argument.
+          <strong class="ph b">Purpose:</strong> Returns the largest integer that is less than or equal to the
+          argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">bigint</code> or <code class="ph codeph">decimal(p,s)</code> depending on the type of
-            the input argument
+            <strong class="ph b">Return type:</strong> Same as the input type
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__fmod">
-          <code class="ph codeph">fmod(double a, double b), fmod(float a, float b)</code>
+          FMOD(DOUBLE a, DOUBLE b), FMOD(FLOAT a, FLOAT b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the modulus of a floating-point number. Equivalent to the <code class="ph codeph">%</code> arithmetic operator.
+          <strong class="ph b">Purpose:</strong> Returns the modulus of a floating-point number.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">float</code> or <code class="ph codeph">double</code>, depending on type of arguments
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, depending on
+            type of arguments
           </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> Impala 1.1.1
       </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
             Because this function operates on <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">FLOAT</code>
             values, it is subject to potential rounding errors for values that cannot be
-            represented precisely. Prefer to use whole numbers, or values that you know
-            can be represented precisely by the <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">FLOAT</code>
+            represented precisely. Prefer to use whole numbers, or values that you know can be
+            represented precisely by the <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">FLOAT</code>
             types.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
             The following examples show equivalent operations with the <code class="ph codeph">fmod()</code>
-            function and the <code class="ph codeph">%</code> arithmetic operator, for values not subject
-            to any rounding error.
+            function and the <code class="ph codeph">%</code> arithmetic operator, for values not subject to
+            any rounding error.
           </p>
+
 <pre class="pre codeblock"><code>select fmod(10,3);
 +-------------+
 | fmod(10, 3) |
@@ -433,15 +880,15 @@ select 5.5 % 2;
 +---------+
 </code></pre>
           <p class="p">
-            The following examples show operations with the <code class="ph codeph">fmod()</code>
-            function for values that cannot be represented precisely by the
-            <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">FLOAT</code> types, and thus are
-            subject to rounding error. <code class="ph codeph">fmod(9.9,3.0)</code> returns a value
-            slightly different than the expected 0.9 because of rounding.
-            <code class="ph codeph">fmod(9.9,3.3)</code> returns a value quite different from
-            the expected value of 0 because of rounding error during intermediate
+            The following examples show operations with the <code class="ph codeph">fmod()</code> function for
+            values that cannot be represented precisely by the <code class="ph codeph">DOUBLE</code> or
+            <code class="ph codeph">FLOAT</code> types, and thus are subject to rounding error.
+            <code class="ph codeph">fmod(9.9,3.0)</code> returns a value slightly different than the expected
+            0.9 because of rounding. <code class="ph codeph">fmod(9.9,3.3)</code> returns a value quite
+            different from the expected value of 0 because of rounding error during intermediate
             calculations.
           </p>
+
 <pre class="pre codeblock"><code>select fmod(9.9,3.0);
 +--------------------+
 | fmod(9.9, 3.0)     |
@@ -458,53 +905,71 @@ select fmod(9.9,3.3);
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__fnv_hash">
-          <code class="ph codeph">fnv_hash(type v)</code>,
+          FNV_HASH(type v),
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a consistent 64-bit value derived from the input argument, for convenience of
-          implementing hashing logic in an application.
+          <strong class="ph b">Purpose:</strong> Returns a consistent 64-bit value derived from the input argument, for
+          convenience of implementing hashing logic in an application.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            You might use the return value in an application where you perform load balancing, bucketing, or some
-            other technique to divide processing or storage.
+            You might use the return value in an application where you perform load balancing,
+            bucketing, or some other technique to divide processing or storage.
           </p>
+
+
           <p class="p">
-            Because the result can be any 64-bit value, to restrict the value to a particular range, you can use an
-            expression that includes the <code class="ph codeph">ABS()</code> function and the <code class="ph codeph">%</code> (modulo)
-            operator. For example, to produce a hash value in the range 0-9, you could use the expression
-            <code class="ph codeph">ABS(FNV_HASH(x)) % 10</code>.
+            Because the result can be any 64-bit value, to restrict the value to a particular
+            range, you can use an expression that includes the <code class="ph codeph">ABS()</code> function
+            and the <code class="ph codeph">%</code> (modulo) operator. For example, to produce a hash value
+            in the range 0-9, you could use the expression <code class="ph codeph">ABS(FNV_HASH(x)) %
+            10</code>.
           </p>
+
+
           <p class="p">
-            This function implements the same algorithm that Impala uses internally for hashing, on systems where
-            the CRC32 instructions are not available.
+            This function implements the same algorithm that Impala uses internally for hashing,
+            on systems where the CRC32 instructions are not available.
           </p>
+
+
           <p class="p">
             This function implements the
             <a class="xref" href="http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function" target="_blank">Fowler–Noll–Vo
-            hash function</a>, in particular the FNV-1a variation. This is not a perfect hash function: some
-            combinations of values could produce the same result value. It is not suitable for cryptographic use.
+            hash function</a>, in particular the FNV-1a variation. This is not a perfect hash
+            function: some combinations of values could produce the same result value. It is not
+            suitable for cryptographic use.
           </p>
+
+
           <p class="p">
-            Similar input values of different types could produce different hash values, for example the same
-            numeric value represented as <code class="ph codeph">SMALLINT</code> or <code class="ph codeph">BIGINT</code>,
-            <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, or <code class="ph codeph">DECIMAL(5,2)</code> or
-            <code class="ph codeph">DECIMAL(20,5)</code>.
+            Similar input values of different types could produce different hash values, for
+            example the same numeric value represented as <code class="ph codeph">SMALLINT</code> or
+            <code class="ph codeph">BIGINT</code>, <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, or
+            <code class="ph codeph">DECIMAL(5,2)</code> or <code class="ph codeph">DECIMAL(20,5)</code>.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table h (x int, s string);
 [localhost:21000] &gt; insert into h values (0, 'hello'), (1,'world'), (1234567890,'antidisestablishmentarianism');
 [localhost:21000] &gt; select x, fnv_hash(x) from h;
@@ -532,8 +997,10 @@ select fmod(9.9,3.3);
 | antidisestablishmentarianism | 4                       |
 +------------------------------+-------------------------+</code></pre>
           <p class="p">
-            For short argument values, the high-order bits of the result have relatively low entropy:
+            For short argument values, the high-order bits of the result have relatively low
+            entropy:
           </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table b (x boolean);
 [localhost:21000] &gt; insert into b values (true), (true), (false), (false);
 [localhost:21000] &gt; select x, fnv_hash(x) from b;
@@ -548,62 +1015,73 @@ select fmod(9.9,3.3);
           <p class="p">
             <strong class="ph b">Added in:</strong> Impala 1.2.2
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__greatest">
-          <code class="ph codeph">greatest(bigint a[, bigint b ...])</code>, <code class="ph codeph">greatest(double a[, double b ...])</code>,
-          <code class="ph codeph">greatest(decimal(p,s) a[, decimal(p,s) b ...])</code>, <code class="ph codeph">greatest(string a[, string b
-          ...])</code>, <code class="ph codeph">greatest(timestamp a[, timestamp b ...])</code>
+          GREATEST(BIGINT a[, BIGINT b ...]), GREATEST(DOUBLE a[, DOUBLE b ...]),
+          GREATEST(DECIMAL(p,s) a[, DECIMAL(p,s) b ...]), GREATEST(STRING a[, STRING b ...]),
+          GREATEST(TIMESTAMP a[, TIMESTAMP b ...])
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the largest value from a list of expressions.
           <p class="p">
         <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
         <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
         <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
       </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__hex">
-          <code class="ph codeph">hex(bigint a), hex(string a)</code>
+          HEX(BIGINT a), HEX(STRING a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the hexadecimal representation of an integer value, or of the characters in a
-          string.
+          <strong class="ph b">Purpose:</strong> Returns the hexadecimal representation of an integer value, or of the
+          characters in a string.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__is_inf">
-          <code class="ph codeph">is_inf(double a)</code>,
+          IS_INF(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Tests whether a value is equal to the special value <span class="q">"inf"</span>, signifying infinity.
+          <strong class="ph b">Purpose:</strong> Tests whether a value is equal to the special value <span class="q">"inf"</span>,
+          signifying infinity.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">boolean</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
         Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
         respectively, and Impala interprets them as these special values. They can also be produced by certain
@@ -611,26 +1089,32 @@ select fmod(9.9,3.3);
         <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
         DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__is_nan">
-          <code class="ph codeph">is_nan(double a)</code>,
+          IS_NAN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Tests whether a value is equal to the special value <span class="q">"NaN"</span>, signifying <span class="q">"not a
-          number"</span>.
+          <strong class="ph b">Purpose:</strong> Tests whether a value is equal to the special value <span class="q">"NaN"</span>,
+          signifying <span class="q">"not a number"</span>.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">boolean</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
         Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
         respectively, and Impala interprets them as these special values. They can also be produced by certain
@@ -638,203 +1122,228 @@ select fmod(9.9,3.3);
         <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
         DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__least">
-          <code class="ph codeph">least(bigint a[, bigint b ...])</code>, <code class="ph codeph">least(double a[, double b ...])</code>,
-          <code class="ph codeph">least(decimal(p,s) a[, decimal(p,s) b ...])</code>, <code class="ph codeph">least(string a[, string b
-          ...])</code>, <code class="ph codeph">least(timestamp a[, timestamp b ...])</code>
+          LEAST(BIGINT a[, BIGINT b ...]), LEAST(DOUBLE a[, DOUBLE b ...]), LEAST(DECIMAL(p,s)
+          a[, DECIMAL(p,s) b ...]), LEAST(STRING a[, STRING b ...]), LEAST(TIMESTAMP a[,
+          TIMESTAMP b ...])
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the smallest value from a list of expressions.
           <p class="p">
         <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
         <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
         <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
       </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__ln">
-          <code class="ph codeph">ln(double a)</code>,
-          <code class="ph codeph" id="math_functions__dlog1">dlog1(double a)</code>
+          LN(DOUBLE a), DLOG1(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
-          
           <strong class="ph b">Purpose:</strong> Returns the
           <a class="xref" href="https://en.wikipedia.org/wiki/Natural_logarithm" target="_blank">natural
           logarithm</a> of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__log">
-          <code class="ph codeph">log(double base, double a)</code>
+          LOG(DOUBLE base, DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the logarithm of the second argument to the specified base.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__log10">
-          <code class="ph codeph">log10(double a)</code>,
-          <code class="ph codeph" id="math_functions__dlog10">dlog10(double a)</code>
+          LOG10(DOUBLE a), DLOG10(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
-          
           <strong class="ph b">Purpose:</strong> Returns the logarithm of the argument to the base 10.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__log2">
-          <code class="ph codeph">log2(double a)</code>
+          LOG2(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the logarithm of the argument to the base 2.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__max_int">
-          <code class="ph codeph">max_int(), <span class="ph" id="math_functions__max_tinyint">max_tinyint()</span>, <span class="ph" id="math_functions__max_smallint">max_smallint()</span>,
-          <span class="ph" id="math_functions__max_bigint">max_bigint()</span></code>
+          MAX_INT(), MAX_TINYINT(), MAX_SMALLINT(), MAX_BIGINT()
         </dt>
 
+
         <dd class="dd">
-          
-          
-          
-          
           <strong class="ph b">Purpose:</strong> Returns the largest value of the associated integral type.
           <p class="p">
             <strong class="ph b">Return type:</strong> The same as the integral type being checked.
           </p>
-          <p class="p">
 
-            <strong class="ph b">Usage notes:</strong> Use the corresponding <code class="ph codeph">min_</code> and <code class="ph codeph">max_</code> functions to
-            check if all values in a column are within the allowed range, before copying data or altering column
-            definitions. If not, switch to the next higher integral type or to a <code class="ph codeph">DECIMAL</code> with
-            sufficient precision.
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Use the corresponding <code class="ph codeph">min_</code> and
+            <code class="ph codeph">max_</code> functions to check if all values in a column are within the
+            allowed range, before copying data or altering column definitions. If not, switch to
+            the next higher integral type or to a <code class="ph codeph">DECIMAL</code> with sufficient
+            precision.
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__min_int">
-          <code class="ph codeph">min_int(), <span class="ph" id="math_functions__min_tinyint">min_tinyint()</span>, <span class="ph" id="math_functions__min_smallint">min_smallint()</span>,
-          <span class="ph" id="math_functions__min_bigint">min_bigint()</span></code>
+          MIN_INT(), MIN_TINYINT(), MIN_SMALLINT(), MIN_BIGINT()
         </dt>
 
+
         <dd class="dd">
-          
-          
-          
-          
-          <strong class="ph b">Purpose:</strong> Returns the smallest value of the associated integral type (a negative number).
+          <strong class="ph b">Purpose:</strong> Returns the smallest value of the associated integral type (a negative
+          number).
           <p class="p">
             <strong class="ph b">Return type:</strong> The same as the integral type being checked.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Use the corresponding <code class="ph codeph">min_</code> and <code class="ph codeph">max_</code> functions to
-            check if all values in a column are within the allowed range, before copying data or altering column
-            definitions. If not, switch to the next higher integral type or to a <code class="ph codeph">DECIMAL</code> with
-            sufficient precision.
+            <strong class="ph b">Usage notes:</strong> Use the corresponding <code class="ph codeph">min_</code> and
+            <code class="ph codeph">max_</code> functions to check if all values in a column are within the
+            allowed range, before copying data or altering column definitions. If not, switch to
+            the next higher integral type or to a <code class="ph codeph">DECIMAL</code> with sufficient
+            precision.
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__mod">
-          <code class="ph codeph">mod(<var class="keyword varname">numeric_type</var> a, <var class="keyword varname">same_type</var> b)</code>
+          MOD(numeric_type a, same_type b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the modulus of a number. Equivalent to the <code class="ph codeph">%</code> arithmetic operator.
-          Works with any size integer type, any size floating-point type, and <code class="ph codeph">DECIMAL</code>
-          with any precision and scale.
+          <strong class="ph b">Purpose:</strong> Returns the modulus of a number. Equivalent to the <code class="ph codeph">%</code>
+          arithmetic operator. Works with any size integer type, any size floating-point type,
+          and <code class="ph codeph">DECIMAL</code> with any precision and scale.
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Because this function works with <code class="ph codeph">DECIMAL</code> values, prefer it over <code class="ph codeph">fmod()</code>
-            when working with fractional values. It is not subject to the rounding errors that make
-            <code class="ph codeph">fmod()</code> problematic with floating-point numbers.
-            The <code class="ph codeph">%</code> arithmetic operator now uses the <code class="ph codeph">mod()</code> function
-            in cases where its arguments can be interpreted as <code class="ph codeph">DECIMAL</code> values,
-            increasing the accuracy of that operator.
+            Because this function works with <code class="ph codeph">DECIMAL</code> values, prefer it over
+            <code class="ph codeph">fmod()</code> when working with fractional values. It is not subject to
+            the rounding errors that make <code class="ph codeph">fmod()</code> problematic with
+            floating-point numbers.
           </p>
+
+
+          <p class="p">
+            Query plans shows the <code class="ph codeph">MOD()</code> function as the <code class="ph codeph">%</code>
+            operator.
+          </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples show how the <code class="ph codeph">mod()</code> function works for
-            whole numbers and fractional values, and how the <code class="ph codeph">%</code> operator
-            works the same way. In the case of <code class="ph codeph">mod(9.9,3)</code>,
-            the type conversion for the second argument results in the first argument
-            being interpreted as <code class="ph codeph">DOUBLE</code>, so to produce an accurate
-            <code class="ph codeph">DECIMAL</code> result requires casting the second argument
-            or writing it as a <code class="ph codeph">DECIMAL</code> literal, 3.0.
+            The following examples show how the <code class="ph codeph">mod()</code> function works for whole
+            numbers and fractional values, and how the <code class="ph codeph">%</code> operator works the
+            same way. In the case of <code class="ph codeph">mod(9.9,3)</code>, the type conversion for the
+            second argument results in the first argument being interpreted as
+            <code class="ph codeph">DOUBLE</code>, so to produce an accurate <code class="ph codeph">DECIMAL</code> result
+            requires casting the second argument or writing it as a <code class="ph codeph">DECIMAL</code>
+            literal, 3.0.
           </p>
+
 <pre class="pre codeblock"><code>select mod(10,3);
 +-------------+
-| fmod(10, 3) |
+| mod(10, 3) |
 +-------------+
 | 1           |
 +-------------+
 
 select mod(5.5,2);
 +--------------+
-| fmod(5.5, 2) |
+| mod(5.5, 2) |
 +--------------+
 | 1.5          |
 +--------------+
@@ -883,44 +1392,61 @@ select mod(9.9,3.0);
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__murmur_hash">
-          <code class="ph codeph">murmur_hash(type v)</code>
+          MURMUR_HASH(type v)
         </dt>
 
-        <dd class="dd">
 
-          <strong class="ph b">Purpose:</strong> Returns a consistent 64-bit value derived from the input argument, for convenience of
-          implementing <a class="xref" href="https://en.wikipedia.org/wiki/MurmurHash" target="_blank"> MurmurHash2</a> non-cryptographic hash function.
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns a consistent 64-bit value derived from the input argument, for
+          convenience of implementing <a class="xref" href="https://en.wikipedia.org/wiki/MurmurHash" target="_blank"> MurmurHash2</a>
+          non-cryptographic hash function.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            You might use the return value in an application where you perform load balancing, bucketing, or some
-            other technique to divide processing or storage. This function provides a good performance for all kinds
-            of keys such as number, ascii string and UTF-8. It can be recommended as general-purpose hashing function.
+            You might use the return value in an application where you perform load balancing,
+            bucketing, or some other technique to divide processing or storage. This function
+            provides a good performance for all kinds of keys such as number, ascii string and
+            UTF-8. It can be recommended as general-purpose hashing function.
           </p>
+
+
           <p class="p">
-            Regarding comparison of murmur_hash with fnv_hash, murmur_hash is based on Murmur2 hash algorithm and fnv_hash
-            function is based on FNV-1a hash algorithm. Murmur2 and FNV-1a can show very good randomness and performance
-            compared with well known other hash algorithms, but Murmur2 slightly show better randomness and performance than FNV-1a.
-            See <a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[1]</a><a class="xref" href="https://aras-p.info/blog/2016/08/09/More-Hash-Function-Tests" target="_blank">[2]</a><a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[3]</a> for details.
+            Regarding comparison of murmur_hash with fnv_hash, murmur_hash is based on Murmur2
+            hash algorithm and fnv_hash function is based on FNV-1a hash algorithm. Murmur2 and
+            FNV-1a can show very good randomness and performance compared with well known other
+            hash algorithms, but Murmur2 slightly show better randomness and performance than
+            FNV-1a. See
+            <a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[1]</a><a class="xref" href="https://aras-p.info/blog/2016/08/09/More-Hash-Function-Tests" target="_blank">[2]</a><a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[3]</a>
+            for details.
           </p>
+
+
           <p class="p">
-            Similar input values of different types could produce different hash values, for example the same
-            numeric value represented as <code class="ph codeph">SMALLINT</code> or <code class="ph codeph">BIGINT</code>,
-            <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, or <code class="ph codeph">DECIMAL(5,2)</code> or
-            <code class="ph codeph">DECIMAL(20,5)</code>.
+            Similar input values of different types could produce different hash values, for
+            example the same numeric value represented as <code class="ph codeph">SMALLINT</code> or
+            <code class="ph codeph">BIGINT</code>, <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, or
+            <code class="ph codeph">DECIMAL(5,2)</code> or <code class="ph codeph">DECIMAL(20,5)</code>.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table h (x int, s string);
 [localhost:21000] &gt; insert into h values (0, 'hello'), (1,'world'), (1234567890,'antidisestablishmentarianism');
 [localhost:21000] &gt; select x, murmur_hash(x) from h;
@@ -940,8 +1466,10 @@ select mod(9.9,3.0);
 | antidisestablishmentarianism | -2261804666958489663 |
 +------------------------------+----------------------+ </code></pre>
           <p class="p">
-            For short argument values, the high-order bits of the result have relatively higher entropy than fnv_hash:
+            For short argument values, the high-order bits of the result have relatively higher
+            entropy than fnv_hash:
           </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table b (x boolean);
 [localhost:21000] &gt; insert into b values (true), (true), (false), (false);
 [localhost:21000] &gt; select x, murmur_hash(x) from b;
@@ -956,70 +1484,84 @@ select mod(9.9,3.0);
           <p class="p">
             <strong class="ph b">Added in:</strong> Impala 2.12.0
           </p>
+
         </dd>
+
 
 
 
 
 
         <dt class="dt dlterm" id="math_functions__negative">
-          <code class="ph codeph">negative(numeric_type a)</code>
-
+          NEGATIVE(numeric_type a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the argument with the sign reversed; returns a positive value if the argument was
-          already negative.
+          <strong class="ph b">Purpose:</strong> Returns the argument with the sign reversed; returns a positive value
+          if the argument was already negative.
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
 
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Use <code class="ph codeph">-abs(a)</code> instead if you need to ensure all return values are
-            negative.
+            <strong class="ph b">Usage notes:</strong> Use <code class="ph codeph">-ABS(a)</code> instead if you need to ensure all
+            return values are negative.
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__pi">
-          <code class="ph codeph">pi()</code>
+          PI()
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the constant pi.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__pmod">
-          <code class="ph codeph">pmod(bigint a, bigint b), pmod(double a, double b)</code>
+          PMOD(BIGINT a, BIGINT b), PMOD(DOUBLE a, DOUBLE b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the positive modulus of a number.
-          Primarily for <a class="xref" href="https://issues.apache.org/jira/browse/HIVE-656" target="_blank">HiveQL compatibility</a>.
+          <strong class="ph b">Purpose:</strong> Returns the positive modulus of a number. Primarily for
+          <a class="xref" href="https://issues.apache.org/jira/browse/HIVE-656" target="_blank">HiveQL
+          compatibility</a>.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code> or <code class="ph codeph">double</code>, depending on type of arguments
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code> or <code class="ph codeph">DOUBLE</code>, depending on
+            type of arguments
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples show how the <code class="ph codeph">fmod()</code> function sometimes returns a negative value
-            depending on the sign of its arguments, and the <code class="ph codeph">pmod()</code> function returns the same value
-            as <code class="ph codeph">fmod()</code>, but sometimes with the sign flipped.
+            The following examples show how the <code class="ph codeph">FMOD()</code> function sometimes
+            returns a negative value depending on the sign of its arguments, and the
+            <code class="ph codeph">PMOD()</code> function returns the same value as <code class="ph codeph">FMOD()</code>,
+            but sometimes with the sign flipped.
           </p>
+
 <pre class="pre codeblock"><code>select fmod(-5,2);
 +-------------+
 | fmod(-5, 2) |
@@ -1064,76 +1606,87 @@ select pmod(5,-2);
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__positive">
-          <code class="ph codeph">positive(numeric_type a)</code>
-
+          POSITIVE(numeric_type a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the original argument unchanged (even if the argument is negative).
+          <strong class="ph b">Purpose:</strong> Returns the original argument unchanged (even if the argument is
+          negative).
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
 
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Use <code class="ph codeph">abs()</code> instead if you need to ensure all return values are
-            positive.
+            <strong class="ph b">Usage notes:</strong> Use <code class="ph codeph">ABS()</code> instead if you need to ensure all
+            return values are positive.
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__pow">
-          <code class="ph codeph">pow(double a, double p)</code>,
-          <code class="ph codeph" id="math_functions__power">power(double a, double p)</code>,
-          <code class="ph codeph" id="math_functions__dpow">dpow(double a, double p)</code>,
-          <code class="ph codeph" id="math_functions__fpow">fpow(double a, double p)</code>
+          POW(DOUBLE a, DOUBLE p), POWER(DOUBLE a, DOUBLE p), DPOW(DOUBLE a, DOUBLE p),
+          FPOW(DOUBLE a, DOUBLE p)
         </dt>
 
+
         <dd class="dd">
-          
-          
-          
-          
           <strong class="ph b">Purpose:</strong> Returns the first argument raised to the power of the second argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__precision">
-          <code class="ph codeph">precision(<var class="keyword varname">numeric_expression</var>)</code>
+          PRECISION(numeric_expression)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Computes the precision (number of decimal digits) needed to represent the type of the
-          argument expression as a <code class="ph codeph">DECIMAL</code> value.
+          <strong class="ph b">Purpose:</strong> Computes the precision (number of decimal digits) needed to represent
+          the type of the argument expression as a <code class="ph codeph">DECIMAL</code> value.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Typically used in combination with the <code class="ph codeph">scale()</code> function, to determine the appropriate
-            <code class="ph codeph">DECIMAL(<var class="keyword varname">precision</var>,<var class="keyword varname">scale</var>)</code> type to declare in a
-            <code class="ph codeph">CREATE TABLE</code> statement or <code class="ph codeph">CAST()</code> function.
+            Typically used in combination with the <code class="ph codeph">SCALE()</code> function, to
+            determine the appropriate
+            <code class="ph codeph">DECIMAL(<var class="keyword varname">precision</var>,<var class="keyword varname">scale</var>)</code> type
+            to declare in a <code class="ph codeph">CREATE TABLE</code> statement or <code class="ph codeph">CAST()</code>
+            function.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <div class="p">
         The following examples demonstrate how to check the precision and scale of numeric literals or other
         numeric expressions. Impala represents numeric literals in the smallest appropriate type. 5 is a
@@ -1162,84 +1715,101 @@ select pmod(5,-2);
 +--------------+----------+
 </code></pre>
       </div>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__quotient">
-          <code class="ph codeph">quotient(bigint numerator, bigint denominator)</code>,
-          <code class="ph codeph">quotient(double numerator, double denominator)</code>
+          QUOTIENT(BIGINT numerator, BIGINT denominator), QUOTIENT(DOUBLE numerator, DOUBLE
+          denominator)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the first argument divided by the second argument, discarding any fractional
-          part. Avoids promoting integer arguments to <code class="ph codeph">DOUBLE</code> as happens with the <code class="ph codeph">/</code> SQL
-          operator. <span class="ph">Also includes an overload that accepts <code class="ph codeph">DOUBLE</code> arguments,
-          discards the fractional part of each argument value before dividing, and again returns <code class="ph codeph">BIGINT</code>.
-          With integer arguments, this function works the same as the <code class="ph codeph">DIV</code> operator.</span>
+          <strong class="ph b">Purpose:</strong> Returns the first argument divided by the second argument, discarding
+          any fractional part. Avoids promoting integer arguments to <code class="ph codeph">DOUBLE</code> as
+          happens with the <code class="ph codeph">/</code> SQL operator. <span class="ph">Also includes
+          an overload that accepts <code class="ph codeph">DOUBLE</code> arguments, discards the fractional
+          part of each argument value before dividing, and again returns
+          <code class="ph codeph">BIGINT</code>. With integer arguments, this function works the same as the
+          <code class="ph codeph">DIV</code> operator.</span>
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">bigint</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__radians">
-          <code class="ph codeph">radians(double a)</code>
+          RADIANS(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Converts argument value from degrees to radians.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__rand">
-          <code class="ph codeph">rand()</code>, <code class="ph codeph">rand(int seed)</code>,
-          <code class="ph codeph" id="math_functions__random">random()</code>,
-          <code class="ph codeph">random(int seed)</code>
+          RAND(), RAND(BIGINT seed), RANDOME(), RANDOME(BIGINT seed)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a random value between 0 and 1. After <code class="ph codeph">rand()</code> is called with a
-          seed argument, it produces a consistent random sequence based on the seed value.
+          <strong class="ph b">Purpose:</strong> Returns a random value between 0 and 1. After <code class="ph codeph">RAND()</code>
+          is called with a seed argument, it produces a consistent random sequence based on the
+          seed value.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Currently, the random sequence is reset after each query, and multiple calls to
-            <code class="ph codeph">rand()</code> within the same query return the same value each time. For different number
-            sequences that are different for each query, pass a unique seed value to each call to
-            <code class="ph codeph">rand()</code>. For example, <code class="ph codeph">select rand(unix_timestamp()) from ...</code>
+            <strong class="ph b">Usage notes:</strong> Currently, the random sequence is reset after each query, and
+            multiple calls to <code class="ph codeph">RAND()</code> within the same query return the same
+            value each time. For different number sequences that are different for each query,
+            pass a unique seed value to each call to <code class="ph codeph">RAND()</code>. For example,
+            <code class="ph codeph">SELECT RAND(UNIX_TIMESTAMP()) FROM ...</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples show how <code class="ph codeph">rand()</code> can produce sequences of varying predictability,
-            so that you can reproduce query results involving random values or generate unique sequences of random
-            values for each query.
-            When <code class="ph codeph">rand()</code> is called with no argument, it generates the same sequence of values each time,
-            regardless of the ordering of the result set.
-            When <code class="ph codeph">rand()</code> is called with a constant integer, it generates a different sequence of values,
-            but still always the same sequence for the same seed value.
-            If you pass in a seed value that changes, such as the return value of the expression <code class="ph codeph">unix_timestamp(now())</code>,
-            each query will use a different sequence of random values, potentially more useful in probability calculations although
-            more difficult to reproduce at a later time. Therefore, the final two examples with an unpredictable seed value
-            also include the seed in the result set, to make it possible to reproduce the same random sequence later.
+            The following examples show how <code class="ph codeph">rand()</code> can produce sequences of
+            varying predictability, so that you can reproduce query results involving random
+            values or generate unique sequences of random values for each query. When
+            <code class="ph codeph">rand()</code> is called with no argument, it generates the same sequence
+            of values each time, regardless of the ordering of the result set. When
+            <code class="ph codeph">rand()</code> is called with a constant integer, it generates a different
+            sequence of values, but still always the same sequence for the same seed value. If
+            you pass in a seed value that changes, such as the return value of the expression
+            <code class="ph codeph">unix_timestamp(now())</code>, each query will use a different sequence of
+            random values, potentially more useful in probability calculations although more
+            difficult to reproduce at a later time. Therefore, the final two examples with an
+            unpredictable seed value also include the seed in the result set, to make it
+            possible to reproduce the same random sequence later.
           </p>
+
 <pre class="pre codeblock"><code>select x, rand() from three_rows;
 +---+-----------------------+
 | x | rand()                |
@@ -1298,62 +1868,68 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__round">
-          <code class="ph codeph">round(double a)</code>,
-          <code class="ph codeph">round(double a, int d)</code>,
-          <code class="ph codeph">round(decimal a, int_type d)</code>,
-          <code class="ph codeph" id="math_functions__dround">dround(double a)</code>,
-          <code class="ph codeph">dround(double a, int d)</code>,
-          <code class="ph codeph">dround(decimal(p,s) a, int_type d)</code>
+          ROUND(DOUBLE a), ROUND(DOUBLE a, INT d), ROUND(DECIMAL a, int_type d), DROUND(DOUBLE
+          a), DROUND(DOUBLE a, INT d), DROUND(DECIMAL(p,s) a, int_type d)
         </dt>
 
+
         <dd class="dd">
-          
-          
-          <strong class="ph b">Purpose:</strong> Rounds a floating-point value. By default (with a single argument), rounds to the nearest
-          integer. Values ending in .5 are rounded up for positive numbers, down for negative numbers (that is,
-          away from zero). The optional second argument specifies how many digits to leave after the decimal point;
-          values greater than zero produce a floating-point return value rounded to the requested number of digits
-          to the right of the decimal point.
+          <strong class="ph b">Purpose:</strong> Rounds a floating-point value. By default (with a single argument),
+          rounds to the nearest integer. Values ending in .5 are rounded up for positive
+          numbers, down for negative numbers (that is, away from zero). The optional second
+          argument specifies how many digits to leave after the decimal point; values greater
+          than zero produce a floating-point return value rounded to the requested number of
+          digits to the right of the decimal point.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">bigint</code> for single <code class="ph codeph">double</code> argument.
-            <code class="ph codeph">double</code> for two-argument signature when second argument greater than zero.
-            For <code class="ph codeph">DECIMAL</code> values, the smallest
-            <code class="ph codeph">DECIMAL(<var class="keyword varname">p</var>,<var class="keyword varname">s</var>)</code> type with appropriate precision and
-            scale.
+            <strong class="ph b">Return type:</strong> Same as the input type
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__scale">
-          <code class="ph codeph">scale(<var class="keyword varname">numeric_expression</var>)</code>
+          SCALE(numeric_expression)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Computes the scale (number of decimal digits to the right of the decimal point) needed to
-          represent the type of the argument expression as a <code class="ph codeph">DECIMAL</code> value.
+          <strong class="ph b">Purpose:</strong> Computes the scale (number of decimal digits to the right of the
+          decimal point) needed to represent the type of the argument expression as a
+          <code class="ph codeph">DECIMAL</code> value.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Typically used in combination with the <code class="ph codeph">precision()</code> function, to determine the
-            appropriate <code class="ph codeph">DECIMAL(<var class="keyword varname">precision</var>,<var class="keyword varname">scale</var>)</code> type to
-            declare in a <code class="ph codeph">CREATE TABLE</code> statement or <code class="ph codeph">CAST()</code> function.
+            Typically used in combination with the <code class="ph codeph">PRECISION()</code> function, to
+            determine the appropriate
+            <code class="ph codeph">DECIMAL(<var class="keyword varname">precision</var>,<var class="keyword varname">scale</var>)</code> type
+            to declare in a <code class="ph codeph">CREATE TABLE</code> statement or <code class="ph codeph">CAST()</code>
+            function.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <div class="p">
         The following examples demonstrate how to check the precision and scale of numeric literals or other
         numeric expressions. Impala represents numeric literals in the smallest appropriate type. 5 is a
@@ -1382,173 +1958,198 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
 +--------------+----------+
 </code></pre>
       </div>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__sign">
-          <code class="ph codeph">sign(double a)</code>
+          SIGN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns -1, 0, or 1 to indicate the signedness of the argument value.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__sin">
-          <code class="ph codeph">sin(double a)</code>
+          SIN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the sine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__sinh">
-          <code class="ph codeph">sinh(double a)</code>
+          SINH(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the hyperbolic sine of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__sqrt">
-          <code class="ph codeph">sqrt(double a)</code>,
-          <code class="ph codeph" id="math_functions__dsqrt">dsqrt(double a)</code>
+          SQRT(DOUBLE a), DSQRT(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
-          
           <strong class="ph b">Purpose:</strong> Returns the square root of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__tan">
-          <code class="ph codeph">tan(double a)</code>
+          TAN(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the tangent of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__tanh">
-          <code class="ph codeph">tanh(double a)</code>
+          TANH(DOUBLE a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Returns the hyperbolic tangent of the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">double</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="math_functions__truncate">
-          <code class="ph codeph">truncate(double_or_decimal a[, digits_to_leave])</code>,
-          <span class="ph" id="math_functions__dtrunc"><code class="ph codeph">dtrunc(double_or_decimal a[, digits_to_leave])</code></span>,
-          <span class="ph" id="math_functions__trunc_number"><code class="ph codeph">trunc(double_or_decimal a[, digits_to_leave])</code></span>
+          TRUNCATE(DOUBLE_or_DECIMAL a[, digits_to_leave]), DTRUNC(DOUBLE_or_DECIMAL a[,
+          digits_to_leave]), TRUNC(DOUBLE_or_DECIMAL a[, digits_to_leave])
         </dt>
 
+
         <dd class="dd">
-          
-          
-          
           <strong class="ph b">Purpose:</strong> Removes some or all fractional digits from a numeric value.
           <p class="p">
-            <strong class="ph b">Arguments:</strong>
-            With a single floating-point argument, removes all fractional digits, leaving an
-            integer value. The optional second argument specifies the number of fractional digits
-            to include in the return value, and only applies when the argument type is
-            <code class="ph codeph">DECIMAL</code>. A second argument of 0 truncates to a whole integer value.
-            A second argument of negative N sets N digits to 0 on the left side of the decimal
+            <strong class="ph b">Arguments:</strong> With a single floating-point argument, removes all fractional
+            digits, leaving an integer value. The optional second argument specifies the number
+            of fractional digits to include in the return value, and only applies when the
+            argument type is <code class="ph codeph">DECIMAL</code>. A second argument of 0 truncates to a
+            whole integer value. A second argument of negative N sets N digits to 0 on the left
+            side of the decimal
           </p>
+
+
           <p class="p">
             <strong class="ph b">Scale argument:</strong> The scale argument applies only when truncating
-            <code class="ph codeph">DECIMAL</code> values. It is an integer specifying how many
-            significant digits to leave to the right of the decimal point.
-            A scale argument of 0 truncates to a whole integer value. A scale
-            argument of negative N sets N digits to 0 on the left side of the decimal
-            point.
+            <code class="ph codeph">DECIMAL</code> values. It is an integer specifying how many significant
+            digits to leave to the right of the decimal point. A scale argument of 0 truncates
+            to a whole integer value. A scale argument of negative N sets N digits to 0 on the
+            left side of the decimal point.
           </p>
+
+
           <p class="p">
-            <code class="ph codeph">truncate()</code>, <code class="ph codeph">dtrunc()</code>,
-            <span class="ph">and <code class="ph codeph">trunc()</code></span> are aliases for the
-            same function.
+            <code class="ph codeph">TRUNCATE()</code>, <code class="ph codeph">DTRUNC()</code>,
+            <span class="ph">and <code class="ph codeph">TRUNC()</code></span> are
+            aliases for the same function.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">decimal</code> for <code class="ph codeph">DECIMAL</code> arguments;
-            <code class="ph codeph">bigint</code> for <code class="ph codeph">DOUBLE</code> arguments
+            <strong class="ph b">Return type:</strong> Same as the input type
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Added in:</strong> The <code class="ph codeph">trunc()</code> alias was added in
+            <strong class="ph b">Added in:</strong> The <code class="ph codeph">TRUNC()</code> alias was added in
             <span class="keyword">Impala 2.10</span>.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
             You can also pass a <code class="ph codeph">DOUBLE</code> argument, or <code class="ph codeph">DECIMAL</code>
-            argument with optional scale, to the <code class="ph codeph">dtrunc()</code> or
-            <code class="ph codeph">truncate</code> functions. Using the <code class="ph codeph">trunc()</code>
-            function for numeric values is common with other industry-standard database
-            systems, so you might find such <code class="ph codeph">trunc()</code> calls in code that you
-            are porting to Impala.
+            argument with optional scale, to the <code class="ph codeph">DTRUNC()</code> or
+            <code class="ph codeph">TRUNCATE</code> functions. Using the <code class="ph codeph">TRUNC()</code> function for
+            numeric values is common with other industry-standard database systems, so you might
+            find such <code class="ph codeph">TRUNC()</code> calls in code that you are porting to Impala.
           </p>
+
+
           <p class="p">
-            The <code class="ph codeph">trunc()</code> function also has a signature that applies to
-            <code class="ph codeph">TIMESTAMP</code> values. See <a class="xref" href="impala_datetime_functions.html">Impala Date and Time Functions</a>
-            for details.
+            The <code class="ph codeph">TRUNC()</code> function also has a signature that applies to
+            <code class="ph codeph">TIMESTAMP</code> values. See
+            <a class="xref" href="impala_datetime_functions.html">Impala Date and Time Functions</a> for details.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples demonstrate the <code class="ph codeph">truncate()</code>
-            and <code class="ph codeph">dtrunc()</code> signatures for this function:
+            The following examples demonstrate the <code class="ph codeph">TRUNCATE()</code> and
+            <code class="ph codeph">DTRUNC()</code> signatures for this function:
           </p>
+
 <pre class="pre codeblock"><code>select truncate(3.45);
 +----------------+
 | truncate(3.45) |
@@ -1593,11 +2194,11 @@ select truncate(3.456,7);
 </code></pre>
           <p class="p">
             The following examples demonstrate using <code class="ph codeph">trunc()</code> with
-            <code class="ph codeph">DECIMAL</code> or <code class="ph codeph">DOUBLE</code> values, and with
-            an optional scale argument for <code class="ph codeph">DECIMAL</code> values.
-            (The behavior is the same for the <code class="ph codeph">truncate()</code> and
-            <code class="ph codeph">dtrunc()</code> aliases also.)
+            <code class="ph codeph">DECIMAL</code> or <code class="ph codeph">DOUBLE</code> values, and with an optional
+            scale argument for <code class="ph codeph">DECIMAL</code> values. (The behavior is the same for
+            the <code class="ph codeph">truncate()</code> and <code class="ph codeph">dtrunc()</code> aliases also.)
           </p>
+
 <pre class="pre codeblock"><code>
 create table t1 (d decimal(20,7));
 
@@ -1669,7 +2270,6 @@ from t1 order by d;
 | 9999.99     | 15 | 2 |
 +-------------+----+---+
 </code></pre>
-
 <pre class="pre codeblock"><code>
 create table dbl (d double);
 
@@ -1693,24 +2293,158 @@ select trunc(d) from dbl order by d;
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="math_functions__unhex">
-          <code class="ph codeph">unhex(string a)</code>
+          UNHEX(STRING a)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a string of characters with ASCII values corresponding to pairs of hexadecimal
-          digits in the argument.
+          <strong class="ph b">Purpose:</strong> Returns a string of characters with ASCII values corresponding to
+          pairs of hexadecimal digits in the argument.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
         </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm" id="math_functions__width_bucket">
+          WIDTH_BUCKET(DECIMAL expr, DECIMAL min_value, DECIMAL max_value, INT num_buckets)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the bucket number in which the <code class="ph codeph">expr</code> value
+          would fall in the histogram where its range between <code class="ph codeph">min_value</code> and
+          <code class="ph codeph">max_value</code> is divided into <code class="ph codeph">num_buckets</code> buckets of
+          identical sizes.
+        </dd>
+
+
+        <dd class="dd ddexpand">
+          The function returns:
+          <ul class="ul">
+            <li class="li">
+              <code class="ph codeph">NULL</code> if any argument is <code class="ph codeph">NULL</code>.
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">0</code> if <code class="ph codeph">expr</code> &lt; <code class="ph codeph">min_value</code>.
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">num_buckets + 1</code> if <code class="ph codeph">expr</code> &gt;=
+              <code class="ph codeph">max_val</code>.
+            </li>
+
+
+            <li class="li">
+              If none of the above, the bucket number where <code class="ph codeph">expr</code> falls.
+            </li>
+
+          </ul>
+
+          <div class="p">
+            <strong class="ph b">Arguments:</strong>The following rules apply to the arguments.
+            <ul class="ul">
+              <li class="li">
+                <code class="ph codeph">min_val</code> is the minimum value of the histogram range.
+              </li>
+
+
+              <li class="li">
+                <code class="ph codeph">max_val</code> is the maximum value of the histogram range.
+              </li>
+
+
+              <li class="li">
+                <code class="ph codeph">num_buckets</code> must be greater than <code class="ph codeph">0</code>.
+              </li>
+
+
+              <li class="li">
+                <code class="ph codeph">min_value</code> must be less than <code class="ph codeph">max_value</code>.
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            Each bucket contains values equal to or greater than the base value of that bucket
+            and less than the base value of the next bucket. For example, with
+            <code class="ph codeph">width_bucket(8, 1, 10, 3)</code>, the bucket ranges are actually the 0th
+            "underflow bucket" with the range (-infinity to 0.999...), (1 to 3.999...), (4, to
+            6.999...), (7 to 9.999...), and the "overflow bucket" with the range (10 to
+            infinity).
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>.
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Examples:</strong>
+          </p>
+
+
+          <div class="p">
+            The below function creates <code class="ph codeph">3</code> buckets between the range of
+            <code class="ph codeph">1</code> and <code class="ph codeph">20</code> with the bucket width of 6.333, and
+            returns <code class="ph codeph">2</code> for the bucket #2 where the value <code class="ph codeph">8</code>
+            falls in:
+<pre class="pre codeblock"><code>width_bucket(8, 1, 20, 3)</code></pre>
+          </div>
+
+
+          <p class="p">
+            The below statement returns a list of accounts with the energy spending and the
+            spending bracket each account falls in, between 0 and 11. Bucket 0 (underflow
+            bucket) will be assigned to the accounts whose energy spendings are less than $50.
+            Bucket 11 (overflow bucket) will be assigned to the accounts whose energy spendings
+            are more than or equal to $1000.
+          </p>
+
+<pre class="pre codeblock"><code>SELECT account, invoice_amount, WIDTH_BUCKET(invoice_amount,50,1000,10)
+FROM invoices_june2018
+ORDER BY 3;</code></pre>
+        </dd>
+
 
       
     </dl>
+
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div></body>
+</html>

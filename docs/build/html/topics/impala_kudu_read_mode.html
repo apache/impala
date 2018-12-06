@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="KUDU_READ_MODE Query Option (Impala 3.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="kudu_read_mode" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>KUDU_READ_MODE Query Option (Impala 3.1 or higher only)</title>
+</head>
+<body id="kudu_read_mode">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">KUDU_READ_MODE Query Option (<span class="keyword">Impala 3.1</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">KUDU_READ_MODE</code> query option allows you to set a desired consistency
+      level for scans of Kudu tables.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> String
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">"DEFAULT"</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+
+    <div class="p">
+      The following values are supported for the query option:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">"DEFAULT"</code>: The value of the startup flag,
+          <code class="ph codeph">--kudu_read_mode</code>, is used.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">"READ_LATEST"</code>: Commonly known as the Read Committed isolation mode,
+          in this mode, Kudu provides no consistency guarantees for this mode, except that all
+          returned rows were committed at some point.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">"READ_AT_SNAPSHOT"</code>: Kudu will take a snapshot of the current state of
+          the data and perform the scan over the snapshot, possibly after briefly waiting for
+          ongoing writes to complete. This provides "Read Your Writes" consistency within a
+          single Impala session, except in the case of a Kudu leader change. See the Kudu
+          documentation for more details.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

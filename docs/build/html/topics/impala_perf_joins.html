@@ -1,8 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="perf_joins"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Performance Considerations for Join Queries</title></head><body id="perf_joins"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Performance Considerations for Join Queries" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="perf_joins" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Performance Considerations for Join Queries</title>
+</head>
+<body id="perf_joins">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Performance Considerations for Join Queries</h1>
+
   
   
 
@@ -16,6 +42,7 @@
       practical time and has to be cancelled.
     </p>
 
+
     <p class="p">
       The simplest technique for tuning an Impala join query is to collect statistics on each table involved in the
       join using the <code class="ph codeph"><a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS</a></code>
@@ -27,6 +54,7 @@
       and so on.
     </p>
 
+
     <p class="p">
       If statistics are not available for all the tables in the join query, or if Impala chooses a join order that
       is not the most efficient, you can override the automatic join order optimization by specifying the
@@ -35,6 +63,7 @@
       joins are processed.
     </p>
 
+
     <p class="p">
       When you use the <code class="ph codeph">STRAIGHT_JOIN</code> technique, you must order the tables in the join query
       manually instead of relying on the Impala optimizer. The optimizer uses sophisticated techniques to estimate
@@ -42,11 +71,13 @@
       start with, and then experiment to fine-tune the order:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         Specify the largest table first. This table is read from disk by each Impala node and so its size is not
         significant in terms of memory usage during the query.
       </li>
+
 
       <li class="li">
         Next, specify the smallest table. The contents of the second, third, and so on tables are all transmitted
@@ -55,16 +86,20 @@
         even as subsequent larger tables are processed.
       </li>
 
+
       <li class="li">
         Join the next smallest table, then the next smallest, and so on.
       </li>
 
-      <li class="li">
+    </ul>
+
+
+      <p class="p">
         For example, if you had tables <code class="ph codeph">BIG</code>, <code class="ph codeph">MEDIUM</code>, <code class="ph codeph">SMALL</code>, and
         <code class="ph codeph">TINY</code>, the logical join order to try would be <code class="ph codeph">BIG</code>, <code class="ph codeph">TINY</code>,
         <code class="ph codeph">SMALL</code>, <code class="ph codeph">MEDIUM</code>.
-      </li>
-    </ul>
+      </p>
+
 
     <p class="p">
       The terms <span class="q">"largest"</span> and <span class="q">"smallest"</span> refers to the size of the intermediate result set based on the
@@ -74,6 +109,7 @@
       ... FROM sales JOIN customers ...</code>, putting <code class="ph codeph">customers</code> on the right side because it
       is smaller in the context of this query.
     </p>
+
 
     <p class="p">
       The Impala query planner chooses between different techniques for performing join queries, depending on the
@@ -86,17 +122,25 @@
       tables in the join, gathered by the <code class="ph codeph">COMPUTE STATS</code> statement.
     </p>
 
+
     <p class="p">
       To see which join strategy is used for a particular query, issue an <code class="ph codeph">EXPLAIN</code> statement for
       the query. If you find that a query uses a broadcast join when you know through benchmarking that a
       partitioned join would be more efficient, or vice versa, add a hint to the query to specify the precise join
       mechanism to use. See <a class="xref" href="impala_hints.html#hints">Optimizer Hints</a> for details.
     </p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="perf_joins__joins_no_stats">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="joins_no_stats">
 
     <h2 class="title topictitle2" id="ariaid-title2">How Joins Are Processed when Statistics Are Unavailable</h2>
+
   
 
     <div class="body conbody">
@@ -107,12 +151,16 @@
         order, in descending order of cost based on overall size and cardinality. Tables without statistics are
         treated as zero-size, that is, they are always placed on the right side of the join order.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="perf_joins__straight_join">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="straight_join">
 
     <h2 class="title topictitle2" id="ariaid-title3">Overriding Join Reordering with STRAIGHT_JOIN</h2>
+
 
     <div class="body conbody">
 
@@ -122,18 +170,20 @@
         immediately after the <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code>
         keywords. The <code class="ph codeph">STRAIGHT_JOIN</code> keyword turns off
         the reordering of join clauses that Impala does internally, and produces a plan that relies on the join
-        clauses being ordered optimally in the query text. In this case, rewrite the query so that the largest
-        table is on the left, followed by the next largest, and so on until the smallest table is on the right.
+        clauses being ordered optimally in the query text.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
         The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
         block containing the hint. It does not affect the join order of nested queries, such as views,
         inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
         tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
       </p>
+
       </div>
+
 
       <p class="p">
         In this example, the subselect from the <code class="ph codeph">BIG</code> table produces a very small result set, but
@@ -142,6 +192,7 @@
         keeping it as the rightmost table in the join order.
       </p>
 
+
 <pre class="pre codeblock"><code>select straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
   where medium.id = small.id and small.id = big.id;
 
@@ -149,11 +200,14 @@
 select distinct straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
   where medium.id = small.id and small.id = big.id;</code></pre>
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="perf_joins__perf_joins_examples">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="perf_joins_examples">
 
     <h2 class="title topictitle2" id="ariaid-title4">Examples of Join Order Optimization</h2>
+
 
     <div class="body conbody">
 
@@ -164,7 +218,9 @@ select distinct straight_join x from medium join small join (select * from big w
         table only contains a subset of columns from the others.
       </p>
 
+
       <p class="p"></p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table big stored as parquet as select * from raw_data;
 +----------------------------+
@@ -207,6 +263,7 @@ Returned 1 row(s) in 6.32s</code></pre>
         rows involved at each stage of processing, and is likely to stick with the <code class="ph codeph">BROADCAST</code> join
         mechanism that sends a complete copy of one of the tables to each node.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; set explain_level=verbose;
 EXPLAIN_LEVEL set to verbose
@@ -286,6 +343,7 @@ Returned 64 row(s) in 0.04s</code></pre>
         per table:
       </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats small;
 +-----------------------------------------+
 | summary                                 |
@@ -313,6 +371,7 @@ Returned 1 row(s) in 165.44s</code></pre>
         left-to-right sequence of tables in the query, and can choose <code class="ph codeph">BROADCAST</code> or
         <code class="ph codeph">PARTITIONED</code> join strategies based on the overall sizes and number of rows in the table:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; explain select count(*) from medium join big where big.id = medium.id;
 Query: explain select count(*) from medium join big where big.id = medium.id
@@ -464,6 +523,7 @@ Returned 64 row(s) in 0.03s</code></pre>
         <code class="ph codeph">VAL</code> column containing duplicate values:
       </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select count(*) from big join small on (big.id = small.id);
 Query: select count(*) from big join small on (big.id = small.id)
 +----------+
@@ -496,13 +556,17 @@ Returned 1 row(s) in 108.85s
 +------------+
 Returned 1 row(s) in 100.76s</code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         When examining the performance of join queries and the effectiveness of the join order optimization, make
         sure the query involves enough data and cluster resources to see a difference depending on the query plan.
         For example, a single data file of just a few megabytes will reside in a single HDFS block and be processed
         on a single node. Likewise, if you use a single-node or two-node cluster, there might not be much
         difference in efficiency for the broadcast or partitioned join strategies.
       </div>
+
     </div>
-  </article>
-</article></main></body></html>
+
+  </div>
+
+</body>
+</html>

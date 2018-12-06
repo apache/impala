@@ -1,132 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="misc_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Miscellaneous Functions</title></head><body id="misc_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Miscellaneous Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="misc_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Miscellaneous Functions</title>
+</head>
+<body id="misc_functions">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Miscellaneous Functions</h1>
+
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      Impala supports the following utility functions that do not operate on a particular column or data type:
+      Impala supports the following utility functions that do not operate on a particular column
+      or data type:
     </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="#misc_functions__current_database">CURRENT_DATABASE</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__effective_user">EFFECTIVE_USER</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__logged_in_user">LOGGED_IN_USER</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__pid">PID</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__sleep">SLEEP</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__user">USER</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__uuid">UUID</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__version">VERSION</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__coordinator">COORDINATOR</a>
+      </li>
+
+    </ul>
+
 
     <dl class="dl">
       
 
         <dt class="dt dlterm" id="misc_functions__current_database">
-          <code class="ph codeph">current_database()</code>
+          CURRENT_DATABASE()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the database that the session is currently using, either <code class="ph codeph">default</code>
-          if no database has been selected, or whatever database the session switched to through a
-          <code class="ph codeph">USE</code> statement or the <span class="keyword cmdname">impalad</span><code class="ph codeph">-d</code> option.
+          <strong class="ph b">Purpose:</strong> Returns the database that the session is currently using, either
+          <code class="ph codeph">default</code> if no database has been selected, or whatever database the
+          session switched to through a <code class="ph codeph">USE</code> statement or the
+          <span class="keyword cmdname">impalad</span> <code class="ph codeph">-d</code> option.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="misc_functions__effective_user">
-          <code class="ph codeph">effective_user()</code>
+          EFFECTIVE_USER()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Typically returns the same value as <code class="ph codeph">user()</code>,
-          except if delegation is enabled, in which case it returns the ID of the delegated user.
+          <strong class="ph b">Purpose:</strong> Typically returns the same value as <code class="ph codeph">USER()</code>. If
+          delegation is enabled, it returns the ID of the delegated user.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
+
           <p class="p">
             <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.5</span>
           </p>
+
         </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm" id="misc_functions__logged_in_user">
+          LOGGED_IN_USER()
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Typically returns the same value as <code class="ph codeph">USER()</code>. If
+          delegation is enabled, it returns the ID of the delegated user.
+          <p class="p">
+            <code class="ph codeph">LOGGED_IN_USER()</code> is an alias of <code class="ph codeph">EFFECTIVE_USER()</code>.
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+          </p>
+
+        </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="misc_functions__pid">
-          <code class="ph codeph">pid()</code>
+          PID()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the process ID of the <span class="keyword cmdname">impalad</span> daemon that the session is
-          connected to. You can use it during low-level debugging, to issue Linux commands that trace, show the
-          arguments, and so on the <span class="keyword cmdname">impalad</span> process.
+          <strong class="ph b">Purpose:</strong> Returns the process ID of the <span class="keyword cmdname">impalad</span> daemon that
+          the session is connected to. You can use it during low-level debugging, to issue Linux
+          commands that trace, show the arguments, and so on the <span class="keyword cmdname">impalad</span>
+          process.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
           </p>
+
         </dd>
 
+
+
+
       
+
+        <dt class="dt dlterm" id="misc_functions__sleep">
+          SLEEP(INT ms)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Pauses the query for a specified number of milliseconds. For slowing
+          down queries with small result sets enough to monitor runtime execution, memory usage,
+          or other factors that otherwise would be difficult to capture during the brief
+          interval of query execution. When used in the <code class="ph codeph">SELECT</code> list, it is
+          called once for each row in the result set; adjust the number of milliseconds
+          accordingly. For example, a query <code class="ph codeph">SELECT *, SLEEP(5) FROM
+          table_with_1000_rows</code> would take at least 5 seconds to complete (5
+          milliseconds * 1000 rows in result set). To avoid an excessive number of concurrent
+          queries, use this function for troubleshooting on test and development systems, not
+          for production queries.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> N/A
+          </p>
+
+        </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="misc_functions__user">
-          <code class="ph codeph">user()</code>
+          USER()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns the username of the Linux user who is connected to the <span class="keyword cmdname">impalad</span>
-          daemon. Typically called a single time, in a query without any <code class="ph codeph">FROM</code> clause, to
-          understand how authorization settings apply in a security context; once you know the logged-in username,
-          you can check which groups that user belongs to, and from the list of groups you can check which roles
-          are available to those groups through the authorization policy file.
+          <strong class="ph b">Purpose:</strong> Returns the username of the Linux user who is connected to the
+          <span class="keyword cmdname">impalad</span> daemon. Typically called a single time, in a query without
+          any <code class="ph codeph">FROM</code> clause, to understand how authorization settings apply in a
+          security context; once you know the logged-in username, you can check which groups
+          that user belongs to, and from the list of groups you can check which roles are
+          available to those groups through the authorization policy file.
           <p class="p">
         In Impala 2.0 and later, <code class="ph codeph">user()</code> returns the full Kerberos principal string, such as
         <code class="ph codeph">user@example.com</code>, in a Kerberized environment.
       </p>
+
+
           <p class="p">
-            When delegation is enabled, consider calling the <code class="ph codeph">effective_user()</code> function instead.
+            When delegation is enabled, consider calling the <code class="ph codeph">EFFECTIVE_USER()</code>
+            function instead.
           </p>
+
+
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
         </dd>
+
 
       
 
       
 
         <dt class="dt dlterm" id="misc_functions__uuid">
-          <code class="ph codeph">uuid()</code>
+          UUID()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a <a class="xref" href="https://en.wikipedia.org/wiki/Universally_unique_identifier" target="_blank">universal unique identifier</a>, a 128-bit value encoded as a string with groups of hexadecimal digits separated by dashes.
+          <strong class="ph b">Purpose:</strong> Returns a
+          <a class="xref" href="https://en.wikipedia.org/wiki/Universally_unique_identifier" target="_blank">universal
+          unique identifier</a>, a 128-bit value encoded as a string with groups of
+          hexadecimal digits separated by dashes.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.5.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Ascending numeric sequences of type <code class="ph codeph">BIGINT</code> are often used
-            as identifiers within a table, and as join keys across multiple tables.
-            The <code class="ph codeph">uuid()</code> value is a convenient alternative that does not
-            require storing or querying the highest sequence number. For example, you
-            can use it to quickly construct new unique identifiers during a data import job,
-            or to combine data from different tables without the likelihood of ID collisions.
+            Ascending numeric sequences of type <code class="ph codeph">BIGINT</code> are often used as
+            identifiers within a table, and as join keys across multiple tables. The
+            <code class="ph codeph">UUID()</code> value is a convenient alternative that does not require
+            storing or querying the highest sequence number. For example, you can use it to
+            quickly construct new unique identifiers during a data import job, or to combine
+            data from different tables without the likelihood of ID collisions.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>
 -- Each call to uuid() produces a new arbitrary value.
 select uuid();
@@ -150,26 +306,64 @@ select uuid() from four_row_table;
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="misc_functions__version">
-          <code class="ph codeph">version()</code>
+          VERSION()
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns information such as the precise version number and build date for the
-          <code class="ph codeph">impalad</code> daemon that you are currently connected to. Typically used to confirm that you
-          are connected to the expected level of Impala to use a particular feature, or to connect to several nodes
-          and confirm they are all running the same level of <span class="keyword cmdname">impalad</span>.
+          <strong class="ph b">Purpose:</strong> Returns information such as the precise version number and build date
+          for the <code class="ph codeph">impalad</code> daemon that you are currently connected to. Typically
+          used to confirm that you are connected to the expected level of Impala to use a
+          particular feature, or to connect to several nodes and confirm they are all running
+          the same level of <span class="keyword cmdname">impalad</span>.
           <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code> (with one or more embedded newlines)
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code> (with one or more embedded newlines)
           </p>
+
         </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm" id="misc_functions__coordinator">
+          COORDINATOR()
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the name of the host which is running the
+          <code class="ph codeph">impalad</code> daemon that is acting as the <code class="ph codeph">coordinator</code> for
+          the current query.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+          </p>
+
+        </dd>
+
 
       
     </dl>
+
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div></body>
+</html>

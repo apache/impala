@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="TOPN_BYTES_LIMIT Query Option (Impala 3.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="topn_bytes_limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>TOPN_BYTES_LIMIT Query Option (Impala 3.1 or higher only)</title>
+</head>
+<body id="topn_bytes_limit">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">TOPN_BYTES_LIMIT Query Option (<span class="keyword">Impala 3.1</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">TOPN_BYTES_LIMIT</code> query option places a limit on the amount of
+      estimated memory that Impala can process for <em class="ph i">top-N</em> queries.
+    </p>
+
+
+    <p class="p">
+      <em class="ph i">Top-N</em> queries are the queries that include both <code class="ph codeph">ORDER BY</code> and
+      <code class="ph codeph">LIMIT</code> clauses. <em class="ph i">Top-N</em> queries don't spill to disk so they have to
+      keep all rows they process in memory, and those queries can cause out-of-memory issues
+      when running with a large limit and an offset. If the Impala planner estimates that a
+      <em class="ph i">top-N</em> operator will process more bytes than the <code class="ph codeph">TOPN_BYTES_LIMIT</code>
+      value, it will replace the <em class="ph i">top-N</em> operator with the <em class="ph i">sort</em> operator. Switching
+      to the <em class="ph i">sort</em> operator allows Impala to spill to disk, thus requiring less memory
+      than <em class="ph i">top-N</em>, but potentially with performance penalties.
+    </p>
+
+
+    <p class="p">
+      The option has no effect when set to 0 or -1.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>SET TOPN_BYTES_LIMIT=<var class="keyword varname">limit</var></code></pre>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> Number
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 536870912 (512 MB)
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

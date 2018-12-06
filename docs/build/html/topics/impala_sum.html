@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="sum"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SUM Function</title></head><body id="sum"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="SUM Function" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="sum" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>SUM Function</title>
+</head>
+<body id="sum">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">SUM Function</h1>
+
   
   
 
@@ -16,9 +36,11 @@
       <code class="ph codeph">MIN</code> are <code class="ph codeph">NULL</code>, <code class="ph codeph">SUM</code> returns <code class="ph codeph">NULL</code>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>SUM([DISTINCT | ALL] <var class="keyword varname">expression</var>) [OVER (<var class="keyword varname">analytic_clause</var>)]</code></pre>
 
@@ -27,14 +49,17 @@
       grouping values.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code> for integer arguments, <code class="ph codeph">DOUBLE</code> for floating-point
       arguments
     </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
         To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>)
@@ -42,6 +67,7 @@
         and then apply the function to the final scalar item, field, key, or value at the bottom of any nested type hierarchy in the column.
         See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using complex types in Impala.
       </p>
+
 
     <div class="p">
 The following example demonstrates calls to several aggregation functions
@@ -126,14 +152,17 @@ order by r_name;
 </code></pre>
 </div>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following example shows how to use <code class="ph codeph">SUM()</code> to compute the total for all the values in the
       table, a subset of values, or the sum for each combination of values in the <code class="ph codeph">GROUP BY</code> clause:
     </p>
+
 
 <pre class="pre codeblock"><code>-- Total all the values for this column in the table.
 select sum(c1) from t1;
@@ -305,9 +334,11 @@ ERROR: AnalysisException: RANGE is only supported with both the lower and upper 
 </code></pre>
     </div>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
 
 
@@ -321,13 +352,22 @@ ERROR: AnalysisException: RANGE is only supported with both the lower and upper 
         <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       <a class="xref" href="impala_analytic_functions.html#analytic_functions">Impala Analytic Functions</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div>
+</div>
+</div></body>
+</html>

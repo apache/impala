@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_role"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>CREATE ROLE Statement (Impala 2.0 or higher only)</title></head><body id="create_role"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="CREATE ROLE Statement (Impala 2.0 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="create_role" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>CREATE ROLE Statement (Impala 2.0 or higher only)</title>
+</head>
+<body id="create_role">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">CREATE ROLE Statement (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+
   
   
 
@@ -18,9 +38,11 @@
       administrative privileges in Sentry.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>CREATE ROLE <var class="keyword varname">role_name</var>
 </code></pre>
@@ -29,14 +51,17 @@
         <strong class="ph b">Required privileges:</strong>
       </p>
 
+
     <p class="p">
       Only administrative users (those with <code class="ph codeph">ALL</code> privileges on the server, defined in the Sentry
       policy file) can use this statement.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Compatibility:</strong>
       </p>
+
 
     <p class="p">
       Impala makes use of any roles and privileges specified by the <code class="ph codeph">GRANT</code> and
@@ -48,23 +73,34 @@
 
 
 
+
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
+
 
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
         therefore no HDFS permissions are required.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>, <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a>,
       <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>,
       <a class="xref" href="impala_show.html#show">SHOW Statement</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

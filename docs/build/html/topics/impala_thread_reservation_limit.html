@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="THREAD_RESERVATION_LIMIT Query Option (Impala 3.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="thread_reservation_limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>THREAD_RESERVATION_LIMIT Query Option (Impala 3.1 or higher only)</title>
+</head>
+<body id="thread_reservation_limit">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">THREAD_RESERVATION_LIMIT Query Option (<span class="keyword">Impala 3.1</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">THREAD_RESERVATION_LIMIT</code> query option limits the number of reserved
+      threads for a query on each node. The option is intended to prevent execution of complex
+      queries that can consume excessive CPU or operating system resources on a single node.
+      Queries that have more threads per node than this threshold are rejected by Impala’s
+      admission controller before they start executing. You can see the number of reserved
+      threads for a query in its
+      <a class="xref" href="impala_explain_plan.html#explain_plan">explain plan</a> in the
+      “Per-Host Resource Reservation" line.
+    </p>
+
+
+    <p class="p">
+      For example, an Impala administrator could set a default value of
+      <code class="ph codeph">THREAD_RESERVATION_LIMIT=100</code> for a resource pool where they expect only
+      relatively simple queries to run. This will reject queries that require more than 100
+      reserved threads on a node, for example, queries with more than 100 fragments.
+    </p>
+
+
+    <p class="p">
+      You can override the default value per-query or per-session, in the same way as other
+      query options, if you do not want the default <code class="ph codeph">THREAD_RESERVATION_LIMIT</code>
+      value to apply to a specific query or session.
+    </p>
+
+
+    <div class="p">
+      <div class="note note"><span class="notetitle">Note:</span>
+        The number of reserved threads on a node may be lower than the maximum value in the
+        explain plan if not all fragments of that query are scheduled on every node.
+      </div>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong> <code class="ph codeph">SET THREAD_RESERVATION_LIMIT=number;</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 3000
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

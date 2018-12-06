@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="disable_unsafe_spills"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DISABLE_UNSAFE_SPILLS Query Option (Impala 2.0 or higher only)</title></head><body id="disable_unsafe_spills"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DISABLE_UNSAFE_SPILLS Query Option (Impala 2.0 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="disable_unsafe_spills" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DISABLE_UNSAFE_SPILLS Query Option (Impala 2.0 or higher only)</title>
+</head>
+<body id="disable_unsafe_spills">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">DISABLE_UNSAFE_SPILLS Query Option (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+
   
   
 
@@ -14,12 +34,14 @@
       write temporary data to disk.
     </p>
 
+
     <p class="p">
       Queries that <span class="q">"spill"</span> to disk typically complete successfully, when in earlier Impala releases they would have failed.
       However, queries with exorbitant memory requirements due to missing statistics or inefficient join clauses could
       become so slow as a result that you would rather have them cancelled automatically and reduce the memory
       usage through standard Impala tuning techniques.
     </p>
+
 
     <p class="p">
       This option prevents only <span class="q">"unsafe"</span> spill operations, meaning that one or more tables are missing
@@ -29,22 +51,33 @@
       good way to find tables on which to run the <code class="ph codeph">COMPUTE STATS</code> statement.
     </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_scalability.html#spill_to_disk">SQL Operations that Spill to Disk</a> for information about the <span class="q">"spill to disk"</span>
       feature for queries processing large result sets with joins, <code class="ph codeph">ORDER BY</code>, <code class="ph codeph">GROUP
       BY</code>, <code class="ph codeph">DISTINCT</code>, aggregation functions, or analytic functions.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
         any other value interpreted as <code class="ph codeph">false</code>
       </p>
+
     <p class="p">
         <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
       </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

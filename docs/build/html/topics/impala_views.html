@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="views"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Overview of Impala Views</title></head><body id="views"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Overview of Impala Views" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="views" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Overview of Impala Views</title>
+</head>
+<body id="views">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Overview of Impala Views</h1>
+
   
   
 
@@ -14,9 +34,11 @@
       <code class="ph codeph">INSERT</code> statement) where you would usually specify a table name.
     </p>
 
+
     <p class="p">
       A view lets you:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -27,6 +49,7 @@ create view v1 as select c1, c2, avg(c3) from t1 group by c3 order by c1 desc li
 select * from v1;</code></pre>
       </li>
 
+
       <li class="li">
         Reduce maintenance, by avoiding the duplication of complicated queries across multiple applications in
         multiple languages:
@@ -35,6 +58,7 @@ select * from v1;</code></pre>
 -- The view definition can remain stable even if the structure of the underlying tables changes.
 select c1, c2, c3 from v2;</code></pre>
       </li>
+
 
       <li class="li">
         Build a new, more refined query on top of the original query by adding new clauses, select-list
@@ -47,6 +71,7 @@ create view top_10_expensive_categories as select category, avg_price from expen
 
       </li>
 
+
       <li class="li">
         Set up aliases with intuitive names for tables, columns, result sets from joins, and so on:
 <pre class="pre codeblock"><code>-- The original tables might have cryptic names inherited from a legacy system.
@@ -54,6 +79,7 @@ create view action_items as select rrptsk as assignee, treq as due_date, dmisc a
 -- You can leave original names for compatibility, build new applications using more intuitive ones.
 select assignee, due_date, notes from action_items;</code></pre>
       </li>
+
 
       <li class="li">
         Swap tables with others that use different file formats, partitioning schemes, and so on without any
@@ -72,9 +98,11 @@ alter view report as select s from fast where x between 20 and 30;
 select * from report;</code></pre>
       </li>
 
+
       <li class="li">
         Avoid coding lengthy subqueries and repeating the same subquery text in many other queries.
       </li>
+
 
       <li class="li">
         Set up fine-grained security where a user can query some columns from a table but not other columns.
@@ -82,7 +110,9 @@ select * from report;</code></pre>
         required. If you formerly implemented column-level security through views, see
         <span class="xref">the documentation for Apache Sentry</span> for details about the column-level authorization feature.
       </li>
+
     </ul>
+
 
     <p class="p">
       The SQL statements that configure views are <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>,
@@ -91,6 +121,7 @@ select * from report;</code></pre>
       table to another (<a class="xref" href="impala_insert.html#insert">INSERT Statement</a>). The <a class="xref" href="impala_with.html#with">WITH</a>
       clause creates an inline view, that only exists for the duration of a single query.
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create view trivial as select * from customer;
 [localhost:21000] &gt; create view some_columns as select c_first_name, c_last_name, c_login from customer;
@@ -126,6 +157,7 @@ Returned 5 row(s) in 0.48s</code></pre>
       <code class="ph codeph">C_LAST_NAME</code>, making the lowest-ordered names unuseful in a sample query.
     </p>
 
+
 <pre class="pre codeblock"><code>create view visitors_by_day as select day, count(distinct visitors) as howmany from web_traffic group by day;
 create view top_10_days as select day, howmany from visitors_by_day order by howmany limit 10;
 select * from top_10_days;</code></pre>
@@ -133,6 +165,7 @@ select * from top_10_days;</code></pre>
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <div class="p">
         To see the definition of a view, issue a <code class="ph codeph">DESCRIBE FORMATTED</code> statement, which shows the
@@ -176,6 +209,7 @@ Query finished, fetching results ...
 </code></pre>
       </div>
 
+
     <p class="p">
         Prior to Impala 1.4.0, it was not possible to use the <code class="ph codeph">CREATE TABLE LIKE
         <var class="keyword varname">view_name</var></code> syntax. In Impala 1.4.0 and higher, you can create a table with the
@@ -187,9 +221,11 @@ Query finished, fetching results ...
         statement.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
         For tables containing complex type columns (<code class="ph codeph">ARRAY</code>,
@@ -201,6 +237,7 @@ Query finished, fetching results ...
         See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_views">Accessing Complex Type Data in Flattened Form Using Views</a> for details.
       </p>
 
+
     <p class="p">
         The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
         block containing the hint. It does not affect the join order of nested queries, such as views,
@@ -208,9 +245,11 @@ Query finished, fetching results ...
         tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -219,7 +258,9 @@ Query finished, fetching results ...
           rows into the base table.) You can use a view name on the right-hand side of an <code class="ph codeph">INSERT</code>
           statement, in the <code class="ph codeph">SELECT</code> part.
         </p>
+
       </li>
+
 
       <li class="li">
 
@@ -229,7 +270,9 @@ Query finished, fetching results ...
         Prior to Impala 1.4, only the <code class="ph codeph">WHERE</code> clauses on the original query from the
         <code class="ph codeph">CREATE VIEW</code> statement were used for partition pruning.
       </p>
+
       </li>
+
 
       <li class="li">
         <div class="p">
@@ -280,7 +323,9 @@ Query finished, fetching results ...
 +---+
 </code></pre>
       </div>
+
       </li>
+
       <li class="li">
         <p class="p">
         The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
@@ -289,12 +334,22 @@ Query finished, fetching results ...
         backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
         HBase tables.
       </p>
+
       </li>
+
     </ul>
+
 
     <p class="p">
       <strong class="ph b">Related statements:</strong> <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>,
       <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a>, <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div>
+</div>
+</div></body>
+</html>

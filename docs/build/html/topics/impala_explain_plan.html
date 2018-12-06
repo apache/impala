@@ -1,8 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="explain_plan"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</title></head><body id="explain_plan"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="explain_plan" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</title>
+</head>
+<body id="explain_plan">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</h1>
+
   
   
 
@@ -14,12 +40,14 @@
       actually running the query itself.
     </p>
 
+
     <p class="p">
       For an overview of the physical performance characteristics for a query, issue the <code class="ph codeph">SUMMARY</code>
       statement in <span class="keyword cmdname">impala-shell</span> immediately after executing a query. This condensed information
       shows which phases of execution took the most time, and how the estimates for memory usage and number of rows
       at each phase compare to the actual values.
     </p>
+
 
     <p class="p">
       To understand the detailed performance characteristics for a query, issue the <code class="ph codeph">PROFILE</code>
@@ -28,7 +56,9 @@
       query is actually run.
     </p>
 
+
     <p class="p toc inpage"></p>
+
 
     <p class="p">
       Also, see <a class="xref" href="impala_hbase.html#hbase_performance">Performance Considerations for the Impala-HBase Integration</a>
@@ -37,11 +67,18 @@
       <code class="ph codeph">EXPLAIN</code> plans for queries against HBase tables
       <span class="ph">and data stored in the Amazon Simple Storage System (S3)</span>.
     </p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="explain_plan__perf_explain">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="perf_explain">
 
     <h2 class="title topictitle2" id="ariaid-title2">Using the EXPLAIN Plan for Performance Tuning</h2>
+
 
     <div class="body conbody">
 
@@ -52,6 +89,7 @@
         before actually running the query. You can use this information to check that the query will not operate in
         some very unexpected or inefficient way.
       </p>
+
 
 
 
@@ -83,15 +121,18 @@
             take to scan a table based on total data size and the size of the cluster.
           </li>
 
+
           <li class="li">
             As you work your way up, next you see the operations that will be parallelized and performed on each
             Impala node.
           </li>
 
+
           <li class="li">
             At the higher levels, you see how data flows when intermediate result sets are combined and transmitted
             from one node to another.
           </li>
+
 
           <li class="li">
             See <a class="xref" href="../shared/../topics/impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a> for details about the
@@ -99,14 +140,18 @@
             <code class="ph codeph">EXPLAIN</code> plan depending on whether you are doing high-level or low-level tuning,
             dealing with logical or physical aspects of the query.
           </li>
+
         </ul>
+
       </div>
+
 
       <p class="p">
         The <code class="ph codeph">EXPLAIN</code> plan is also printed at the beginning of the query profile report described in
         <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining both the logical and physical aspects of the
         query side-by-side.
       </p>
+
 
       <p class="p">
         The amount of detail displayed in the <code class="ph codeph">EXPLAIN</code> output is controlled by the
@@ -116,13 +161,17 @@
         tuning, or when estimating query resource usage in conjunction with the resource management features.
       </p>
 
+
       
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="explain_plan__perf_summary">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="perf_summary">
 
     <h2 class="title topictitle2" id="ariaid-title3">Using the SUMMARY Report for Performance Tuning</h2>
+
 
     <div class="body conbody">
 
@@ -134,11 +183,13 @@
         query is run and so displays actual timing numbers.
       </p>
 
+
       <p class="p">
         The <code class="ph codeph">SUMMARY</code> report is also printed at the beginning of the query profile report described
         in <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining high-level and low-level aspects of the query
         side-by-side.
       </p>
+
 
       <p class="p">
         For example, here is a query involving an aggregate function, on a single-node VM. The different stages of
@@ -150,6 +201,7 @@
         as <code class="ph codeph">us</code> for microseconds and <code class="ph codeph">ms</code> for milliseconds, rather than just looking
         for the largest numbers.)
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select avg(ss_sales_price) from store_sales where ss_coupon_amt = 0;
 +---------------------+
@@ -173,10 +225,12 @@
         smaller intermediate results are measured in milliseconds (ms) or even nanoseconds (ns).
       </p>
 
+
       <p class="p">
         Here is an example from a more complicated query, as it would appear in the <code class="ph codeph">PROFILE</code>
         output:
       </p>
+
 
 <pre class="pre codeblock"><code>Operator              #Hosts   Avg Time   Max Time    #Rows  Est. #Rows  Peak Mem  Est. Peak Mem  Detail
 ------------------------------------------------------------------------------------------------------------------------
@@ -192,11 +246,14 @@
 00:SCAN HDFS               3    8s032ms    8s558ms    3.79M     600.12K  32.29 MB      264.00 MB  tpch.lineitem l
 </code></pre>
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="explain_plan__perf_profile">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="perf_profile">
 
     <h2 class="title topictitle2" id="ariaid-title4">Using the Query Profile for Performance Tuning</h2>
+
 
     <div class="body conbody">
 
@@ -211,6 +268,7 @@
         reads are in effect.
       </p>
 
+
       <p class="p">
         By default, time values in the profile output reflect the wall-clock time taken by an operation.
         For values denoting system time or user time, the measurement unit is reflected in the metric
@@ -222,6 +280,7 @@
         is actively using CPU cycles.
       </p>
 
+
       <p class="p">
         The <a class="xref" href="impala_explain_plan.html#perf_explain"><code class="ph codeph">EXPLAIN</code> plan</a> is also printed
         at the beginning of the query profile report, for convenience in examining both the logical and physical
@@ -230,12 +289,14 @@
         verbosity of the <code class="ph codeph">EXPLAIN</code> output printed by the <code class="ph codeph">PROFILE</code> command.
       </p>
 
+
       
 
       <p class="p">
         Here is an example of a query profile, from a relatively straightforward query on a single-node
         pseudo-distributed cluster to keep the output relatively brief.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; profile;
 Query Runtime Profile:
@@ -588,5 +649,8 @@ PLAN FRAGMENT 2
            - TotalRawHdfsReadTime(*): 7.199ms
            - TotalReadThroughput: 0.00 /sec</code></pre>
     </div>
-  </article>
-</article></main></body></html>
+
+  </div>
+
+</body>
+</html>

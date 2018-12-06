@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_config_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="processes"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Starting Impala</title></head><body id="processes"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Starting Impala" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_config_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="processes" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Starting Impala</title>
+</head>
+<body id="processes">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Starting Impala</h1>
+
   
 
   <div class="body conbody">
@@ -14,11 +34,13 @@
       To activate Impala if it is installed but not yet started:
     </p>
 
+
     <ol class="ol">
       <li class="li">
         Set any necessary configuration options for the Impala services. See
         <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details.
       </li>
+
 
       <li class="li">
         Start one instance of the Impala statestore. The statestore helps Impala to distribute work efficiently,
@@ -26,27 +48,40 @@
         becomes unavailable, Impala continues to function.
       </li>
 
+
       <li class="li">
         Start one instance of the Impala catalog service.
       </li>
+
 
       <li class="li">
         Start the main Impala service on one or more DataNodes, ideally on all DataNodes to maximize local
         processing and avoid network traffic due to remote reads.
       </li>
+
     </ol>
+
 
     <p class="p">
       Once Impala is running, you can conduct interactive experiments using the instructions in
       <a class="xref" href="impala_tutorial.html#tutorial">Impala Tutorials</a> and try <a class="xref" href="impala_impala_shell.html#impala_shell">Using the Impala Shell (impala-shell Command)</a>.
     </p>
 
+
     <p class="p toc inpage"></p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_config_options.html">Modifying Impala Startup Options</a></strong><br></li></ul></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="processes__starting_via_cmdline">
+
+  <div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_config_options.html">Modifying Impala Startup Options</a></strong><br />
+</li>
+</ul>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="starting_via_cmdline">
 
     <h2 class="title topictitle2" id="ariaid-title2">Starting Impala from the Command Line</h2>
+
 
     <div class="body conbody">
 
@@ -56,23 +91,28 @@
         <span class="keyword cmdname">impalad</span>, <code class="ph codeph">statestored</code>, and <span class="keyword cmdname">catalogd</span> executables.
       </p>
 
+
       <p class="p">
         Start the Impala statestore and then start <code class="ph codeph">impalad</code> instances. You can modify the values
         the service initialization scripts use when starting the statestore and Impala by editing
         <code class="ph codeph">/etc/default/impala</code>.
       </p>
 
+
       <p class="p">
         Start the statestore service using a command similar to the following:
       </p>
+
 
       <div class="p">
 <pre class="pre codeblock"><code>$ sudo service impala-state-store start</code></pre>
       </div>
 
+
       <p class="p">
         Start the catalog service using a command similar to the following:
       </p>
+
 
 <pre class="pre codeblock"><code>$ sudo service impala-catalog start</code></pre>
 
@@ -80,11 +120,13 @@
         Start the Impala service on each DataNode using a command similar to the following:
       </p>
 
+
       <div class="p">
 <pre class="pre codeblock"><code>$ sudo service impala-server start</code></pre>
       </div>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
         Java UDFs are also persisted, if they were created with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs,
@@ -96,7 +138,9 @@
         you restart the <span class="keyword cmdname">catalogd</span> daemon.
         Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
       </p>
+
       </div>
+
 
       <div class="p">
         If any of the services fail to start, review:
@@ -105,11 +149,18 @@
             <a class="xref" href="impala_logging.html#logs_debug">Reviewing Impala Logs</a>
           </li>
 
+
           <li class="li">
             <a class="xref" href="impala_troubleshooting.html#troubleshooting">Troubleshooting Impala</a>
           </li>
+
         </ul>
+
       </div>
+
     </div>
-  </article>
-</article></main></body></html>
+
+  </div>
+
+</body>
+</html>

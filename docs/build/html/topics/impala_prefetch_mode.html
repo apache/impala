@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="prefetch_mode"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>PREFETCH_MODE Query Option (Impala 2.6 or higher only)</title></head><body id="prefetch_mode"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="PREFETCH_MODE Query Option (Impala 2.6 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="prefetch_mode" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>PREFETCH_MODE Query Option (Impala 2.6 or higher only)</title>
+</head>
+<body id="prefetch_mode">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">PREFETCH_MODE Query Option (<span class="keyword">Impala 2.6</span> or higher only)</h1>
+
   
   
 
@@ -14,34 +34,48 @@
       join query processing.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Type:</strong> numeric (0, 1)
       or corresponding mnemonic strings (<code class="ph codeph">NONE</code>, <code class="ph codeph">HT_BUCKET</code>).
     </p>
 
+
     <p class="p">
       <strong class="ph b">Default:</strong> 1 (equivalent to <code class="ph codeph">HT_BUCKET</code>)
     </p>
+
 
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.6.0</span>
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
     <p class="p">
       The default mode is 1, which means that hash table buckets are
       prefetched during join query processing.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
     <p class="p">
       <a class="xref" href="impala_joins.html#joins">Joins in Impala SELECT Statements</a>,
       <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a>.
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

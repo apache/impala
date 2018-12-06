@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="tablesample"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>TABLESAMPLE Clause</title></head><body id="tablesample"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="TABLESAMPLE Clause" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="tablesample" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>TABLESAMPLE Clause</title>
+</head>
+<body id="tablesample">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">TABLESAMPLE Clause</h1>
+
   
 
   <div class="body conbody">
@@ -14,6 +34,7 @@
       or selected partitions.
     </p>
 
+
     <p class="p">
       The clause makes the query process a randomized set of data files from the
       table, so that the total volume of data is greater than or equal to the specified
@@ -21,9 +42,11 @@
       partitions that remain after partition pruning is performed.)
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>
   <span class="ph">TABLESAMPLE SYSTEM(<var class="keyword varname">percentage</var>) [REPEATABLE(<var class="keyword varname">seed</var>)]</span>
@@ -33,10 +56,12 @@
       The <code class="ph codeph">TABLESAMPLE</code> clause comes immediately after a table name or table alias.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">SYSTEM</code> keyword represents the sampling method. Currently,
       Impala only supports a single sampling method named <code class="ph codeph">SYSTEM</code>.
     </p>
+
 
     <p class="p">
       The <var class="keyword varname">percentage</var> argument is an integer literal from 0 to 100.
@@ -47,6 +72,7 @@
       of the underlying data files. See the usage notes for details.
     </p>
 
+
     <p class="p">
       The optional <code class="ph codeph">REPEATABLE</code> keyword lets you specify an arbitrary
       positive integer seed value that ensures that when the query is run again, the
@@ -55,9 +81,11 @@
       the random seed is derived from the current time.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.9.0</span>
       </p>
+
 
     <p class="p">
       See <a href="impala_compute_stats.html"><span class="keyword">COMPUTE STATS Statement</span></a> for the
@@ -65,9 +93,11 @@
         STATS</code> statement.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       You might use this clause with aggregation queries, such as finding
@@ -77,12 +107,14 @@
       a partitioning strategy for the data.
     </p>
 
+
     <p class="p">
       Some other database systems have a <code class="ph codeph">TABLESAMPLE</code> clause.
       The Impala syntax for this clause is modeled on the syntax for popular
       relational databases, not the Hive <code class="ph codeph">TABLESAMPLE</code> clause.
       For example, there is no <code class="ph codeph">BUCKETS</code> keyword as in HiveQL.
     </p>
+
 
     <p class="p">
       The precision of the <var class="keyword varname">percentage</var> threshold depends on
@@ -93,6 +125,7 @@
       when the table contains many data files with consistent sizes. See the
       code listings later in this section for examples.
     </p>
+
 
     <p class="p">
       When you estimate characteristics of the data distribution based on sampling
@@ -107,6 +140,7 @@
       only some of the data files.
     </p>
 
+
     <p class="p">
       Because a sample of the table data might not contain all values for a particular
       column, if the <code class="ph codeph">TABLESAMPLE</code> is used in a join query, the
@@ -116,6 +150,7 @@
       not match between the two tables, even though overall there is a 1:1
       relationship between the tables.
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">REPEATABLE</code> keyword makes identical queries use a
@@ -130,23 +165,30 @@
       non-repeatable are:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         <code class="ph codeph">INSERT</code>.
       </li>
+
       <li class="li">
         <code class="ph codeph">TRUNCATE TABLE</code>.
       </li>
+
       <li class="li">
         <code class="ph codeph">LOAD DATA</code>.
       </li>
+
       <li class="li">
         <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code>
         after files are added or removed by a non-Impala mechanism.
       </li>
+
       <li class="li">
       </li>
+
     </ul>
+
 
     <p class="p">
       This clause is similar in some ways to the <code class="ph codeph">LIMIT</code> clause,
@@ -161,9 +203,11 @@
       <code class="ph codeph">ORDER BY</code>, and <code class="ph codeph">LIMIT</code> clauses within a single query.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Partitioning:</strong>
       </p>
+
     <p class="p">
       When you query a partitioned table, any partition pruning happens
       before Impala selects the data files to sample. For example, in a
@@ -173,39 +217,49 @@
       2017 partition.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Amazon S3 considerations:</strong>
       </p>
+
     <p class="p">
       This clause applies to S3 tables the same way as tables
       with data files stored on HDFS.
     </p>
 
+
     <p class="p">
         <strong class="ph b">ADLS considerations:</strong>
       </p>
+
     <p class="p">
       This clause applies to ADLS tables the same way as tables
       with data files stored on HDFS.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
     <p class="p">
       This clause does not apply to Kudu tables.
     </p>
 
+
     <p class="p">
         <strong class="ph b">HBase considerations:</strong>
       </p>
+
     <p class="p">
       This clause does not apply to HBase tables.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Performance considerations:</strong>
       </p>
+
     <p class="p">
       From a performance perspective, the <code class="ph codeph">TABLESAMPLE</code>
       clause is especially valuable for exploratory queries on
@@ -219,9 +273,11 @@
       table.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
     <p class="p">
       This clause applies only to tables that use a storage layer
@@ -229,11 +285,13 @@
       or Microsoft ADLS.
     </p>
 
+
     <p class="p">
       This clause does not apply to table references that represent views.
       A query that applies the <code class="ph codeph">TABLESAMPLE</code> clause to a
       view or a subquery fails with a semantic error.
     </p>
+
 
     <p class="p">
       Because the sampling works at the level of entire data files, it
@@ -252,6 +310,7 @@
       depending on which data files were selected for sampling.
     </p>
 
+
     <p class="p">
       If data files are added by a non-Impala mechanism, and the
       table metadata is not updated by a <code class="ph codeph">REFRESH</code>
@@ -261,6 +320,7 @@
       or selecting which files to sample.
     </p>
 
+
     <p class="p">
       If data files are removed by a non-Impala mechanism, and the
       table metadata is not updated by a <code class="ph codeph">REFRESH</code>
@@ -269,9 +329,11 @@
       attempts to reference any of the missing files.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following examples demonstrate the <code class="ph codeph">TABLESAMPLE</code> clause.
@@ -280,10 +342,12 @@
       interact with the percentage specified in the clause.
     </p>
 
+
     <p class="p">
       These examples use an unpartitioned table, containing several files of roughly
       the same size:
     </p>
+
 
 <pre class="pre codeblock"><code>
 create table sample_demo (x int, s string);
@@ -552,9 +616,17 @@ select count(*) from sample_demo_partitions
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
     <p class="p">
       <a class="xref" href="impala_select.html#select">SELECT Statement</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div>
+</div>
+</div></body>
+</html>

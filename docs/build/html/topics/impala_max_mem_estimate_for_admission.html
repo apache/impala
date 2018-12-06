@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="MAX_MEM_ESTIMATE_FOR_ADMISSION Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="max_mem_estimate_for_admission" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>MAX_MEM_ESTIMATE_FOR_ADMISSION Query Option</title>
+</head>
+<body id="max_mem_estimate_for_admission">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">MAX_MEM_ESTIMATE_FOR_ADMISSION Query Option</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      Use the <code class="ph codeph">MAX_MEM_ESTIMATE_FOR_ADMISSION</code> query option to set an upper limit
+      on the memory estimates of a query as a workaround for over-estimates precluding a query
+      from being admitted.
+    </p>
+
+
+    <p class="p">
+      The query option takes effect when all of the below conditions are met:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        Memory-based admission control is enabled for the pool.
+      </li>
+
+
+      <li class="li">
+        The <code class="ph codeph">MEM_LIMIT</code> query option is not set at the query, session, resource
+        pool, or global level.
+      </li>
+
+    </ul>
+
+
+    <p class="p">
+      When the above conditions are met, MIN(<code class="ph codeph">MAX_MEM_ESTIMATE_FOR_ADMISSION</code>,
+      mem_estimate) is used for admission control.
+    </p>
+
+
+    <p class="p">
+      Setting the <code class="ph codeph">MEM_LIMIT</code> query option is usually a better option. Use the
+      <code class="ph codeph">MAX_MEM_ESTIMATE_FOR_ADMISSION</code> query option when it is not feasible to
+      set <code class="ph codeph">MEM_LIMIT</code> for each individual query.
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> integer
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Default:</strong>
+      </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="count"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COUNT Function</title></head><body id="count"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="COUNT Function" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="count" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>COUNT Function</title>
+</head>
+<body id="count">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">COUNT Function</h1>
+
   
   
 
@@ -13,9 +33,11 @@
       An aggregate function that returns the number of rows, or the number of non-<code class="ph codeph">NULL</code> rows.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>COUNT([DISTINCT | ALL] <var class="keyword varname">expression</var>) [OVER (<var class="keyword varname">analytic_clause</var>)]</code></pre>
 
@@ -23,34 +45,42 @@
       Depending on the argument, <code class="ph codeph">COUNT()</code> considers rows that meet certain conditions:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         The notation <code class="ph codeph">COUNT(*)</code> includes <code class="ph codeph">NULL</code> values in the total.
       </li>
+
 
       <li class="li">
         The notation <code class="ph codeph">COUNT(<var class="keyword varname">column_name</var>)</code> only considers rows where the column
         contains a non-<code class="ph codeph">NULL</code> value.
       </li>
 
+
       <li class="li">
         You can also combine <code class="ph codeph">COUNT</code> with the <code class="ph codeph">DISTINCT</code> operator to eliminate
         duplicates before counting, and to count the combinations of values across multiple columns.
       </li>
+
     </ul>
+
 
     <p class="p">
       When the query contains a <code class="ph codeph">GROUP BY</code> clause, returns one value for each combination of
       grouping values.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
         If you frequently run aggregate functions such as <code class="ph codeph">MIN()</code>, <code class="ph codeph">MAX()</code>, and
@@ -61,9 +91,11 @@
         evaluated when this query option is enabled.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
         To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>)
@@ -71,6 +103,7 @@
         and then apply the function to the final scalar item, field, key, or value at the bottom of any nested type hierarchy in the column.
         See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using complex types in Impala.
       </p>
+
 
     <div class="p">
 The following example demonstrates calls to several aggregation functions
@@ -155,9 +188,11 @@ order by r_name;
 </code></pre>
 </div>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>-- How many rows total are in the table, regardless of NULL values?
 select count(*) from t1;
@@ -314,40 +349,22 @@ ERROR: AnalysisException: RANGE is only supported with both the lower and upper 
 </code></pre>
     </div>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-        <p class="p">
-          By default, Impala only allows a single <code class="ph codeph">COUNT(DISTINCT <var class="keyword varname">columns</var>)</code>
-          expression in each query.
-        </p>
-        <p class="p">
-          If you do not need precise accuracy, you can produce an estimate of the distinct values for a column by
-          specifying <code class="ph codeph">NDV(<var class="keyword varname">column</var>)</code>; a query can contain multiple instances of
-          <code class="ph codeph">NDV(<var class="keyword varname">column</var>)</code>. To make Impala automatically rewrite
-          <code class="ph codeph">COUNT(DISTINCT)</code> expressions to <code class="ph codeph">NDV()</code>, enable the
-          <code class="ph codeph">APPX_COUNT_DISTINCT</code> query option.
-        </p>
-        <p class="p">
-          To produce the same result as multiple <code class="ph codeph">COUNT(DISTINCT)</code> expressions, you can use the
-          following technique for queries involving a single table:
-        </p>
-<pre class="pre codeblock"><code>select v1.c1 result1, v2.c1 result2 from
-  (select count(distinct col1) as c1 from t1) v1
-    cross join
-  (select count(distinct col2) as c1 from t1) v2;
-</code></pre>
-        <p class="p">
-          Because <code class="ph codeph">CROSS JOIN</code> is an expensive operation, prefer to use the <code class="ph codeph">NDV()</code>
-          technique wherever practical.
-        </p>
-      </div>
 
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       <a class="xref" href="impala_analytic_functions.html#analytic_functions">Impala Analytic Functions</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div>
+</div>
+</div></body>
+</html>

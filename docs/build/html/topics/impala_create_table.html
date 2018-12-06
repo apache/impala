@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_table"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>CREATE TABLE Statement</title></head><body class="impala sql_statement" id="create_table"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="CREATE TABLE Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="create_table" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>CREATE TABLE Statement</title>
+</head>
+<body class="impala sql_statement" id="create_table">
+
 
   <h1 class="title topictitle1 impala_title sql_statement_title" id="ariaid-title1">CREATE TABLE Statement</h1>
+
 
   
 
@@ -16,39 +36,49 @@
       optionally specify aspects such as:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         Whether the table is internal or external.
       </li>
 
+
       <li class="li">
         The columns and associated data types.
       </li>
+
 
       <li class="li">
         The columns used for physically partitioning the data.
       </li>
 
+
       <li class="li">
         The file format for data files.
       </li>
 
+
       <li class="li">
         The HDFS directory where the data files are located.
       </li>
+
     </ul>
+
 
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
 
+
     <p class="p">
       The general syntax for creating a table and specifying its columns is as follows:
     </p>
 
+
     <p class="p">
       <strong class="ph b">Explicit column definitions:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   (<var class="keyword varname">col_name</var> <var class="keyword varname">data_type</var>
@@ -58,30 +88,29 @@
   [PARTITIONED BY (<var class="keyword varname">col_name</var> <var class="keyword varname">data_type</var> [COMMENT '<var class="keyword varname">col_comment</var>'], ...)]
   <span class="ph">[SORT BY ([<var class="keyword varname">column</var> [, <var class="keyword varname">column</var> ...]])]</span>
   [COMMENT '<var class="keyword varname">table_comment</var>']
+  [ROW FORMAT <var class="keyword varname">row_format</var>]
   [WITH SERDEPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
-  [
-   [ROW FORMAT <var class="keyword varname">row_format</var>] [STORED AS <var class="keyword varname">file_format</var>]
-  ]
+  [STORED AS <var class="keyword varname">file_format</var>]
   [LOCATION '<var class="keyword varname">hdfs_path</var>']
+  <span class="ph">[CACHED IN '<var class="keyword varname">pool_name</var>'</span> <span class="ph">[WITH REPLICATION = <var class="keyword varname">integer</var>]</span> | UNCACHED]
   [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
-<span class="ph">  [CACHED IN '<var class="keyword varname">pool_name</var>'</span> <span class="ph">[WITH REPLICATION = <var class="keyword varname">integer</var>]</span> | UNCACHED]
 </code></pre>
 
     <p class="p">
       <strong class="ph b">CREATE TABLE AS SELECT:</strong>
     </p>
 
+
 <pre class="pre codeblock"><code>CREATE [EXTERNAL] TABLE [IF NOT EXISTS] <var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   <span class="ph">[PARTITIONED BY (<var class="keyword varname">col_name</var>[, ...])]</span>
   <span class="ph">[SORT BY ([<var class="keyword varname">column</var> [, <var class="keyword varname">column</var> ...]])]</span>
   [COMMENT '<var class="keyword varname">table_comment</var>']
+  [ROW FORMAT <var class="keyword varname">row_format</var>]
   [WITH SERDEPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
-  [
-   [ROW FORMAT <var class="keyword varname">row_format</var>] <span class="ph">[STORED AS <var class="keyword varname">ctas_file_format</var>]</span>
-  ]
+  <span class="ph">[STORED AS <var class="keyword varname">ctas_file_format</var>]</span>
   [LOCATION '<var class="keyword varname">hdfs_path</var>']
+  <span class="ph">  [CACHED IN '<var class="keyword varname">pool_name</var>'</span> <span class="ph">[WITH REPLICATION = <var class="keyword varname">integer</var>]</span> | UNCACHED]
   [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
-<span class="ph">  [CACHED IN '<var class="keyword varname">pool_name</var>'</span> <span class="ph">[WITH REPLICATION = <var class="keyword varname">integer</var>]</span> | UNCACHED]
 AS
   <var class="keyword varname">select_statement</var></code></pre>
 
@@ -130,18 +159,18 @@ file_format:
       <strong class="ph b">Column definitions inferred from data file:</strong>
     </p>
 
+
 <pre class="pre codeblock"><code>CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   LIKE PARQUET '<var class="keyword varname">hdfs_path_of_parquet_file</var>'
+  [PARTITIONED BY (<var class="keyword varname">col_name</var> <var class="keyword varname">data_type</var> [COMMENT '<var class="keyword varname">col_comment</var>'], ...)]
   <span class="ph">[SORT BY ([<var class="keyword varname">column</var> [, <var class="keyword varname">column</var> ...]])]</span>
   [COMMENT '<var class="keyword varname">table_comment</var>']
-  [PARTITIONED BY (<var class="keyword varname">col_name</var> <var class="keyword varname">data_type</var> [COMMENT '<var class="keyword varname">col_comment</var>'], ...)]
+  [ROW FORMAT <var class="keyword varname">row_format</var>]
   [WITH SERDEPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
-  [
-   [ROW FORMAT <var class="keyword varname">row_format</var>] [STORED AS <var class="keyword varname">file_format</var>]
-  ]
+  [STORED AS <var class="keyword varname">file_format</var>]
   [LOCATION '<var class="keyword varname">hdfs_path</var>']
-  [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
 <span class="ph">  [CACHED IN '<var class="keyword varname">pool_name</var>'</span> <span class="ph">[WITH REPLICATION = <var class="keyword varname">integer</var>]</span> | UNCACHED]
+  [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
 data_type:
     <var class="keyword varname">primitive_type</var>
   | array_type
@@ -152,6 +181,7 @@ data_type:
     <p class="p">
       <strong class="ph b">Kudu tables:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   (<var class="keyword varname">col_name</var> <var class="keyword varname">data_type</var>
@@ -178,10 +208,11 @@ data_type:
 </code></pre>
     </div>
 
+
     <div class="p">
       <strong class="ph b">kudu_partition_clause:</strong>
-<pre class="pre codeblock"><code>
-kudu_partition_clause ::= [<var class="keyword varname">hash_clause</var>] [, <var class="keyword varname">range_clause</var> [ , <var class="keyword varname">range_clause</var> ] ]
+      <pre class="pre codeblock"><code>
+kudu_partition_clause ::= [ <var class="keyword varname">hash_clause</var> [, ...]] [, <var class="keyword varname">range_clause</var> ]
 
 hash_clause ::=
   HASH [ (<var class="keyword varname">pk_col</var> [, ...]) ]
@@ -201,9 +232,11 @@ range_comparison_operator ::= { &lt; | &lt;= }
 </code></pre>
     </div>
 
+
     <p class="p">
       <strong class="ph b">External Kudu tables:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE EXTERNAL TABLE [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   [COMMENT '<var class="keyword varname">table_comment</var>']
@@ -214,6 +247,7 @@ range_comparison_operator ::= { &lt; | &lt;= }
     <p class="p">
       <strong class="ph b">CREATE TABLE AS SELECT for Kudu tables:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE [IF NOT EXISTS] <var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   [PRIMARY KEY (<var class="keyword varname">col_name</var>[, ...])]
@@ -230,20 +264,24 @@ AS
 
 
 
+
     <p class="p">
       <strong class="ph b">Column definitions:</strong>
     </p>
+
 
     <p class="p">
       Depending on the form of the <code class="ph codeph">CREATE TABLE</code> statement, the column
       definitions are required or not allowed.
     </p>
 
+
     <p class="p">
       With the <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">CREATE TABLE LIKE</code>
       syntax, you do not specify the columns at all; the column names and types are derived from
       the source table, query, or data file.
     </p>
+
 
     <p class="p">
       With the basic <code class="ph codeph">CREATE TABLE</code> syntax, you must list one or more columns,
@@ -253,9 +291,11 @@ AS
       and specify the same metadata as part of the <code class="ph codeph">TBLPROPERTIES</code> clause.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
       The Impala complex types (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or
@@ -264,6 +304,7 @@ AS
       an array field), these types are also sometimes referred to as nested types. See
       <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for usage details.
     </p>
+
 
 
 
@@ -279,14 +320,17 @@ AS
       partitions in that table.
     </p>
 
+
     <p class="p">
         Partitioned tables can contain complex type columns.
         All the partition key columns must be scalar types.
       </p>
 
+
     <p class="p">
       <strong class="ph b">Internal and external tables (EXTERNAL and LOCATION clauses):</strong>
     </p>
+
 
     <p class="p">
       By default, Impala creates an <span class="q">"internal"</span> table, where Impala manages the underlying
@@ -298,12 +342,14 @@ AS
       <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>.
     </p>
 
+
     <p class="p">
       Typically, for an external table you include a <code class="ph codeph">LOCATION</code> clause to specify
       the path to the HDFS directory where Impala reads and writes files for the table. For
       example, if your data pipeline produces Parquet files in the HDFS directory
       <span class="ph filepath">/user/etl/destination</span>, you might create an external table as follows:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE EXTERNAL TABLE external_parquet (c1 INT, c2 STRING, c3 TIMESTAMP)
   STORED AS PARQUET LOCATION '/user/etl/destination';
@@ -319,9 +365,11 @@ AS
       <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Partitioned tables (PARTITIONED BY clause):</strong>
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">PARTITIONED BY</code> clause divides the data files based on the values from
@@ -331,12 +379,14 @@ AS
       <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a>.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         All Kudu tables require partitioning, which involves different syntax than non-Kudu
         tables. See the <code class="ph codeph">PARTITION BY</code> clause, rather than <code class="ph codeph">PARTITIONED
         BY</code>, for Kudu tables.
       </p>
+
       <p class="p">
         In <span class="keyword">Impala 2.10</span> and higher, the <code class="ph codeph">PARTITION BY</code>
         clause is optional for Kudu tables. If the clause is omitted, Impala automatically
@@ -345,7 +395,9 @@ AS
         query optimizations, omitting the <code class="ph codeph">PARTITION BY</code> clause is only
         appropriate for small lookup tables.
       </p>
+
     </div>
+
 
     <p class="p">
       Prior to <span class="keyword">Impala 2.5</span>, you could use a partitioned table as the
@@ -356,9 +408,11 @@ AS
       SELECT</code> syntax variation.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Sorted tables (SORT BY clause):</strong>
     </p>
+
 
     <p class="p">
       The optional <code class="ph codeph">SORT BY</code> clause lets you specify zero or more columns
@@ -373,6 +427,7 @@ AS
       of Parquet encoding and compression.
     </p>
 
+
     <p class="p">
       This clause is not applicable for Kudu tables or HBase tables. Although it works
       for other HDFS file formats besides Parquet, the more efficient layout is most
@@ -380,11 +435,13 @@ AS
       about the data values in that file.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">SORT BY</code> columns cannot include any partition key columns
       for a partitioned table, because those column values are not represented in
       the underlying data files.
     </p>
+
 
     <p class="p">
       Because data files can arrive in Impala tables by mechanisms that do not respect
@@ -399,6 +456,7 @@ AS
       clause.
     </p>
 
+
     <p class="p">
       For example, when creating a table intended to contain census data, you might define
       sort columns such as last name and state. If a data file in this table contains a
@@ -406,6 +464,7 @@ AS
       Impala can quickly detect that this data file contains no matches for a <code class="ph codeph">WHERE</code>
       clause such as <code class="ph codeph">WHERE last_name = 'Jones'</code> and avoid reading the entire file.
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE census_data (last_name STRING, first_name STRING, state STRING, address STRING)
   SORT BY (last_name, state)
@@ -418,6 +477,7 @@ AS
       <code class="ph codeph">CREATE TABLE AS SELECT</code> to copy that data into a new table with a
       <code class="ph codeph">SORT BY</code> clause:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE sorted_census_data
   SORT BY (last_name, state)
@@ -433,9 +493,11 @@ AS
       clause.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
 
     <p class="p">
       Because Kudu tables do not support clauses related to HDFS and S3 data files and
@@ -447,9 +509,11 @@ AS
       the <code class="ph codeph">PARTITIONED BY</code> clause for HDFS-backed tables.</span>
     </p>
 
+
     <p class="p">
       Here are some examples of creating empty Kudu tables:
     </p>
+
 
 <pre class="pre codeblock"><code>
 <span class="ph">-- Single partition. Only for <span class="keyword">Impala 2.10</span> and higher.
@@ -484,6 +548,7 @@ CREATE TABLE kudu_t3 (id BIGINT, year INT, s STRING,
       Here is an example of creating an external Kudu table:
     </p>
 
+
 <pre class="pre codeblock"><code>
 -- Inherits column definitions from original table.
 -- For tables created through Impala, the kudu.table_name property
@@ -496,6 +561,7 @@ CREATE EXTERNAL TABLE external_t1 STORED AS KUDU
     <p class="p">
       Here is an example of <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax for a Kudu table:
     </p>
+
 
 <pre class="pre codeblock"><code>
 -- The CTAS statement defines the primary key and partitioning scheme.
@@ -511,28 +577,35 @@ CREATE TABLE ctas_t1
       The following <code class="ph codeph">CREATE TABLE</code> clauses are not supported for Kudu tables:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         <code class="ph codeph">PARTITIONED BY</code> (Kudu tables use the clause <code class="ph codeph">PARTITION
         BY</code> instead)
       </li>
 
+
       <li class="li">
         <code class="ph codeph">LOCATION</code>
       </li>
+
 
       <li class="li">
         <code class="ph codeph">ROWFORMAT</code>
       </li>
 
+
       <li class="li">
         <code class="ph codeph">CACHED IN | UNCACHED</code>
       </li>
 
+
       <li class="li">
         <code class="ph codeph">WITH SERDEPROPERTIES</code>
       </li>
+
     </ul>
+
 
     <p class="p">
       For more on the <code class="ph codeph">PRIMARY KEY</code> clause, see
@@ -540,34 +613,47 @@ CREATE TABLE ctas_t1
       <a class="xref" href="impala_kudu.html#kudu_primary_key_attribute">PRIMARY KEY Attribute</a>.
     </p>
 
+
+    <p class="p">
+      For more on creating a Kudu table with a specific replication factor, see
+        <a class="xref" href="impala_kudu.html#kudu_replication_factor">Kudu Replication Factor</a>.
+    </p>
+
+
     <p class="p">
       For more on the <code class="ph codeph">NULL</code> and <code class="ph codeph">NOT NULL</code> attributes, see
       <a class="xref" href="impala_kudu.html#kudu_not_null_attribute">NULL | NOT NULL Attribute</a>.
     </p>
+
 
     <p class="p">
       For more on the <code class="ph codeph">ENCODING</code> attribute, see
       <a class="xref" href="impala_kudu.html#kudu_encoding_attribute">ENCODING Attribute</a>.
     </p>
 
+
     <p class="p">
       For more on the <code class="ph codeph">COMPRESSION</code> attribute, see
       <a class="xref" href="impala_kudu.html#kudu_compression_attribute">COMPRESSION Attribute</a>.
     </p>
+
 
     <p class="p">
       For more on the <code class="ph codeph">DEFAULT</code> attribute, see
       <a class="xref" href="impala_kudu.html#kudu_default_attribute">DEFAULT Attribute</a>.
     </p>
 
+
     <p class="p">
       For more on the <code class="ph codeph">BLOCK_SIZE</code> attribute, see
       <a class="xref" href="impala_kudu.html#kudu_block_size_attribute">BLOCK_SIZE Attribute</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Partitioning for Kudu tables (PARTITION BY clause)</strong>
     </p>
+
 
     <p class="p">
       For Kudu tables, you specify logical partitioning across one or more columns using the
@@ -580,9 +666,11 @@ CREATE TABLE ctas_t1
       set of comparison operations for the partition key columns.
     </p>
 
+
     <p class="p">
       Here are some examples of the <code class="ph codeph">PARTITION BY HASH</code> syntax:
     </p>
+
 
 <pre class="pre codeblock"><code>
 -- Apply hash function to 1 primary key column.
@@ -617,6 +705,7 @@ create table hash_t5 (x bigint, y bigint, s string, primary key (x,y))
     <p class="p">
       Here are some examples of the <code class="ph codeph">PARTITION BY RANGE</code> syntax:
     </p>
+
 
 <pre class="pre codeblock"><code>
 -- Create partitions that cover every possible value of X.
@@ -665,6 +754,7 @@ create table range_t4 (x bigint, s string, s2 string, primary key (x, s))
       syntax for the <code class="ph codeph">PARTITION BY</code> clause:
     </p>
 
+
 <pre class="pre codeblock"><code>
 -- Values from each range partition are hashed into 10 associated buckets.
 -- Total number of partitions in this case is 10 x 2.
@@ -691,9 +781,11 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       <a class="xref" href="impala_kudu.html">Using Impala to Query Kudu Tables</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Specifying file format (STORED AS and ROW FORMAT clauses):</strong>
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">STORED AS</code> clause identifies the format of the underlying data files.
@@ -705,11 +797,13 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       see <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a>.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       In Impala 1.4.0 and higher, Impala can create Avro tables, which formerly required doing
       the <code class="ph codeph">CREATE TABLE</code> statement in Hive. See
       <a class="xref" href="impala_avro.html#avro">Using the Avro File Format with Impala Tables</a> for details and examples.
     </div>
+
 
     <p class="p">
       By default (when no <code class="ph codeph">STORED AS</code> clause is specified), data files in Impala
@@ -724,6 +818,7 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       <code class="ph codeph">\</code><code class="ph codeph">0</code> for ASCII <code class="ph codeph">nul</code> (hex 00). For more
       examples of text tables, see <a class="xref" href="impala_txtfile.html#txtfile">Using Text Data Files with Impala Tables</a>.
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">ESCAPED BY</code> clause applies both to text files that you create through
@@ -741,7 +836,8 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       BY '\\'</code>.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
         The <code class="ph codeph">CREATE TABLE</code> clauses <code class="ph codeph">FIELDS TERMINATED BY</code>, <code class="ph codeph">ESCAPED
         BY</code>, and <code class="ph codeph">LINES TERMINATED BY</code> have special rules for the string literal used for
         their argument, because they all require a single character. You can use a regular character surrounded by
@@ -752,9 +848,11 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
         character used as a delimiter by some data formats.
       </div>
 
+
     <p class="p">
       <strong class="ph b">Cloning tables (LIKE clause):</strong>
     </p>
+
 
     <p class="p">
       To create an empty table with the same columns, comments, and other attributes as another
@@ -763,18 +861,21 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       <code class="ph codeph">COMMENT</code>, and <code class="ph codeph">STORED AS</code> clauses.
     </p>
 
+
 <pre class="pre codeblock"><code>CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   <span class="ph">LIKE { [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> | PARQUET '<var class="keyword varname">hdfs_path_of_parquet_file</var>' }</span>
   [COMMENT '<var class="keyword varname">table_comment</var>']
   [STORED AS <var class="keyword varname">file_format</var>]
   [LOCATION '<var class="keyword varname">hdfs_path</var>']</code></pre>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         To clone the structure of a table and transfer data into it in a single operation, use
         the <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax described in the next subsection.
       </p>
+
     </div>
+
 
     <p class="p">
       When you clone the structure of an existing table using the <code class="ph codeph">CREATE TABLE ...
@@ -784,11 +885,13 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       <span class="q">"like"</span> a view produces a text table by default.)
     </p>
 
+
     <p class="p">
       Although normally Impala cannot create an HBase table directly, Impala can clone the
       structure of an existing HBase table with the <code class="ph codeph">CREATE TABLE ... LIKE</code>
       syntax, preserving the file format and metadata from the original table.
     </p>
+
 
     <p class="p">
       There are some exceptions to the ability to use <code class="ph codeph">CREATE TABLE ... LIKE</code>
@@ -798,12 +901,14 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       Impala either.
     </p>
 
+
     <p class="p">
       If the original table is partitioned, the new table inherits the same partition key
       columns. Because the new table is initially empty, it does not inherit the actual
       partitions that exist in the original one. To create partitions in the new table, insert
       data or issue <code class="ph codeph">ALTER TABLE ... ADD PARTITION</code> statements.
     </p>
+
 
     <p class="p">
         Prior to Impala 1.4.0, it was not possible to use the <code class="ph codeph">CREATE TABLE LIKE
@@ -816,6 +921,7 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
         statement.
       </p>
 
+
     <p class="p">
       Because <code class="ph codeph">CREATE TABLE ... LIKE</code> only manipulates table metadata, not the
       physical data of the table, issue <code class="ph codeph">INSERT INTO TABLE</code> statements afterward
@@ -826,9 +932,11 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details.)
     </p>
 
+
     <p class="p" id="create_table__ctas">
       <strong class="ph b">CREATE TABLE AS SELECT:</strong>
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax is a shorthand notation to create a
@@ -837,11 +945,13 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       This idiom is so popular that it has its own acronym, <span class="q">"CTAS"</span>.
     </p>
 
+
     <p class="p">
       The following examples show how to copy data from a source table <code class="ph codeph">T1</code> to a
       variety of destinations tables, applying various transformations to the table properties,
       table layout, or the data itself as part of the operation:
     </p>
+
 
 <pre class="pre codeblock"><code>
 -- Sample table to be the source of CTAS operations.
@@ -906,18 +1016,21 @@ SELECT * FROM t5;
       <code class="ph codeph">SELECT</code> portion of a <code class="ph codeph">CREATE TABLE AS SELECT</code> statement.
     </p>
 
+
     <p class="p">
       The newly created table inherits the column names that you select from the original table,
       which you can override by specifying column aliases in the query. Any column or table
       comments from the original table are not carried over to the new table.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       When using the <code class="ph codeph">STORED AS</code> clause with a <code class="ph codeph">CREATE TABLE AS
       SELECT</code> statement, the destination table must be a file format that Impala can
       write to: currently, text or Parquet. You cannot specify an Avro, SequenceFile, or RCFile
       table as the destination table for a CTAS operation.
     </div>
+
 
     <p class="p">
       Prior to <span class="keyword">Impala 2.5</span> you could use a partitioned table as the source
@@ -933,6 +1046,7 @@ SELECT * FROM t5;
       You also only specify the column names in the <code class="ph codeph">PARTITIONED BY</code> clause, not
       the data types or column comments.
     </p>
+
 
 <pre class="pre codeblock"><code>
 create table partitions_no (year smallint, month tinyint, s string);
@@ -970,6 +1084,7 @@ show partitions partitions_yes;
       select list, resulting in that same column order in the destination table.
     </p>
 
+
 <pre class="pre codeblock"><code>
 describe partitions_no;
 +-------+----------+---------+
@@ -998,6 +1113,7 @@ describe partitions_yes;
       an error due to a column name mismatch:
     </p>
 
+
 <pre class="pre codeblock"><code>
 -- We expect this CTAS to fail because non-key column S
 -- comes after key columns YEAR and MONTH in the select list.
@@ -1012,11 +1128,13 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       of expressions:
     </p>
 
+
     <p class="p">
       As part of a CTAS operation, you can convert the data to any file format that Impala can
       write (currently, <code class="ph codeph">TEXTFILE</code> and <code class="ph codeph">PARQUET</code>). You cannot
       specify the lower-level properties of a text table, such as the delimiter.
     </p>
+
 
     <p class="p">
         <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code> clause in an
@@ -1026,9 +1144,11 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         stored in sorted order is impractical.
       </p>
 
+
     <p class="p">
       <strong class="ph b">CREATE TABLE LIKE PARQUET:</strong>
     </p>
+
 
     <p class="p">
       The variation <code class="ph codeph">CREATE TABLE ... LIKE PARQUET
@@ -1044,10 +1164,12 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       for querying.)
     </p>
 
+
     <p class="p">
       The following considerations apply when you use the <code class="ph codeph">CREATE TABLE LIKE
       PARQUET</code> technique:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -1055,6 +1177,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         column in the new table has a comment stating the low-level Parquet field type used to
         deduce the appropriate SQL column type.
       </li>
+
 
       <li class="li">
         If you use a data file from a partitioned Impala table, any partition key columns from
@@ -1064,12 +1187,14 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         <code class="ph codeph">CREATE TABLE</code> statement.
       </li>
 
+
       <li class="li">
         The file format of the new table defaults to text, as with other kinds of <code class="ph codeph">CREATE
         TABLE</code> statements. To make the new table also use Parquet format, include the
         clause <code class="ph codeph">STORED AS PARQUET</code> in the <code class="ph codeph">CREATE TABLE LIKE
         PARQUET</code> statement.
       </li>
+
 
       <li class="li">
         If the Parquet data file comes from an existing Impala table, currently, any
@@ -1078,6 +1203,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         32-bit integers.
       </li>
 
+
       <li class="li">
         When the destination table uses the Parquet file format, the <code class="ph codeph">CREATE TABLE AS
         SELECT</code> and <code class="ph codeph">INSERT ... SELECT</code> statements always create at least
@@ -1085,16 +1211,20 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         any rows. You can use such an empty Parquet data file as a template for subsequent
         <code class="ph codeph">CREATE TABLE LIKE PARQUET</code> statements.
       </li>
+
     </ul>
+
 
     <p class="p">
       For more details about creating Parquet tables, and examples of the <code class="ph codeph">CREATE TABLE
       LIKE PARQUET</code> syntax, see <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Visibility and Metadata (TBLPROPERTIES and WITH SERDEPROPERTIES clauses):</strong>
     </p>
+
 
     <p class="p">
       You can associate arbitrary items of metadata with a table by specifying the
@@ -1106,6 +1236,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       <code class="ph codeph">ALTER TABLE ... SET TBLPROPERTIES</code>.
     </p>
 
+
     <p class="p">
       You can also associate SerDes properties with the table by specifying key-value pairs
       through the <code class="ph codeph">WITH SERDEPROPERTIES</code> clause. This metadata is not used by
@@ -1113,6 +1244,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       supports. Particular property values might be needed for Hive compatibility with certain
       variations of file formats, particularly Avro.
     </p>
+
 
     <p class="p">
       Some DDL operations that interact with other Hadoop components require specifying
@@ -1122,6 +1254,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       currently available in Impala.)
 
     </p>
+
 
     <p class="p">
       To see the column definitions and column comments for an existing table, for example
@@ -1134,6 +1267,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       to see any overall table comment (as opposed to individual column comments).
     </p>
 
+
     <p class="p">
       After creating a table, your <span class="keyword cmdname">impala-shell</span> session or another
       <span class="keyword cmdname">impala-shell</span> connected to the same node can immediately query that
@@ -1143,9 +1277,11 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       enable the <code class="ph codeph">SYNC_DDL</code> query option.
     </p>
 
+
     <p class="p">
       <strong class="ph b">HDFS caching (CACHED IN clause):</strong>
     </p>
+
 
     <p class="p">
       If you specify the <code class="ph codeph">CACHED IN</code> clause, any existing or future data files in
@@ -1154,6 +1290,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a> for details about using the HDFS
       caching feature.
     </p>
+
 
     <p class="p">
         In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH REPLICATION</code> clause
@@ -1167,20 +1304,24 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
 
 
+
     <p class="p">
       <strong class="ph b">Column order</strong>:
     </p>
+
 
     <p class="p">
       If you intend to use the table to hold data files produced by some external source,
       specify the columns in the same order as they appear in the data files.
     </p>
 
+
     <p class="p">
       If you intend to insert or copy data into the table through Impala, or if you have control
       over the way externally produced data files are arranged, use your judgment to specify
       columns in the most convenient order:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -1189,7 +1330,9 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
           might produce data files that omit these trailing columns entirely. Impala
           automatically fills in the <code class="ph codeph">NULL</code> values if so.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -1200,7 +1343,9 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
           table. This technique lets you use <code class="ph codeph">INSERT ... SELECT *</code> when copying
           data to the partitioned table, rather than specifying each column name individually.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -1211,12 +1356,16 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
           specify a permuted order for the inserted columns to match the order in the
           destination table.
         </p>
+
       </li>
+
     </ul>
+
 
     <p class="p">
         <strong class="ph b">Hive considerations:</strong>
       </p>
+
 
     <p class="p">
       Impala queries can make use of metadata about the table and columns, such as the number of
@@ -1227,22 +1376,27 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       statistics within Impala, without needing to use Hive at all.
     </p>
 
+
     <p class="p">
         <strong class="ph b">HBase considerations:</strong>
       </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         The Impala <code class="ph codeph">CREATE TABLE</code> statement cannot create an HBase table, because
         it currently does not support the <code class="ph codeph">STORED BY</code> clause needed for HBase
         tables. Create such tables in Hive, then query them through Impala. For information on
         using Impala with HBase tables, see <a class="xref" href="impala_hbase.html#impala_hbase">Using Impala to Query HBase Tables</a>.
       </p>
+
     </div>
+
 
     <p class="p">
         <strong class="ph b">Amazon S3 considerations:</strong>
       </p>
+
 
     <p class="p">
       To create a table where the data resides in the Amazon Simple Storage Service (S3),
@@ -1250,11 +1404,13 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       the data files in S3.
     </p>
 
+
     <p class="p">
       In <span class="keyword">Impala 2.6</span> and higher, you can use this special
       <code class="ph codeph">LOCATION</code> syntax as part of a <code class="ph codeph">CREATE TABLE AS SELECT</code>
       statement.
     </p>
+
 
     <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
@@ -1265,6 +1421,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code> clause in an
         <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code> clause is ignored and the
@@ -1273,9 +1430,11 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         stored in sorted order is impractical.
       </p>
 
+
     <p class="p">
         <strong class="ph b">HDFS considerations:</strong>
       </p>
+
 
     <p class="p">
       The <code class="ph codeph">CREATE TABLE</code> statement for an internal table creates a directory in
@@ -1288,15 +1447,18 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       <code class="ph codeph">shell</code> or <code class="ph codeph">!</code> commands in <span class="keyword cmdname">impala-shell</span>.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax creates data files under the table data
       directory to hold any data copied by the <code class="ph codeph">INSERT</code> portion of the statement.
       (Even if no data is copied, Impala might create one or more empty data files.)
     </p>
 
+
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
 
     <p class="p">
       The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under, typically the
@@ -1304,15 +1466,18 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       directory where the table is being created.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
+
 
     <p class="p">
         If these statements in your environment contain sensitive literal values such as credit card numbers or tax
         identifiers, Impala can redact this sensitive information when displaying the statements in log files and
         other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
+
 
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Certain multi-stage statements (<code class="ph codeph">CREATE TABLE AS SELECT</code> and
@@ -1324,9 +1489,11 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
         (port 25000).
       </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>,
@@ -1341,6 +1508,13 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
     </p>
 
+
   </div>
 
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

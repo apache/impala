@@ -1,8 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="analytic_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Analytic Functions</title></head><body id="analytic_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Analytic Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="analytic_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Analytic Functions</title>
+</head>
+<body id="analytic_functions">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Analytic Functions</h1>
+
 
   
 
@@ -10,20 +64,19 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
+    <p class="p"> Analytic functions (also known as window functions) are a
+      special category of built-in functions. Like aggregate functions, they
+      examine the contents of multiple input rows to compute each output value.
+      However, rather than being limited to one result value per <code class="ph codeph">GROUP
+        BY</code> group, they operate on <dfn class="term">windows</dfn> where the input
+      rows are ordered and grouped using flexible conditions expressed through
+      an <code class="ph codeph">OVER()</code> clause. </p>
 
-      
-      Analytic functions (also known as window functions) are a special category of built-in functions. Like
-      aggregate functions, they examine the contents of multiple input rows to compute each output value. However,
-      rather than being limited to one result value per <code class="ph codeph">GROUP BY</code> group, they operate on
-      <dfn class="term">windows</dfn> where the input rows are ordered and grouped using flexible conditions expressed through
-      an <code class="ph codeph">OVER()</code> clause.
-    </p>
 
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
+
 
 
 
@@ -35,6 +88,7 @@
       rows in the window.
     </p>
 
+
     <p class="p">
       Although analytic functions often compute the same value you would see from an aggregate function in a
       <code class="ph codeph">GROUP BY</code> query, the analytic functions produce a value for each row in the result set rather
@@ -42,11 +96,13 @@
       <code class="ph codeph">SELECT</code> list, offering more opportunities for organizing and filtering the result set.
     </p>
 
+
     <p class="p">
       Analytic function calls are only allowed in the <code class="ph codeph">SELECT</code> list and in the outermost
       <code class="ph codeph">ORDER BY</code> clause of the query. During query processing, analytic functions are evaluated
       after other query stages such as joins, <code class="ph codeph">WHERE</code>, and <code class="ph codeph">GROUP BY</code>,
     </p>
+
 
 
 
@@ -68,6 +124,7 @@
 
 
 
+
     <p class="p">
       Analytic functions are frequently used in fields such as finance and science to provide trend, outlier, and
       bucketed analysis for large data sets. You might also see the term <span class="q">"window functions"</span> in database
@@ -76,19 +133,28 @@
       keyword.
     </p>
 
+
     <p class="p">
       The following sections describe the analytic query clauses and the pure analytic functions provided by
       Impala. For usage information about aggregate functions in an analytic context, see
       <a class="xref" href="impala_aggregate_functions.html#aggregate_functions">Impala Aggregate Functions</a>.
     </p>
 
+
     <p class="p toc inpage"></p>
+
 
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="analytic_functions__over">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="over">
 
     <h2 class="title topictitle2" id="ariaid-title2">OVER Clause</h2>
+
 
     <div class="body conbody">
 
@@ -99,9 +165,11 @@
         <code class="ph codeph">COUNT()</code>, or <code class="ph codeph">SUM()</code>, they operate as analytic functions.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>function(<var class="keyword varname">args</var>) OVER([<var class="keyword varname">partition_by_clause</var>] [<var class="keyword varname">order_by_clause</var> [<var class="keyword varname">window_clause</var>]])
 
@@ -114,6 +182,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         <strong class="ph b">PARTITION BY clause:</strong>
       </p>
 
+
       <p class="p">
         The <code class="ph codeph">PARTITION BY</code> clause acts much like the <code class="ph codeph">GROUP BY</code> clause in the
         outermost block of a query. It divides the rows into groups containing identical values in one or more
@@ -123,6 +192,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         calls involving partitioned tables.
       </p>
 
+
       <p class="p">
         In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
         clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
@@ -130,6 +200,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         for example, <code class="ph codeph">OVER (PARTITION BY year,<var class="keyword varname">other_columns</var> <var class="keyword varname">other_analytic_clauses</var>)</code>.
 
       </p>
+
 
       <p class="p">
         The sequence of results from an analytic function <span class="q">"resets"</span> for each new partition in the result set.
@@ -139,9 +210,11 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         analytic operation to all the rows in the table.
       </p>
 
+
       <p class="p">
         <strong class="ph b">ORDER BY clause:</strong>
       </p>
+
 
       <p class="p">
         The <code class="ph codeph">ORDER BY</code> clause works much like the <code class="ph codeph">ORDER BY</code> clause in the outermost
@@ -153,6 +226,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         BY</code> clause in the outer block of the query.
       </p>
 
+
       <p class="p">
         When the <code class="ph codeph">ORDER BY</code> clause is omitted, the analytic function applies to all items in the
         group produced by the <code class="ph codeph">PARTITION BY</code> clause. When the <code class="ph codeph">ORDER BY</code> clause is
@@ -160,10 +234,12 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         window clause.
       </p>
 
+
       <p class="p">
         The order in which the rows are analyzed is only defined for those columns specified in <code class="ph codeph">ORDER
         BY</code> clauses.
       </p>
+
 
       <p class="p">
         One difference between the analytic and outer uses of the <code class="ph codeph">ORDER BY</code> clause: inside the
@@ -171,9 +247,11 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         constant sort value (effectively a no-op) rather than referring to column 1.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Window clause:</strong>
       </p>
+
 
       <p class="p">
         The window clause is only allowed in combination with an <code class="ph codeph">ORDER BY</code> clause. If the
@@ -182,9 +260,11 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         <a class="xref" href="impala_analytic_functions.html#window_clause">Window Clause</a> for full details.
       </p>
 
+
       <p class="p">
         <strong class="ph b">HBase considerations:</strong>
       </p>
+
 
       <p class="p">
         Because HBase tables are optimized for single-row lookups rather than full scans, analytic functions using
@@ -192,9 +272,11 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         performance is lower than on comparable tables using HDFS data files.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Parquet considerations:</strong>
       </p>
+
 
       <p class="p">
         Analytic functions are very efficient for Parquet tables. The data that is examined during evaluation of
@@ -202,22 +284,27 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         are arranged sequentially within each data file.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Text table considerations:</strong>
       </p>
+
 
       <p class="p">
         Analytic functions are convenient to use with text tables for exploratory business intelligence. When the
         volume of data is substantial, prefer to use Parquet tables for performance-critical analytic queries.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example shows how to synthesize a numeric sequence corresponding to all the rows in a table.
@@ -225,6 +312,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
         the integers 1, 2, 3, and so on, corresponding to the order of a <code class="ph codeph">TIMESTAMP</code> column in the
         original table.
       </p>
+
 
 
 
@@ -243,6 +331,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
 
 
 
+
 <pre class="pre codeblock"><code>SELECT x, y, z,
   count() OVER (PARTITION BY x) AS how_many_x
 FROM t1;
@@ -252,11 +341,13 @@ FROM t1;
         <strong class="ph b">Restrictions:</strong>
       </p>
 
+
       <p class="p">
         You cannot directly combine the <code class="ph codeph">DISTINCT</code> operator with analytic function calls. You can
         put the analytic function call in a <code class="ph codeph">WITH</code> clause or an inline view, and apply the
         <code class="ph codeph">DISTINCT</code> operator to its result set.
       </p>
+
 
 <pre class="pre codeblock"><code>WITH t1 AS (SELECT x, sum(x) OVER (PARTITION BY x) AS total FROM t1)
   SELECT DISTINCT x, total FROM t1;
@@ -264,11 +355,14 @@ FROM t1;
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="analytic_functions__window_clause">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="window_clause">
 
     <h2 class="title topictitle2" id="ariaid-title3">Window Clause</h2>
+
 
     <div class="body conbody">
 
@@ -280,6 +374,7 @@ FROM t1;
         analytic results for rows within the same partition.
       </p>
 
+
       <p class="p">
         The window clause is supported with the <code class="ph codeph">AVG()</code>, <code class="ph codeph">COUNT()</code>,
         <code class="ph codeph">FIRST_VALUE()</code>, <code class="ph codeph">LAST_VALUE()</code>, and <code class="ph codeph">SUM()</code> functions.
@@ -288,9 +383,11 @@ FROM t1;
         <code class="ph codeph">UNBOUNDED PRECEDING</code>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>ROWS BETWEEN [ { <var class="keyword varname">m</var> | UNBOUNDED } PRECEDING | CURRENT ROW] [ AND [CURRENT ROW | { UNBOUNDED | <var class="keyword varname">n</var> } FOLLOWING] ]
 RANGE BETWEEN [ {<var class="keyword varname">m</var> | UNBOUNDED } PRECEDING | CURRENT ROW] [ AND [CURRENT ROW | { UNBOUNDED | <var class="keyword varname">n</var> } FOLLOWING] ]</code></pre>
@@ -300,6 +397,7 @@ RANGE BETWEEN [ {<var class="keyword varname">m</var> | UNBOUNDED } PRECEDING | 
         result set. The size of the window is predictable based on the clauses the position within the result set.
       </p>
 
+
       <p class="p">
         <code class="ph codeph">RANGE BETWEEN</code> does not currently support numeric arguments to define a variable-size
         sliding window.
@@ -308,9 +406,11 @@ RANGE BETWEEN [ {<var class="keyword varname">m</var> | UNBOUNDED } PRECEDING | 
 
 
 
+
       <p class="p">
         Currently, Impala supports only some combinations of arguments to the <code class="ph codeph">RANGE</code> clause:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -318,32 +418,40 @@ RANGE BETWEEN [ {<var class="keyword varname">m</var> | UNBOUNDED } PRECEDING | 
           BY</code> is specified and the window clause is omitted)
         </li>
 
+
         <li class="li">
           <code class="ph codeph">RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING</code>
         </li>
 
+
         <li class="li">
           <code class="ph codeph">RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING</code>
         </li>
+
       </ul>
+
 
       <p class="p">
         When <code class="ph codeph">RANGE</code> is used, <code class="ph codeph">CURRENT ROW</code> includes not just the current row but all
         rows that are tied with the current row based on the <code class="ph codeph">ORDER BY</code> expressions.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
+
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         The following examples show financial data for a fictional stock symbol <code class="ph codeph">JDR</code>. The closing
         price moves up and down each day.
       </p>
+
 
 <pre class="pre codeblock"><code>create table stock_ticker (stock_symbol string, closing_price decimal(8,2), closing_date timestamp);
 ...load some data...
@@ -370,6 +478,7 @@ select * from stock_ticker order by stock_symbol, closing_date
         prices for a single stock.
       </p>
 
+
 <pre class="pre codeblock"><code>select stock_symbol, closing_date, closing_price,
   avg(closing_price) over (partition by stock_symbol order by closing_date
     rows between 1 preceding and 1 following) as moving_average
@@ -392,6 +501,7 @@ select * from stock_ticker order by stock_symbol, closing_date
         average, from the earliest data up to the value for each day.
       </p>
 
+
 <pre class="pre codeblock"><code>select stock_symbol, closing_date, closing_price,
   avg(closing_price) over (partition by stock_symbol order by closing_date
     rows between unbounded preceding and current row) as moving_average
@@ -413,11 +523,14 @@ select * from stock_ticker order by stock_symbol, closing_date
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="analytic_functions__avg_analytic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="avg_analytic">
 
     <h2 class="title topictitle2" id="ariaid-title4">AVG Function - Analytic Context</h2>
+
 
     <div class="body conbody">
 
@@ -426,13 +539,17 @@ select * from stock_ticker order by stock_symbol, closing_date
         function. See <a class="xref" href="impala_avg.html#avg">AVG Function</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="analytic_functions__count_analytic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="count_analytic">
 
     <h2 class="title topictitle2" id="ariaid-title5">COUNT Function - Analytic Context</h2>
+
 
     <div class="body conbody">
 
@@ -441,13 +558,17 @@ select * from stock_ticker order by stock_symbol, closing_date
         function. See <a class="xref" href="impala_count.html#count">COUNT Function</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="analytic_functions__cume_dist">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="cume_dist">
 
     <h2 class="title topictitle2" id="ariaid-title6">CUME_DIST Function (<span class="keyword">Impala 2.3</span> or higher only)</h2>
+
 
     <div class="body conbody">
 
@@ -456,9 +577,11 @@ select * from stock_ticker order by stock_symbol, closing_date
         and less than or equal to 1.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>CUME_DIST (<var class="keyword varname">expr</var>)
   OVER ([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)
@@ -469,9 +592,11 @@ select * from stock_ticker order by stock_symbol, closing_date
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         Within each partition of the result set, the <code class="ph codeph">CUME_DIST()</code> value represents an ascending
@@ -479,19 +604,23 @@ select * from stock_ticker order by stock_symbol, closing_date
         less than or equal to the value in the current row.
       </p>
 
+
       <p class="p">
         If the sequence of input values contains ties, the <code class="ph codeph">CUME_DIST()</code> results are identical for the
         tied values.
       </p>
+
 
       <p class="p">
         Impala only supports the <code class="ph codeph">CUME_DIST()</code> function in an analytic context, not as a regular
         aggregate function.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         This example uses a table with 9 rows. The <code class="ph codeph">CUME_DIST()</code>
@@ -502,6 +631,7 @@ select * from stock_ticker order by stock_symbol, closing_date
         and so on up to the heaviest animal (elephant), where 9/9 of the rows are less than or
         equal to its weight.
       </p>
+
 
 <pre class="pre codeblock"><code>create table animals (name string, kind string, kilos decimal(9,3));
 insert into animals values
@@ -534,6 +664,7 @@ select name, cume_dist() over (order by kilos) from animals;
         value of 1.
       </p>
 
+
 <pre class="pre codeblock"><code>select name, kind, cume_dist() over (partition by kind order by kilos) from animals
 +------------+--------+-----------------------+
 | name       | kind   | cume_dist() OVER(...) |
@@ -555,6 +686,7 @@ select name, cume_dist() over (order by kilos) from animals;
         clause within the <code class="ph codeph">OVER()</code> clause. Now the lightest (smallest value of <code class="ph codeph">kilos</code>)
         animal of each kind has a <code class="ph codeph">CUME_DIST()</code> value of 1.
       </p>
+
 
 <pre class="pre codeblock"><code>select name, kind, cume_dist() over (partition by kind order by kilos desc) from animals
 +------------+--------+-----------------------+
@@ -580,6 +712,7 @@ select name, cume_dist() over (order by kilos) from animals;
         equal to 15.
       </p>
 
+
 <pre class="pre codeblock"><code>insert into animals values ('California Condor', 'Bird', 15), ('Andean Condor', 'Bird', 15)
 
 select name, kind, cume_dist() over (order by kilos) from animals where kind = 'Bird';
@@ -601,6 +734,7 @@ select name, kind, cume_dist() over (order by kilos) from animals where kind = '
         values are ordered by the animal name.
       </p>
 
+
 <pre class="pre codeblock"><code>select name, kind, cume_dist() over (partition by kind order by kilos) as ordering
   from animals
 where
@@ -619,11 +753,14 @@ order by kind, ordering desc, name;
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="analytic_functions__dense_rank">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="dense_rank">
 
     <h2 class="title topictitle2" id="ariaid-title7">DENSE_RANK Function</h2>
+
 
     <div class="body conbody">
 
@@ -635,9 +772,11 @@ order by kind, ordering desc, name;
         sequence over for each group produced by the <code class="ph codeph">PARTITIONED BY</code> clause.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>DENSE_RANK() OVER([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
 
@@ -648,27 +787,33 @@ order by kind, ordering desc, name;
 
 
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         Often used for top-N and bottom-N queries. For example, it could produce a <span class="q">"top 10"</span> report including
         all the items with the 10 highest values, even if several items tied for 1st place.
       </p>
 
+
       <p class="p">
         Similar to <code class="ph codeph">ROW_NUMBER</code> and <code class="ph codeph">RANK</code>. These functions differ in how they treat
         duplicate combinations of values.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example demonstrates how the <code class="ph codeph">DENSE_RANK()</code> function identifies where each
@@ -677,6 +822,7 @@ order by kind, ordering desc, name;
         column, both <code class="ph codeph">1</code> values are tied for first; both <code class="ph codeph">2</code> values are tied for
         second; and so on.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, dense_rank() over(order by x) as rank, property from int_t;
 +----+------+----------+
@@ -712,11 +858,13 @@ order by kind, ordering desc, name;
         <code class="ph codeph">PARTITION</code> property within the <code class="ph codeph">ORDER BY</code> clause.
       </p>
 
+
       <p class="p">
         Partitioning by the <code class="ph codeph">PROPERTY</code> column groups all the even, odd, and so on values together,
         and <code class="ph codeph">DENSE_RANK()</code> returns the place of each value within the group, producing several
         ascending sequences.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, dense_rank() over(partition by property order by x) as rank, property from int_t;
 +----+------+----------+
@@ -753,6 +901,7 @@ order by kind, ordering desc, name;
         <code class="ph codeph">DENSE_RANK()</code> designates each <code class="ph codeph">X</code> value as either first or second within its
         group.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, dense_rank() over(partition by x order by property) as rank, property from int_t;
 +----+------+----------+
@@ -791,6 +940,7 @@ order by kind, ordering desc, name;
         fourth richest person.)
       </p>
 
+
 <pre class="pre codeblock"><code>select dense_rank() over (order by net_worth desc) as placement, name, net_worth from wealth order by placement, name;
 +-----------+---------+---------------+
 | placement | name    | net_worth     |
@@ -807,17 +957,22 @@ order by kind, ordering desc, name;
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_analytic_functions.html#rank">RANK Function</a>, <a class="xref" href="impala_analytic_functions.html#row_number">ROW_NUMBER Function</a>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="analytic_functions__first_value">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="first_value">
 
     <h2 class="title topictitle2" id="ariaid-title8">FIRST_VALUE Function</h2>
+
 
     <div class="body conbody">
 
@@ -826,9 +981,11 @@ order by kind, ordering desc, name;
         the input expression is <code class="ph codeph">NULL</code>.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>FIRST_VALUE(<var class="keyword varname">expr</var>) OVER([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var> [<var class="keyword varname">window_clause</var>])</code></pre>
 
@@ -837,9 +994,11 @@ order by kind, ordering desc, name;
         window clause is optional.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         If any duplicate values occur in the tuples evaluated by the <code class="ph codeph">ORDER BY</code> clause, the result
@@ -847,13 +1006,16 @@ order by kind, ordering desc, name;
         ensure consistent ordering.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example shows a table with a wide variety of country-appropriate greetings. For consistency,
@@ -861,6 +1023,7 @@ order by kind, ordering desc, name;
         helps to produce a mail merge report where every person from the same country is addressed with the same
         greeting.
       </p>
+
 
 <pre class="pre codeblock"><code>select name, country, greeting from mail_merge
 +---------+---------+--------------+
@@ -894,6 +1057,7 @@ select country, name,
         Changing the order in which the names are evaluated changes which greeting is applied to each group.
       </p>
 
+
 <pre class="pre codeblock"><code>select country, name,
   first_value(greeting)
     over (partition by country order by name desc, greeting) as greeting
@@ -914,17 +1078,22 @@ select country, name,
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_analytic_functions.html#last_value">LAST_VALUE Function</a>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="analytic_functions__lag">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="lag">
 
     <h2 class="title topictitle2" id="ariaid-title9">LAG Function</h2>
+
 
     <div class="body conbody">
 
@@ -935,9 +1104,11 @@ select country, name,
         contains a time sequence or numeric sequence column that clearly distinguishes the ordering of the rows.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>LAG (<var class="keyword varname">expr</var> [, <var class="keyword varname">offset</var>] [, <var class="keyword varname">default</var>])
   OVER ([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
@@ -947,27 +1118,33 @@ select country, name,
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         Sometimes used an an alternative to doing a self-join.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example uses the same stock data created in <a class="xref" href="#window_clause">Window Clause</a>. For each day, the
         query prints the closing price alongside the previous day's closing price. The first row for each stock
         symbol has no previous row, so that <code class="ph codeph">LAG()</code> value is <code class="ph codeph">NULL</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>select stock_symbol, closing_date, closing_price,
     lag(closing_price,1) over (partition by stock_symbol order by closing_date) as "yesterday closing"
@@ -995,6 +1172,7 @@ select country, name,
         first.
       </p>
 
+
 <pre class="pre codeblock"><code>select stock_symbol, closing_date, closing_price,
     cast(
       closing_price - lag(closing_price,1) over
@@ -1021,17 +1199,22 @@ select country, name,
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         This function is the converse of <a class="xref" href="impala_analytic_functions.html#lead">LEAD Function</a>.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="analytic_functions__last_value">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="last_value">
 
     <h2 class="title topictitle2" id="ariaid-title10">LAST_VALUE Function</h2>
+
 
     <div class="body conbody">
 
@@ -1041,9 +1224,11 @@ select country, name,
         <code class="ph codeph">NULL</code>.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>LAST_VALUE(<var class="keyword varname">expr</var>) OVER([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var> [<var class="keyword varname">window_clause</var>])</code></pre>
 
@@ -1052,9 +1237,11 @@ select country, name,
         window clause is optional.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         If any duplicate values occur in the tuples evaluated by the <code class="ph codeph">ORDER BY</code> clause, the result
@@ -1062,13 +1249,16 @@ select country, name,
         ensure consistent ordering.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example uses the same <code class="ph codeph">MAIL_MERGE</code> table as in the example for
@@ -1077,6 +1267,7 @@ select country, name,
         <code class="ph codeph">UNBOUNDED FOLLOWING</code> to look ahead to subsequent rows and find the last value for each
         country.
       </p>
+
 
 <pre class="pre codeblock"><code>select country, name,
   last_value(greeting) over (
@@ -1100,17 +1291,22 @@ select country, name,
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_analytic_functions.html#first_value">FIRST_VALUE Function</a>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="analytic_functions__lead">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="lead">
 
     <h2 class="title topictitle2" id="ariaid-title11">LEAD Function</h2>
+
 
     <div class="body conbody">
 
@@ -1121,9 +1317,11 @@ select country, name,
         contains a time sequence or numeric sequence column that clearly distinguishes the ordering of the rows.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>LEAD (<var class="keyword varname">expr</var> [, <var class="keyword varname">offset</var>] [, <var class="keyword varname">default</var>])
   OVER ([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
@@ -1133,27 +1331,33 @@ select country, name,
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         Sometimes used an an alternative to doing a self-join.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example uses the same stock data created in <a class="xref" href="#window_clause">Window Clause</a>. The query analyzes
         the closing price for a stock symbol, and for each day evaluates if the closing price for the following day
         is higher or lower.
       </p>
+
 
 <pre class="pre codeblock"><code>select stock_symbol, closing_date, closing_price,
   case
@@ -1182,17 +1386,22 @@ from stock_ticker
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         This function is the converse of <a class="xref" href="impala_analytic_functions.html#lag">LAG Function</a>.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="analytic_functions__max_analytic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="max_analytic">
 
     <h2 class="title topictitle2" id="ariaid-title12">MAX Function - Analytic Context</h2>
+
 
     <div class="body conbody">
 
@@ -1201,13 +1410,17 @@ from stock_ticker
         function. See <a class="xref" href="impala_max.html#max">MAX Function</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="analytic_functions__min_analytic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="min_analytic">
 
     <h2 class="title topictitle2" id="ariaid-title13">MIN Function - Analytic Context</h2>
+
 
     <div class="body conbody">
 
@@ -1216,15 +1429,19 @@ from stock_ticker
         function. See <a class="xref" href="impala_min.html#min">MIN Function</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
+
+  </div>
+
 
   
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title14" id="analytic_functions__ntile">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="ntile">
 
     <h2 class="title topictitle2" id="ariaid-title14">NTILE Function (<span class="keyword">Impala 2.3</span> or higher only)</h2>
+
 
     <div class="body conbody">
 
@@ -1235,9 +1452,11 @@ from stock_ticker
 
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>NTILE (<var class="keyword varname">expr</var> [, <var class="keyword varname">offset</var> ...]
   OVER ([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
@@ -1247,9 +1466,11 @@ from stock_ticker
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         The <span class="q">"ntile"</span> name is derived from the practice of dividing result sets into fourths (quartile), tenths
@@ -1257,9 +1478,11 @@ from stock_ticker
         percentile value.
       </p>
 
+
       <p class="p">
         The number of buckets must be a positive integer.
       </p>
+
 
       <p class="p">
         The number of items in each bucket is identical or almost so, varying by at most 1. If the number of items
@@ -1267,14 +1490,17 @@ from stock_ticker
         buckets.
       </p>
 
+
       <p class="p">
         If the number of buckets N is greater than the number of input rows in the partition, then the first N
         buckets each contain one item, and the remaining buckets are empty.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example shows divides groups of animals into 4 buckets based on their weight. The
@@ -1284,6 +1510,7 @@ from stock_ticker
         which the rows are evaluated by the <code class="ph codeph">OVER()</code> clause.) Because there are 9 rows in the group,
         divided into 4 buckets, the first bucket receives the extra item.
       </p>
+
 
 <pre class="pre codeblock"><code>create table animals (name string, kind string, kilos decimal(9,3));
 
@@ -1316,6 +1543,7 @@ order by quarter desc;
         the heavier half and the lighter half.
       </p>
 
+
 <pre class="pre codeblock"><code>select name, kind, ntile(2) over (partition by kind order by kilos desc) as half
   from animals
 order by kind;
@@ -1341,6 +1569,7 @@ order by kind;
         housecat and mouse are in the <span class="q">"bottom half"</span>.
       </p>
 
+
 <pre class="pre codeblock"><code>select name, kind, ntile(2) over (partition by kind order by kilos desc) as half
   from animals
 order by kilos desc;
@@ -1361,17 +1590,21 @@ order by kilos desc;
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="analytic_functions__percent_rank">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="percent_rank">
 
     <h2 class="title topictitle2" id="ariaid-title15">PERCENT_RANK Function (<span class="keyword">Impala 2.3</span> or higher only)</h2>
+
 
     <div class="body conbody">
 
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>PERCENT_RANK (<var class="keyword varname">expr</var>)
   OVER ([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)
@@ -1384,20 +1617,24 @@ order by kilos desc;
       If there is only a single item in the partition group, its <code class="ph codeph">PERCENT_RANK()</code> value is 0.
       </p>
 
+
       <p class="p">
         The <code class="ph codeph">ORDER BY</code> clause is required. The <code class="ph codeph">PARTITION BY</code> clause is optional. The
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         This function is similar to the <code class="ph codeph">RANK</code> and <code class="ph codeph">CUME_DIST()</code> functions: it returns an ascending sequence representing the position of each
         row within the rows of the same partition group. The actual numeric sequence is calculated differently,
         and the handling of duplicate (tied) values is different.
       </p>
+
 
       <p class="p">
         The return values range from 0 to 1 inclusive.
@@ -1409,15 +1646,18 @@ order by kilos desc;
         the highest <code class="ph codeph">CUME_DIST()</code> value.)
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example uses the same <code class="ph codeph">ANIMALS</code> table as the examples for <code class="ph codeph">CUME_DIST()</code>
         and <code class="ph codeph">NTILE()</code>, with a few additional rows to illustrate the results where some values are
         <code class="ph codeph">NULL</code> or there is only a single row in a partition group.
       </p>
+
 
 <pre class="pre codeblock"><code>insert into animals values ('Komodo dragon', 'Reptile', 70);
 insert into animals values ('Unicorn', 'Mythical', NULL);
@@ -1432,6 +1672,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         Both <span class="q">"Mythical"</span> animals have a <code class="ph codeph">PERCENT_RANK()</code> of 0 because
         a <code class="ph codeph">NULL</code> is considered the lowest value within its partition group.
       </p>
+
 
 <pre class="pre codeblock"><code>select name, kind, percent_rank() over (partition by kind order by kilos) from animals;
 +-----------------------+----------+--------------------------+
@@ -1455,11 +1696,14 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
 </code></pre>
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title16" id="analytic_functions__rank">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="rank">
 
     <h2 class="title topictitle2" id="ariaid-title16">RANK Function</h2>
+
 
     <div class="body conbody">
 
@@ -1471,9 +1715,11 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         sequence over for each group produced by the <code class="ph codeph">PARTITIONED BY</code> clause.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>RANK() OVER([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
 
@@ -1482,9 +1728,11 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
 
 
@@ -1493,18 +1741,22 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         several items that were tied for 10th place.
       </p>
 
+
       <p class="p">
         Similar to <code class="ph codeph">ROW_NUMBER</code> and <code class="ph codeph">DENSE_RANK</code>. These functions differ in how they
         treat duplicate combinations of values.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example demonstrates how the <code class="ph codeph">RANK()</code> function identifies where each value
@@ -1513,6 +1765,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         <code class="ph codeph">X</code> column, both <code class="ph codeph">1</code> values are tied for first; both <code class="ph codeph">2</code>
         values are tied for third; and so on.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, rank() over(order by x) as rank, property from int_t;
 +----+------+----------+
@@ -1548,11 +1801,13 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         <code class="ph codeph">PARTITION</code> property within the <code class="ph codeph">ORDER BY</code> clause.
       </p>
 
+
       <p class="p">
         Partitioning by the <code class="ph codeph">PROPERTY</code> column groups all the even, odd, and so on values together,
         and <code class="ph codeph">RANK()</code> returns the place of each value within the group, producing several ascending
         sequences.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, rank() over(partition by property order by x) as rank, property from int_t;
 +----+------+----------+
@@ -1590,6 +1845,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         group.
       </p>
 
+
 <pre class="pre codeblock"><code>select x, rank() over(partition by x order by property) as rank, property from int_t;
 +----+------+----------+
 | x  | rank | property |
@@ -1624,6 +1880,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         Midas are tied for second, then Crassus is fourth.
       </p>
 
+
 <pre class="pre codeblock"><code>select rank() over (order by net_worth desc) as rank, name, net_worth from wealth order by rank, name;
 +------+---------+---------------+
 | rank | name    | net_worth     |
@@ -1640,18 +1897,23 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_analytic_functions.html#dense_rank">DENSE_RANK Function</a>,
         <a class="xref" href="impala_analytic_functions.html#row_number">ROW_NUMBER Function</a>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title17" id="analytic_functions__row_number">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="row_number">
 
     <h2 class="title topictitle2" id="ariaid-title17">ROW_NUMBER Function</h2>
+
 
     <div class="body conbody">
 
@@ -1662,9 +1924,11 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         duplicate input values.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>ROW_NUMBER() OVER([<var class="keyword varname">partition_by_clause</var>] <var class="keyword varname">order_by_clause</var>)</code></pre>
 
@@ -1673,14 +1937,17 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         window clause is not allowed.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         Often used for top-N and bottom-N queries where the input values are known to be unique, or precisely N
         rows are needed regardless of duplicate values.
       </p>
+
 
       <p class="p">
         Because its result value is different for each row in the result set (when used without a <code class="ph codeph">PARTITION
@@ -1688,23 +1955,28 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         example for result sets involving unique values or tuples.
       </p>
 
+
       <p class="p">
         Similar to <code class="ph codeph">RANK</code> and <code class="ph codeph">DENSE_RANK</code>. These functions differ in how they treat
         duplicate combinations of values.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
       </p>
+
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         The following example demonstrates how <code class="ph codeph">ROW_NUMBER()</code> produces a continuous numeric
         sequence, even though some values of <code class="ph codeph">X</code> are repeated.
       </p>
+
 
 <pre class="pre codeblock"><code>select x, row_number() over(order by x, property) as row_number, property from int_t;
 +----+------------+----------+
@@ -1742,6 +2014,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         input rows.
       </p>
 
+
 <pre class="pre codeblock"><code>select row_number() over (order by net_worth desc) as account_id, name, net_worth
   from wealth order by account_id, name;
 +------------+---------+---------------+
@@ -1759,17 +2032,22 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_analytic_functions.html#rank">RANK Function</a>, <a class="xref" href="impala_analytic_functions.html#dense_rank">DENSE_RANK Function</a>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title18" id="analytic_functions__sum_analytic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="sum_analytic">
 
     <h2 class="title topictitle2" id="ariaid-title18">SUM Function - Analytic Context</h2>
+
 
     <div class="body conbody">
 
@@ -1778,8 +2056,12 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
         function. See <a class="xref" href="impala_sum.html#sum">SUM Function</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
 
-</article></main></body></html>
+  </div>
+
+
+</body>
+</html>

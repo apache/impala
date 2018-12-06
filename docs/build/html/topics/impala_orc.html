@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using the ORC File Format with Impala Tables" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="orc" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using the ORC File Format with Impala Tables</title>
+</head>
+<body id="orc">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using the ORC File Format with Impala Tables</h1>
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Impala supports using ORC data files as an experimental feature since 2.12.
+      To disable it, set --enable_orc_scanner to false when starting the cluster.
+    </p>
+
+
+
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>ORC Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
+          <tr class="row">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e70">
+              File Type
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e73">
+              Format
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e76">
+              Compression Codecs
+            </th>
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e79">
+              Impala Can CREATE?
+            </th>
+
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d131791e82">
+              Impala Can INSERT?
+            </th>
+
+          </tr>
+
+        </thead>
+<tbody class="tbody">
+          <tr class="row">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e70 ">
+              <a class="xref" href="impala_orc.html#orc">ORC</a>
+            </td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e73 ">
+              Structured
+            </td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e76 ">
+              gzip, Snappy, LZO, LZ4; currently gzip by default
+            </td>
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e79 ">
+              Yes, in Impala 2.12.0 and higher.
+            </td>
+
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d131791e82 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
+              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            </td>
+
+          </tr>
+
+        </tbody>
+</table>
+</div>
+
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="orc_create">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Creating ORC Tables and Loading Data</h2>
+
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        If you do not have an existing data file to use, begin by creating one in the appropriate format.
+      </p>
+
+
+      <p class="p">
+        <strong class="ph b">To create an ORC table:</strong>
+      </p>
+
+
+      <p class="p">
+        In the <code class="ph codeph">impala-shell</code> interpreter, issue a command similar to:
+      </p>
+
+
+<pre class="pre codeblock"><code>CREATE TABLE orc_table (<var class="keyword varname">column_specs</var>) STORED AS ORC;</code></pre>
+
+      <p class="p">
+        Because Impala can query some kinds of tables that it cannot currently write to, after creating tables of
+        certain file formats, you might use the Hive shell to load the data. See
+        <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details. After loading data into a table through
+        Hive or other mechanism outside of Impala, issue a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code>
+        statement the next time you connect to the Impala node, before querying the table, to make Impala recognize
+        the new data.
+      </p>
+
+
+      <p class="p">
+        For example, here is how you might create some ORC tables in Impala (by specifying the columns
+        explicitly, or cloning the structure of another table), load data through Hive, and query them through
+        Impala:
+      </p>
+
+
+<pre class="pre codeblock"><code>$ impala-shell -i localhost
+[localhost:21000] default&gt; CREATE TABLE orc_table (x INT) STORED AS ORC;
+[localhost:21000] default&gt; CREATE TABLE orc_clone LIKE some_other_table STORED AS ORC;
+[localhost:21000] default&gt; quit;
+
+$ hive
+hive&gt; INSERT INTO TABLE orc_table SELECT x FROM some_other_table;
+3 Rows loaded to orc_table
+Time taken: 4.169 seconds
+hive&gt; quit;
+
+$ impala-shell -i localhost
+[localhost:21000] default&gt; SELECT * FROM orc_table;
+Fetched 0 row(s) in 0.11s
+[localhost:21000] default&gt; -- Make Impala recognize the data loaded through Hive;
+[localhost:21000] default&gt; REFRESH orc_table;
+[localhost:21000] default&gt; SELECT * FROM orc_table;
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
++---+
+Fetched 3 row(s) in 0.11s</code></pre>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="orc_compression">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Enabling Compression for ORC Tables</h2>
+
+
+
+    <div class="body conbody">
+
+      <p class="p">
+
+        ORC tables are in zlib (Deflate in Impala) compression in default. You may want
+        to use Snappy or LZO compression on existing tables for different balance between
+        compression ratio and decompression speed. In Hive-1.1.0, the supported
+        compressions for ORC tables are NONE, ZLIB, SNAPPY and LZO.
+        For example, to enable Snappy compression, you would specify
+        the following additional settings when loading data through the Hive shell:
+      </p>
+
+
+<pre class="pre codeblock"><code>hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET orc.compress=SNAPPY;
+hive&gt; INSERT OVERWRITE TABLE <var class="keyword varname">new_table</var> SELECT * FROM <var class="keyword varname">old_table</var>;</code></pre>
+
+      <p class="p">
+        If you are converting partitioned tables, you must complete additional steps. In such a case, specify
+        additional settings similar to the following:
+      </p>
+
+
+<pre class="pre codeblock"><code>hive&gt; CREATE TABLE <var class="keyword varname">new_table</var> (<var class="keyword varname">your_cols</var>) PARTITIONED BY (<var class="keyword varname">partition_cols</var>) STORED AS <var class="keyword varname">new_format</var>;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE <var class="keyword varname">new_table</var> PARTITION(<var class="keyword varname">comma_separated_partition_cols</var>) SELECT * FROM <var class="keyword varname">old_table</var>;</code></pre>
+
+      <p class="p">
+        Remember that Hive does not require that you specify a source format for it. Consider the case of
+        converting a table with two partition columns called <code class="ph codeph">year</code> and <code class="ph codeph">month</code> to a
+        Snappy compressed ORC table. Combining the components outlined previously to complete this table conversion,
+        you would specify settings similar to the following:
+      </p>
+
+
+<pre class="pre codeblock"><code>hive&gt; CREATE TABLE tbl_orc (int_col INT, string_col STRING) STORED AS ORC;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET orc.compress=SNAPPY;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_orc SELECT * FROM tbl;</code></pre>
+
+      <p class="p">
+        To complete a similar process for a table that includes partitions, you would specify settings similar to
+        the following:
+      </p>
+
+
+<pre class="pre codeblock"><code>hive&gt; CREATE TABLE tbl_orc (int_col INT, string_col STRING) PARTITIONED BY (year INT) STORED AS ORC;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET orc.compress=SNAPPY;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_orc PARTITION(year) SELECT * FROM tbl;</code></pre>
+
+      <div class="note note"><span class="notetitle">Note:</span>
+        <p class="p">
+          The compression type is specified in the following command:
+        </p>
+
+<pre class="pre codeblock"><code>SET orc.compress=SNAPPY;</code></pre>
+        <p class="p">
+          You could elect to specify alternative codecs such as <code class="ph codeph">NONE, GZIP, LZO</code> here.
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="rcfile_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Query Performance for Impala ORC Tables</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        In general, expect query performance with ORC tables to be
+        faster than with tables using text data, but slower than with
+        Parquet tables since there're bunch of optimizations for Parquet.
+        See <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>
+        for information about using the Parquet file format for
+        high-performance analytic queries.
+      </p>
+
+
+      <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
+        For Impala tables that use the file formats Parquet, ORC, RCFile, SequenceFile,
+        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
+        in the <span class="ph filepath">core-site.xml</span> configuration file determines
+        how Impala divides the I/O work of reading the data files. This configuration
+        setting is specified in bytes. By default, this
+        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
+        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
+        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
+        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="orc_data_types">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Data Type Considerations for ORC Tables</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        The ORC format defines a set of data types whose names differ from the names of the corresponding
+        Impala data types. If you are preparing ORC files using other Hadoop components such as Pig or
+        MapReduce, you might need to work with the type names defined by ORC. The following figure lists the
+        ORC-defined types and the equivalent types in Impala.
+      </p>
+
+
+      <p class="p">
+        <strong class="ph b">Primitive types:</strong>
+      </p>
+
+
+<pre class="pre codeblock"><code>BINARY -&gt; STRING
+BOOLEAN -&gt; BOOLEAN
+DOUBLE -&gt; DOUBLE
+FLOAT -&gt; FLOAT
+TINYINT -&gt; TINYINT
+SMALLINT -&gt; SMALLINT
+INT -&gt; INT
+BIGINT -&gt; BIGINT
+TIMESTAMP -&gt; TIMESTAMP
+DATE (not supported)
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Complex types:</strong>
+      </p>
+
+      <p class="p">
+        Complex types are currently not supported on ORC. However, queries materializing only scalar type
+        columns are allowed:
+      </p>
+
+
+<pre class="pre codeblock"><code>$ hive
+hive&gt; CREATE TABLE orc_nested_table (id INT, a ARRAY&lt;INT&gt;) STORED AS ORC;
+hive&gt; INSERT INTO TABLE orc_nested_table SELECT 1, ARRAY(1,2,3);
+OK
+Time taken: 2.629 seconds
+hive&gt; quit;
+
+$ impala-shell -i localhost
+[localhost:21000] default&gt; INVALIDATE METADATA orc_nested_table;
+[localhost:21000] default&gt; SELECT 1 FROM orc_nested_table t, t.a;
+ERROR: NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 'a' with a complex type 'ARRAY&lt;INT&gt;'.
+Complex types are supported for these file formats: PARQUET.
+
+[localhost:21000] default&gt; SELECT COUNT(*) FROM orc_nested_table;
++----------+
+| count(*) |
++----------+
+| 1        |
++----------+
+Fetched 1 row(s) in 0.12s
+
+[localhost:21000] default&gt; SELECT id FROM orc_nested_table;
++----+
+| id |
++----+
+| 1  |
++----+
+Fetched 1 row(s) in 0.12s
+</code></pre>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

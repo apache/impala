@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ddl"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DDL Statements</title></head><body id="ddl"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DDL Statements" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="ddl" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DDL Statements</title>
+</head>
+<body id="ddl">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">DDL Statements</h1>
+
   
 
   <div class="body conbody">
@@ -14,71 +34,89 @@
       <code class="ph codeph">DROP</code>, or <code class="ph codeph">ALTER</code>.
     </p>
 
+
     <p class="p">
       The Impala DDL statements are:
     </p>
+
 
     <ul class="ul">
       <li class="li">
         <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_create_database.html#create_database">CREATE DATABASE Statement</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_create_function.html#create_function">CREATE FUNCTION Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a>
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>
       </li>
+
     </ul>
+
 
     <p class="p">
       After Impala executes a DDL command, information about available tables, columns, views, partitions, and so
@@ -87,6 +125,7 @@
       nodes to make them aware of the changes.)
     </p>
 
+
     <p class="p">
       If the timing of metadata updates is significant, for example if you use round-robin scheduling where each
       query could be issued through a different Impala node, you can enable the
@@ -94,16 +133,19 @@
       all nodes have been notified about the metadata changes.
     </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about how Impala DDL statements interact with
       tables and partitions stored in the Amazon S3 filesystem.
     </p>
+
 
     <p class="p">
       Although the <code class="ph codeph">INSERT</code> statement is officially classified as a DML (data manipulation language)
       statement, it also involves metadata changes that must be broadcast to all Impala nodes, and so is also
       affected by the <code class="ph codeph">SYNC_DDL</code> query option.
     </p>
+
 
     <p class="p">
       Because the <code class="ph codeph">SYNC_DDL</code> query option makes each DDL operation take longer than normal, you
@@ -115,6 +157,7 @@
       you could connect to any node and issue queries through it.
     </p>
 
+
     <p class="p">
       The classification of DDL, DML, and other statements is not necessarily the same between Impala and Hive.
       Impala organizes these statements in a way intended to be familiar to people familiar with relational
@@ -123,19 +166,29 @@
       <code class="ph codeph">SHOW</code> or <code class="ph codeph">DESCRIBE</code>, are put into a separate category of utility statements.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       The query types shown in the Impala debug web user interface might not match exactly the categories listed
       here. For example, currently the <code class="ph codeph">USE</code> statement is shown as DDL in the debug web UI. The
       query types shown in the debug web UI are subject to change, for improved consistency.
     </div>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       The other major classifications of SQL statements are data manipulation language (see
       <a class="xref" href="impala_dml.html#dml">DML Statements</a>) and queries (see <a class="xref" href="impala_select.html#select">SELECT Statement</a>).
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

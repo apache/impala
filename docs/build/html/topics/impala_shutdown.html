@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="SHUTDOWN Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="shutdown" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>SHUTDOWN Statement</title>
+</head>
+<body id="shutdown">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">SHUTDOWN Statement</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">SHUTDOWN</code> statement performs a graceful shutdown of Impala Daemon. The
+      Impala daemon will notify other Impala daemons that it is shutting down, wait for a grace
+      period, then shut itself down once no more queries or fragments are executing on that
+      daemon. The <code class="ph codeph">--shutdown_grace_period_s</code> flag determines the duration of the
+      grace period in seconds.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>:SHUTDOWN()
+:SHUTDOWN([<var class="keyword varname">host_name</var>[:<var class="keyword varname">port_number</var>] )
+:SHUTDOWN(<var class="keyword varname">deadline</var>)
+:SHUTDOWN([<var class="keyword varname">host_name</var>[:<var class="keyword varname">port_number</var>], <var class="keyword varname">deadline</var>)</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong>
+    </p>
+
+
+    <p class="p">
+      All arguments are optional for <code class="ph codeph">SHUTDOWN</code>.
+    </p>
+
+
+    <table cellpadding="4" cellspacing="0" summary="" id="shutdown__simpletable_sly_wrf_rfb" border="1" class="simpletable"><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><thead><tr class="sthead">
+
+        <th style="vertical-align:bottom;text-align:left;" id="d188306e96" class="stentry">Argument</th>
+
+
+        <th style="vertical-align:bottom;text-align:left;" id="d188306e99" class="stentry">Type</th>
+
+
+        <th style="vertical-align:bottom;text-align:left;" id="d188306e102" class="stentry">Default</th>
+
+
+        <th style="vertical-align:bottom;text-align:left;" id="d188306e105" class="stentry">Description</th>
+
+
+      </tr>
+</thead><tbody><tr class="strow">
+
+        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">host_name</var></code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">STRING</code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e102" class="stentry">The current <code class="ph codeph">impalad</code> host</td>
+
+
+        <td style="vertical-align:top;" headers="d188306e105" class="stentry">
+
+          <p class="p">
+            Address of the backend to be shut down.
+          </p>
+
+
+        </td>
+
+
+      </tr>
+<tr class="strow">
+
+        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">port_number</var></code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">INT</code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e102" class="stentry"><code class="ph codeph">0</code> which is treated the same port as current
+            <code class="ph codeph">impalad</code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e105" class="stentry">n/a</td>
+
+
+      </tr>
+<tr class="strow">
+
+        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">INT</code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e102" class="stentry"><code class="ph codeph">The value of the <code class="ph codeph">--shutdown_deadline_s</code>
+            flag, which defaults to 1 hour.</code>
+
+        </td>
+
+
+        <td style="vertical-align:top;" headers="d188306e105" class="stentry">
+
+          <p class="p">
+            <code class="ph codeph"><var class="keyword varname">deadline</var></code> must be a non-negative number,
+            specified in seconds.
+          </p>
+
+
+          <p class="p">
+            The value, 0, for <var class="keyword varname">deadline</var> specifies an immediate shutdown.
+          </p>
+
+
+        </td>
+
+
+      </tr>
+</tbody></table>
+
+
+    <p class="p">
+      Take the following points into consideration when running the <code class="ph codeph">SHUTDOWN</code>
+      statement:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        A client can shut down the
+        <a class="xref" href="impala_components.html#intro_impalad">coordinator</a>
+        <code class="ph codeph">impalad</code> that it is connected to via <code class="ph codeph">:SHUTDOWN()</code>.
+      </li>
+
+
+      <li class="li">
+        A client can remotely shut down another non-coordinator <code class="ph codeph">impalad</code> via
+        <code class="ph codeph">:SHUTDOWN('<var class="keyword varname">hostname</var>')</code>.
+      </li>
+
+
+      <li class="li">
+        The shutdown time limit can be overridden to force a quicker or slower shutdown by
+        specifying a deadline. The default deadline is determined by the
+        <code class="ph codeph">--shutdown_deadline_s</code> flag, which defaults to 1 hour.
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="impala_components.html#intro_impalad">Executors</a> can be shut down
+        without disrupting running queries. Short-running queries will finish, and long-running
+        queries will continue until a threshold time limit is reached.
+      </li>
+
+
+      <li class="li">
+        If queries are submitted to a coordinator after shutdown of that coordinator has
+        started, they will fail.
+      </li>
+
+
+      <li class="li">
+        Long running queries or other issues, such as stuck fragments, will slow down but not
+        prevent eventual shutdown.
+      </li>
+
+    </ul>
+
+
+    <p class="p">
+      <strong class="ph b">Security considerations:</strong>
+    </p>
+
+
+    <p class="p">
+      The <code class="ph codeph">ALL</code> privilege is required on the server.
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+
+    <p class="p">
+      <strong class="ph b">Examples:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>:SHUTDOWN(); -- Shut down the current impalad  with the default deadline.
+:SHUTDOWN('hostname'); --  Shut down impalad running on hostname  with the default deadline.
+:SHUTDOWN(\"hostname:1234\"); -- Shut down impalad running on host at port 1234  with the default deadline.
+:SHUTDOWN(10); - Shut down the current impalad after 10 seconds.
+:SHUTDOWN('hostname', 10); - Shut down impalad running on hostname when all queries running on hostname finish, or after 10 seconds.
+:SHUTDOWN('hostname:11', 10 * 60); -- Shut down impalad running on hostname at port 11 when all queries running on hostname finish, or after 600 seconds.
+:SHUTDOWN(0); -- Perform an immdediate shutdown of the current impalad.</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

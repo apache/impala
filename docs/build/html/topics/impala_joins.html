@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="joins"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Joins in Impala SELECT Statements</title></head><body id="joins"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Joins in Impala SELECT Statements" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="joins" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Joins in Impala SELECT Statements</title>
+</head>
+<body id="joins">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Joins in Impala SELECT Statements</h1>
+
   
   
 
@@ -16,9 +36,11 @@
       using identifiers that are repeated in each of the joined tables.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
     <p class="p">
         Impala supports a wide variety of <code class="ph codeph">JOIN</code> clauses. Left, right, semi, full, and outer joins
@@ -27,6 +49,7 @@
         internally by including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
         <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords.
       </p>
+
 
 <pre class="pre codeblock"><code>SELECT <var class="keyword varname">select_list</var> FROM
   <var class="keyword varname">table_or_subquery1</var> [INNER] JOIN <var class="keyword varname">table_or_subquery2</var> |
@@ -53,11 +76,13 @@ SELECT <var class="keyword varname">select_list</var> FROM
       <strong class="ph b">SQL-92 and SQL-89 Joins:</strong>
     </p>
 
+
     <p class="p">
       Queries with the explicit <code class="ph codeph">JOIN</code> keywords are known as SQL-92 style joins, referring to the
       level of the SQL standard where they were introduced. The corresponding <code class="ph codeph">ON</code> or
       <code class="ph codeph">USING</code> clauses clearly show which columns are used as the join keys in each case:
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1 JOIN t2</strong>
   <strong class="ph b">ON t1.id = t2.id and t1.type_flag = t2.type_flag</strong>
@@ -76,12 +101,14 @@ SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1 JOIN t2</strong>
       less readable and harder to maintain.
     </p>
 
+
     <p class="p">
       Queries with a comma-separated list of tables and subqueries are known as SQL-89 style joins. In these
       queries, the equality comparisons between columns of the joined tables go in the <code class="ph codeph">WHERE</code>
       clause alongside other kinds of comparisons. This syntax is easy to learn, but it is also easy to
       accidentally remove a <code class="ph codeph">WHERE</code> clause needed for the join to work correctly.
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1, t2</strong>
   WHERE
@@ -92,6 +119,7 @@ SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1 JOIN t2</strong>
       <strong class="ph b">Self-joins:</strong>
     </p>
 
+
     <p class="p">
       Impala can do self-joins, for example to join on two different columns in the same table to represent
       parent-child relationships or other tree-structured data. There is no explicit syntax for this; just use the
@@ -99,12 +127,14 @@ SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1 JOIN t2</strong>
       referring to the fully qualified column names:
     </p>
 
+
 <pre class="pre codeblock"><code>-- Combine fields from both parent and child rows.
 SELECT lhs.id, rhs.parent, lhs.c1, rhs.c2 FROM tree_data lhs, tree_data rhs WHERE lhs.id = rhs.parent;</code></pre>
 
     <p class="p">
       <strong class="ph b">Cartesian joins:</strong>
     </p>
+
 
     <div class="p">
       To avoid producing huge result sets by mistake, Impala does not allow Cartesian joins of the form:
@@ -118,12 +148,14 @@ SELECT ... FROM t1, t2;</code></pre>
       clauses. For example:
     </div>
 
+
 <pre class="pre codeblock"><code>SELECT ... FROM t1 CROSS JOIN t2;
 SELECT ... FROM t1 CROSS JOIN t2 WHERE <var class="keyword varname">tests_on_non_join_columns</var>;</code></pre>
 
     <p class="p">
       <strong class="ph b">Inner and outer joins:</strong>
     </p>
+
 
     <p class="p">
       An inner join is the most common and familiar type: rows in the result set contain the requested columns from
@@ -132,6 +164,7 @@ SELECT ... FROM t1 CROSS JOIN t2 WHERE <var class="keyword varname">tests_on_non
       refer to the column in the select list or other clauses. Impala performs inner joins by default for both
       SQL-89 and SQL-92 join syntax:
     </p>
+
 
 <pre class="pre codeblock"><code>-- The following 3 forms are all equivalent.
 SELECT t1.id, c1, c2 FROM t1, t2 WHERE t1.id = t2.id;
@@ -145,6 +178,7 @@ SELECT t1.id, c1, c2 FROM t1 INNER JOIN t2 ON t1.id = t2.id;</code></pre>
       join operator, along with either <code class="ph codeph">LEFT</code>, <code class="ph codeph">RIGHT</code>, or <code class="ph codeph">FULL</code>:
     </p>
 
+
 <pre class="pre codeblock"><code>SELECT * FROM t1 LEFT OUTER JOIN t2 ON t1.id = t2.id;
 SELECT * FROM t1 RIGHT OUTER JOIN t2 ON t1.id = t2.id;
 SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
@@ -155,9 +189,11 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       <code class="ph codeph">*=</code> notation for doing outer joins with SQL-89 query syntax.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Equijoins and Non-Equijoins:</strong>
     </p>
+
 
     <p class="p">
       By default, Impala requires an equality comparison between the left-hand and right-hand tables, either
@@ -166,6 +202,7 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       the presence of equality tests between columns in the left-hand and right-hand tables.
     </p>
 
+
     <p class="p">
       In Impala 1.2.2 and higher, non-equijoin queries are also possible, with comparisons such as
       <code class="ph codeph">!=</code> or <code class="ph codeph">&lt;</code> between the join columns. These kinds of queries require care to
@@ -173,6 +210,7 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       query that produces a result set of acceptable size, you can code the query using the <code class="ph codeph">CROSS
       JOIN</code> operator, and add the extra comparisons in the <code class="ph codeph">WHERE</code> clause:
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT * FROM t1 CROSS JOIN t2 WHERE t1.total &gt; t2.maximum_price;</code></pre>
 
@@ -187,11 +225,13 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       specify any query hint to choose between the nested loop join or the original hash join algorithm.
     </p>
 
+
 <pre class="pre codeblock"><code>SELECT * FROM t1 LEFT OUTER JOIN t2 ON t1.int_col &lt; t2.int_col;</code></pre>
 
     <p class="p">
       <strong class="ph b">Semi-joins:</strong>
     </p>
+
 
     <p class="p">
       Semi-joins are a relatively rarely used variation. With the left semi-join, only data from the left-hand
@@ -202,11 +242,13 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       data from the right-hand table.</span>
     </p>
 
+
 <pre class="pre codeblock"><code>SELECT t1.c1, t1.c2, t1.c2 FROM t1 LEFT SEMI JOIN t2 ON t1.id = t2.id;</code></pre>
 
     <p class="p">
       <strong class="ph b">Natural joins (not supported):</strong>
     </p>
+
 
     <p class="p">
       Impala does not support the <code class="ph codeph">NATURAL JOIN</code> operator, again to avoid inconsistent or huge
@@ -217,11 +259,13 @@ SELECT * FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id;</code></pre>
       results as columns are added to or removed from tables.
     </p>
 
+
     <p class="p">
       If you do have any queries that use <code class="ph codeph">NATURAL JOIN</code>, make sure to rewrite them with explicit
       <code class="ph codeph">USING</code> clauses, because Impala could interpret the <code class="ph codeph">NATURAL</code> keyword as a
       table alias:
     </p>
+
 
 <pre class="pre codeblock"><code>-- 'NATURAL' is interpreted as an alias for 't1' and Impala attempts an inner join,
 -- resulting in an error because inner joins require explicit comparisons between columns.
@@ -237,6 +281,7 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
       <strong class="ph b">Anti-joins (<span class="keyword">Impala 2.0</span> and higher only):</strong>
     </p>
 
+
     <p class="p">
       Impala supports the <code class="ph codeph">LEFT ANTI JOIN</code> and <code class="ph codeph">RIGHT ANTI JOIN</code> clauses in
       <span class="keyword">Impala 2.0</span> and higher. The <code class="ph codeph">LEFT</code> or <code class="ph codeph">RIGHT</code>
@@ -249,9 +294,11 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
 
 
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
 
 
@@ -264,27 +311,32 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
       See <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about Impala support for complex types.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+
     <p class="p">
       You typically use join queries in situations like these:
     </p>
+
 
     <ul class="ul">
       <li class="li">
         When related data arrives from different sources, with each data set physically residing in a separate
         table. For example, you might have address data from business records that you cross-check against phone
         listings or census data.
-        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <div class="note note"><span class="notetitle">Note:</span>
           Impala can join tables of different file formats, including Impala-managed tables and HBase tables. For
           example, you might keep small dimension tables in HBase, for convenience of single-row lookups and
           updates, and for the larger fact tables use Parquet or other binary file format optimized for scan
           operations. Then, you can issue a join query to cross-reference the fact tables with the dimension
           tables.
         </div>
+
       </li>
+
 
       <li class="li">
         When data is normalized, a technique for reducing data duplication by dividing it across multiple tables.
@@ -294,6 +346,7 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
         table that specifies which customer ID corresponds to which name.
       </li>
 
+
       <li class="li">
         When certain columns are rarely needed for queries, so they are moved into separate tables to reduce
         overhead for common queries. For example, a <code class="ph codeph">biography</code> field might be rarely needed in
@@ -302,17 +355,21 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
         can retrieve it by performing a join with that separate table.
       </li>
 
+
       <li class="li">
         In <span class="keyword">Impala 2.3</span> or higher, when referring to complex type columns in queries.
         See <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details.
       </li>
+
     </ul>
+
 
     <p class="p">
       When comparing columns with the same names in <code class="ph codeph">ON</code> or <code class="ph codeph">WHERE</code> clauses, use the
       fully qualified names such as <code class="ph codeph"><var class="keyword varname">db_name</var>.<var class="keyword varname">table_name</var></code>, or
       assign table aliases, column aliases, or both to make the code more compact and understandable:
     </p>
+
 
 <pre class="pre codeblock"><code>select t1.c1 as first_id, t2.c2 as second_id from
   t1 join t2 on first_id = second_id;
@@ -321,12 +378,13 @@ select fact.custno, dimension.custno from
   customer_data as fact join customer_address as dimension
   using (custno)</code></pre>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         Performance for join queries is a crucial aspect for Impala, because complex join queries are
         resource-intensive operations. An efficient join query produces much less network traffic and CPU overhead
         than an inefficient one. For best results:
       </p>
+
       <ul class="ul">
         <li class="li">
           Make sure that both <a class="xref" href="impala_perf_stats.html#perf_stats">table and column statistics</a> are
@@ -340,29 +398,36 @@ select fact.custno, dimension.custno from
           statistics up to date after any substantial <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code> operations.
         </li>
 
+
         <li class="li">
           If table or column statistics are not available, join the largest table first. You can check the
           existence of statistics with the <code class="ph codeph">SHOW TABLE STATS <var class="keyword varname">table_name</var></code> and
           <code class="ph codeph">SHOW COLUMN STATS <var class="keyword varname">table_name</var></code> statements.
         </li>
 
+
         <li class="li">
           If table or column statistics are not available, join subsequent tables according to which table has the
           most selective filter, based on overall size and <code class="ph codeph">WHERE</code> clauses. Joining the table with
           the most selective filter results in the fewest number of rows being returned.
         </li>
+
       </ul>
+
       <p class="p">
         For more information and examples of performance for join queries, see
         <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a>.
       </p>
+
     </div>
+
 
     <p class="p">
       To control the result set from a join query, include the names of corresponding column names in both tables
       in an <code class="ph codeph">ON</code> or <code class="ph codeph">USING</code> clause, or by coding equality comparisons for those
       columns in the <code class="ph codeph">WHERE</code> clause.
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select c_last_name, ca_city from customer join customer_address where c_customer_sk = ca_address_sk;
 +-------------+-----------------+
@@ -392,10 +457,12 @@ Returned 50000 row(s) in 9.82s</code></pre>
       clause such as <code class="ph codeph">ON t1.c1 = t2.c2</code> or <code class="ph codeph">WHERE t1.c1 = t2.c2</code>.
     </p>
 
+
     <p class="p">
       Because even with equality clauses, the result set can still be large, as we saw in the previous example, you
       might use a <code class="ph codeph">LIMIT</code> clause to return a subset of the results:
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select c_last_name, ca_city from customer, customer_address where c_customer_sk = ca_address_sk limit 10;
 +-------------+-----------------+
@@ -418,6 +485,7 @@ Returned 10 row(s) in 0.63s</code></pre>
       Or you might use additional comparison operators or aggregation functions to condense a large result set into
       a smaller set of values:
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; -- Find the names of customers who live in one particular town.
 [localhost:21000] &gt; select distinct c_last_name from customer, customer_address where
@@ -459,6 +527,7 @@ Returned 1 row(s) in 1.00s</code></pre>
       your data set, hardware capacity, network configuration, and cluster workload.
     </p>
 
+
     <p class="p">
       The two categories of joins in Impala are known as <strong class="ph b">partitioned joins</strong> and <strong class="ph b">broadcast joins</strong>. If
       inaccurate table or column statistics, or some quirk of the data distribution, causes Impala to choose the
@@ -466,9 +535,11 @@ Returned 1 row(s) in 1.00s</code></pre>
       <a class="xref" href="impala_hints.html#hints">Optimizer Hints</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Handling NULLs in Join Columns:</strong>
     </p>
+
 
     <p class="p">
       By default, join key columns do not match if either one contains a <code class="ph codeph">NULL</code> value.
@@ -480,9 +551,11 @@ Returned 1 row(s) in 1.00s</code></pre>
       manner, because the operator can use a hash join while the <code class="ph codeph">OR</code> expression cannot.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <div class="p">
       The following examples refer to these simple tables containing small sets of integers:
@@ -499,10 +572,12 @@ Returned 1 row(s) in 1.00s</code></pre>
 
 
 
+
     <p class="p">
       The following example demonstrates an anti-join, returning the values from <code class="ph codeph">T1</code> that do not
       exist in <code class="ph codeph">T2</code> (in this case, the odd numbers 1, 3, and 5):
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select x from t1 left anti join t2 on (t1.x = t2.y);
 +---+
@@ -518,14 +593,24 @@ Returned 1 row(s) in 1.00s</code></pre>
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       See these tutorials for examples of different kinds of joins:
     </p>
+
 
     <ul class="ul">
       <li class="li">
         <a class="xref" href="impala_tutorial.html#tut_cross_join">Cross Joins and Cartesian Products with the CROSS JOIN Operator</a>
       </li>
+
     </ul>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div>
+</div>
+</div></body>
+</html>

@@ -1,11 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ports"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Ports Used by Impala</title></head><body id="ports"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Ports Used by Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="ports" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Ports Used by Impala</title>
+</head>
+<body id="ports">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Ports Used by Impala</h1>
+
   
 
-  <div class="body conbody" id="ports__conbody_ports">
+  <div class="body conbody" id="conbody_ports">
 
     <p class="p">
       
@@ -13,409 +32,605 @@
       on each system.
     </p>
 
-    <table class="table"><caption></caption><colgroup><col style="width:18.181818181818183%"><col style="width:27.27272727272727%"><col style="width:9.090909090909092%"><col style="width:18.181818181818183%"><col style="width:27.27272727272727%"></colgroup><thead class="thead">
+
+
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:18.181818181818183%" /><col style="width:27.27272727272727%" /><col style="width:9.090909090909092%" /><col style="width:18.181818181818183%" /><col style="width:27.27272727272727%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" id="ports__conbody_ports__entry__1">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d143935e75">
               Component
             </th>
-            <th class="entry nocellnorowborder" id="ports__conbody_ports__entry__2">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d143935e78">
               Service
             </th>
-            <th class="entry nocellnorowborder" id="ports__conbody_ports__entry__3">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d143935e81">
               Port
             </th>
-            <th class="entry nocellnorowborder" id="ports__conbody_ports__entry__4">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d143935e84">
               Access Requirement
             </th>
-            <th class="entry nocellnorowborder" id="ports__conbody_ports__entry__5">
+
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d143935e87">
               Comment
             </th>
+
           </tr>
-        </thead><tbody class="tbody">
+
+        </thead>
+<tbody class="tbody">
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Impala Daemon Frontend Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 21000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Used to transmit commands and receive results by <code class="ph codeph">impala-shell</code> and
                 some ODBC drivers.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Impala Daemon Frontend Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 21050
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Used to transmit commands and receive results by applications, such as Business Intelligence tools,
                 using JDBC, the Beeswax query editor in Hue, and some ODBC drivers.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Impala Daemon Backend Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 22000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
-              <p class="p">
-                Internal use only. Impala daemons use this port to communicate with each other.
-              </p>
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
+              <p class="p"> Internal use only. Impala daemons use this port for Thrift
+                based communication with each other. </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 StateStoreSubscriber Service Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 23000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. Impala daemons listen on this port for updates from the statestore daemon.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Catalog Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 StateStoreSubscriber Service Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 23020
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. The catalog daemon listens on this port for updates from the statestore daemon.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Impala Daemon HTTP Server Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 25000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Impala web interface for administrators to monitor and troubleshoot.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala StateStore Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 StateStore HTTP Server Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 25010
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 StateStore web interface for administrators to monitor and troubleshoot.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Catalog Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Catalog HTTP Server Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 25020
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Catalog service web interface for administrators to monitor and troubleshoot. New in Impala 1.2 and
                 higher.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala StateStore Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 StateStore Service Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 24000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. The statestore daemon listens on this port for registration/unregistration
                 requests.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Catalog Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 StateStore Service Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 26000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. The catalog service uses this port to communicate with the Impala daemons. New
                 in Impala 1.2 and higher.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
+              <p class="p"> Impala Daemon </p>
+
+            </td>
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
+              <p class="p">KRPC Port</p>
+
+            </td>
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
+              <p class="p">27000</p>
+
+            </td>
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
+              <p class="p">Internal</p>
+
+            </td>
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
+              <p class="p">Internal use only. Impala daemons use this port for KRPC based
+                communication with each other.</p>
+
+            </td>
+
+          </tr>
+
+          <tr class="row">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Daemon
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Llama Callback Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 28000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. Impala daemons use to communicate with Llama. New in <span class="keyword">Impala 1.3</span> and higher.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Llama ApplicationMaster
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Llama Thrift Admin Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 15002
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. New in <span class="keyword">Impala 1.3</span> and higher.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Llama ApplicationMaster
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Llama Thrift Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 15000
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 Internal
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Internal use only. New in <span class="keyword">Impala 1.3</span> and higher.
               </p>
+
             </td>
+
           </tr>
+
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__1 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d143935e75 ">
               <p class="p">
                 Impala Llama ApplicationMaster
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__2 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d143935e78 ">
               <p class="p">
                 Llama HTTP Port
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__3 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d143935e81 ">
               <p class="p">
                 15001
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__4 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d143935e84 ">
               <p class="p">
                 External
               </p>
+
             </td>
-            <td class="entry nocellnorowborder" headers="ports__conbody_ports__entry__5 ">
+
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d143935e87 ">
               <p class="p">
                 Llama service web interface for administrators to monitor and troubleshoot.
                 New in <span class="keyword">Impala 1.3</span> and higher.
               </p>
+
             </td>
+
           </tr>
-        </tbody></table>
+
+        </tbody>
+</table>
+</div>
+
   </div>
-</article></main></body></html>
+
+</body>
+</html>

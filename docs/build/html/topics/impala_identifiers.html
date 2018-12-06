@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="identifiers"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Overview of Impala Identifiers</title></head><body id="identifiers"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Overview of Impala Identifiers" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="identifiers" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Overview of Impala Identifiers</title>
+</head>
+<body id="identifiers">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Overview of Impala Identifiers</h1>
+
   
   
 
@@ -14,32 +34,40 @@
       containing unusual characters, and other aspects such as case sensitivity.
     </p>
 
+
     <ul class="ul">
       <li class="li">
         <p class="p">
         The minimum length of an identifier is 1 character.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
         The maximum length of an identifier is currently 128 characters, enforced by the metastore database.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
-        An identifier must start with an alphabetic character. The remainder can contain any combination of
-        alphanumeric characters and underscores. Quoting the identifier with backticks has no effect on the allowed
-        characters in the name.
+        An identifier must start with an alphanumeric or underscore character. Quoting the identifier with
+        backticks has no effect on the allowed characters in the name.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
         An identifier can contain only ASCII characters.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -50,6 +78,7 @@
         with backticks in the <code class="ph codeph">CREATE TABLE</code> statement, and how the column name
         must also be quoted with backticks in a query:
         </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table reserved (`data` string);
 
 [localhost:21000] &gt; select data from reserved;
@@ -73,7 +102,7 @@ CAUSED BY: Exception: Syntax error
 [localhost:21000] &gt;
 </code></pre>
 
-        <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+        <div class="note important"><span class="importanttitle">Important:</span>
           Because the list of reserved words grows over time as new SQL syntax is added,
           consider adopting coding conventions (especially for any automated scripts
           or in packaged applications) to always quote all identifiers with backticks.
@@ -81,7 +110,9 @@ CAUSED BY: Exception: Syntax error
           new reserved words are added in later releases.
         </div>
 
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -90,8 +121,11 @@ CAUSED BY: Exception: Syntax error
         always folds all specified table and column names to lowercase. This is why the column headers in query
         output are always displayed in lowercase.
         </p>
+
       </li>
+
     </ul>
+
 
     <p class="p">
       See <a class="xref" href="impala_aliases.html#aliases">Overview of Impala Aliases</a> for how to define shorter or easier-to-remember aliases if the
@@ -102,9 +136,17 @@ CAUSED BY: Exception: Syntax error
         </span>
     </p>
 
+
     <p class="p">
         Another way to define different names for the same tables or columns is to create views. See
         <a class="xref" href="../shared/../topics/impala_views.html#views">Overview of Impala Views</a> for details.
       </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div>
+</div>
+</div></body>
+</html>

@@ -1,30 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="admission_control"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Admission Control and Query Queuing</title></head><body id="admission_control"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Admission Control and Query Queuing" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="admission_control" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Admission Control and Query Queuing</title>
+</head>
+<body id="admission_control">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Admission Control and Query Queuing</h1>
+
   
 
   <div class="body conbody">
 
-    <p class="p" id="admission_control__admission_control_intro">
-      Admission control is an Impala feature that imposes limits on concurrent SQL queries, to avoid resource usage
-      spikes and out-of-memory conditions on busy clusters.
-      It is a form of <span class="q">"throttling"</span>.
-      New queries are accepted and executed until
-      certain conditions are met, such as too many queries or too much
-      total memory used across the cluster.
-      When one of these thresholds is reached,
-      incoming queries wait to begin execution. These queries are
-      queued and are admitted (that is, begin executing) when the resources become available.
-    </p>
+    <p class="p" id="admission_control__admission_control_intro"> Admission control is an Impala feature that
+      limits the number of concurrently running queries to avoid resource usage
+      spikes and out-of-memory conditions on busy clusters. New queries are
+      accepted and executed until certain a threshold is reached, such as too
+      many queries or too much total memory used across the cluster. When one of
+      these thresholds is reached, incoming queries are queued and are admitted
+      (that is, begin executing) when the resources become available. </p>
+
+    <p class="p"> In addition to the threshold values for currently executing queries, you
+      can place limits on the maximum number of queries that are queued,
+      waiting, and a limit on the amount of time they might wait before
+      returning with an error. These queue settings let you ensure that queries
+      do not wait indefinitely so that you can detect and correct
+        <span class="q">"starvation"</span> scenarios. </p>
+
     <p class="p">
-      In addition to the threshold values for currently executing queries,
-      you can place limits on the maximum number of queries that are
-      queued (waiting) and a limit on the amount of time they might wait
-      before returning with an error. These queue settings let you ensure that queries do
-      not wait indefinitely, so that you can detect and correct <span class="q">"starvation"</span> scenarios.
+      Queries, DML statements, and some DDL statements, including
+        <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">COMPUTE
+        STATS</code> are affected by admission control.
     </p>
+
     <p class="p">
       Enable this feature if your cluster is
       underutilized at some times and overutilized at others. Overutilization is indicated by performance
@@ -33,26 +56,37 @@
       avoid out-of-memory conditions during heavy concurrent usage.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           The use of the Llama component for integrated resource management within YARN
           is no longer supported with <span class="keyword">Impala 2.3</span> and higher.
           The Llama support code is removed entirely in <span class="keyword">Impala 2.8</span> and higher.
         </p>
+
         <p class="p">
           For clusters running Impala alongside
           other data management components, you define static service pools to define the resources
           available to Impala and other components. Then within the area allocated for Impala,
           you can create dynamic service pools, each with its own settings for the Impala admission control feature.
         </p>
+
       </div>
 
+
     <p class="p toc inpage"></p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="admission_control__admission_intro">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="admission_intro">
 
     <h2 class="title topictitle2" id="ariaid-title2">Overview of Impala Admission Control</h2>
+
   
 
     <div class="body conbody">
@@ -65,15 +99,17 @@
         all queries contend for resources and run slowly, admission control can result in higher overall throughput.
       </p>
 
-      <p class="p">
-        For another example, consider a memory-bound workload such as many large joins or aggregation queries.
-        Each such query could briefly use many gigabytes of memory to process intermediate results.
-        Because Impala by default cancels queries that exceed the specified memory limit,
-        running multiple large-scale queries at once might require
-        re-running some queries that are cancelled. In this case, admission control improves the
-        reliability and stability of the overall workload by only allowing as many concurrent queries
-        as the overall memory of the cluster can accomodate.
-      </p>
+
+      <p class="p"> For another example, consider a memory-bound workload such as many
+        large joins or aggregation queries. Each such query could briefly use
+        many gigabytes of memory to process intermediate results. Because Impala
+        by default cancels queries that exceed the specified memory limit,
+        running multiple large-scale queries at once might require re-running
+        some queries that are cancelled. In this case, admission control
+        improves the reliability and stability of the overall workload by only
+        allowing as many concurrent queries as the overall memory of the cluster
+        can accommodate. </p>
+
 
       <p class="p">
         The admission control feature lets you set an upper limit on the number of concurrent Impala
@@ -82,6 +118,7 @@
         queued queries are allowed to proceed.
       </p>
 
+
       <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, you can specify these limits and thresholds for each
         pool rather than globally. That way, you can balance the resource usage and throughput
@@ -89,15 +126,20 @@
         exploratory queries.
       </p>
 
+
       <p class="p">
         For details on the internal workings of admission control, see
         <a class="xref" href="impala_admission.html#admission_architecture">How Impala Schedules and Enforces Limits on Concurrent Queries</a>.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="admission_control__admission_concurrency">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="admission_concurrency">
     <h2 class="title topictitle2" id="ariaid-title3">Concurrent Queries and Admission Control</h2>
+
     <div class="body conbody">
       <p class="p">
         One way to limit resource usage through admission control is to set an upper limit
@@ -105,74 +147,223 @@
         when you do not have extensive information about memory usage for your workload.
         This setting can be specified separately for each dynamic resource pool.
       </p>
+
       <p class="p">
         You can combine this setting with the memory-based approach described in
         <a class="xref" href="impala_admission.html#admission_memory">Memory Limits and Admission Control</a>. If either the maximum number of
         or the expected memory usage of the concurrent queries is exceeded, subsequent queries
         are queued until the concurrent workload falls below the threshold again.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="admission_control__admission_memory">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="admission_memory">
     <h2 class="title topictitle2" id="ariaid-title4">Memory Limits and Admission Control</h2>
+
     <div class="body conbody">
       <p class="p">
         Each dynamic resource pool can have an upper limit on the cluster-wide memory used by queries executing in that pool.
         This is the technique to use once you have a stable workload with well-understood memory requirements.
       </p>
-      <p class="p">
-        Always specify the <span class="ph uicontrol">Default Query Memory Limit</span> for the expected maximum amount of RAM
-        that a query might require on each host, which is equivalent to setting the <code class="ph codeph">MEM_LIMIT</code>
-        query option for every query run in that pool. That value affects the execution of each query, preventing it
-        from overallocating memory on each host, and potentially activating the spill-to-disk mechanism or cancelling
-        the query when necessary.
-      </p>
-      <p class="p">
-        Optionally, specify the <span class="ph uicontrol">Max Memory</span> setting, a cluster-wide limit that determines
-        how many queries can be safely run concurrently, based on the upper memory limit per host multiplied by the
-        number of Impala nodes in the cluster.
-      </p>
-      <div class="p">
-        For example, consider the following scenario:
-        <ul class="ul">
-          <li class="li"> The cluster is running <span class="keyword cmdname">impalad</span> daemons on five
-            DataNodes. </li>
-          <li class="li"> A dynamic resource pool has <span class="ph uicontrol">Max Memory</span> set
-            to 100 GB. </li>
-          <li class="li"> The <span class="ph uicontrol">Default Query Memory Limit</span> for the
-            pool is 10 GB. Therefore, any query running in this pool could use
-            up to 50 GB of memory (default query memory limit * number of Impala
-            nodes). </li>
-          <li class="li"> The maximum number of queries that Impala executes concurrently
-            within this dynamic resource pool is two, which is the most that
-            could be accomodated within the 100 GB <span class="ph uicontrol">Max
-              Memory</span> cluster-wide limit. </li>
-          <li class="li"> There is no memory penalty if queries use less memory than the
-              <span class="ph uicontrol">Default Query Memory Limit</span> per-host setting
-            or the <span class="ph uicontrol">Max Memory</span> cluster-wide limit. These
-            values are only used to estimate how many queries can be run
-            concurrently within the resource constraints for the pool. </li>
+
+      <p class="p">Use the following settings to manage memory-based admission
+        control.</p>
+
+      <dl class="dl">
+
+          <dt class="dt dlterm">Max Memory</dt>
+
+          <dd class="dd">
+            <p class="p">
+              The maximum amount of aggregate memory available across the
+              cluster to all queries executing in this pool. This should be a
+              portion of the aggregate configured memory for Impala daemons,
+              which will be shown in the settings dialog next to this option for
+              convenience. Setting this to a non-zero value enables memory based
+              admission control.
+            </p>
+
+            <p class="p">
+              Impala determines the expected maximum memory used by all
+              queries in the pool and holds back any further queries that would
+              result in Max Memory being exceeded.
+            </p>
+
+            <p class="p">
+              You set Max Memory in <code class="ph codeph">fair-scheduler.xml</code> file
+              with the <code class="ph codeph">maxResources</code> tag. For example:
+                <code class="ph codeph">&lt;maxResources&gt;2500 mb&lt;/maxResources&gt;</code>
+            </p>
+
+            <p class="p">
+              If you specify Max Memory, you should specify the amount of
+              memory to allocate to each query in this pool. You can do this in
+              two ways:
+            </p>
+
+            <ul class="ul">
+              <li class="li">By setting Maximum Query Memory Limit and Minimum Query Memory
+                Limit. This is preferred in <span class="keyword">Impala 3.1</span>
+                and greater and gives Impala flexibility to set aside more
+                memory to queries that are expected to be memory-hungry.</li>
+
+              <li class="li">By setting Default Query Memory Limit to the exact amount of
+                memory that Impala should set aside for queries in that
+                pool.</li>
+
+            </ul>
+
+            <div class="p">
+              Note that in the following cases, Impala will rely entirely on
+              memory estimates to determine how much memory to set aside for
+              each query. This is not recommended because it can result in
+              queries not running or being starved for memory if the estimates
+              are inaccurate. And it can affect other queries running on the
+              same node.
+              <ul class="ul">
+                <li class="li">Max Memory, Maximum Query Memory Limit, and Minimum Query
+                  Memory Limit are not set, and the <code class="ph codeph">MEM_LIMIT</code>
+                  query option is not set for the query.</li>
+
+                <li class="li">Default Query Memory Limit is set to 0, and the
+                    <code class="ph codeph">MEM_LIMIT</code> query option is not set for the
+                  query.</li>
+
+              </ul>
+
+            </div>
+
+          </dd>
+
+
+
+          <dt class="dt dlterm">Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
+
+          <dd class="dd">
+            <p class="p">These two options determine the minimum and maximum per-host
+              memory limit that will be chosen by Impala Admission control for
+              queries in this resource pool. If set, Impala Admission Control
+              will choose a memory limit between the minimum and maximum values
+              based on the per-host memory estimate for the query. The memory
+              limit chosen determines the amount of memory that Impala Admission
+              control will set aside for this query on each host that the query
+              is running on. The aggregate memory across all of the hosts that
+              the query is running on is counted against the pool’s Max
+              Memory.</p>
+
+            <p class="p">Minimum Query Memory Limit must be less than or equal to Maximum
+              Query Memory Limit and Max Memory.</p>
+
+            <p class="p">You set the settings in <code class="ph codeph">llama-site.xml</code>. For
+              example:</p>
+
+            <pre class="pre codeblock"><code>
+&lt;property&gt;
+    &lt;name&gt;impala.admission-control.<strong class="ph b">max-query-mem-limit</strong>.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;1610612736&lt;/value&gt;&lt;!--1.5GB--&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;impala.admission-control.<strong class="ph b">min-query-mem-limit</strong>.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;52428800&lt;/value&gt;&lt;!--50MB--&gt;
+  &lt;/property&gt;</code></pre>
+            <p class="p">A user can override Impala’s choice of memory limit by setting
+              the <code class="ph codeph">MEM_LIMIT</code> query option. If the Clamp
+              MEM_LIMIT Query Option setting is set to <code class="ph codeph">TRUE</code> and
+              the user sets <code class="ph codeph">MEM_LIMIT</code> to a value that is
+              outside of the range specified by these two options, then the
+              effective memory limit will be either the minimum or maximum,
+              depending on whether <code class="ph codeph">MEM_LIMIT</code> is lower than or
+              higher the range.</p>
+
+            <div class="p">For example, assume a resource pool with the following parameters
+              set: <ul class="ul">
+                <li class="li">Minimum Query Memory Limit = 2GB</li>
+
+                <li class="li">Maximum Query Memory Limit = 10GB</li>
+
+              </ul>
+If a user tries to submit a query with the
+                <code class="ph codeph">MEM_LIMIT</code> query option set to 14 GB, the
+              following would happen:<ul class="ul">
+                <li class="li">If Clamp MEM_LIMIT Query Option = true, admission controller
+                  would override <code class="ph codeph">MEM_LIMIT</code> with 10 GB and
+                  attempt admission using that value.</li>
+
+                <li class="li">If Clamp MEM_LIMIT Query Option = false, the admission
+                  controller will retain the <code class="ph codeph">MEM_LIMIT</code> of 14 GB
+                  set by the user and will attempt admission using the
+                  value.</li>
+
+              </ul>
+</div>
+
+          </dd>
+
+
+
+          <dt class="dt dlterm">Default Query Memory Limit</dt>
+
+          <dd class="dd">The default memory limit applied to queries executing in this pool
+            when no explicit <code class="ph codeph">MEM_LIMIT</code> query option is set. The
+            memory limit chosen determines the amount of memory that Impala
+            Admission control will set aside for this query on each host that
+            the query is running on. The aggregate memory across all of the
+            hosts that the query is running on is counted against the pool’s Max
+            Memory. This option is deprecated in <span class="keyword">Impala 3.1</span> and higher and is replaced by Maximum Query Memory Limit and
+            Minimum Query Memory Limit. Do not set this if either Maximum Query
+            Memory Limit or Minimum Query Memory Limit is set.</dd>
+
+
+      </dl>
+
+      <div class="p"> For example, consider the
+        following scenario: <ul class="ul">
+          <li class="li">The cluster is running <code class="ph codeph">impalad</code> daemons on five
+            hosts.</li>
+
+          <li class="li">A dynamic resource pool has Max Memory set to 100 GB.</li>
+
+          <li class="li">The Maximum Query Memory Limit for the pool is 10 GB and Minimum
+            Query Memory Limit is 2 GB. Therefore, any query running in this
+            pool could use up to 50 GB of memory (Maximum Query Memory Limit *
+            number of Impala nodes).</li>
+
+          <li class="li">Impala will execute varying numbers of queries concurrently
+            because queries may be given memory limits anywhere between 2 GB and
+            10 GB, depending on the estimated memory requirements. For example,
+            Impala may execute up to 10 small queries with 2 GB memory limits or
+            two large queries with 10 GB memory limits because that is what will
+            fit in the 100 GB cluster-wide limit when executing on five
+            hosts.</li>
+
+          <li class="li">The executing queries may use less memory than the per-host memory
+            limit or the Max Memory cluster-wide limit if they do not need that
+            much memory. In general this is not a problem so long as you are
+            able to execute enough queries concurrently to meet your needs.</li>
+
         </ul>
+
       </div>
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span>  If you specify <span class="ph uicontrol">Max
-          Memory</span> for an Impala dynamic resource pool, you must also
-        specify the <span class="ph uicontrol">Default Query Memory Limit</span>.
-          <span class="ph uicontrol">Max Memory</span> relies on the <span class="ph uicontrol">Default
-          Query Memory Limit</span> to produce a reliable estimate of
-        overall memory consumption for a query. </div>
+
       <p class="p">
         You can combine the memory-based settings with the upper limit on concurrent queries described in
         <a class="xref" href="impala_admission.html#admission_concurrency">Concurrent Queries and Admission Control</a>. If either the maximum number of
         or the expected memory usage of the concurrent queries is exceeded, subsequent queries
         are queued until the concurrent workload falls below the threshold again.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="admission_control__admission_yarn">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="admission_yarn">
 
     <h2 class="title topictitle2" id="ariaid-title5">How Impala Admission Control Relates to Other Resource Management Tools</h2>
+
   
 
     <div class="body conbody">
@@ -183,12 +374,14 @@
         decide which combination of resource management features to use for Impala.
       </p>
 
+
       <p class="p">
         Admission control is a lightweight, decentralized system that is suitable for workloads consisting
         primarily of Impala queries and other SQL statements. It sets <span class="q">"soft"</span> limits that smooth out Impala
         memory usage during times of heavy load, rather than taking an all-or-nothing approach that cancels jobs
         that are too resource-intensive.
       </p>
+
 
       <p class="p">
         Because the admission control system does not interact with other Hadoop workloads such as MapReduce jobs, you
@@ -200,10 +393,12 @@
         cluster. In this scenario, Impala's resources are not managed by YARN.
       </p>
 
+
       <p class="p">
         The Impala admission control feature uses the same configuration mechanism as the YARN resource manager to map users to
         pools and authenticate them.
       </p>
+
 
       <p class="p">
         Although the Impala admission control feature uses a <code class="ph codeph">fair-scheduler.xml</code> configuration file
@@ -211,12 +406,16 @@
         even when YARN is using the capacity scheduler.
       </p>
 
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="admission_control__admission_architecture">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="admission_architecture">
 
     <h2 class="title topictitle2" id="ariaid-title6">How Impala Schedules and Enforces Limits on Concurrent Queries</h2>
+
   
 
     <div class="body conbody">
@@ -235,7 +434,6 @@
       </p>
 
 
-
       <p class="p">
         To avoid a large backlog of queued requests, you can set an upper limit on the size of the queue for
         queries that are queued. When the number of queued queries exceeds this limit, further queries are
@@ -246,12 +444,16 @@
         smooth out the load, or by doing <a class="xref" href="impala_performance.html#performance">Impala performance
         tuning</a> to enable higher throughput.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="admission_control__admission_jdbc_odbc">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="admission_jdbc_odbc">
 
     <h2 class="title topictitle2" id="ariaid-title7">How Admission Control works with Impala Clients (JDBC, ODBC, HiveServer2)</h2>
+
   
 
     <div class="body conbody">
@@ -260,6 +462,7 @@
         Most aspects of admission control work transparently with client interfaces such as JDBC and ODBC:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           If a SQL statement is put into a queue rather than running immediately, the API call blocks until the
@@ -267,12 +470,15 @@
           results, which might also block until results become available.
         </li>
 
+
         <li class="li">
           If a SQL statement is cancelled because it has been queued for too long or because it exceeded the memory
           limit during execution, the error is returned to the client program with a descriptive error message.
         </li>
 
+
       </ul>
+
 
       <p class="p">
         In Impala 2.0 and higher, you can submit
@@ -282,6 +488,7 @@
         as described in <a class="xref" href="impala_request_pool.html#request_pool">REQUEST_POOL Query Option</a>.
 
       </p>
+
 
       <p class="p">
         At any time, the set of queued queries could include queries submitted through multiple different Impala
@@ -296,10 +503,12 @@
         Impala daemon host.
       </p>
 
+
       <p class="p">
         Admission control has the following limitations or special behavior when used with JDBC or ODBC
         applications:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -307,12 +516,17 @@
           <code class="ph codeph">RESERVATION_REQUEST_TIMEOUT</code> and <code class="ph codeph">V_CPU_CORES</code>, are no longer used. Those query options only
           applied to using Impala with Llama, which is no longer supported.
         </li>
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="admission_control__admission_schema_config">
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="admission_schema_config">
     <h2 class="title topictitle2" id="ariaid-title8">SQL and Schema Considerations for Admission Control</h2>
+
     <div class="body conbody">
       <p class="p">
         When queries complete quickly and are tuned for optimal memory usage, there is less chance of
@@ -322,12 +536,14 @@
         resource-intensive, helps you to plan how to divide the queries into different pools and
         decide what limits to define for each pool.
       </p>
+
       <p class="p">
         For large tables, especially those involved in join queries, keep their statistics up to date
         after loading substantial amounts of new data or adding new partitions.
         Use the <code class="ph codeph">COMPUTE STATS</code> statement for unpartitioned tables, and
         <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> for partitioned tables.
       </p>
+
       <p class="p">
         When you use dynamic resource pools with a <span class="ph uicontrol">Max Memory</span> setting enabled,
         you typically override the memory estimates that Impala makes based on the statistics from the
@@ -340,16 +556,21 @@
         that use the same resource pool, you avoid unnecessary query queuing or out-of-memory conditions
         that can arise during high-concurrency workloads when memory estimates for some queries are inaccurate.
       </p>
+
       <p class="p">
         Follow other steps from <a class="xref" href="impala_performance.html#performance">Tuning Impala for Performance</a> to tune your queries.
       </p>
+
     </div>
-  </article>
+
+  </div>
 
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="admission_control__admission_config">
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="admission_config">
 
     <h2 class="title topictitle2" id="ariaid-title9">Configuring Admission Control</h2>
+
   
 
     <div class="body conbody">
@@ -360,7 +581,8 @@
         for a different set of users and groups).
       </p>
 
-      <section class="section" id="admission_config__admission_flags"><h3 class="title sectiontitle">Impala Service Flags for Admission Control (Advanced)</h3>
+
+      <div class="section" id="admission_config__admission_flags"><h3 class="title sectiontitle">Impala Service Flags for Admission Control (Advanced)</h3>
 
         
 
@@ -369,11 +591,13 @@
           options on the <span class="keyword cmdname">impalad</span> command line, prepend the option name with <code class="ph codeph">--</code>.
         </p>
 
+
         <dl class="dl" id="admission_config__admission_control_option_list">
           
             <dt class="dt dlterm" id="admission_config__queue_wait_timeout_ms">
               <code class="ph codeph">queue_wait_timeout_ms</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Maximum amount of time (in milliseconds) that a
@@ -381,15 +605,19 @@
               <p class="p">
                 <strong class="ph b">Type:</strong> <code class="ph codeph">int64</code>
               </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong> <code class="ph codeph">60000</code>
               </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__default_pool_max_requests">
               <code class="ph codeph">default_pool_max_requests</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Maximum number of concurrent outstanding requests
@@ -403,16 +631,20 @@
                 <strong class="ph b">Type:</strong>
                 <code class="ph codeph">int64</code>
               </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <span class="ph">-1, meaning unlimited (prior to <span class="keyword">Impala 2.5</span> the default was 200)</span>
               </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__default_pool_max_queued">
               <code class="ph codeph">default_pool_max_queued</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Maximum number of requests allowed to be queued
@@ -427,16 +659,20 @@
                 <strong class="ph b">Type:</strong>
                 <code class="ph codeph">int64</code>
               </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <span class="ph">unlimited</span>
               </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__default_pool_mem_limit">
               <code class="ph codeph">default_pool_mem_limit</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Maximum amount of memory (across the entire
@@ -455,95 +691,121 @@
               is a soft limit; the overall memory used by concurrent queries
               might be slightly higher during times of heavy load. Ignored if
                 <code class="ph codeph">fair_scheduler_config_path</code> and
-                <code class="ph codeph">llama_site_path</code> are set. <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+                <code class="ph codeph">llama_site_path</code> are set. <div class="note note"><span class="notetitle">Note:</span>
         Impala relies on the statistics produced by the <code class="ph codeph">COMPUTE STATS</code> statement to estimate memory
         usage for each query. See <a class="xref" href="../shared/../topics/impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for guidelines
         about how and when to use this statement.
       </div>
+
               <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <code class="ph codeph">""</code> (empty string, meaning unlimited) </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__disable_pool_max_requests">
               <code class="ph codeph">disable_pool_max_requests</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Disables all per-pool limits on the maximum number
               of running requests. <p class="p">
                 <strong class="ph b">Type:</strong> Boolean </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <code class="ph codeph">false</code>
               </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__disable_pool_mem_limits">
               <code class="ph codeph">disable_pool_mem_limits</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Disables all per-pool mem limits. <p class="p">
                 <strong class="ph b">Type:</strong> Boolean </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <code class="ph codeph">false</code>
               </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__fair_scheduler_allocation_path">
               <code class="ph codeph">fair_scheduler_allocation_path</code>
             </dt>
+
             <dd class="dd">
               
               <strong class="ph b">Purpose:</strong> Path to the fair scheduler allocation file
                 (<code class="ph codeph">fair-scheduler.xml</code>). <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
+
               <p class="p">
                 <strong class="ph b">Default:</strong>
                 <code class="ph codeph">""</code> (empty string) </p>
+
               <p class="p">
                 <strong class="ph b">Usage notes:</strong> Admission control only uses a small subset
                 of the settings that can go in this file, as described below.
                 For details about all the Fair Scheduler configuration settings,
                 see the <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache wiki</a>. </p>
+
             </dd>
+
           
           
             <dt class="dt dlterm" id="admission_config__llama_site_path">
               <code class="ph codeph">llama_site_path</code>
             </dt>
+
             <dd class="dd">
               
-              <strong class="ph b">Purpose:</strong> Path to the configuration file used by admission control
-                (<code class="ph codeph">llama-site.xml</code>). If set,
-                <code class="ph codeph">fair_scheduler_allocation_path</code> must also be set.
-              <p class="p">
+              <strong class="ph b">Purpose:</strong> Path to the configuration file used by admission
+              control (<code class="ph codeph">llama-site.xml</code>). If set,
+                <code class="ph codeph">fair_scheduler_allocation_path</code> must also be
+              set. <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
+
               <p class="p">
-                <strong class="ph b">Default:</strong> <code class="ph codeph">""</code> (empty string) </p>
+                <strong class="ph b">Default:</strong>
+                <code class="ph codeph">""</code> (empty string) </p>
+
               <p class="p">
-                <strong class="ph b">Usage notes:</strong> Admission control only uses a few
-                of the settings that can go in this file, as described below.
-              </p>
+                <strong class="ph b">Usage notes:</strong> Admission control only uses a few of the
+                settings that can go in this file, as described below. </p>
+
             </dd>
+
           
         </dl>
-      </section>
+
+      </div>
+
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="admission_config__admission_config_manual">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="admission_config_manual">
 
       <h3 class="title topictitle3" id="ariaid-title10">Configuring Admission Control Using the Command Line</h3>
+
 
       <div class="body conbody">
 
@@ -553,33 +815,42 @@
             <span class="ph filepath">llama-site.xml</span>.
         </p>
 
+
         <p class="p">
           For a straightforward configuration using a single resource pool named <code class="ph codeph">default</code>, you can
           specify configuration options on the command line and skip the <span class="ph filepath">fair-scheduler.xml</span>
           and <span class="ph filepath">llama-site.xml</span> configuration files.
         </p>
 
-        <p class="p">
-          For an advanced configuration with multiple resource pools using different settings, set up the
-          <span class="ph filepath">fair-scheduler.xml</span> and <span class="ph filepath">llama-site.xml</span> configuration files
-          manually. Provide the paths to each one using the <span class="keyword cmdname">impalad</span> command-line options,
-          <code class="ph codeph">--fair_scheduler_allocation_path</code> and <code class="ph codeph">--llama_site_path</code> respectively.
-        </p>
 
-        <p class="p">
-          The Impala admission control feature only uses the Fair Scheduler configuration settings to determine how
-          to map users and groups to different resource pools. For example, you might set up different resource
-          pools with separate memory limits, and maximum number of concurrent and queued queries, for different
-          categories of users within your organization. For details about all the Fair Scheduler configuration
-          settings, see the
-          <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
-          wiki</a>.
-        </p>
+        <div class="p"> For an advanced configuration with multiple resource pools using
+          different settings:<ol class="ol">
+            <li class="li">Set up the <span class="ph filepath">fair-scheduler.xml</span> and
+                <span class="ph filepath">llama-site.xml</span> configuration files
+              manually.</li>
 
-        <p class="p">
-          The Impala admission control feature only uses a small subset of possible settings from the
-          <span class="ph filepath">llama-site.xml</span> configuration file:
-        </p>
+            <li class="li">Provide the paths to each one using the
+                <span class="keyword cmdname">impalad</span> command-line options,
+                <code class="ph codeph">--fair_scheduler_allocation_path</code> and
+                <code class="ph codeph">--llama_site_path</code> respectively. </li>
+
+          </ol>
+</div>
+
+
+        <p class="p"> The Impala admission control feature uses the Fair Scheduler
+          configuration settings to determine how to map users and groups to
+          different resource pools. For example, you might set up different
+          resource pools with separate memory limits, and maximum number of
+          concurrent and queued queries, for different categories of users
+          within your organization. For details about all the Fair Scheduler
+          configuration settings, see the <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache wiki</a>. </p>
+
+
+        <p class="p"> The Impala admission control feature uses a small subset of possible
+          settings from the <span class="ph filepath">llama-site.xml</span> configuration
+          file: </p>
+
 
 <pre class="pre codeblock"><code>llama.am.throttling.maximum.placed.reservations.<var class="keyword varname">queue_name</var>
 llama.am.throttling.maximum.queued.reservations.<var class="keyword varname">queue_name</var>
@@ -587,47 +858,56 @@ llama.am.throttling.maximum.queued.reservations.<var class="keyword varname">que
 impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queue_name</var></span>
 </code></pre>
 
-        <p class="p">
-          The <code class="ph codeph">impala.admission-control.pool-queue-timeout-ms</code>
-          setting specifies the timeout value for this pool, in milliseconds.
-          The<code class="ph codeph">impala.admission-control.pool-default-query-options</code>
+        <p class="p"> The
+            <code class="ph codeph">impala.admission-control.pool-queue-timeout-ms</code>
+          setting specifies the timeout value for this pool in milliseconds. </p>
+
+        <p class="p">The<code class="ph codeph">impala.admission-control.pool-default-query-options</code>
           settings designates the default query options for all queries that run
           in this pool. Its argument value is a comma-delimited string of
-          'key=value' pairs, for example,<code class="ph codeph">'key1=val1,key2=val2'</code>.
-          For example, this is where you might set a default memory limit
-          for all queries in the pool, using an argument such as <code class="ph codeph">MEM_LIMIT=5G</code>.
-        </p>
+          'key=value' pairs, <code class="ph codeph">'key1=val1,key2=val2, ...'</code>. For
+          example, this is where you might set a default memory limit for all
+          queries in the pool, using an argument such as
+            <code class="ph codeph">MEM_LIMIT=5G</code>. </p>
+
 
         <p class="p">
           The <code class="ph codeph">impala.admission-control.*</code> configuration settings are available in
           <span class="keyword">Impala 2.5</span> and higher.
         </p>
 
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title11" id="admission_config__admission_examples">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="admission_examples">
 
       <h3 class="title topictitle3" id="ariaid-title11">Example of Admission Control Configuration</h3>
+
 
       <div class="body conbody">
 
         <p class="p"> Here are sample <span class="ph filepath">fair-scheduler.xml</span> and
-          <span class="ph filepath">llama-site.xml</span> files that define resource pools
-          <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>, and
-          <code class="ph codeph">root.production</code>. These sample files are stripped down: in a real
-          deployment they might contain other settings for use with various aspects of the YARN
-          component. The settings shown here are the significant ones for the Impala admission
-          control feature. </p>
+            <span class="ph filepath">llama-site.xml</span> files that define resource pools
+            <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>,
+          and <code class="ph codeph">root.production</code>. These files define resource
+          pools for Impala admission control and are separate from the similar
+            <code class="ph codeph">fair-scheduler.xml</code>that defines resource pools for
+          YARN.</p>
+
 
         <p class="p">
           <strong class="ph b">fair-scheduler.xml:</strong>
         </p>
 
+
         <p class="p">
           Although Impala does not use the <code class="ph codeph">vcores</code> value, you must still specify it to satisfy
           YARN requirements for the file contents.
         </p>
+
 
         <p class="p">
           Each <code class="ph codeph">&lt;aclSubmitApps&gt;</code> tag (other than the one for <code class="ph codeph">root</code>) contains
@@ -635,11 +915,13 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
           users and groups allowed to submit Impala statements to the corresponding resource pool.
         </p>
 
+
         <p class="p">
           If you leave the <code class="ph codeph">&lt;aclSubmitApps&gt;</code> element empty for a pool, nobody can submit
           directly to that pool; child pools can specify their own <code class="ph codeph">&lt;aclSubmitApps&gt;</code> values
           to authorize users and groups to submit to those pools.
         </p>
+
 
         <pre class="pre codeblock"><code>&lt;allocations&gt;
 
@@ -670,6 +952,7 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
           <strong class="ph b">llama-site.xml:</strong>
         </p>
 
+
         <pre class="pre codeblock"><code>
 &lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;configuration&gt;
@@ -690,133 +973,96 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
     &lt;value&gt;30000&lt;/value&gt;
   &lt;/property&gt;
   &lt;property&gt;
-    &lt;name&gt;llama.am.throttling.maximum.placed.reservations.root.development&lt;/name&gt;
-    &lt;value&gt;50&lt;/value&gt;
+    &lt;name&gt;impala.admission-control.max-query-mem-limit.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;1610612736&lt;/value&gt;&lt;!--1.5GB--&gt;
   &lt;/property&gt;
   &lt;property&gt;
-    &lt;name&gt;llama.am.throttling.maximum.queued.reservations.root.development&lt;/name&gt;
-    &lt;value&gt;100&lt;/value&gt;
+    &lt;name&gt;impala.admission-control.min-query-mem-limit.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;52428800&lt;/value&gt;&lt;!--50MB--&gt;
   &lt;/property&gt;
   &lt;property&gt;
-    &lt;name&gt;impala.admission-control.pool-default-query-options.root.development&lt;/name&gt;
-    &lt;value&gt;mem_limit=256m,query_timeout_s=30,max_io_buffers=10&lt;/value&gt;
+    &lt;name&gt;impala.admission-control.clamp-mem-limit-query-option.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
   &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;impala.admission-control.pool-queue-timeout-ms.root.development&lt;/name&gt;
-    &lt;value&gt;15000&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;llama.am.throttling.maximum.placed.reservations.root.production&lt;/name&gt;
-    &lt;value&gt;100&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;llama.am.throttling.maximum.queued.reservations.root.production&lt;/name&gt;
-    &lt;value&gt;200&lt;/value&gt;
-  &lt;/property&gt;
-&lt;!--
-       Default query options for the 'root.production' pool.
-       THIS IS A NEW PARAMETER in Impala 2.5.
-       Note that the MEM_LIMIT query option still shows up in here even though it is a
-       separate box in the UI. We do that because it is the most important query option
-       that people will need (everything else is somewhat advanced).
-
-       MEM_LIMIT takes a per-node memory limit which is specified using one of the following:
-        - '&lt;int&gt;[bB]?'  -&gt; bytes (default if no unit given)
-        - '&lt;float&gt;[mM(bB)]' -&gt; megabytes
-        - '&lt;float&gt;[gG(bB)]' -&gt; in gigabytes
-        E.g. 'MEM_LIMIT=12345' (no unit) means 12345 bytes, and you can append m or g
-             to specify megabytes or gigabytes, though that is not required.
---&gt;
-  &lt;property&gt;
-    &lt;name&gt;impala.admission-control.pool-default-query-options.root.production&lt;/name&gt;
-    &lt;value&gt;mem_limit=386m,query_timeout_s=30,max_io_buffers=10&lt;/value&gt;
-  &lt;/property&gt;
-&lt;!--
-  Default queue timeout (ms) for the pool 'root.production'.
-  If this isn’t set, the process-wide flag is used.
-  THIS IS A NEW PARAMETER in Impala 2.5.
---&gt;
-  &lt;property&gt;
-    &lt;name&gt;impala.admission-control.pool-queue-timeout-ms.root.production&lt;/name&gt;
-    &lt;value&gt;30000&lt;/value&gt;
-  &lt;/property&gt;
-&lt;/configuration&gt;
-
 </code></pre>
 
       </div>
-    </article>
-
-
-
-  <article class="topic concept nested2" aria-labelledby="ariaid-title12" id="admission_config__admission_guidelines">
-
-    <h3 class="title topictitle3" id="ariaid-title12">Guidelines for Using Admission Control</h3>
-  
-
-    <div class="body conbody">
-
-      <p class="p">
-        To see how admission control works for particular queries, examine the profile output for the query. This
-        information is available through the <code class="ph codeph">PROFILE</code> statement in <span class="keyword cmdname">impala-shell</span>
-        immediately after running a query in the shell, on the <span class="ph uicontrol">queries</span> page of the Impala
-        debug web UI, or in the Impala log file (basic information at log level 1, more detailed information at log
-        level 2). The profile output contains details about the admission decision, such as whether the query was
-        queued or not and which resource pool it was assigned to. It also includes the estimated and actual memory
-        usage for the query, so you can fine-tune the configuration for the memory limits of the resource pools.
-      </p>
-
-      <p class="p">
-        Remember that the limits imposed by admission control are <span class="q">"soft"</span> limits.
-        The decentralized nature of this mechanism means that each Impala node makes its own decisions about whether
-        to allow queries to run immediately or to queue them. These decisions rely on information passed back and forth
-        between nodes by the statestore service. If a sudden surge in requests causes more queries than anticipated to run
-        concurrently, then throughput could decrease due to queries spilling to disk or contending for resources;
-        or queries could be cancelled if they exceed the <code class="ph codeph">MEM_LIMIT</code> setting while running.
-      </p>
-
-
-
-      <p class="p">
-        In <span class="keyword cmdname">impala-shell</span>, you can also specify which resource pool to direct queries to by
-        setting the <code class="ph codeph">REQUEST_POOL</code> query option.
-      </p>
-
-      <p class="p">
-        The statements affected by the admission control feature are primarily queries, but also include statements
-        that write data such as <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE AS SELECT</code>. Most write
-        operations in Impala are not resource-intensive, but inserting into a Parquet table can require substantial
-        memory due to buffering intermediate data before writing out each Parquet data block. See
-        <a class="xref" href="impala_parquet.html#parquet_etl">Loading Data into Parquet Tables</a> for instructions about inserting data efficiently into
-        Parquet tables.
-      </p>
-
-      <p class="p">
-        Although admission control does not scrutinize memory usage for other kinds of DDL statements, if a query
-        is queued due to a limit on concurrent queries or memory usage, subsequent statements in the same session
-        are also queued so that they are processed in the correct order:
-      </p>
-
-<pre class="pre codeblock"><code>-- This query could be queued to avoid out-of-memory at times of heavy load.
-select * from huge_table join enormous_table using (id);
--- If so, this subsequent statement in the same session is also queued
--- until the previous statement completes.
-drop table huge_table;
-</code></pre>
-
-      <p class="p">
-        If you set up different resource pools for different users and groups, consider reusing any classifications
-        you developed for use with Sentry security. See <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for details.
-      </p>
-
-      <p class="p">
-        For details about all the Fair Scheduler configuration settings, see
-        <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Fair Scheduler Configuration</a>, in particular the tags such as <code class="ph codeph">&lt;queue&gt;</code> and
-        <code class="ph codeph">&lt;aclSubmitApps&gt;</code> to map users and groups to particular resource pools (queues).
-      </p>
-
 
     </div>
-  </article>
-</article>
-</article></main></body></html>
+
+
+
+
+  <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="admission_guidelines">
+      <h3 class="title topictitle3" id="ariaid-title12">Guidelines for Using Admission Control</h3>
+
+
+      <div class="body conbody">
+        <p class="p"> The limits imposed by admission control are de-centrally managed
+            <span class="q">"soft"</span> limits. Each Impala coordinator node makes its own
+          decisions about whether to allow queries to run immediately or to
+          queue them. These decisions rely on information passed back and forth
+          between nodes by the StateStore service. If a sudden surge in requests
+          causes more queries than anticipated to run concurrently, then the
+          throughput could decrease due to queries spilling to disk or
+          contending for resources. Or queries could be cancelled if they exceed
+          the <code class="ph codeph">MEM_LIMIT</code> setting while running. </p>
+
+        <p class="p">
+          In <span class="keyword cmdname">impala-shell</span>, you can also specify which
+          resource pool to direct queries to by setting the
+            <code class="ph codeph">REQUEST_POOL</code> query option.
+        </p>
+
+        <div class="p"> To see how admission control works for particular queries, examine
+          the profile output or the summary output for the query. <ul class="ul">
+            <li class="li">Profile<p class="p">The information is available through the
+                  <code class="ph codeph">PROFILE</code> statement in
+                  <span class="keyword cmdname">impala-shell</span> immediately after running a
+                query in the shell, on the <span class="ph uicontrol">queries</span> page
+                of the Impala debug web UI, or in the Impala log file (basic
+                information at log level 1, more detailed information at log
+                level 2). </p>
+<p class="p">The profile output contains details about the
+                admission decision, such as whether the query was queued or not
+                and which resource pool it was assigned to. It also includes the
+                estimated and actual memory usage for the query, so you can
+                fine-tune the configuration for the memory limits of the
+                resource pools. </p>
+</li>
+
+            <li class="li">Summary<p class="p">Starting in <span class="keyword">Impala 3.1</span>, the
+                information is available in <span class="keyword cmdname">impala-shell</span> when
+                the <code class="ph codeph">LIVE_PROGRESS</code> or
+                  <code class="ph codeph">LIVE_SUMMARY</code> query option is set to
+                  <code class="ph codeph">TRUE</code>.</p>
+<p class="p">You can also start an
+                  <code class="ph codeph">impala-shell</code> session with the
+                  <code class="ph codeph">--live_progress</code> or
+                  <code class="ph codeph">--live_summary</code> flags to monitor all queries
+                in that <code class="ph codeph">impala-shell</code> session.</p>
+<p class="p">The summary
+                output includes the queuing status consisting of whether the
+                query was queued and what was the latest queuing
+              reason.</p>
+</li>
+
+          </ul>
+</div>
+
+        <p class="p">
+          For details about all the Fair Scheduler configuration settings, see
+            <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Fair Scheduler Configuration</a>, in
+          particular the tags such as <code class="ph codeph">&lt;queue&gt;</code> and
+            <code class="ph codeph">&lt;aclSubmitApps&gt;</code> to map users and groups to
+          particular resource pools (queues).
+        </p>
+
+      </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

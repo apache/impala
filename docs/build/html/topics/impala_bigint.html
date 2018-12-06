@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="bigint"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>BIGINT Data Type</title></head><body id="bigint"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="BIGINT Data Type" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="bigint" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>BIGINT Data Type</title>
+</head>
+<body id="bigint">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">BIGINT Data Type</h1>
+
   
   
 
@@ -13,19 +33,23 @@
       statements.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
 
+
     <p class="p">
       In the column definition of a <code class="ph codeph">CREATE TABLE</code> statement:
     </p>
+
 
 <pre class="pre codeblock"><code><var class="keyword varname">column_name</var> BIGINT</code></pre>
 
     <p class="p">
       <strong class="ph b">Range:</strong> -9223372036854775808 .. 9223372036854775807. There is no <code class="ph codeph">UNSIGNED</code> subtype.
     </p>
+
 
     <p class="p">
       <strong class="ph b">Conversions:</strong> Impala automatically converts to a floating-point type (<code class="ph codeph">FLOAT</code> or
@@ -40,9 +64,11 @@
         </span>
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE t1 (x BIGINT);
 SELECT CAST(1000 AS BIGINT);
@@ -51,6 +77,7 @@ SELECT CAST(1000 AS BIGINT);
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       <code class="ph codeph">BIGINT</code> is a convenient type to use for column declarations because you can use any kind of
@@ -61,29 +88,35 @@ SELECT CAST(1000 AS BIGINT);
       <code class="ph codeph">CAST()</code> when necessary to the appropriate type.
     </p>
 
+
     <p class="p">
       For a convenient and automated way to check the bounds of the <code class="ph codeph">BIGINT</code> type, call the
       functions <code class="ph codeph">MIN_BIGINT()</code> and <code class="ph codeph">MAX_BIGINT()</code>.
     </p>
+
 
     <p class="p">
       If an integer value is too large to be represented as a <code class="ph codeph">BIGINT</code>, use a
       <code class="ph codeph">DECIMAL</code> instead with sufficient digits of precision.
     </p>
 
+
     <p class="p">
         <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a <code class="ph codeph">NULL</code>
         value.
       </p>
+
 
     <p class="p">
         <strong class="ph b">Partitioning:</strong> Prefer to use this type for a partition key column. Impala can process the numeric
         type more efficiently than a <code class="ph codeph">STRING</code> representation of the value.
       </p>
 
+
     <p class="p">
         <strong class="ph b">HBase considerations:</strong> This data type is fully compatible with HBase tables.
       </p>
+
 
 
 
@@ -94,13 +127,16 @@ SELECT CAST(1000 AS BIGINT);
 
 
 
+
     <p class="p">
         <strong class="ph b">Internal details:</strong> Represented in memory as an 8-byte value.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> Available in all versions of Impala.
       </p>
+
 
     <p class="p">
         <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
@@ -108,9 +144,11 @@ SELECT CAST(1000 AS BIGINT);
         statement.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Sqoop considerations:</strong>
       </p>
+
 
     <p class="p"> If you use Sqoop to
         convert RDBMS data to Parquet, be careful with interpreting any
@@ -124,15 +162,24 @@ SELECT CAST(1000 AS BIGINT);
         this way from Sqoop, divide the values by 1000 when interpreting as the
           <code class="ph codeph">TIMESTAMP</code> type.</p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       <a class="xref" href="impala_literals.html#numeric_literals">Numeric Literals</a>, <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
       <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, <a class="xref" href="impala_int.html#int">INT Data Type</a>,
-      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 1.4 or higher only)</a>,
+      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 3.0 or higher only)</a>,
       <a class="xref" href="impala_math_functions.html#math_functions">Impala Mathematical Functions</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div>
+</div>
+</div></body>
+</html>

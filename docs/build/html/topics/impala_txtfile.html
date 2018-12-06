@@ -1,19 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="txtfile"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Text Data Files with Impala Tables</title></head><body id="txtfile"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Text Data Files with Impala Tables" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="txtfile" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Text Data Files with Impala Tables</title>
+</head>
+<body id="txtfile">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Using Text Data Files with Impala Tables</h1>
+
   
   
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      Impala supports using text files as the storage format for input and output. Text files are a
-      convenient format to use for interchange with other applications or scripts that produce or read delimited
-      text files, such as CSV or TSV with commas or tabs for delimiters.
-    </p>
+    <p class="p"> Impala supports using text files as the storage format for input and
+      output. Text files are a convenient format to use for interchange with
+      other applications or scripts that produce or read delimited text files,
+      such as CSV or TSV with commas or tabs for delimiters. </p>
+
 
     <p class="p">
       Text files are also very flexible in their column definitions. For example, a text file could have more
@@ -23,58 +54,80 @@
       TABLE ... REPLACE COLUMNS</code> to switch them to strings, or the reverse.
     </p>
 
-    <table class="table"><caption><span class="table--title-label">Table 1. </span><span class="title">Text Format Support in Impala</span></caption><colgroup><col style="width:10%"><col style="width:10%"><col style="width:20%"><col style="width:30%"><col style="width:30%"></colgroup><thead class="thead">
+
+
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Text Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" id="txtfile__entry__1">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204136e149">
               File Type
             </th>
-            <th class="entry nocellnorowborder" id="txtfile__entry__2">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204136e152">
               Format
             </th>
-            <th class="entry nocellnorowborder" id="txtfile__entry__3">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204136e155">
               Compression Codecs
             </th>
-            <th class="entry nocellnorowborder" id="txtfile__entry__4">
+
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204136e158">
               Impala Can CREATE?
             </th>
-            <th class="entry nocellnorowborder" id="txtfile__entry__5">
+
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d204136e161">
               Impala Can INSERT?
             </th>
+
           </tr>
-        </thead><tbody class="tbody">
+
+        </thead>
+<tbody class="tbody">
           <tr class="row">
-            <td class="entry nocellnorowborder" headers="txtfile__entry__1 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204136e149 ">
               <a class="xref" href="impala_txtfile.html#txtfile">Text</a>
             </td>
-            <td class="entry nocellnorowborder" headers="txtfile__entry__2 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204136e152 ">
               Unstructured
             </td>
-            <td class="entry nocellnorowborder" headers="txtfile__entry__3 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204136e155 ">
               LZO, gzip, bzip2, Snappy
             </td>
-            <td class="entry nocellnorowborder" headers="txtfile__entry__4 ">
+
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204136e158 ">
               Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause, the default file
               format is uncompressed text, with values separated by ASCII <code class="ph codeph">0x01</code> characters
               (typically represented as Ctrl-A).
             </td>
-            <td class="entry nocellnorowborder" headers="txtfile__entry__5 ">
-              Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and query.
-              If LZO compression is used, you must create the table and load data in Hive. If other kinds of
-              compression are used, you must load data through <code class="ph codeph">LOAD DATA</code>, Hive, or manually in
-              HDFS.
 
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d204136e161 "> Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>,
+                <code class="ph codeph">LOAD DATA</code>, and query. If LZO compression is
+              used, you must create the table and load data in Hive. If other
+              kinds of compression are used, you must load data through
+                <code class="ph codeph">LOAD DATA</code>, Hive, or manually in HDFS.</td>
 
-            </td>
           </tr>
-        </tbody></table>
+
+        </tbody>
+</table>
+</div>
+
 
     <p class="p toc inpage"></p>
 
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="txtfile__text_performance">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="text_performance">
 
     <h2 class="title topictitle2" id="ariaid-title2">Query Performance for Impala Text Tables</h2>
+
   
 
     <div class="body conbody">
@@ -89,11 +142,13 @@
         most performance-critical queries.
       </p>
 
+
       <p class="p">
         For frequently queried data, you might load the original text data files into one Impala table, then use an
         <code class="ph codeph">INSERT</code> statement to transfer the data to another table that uses the Parquet file format;
         the data is converted automatically as it is stored in the destination table.
       </p>
+
 
       <p class="p">
         For more compact data, consider using LZO compression for the text files. LZO is the only compression codec
@@ -101,6 +156,7 @@
         nodes work on different parts of the same file in parallel. See <a class="xref" href="impala_txtfile.html#lzo">Using LZO-Compressed Text Files</a> for
         details.
       </p>
+
 
       <p class="p">
         In Impala 2.0 and later, you can also use text data compressed in the gzip, bzip2, or Snappy formats.
@@ -111,21 +167,25 @@
         statement to copy the original data into a Parquet table.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           Impala supports bzip files created by the <code class="ph codeph">bzip2</code> command, but not bzip files with
           multiple streams created by the <code class="ph codeph">pbzip2</code> command. Impala decodes only the data from the
           first part of such files, leading to incomplete results.
         </p>
 
+
         <p class="p">
           The maximum size that Impala can accommodate for an individual bzip file is 1 GB (after uncompression).
         </p>
+
       </div>
+
 
       <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
-        For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
+        For Impala tables that use the file formats Parquet, ORC, RCFile, SequenceFile,
         Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
         in the <span class="ph filepath">core-site.xml</span> configuration file determines
         how Impala divides the I/O work of reading the data files. This configuration
@@ -138,13 +198,17 @@
         to 268435456 (256 MB) to match the row group size produced by Impala.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="txtfile__text_ddl">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="text_ddl">
 
     <h2 class="title topictitle2" id="ariaid-title3">Creating Text Tables</h2>
+
 
     <div class="body conbody">
 
@@ -152,11 +216,13 @@
         <strong class="ph b">To create a table using text data files:</strong>
       </p>
 
+
       <p class="p">
         If the exact format of the text data files (such as the delimiter character) is not significant, use the
         <code class="ph codeph">CREATE TABLE</code> statement with no extra clauses at the end to create a text-format table. For
         example:
       </p>
+
 
 <pre class="pre codeblock"><code>create table my_table(id int, s string, n int, t timestamp, b boolean);
 </code></pre>
@@ -166,6 +232,7 @@
         a separator between each column value.
       </p>
 
+
       <p class="p">
         A common use case is to import existing text files into an Impala table. The syntax is more verbose; the
         significant part is the <code class="ph codeph">FIELDS TERMINATED BY</code> clause, which must be preceded by the
@@ -173,6 +240,7 @@
         TEXTFILE</code> clause, but that clause is optional because text format tables are the default. For
         example:
       </p>
+
 
 <pre class="pre codeblock"><code>create table csv(id int, s string, n int, t timestamp, b boolean)
   row format delimited
@@ -195,10 +263,12 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         Impala data directory.
       </p>
 
+
       <p class="p">
         In Impala 1.3.1 and higher, you can specify a delimiter character <code class="ph codeph">'\</code><code class="ph codeph">0'</code> to
         use the ASCII 0 (<code class="ph codeph">nul</code>) character for text tables:
       </p>
+
 
 <pre class="pre codeblock"><code>create table nul_separated(id int, s string, n int, t timestamp, b boolean)
   row format delimited
@@ -206,7 +276,7 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
   stored as textfile;
 </code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           Do not surround string values with quotation marks in text data files that you construct. If you need to
           include the separator character inside a field value, for example to put a string value with a comma
@@ -214,14 +284,15 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
           with the <code class="ph codeph">ESCAPED BY</code> clause, and insert that character immediately before any separator
           characters that need escaping.
         </p>
-      </div>
 
+      </div>
 
 
       <p class="p">
         Issue a <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code> statement to see the details of
         how each table is represented internally in Impala.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
@@ -235,13 +306,17 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         </span>
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="txtfile__text_data_files">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="text_data_files">
 
     <h2 class="title topictitle2" id="ariaid-title4">Data Files for Text Tables</h2>
+
 
     <div class="body conbody">
 
@@ -250,12 +325,15 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         for that table, with some exceptions:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <p class="p">
             Impala ignores any hidden files, that is, files whose names start with a dot or an underscore.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -264,17 +342,20 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         Impala table. The suffix matching is case-insensitive, so for example Impala ignores both
         <code class="ph codeph">.copying</code> and <code class="ph codeph">.COPYING</code> suffixes.
       </p>
+
         </li>
 
-        <li class="li">
 
+        <li class="li">
           <p class="p">
             Impala uses suffixes to recognize when text data files are compressed text. For Impala to recognize the
             compressed text files, they must have the appropriate file extension corresponding to the compression
             codec, either <code class="ph codeph">.gz</code>, <code class="ph codeph">.bz2</code>, or <code class="ph codeph">.snappy</code>. The extensions
             can be in uppercase or lowercase.
           </p>
+
         </li>
+
 
         <li class="li">
           Otherwise, the file names are not significant. When you put files into an HDFS directory through ETL
@@ -282,12 +363,15 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
           statement, or move data files under external control with the <code class="ph codeph">LOAD DATA</code> statement,
           Impala preserves the original filenames.
         </li>
+
       </ul>
+
 
       <p class="p">
         Filenames for data produced through Impala <code class="ph codeph">INSERT</code> statements are given unique names to
         avoid filename conflicts.
       </p>
+
 
       <p class="p">
         An <code class="ph codeph">INSERT ... SELECT</code> statement produces one data file from each node that processes the
@@ -299,9 +383,11 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         SELECT</code> to transfer the data to a new table.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Special values within text data files:</strong>
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -309,7 +395,9 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
             Impala recognizes the literal strings <code class="ph codeph">inf</code> for infinity and <code class="ph codeph">nan</code> for
             <span class="q">"Not a Number"</span>, for <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> columns.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -321,7 +409,9 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
             is to change the table properties through <code class="ph codeph">ALTER TABLE <var class="keyword varname">name</var> SET
             TBLPROPERTIES("serialization.null.format"="null")</code>.)
           </p>
+
         </li>
+
 
         <li class="li">
           <div class="p">
@@ -365,16 +455,22 @@ select * from header_line limit 10;
 +------------+-----+
 </code></pre>
       </div>
+
         </li>
+
       </ul>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="txtfile__text_etl">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="text_etl">
 
     <h2 class="title topictitle2" id="ariaid-title5">Loading Data into Impala Text Tables</h2>
+
   
 
     <div class="body conbody">
@@ -384,15 +480,18 @@ select * from header_line limit 10;
         specify the path of the file in HDFS. That file is moved into the appropriate Impala data directory.
       </p>
 
+
       <p class="p">
         To load multiple existing text files into an Impala text table, use the <code class="ph codeph">LOAD DATA</code>
         statement and specify the HDFS path of the directory containing the files. All non-hidden files are moved
         into the appropriate Impala data directory.
       </p>
 
+
       <p class="p">
         To convert data to text from any other file format supported by Impala, use a SQL statement such as:
       </p>
+
 
 <pre class="pre codeblock"><code>-- Text table with default delimiter, the hex 01 character.
 CREATE TABLE text_table AS SELECT * FROM other_file_format_table;
@@ -412,14 +511,16 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
         text file.
       </p>
 
+
       <p class="p">
         To create a few rows in a text table for test purposes, you can use the <code class="ph codeph">INSERT ... VALUES</code>
         syntax:
       </p>
 
+
 <pre class="pre codeblock"><code>INSERT INTO <var class="keyword varname">text_table</var> VALUES ('string_literal',100,hex('hello world'));</code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         Because Impala and the HDFS infrastructure are optimized for multi-megabyte files, avoid the <code class="ph codeph">INSERT
         ... VALUES</code> notation when you are inserting many rows. Each <code class="ph codeph">INSERT ... VALUES</code>
         statement produces a new tiny file, leading to fragmentation and reduced performance. When creating any
@@ -429,21 +530,25 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
         same fragmentation issues as tables stored on HDFS.
       </div>
 
+
       <p class="p">
         When you create a text file for use with an Impala text table, specify <code class="ph codeph">\N</code> to represent a
         <code class="ph codeph">NULL</code> value. For the differences between <code class="ph codeph">NULL</code> and empty strings, see
         <a class="xref" href="impala_literals.html#null">NULL</a>.
       </p>
 
+
       <p class="p">
         If a text file has fewer fields than the columns in the corresponding Impala table, all the corresponding
         columns are set to <code class="ph codeph">NULL</code> when the data in that file is read by an Impala query.
       </p>
 
+
       <p class="p">
         If a text file has more fields than the columns in the corresponding Impala table, the extra fields are
         ignored when the data in that file is read by an Impala query.
       </p>
+
 
       <p class="p">
         You can also use manual HDFS operations such as <code class="ph codeph">hdfs dfs -put</code> or <code class="ph codeph">hdfs dfs
@@ -453,25 +558,27 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
         query against that table, to make Impala recognize the newly added files.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="txtfile__lzo">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="lzo">
 
     <h2 class="title topictitle2" id="ariaid-title6">Using LZO-Compressed Text Files</h2>
+
   
 
     <div class="body conbody">
 
-      <p class="p">
-        
+      <p class="p"> Impala supports using text data files that employ LZO compression.
+        Where practical, apply compression to text data files. Impala queries
+        are usually I/O-bound; reducing the amount of data read from disk
+        typically speeds up a query, despite the extra CPU work to uncompress
+        the data in memory. </p>
 
-        
-        Impala supports using text data files that employ LZO compression. Where practical, apply compression to
-        text data files. Impala queries are usually I/O-bound; reducing the amount of data read from
-        disk typically speeds up a query, despite the extra CPU work to uncompress the data in memory.
-      </p>
 
       <p class="p">
         Impala can work with LZO-compressed text files are preferable to files compressed by other codecs, because
@@ -479,9 +586,11 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
         and processed independently by different nodes.
       </p>
 
+
       <p class="p">
         Impala does not currently support writing LZO-compressed text files.
       </p>
+
 
       <p class="p">
         Because Impala can query LZO-compressed files but currently cannot write them, you use Hive to do the
@@ -495,7 +604,8 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
         or similar method.
       </p>
 
-      <section class="section" id="lzo__lzo_setup"><h3 class="title sectiontitle">Preparing to Use LZO-Compressed Text Files</h3>
+
+      <div class="section" id="lzo__lzo_setup"><h3 class="title sectiontitle">Preparing to Use LZO-Compressed Text Files</h3>
 
         
 
@@ -506,6 +616,7 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
           are using cluster management software.
         </p>
 
+
         <ol class="ol">
           <li class="li">
             <strong class="ph b">Prepare your systems to work with LZO by downloading and installing the appropriate libraries:</strong>
@@ -513,7 +624,9 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
             <p class="p">
               Download and install the appropriate file to each machine on which you intend to use LZO with Impala.
             </p>
+
           </li>
+
 
           <li class="li">
             <strong class="ph b">Configure Impala to use LZO:</strong>
@@ -523,40 +636,49 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
               Impala.
             </p>
 
-            <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+            <div class="note note"><span class="notetitle">Note:</span>
               <p class="p">
                 The name of the Hadoop LZO package changed in the distant past.
                 Currently, the package name is <code class="ph codeph">hadoop-lzo</code>.
               </p>
+
             </div>
+
 
             <p class="p">
               <strong class="ph b">For RHEL/CentOS systems:</strong>
             </p>
+
 <pre class="pre codeblock"><code>$ sudo yum update
 $ sudo yum install hadoop-lzo
 $ sudo yum install impala-lzo</code></pre>
             <p class="p">
               <strong class="ph b">For SUSE systems:</strong>
             </p>
+
 <pre class="pre codeblock"><code>$ sudo apt-get update
 $ sudo zypper install hadoop-lzo
 $ sudo zypper install impala-lzo</code></pre>
             <p class="p">
               <strong class="ph b">For Debian/Ubuntu systems:</strong>
             </p>
+
 <pre class="pre codeblock"><code>$ sudo zypper update
 $ sudo apt-get install hadoop-lzo
 $ sudo apt-get install impala-lzo</code></pre>
-            <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <div class="note note"><span class="notetitle">Note:</span>
               <p class="p">
                 The level of the <code class="ph codeph">impala-lzo</code> package is closely tied to the version of Impala
                 you use. Any time you upgrade Impala, re-do the installation command for
                 <code class="ph codeph">impala-lzo</code> on each applicable machine to make sure you have the appropriate
                 version of that package.
               </p>
+
             </div>
+
           </li>
+
 
           <li class="li">
             For <code class="ph codeph">core-site.xml</code> on the client <strong class="ph b">and</strong> server (that is, in the configuration
@@ -568,12 +690,13 @@ $ sudo apt-get install impala-lzo</code></pre>
         org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.DeflateCodec,
         org.apache.hadoop.io.compress.SnappyCodec,com.hadoop.compression.lzo.LzopCodec&lt;/value&gt;
 &lt;/property&gt;</code></pre>
-            <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <div class="note note"><span class="notetitle">Note:</span>
               <p class="p">
                 If this is the first time you have edited the Hadoop <span class="ph filepath">core-site.xml</span> file, note
                 that the <span class="ph filepath">/etc/hadoop/conf</span> directory is typically a symbolic link, so the
                 canonical <span class="ph filepath">core-site.xml</span> might reside in a different directory:
               </p>
+
 <pre class="pre codeblock"><code>$ ls -l /etc/hadoop
 total 8
 lrwxrwxrwx. 1 root root   29 Feb 26  2013 conf -&gt; /etc/alternatives/hadoop-conf
@@ -585,17 +708,23 @@ drwxr-xr-x. 2 root root 4096 Oct 28 15:46 conf.pseudo</code></pre>
                 <span class="ph filepath">core-site.xml</span>, only add <code class="ph codeph">com.hadoop.compression.lzo.LzopCodec</code>
                 to the new property value, not all the names from the preceding example.
               </p>
+
             </div>
+
           </li>
+
 
           <li class="li">
             Restart the MapReduce and Impala services.
           </li>
+
         </ol>
 
-      </section>
 
-      <section class="section" id="lzo__lzo_create_table"><h3 class="title sectiontitle">Creating LZO Compressed Text Tables</h3>
+      </div>
+
+
+      <div class="section" id="lzo__lzo_create_table"><h3 class="title sectiontitle">Creating LZO Compressed Text Tables</h3>
 
         
 
@@ -603,15 +732,15 @@ drwxr-xr-x. 2 root root 4096 Oct 28 15:46 conf.pseudo</code></pre>
           A table containing LZO-compressed text files must be created in Hive with the following storage clause:
         </p>
 
+
 <pre class="pre codeblock"><code>STORED AS
     INPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'
     OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'</code></pre>
 
-
-
         <p class="p">
           Also, certain Hive settings need to be in effect. For example:
         </p>
+
 
 <pre class="pre codeblock"><code>hive&gt; SET mapreduce.output.fileoutputformat.compress=true;
 hive&gt; SET hive.exec.compress.output=true;
@@ -626,12 +755,14 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
           of file format) by using the <code class="ph codeph">INSERT ... SELECT</code> statement in Hive.
         </p>
 
+
         <p class="p">
           Files in an LZO-compressed table must use the <code class="ph codeph">.lzo</code> extension. Examine the files in the
           HDFS data directory after doing the <code class="ph codeph">INSERT</code> in Hive, to make sure the files have the
           right extension. If the required settings are not in place, you end up with regular uncompressed files,
           and Impala cannot access the table because it finds data files with the wrong (uncompressed) format.
         </p>
+
 
         <p class="p">
           After loading data into an LZO-compressed text table, index the files so that they can be split. You
@@ -640,17 +771,20 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
           Java class is included in the <code class="ph codeph">hadoop-lzo</code> package.
         </p>
 
+
         <p class="p">
           Run the indexer using a command like the following:
         </p>
 
+
 <pre class="pre codeblock"><code>$ hadoop jar /usr/lib/hadoop/lib/hadoop-lzo-<var class="keyword varname">version</var>-gplextras.jar
   com.hadoop.compression.lzo.DistributedLzoIndexer /<var class="keyword varname">hdfs_location_of_table</var>/</code></pre>
 
-        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <div class="note note"><span class="notetitle">Note:</span>
           If the path of the JAR file in the preceding example is not recognized, do a <span class="keyword cmdname">find</span>
           command to locate <span class="ph filepath">hadoop-lzo-*-gplextras.jar</span> and use that path.
         </div>
+
 
         <p class="p">
           Indexed files have the same name as the file they index, with the <code class="ph codeph">.index</code> extension. If
@@ -658,7 +792,6 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
           DataNodes, which is very inefficient.
         </p>
 
-        
 
         <p class="p">
           Once the LZO-compressed tables are created, and data is loaded and indexed, you can query them through
@@ -668,33 +801,32 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
           than on all the Impala nodes.)
         </p>
 
-      </section>
+
+      </div>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="txtfile__gzip">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="gzip">
 
     <h2 class="title topictitle2" id="ariaid-title7">Using gzip, bzip2, or Snappy-Compressed Text Files</h2>
+
   
 
     <div class="body conbody">
 
-      <p class="p">
-        
+      <p class="p"> In Impala 2.0 and later, Impala supports using text data files that
+        employ gzip, bzip2, or Snappy compression. These compression types are
+        primarily for convenience within an existing ETL pipeline rather than
+        maximum performance. Although it requires less I/O to read compressed
+        text than the equivalent uncompressed text, files compressed by these
+        codecs are not <span class="q">"splittable"</span> and therefore cannot take full
+        advantage of the Impala parallel query capability. </p>
 
-        
-
-        
-
-        
-        In Impala 2.0 and later, Impala supports using text data files that employ gzip, bzip2, or Snappy
-        compression. These compression types are primarily for convenience within an existing ETL pipeline rather
-        than maximum performance. Although it requires less I/O to read compressed text than the equivalent
-        uncompressed text, files compressed by these codecs are not <span class="q">"splittable"</span> and therefore cannot take
-        full advantage of the Impala parallel query capability.
-      </p>
 
       <p class="p">
         As each bzip2- or Snappy-compressed text file is processed, the node doing the work reads the entire file
@@ -706,12 +838,12 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
       </p>
 
 
-
       <p class="p">
         To create a table to hold gzip, bzip2, or Snappy-compressed text, create a text table with no special
         compression options. Specify the delimiter and escape character if required, using the <code class="ph codeph">ROW
         FORMAT</code> clause.
       </p>
+
 
       <p class="p">
         Because Impala can query compressed text files but currently cannot write them, produce the compressed text
@@ -720,17 +852,20 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
         the <code class="ph codeph">LOCATION</code> attribute at a directory containing existing compressed text files.)
       </p>
 
+
       <p class="p">
         For Impala to recognize the compressed text files, they must have the appropriate file extension
         corresponding to the compression codec, either <code class="ph codeph">.gz</code>, <code class="ph codeph">.bz2</code>, or
         <code class="ph codeph">.snappy</code>. The extensions can be in uppercase or lowercase.
       </p>
 
+
       <p class="p">
         The following example shows how you can create a regular text table, put different kinds of compressed and
         uncompressed files into it, and Impala automatically recognizes and decompresses each one based on their
         file extensions:
       </p>
+
 
 <pre class="pre codeblock"><code>create table csv_compressed (a string, b string, c string)
   row format delimited fields terminated by ",";
@@ -763,8 +898,9 @@ $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_co
 
     </div>
 
-  </article>
 
-  
+  </div>
 
-</article></main></body></html>
+
+</body>
+</html>

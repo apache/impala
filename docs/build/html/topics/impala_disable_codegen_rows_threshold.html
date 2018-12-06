@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DISABLE_CODEGEN_ROWS_THRESHOLD Query Option (Impala 2.10 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="disable_codegen_rows_threshold" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DISABLE_CODEGEN_ROWS_THRESHOLD Query Option (Impala 2.10 or higher only)</title>
+</head>
+<body id="disable_codegen_rows_threshold">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">DISABLE_CODEGEN_ROWS_THRESHOLD Query Option (<span class="keyword">Impala 2.10</span> or higher only)</h1>
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p"> This setting controls the cutoff point (in terms of number
+      of rows processed per Impala daemon) below which Impala disables native
+      code generation for the whole query. Native code generation is very
+      beneficial for queries that process many rows because it reduces the time
+      taken to process of each row. However, generating the native code adds
+      latency to query startup. Therefore, automatically disabling codegen for
+      queries that process relatively small amounts of data can improve query
+      response time. </p>
+
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+
+<pre class="pre codeblock"><code>SET DISABLE_CODEGEN_ROWS_THRESHOLD=<var class="keyword varname">number_of_rows</var></code></pre>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 50000
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong> Typically, you increase the default value to make this optimization apply to more queries.
+      If incorrect or corrupted table and column statistics cause Impala to apply this optimization incorrectly to
+      queries that actually involve substantial work, you might see the queries being slower as a result of codegen
+      being disabled. In that case, recompute statistics with the <code class="ph codeph">COMPUTE STATS</code> or
+      <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement. If there is a problem collecting accurate statistics,
+      you can turn this feature off by setting the value to 0.
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong>
+      </p>
+
+
+    <p class="p">
+      This setting applies to queries where the number of rows processed can be accurately
+      determined, either through table and column statistics, or by the presence of a
+      <code class="ph codeph">LIMIT</code> clause. If Impala cannot accurately estimate the number of rows,
+      then this setting does not apply.
+    </p>
+
+
+    <p class="p">
+      If a query uses the complex data types <code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>,
+      or <code class="ph codeph">MAP</code>, then codegen is never automatically disabled regardless of the
+      <code class="ph codeph">DISABLE_CODEGEN_ROWS_THRESHOLD</code> setting.
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.10.0</span>
+      </p>
+
+
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="subqueries"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Subqueries in Impala SELECT Statements</title></head><body id="subqueries"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Subqueries in Impala SELECT Statements" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="subqueries" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Subqueries in Impala SELECT Statements</title>
+</head>
+<body id="subqueries">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Subqueries in Impala SELECT Statements</h1>
+
   
   
 
@@ -15,10 +35,12 @@
       expressive power for SQL queries.
     </p>
 
+
     <p class="p">
       A subquery can return a result set for use in the <code class="ph codeph">FROM</code> or <code class="ph codeph">WITH</code> clauses, or
       with operators such as <code class="ph codeph">IN</code> or <code class="ph codeph">EXISTS</code>.
     </p>
+
 
     <p class="p">
       A <dfn class="term">scalar subquery</dfn> produces a result set with a single row containing a single column, typically
@@ -29,6 +51,7 @@
       <code class="ph codeph">WHERE</code> clause of the outer block that queries <code class="ph codeph">T1</code>:
     </p>
 
+
 <pre class="pre codeblock"><code>SELECT x FROM t1 WHERE x &gt; (SELECT MAX(y) FROM t2);
 </code></pre>
 
@@ -38,6 +61,7 @@
       In this example, the subquery returns an arbitrary number of values from <code class="ph codeph">T2.Y</code>, and each
       value of <code class="ph codeph">T1.X</code> is tested for membership in that same set of values:
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT x FROM t1 WHERE x IN (SELECT y FROM t2);
 </code></pre>
@@ -50,10 +74,12 @@
       <strong class="ph b">Restrictions</strong> item.)
     </p>
 
+
     <p class="p">
       For example, the following query finds all the employees with salaries that are higher than average for their
       department. The subquery potentially computes a different <code class="ph codeph">AVG()</code> value for each employee.
     </p>
+
 
 
 
@@ -65,9 +91,11 @@
         <strong class="ph b">Syntax:</strong>
       </p>
 
+
     <p class="p">
       <strong class="ph b">Subquery in the <code class="ph codeph">FROM</code> clause:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT <var class="keyword varname">select_list</var> FROM <var class="keyword varname">table_ref</var> [, <var class="keyword varname">table_ref</var> ...]
 
@@ -77,6 +105,7 @@
     <p class="p">
       <strong class="ph b">Subqueries in <code class="ph codeph">WHERE</code> clause:</strong>
     </p>
+
 
 <pre class="pre codeblock"><code>WHERE <var class="keyword varname">value</var> <var class="keyword varname">comparison_operator</var> (<var class="keyword varname">scalar_select_statement</var>)
 WHERE <var class="keyword varname">value</var> [NOT] IN (<var class="keyword varname">select_statement</var>)
@@ -90,34 +119,41 @@ WHERE NOT EXISTS (<var class="keyword varname">correlated_select_statement</var>
       <code class="ph codeph">LIKE</code> or <code class="ph codeph">REGEXP</code>.
     </p>
 
+
     <p class="p">
       Although you can use non-equality comparison operators such as <code class="ph codeph">&lt;</code> or
       <code class="ph codeph">&gt;=</code>, the subquery must include at least one equality comparison between the columns of the
       inner and outer query blocks.
     </p>
 
+
     <p class="p">
       All syntax is available for both correlated and uncorrelated queries, except that the <code class="ph codeph">NOT
       EXISTS</code> clause cannot be used with an uncorrelated subquery.
     </p>
 
+
     <p class="p">
       Impala subqueries can be nested arbitrarily deep.
     </p>
+
 
     <p class="p">
       <strong class="ph b">Standards compliance:</strong> Introduced in
       <a class="xref" href="http://en.wikipedia.org/wiki/SQL:1999" target="_blank">SQL:1999</a>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       This example illustrates how subqueries can be used in the <code class="ph codeph">FROM</code> clause to organize the table
       names, column names, and column values by producing intermediate result sets, especially for join queries.
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT avg(t1.x), max(t2.y) FROM
   (SELECT id, cast(a AS DECIMAL(10,5)) AS x FROM raw_data WHERE a BETWEEN 0 AND 100) AS t1
@@ -132,9 +168,11 @@ WHERE NOT EXISTS (<var class="keyword varname">correlated_select_statement</var>
 
     </p>
 
+
     <p class="p">
       The following examples show how a value can be compared against a set of values returned by a subquery.
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT count(x) FROM t1 WHERE EXISTS(SELECT 1 FROM t2 WHERE t1.x = t2.y * 10);
 
@@ -145,6 +183,7 @@ SELECT x FROM t1 WHERE x IN (SELECT y FROM t2 WHERE state = 'CA');
       The following examples demonstrate scalar subqueries. When a subquery is known to return a single value, you
       can substitute it where you would normally put a constant value.
     </p>
+
 
 <pre class="pre codeblock"><code>SELECT x FROM t1 WHERE y = (SELECT max(z) FROM t2);
 SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
@@ -160,10 +199,12 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+
     <p class="p">
       If the same table is referenced in both the outer and inner query blocks, construct a table alias in the
       outer query block and use a fully qualified name to distinguish the inner and outer table references:
     </p>
+
 
 
 
@@ -177,9 +218,11 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
         tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Internal details:</strong>
       </p>
+
 
     <p class="p">
       Internally, subqueries involving <code class="ph codeph">IN</code>, <code class="ph codeph">NOT IN</code>, <code class="ph codeph">EXISTS</code>, or
@@ -187,15 +230,18 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
       might be rewritten to an outer join, semi join, cross join, or anti join.
     </p>
 
+
     <p class="p">
       A query is processed differently depending on whether the subquery calls any aggregation functions. There are
       correlated and uncorrelated forms, with and without calls to aggregation functions. Each of these four
       categories is rewritten differently.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Column statistics considerations:</strong>
       </p>
+
 
     <p class="p">
       Because queries that include correlated and uncorrelated subqueries in the <code class="ph codeph">WHERE</code> clause are
@@ -205,20 +251,24 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
       the data in that table. See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for details.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Added in:</strong> Subqueries are substantially enhanced starting in Impala 2.0. Now,
       they can be used in the <code class="ph codeph">WHERE</code> clause, in combination with clauses such as
       <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code>, rather than just in the <code class="ph codeph">FROM</code> clause.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
     <p class="p">
       The initial Impala support for nested subqueries addresses the most common use cases. Some restrictions
       remain:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -227,7 +277,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           in Impala 2.1.0 and higher, currently you cannot construct a union of two subqueries (for example, in the
           argument of an <code class="ph codeph">IN</code> or <code class="ph codeph">EXISTS</code> operator).
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -235,7 +287,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           <code class="ph codeph">ALL</code>. (Impala does not currently have a <code class="ph codeph">SOME</code> operator, but if it did,
           the same restriction would apply.)
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -244,7 +298,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           other kinds of comparisons such as less than, greater than, <code class="ph codeph">BETWEEN</code>, or
           <code class="ph codeph">!=</code>.
         </p>
+
       </li>
+
 
       <li class="li">
 
@@ -252,7 +308,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           Currently, a scalar subquery cannot be used as the first or second argument to the
           <code class="ph codeph">BETWEEN</code> operator.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -260,7 +318,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           example in the <code class="ph codeph">WHERE</code> clause, can use <code class="ph codeph">OR</code> conjunctions; the restriction
           only applies to parts of the query <span class="q">"above"</span> the subquery.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -268,7 +328,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           to the <code class="ph codeph">LIKE</code>, <code class="ph codeph">REGEXP</code>, or <code class="ph codeph">RLIKE</code> operators, or compare it
           to a value of a non-numeric type such as <code class="ph codeph">TIMESTAMP</code> or <code class="ph codeph">BOOLEAN</code>.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -276,7 +338,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           You cannot use subqueries with the <code class="ph codeph">CASE</code> function to generate the comparison value, the
           values to be compared against, or the return value.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -284,7 +348,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           speaking, a subquery cannot appear anywhere outside the <code class="ph codeph">WITH</code>, <code class="ph codeph">FROM</code>, and
           <code class="ph codeph">WHERE</code> clauses.)
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
@@ -293,7 +359,9 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
           <code class="ph codeph"><var class="keyword varname">database_name</var>.<var class="keyword varname">table_name</var>.<var class="keyword varname">column_name</var></code>)
           when referring to any column from the outer query block within a subquery.
         </p>
+
       </li>
+
       <li class="li">
         <p class="p">
         The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
@@ -302,12 +370,16 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
         backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
         HBase tables.
       </p>
+
       </li>
+
     </ul>
+
 
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
       For the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>)
@@ -321,12 +393,21 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
       using subqueries with complex types.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       <a class="xref" href="impala_operators.html#exists">EXISTS Operator</a>, <a class="xref" href="impala_operators.html#in">IN Operator</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div>
+</div>
+</div></body>
+</html>

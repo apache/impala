@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="timeouts"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Setting Timeout Periods for Daemons, Queries, and Sessions</title></head><body id="timeouts"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Setting Timeout Periods for Daemons, Queries, and Sessions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="timeouts" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Setting Timeout Periods for Daemons, Queries, and Sessions</title>
+</head>
+<body id="timeouts">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Setting Timeout Periods for Daemons, Queries, and Sessions</h1>
+
 
   
 
@@ -18,13 +38,21 @@
       or hung operations are consuming resources and reducing concurrency.
     </p>
 
+
     <p class="p toc inpage"></p>
+
 
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="timeouts__statestore_timeout">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="statestore_timeout">
 
     <h2 class="title topictitle2" id="ariaid-title2">Increasing the Statestore Timeout</h2>
+
 
     <div class="body conbody">
 
@@ -40,6 +68,7 @@
         messages in the <code class="ph codeph">impalad</code> log such as:
       </p>
 
+
 <pre class="pre codeblock"><code>Connection with state-store lost
 Trying to re-register with state-store</code></pre>
 
@@ -49,13 +78,17 @@ Trying to re-register with state-store</code></pre>
         objects such as tables and partitions.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="timeouts__impalad_timeout">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="impalad_timeout">
 
     <h2 class="title topictitle2" id="ariaid-title3">Setting the Idle Query and Idle Session Timeouts for impalad</h2>
+
 
     <div class="body conbody">
 
@@ -64,119 +97,218 @@ Trying to re-register with state-store</code></pre>
         set timeout intervals for both individual queries, and entire sessions.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
-          The timeout clock for queries and sessions only starts ticking when the query or session is idle.
-          For queries, this means the query has results ready but is waiting for a client to fetch the data. A
-          query can run for an arbitrary time without triggering a timeout, because the query is computing results
-          rather than sitting idle waiting for the results to be fetched. The timeout period is intended to prevent
-          unclosed queries from consuming resources and taking up slots in the admission count of running queries,
-          potentially preventing other queries from starting.
+          The timeout clock for queries and sessions only starts ticking when
+          the query or session is idle.
         </p>
+
+
+        <p class="p">
+          For queries, this means the query has results ready but is waiting
+          for a client to fetch the data. A query can run for an arbitrary time
+          without triggering a timeout, because the query is computing results
+          rather than sitting idle waiting for the results to be fetched. The
+          timeout period is intended to prevent unclosed queries from consuming
+          resources and taking up slots in the admission count of running
+          queries, potentially preventing other queries from starting.
+        </p>
+
+
         <p class="p">
           For sessions, this means that no query has been submitted for some period of time.
         </p>
+
       </div>
 
+
       <p class="p">
-        Specify the following startup options for the <span class="keyword cmdname">impalad</span> daemon:
+        Use the following startup options for the <span class="keyword cmdname">impalad</span>
+        daemon to specify timeout values:
       </p>
 
+
       <ul class="ul">
-        <li class="li">
+        <li class="li"><code class="ph codeph">--idle_query_timeout</code>
           <p class="p">
-            The <code class="ph codeph">--idle_query_timeout</code> option specifies the time in seconds after
-            which an idle query is cancelled. This could be a query whose results were all fetched
-            but was never closed, or one whose results were partially fetched and then the client
-            program stopped requesting further results. This condition is most likely to occur in
-            a client program using the JDBC or ODBC interfaces, rather than in the interactive
-            <span class="keyword cmdname">impala-shell</span> interpreter. Once the query is cancelled, the client
-            program cannot retrieve any further results.
+            Specifies the time in
+            seconds after which an idle query is cancelled. This could be a
+            query whose results were all fetched but was never closed, or one
+            whose results were partially fetched and then the client program
+            stopped requesting further results. This condition is most likely to
+            occur in a client program using the JDBC or ODBC interfaces, rather
+            than in the interactive <span class="keyword cmdname">impala-shell</span> interpreter.
+            Once a query is cancelled, the client program cannot retrieve any
+            further results from the query.
           </p>
 
           <p class="p">
-            You can reduce the idle query timeout by using the <code class="ph codeph">QUERY_TIMEOUT_S</code>
-            query option. Any non-zero value specified for the <code class="ph codeph">--idle_query_timeout</code> startup
-            option serves as an upper limit for the <code class="ph codeph">QUERY_TIMEOUT_S</code> query option.
-            A zero value for <code class="ph codeph">--idle_query_timeout</code> disables query timeouts.
-            See <a class="xref" href="impala_query_timeout_s.html#query_timeout_s">QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</a> for details.
+            You can reduce
+            the idle query timeout by using the <code class="ph codeph">QUERY_TIMEOUT_S</code>
+            query option. Any non-zero value specified for the
+              <code class="ph codeph">--idle_query_timeout</code> startup option serves as an
+            upper limit for the <code class="ph codeph">QUERY_TIMEOUT_S</code> query option.
+            See <a class="xref" href="impala_query_timeout_s.html#query_timeout_s">QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</a> about
+            the query option.
           </p>
+
+          <p class="p">A zero value for
+              <code class="ph codeph">--idle_query_timeout</code> disables query timeouts.
+          </p>
+
+          <p class="p">
+            Cancelled queries remain in the open state but use only the
+            minimal resources.
+          </p>
+
         </li>
 
-        <li class="li">
+
+        <li class="li"><code class="ph codeph">--idle_session_timeout</code>
           <p class="p">
-            The <code class="ph codeph">--idle_session_timeout</code> option specifies the time in seconds after
-            which an idle session is expired. A session is idle when no activity is occurring for
-            any of the queries in that session, and the session has not started any new queries.
-            Once a session is expired, you cannot issue any new query requests to it. The session
-            remains open, but the only operation you can perform is to close it. The default value
-            of 0 means that sessions never expire.
+            Specifies the time in
+            seconds after which an idle session expires. A session is idle when
+            no activity is occurring for any of the queries in that session, and
+            the session has not started any new queries. Once a session is
+            expired, you cannot issue any new query requests to it. The session
+            remains open, but the only operation you can perform is to close it.
           </p>
+
+          <p class="p">
+            The default value of 0 specifies sessions never
+            expire.
+          </p>
+
+          <p class="p">
+            You can override the
+              <code class="ph codeph">--idle_session_timeout</code> value with the <a class="xref" href="impala_idle_session_timeout.html#idle_session_timeout">IDLE_SESSION_TIMEOUT Query Option (Impala 2.12 or higher only)</a> at
+            the session level.
+          </p>
+
         </li>
+
       </ul>
+
 
       <p class="p">
         For instructions on changing <span class="keyword cmdname">impalad</span> startup options, see
         <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a>.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           Impala checks periodically for idle sessions and queries
           to cancel. The actual idle time before cancellation might be up to 50% greater than
           the specified configuration setting. For example, if the timeout setting was 60, the
           session or query might be cancelled after being idle between 60 and 90 seconds.
         </p>
+
       </div>
+
 
     </div>
 
-  </article>
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="timeouts__concept_rfy_jl1_rx">
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="concept_rfy_jl1_rx">
     <h2 class="title topictitle2" id="ariaid-title4">Setting Timeout and Retries for Thrift Connections to the Backend
       Client</h2>
+
     <div class="body conbody">
       <p class="p">Impala connections to the backend client are subject to failure in
         cases when the network is momentarily overloaded. To avoid failed
         queries due to transient network problems, you can configure the number
         of Thrift connection retries using the following option: </p>
+
       <ul class="ul" id="concept_rfy_jl1_rx__ul_bj3_ql1_rx">
         <li class="li">The <code class="ph codeph">--backend_client_connection_num_retries</code> option
           specifies the number of times Impala will try connecting to the
           backend client after the first connection attempt fails. By default,
             <span class="keyword cmdname">impalad</span> will attempt three re-connections before
           it returns a failure. </li>
+
       </ul>
+
       <p class="p">You can configure timeouts for sending and receiving data from the
         backend client. Therefore, if for some reason a query hangs, instead of
         waiting indefinitely for a response, Impala will terminate the
         connection after a configurable timeout.</p>
+
       <ul class="ul" id="concept_rfy_jl1_rx__ul_vm2_2v1_rx">
         <li class="li">The <code class="ph codeph">--backend_client_rpc_timeout_ms</code> option can be
           used to specify the number of milliseconds Impala should wait for a
           response from the backend client before it terminates the connection
           and signals a failure. The default value for this property is 300000
           milliseconds, or 5 minutes. </li>
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="timeouts__cancel_query">
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="cancel_query">
 
     <h2 class="title topictitle2" id="ariaid-title5">Cancelling a Query</h2>
 
-    <div class="body conbody">
 
-      <p class="p">
-        Sometimes, an Impala query might run for an unexpectedly long time, tying up resources
-        in the cluster. You can cancel the query explicitly, independent of the timeout period,
-        by going into the web UI for the <span class="keyword cmdname">impalad</span> host (on port 25000 by
-        default), and using the link on the <code class="ph codeph">/queries</code> tab to cancel the running
-        query. For example, press <code class="ph codeph">^C</code> in <span class="keyword cmdname">impala-shell</span>.
-      </p>
+    <div class="body conbody">
+      <p class="p"> Occasionally, an Impala query might run for an unexpectedly long time,
+        tying up resources in the cluster. This section describes the options to
+        terminate such runaway queries.</p>
 
     </div>
 
-  </article>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="cancel_query_with_query_option">
+      <h3 class="title topictitle3" id="ariaid-title6">Setting a Time Limit on Query Execution</h3>
 
-</article></main></body></html>
+      <div class="body conbody">
+        <p class="p">An Impala administrator can set a default value of the
+            <code class="ph codeph">EXEC_TIME_LIMIT_S</code> query option for a resource pool.
+          If a user accidentally runs a large query that executes for longer
+          than the limit, it will be automatically terminated after the time
+          limit expires to free up resources. </p>
+
+        <p class="p">You can override the default value per query or per session if you do
+          not want to apply the default <code class="ph codeph">EXEC_TIME_LIMIT_S</code> value
+          to a specific query or a session. See <a class="xref" href="impala_exec_time_limit_s.html#exec_time_limit_s">EXEC_TIME_LIMIT_S Query Option (Impala 2.12 or higher only)</a> for the
+          details of the query option.</p>
+
+      </div>
+
+    </div>
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="cancel_query_in_webUI">
+      <h3 class="title topictitle3" id="ariaid-title7">Interactively Cancelling a Query </h3>
+
+      <div class="body conbody">
+        <p class="p"> You can cancel the query explicitly, independent of the timeout
+          period, by going into the web UI for the <span class="keyword cmdname">impalad</span>
+          host (on port 25000 by default), and using the link on the
+            <code class="ph codeph">/queries</code> tab to cancel the running query. </p>
+
+        <div class="p"> Various client applications let you interactively cancel queries
+          submitted or monitored through those applications. For example: <ul class="ul">
+            <li class="li"> Press <samp class="ph systemoutput">^C</samp> in
+                <span class="keyword cmdname">impala-shell</span>. </li>
+
+            <li class="li"> Click <strong class="ph b">Cancel</strong> from the <strong class="ph b">Watch</strong>page in Hue. </li>
+
+          </ul>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+  </div>
+
+
+</body>
+</html>

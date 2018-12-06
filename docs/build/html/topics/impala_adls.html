@@ -1,21 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="adls"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala with the Azure Data Lake Store (ADLS)</title></head><body id="adls"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Impala with the Azure Data Lake Store (ADLS)" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="adls" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Impala with the Azure Data Lake Store (ADLS)</title>
+</head>
+<body id="adls">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Using Impala with the Azure Data Lake Store (ADLS)</h1>
+
   
   
 
   <div class="body conbody">
 
     <p class="p">
-      
-      You can use Impala to query data residing on the Azure Data Lake Store (ADLS) filesystem.
-      This capability allows convenient access to a storage system that is remotely managed,
-      accessible from anywhere, and integrated with various cloud-based services. Impala can
-      query files in any supported file format from ADLS. The ADLS storage location
-      can be for an entire table, or individual partitions in a partitioned table.
+      You can use Impala to query data residing on the Azure Data Lake Store
+      (ADLS) filesystem. This capability allows convenient access to a storage
+      system that is remotely managed, accessible from anywhere, and integrated
+      with various cloud-based services. Impala can query files in any supported
+      file format from ADLS. The ADLS storage location can be for an entire
+      table or individual partitions in a partitioned table.
     </p>
+
 
     <p class="p">
       The default Impala tables use data files stored on HDFS, which are ideal for bulk loads and queries using
@@ -25,147 +43,209 @@
       to put some partitions on HDFS and others on ADLS, typically depending on the age of the data.
     </p>
 
+    <p class="p">Starting in <span class="keyword">Impala 3.1</span>, Impala supports ADLS Gen2
+      filesystem, Azure Blob File System (ABFS).</p>
+
+
     <p class="p toc inpage"></p>
+
 
   </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="adls__prereqs">
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="prereqs">
     <h2 class="title topictitle2" id="ariaid-title2">Prerequisites</h2>
+
     <div class="body conbody">
       <p class="p">
         These procedures presume that you have already set up an Azure account,
         configured an ADLS store, and configured your Hadoop cluster with appropriate
         credentials to be able to access ADLS. See the following resources for information:
       </p>
+
       <ul class="ul">
         <li class="li">
           <p class="p">
             <a class="xref" href="https://docs.microsoft.com/en-us/azure/data-lake-store/data-lake-store-get-started-portal" target="_blank">Get started with Azure Data Lake Store using the Azure Portal</a>
           </p>
+
         </li>
+
+        <li class="li"><a class="xref" href="https://docs.microsoft.com/en-us/azure/storage/data-lake-storage/quickstart-create-account" target="_blank">Azure Data Lake Storage Gen2</a></li>
+
         <li class="li">
           <p class="p">
             <a class="xref" href="https://hadoop.apache.org/docs/current/hadoop-azure-datalake/index.html" target="_blank">Hadoop Azure Data Lake Support</a>
           </p>
-        </li>
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="adls__sql">
-    <h2 class="title topictitle2" id="ariaid-title3">How Impala SQL Statements Work with ADLS</h2>
-    <div class="body conbody">
-      <p class="p">
-        Impala SQL statements work with data on ADLS as follows:
-      </p>
-      <ul class="ul">
-        <li class="li">
-          <p class="p">
-            The <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>
-            or <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> statements
-            can specify that a table resides on the ADLS filesystem by
-            encoding an <code class="ph codeph">adl://</code> prefix for the <code class="ph codeph">LOCATION</code>
-            property. <code class="ph codeph">ALTER TABLE</code> can also set the <code class="ph codeph">LOCATION</code>
-            property for an individual partition, so that some data in a table resides on
-            ADLS and other data in the same table resides on HDFS.
-          </p>
-          <div class="p">
-            The full format of the location URI is typically:
-<pre class="pre codeblock"><code>
-adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<var class="keyword varname">rest_of_directory_path</var>
-</code></pre>
-          </div>
         </li>
+
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="sql">
+    <h2 class="title topictitle2" id="ariaid-title3">How Impala SQL Statements Work with ADLS</h2>
+
+    <div class="body conbody">
+      <p class="p"> Impala SQL statements work with data on ADLS as follows. </p>
+
+      <ul class="ul">
+        <li class="li"><div class="p"> The <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> or <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> statements can specify
+            that a table resides on the ADLS filesystem by using one of the
+            following ADLS prefixes in the <code class="ph codeph">LOCATION</code> property.<ul class="ul">
+              <li class="li">For ADLS Gen1: <code class="ph codeph">adl://</code></li>
+
+              <li class="li">For ADLS Gen2: <code class="ph codeph">abfs://</code> or
+                  <code class="ph codeph">abfss://</code></li>
+
+            </ul>
+</div>
+<p class="p"><code class="ph codeph">ALTER TABLE</code> can also set the
+              <code class="ph codeph">LOCATION</code> property for an individual partition, so
+            that some data in a table resides on ADLS and other data in the same
+            table resides on HDFS. </p>
+ See <a class="xref" href="impala_adls.html#ddl">Creating Impala Databases, Tables, and Partitions for Data Stored on ADLS</a>
+          for usage information.</li>
+
         <li class="li">
           <p class="p">
             Once a table or partition is designated as residing on ADLS, the <a class="xref" href="impala_select.html#select">SELECT Statement</a>
             statement transparently accesses the data files from the appropriate storage layer.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             If the ADLS table is an internal table, the <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> statement
             removes the corresponding data files from ADLS when the table is dropped.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The <a class="xref" href="impala_truncate_table.html#truncate_table">TRUNCATE TABLE Statement (Impala 2.3 or higher only)</a> statement always removes the corresponding
             data files from ADLS when the table is truncated.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The <a class="xref" href="impala_load_data.html#load_data">LOAD DATA Statement</a> can move data files residing in HDFS into
             an ADLS table.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>, or the <code class="ph codeph">CREATE TABLE AS SELECT</code>
             form of the <code class="ph codeph">CREATE TABLE</code> statement, can copy data from an HDFS table or another ADLS
             table into an ADLS table.
           </p>
-        </li>
-      </ul>
-      <p class="p">
-        For usage information about Impala SQL statements with ADLS tables, see <a class="xref" href="impala_adls.html#ddl">Creating Impala Databases, Tables, and Partitions for Data Stored on ADLS</a>
-        and <a class="xref" href="impala_adls.html#dml">Using Impala DML Statements for ADLS Data</a>.
-      </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="adls__creds">
+        </li>
+
+      </ul>
+
+      <p class="p"> For usage information about Impala SQL statements with ADLS tables,
+        see <a class="xref" href="impala_adls.html#dml">Using Impala DML Statements for ADLS Data</a>. </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="creds">
 
     <h2 class="title topictitle2" id="ariaid-title4">Specifying Impala Credentials to Access Data in ADLS</h2>
 
+
     <div class="body conbody">
 
-      <p class="p">
-        To allow Impala to access data in ADLS, specify values for the following configuration settings in your
-        <span class="ph filepath">core-site.xml</span> file:
-      </p>
+      <p class="p"> To allow Impala to access data in ADLS, specify values for the
+        following configuration settings in your
+          <span class="ph filepath">core-site.xml</span> file.</p>
 
-<pre class="pre codeblock"><code>
-&lt;property&gt;
+      <p class="p">For ADLS Gen1:</p>
+
+
+<pre class="pre codeblock"><code>&lt;property&gt;
    &lt;name&gt;dfs.adls.oauth2.access.token.provider.type&lt;/name&gt;
    &lt;value&gt;ClientCredential&lt;/value&gt;
 &lt;/property&gt;
 &lt;property&gt;
    &lt;name&gt;dfs.adls.oauth2.client.id&lt;/name&gt;
-   &lt;value&gt;&lt;varname&gt;your_client_id&lt;/varname&gt;&lt;/value&gt;
+   &lt;value&gt;<var class="keyword varname">your_client_id</var>&lt;/value&gt;
 &lt;/property&gt;
 &lt;property&gt;
    &lt;name&gt;dfs.adls.oauth2.credential&lt;/name&gt;
-   &lt;value&gt;&lt;varname&gt;your_client_secret&lt;/varname&gt;&lt;/value&gt;
+   &lt;value&gt;<var class="keyword varname">your_client_secret</var>&lt;/value&gt;
 &lt;/property&gt;
 &lt;property&gt;
    &lt;name&gt;dfs.adls.oauth2.refresh.url&lt;/name&gt;
-   &lt;value&gt;&lt;varname&gt;refresh_URL&lt;/varname&gt;&lt;/value&gt;
+   &lt;value&gt;https://login.windows.net/<var class="keyword varname">your_azure_tenant_id</var>/oauth2/token&lt;/value&gt;
 &lt;/property&gt;
 
 </code></pre>
+      <p class="p">For ADLS Gen2:</p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <pre class="pre codeblock"><code> &lt;property&gt;
+    &lt;name&gt;fs.azure.account.auth.type&lt;/name&gt;
+    &lt;value&gt;OAuth&lt;/value&gt;
+  &lt;/property&gt;
+
+  &lt;property&gt;
+    &lt;name&gt;fs.azure.account.oauth.provider.type&lt;/name&gt;
+    &lt;value&gt;org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider&lt;/value&gt;
+  &lt;/property&gt;
+
+  &lt;property&gt;
+    &lt;name&gt;fs.azure.account.oauth2.client.id&lt;/name&gt;
+    &lt;value&gt;<var class="keyword varname">your_client_id</var>&lt;/value&gt;
+  &lt;/property&gt;
+
+  &lt;property&gt;
+    &lt;name&gt;fs.azure.account.oauth2.client.secret&lt;/name&gt;
+    &lt;value&gt;<var class="keyword varname">your_client_secret</var>&lt;/value&gt;
+  &lt;/property&gt;
+
+  &lt;property&gt;
+    &lt;name&gt;fs.azure.account.oauth2.client.endpoint&lt;/name&gt;
+    &lt;value&gt;https://login.microsoftonline.com/<var class="keyword varname">your_azure_tenant_id</var>/oauth2/token&lt;/value&gt;
+  &lt;/property&gt;</code></pre>
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           Check if your Hadoop distribution or cluster management tool includes support for
           filling in and distributing credentials across the cluster in an automated way.
         </p>
+
       </div>
 
-      <p class="p">
-        After specifying the credentials, restart both the Impala and
-        Hive services. (Restarting Hive is required because Impala queries, CREATE TABLE statements, and so on go
-        through the Hive metastore.)
-      </p>
+
+      <p class="p"> After specifying the credentials, restart both the Impala and Hive
+        services. Restarting Hive is required because certain Impala queries,
+        such as <code class="ph codeph">CREATE TABLE</code> statements, go through the Hive
+        metastore.</p>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="adls__etl">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="etl">
 
     <h2 class="title topictitle2" id="ariaid-title5">Loading Data into ADLS for Impala Queries</h2>
+
   
 
     <div class="body conbody">
@@ -176,27 +256,37 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         use the same data loading techniques as you would for non-Impala data.
       </p>
 
+
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="etl__dml">
-      <h3 class="title topictitle3" id="ariaid-title6">Using Impala DML Statements for ADLS Data</h3>
-      <div class="body conbody">
-        <p class="p">
-        In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
-        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
-        Azure Data Lake Store (ADLS).
-        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
-        partitions is specified by an <code class="ph codeph">adl://</code> prefix in the
-        <code class="ph codeph">LOCATION</code> attribute of
-        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
-        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
-        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the ADLS data.
-      </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="etl__manual_etl">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="dml">
+      <h3 class="title topictitle3" id="ariaid-title6">Using Impala DML Statements for ADLS Data</h3>
+
+      <div class="body conbody">
+        <p class="p"> In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements
+          (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and
+          <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table
+        or partition that resides in the Azure Data Lake Store (ADLS). ADLS Gen2
+        is supported in <span class="keyword">Impala 3.1</span> and higher.</p>
+<p class="p">In the<code class="ph codeph">CREATE TABLE</code> or
+          <code class="ph codeph">ALTER TABLE</code> statements, specify the ADLS location for
+        tables and partitions with the <code class="ph codeph">adl://</code> prefix for ADLS
+        Gen1 and <code class="ph codeph">abfs://</code> or <code class="ph codeph">abfss://</code> for ADLS
+        Gen2 in the <code class="ph codeph">LOCATION</code> attribute.</p>
+<p class="p">If you bring data into ADLS
+        using the normal ADLS transfer mechanisms instead of Impala DML
+        statements, issue a <code class="ph codeph">REFRESH</code> statement for the table
+        before using Impala to query the ADLS data. </p>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="manual_etl">
       <h3 class="title topictitle3" id="ariaid-title7">Manually Loading Data into Impala Tables on ADLS</h3>
+
       <div class="body conbody">
         <p class="p">
           As an alternative, you can use the Microsoft-provided methods to bring data files
@@ -205,30 +295,78 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           for details.
         </p>
 
+
         <p class="p">
           After you upload data files to a location already mapped to an Impala table or partition, or if you delete
           files in ADLS from such a location, issue the <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code>
           statement to make Impala aware of the new set of data files.
         </p>
 
+
       </div>
-    </article>
 
-  </article>
+    </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="adls__ddl">
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="ddl">
 
     <h2 class="title topictitle2" id="ariaid-title8">Creating Impala Databases, Tables, and Partitions for Data Stored on ADLS</h2>
+
   
 
     <div class="body conbody">
 
+      <div class="p">
+        Impala reads data for a table or partition from ADLS based on the
+          <code class="ph codeph">LOCATION</code> attribute for the table or partition.
+        Specify the ADLS details in the <code class="ph codeph">LOCATION</code> clause of a
+          <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code>
+        statement. The syntax for the <code class="ph codeph">LOCATION</code> clause is:
+        <ul class="ul">
+          <li class="li">
+            For ADLS Gen1:
+<pre class="pre codeblock"><code>adl://<var class="keyword varname">account</var>.azuredatalakestore.net/<var class="keyword varname">path/file</var></code></pre></li>
+
+          <li class="li">
+            For ADLS Gen2:
+<pre class="pre codeblock"><code>abfs://<var class="keyword varname">container</var>@<var class="keyword varname">account</var>.dfs.core.windows.net/<var class="keyword varname">path</var>/<var class="keyword varname">file</var></code></pre>
+            <p class="p">
+              or
+            </p>
+
+<pre class="pre codeblock"><code>abfss://<var class="keyword varname">container</var>@<var class="keyword varname">account</var>.dfs.core.windows.net/<var class="keyword varname">path</var>/<var class="keyword varname">file</var></code></pre>
+          </li>
+
+        </ul>
+
+      </div>
+
       <p class="p">
-        Impala reads data for a table or partition from ADLS based on the <code class="ph codeph">LOCATION</code> attribute for the
-        table or partition. Specify the ADLS details in the <code class="ph codeph">LOCATION</code> clause of a <code class="ph codeph">CREATE
-        TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statement. The notation for the <code class="ph codeph">LOCATION</code>
-        clause is <code class="ph codeph">adl://<var class="keyword varname">store</var>/<var class="keyword varname">path/to/file</var></code>.
+        <code class="ph codeph"><var class="keyword varname">container</var></code> denotes the parent
+        location that holds the files and folders, which is the Containers in
+        the Azure Storage Blobs service.
       </p>
+
+      <p class="p">
+        <code class="ph codeph"><var class="keyword varname">account</var></code> is the name given for your
+        storage account.
+      </p>
+
+      <div class="note note"><span class="notetitle">Note:</span>
+        <p class="p"> By default, TLS is enabled both with <code class="ph codeph">abfs://</code> and
+            <code class="ph codeph">abfss://</code>. </p>
+
+        <p class="p">
+          When you set the <code class="ph codeph">fs.azure.always.use.https=false</code>
+          property, TLS is disabled with <code class="ph codeph">abfs://</code>, and TLS is
+          enabled with <code class="ph codeph">abfss://</code>
+        </p>
+
+      </div>
+
 
       <p class="p">
         For a partitioned table, either specify a separate <code class="ph codeph">LOCATION</code> clause for each new partition,
@@ -238,6 +376,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         pathnames that include directories.
       </p>
 
+
       <p class="p">
         To point a nonpartitioned table or an individual partition at ADLS, specify a single directory
         path in ADLS, which could be any arbitrary directory. To replicate the structure of an entire Impala
@@ -246,12 +385,14 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         necessary in HDFS, and recording the complete directory structure so that you can replicate it in ADLS.
       </p>
 
+
       <p class="p">
         For example, the following session creates a partitioned table where only a single partition resides on ADLS.
         The partitions for years 2013 and 2014 are located on HDFS. The partition for year 2015 includes a
         <code class="ph codeph">LOCATION</code> attribute with an <code class="ph codeph">adl://</code> URL, and so refers to data residing on
         ADLS, under a specific path underneath the store <code class="ph codeph">impalademo</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create database db_on_hdfs;
 [localhost:21000] &gt; use db_on_hdfs;
@@ -262,15 +403,13 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
                   &gt;   location 'adl://impalademo.azuredatalakestore.net/dir1/dir2/dir3/t1';
 </code></pre>
 
-      <p class="p">
-        For convenience when working with multiple tables with data files stored in ADLS, you can create a database
-        with a <code class="ph codeph">LOCATION</code> attribute pointing to an ADLS path.
-        Specify a URL of the form <code class="ph codeph">adl://<var class="keyword varname">store</var>/<var class="keyword varname">root/path/for/database</var></code>
-        for the <code class="ph codeph">LOCATION</code> attribute of the database.
-        Any tables created inside that database
-        automatically create directories underneath the one specified by the database
-        <code class="ph codeph">LOCATION</code> attribute.
-      </p>
+      <p class="p"> For convenience when working with multiple tables with data files
+        stored in ADLS, you can create a database with a
+          <code class="ph codeph">LOCATION</code> attribute pointing to an ADLS path. Specify
+        a URL of the form as shown above. Any tables created inside that
+        database automatically create directories underneath the one specified
+        by the database <code class="ph codeph">LOCATION</code> attribute. </p>
+
 
       <p class="p">
         The following session creates a database and two partitioned tables residing entirely on ADLS, one
@@ -282,6 +421,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         <code class="ph codeph">month=1</code> do not include leading zeroes, which sometimes appear in partition directories created
         through Hive.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create database db_on_adls location 'adl://impalademo.azuredatalakestore.net/dir1/dir2/dir3';
 [localhost:21000] &gt; use db_on_adls;
@@ -326,6 +466,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         -p</code>.
       </p>
 
+
       <p class="p">
         Use the standard ADLS file upload methods to actually put the data files into the right locations. You can
         also put the directory paths and data files in place before creating the associated Impala databases or
@@ -333,22 +474,27 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         and tables are created.
       </p>
 
-      <p class="p">
-        You can switch whether an existing table or partition points to data in HDFS or ADLS. For example, if you
-        have an Impala table or partition pointing to data files in HDFS or ADLS, and you later transfer those data
-        files to the other filesystem, use an <code class="ph codeph">ALTER TABLE</code> statement to adjust the
-        <code class="ph codeph">LOCATION</code> attribute of the corresponding table or partition to reflect that change. Because
-        Impala does not have an <code class="ph codeph">ALTER DATABASE</code> statement, this location-switching technique is not
-        practical for entire databases that have a custom <code class="ph codeph">LOCATION</code> attribute.
-      </p>
+
+      <p class="p"> You can switch whether an existing table or partition points to data
+        in HDFS or ADLS. For example, if you have an Impala table or partition
+        pointing to data files in HDFS or ADLS, and you later transfer those
+        data files to the other filesystem, use an <code class="ph codeph">ALTER TABLE</code>
+        statement to adjust the <code class="ph codeph">LOCATION</code> attribute of the
+        corresponding table or partition to reflect that change. This
+        location-switching technique is not practical for entire databases that
+        have a custom <code class="ph codeph">LOCATION</code> attribute. </p>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="adls__internal_external">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="internal_external">
 
     <h2 class="title topictitle2" id="ariaid-title9">Internal and External Tables Located on ADLS</h2>
+
 
     <div class="body conbody">
 
@@ -361,17 +507,20 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a> for details.
       </p>
 
+
       <p class="p">
         If the data on ADLS is intended to be long-lived and accessed by other tools in addition to Impala, create
         any associated ADLS tables with the <code class="ph codeph">CREATE EXTERNAL TABLE</code> syntax, so that the files are not
         deleted from ADLS when the table is dropped.
       </p>
 
+
       <p class="p">
         If the data on ADLS is only needed for querying by Impala and can be safely discarded once the Impala
         workflow is complete, create the associated ADLS tables using the <code class="ph codeph">CREATE TABLE</code> syntax, so
         that dropping the table also deletes the corresponding data files on ADLS.
       </p>
+
 
       <p class="p">
         For example, this session creates a table in ADLS with the same column layout as a table in HDFS, then
@@ -382,6 +531,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         contents form the table data. Because the data in this example is uploaded after the table is created, a
         <code class="ph codeph">REFRESH</code> statement prompts Impala to update its cached information about the data files.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table usa_cities_adls like usa_cities location 'adl://impalademo.azuredatalakestore.net/usa_cities';
 [localhost:21000] &gt; desc usa_cities_adls;
@@ -445,6 +595,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         <code class="ph codeph">REFRESH</code> statement is required.
       </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table sample_data_adls
                   &gt; (id int, id bigint, val int, zerofill string,
                   &gt; name string, assertion boolean, city string, state string)
@@ -466,11 +617,14 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="adls__queries">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="queries">
 
     <h2 class="title topictitle2" id="ariaid-title10">Running and Tuning Impala Queries for Data Stored on ADLS</h2>
+
 
     <div class="body conbody">
 
@@ -479,10 +633,12 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         query data stored in ADLS exactly the same as data stored on HDFS or in HBase:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           Queries against ADLS data support all the same file formats as for HDFS data.
         </li>
+
 
         <li class="li">
           Tables can be unpartitioned or partitioned. For partitioned tables, either manually construct paths in ADLS
@@ -490,14 +646,17 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           ADD PARTITION</code> to set up the appropriate paths in ADLS.
         </li>
 
+
         <li class="li">
           HDFS, Kudu, and HBase tables can be joined to ADLS tables, or ADLS tables can be joined with each other.
         </li>
+
 
         <li class="li">
           Authorization using the Sentry framework to control access to databases, tables, or columns works the
           same whether the data is in HDFS or in ADLS.
         </li>
+
 
         <li class="li">
           The <span class="keyword cmdname">catalogd</span> daemon caches metadata for both HDFS and ADLS tables. Use
@@ -505,30 +664,38 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           where you would issue those statements for HDFS tables.
         </li>
 
+
         <li class="li">
           Queries against ADLS tables are subject to the same kinds of admission control and resource management as
           HDFS tables.
         </li>
 
+
         <li class="li">
           Metadata about ADLS tables is stored in the same metastore database as for HDFS tables.
         </li>
+
 
         <li class="li">
           You can set up views referring to ADLS tables, the same as for HDFS tables.
         </li>
 
+
         <li class="li">
           The <code class="ph codeph">COMPUTE STATS</code>, <code class="ph codeph">SHOW TABLE STATS</code>, and <code class="ph codeph">SHOW COLUMN
           STATS</code> statements work for ADLS tables also.
         </li>
+
       </ul>
+
 
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title11" id="queries__performance">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="performance">
 
       <h3 class="title topictitle3" id="ariaid-title11">Understanding and Tuning Impala Query Performance for ADLS Data</h3>
+
   
 
       <div class="body conbody">
@@ -539,6 +706,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           interpret explain plans and profiles for queries against ADLS data, and tips to achieve the best
           performance possible for such queries.
         </p>
+
 
         <p class="p">
           All else being equal, performance is expected to be lower for queries running against data on ADLS rather
@@ -554,6 +722,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           ADLS data than for HDFS data.
         </p>
 
+
         <p class="p">
         Because ADLS does not expose the block sizes of data files the way HDFS does,
         any Impala <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements
@@ -562,12 +731,14 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         for tables that use other file formats.)
       </p>
 
+
         <p class="p">
           When optimizing aspects of for complex queries such as the join order, Impala treats tables on HDFS and
           ADLS the same way. Therefore, follow all the same tuning recommendations for ADLS tables as for HDFS ones,
           such as using the <code class="ph codeph">COMPUTE STATS</code> statement to help Impala construct accurate estimates of
           row counts and cardinality. See <a class="xref" href="impala_performance.html#performance">Tuning Impala for Performance</a> for details.
         </p>
+
 
         <p class="p">
           In query profile reports, the numbers for <code class="ph codeph">BytesReadLocal</code>,
@@ -578,15 +749,20 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
           remote reads.
         </p>
 
+
       </div>
 
-    </article>
 
-  </article>
+    </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="adls__restrictions">
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="restrictions">
 
     <h2 class="title topictitle2" id="ariaid-title12">Restrictions on Impala Support for ADLS</h2>
+
 
     <div class="body conbody">
 
@@ -595,6 +771,7 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         filesystem in the cluster.
       </p>
 
+
       <p class="p">
         Although ADLS is often used to store JSON-formatted data, the current Impala support for ADLS does not include
         directly querying JSON data. For Impala queries, use data files in one of the file formats listed in
@@ -602,37 +779,51 @@ adl://<var class="keyword varname">your_account</var>.azuredatalakestore.net/<va
         flattened version of that data for querying by Impala as part of your ETL cycle.
       </p>
 
+
       <p class="p">
         You cannot use the <code class="ph codeph">ALTER TABLE ... SET CACHED</code> statement for tables or partitions that are
         located in ADLS.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="adls__best_practices">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="best_practices">
     <h2 class="title topictitle2" id="ariaid-title13">Best Practices for Using Impala with ADLS</h2>
+
     
     <div class="body conbody">
       <p class="p">
         The following guidelines represent best practices derived from testing and real-world experience with Impala on ADLS:
       </p>
+
       <ul class="ul">
         <li class="li">
           <p class="p">
             Any reference to an ADLS location must be fully qualified. (This rule applies when
             ADLS is not designated as the default filesystem.)
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             Set any appropriate configuration settings for <span class="keyword cmdname">impalad</span>.
           </p>
+
         </li>
+
       </ul>
 
-    </div>
-  </article>
 
-</article></main></body></html>
+    </div>
+
+  </div>
+
+
+</body>
+</html>

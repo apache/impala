@@ -1,8 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="partitioning"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Partitioning for Impala Tables</title></head><body id="partitioning"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Partitioning for Impala Tables" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="partitioning" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Partitioning for Impala Tables</title>
+</head>
+<body id="partitioning">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Partitioning for Impala Tables</h1>
+
 
   
 
@@ -21,7 +66,9 @@
       data to read and test.
     </p>
 
+
     <p class="p toc inpage"></p>
+
 
     <p class="p">
       See <a class="xref" href="impala_tutorial.html#tut_external_partition_data">Attaching an External Partitioned Table to an HDFS Directory Structure</a> for an example that illustrates the syntax for creating partitioned
@@ -29,25 +76,31 @@
       elsewhere in HDFS.
     </p>
 
+
     <p class="p">
       Parquet is a popular format for partitioned Impala tables because it is well suited to handle huge data volumes. See
       <a class="xref" href="impala_parquet.html#parquet_performance">Query Performance for Impala Parquet Tables</a> for performance considerations for partitioned Parquet tables.
     </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_literals.html#null">NULL</a> for details about how <code class="ph codeph">NULL</code> values are represented in partitioned tables.
     </p>
+
 
     <p class="p">
       See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about setting up tables where some or all partitions reside on the Amazon Simple
       Storage Service (S3).
     </p>
 
+
   </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="partitioning__partitioning_choosing">
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="partitioning_choosing">
 
     <h2 class="title topictitle2" id="ariaid-title2">When to Use Partitioned Tables</h2>
+
 
     <div class="body conbody">
 
@@ -55,10 +108,12 @@
         Partitioning is typically appropriate for:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           Tables that are very large, where reading the entire data set takes an impractical amount of time.
         </li>
+
 
         <li class="li">
           Tables that are always or almost always queried with conditions on the partitioning columns. In our example of a table partitioned
@@ -67,6 +122,7 @@
           more overall work than in an unpartitioned table. You would probably not partition this way if you frequently queried the table
           based on last name, student ID, and so on without testing the year.
         </li>
+
 
         <li class="li">
           Columns that have reasonable cardinality (number of different values). If a column only has a small number of values, for example
@@ -78,26 +134,33 @@
           hour and minute.)
         </li>
 
+
         <li class="li">
           Data that already passes through an extract, transform, and load (ETL) pipeline. The values of the partitioning columns are
           stripped from the original data files and represented by directory names, so loading data into a partitioned table involves some
           sort of transformation or preprocessing.
         </li>
+
       </ul>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="partitioning__partition_sql">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="partition_sql">
 
     <h2 class="title topictitle2" id="ariaid-title3">SQL Statements for Partitioned Tables</h2>
+
 
     <div class="body conbody">
 
       <p class="p">
         In terms of Impala SQL syntax, partitioning affects these statements:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -106,37 +169,47 @@
           included in the main list of columns for the table.
         </li>
 
+
         <li class="li">
           In <span class="keyword">Impala 2.5</span> and higher, you can also use the <code class="ph codeph">PARTITIONED BY</code> clause in a <code class="ph codeph">CREATE TABLE AS
           SELECT</code> statement. This syntax lets you use a single statement to create a partitioned table, copy data into it, and
           create new partitions based on the values in the inserted data.
         </li>
 
+
         <li class="li">
-          <code class="ph codeph"><a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE</a></code>: you can add or drop partitions, to work with
-          different portions of a huge data set. You can designate the HDFS directory that holds the data files for a specific partition.
-          With data partitioned by date values, you might <span class="q">"age out"</span> data that is no longer relevant.
-          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <code class="ph codeph"><a class="xref" href="impala_alter_table.html#alter_table">ALTER
+              TABLE</a></code>: you can add or drop partitions, to work
+          with different portions of a huge data set. You can designate the HDFS
+          directory that holds the data files for a specific partition. With
+          data partitioned by date values, you might <span class="q">"age out"</span> data that is
+          no longer relevant. <div class="note note"><span class="notetitle">Note:</span>
         If you are creating a partition for the first time and specifying its location, for maximum efficiency, use
         a single <code class="ph codeph">ALTER TABLE</code> statement including both the <code class="ph codeph">ADD PARTITION</code> and
         <code class="ph codeph">LOCATION</code> clauses, rather than separate statements with <code class="ph codeph">ADD PARTITION</code> and
         <code class="ph codeph">SET LOCATION</code> clauses.
       </div>
+
         </li>
 
+
         <li class="li">
-          <code class="ph codeph"><a class="xref" href="impala_insert.html#insert">INSERT</a></code>: When you insert data into a partitioned table, you identify
-          the partitioning columns. One or more values from each inserted row are not stored in data files, but instead determine the
-          directory where that row value is stored. You can also specify which partition to load a set of data into, with <code class="ph codeph">INSERT
-          OVERWRITE</code> statements; you can replace the contents of a specific partition but you cannot append data to a specific
-          partition.
-          <p class="p">
+          <code class="ph codeph"><a class="xref" href="impala_insert.html#insert">INSERT</a></code>:
+          When you insert data into a partitioned table, you identify the
+          partitioning columns. One or more values from each inserted row are
+          not stored in data files, but instead determine the directory where
+          that row value is stored. You can also specify which partition to load
+          a set of data into, with <code class="ph codeph">INSERT OVERWRITE</code> statements;
+          you can replace the contents of a specific partition but you cannot
+          append data to a specific partition. <p class="p">
         By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories underneath a partitioned
         table, those subdirectories are assigned default HDFS permissions for the <code class="ph codeph">impala</code> user. To
         make each subdirectory have the same permissions as its parent directory in HDFS, specify the
         <code class="ph codeph">--insert_inherit_permissions</code> startup option for the <span class="keyword cmdname">impalad</span> daemon.
       </p>
+
         </li>
+
 
         <li class="li">
           Although the syntax of the <code class="ph codeph"><a class="xref" href="impala_select.html#select">SELECT</a></code> statement is the same whether or
@@ -145,19 +218,25 @@
           <a class="xref" href="impala_partitioning.html#partition_pruning">Partition Pruning for Queries</a> for details.
         </li>
 
+
         <li class="li">
           In Impala 1.4 and later, there is a <code class="ph codeph">SHOW PARTITIONS</code> statement that displays information about each partition in a
           table. See <a class="xref" href="impala_show.html#show">SHOW Statement</a> for details.
         </li>
+
       </ul>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="partitioning__partition_static_dynamic">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="partition_static_dynamic">
 
     <h2 class="title topictitle2" id="ariaid-title4">Static and Dynamic Partitioning Clauses</h2>
+
 
     <div class="body conbody">
 
@@ -167,6 +246,7 @@
         only one partition, or with an <code class="ph codeph">INSERT</code> statement that inserts all values into the same partition:
       </p>
 
+
 <pre class="pre codeblock"><code>insert into t1 <strong class="ph b">partition(x=10, y='a')</strong> select c1 from some_other_table;
 </code></pre>
 
@@ -174,6 +254,7 @@
         When you specify some partition key columns in an <code class="ph codeph">INSERT</code> statement, but leave out the values, Impala determines
         which partition to insert. This technique is called <dfn class="term">dynamic partitioning</dfn>:
       </p>
+
 
 <pre class="pre codeblock"><code>insert into t1 <strong class="ph b">partition(x, y='b')</strong> select c1, c2 from some_other_table;
 -- Create new partition if necessary based on variable year, month, and day; insert a single value.
@@ -188,13 +269,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         specified value.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="partitioning__partition_refresh">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="partition_refresh">
 
     <h2 class="title topictitle2" id="ariaid-title5">Refreshing a Single Partition</h2>
+
 
     <div class="body conbody">
 
@@ -205,6 +290,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         <code class="ph codeph">REFRESH</code> operation for a full partitioned table can take significant time.
       </p>
 
+
       <p class="p">
         In <span class="keyword">Impala 2.7</span> and higher, you can include a <code class="ph codeph">PARTITION (<var class="keyword varname">partition_spec</var>)</code> clause in the
         <code class="ph codeph">REFRESH</code> statement so that only a single partition is refreshed. For example, <code class="ph codeph">REFRESH big_table PARTITION
@@ -212,13 +298,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> for more details and examples of <code class="ph codeph">REFRESH</code> syntax and usage.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="partitioning__partition_permissions">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="partition_permissions">
 
     <h2 class="title topictitle2" id="ariaid-title6">Permissions for Partition Subdirectories</h2>
+
 
     <div class="body conbody">
 
@@ -229,13 +319,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         <code class="ph codeph">--insert_inherit_permissions</code> startup option for the <span class="keyword cmdname">impalad</span> daemon.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="partitioning__partition_pruning">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="partition_pruning">
 
     <h2 class="title topictitle2" id="ariaid-title7">Partition Pruning for Queries</h2>
+
 
     <div class="body conbody">
 
@@ -245,6 +339,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         resources and are thus proportionally faster and more scalable.
       </p>
 
+
       <p class="p">
         For example, if a table is partitioned by columns <code class="ph codeph">YEAR</code>, <code class="ph codeph">MONTH</code>, and <code class="ph codeph">DAY</code>, then
         <code class="ph codeph">WHERE</code> clauses such as <code class="ph codeph">WHERE year = 2013</code>, <code class="ph codeph">WHERE year &lt; 2010</code>, or <code class="ph codeph">WHERE
@@ -253,13 +348,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         portion of one year.
       </p>
 
+
       <p class="p toc inpage"></p>
+
 
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="partition_pruning__partition_pruning_checking">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="partition_pruning_checking">
 
       <h3 class="title topictitle3" id="ariaid-title8">Checking if Partition Pruning Happens for a Query</h3>
+
 
       <div class="body conbody">
 
@@ -269,6 +368,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
           <code class="ph codeph">#partitions=1/3</code> in the <code class="ph codeph">EXPLAIN</code> plan confirms that Impala can do the appropriate partition
           pruning.
         </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert into census partition (year=2010) values ('Smith'),('Jones');
 [localhost:21000] &gt; insert into census partition (year=2011) values ('Smith'),('Jones'),('Doe');
@@ -306,13 +406,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
           <code class="ph codeph">PROFILE</code> command; it includes this same summary report near the start of the profile output.
         </p>
 
+
       </div>
 
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title9" id="partition_pruning__partition_pruning_sql">
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="partition_pruning_sql">
 
       <h3 class="title topictitle3" id="ariaid-title9">What SQL Constructs Work with Partition Pruning</h3>
+
 
       <div class="body conbody">
 
@@ -325,6 +429,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
           (<code class="ph codeph">YEAR</code>) to a constant value, Impala can deduce that only the partition <code class="ph codeph">YEAR=2010</code> is required, and
           again only reads 1 out of 3 partitions.
         </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; drop table census;
 [localhost:21000] &gt; create table census (name string, census_year int) partitioned by (year int);
@@ -367,6 +472,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         <code class="ph codeph">CREATE VIEW</code> statement were used for partition pruning.
       </p>
 
+
         <p class="p">
         In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
         clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
@@ -375,13 +481,17 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
 
       </p>
 
+
       </div>
 
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="partition_pruning__dynamic_partition_pruning">
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="dynamic_partition_pruning">
 
       <h3 class="title topictitle3" id="ariaid-title10">Dynamic Partition Pruning</h3>
+
 
       <div class="body conbody">
 
@@ -392,10 +502,12 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
           the query, and Impala prunes unnecessary partitions in ways that were impractical to predict in advance.
         </p>
 
+
         <p class="p">
           For example, if partition key columns are compared to literal values in a <code class="ph codeph">WHERE</code> clause, Impala can perform static
           partition pruning during the planning phase to only read the relevant partitions:
         </p>
+
 
 <pre class="pre codeblock"><code>
 -- The query only needs to read 3 partitions whose key values are known ahead of time.
@@ -404,54 +516,79 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 </code></pre>
 
         <p class="p">
-          Dynamic partition pruning involves using information only available at run time, such as the result of a subquery:
+          Dynamic partition pruning involves using information only available
+          at run time, such as the result of a subquery. The following example
+          shows a simple dynamic partition pruning.
         </p>
 
+
 <pre class="pre codeblock"><code>
-create table yy (s string) partitioned by (year int) stored as parquet;
-insert into yy partition (year) values ('1999', 1999), ('2000', 2000),
-  ('2001', 2001), ('2010',2010);
-compute stats yy;
+CREATE TABLE yy (s STRING) PARTITIONED BY (year INT);
+INSERT INTO yy PARTITION (year) VALUES ('1999', 1999), ('2000', 2000),
+  ('2001', 2001), ('2010', 2010), ('2018', 2018);
+COMPUTE STATS yy;
 
-create table yy2 (s string) partitioned by (year int) stored as parquet;
-insert into yy2 partition (year) values ('1999', 1999), ('2000', 2000),
-  ('2001', 2001);
-compute stats yy2;
+CREATE TABLE yy2 (s STRING, year INT);
+INSERT INTO yy2 VALUES ('1999', 1999), ('2000', 2000), ('2001', 2001);
+COMPUTE STATS yy2;
 
--- The query reads an unknown number of partitions, whose key values are only
--- known at run time. The 'runtime filters' lines show how the information about
--- the partitions is calculated in query fragment 02, and then used in query
--- fragment 00 to decide which partitions to skip.
-explain select s from yy2 where year in (select year from yy where year between 2000 and 2005);
-+----------------------------------------------------------+
-| Explain String                                           |
-+----------------------------------------------------------+
-| Estimated Per-Host Requirements: Memory=16.00MB VCores=2 |
-|                                                          |
-| 04:EXCHANGE [UNPARTITIONED]                              |
-| |                                                        |
-| 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]                 |
-| |  hash predicates: year = year                          |
-| |  <strong class="ph b">runtime filters: RF000 &lt;- year</strong>                        |
-| |                                                        |
-| |--03:EXCHANGE [BROADCAST]                               |
-| |  |                                                     |
-| |  01:SCAN HDFS [dpp.yy]                                 |
-| |     partitions=2/4 files=2 size=468B                   |
-| |                                                        |
-| 00:SCAN HDFS [dpp.yy2]                                   |
-|    partitions=2/3 files=2 size=468B                      |
-|    <strong class="ph b">runtime filters: RF000 -&gt; year</strong>                        |
-+----------------------------------------------------------+
+-- The following query reads an unknown number of partitions, whose key values
+-- are only known at run time. The <strong class="ph b">runtime filters</strong> line shows the
+-- information used in query fragment 02 to decide which partitions to skip.
+
+EXPLAIN SELECT s FROM yy WHERE year IN (SELECT year FROM yy2);
++--------------------------------------------------------------------------+
+| PLAN-ROOT SINK                                                           |
+| |                                                                        |
+| 04:EXCHANGE [UNPARTITIONED]                                              |
+| |                                                                        |
+| 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]                                 |
+| |  hash predicates: year = year                                          |
+| |  <strong class="ph b">runtime filters: RF000 &lt;- year</strong>                                   |
+| |                                                                        |
+| |--03:EXCHANGE [BROADCAST]                                               |
+| |  |                                                                     |
+| |  01:SCAN HDFS [default.yy2]                                            |
+| |     partitions=1/1 files=1 size=620B                                   |
+| |                                                                        |
+| 00:SCAN HDFS [default.yy]                                                |
+|    <strong class="ph b">partitions=5/5</strong> files=5 size=1.71KB                               |
+|    runtime filters: RF000 -&gt; year                                        |
++--------------------------------------------------------------------------+
+
+SELECT s FROM yy WHERE year IN (SELECT year FROM yy2); -- Returns 3 rows from yy
+PROFILE;
 </code></pre>
 
+        <p class="p">
+          In the above example, Impala evaluates the subquery, sends the
+          subquery results to all Impala nodes participating in the query, and
+          then each <span class="keyword cmdname">impalad</span> daemon uses the dynamic partition
+          pruning optimization to read only the partitions with the relevant key
+          values.
+        </p>
 
 
         <p class="p">
-          In this case, Impala evaluates the subquery, sends the subquery results to all Impala nodes participating in the query, and then
-          each <span class="keyword cmdname">impalad</span> daemon uses the dynamic partition pruning optimization to read only the partitions with the
-          relevant key values.
+          The output query plan from the <code class="ph codeph">EXPLAIN</code> statement
+          shows that runtime filters are enabled. The plan also shows that it
+          expects to read all 5 partitions of the <code class="ph codeph">yy</code> table,
+          indicating that static partition pruning will not happen.
         </p>
+
+
+        <p class="p">
+          The Filter summary in the <code class="ph codeph">PROFILE</code> output shows that
+          the scan node filtered out based on a runtime filter of dynamic
+          partition pruning.
+        </p>
+
+
+<pre class="pre codeblock"><code>Filter 0 (1.00 MB):
+ - Files processed: 3
+ - <strong class="ph b">Files rejected: 1 (1)</strong>
+ - Files total: 3 (3)
+</code></pre>
 
         <p class="p">
           Dynamic partition pruning is especially effective for queries involving joins of several large partitioned tables. Evaluating the
@@ -461,26 +598,33 @@ explain select s from yy2 where year in (select year from yy where year between 
           and the amount of intermediate data stored and transmitted across the network during the query.
         </p>
 
+
         <p class="p">
         When the spill-to-disk feature is activated for a join node within a query, Impala does not
         produce any runtime filters for that join operation on that host. Other join nodes within
         the query are not affected.
       </p>
 
+
         <p class="p">
           Dynamic partition pruning is part of the runtime filtering feature, which applies to other kinds of queries in addition to queries
           against partitioned tables. See <a class="xref" href="impala_runtime_filtering.html#runtime_filtering">Runtime Filtering for Impala Queries (Impala 2.5 or higher only)</a> for full details about this feature.
         </p>
 
+
       </div>
 
-    </article>
 
-  </article>
+    </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="partitioning__partition_key_columns">
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="partition_key_columns">
 
     <h2 class="title topictitle2" id="ariaid-title11">Partition Key Columns</h2>
+
 
     <div class="body conbody">
 
@@ -490,20 +634,25 @@ explain select s from yy2 where year in (select year from yy where year between 
         geographic region when the data is associated with some place.
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <p class="p">
             For time-based data, split out the separate parts into their own columns, because Impala cannot partition based on a
             <code class="ph codeph">TIMESTAMP</code> column.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
             The data type of the partition columns does not have a significant effect on the storage required, because the values from those
             columns are not stored in the data files, rather they are represented as strings inside HDFS directory names.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -512,14 +661,18 @@ explain select s from yy2 where year in (select year from yy where year between 
             default because the query behavior is slightly different if the table contains partition directories without actual data inside.
             See <a class="xref" href="impala_optimize_partition_key_scans.html#optimize_partition_key_scans">OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</a> for details.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
         Partitioned tables can contain complex type columns.
         All the partition key columns must be scalar types.
       </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -531,8 +684,11 @@ explain select s from yy2 where year in (select year from yy where year between 
             have data with a geographic component, you might partition based on postal code if you have many megabytes of data for each
             postal code, but if not, you might partition by some larger region such as city, state, or country. state
           </p>
+
         </li>
+
       </ul>
+
 
       <p class="p">
         If you frequently run aggregate functions such as <code class="ph codeph">MIN()</code>, <code class="ph codeph">MAX()</code>, and
@@ -543,13 +699,17 @@ explain select s from yy2 where year in (select year from yy where year between 
         evaluated when this query option is enabled.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="partitioning__mixed_format_partitions">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="mixed_format_partitions">
 
     <h2 class="title topictitle2" id="ariaid-title12">Setting Different File Formats for Partitions</h2>
+
 
     <div class="body conbody">
 
@@ -561,9 +721,11 @@ explain select s from yy2 where year in (select year from yy where year between 
         that use different file formats reside in separate partitions.
       </p>
 
+
       <p class="p">
         For example, here is how you might switch from text to Parquet data as you receive data for different years:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table census (name string) partitioned by (year smallint);
 [localhost:21000] &gt; alter table census add partition (year=2012); -- Text format;
@@ -581,6 +743,7 @@ explain select s from yy2 where year in (select year from yy where year between 
         produces small files that are inefficient for real-world queries.
       </p>
 
+
       <p class="p">
         For other file types that Impala cannot create natively, you can switch into Hive and issue the <code class="ph codeph">ALTER TABLE ... SET
         FILEFORMAT</code> statements and <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code> statements there. After switching back to
@@ -588,13 +751,17 @@ explain select s from yy2 where year in (select year from yy where year between 
         data added through Hive.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="partitioning__partition_management">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="partition_management">
 
     <h2 class="title topictitle2" id="ariaid-title13">Managing Partitions</h2>
+
 
     <div class="body conbody">
 
@@ -605,12 +772,14 @@ explain select s from yy2 where year in (select year from yy where year between 
         formats.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         If you are creating a partition for the first time and specifying its location, for maximum efficiency, use
         a single <code class="ph codeph">ALTER TABLE</code> statement including both the <code class="ph codeph">ADD PARTITION</code> and
         <code class="ph codeph">LOCATION</code> clauses, rather than separate statements with <code class="ph codeph">ADD PARTITION</code> and
         <code class="ph codeph">SET LOCATION</code> clauses.
       </div>
+
 
       <p class="p">
         What happens to the data files when a partition is dropped depends on whether the partitioned table is designated as internal or
@@ -622,13 +791,17 @@ explain select s from yy2 where year in (select year from yy where year between 
         again. See <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a> for details and examples.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title14" id="partitioning__partition_kudu">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="partition_kudu">
 
     <h2 class="title topictitle2" id="ariaid-title14">Using Partitioning with Kudu Tables</h2>
+
 
     
 
@@ -640,18 +813,23 @@ explain select s from yy2 where year in (select year from yy where year between 
         columns.
       </p>
 
+
       <p class="p">
         See <a class="xref" href="impala_kudu.html#kudu_partitioning">Partitioning for Kudu Tables</a> for
         details and examples of the partitioning techniques
         for Kudu tables.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="partitioning__partition_stats">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="partition_stats">
     <h2 class="title topictitle2" id="ariaid-title15">Keeping Statistics Up to Date for Partitioned Tables</h2>
+
     <div class="body conbody">
 
       <p class="p">
@@ -660,7 +838,8 @@ explain select s from yy2 where year in (select year from yy where year between 
         on a per-partition basis such that stats can be incrementally updated when new partitions are added.
       </p>
 
-      <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+
+      <div class="note important"><span class="importanttitle">Important:</span>
         <p class="p">
         For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
         <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
@@ -669,6 +848,7 @@ explain select s from yy2 where year in (select year from yy where year between 
         vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
         making the switch.
       </p>
+
         <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
         the statistics are computed again from scratch regardless of whether the table already
@@ -676,14 +856,19 @@ explain select s from yy2 where year in (select year from yy where year between 
         for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
         for the first time on a given table.
       </p>
-        <p class="p">
-        For a table with a huge number of partitions and many columns, the approximately 400 bytes
-        of metadata per column per partition can add up to significant memory overhead, as it must
-        be cached on the <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host
-        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
-        you might experience service downtime.
-      </p>
+
+        <p class="p"> In Impala 3.0 and lower, approximately
+        400 bytes of metadata per column per partition are needed for caching.
+        Tables with a big number of partitions and many columns can add up to a
+        significant memory overhead as the metadata must be cached on the
+          <span class="keyword cmdname">catalogd</span> host and on every
+          <span class="keyword cmdname">impalad</span> host that is eligible to be a coordinator.
+        If this metadata for all tables exceeds 2 GB, you might experience
+        service downtime. In Impala 3.1 and higher, the issue was alleviated
+        with an improved handling of incremental stats.</p>
+
       </div>
+
 
       <p class="p">
         The <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> variation computes statistics only for partitions that were
@@ -692,6 +877,7 @@ explain select s from yy2 where year in (select year from yy where year between 
         operation takes too long to be practical each time a partition is added or dropped. See
         <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">impala_perf_stats.html#perf_stats_incremental</a> for full usage details.
       </p>
+
 
 <pre class="pre codeblock"><code>-- Initially the table has no incremental stats, as indicated
 -- 'false' under Incremental stats.
@@ -796,6 +982,9 @@ show table stats item_partitioned;
 </code></pre>
 
     </div>
-  </article>
 
-</article></main></body></html>
+  </div>
+
+
+</body>
+</html>

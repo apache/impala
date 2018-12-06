@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="drop_database"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DROP DATABASE Statement</title></head><body id="drop_database"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DROP DATABASE Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="drop_database" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DROP DATABASE Statement</title>
+</head>
+<body id="drop_database">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">DROP DATABASE Statement</h1>
+
   
   
 
@@ -14,9 +34,11 @@
       from the metastore, and deleting the corresponding <code class="ph codeph">*.db</code> directory from HDFS.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>DROP (DATABASE|SCHEMA) [IF EXISTS] <var class="keyword varname">database_name</var> <span class="ph">[RESTRICT | CASCADE]</span>;</code></pre>
 
@@ -24,13 +46,16 @@
         <strong class="ph b">Statement type:</strong> DDL
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+
     <p class="p">
       By default, the database must be empty before it can be dropped, to avoid losing any data.
     </p>
+
 
     <p class="p">
       In <span class="keyword">Impala 2.3</span> and higher, you can include the <code class="ph codeph">CASCADE</code>
@@ -40,6 +65,7 @@
       clause is optional.
     </p>
 
+
     <p class="p">
       The automatic dropping resulting from the <code class="ph codeph">CASCADE</code> clause follows the same rules as the
       corresponding <code class="ph codeph">DROP TABLE</code>, <code class="ph codeph">DROP VIEW</code>, and <code class="ph codeph">DROP FUNCTION</code> statements.
@@ -47,10 +73,12 @@
       tables are removed.
     </p>
 
+
     <p class="p">
       When you do not use the <code class="ph codeph">CASCADE</code> clause, drop or move all the objects inside the database manually
       before dropping the database itself:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -58,22 +86,29 @@
           Use the <code class="ph codeph">SHOW TABLES</code> statement to locate all tables and views in the database,
           and issue <code class="ph codeph">DROP TABLE</code> and <code class="ph codeph">DROP VIEW</code> statements to remove them all.
         </p>
+
       </li>
+
       <li class="li">
         <p class="p">
           Use the <code class="ph codeph">SHOW FUNCTIONS</code> and <code class="ph codeph">SHOW AGGREGATE FUNCTIONS</code> statements
           to locate all user-defined functions in the database, and issue <code class="ph codeph">DROP FUNCTION</code>
           and <code class="ph codeph">DROP AGGREGATE FUNCTION</code> statements to remove them all.
         </p>
+
       </li>
+
       <li class="li">
         <p class="p">
           To keep tables or views contained by a database while removing the database itself, use
           <code class="ph codeph">ALTER TABLE</code> and <code class="ph codeph">ALTER VIEW</code> to move the relevant
           objects to a different database before dropping the original database.
         </p>
+
       </li>
+
     </ul>
+
 
     <p class="p">
       You cannot drop the current database, that is, the database your session connected to
@@ -84,17 +119,21 @@
       before dropping it.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Hive considerations:</strong>
       </p>
+
 
     <p class="p">
       When you drop a database in Impala, the database can no longer be used by Hive.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
 
 
@@ -103,9 +142,11 @@
       DATABASE</code>, <code class="ph codeph">USE</code>, and <code class="ph codeph">DROP DATABASE</code>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Amazon S3 considerations:</strong>
       </p>
+
 
     <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
@@ -116,22 +157,27 @@
         See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 
+
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
     <p class="p">
       The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
       typically the <code class="ph codeph">impala</code> user, must have write
       permission for the directory associated with the database.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <pre class="pre codeblock"><code>create database first_db;
 use first_db;
@@ -185,9 +231,17 @@ drop database temp;
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       <a class="xref" href="impala_databases.html#databases">Overview of Impala Databases</a>, <a class="xref" href="impala_create_database.html#create_database">CREATE DATABASE Statement</a>,
       <a class="xref" href="impala_use.html#use">USE Statement</a>, <a class="xref" href="impala_show.html#show_databases">SHOW DATABASES</a>, <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

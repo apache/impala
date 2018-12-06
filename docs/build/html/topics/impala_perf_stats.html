@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="perf_stats"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Table and Column Statistics</title></head><body id="perf_stats"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Table and Column Statistics" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="perf_stats" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Table and Column Statistics</title>
+</head>
+<body id="perf_stats">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Table and Column Statistics</h1>
+
 
   
 
@@ -18,13 +38,21 @@
       and how to produce them and keep them up to date.
     </p>
 
+
     <p class="p toc inpage all"></p>
+
 
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav><article class="topic concept nested1" aria-labelledby="perf_table_stats__table_stats" id="perf_stats__perf_table_stats">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="perf_table_stats__table_stats" id="perf_table_stats">
 
     <h2 class="title topictitle2" id="perf_table_stats__table_stats">Overview of Table Statistics</h2>
+
 
 
 
@@ -41,6 +69,7 @@
         because they can be calculated cheaply, as part of gathering HDFS block metadata.
       </p>
 
+
       <p class="p">
         The following example shows table stats for an unpartitioned Parquet table. The values
         for the number and sizes of files are always available. Initially, the number of rows is
@@ -48,6 +77,7 @@
         and so that value is displayed as -1. The <code class="ph codeph">COMPUTE STATS</code> statement fills
         in any unknown table stats values.
       </p>
+
 
 <pre class="pre codeblock"><code>
 show table stats parquet_snappy;
@@ -78,12 +108,14 @@ show table stats parquet_snappy;
         optimizations by using a combination of table and column statistics.
       </p>
 
+
       <p class="p">
         To check that table statistics are available for a table, and see the details of those
         statistics, use the statement <code class="ph codeph">SHOW TABLE STATS
         <var class="keyword varname">table_name</var></code>. See <a class="xref" href="impala_show.html#show">SHOW Statement</a> for
         details.
       </p>
+
 
       <p class="p">
         If you use the Hive-based methods of gathering statistics, see
@@ -93,19 +125,24 @@ show table stats parquet_snappy;
         potential configuration and scalability issues with the statistics-gathering process.
       </p>
 
+
       <p class="p">
         If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
         Impala can only use the resulting column statistics if the table is unpartitioned.
         Impala cannot use Hive-generated column statistics for a partitioned table.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="perf_column_stats__column_stats" id="perf_stats__perf_column_stats">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="perf_column_stats__column_stats" id="perf_column_stats">
 
     <h2 class="title topictitle2" id="perf_column_stats__column_stats">Overview of Column Statistics</h2>
+
 
     <div class="body conbody">
 
@@ -119,6 +156,7 @@ show table stats parquet_snappy;
         internally the same way as join queries.</span>
       </p>
 
+
       <p class="p">
         The following example shows column stats for an unpartitioned Parquet table. The values
         for the maximum and average sizes of some types are always available, because those
@@ -130,6 +168,7 @@ show table stats parquet_snappy;
         does not record the number of <code class="ph codeph">NULL</code> values, because currently Impala
         does not use that figure for query optimization.)
       </p>
+
 
 <pre class="pre codeblock"><code>
 show column stats parquet_snappy;
@@ -164,7 +203,7 @@ show column stats parquet_snappy;
 +-------------+----------+------------------+--------+----------+-------------------+
 </code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           For column statistics to be effective in Impala, you also need to have table
           statistics for the applicable tables, as described in
@@ -172,15 +211,18 @@ show column stats parquet_snappy;
           <code class="ph codeph">COMPUTE STATS</code> statement, both table and column statistics are
           automatically gathered at the same time, for all columns in the table.
         </p>
+
       </div>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span>  Prior to Impala 1.4.0,
+
+      <div class="note note"><span class="notetitle">Note:</span>  Prior to Impala 1.4.0,
           <code class="ph codeph">COMPUTE STATS</code> counted the number of
           <code class="ph codeph">NULL</code> values in each column and recorded that figure
         in the metastore database. Because Impala does not currently use the
           <code class="ph codeph">NULL</code> count during query planning, Impala 1.4.0 and
         higher speeds up the <code class="ph codeph">COMPUTE STATS</code> statement by
         skipping this <code class="ph codeph">NULL</code> counting. </div>
+
 
       <p class="p">
         To check whether column statistics are available for a particular set of columns, use
@@ -190,19 +232,24 @@ show column stats parquet_snappy;
         <a class="xref" href="impala_explain.html#explain">EXPLAIN Statement</a> for details.
       </p>
 
+
       <p class="p">
         If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
         Impala can only use the resulting column statistics if the table is unpartitioned.
         Impala cannot use Hive-generated column statistics for a partitioned table.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="perf_stats_partitions__stats_partitions" id="perf_stats__perf_stats_partitions">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="perf_stats_partitions__stats_partitions" id="perf_stats_partitions">
 
     <h2 class="title topictitle2" id="perf_stats_partitions__stats_partitions">How Table and Column Statistics Work for Partitioned Tables</h2>
+
 
     <div class="body conbody">
 
@@ -216,6 +263,7 @@ show column stats parquet_snappy;
         as a result.
       </p>
 
+
       <p class="p">
         The following examples show how table and column stats work with a partitioned table.
         The table for this example is partitioned by year, month, and day. For simplicity, the
@@ -227,6 +275,7 @@ show column stats parquet_snappy;
         HDFS directories, their characteristics are typically known in advance, even when the
         values for non-key columns are shown as -1.
       </p>
+
 
 <pre class="pre codeblock"><code>
 show partitions year_month_day;
@@ -307,13 +356,17 @@ show column stats year_month_day;
         Impala cannot use Hive-generated column statistics for a partitioned table.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="perf_stats__perf_generating_stats">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="perf_generating_stats">
 
     <h2 class="title topictitle2" id="ariaid-title5">Generating Table and Column Statistics</h2>
+
 
     <div class="body conbody">
 
@@ -324,7 +377,8 @@ show column stats year_month_day;
         workflows which are explained below.
       </p>
 
-      <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+
+      <div class="note important"><span class="importanttitle">Important:</span>
         <p class="p">
         For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
         <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
@@ -333,15 +387,19 @@ show column stats year_month_day;
         vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
         making the switch.
       </p>
+
       </div>
+
 
 
 
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="perf_generating_stats__concept_y2f_nfl_mdb">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="concept_y2f_nfl_mdb">
 
       <h3 class="title topictitle3" id="ariaid-title6">COMPUTE STATS</h3>
+
 
       <div class="body conbody">
 
@@ -351,6 +409,7 @@ show column stats year_month_day;
           table. The collection process is CPU-intensive and can take a long time to
           complete for very large tables.
         </p>
+
         <div class="p">
           To speed up <code class="ph codeph">COMPUTE STATS</code> consider the following options
           which can be combined.
@@ -363,7 +422,9 @@ show column stats year_month_day;
               clauses. Other columns are good candidates to exclude from COMPUTE STATS.
               This feature is available since Impala 2.12.
             </p>
+
           </li>
+
           <li class="li">
             <p class="p">
               Set the MT_DOP query option to use more threads within each participating
@@ -373,15 +434,21 @@ show column stats year_month_day;
               COMPUTE STATS claims most CPU cycles.
               This feature is available since Impala 2.8.
             </p>
+
           </li>
+
           <li class="li">
             <p class="p">
               Consider the experimental extrapolation and sampling features (see below)
               to further increase the efficiency of computing stats.
             </p>
+
           </li>
+
           </ul>
+
         </div>
+
 
         <p class="p">
           <code class="ph codeph">COMPUTE STATS</code> is intended to be run periodically,
@@ -395,16 +462,20 @@ show column stats year_month_day;
           statistics.
         </p>
 
+
         <p class="p">
           If you reload a complete new set of data for a table, but the number of rows and
           number of distinct values for each column is relatively unchanged from before, you
           do not need to recompute stats for the table.
         </p>
 
+
       </div>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title7" id="concept_y2f_nfl_mdb__experimental_stats_features">
+
+      <div class="topic concept nested3" aria-labelledby="ariaid-title7" id="experimental_stats_features">
         <h4 class="title topictitle4" id="ariaid-title7">Experimental: Extrapolation and Sampling</h4>
+
         <div class="body conbody">
           <div class="p">
             Impala 2.12 and higher includes two experimental features to alleviate
@@ -419,20 +490,26 @@ show column stats year_month_day;
                 the scan cardinality based on those old partitions that have stats, and
                 the new partitions without stats are treated as having 0 rows.
               </p>
+
             </li>
+
             <li class="li">
               <p class="p">
                 The row counts of existing partitions become stale when data is added
                 or dropped.
               </p>
+
             </li>
+
             <li class="li">
               <p class="p">
                 Computing stats for tables with a 100,000 or more partitions might fail
                 or be very slow due to the high cost of updating the partition metadata
                 in the Hive Metastore.
               </p>
+
             </li>
+
             <li class="li">
               <p class="p">
                 With transient compute resources it is important to minimize the time
@@ -441,30 +518,36 @@ show column stats year_month_day;
                 quickly collect stats that are "good enough" as opposed to spending
                 a lot of time and resouces on computing full-fidelity stats.
               </p>
+
             </li>
+
             </ul>
+
             For very large tables, it is often wasteful or impractical to run a full
             COMPUTE STATS to address the scenarios above on a frequent basis.
           </div>
+
           <p class="p">
             The sampling feature makes COMPUTE STATS more efficient by processing a
             fraction of the table data, and the extrapolation feature aims to reduce
             the frequency at which COMPUTE STATS needs to be re-run by estimating
             the row count of new and modified partitions.
           </p>
+
           <p class="p">
             The sampling and extrapolation features are disabled by default.
             They can be enabled globally or for specific tables, as follows.
             Set the impalad start-up configuration "--enable_stats_extrapolation" to
             enable the features globally. To enable them only for a specific table, set
             the "impala.enable.stats.extrapolation" table property to "true" for the
-            desired table. The tbale-level property overrides the global setting, so
+            desired table. The table-level property overrides the global setting, so
             it is also possible to enable sampling and extrapolation globally, but
             disable it for specific tables by setting the table property to "false".
             Example:
             ALTER TABLE mytable test_table SET TBLPROPERTIES("impala.enable.stats.extrapolation"="true")
           </p>
-          <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+
+          <div class="note note"><span class="notetitle">Note:</span>
             Why are these features experimental? Due to their probabilistic nature
             it is possible that these features perform pathologically poorly on tables
             with extreme data/file/size distributions. Since it is not feasible for us
@@ -475,10 +558,13 @@ show column stats year_month_day;
             We rely on user feedback to guide future inprovements in statistics
             collection.
           </div>
+
         </div>
 
-        <article class="topic concept nested4" aria-labelledby="ariaid-title8" id="experimental_stats_features__experimental_stats_extrapolation">
+
+        <div class="topic concept nested4" aria-labelledby="ariaid-title8" id="experimental_stats_extrapolation">
           <h5 class="title topictitle5" id="ariaid-title8">Stats Extrapolation</h5>
+
           <div class="body conbody">
             <p class="p">
               The main idea of stats extrapolation is to estimate the row count of new
@@ -496,17 +582,22 @@ show column stats year_month_day;
               the scan cardinality estimation ignores per-partition row counts. It
               only relies on the table-level statistics and the scanned data volume.
             </p>
+
             <p class="p">
               The SHOW TABLE STATS and EXPLAIN commands distinguish between row counts
               stored in the Hive Metastore, and the row counts extrapolated based on the
               above process. Consult the SHOW TABLE STATS and EXPLAIN documentation
               for more details.
             </p>
-          </div>
-        </article>
 
-        <article class="topic concept nested4" aria-labelledby="ariaid-title9" id="experimental_stats_features__experimental_stats_sampling">
+          </div>
+
+        </div>
+
+
+        <div class="topic concept nested4" aria-labelledby="ariaid-title9" id="experimental_stats_sampling">
           <h5 class="title topictitle5" id="ariaid-title9">Sampling</h5>
+
           <div class="body conbody">
             <p class="p">
               A TABLESAMPLE clause may be added to COMPUTE STATS to limit the
@@ -516,12 +607,14 @@ show column stats year_month_day;
               sampling was used. The following example runs COMPUTE STATS over a 10 percent
               data sample: COMPUTE STATS test_table TABLESAMPLE SYSTEM(10)
             </p>
+
             <p class="p">
             We have found that a 10 percent sampling rate typically offers a good
             tradeoff between statistics accuracy and execution cost. A sampling rate
             well below 10 percent has shown poor results and is not recommended.
             </p>
-            <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+
+            <div class="note important"><span class="importanttitle">Important:</span>
               Sampling-based techniques sacrifice result accuracy for execution
               efficiency, so your mileage may vary for different tables and columns
               depending on their data distribution. The extrapolation procedure Impala
@@ -529,14 +622,20 @@ show column stats year_month_day;
               non-detetministic, so your results may even vary between runs of
               COMPUTE STATS TABLESAMPLE, even if no data has changed.
             </div>
-          </div>
-        </article>
-      </article>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="perf_generating_stats__concept_bmk_pfl_mdb">
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="concept_bmk_pfl_mdb">
 
       <h3 class="title topictitle3" id="ariaid-title10">COMPUTE INCREMENTAL STATS</h3>
+
 
       <div class="body conbody">
 
@@ -548,12 +647,14 @@ show column stats year_month_day;
           a specialized feature for partitioned tables.
         </p>
 
+
         <p class="p">
           When you compute incremental statistics for a partitioned table, by default Impala only
           processes those partitions that do not yet have incremental statistics. By processing
           only newly added partitions, you can keep statistics up to date without incurring the
           overhead of reprocessing the entire table each time.
         </p>
+
 
         <p class="p">
           You can also compute or drop statistics for a specified subset of partitions by
@@ -562,14 +663,18 @@ show column stats year_month_day;
           statement.
         </p>
 
-        <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
-          <p class="p">
-        For a table with a huge number of partitions and many columns, the approximately 400 bytes
-        of metadata per column per partition can add up to significant memory overhead, as it must
-        be cached on the <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host
-        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
-        you might experience service downtime.
-      </p>
+
+        <div class="note important"><span class="importanttitle">Important:</span>
+          <p class="p"> In Impala 3.0 and lower, approximately
+        400 bytes of metadata per column per partition are needed for caching.
+        Tables with a big number of partitions and many columns can add up to a
+        significant memory overhead as the metadata must be cached on the
+          <span class="keyword cmdname">catalogd</span> host and on every
+          <span class="keyword cmdname">impalad</span> host that is eligible to be a coordinator.
+        If this metadata for all tables exceeds 2 GB, you might experience
+        service downtime. In Impala 3.1 and higher, the issue was alleviated
+        with an improved handling of incremental stats.</p>
+
           <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
         the statistics are computed again from scratch regardless of whether the table already
@@ -577,12 +682,15 @@ show column stats year_month_day;
         for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
         for the first time on a given table.
       </p>
+
         </div>
+
 
         <p class="p">
           The metadata for incremental statistics is handled differently from the original style
           of statistics:
         </p>
+
 
         <ul class="ul">
           <li class="li">
@@ -595,7 +703,9 @@ show column stats year_month_day;
               incremental stats by issuing a <code class="ph codeph">DROP INCREMENTAL STATS</code>
               before running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -606,7 +716,9 @@ show column stats year_month_day;
               indicated by a value other than <code class="ph codeph">-1</code> under the <code class="ph codeph">#Rows</code>
               column. Impala query planning uses either kind of statistics when available.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -618,18 +730,23 @@ show column stats year_month_day;
               not updated with new partitions, use the original <code class="ph codeph">COMPUTE STATS</code>
               syntax.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> uses some memory in the
-              <span class="keyword cmdname">catalogd</span> process, proportional to the number of partitions and
-              number of columns in the applicable table. The memory overhead is approximately 400
-              bytes for each column in each partition. This memory is reserved in the
-              <span class="keyword cmdname">catalogd</span> daemon, the <span class="keyword cmdname">statestored</span> daemon, and
-              in each instance of the <span class="keyword cmdname">impalad</span> daemon.
-            </p>
+                <span class="keyword cmdname">catalogd</span> process, proportional to the number
+              of partitions and number of columns in the applicable table. The
+              memory overhead is approximately 400 bytes for each column in each
+              partition. This memory is reserved in the
+                <span class="keyword cmdname">catalogd</span> daemon, the
+                <span class="keyword cmdname">statestored</span> daemon, and in each instance of
+              the impalad daemon. </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -638,7 +755,9 @@ show column stats year_month_day;
               INCREMENTAL STATS</code> and <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> sequence
               for the changed partition.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -647,13 +766,17 @@ show column stats year_month_day;
               partitions of a table, issue a <code class="ph codeph">DROP STATS</code> statement with no
               <code class="ph codeph">INCREMENTAL</code> or <code class="ph codeph">PARTITION</code> clauses.
             </p>
+
           </li>
+
         </ul>
+
 
         <p class="p">
           The following considerations apply to incremental statistics when the structure of an
           existing table is changed (known as <dfn class="term">schema evolution</dfn>):
         </p>
+
 
         <ul class="ul">
           <li class="li">
@@ -662,7 +785,9 @@ show column stats year_month_day;
               statistics remain valid and <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> does not
               rescan any partitions.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -670,7 +795,9 @@ show column stats year_month_day;
               all partitions and fills in the appropriate column-level values the next time you
               run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -678,7 +805,9 @@ show column stats year_month_day;
               column, Impala rescans all partitions and fills in the appropriate column-level
               values the next time you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -686,23 +815,112 @@ show column stats year_month_day;
               table, the existing statistics remain valid and a subsequent <code class="ph codeph">COMPUTE
               INCREMENTAL STATS</code> does not rescan any partitions.
             </p>
+
           </li>
+
         </ul>
+
 
         <p class="p">
           See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> and
           <a class="xref" href="impala_drop_stats.html#drop_stats">DROP STATS Statement</a> for syntax details.
         </p>
 
+
       </div>
 
-    </article>
+      <div class="topic concept nested3" aria-labelledby="ariaid-title11" id="inc_stats_size_limit_bytes">
+        <h4 class="title topictitle4" id="ariaid-title11">Maximum Serialized Stats Size</h4>
 
-  </article>
+        <div class="body conbody">
+          <p class="p">In Impala 3.0 and lower, when executing <code class="ph codeph">COMPUTE INCREMENTAL
+              STATS</code> on very large tables, use the configuration setting
+              <code class="ph codeph">--inc_stats_size_limit_bytes</code> to prevent Impala
+            from running out of memory while updating table metadata. If this
+            limit is reached, Impala will stop loading the table and return an
+            error. The error serves as an indication that <code class="ph codeph">COMPUTE
+              INCREMENTAL STATS</code> should not be used on the particular
+            table. Consider spitting the table and using regular <code class="ph codeph">COMPUTE
+              STATS</code> ]if possible. </p>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="perf_stats__perf_stats_checking">
 
-    <h2 class="title topictitle2" id="ariaid-title11">Detecting Missing Statistics</h2>
+          <p class="p"> The <code class="ph codeph">--inc_stats_size_limit_bytes</code> limit is set as
+            a safety check, to prevent Impala from hitting the maximum limit for
+            the table metadata. Note that this limit is only one part of the
+            entire table's metadata all of which together must be below 2 GB. </p>
+
+
+          <p class="p"> The default value for
+              <code class="ph codeph">--inc_stats_size_limit_bytes</code> is 209715200, 200
+            MB. </p>
+
+
+          <p class="p"> To change the <code class="ph codeph">--inc_stats_size_limit_bytes</code> value,
+            restart impalad and catalogd with the new value specified in bytes,
+            for example, 1048576000 for 1 GB. See <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for the steps to
+            change the option and restart Impala daemons. </p>
+
+
+          <div class="note attention"><span class="attentiontitle">Attention:</span>  The
+              <code class="ph codeph">--inc_stats_size_limit_bytes</code> setting should be
+            increased with care. A big value for the setting, such as 1 GB or
+            more, can result in a spike in heap usage as well as a crash of
+            Impala. </div>
+
+          <p class="p">In Impala 3.1 and higher, Impala improved how metadata is updated
+            when executing <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>,
+            significantly reducing the need for
+              <code class="ph codeph">--inc_stats_size_limit_bytes</code>. </p>
+
+        </div>
+
+      </div>
+
+      <div class="topic concept nested3" aria-labelledby="ariaid-title12" id="pull_incremental_statistics">
+        <h4 class="title topictitle4" id="ariaid-title12">Loading Incremental Statistics from Catalogd</h4>
+
+        <div class="body conbody">
+          <p class="p">
+            Starting in Impala 3.1, a new configuration setting,
+              <code class="ph codeph">--pull_incremental_statistics</code>, was added and set
+            to <code class="ph codeph">true</code> by default. When you start Impala catalogd
+            and impalad coordinators with this setting enabled:
+          </p>
+
+          <ul class="ul">
+            <li class="li"> Newly created incremental stats will be smaller in size thus
+              reducing memory pressure on the catalogd daemon. Your users can
+              keep more tables and partitions in the same catalog and have lower
+              chances of crashing catalogd due to out-of-memory issues. </li>
+
+            <li class="li">
+              Incremental stats will not be replicated to impalad and will be
+              accessed on demand from catalogd, resulting in a reduced memory
+              footprint of impalad.
+            </li>
+
+          </ul>
+
+          <p class="p">
+            We do not recommend you change the default setting of
+              <code class="ph codeph">--pull_incremental_statistics</code>.
+          </p>
+
+        </div>
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="perf_stats_checking">
+
+    <h2 class="title topictitle2" id="ariaid-title13">Detecting Missing Statistics</h2>
+
 
     <div class="body conbody">
 
@@ -715,11 +933,13 @@ show column stats year_month_day;
         the <code class="ph codeph">#Rows</code> field changes to an accurate value.
       </p>
 
+
       <p class="p">
         The following example shows a table that initially does not have any statistics. The
         <code class="ph codeph">SHOW TABLE STATS</code> statement displays different values for
         <code class="ph codeph">#Rows</code> before and after the <code class="ph codeph">COMPUTE STATS</code> operation.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table no_stats (x int);
 [localhost:21000] &gt; show table stats no_stats;
@@ -749,6 +969,7 @@ show column stats year_month_day;
         partition starts with no statistics, meaning that you must collect statistics after
         adding a new partition.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table no_stats_partitioned (x int) partitioned by (year smallint);
 [localhost:21000] &gt; show table stats no_stats_partitioned;
@@ -781,13 +1002,14 @@ show column stats year_month_day;
 +-------+-------+--------+------+--------------+--------+-------------------+
 </code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         Because the default <code class="ph codeph">COMPUTE STATS</code> statement creates and updates
         statistics for all partitions in a table, if you expect to frequently add new
         partitions, use the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> syntax instead, which
         lets you compute stats for a single specified partition, or only for those partitions
         that do not already have incremental stats.
       </div>
+
 
       <p class="p">
         If checking each individual table is impractical, due to a large number of tables or
@@ -799,6 +1021,7 @@ show column stats year_month_day;
         <code class="ph codeph">EXPLAIN</code> plan and the <code class="ph codeph">PROFILE</code> output display a warning
         if any tables or partitions involved in the query do not have statistics.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table no_stats (x int);
 [localhost:21000] &gt; explain select count(*) from no_stats;
@@ -830,6 +1053,7 @@ show column stats year_month_day;
         see warnings or not for different queries against the same table:
       </p>
 
+
 <pre class="pre codeblock"><code>-- No warning because all the partitions for the year 2012 have stats.
 EXPLAIN SELECT ... FROM t1 WHERE year = 2012;
 
@@ -844,17 +1068,22 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
         <var class="keyword varname">table_name</var></code>.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="perf_stats__concept_s3c_4gl_mdb">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title12">Manually Setting Table and Column Statistics with ALTER TABLE</h2>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title13" id="concept_s3c_4gl_mdb__concept_wpt_pgl_mdb">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="concept_s3c_4gl_mdb">
 
-      <h3 class="title topictitle3" id="ariaid-title13">Setting Table Statistics</h3>
+    <h2 class="title topictitle2" id="ariaid-title14">Manually Setting Table and Column Statistics with ALTER TABLE</h2>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="concept_wpt_pgl_mdb">
+
+      <h3 class="title topictitle3" id="ariaid-title15">Setting Table Statistics</h3>
+
 
       <div class="body conbody">
 
@@ -869,6 +1098,7 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
           you can manually set the number of rows through an <code class="ph codeph">ALTER TABLE</code>
           statement:
         </p>
+
 
 <pre class="pre codeblock"><code>
 -- Set total number of rows. Applies to both unpartitioned and partitioned tables.
@@ -887,6 +1117,7 @@ alter table <var class="keyword varname">table_name</var> partition (<var class=
           for the Hive metastore.)
         </p>
 
+
 <pre class="pre codeblock"><code>create table analysis_data stored as parquet as select * from raw_data;
 Inserted 1000000000 rows in 181.98s
 compute stats analysis_data;
@@ -899,6 +1130,7 @@ alter table analysis_data set tblproperties('numRows'='1001000000', 'STATS_GENER
           For a partitioned table, update both the per-partition number of rows and the number
           of rows for the whole table:
         </p>
+
 
 <pre class="pre codeblock"><code>-- If the table originally contained 1 million rows, and we add another partition with 30 thousand rows,
 -- change the numRows property for the partition and the overall table.
@@ -918,13 +1150,17 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
           <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> operations.
         </p>
 
+
       </div>
 
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="concept_s3c_4gl_mdb__concept_asb_vgl_mdb">
+    </div>
 
-      <h3 class="title topictitle3" id="ariaid-title14">Setting Column Statistics</h3>
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title16" id="concept_asb_vgl_mdb">
+
+      <h3 class="title topictitle3" id="ariaid-title16">Setting Column Statistics</h3>
+
 
       <div class="body conbody">
 
@@ -935,6 +1171,7 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
           <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
           frequently enough to keep up with data changes for a huge table.
         </p>
+
 
         <div class="p">
         You specify a case-insensitive symbolic name for the kind of statistics:
@@ -963,15 +1200,20 @@ show column stats t1;
 </code></pre>
       </div>
 
+
       </div>
 
-    </article>
 
-  </article>
+    </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="perf_stats__perf_stats_examples">
 
-    <h2 class="title topictitle2" id="ariaid-title15">Examples of Using Table and Column Statistics with Impala</h2>
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="perf_stats_examples">
+
+    <h2 class="title topictitle2" id="ariaid-title17">Examples of Using Table and Column Statistics with Impala</h2>
+
 
     <div class="body conbody">
 
@@ -981,6 +1223,7 @@ show column stats t1;
         <code class="ph codeph">SELECT</code> and <code class="ph codeph">INSERT</code> statements to illustrate various
         aspects of how Impala uses statistics to help optimize queries.
       </p>
+
 
       <p class="p">
         This example shows table and column statistics for the <code class="ph codeph">STORE</code> column
@@ -994,6 +1237,7 @@ show column stats t1;
         a constant size such as <code class="ph codeph">INT</code>, <code class="ph codeph">FLOAT</code>, and
         <code class="ph codeph">TIMESTAMP</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; show table stats store;
 +-------+--------+--------+--------+
@@ -1047,6 +1291,7 @@ Returned 29 row(s) in 0.04s</code></pre>
         STATS</code> statement, statistics are filled in for both the table and all its
         columns:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats store;
 +------------------------------------------+
@@ -1109,6 +1354,7 @@ Returned 29 row(s) in 0.04s</code></pre>
 
       </p>
 
+
 <pre class="pre codeblock"><code>localhost:21000] &gt; describe census;
 +------+----------+---------+
 | name | type     | comment |
@@ -1144,6 +1390,7 @@ Returned 2 row(s) in 0.02s</code></pre>
         The following example shows how the statistics are filled in by a <code class="ph codeph">COMPUTE
         STATS</code> statement in Impala.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats census;
 +-----------------------------------------+
@@ -1185,8 +1432,12 @@ Returned 2 row(s) in 0.02s</code></pre>
         performance.
       </p>
 
+
     </div>
 
-  </article>
 
-</article></main></body></html>
+  </div>
+
+
+</body>
+</html>

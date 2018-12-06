@@ -1,23 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="grant"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>GRANT Statement (Impala 2.0 or higher only)</title></head><body id="grant"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="GRANT Statement (Impala 2.0 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="grant" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>GRANT Statement (Impala 2.0 or higher only)</title>
+</head>
+<body id="grant">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">GRANT Statement (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      
-
-      The <code class="ph codeph">GRANT</code> statement grants roles or privileges on specified objects to groups. Only Sentry
-      administrative users can grant roles to a group.
+      The <code class="ph codeph">GRANT</code> statement grants a privilege on a specified object to a role or
+      grants a role to a group.
     </p>
+
 
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>GRANT ROLE <var class="keyword varname">role_name</var> TO GROUP <var class="keyword varname">group_name</var>
 
@@ -25,8 +47,8 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
    TO [ROLE] <var class="keyword varname">roleName</var>
    [WITH GRANT OPTION]
 
-<span class="ph">privilege ::= SELECT | SELECT(<var class="keyword varname">column_name</var>) | INSERT | ALL</span>
-object_type ::= TABLE | DATABASE | SERVER | URI
+<span class="ph" id="grant__privileges">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)</span>
+<span class="ph" id="grant__priv_objs">object_type ::= SERVER | URI | DATABASE | TABLE</span>
 </code></pre>
 
     <p class="p">
@@ -35,84 +57,815 @@ object_type ::= TABLE | DATABASE | SERVER | URI
 
 
 
+
     <p class="p">
         <strong class="ph b">Required privileges:</strong>
       </p>
 
-    <p class="p">
-
-      Only administrative users (initially, a predefined set of users specified in the Sentry service configuration
-      file) can use this statement.
-    </p>
 
     <p class="p">
-      The <code class="ph codeph">WITH GRANT OPTION</code> clause allows members of the specified role to issue
-      <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements for those same privileges
-
-      Hence, if a role has the <code class="ph codeph">ALL</code> privilege on a database and the <code class="ph codeph">WITH GRANT
-      OPTION</code> set, users granted that role can execute <code class="ph codeph">GRANT</code>/<code class="ph codeph">REVOKE</code>
-      statements only for that database or child tables of the database. This means a user could revoke the
-      privileges of the user that provided them the <code class="ph codeph">GRANT OPTION</code>.
-    </p>
-
-    <p class="p">
-
-      Impala does not currently support revoking only the <code class="ph codeph">WITH GRANT OPTION</code> from a privilege
-      previously granted to a role. To remove the <code class="ph codeph">WITH GRANT OPTION</code>, revoke the privilege and
-      grant it again without the <code class="ph codeph">WITH GRANT OPTION</code> flag.
-    </p>
-
-    <p class="p">
-      The ability to grant or revoke <code class="ph codeph">SELECT</code> privilege on specific columns is available
-      in <span class="keyword">Impala 2.3</span> and higher. See <span class="xref">the documentation for Apache Sentry</span> for details.
+      Only administrative users (initially, a predefined set of users specified in the Sentry
+      service configuration file) can use this statement.
     </p>
 
 
+    <p class="p">
+      Only Sentry administrative users can grant roles to a group.
+    </p>
 
+
+    <p class="p">
+      The <code class="ph codeph">WITH GRANT OPTION</code> clause allows members of the specified role to
+      issue <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements for those same
+      privileges. Hence, if a role has the <code class="ph codeph">ALL</code> privilege on a database and the
+      <code class="ph codeph">WITH GRANT OPTION</code> set, users granted that role can execute
+      <code class="ph codeph">GRANT</code>/<code class="ph codeph">REVOKE</code> statements only for that database or child
+      tables of the database. This means a user could revoke the privileges of the user that
+      provided them the <code class="ph codeph">GRANT OPTION</code>.
+    </p>
+
+
+    <p class="p">
+      The ability to grant or revoke <code class="ph codeph">SELECT</code> privilege on specific columns is
+      available in <span class="keyword">Impala 2.3</span> and higher. See
+      <span class="xref">the documentation for Apache Sentry</span> for details.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong>
+    </p>
+
+
+    <p class="p">
+      You can only grant the <code class="ph codeph">ALL</code> privilege to the <code class="ph codeph">URI</code> object.
+      Finer-grained privileges mentioned below on a <code class="ph codeph">URI</code> are not supported.
+    </p>
+
+
+    <div class="p">The table below lists the minimum level
+        of privileges and the scope required to execute SQL statements in
+          <span class="keyword">Impala 3.0</span> and higher. The following notations
+        are used:<ul class="ul">
+          <li class="li"><strong class="ph b">ANY</strong> denotes the <code class="ph codeph">SELECT</code>,
+              <code class="ph codeph">INSERT</code>, <code class="ph codeph">CREATE</code>,
+              <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>, <strong class="ph b"><em class="ph i">or</em></strong>
+            <code class="ph codeph">REFRESH</code> privilege.</li>
+
+          <li class="li"><strong class="ph b">ALL</strong> privilege denotes the <code class="ph codeph">SELECT</code>,
+              <code class="ph codeph">INSERT</code>, <code class="ph codeph">CREATE</code>,
+              <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>, <strong class="ph b"><em class="ph i">and</em></strong>
+            <code class="ph codeph">REFRESH</code> privileges.</li>
+
+          <li class="li">The owner of an object effectively has the ALL privilege on the
+            object.</li>
+
+          <li class="li">The parent levels of the specified scope are implicitly supported
+            where a scope refers to the specific level in the object hierarchy
+            that the privilege is granted. For example, if a privilege is listed
+            with the <code class="ph codeph">TABLE</code> scope, the same privilege granted on
+              <code class="ph codeph">DATABASE</code> and <code class="ph codeph">SERVER</code> will allow
+            the user to execute the specified SQL statement.</li>
+
+        </ul>
+
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="grant__d6e169" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">SQL Statement</strong></td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">Privileges</strong></td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">Scope</strong></td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">WITH SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">TRUNCATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">LOAD</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE DATABASE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE DATABASE LOCATION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE LIKE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE AS SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN CREATE TABLE AS SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE LOCATION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE VIEW</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER DATABASE SET OWNER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE SET LOCATION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE RENAME</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE SET OWNER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW RENAME</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW SET OWNER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">VIEW</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP DATABASE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP TABLE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP VIEW</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE FUNCTION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP FUNCTION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">COMPUTE STATS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER and SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DROP STATS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">INVALIDATE METADATA</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">INVALIDATE METADATA &lt;table&gt;</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH &lt;table&gt;</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH FUNCTIONS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON DATABASE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON TABLE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON VIEW</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON COLUMN</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DESCRIBE DATABASE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DESCRIBE &lt;table/view&gt;</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">If the user has the SELECT privilege at the COLUMN level,
+                  only the columns the user has access will show.</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">COLUMN</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">USE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW DATABASES</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW TABLES</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW FUNCTIONS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW PARTITIONS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW TABLE STATS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW COLUMN STATS</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW FILES</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE TABLE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE VIEW</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE FUNCTION</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">SHOW RANGE PARTITIONS (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">UPDATE (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN UPDATE (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">UPSERT (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">WITH UPSERT (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN UPSERT (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">DELETE (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN DELETE (Kudu only)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+
+              </tr>
+
+            </tbody>
+</table>
+</div>
+</div>
 
 
     <p class="p">
         <strong class="ph b">Compatibility:</strong>
       </p>
 
+
     <div class="p">
       <ul class="ul">
         <li class="li">
-          The Impala <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements are available in
-          <span class="keyword">Impala 2.0</span> and later.
+          The Impala <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements are available
+          in <span class="keyword">Impala 2.0</span> and later.
         </li>
 
-        <li class="li">
-          In <span class="keyword">Impala 1.4</span> and later, Impala can make use of any roles and privileges specified by the
-          <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements in Hive, when your system is configured to
-          use the Sentry service instead of the file-based policy mechanism.
-        </li>
 
         <li class="li">
-          The Impala <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements for privileges do not require
-          the <code class="ph codeph">ROLE</code> keyword to be repeated before each role name, unlike the equivalent Hive
-          statements.
+          In <span class="keyword">Impala 1.4</span> and later, Impala can make use of any roles and
+          privileges specified by the <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code>
+          statements in Hive, when your system is configured to use the Sentry service instead
+          of the file-based policy mechanism.
         </li>
+
+
+        <li class="li">
+          The Impala <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements for
+          privileges do not require the <code class="ph codeph">ROLE</code> keyword to be repeated before each
+          role name, unlike the equivalent Hive statements.
+        </li>
+
 
         <li class="li">
           Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can only grant or
           revoke a single privilege to or from a single role.
         </li>
+
       </ul>
+
     </div>
+
 
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
+
 
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
         therefore no HDFS permissions are required.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
+
     <div class="p">
         Access to Kudu tables must be granted to and revoked from roles with the
         following considerations:
@@ -121,39 +874,57 @@ object_type ::= TABLE | DATABASE | SERVER | URI
             Only users with the <code class="ph codeph">ALL</code> privilege on
               <code class="ph codeph">SERVER</code> can create external Kudu tables.
           </li>
+
           <li class="li">
             The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is
             required to specify the <code class="ph codeph">kudu.master_addresses</code>
             property in the <code class="ph codeph">CREATE TABLE</code> statements for managed
             tables as well as external tables.
           </li>
+
           <li class="li">
             Access to Kudu tables is enforced at the table level and at the
             column level.
           </li>
+
           <li class="li">
             The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific
             permissions are supported.
           </li>
+
           <li class="li">
             The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and
             <code class="ph codeph">UPSERT</code> operations require the <code class="ph codeph">ALL</code>
             privilege.
           </li>
+
         </ul>
+
         Because non-SQL APIs can access Kudu data without going through Sentry
         authorization, currently the Sentry support is considered preliminary
         and subject to change.
       </div>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
-      <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>, <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>,
-      <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>,
-      <a class="xref" href="impala_show.html#show">SHOW Statement</a>
+      <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>,
+      <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>,
+      <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>,
+      <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_show.html#show">SHOW Statement</a>
     </p>
+
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

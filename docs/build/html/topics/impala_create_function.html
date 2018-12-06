@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_function"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>CREATE FUNCTION Statement</title></head><body id="create_function"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="CREATE FUNCTION Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="create_function" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>CREATE FUNCTION Statement</title>
+</head>
+<body id="create_function">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">CREATE FUNCTION Statement</h1>
+
   
   
 
@@ -14,15 +34,18 @@
       <code class="ph codeph">SELECT</code> or <code class="ph codeph">INSERT</code> operations.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
     <p class="p">
       The syntax is different depending on whether you create a scalar UDF, which is called once for each row and
       implemented by a single function, or a user-defined aggregate function (UDA), which is implemented by
       multiple functions that compute intermediate results across sets of rows.
     </p>
+
 
     <p class="p">
       In <span class="keyword">Impala 2.5</span> and higher, the syntax is also different for creating or dropping scalar Java-based UDFs.
@@ -31,9 +54,11 @@
       between Impala and Hive.
     </p>
 
+
     <p class="p">
       To create a persistent scalar C++ UDF with <code class="ph codeph">CREATE FUNCTION</code>:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE FUNCTION [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">function_name</var>([<var class="keyword varname">arg_type</var>[, <var class="keyword varname">arg_type</var>...])
   RETURNS <var class="keyword varname">return_type</var>
@@ -49,9 +74,11 @@
 
 
 
+
     <p class="p">
       To create a persistent UDA, which must be written in C++, issue a <code class="ph codeph">CREATE AGGREGATE FUNCTION</code> statement:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE [AGGREGATE] FUNCTION [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">function_name</var>([<var class="keyword varname">arg_type</var>[, <var class="keyword varname">arg_type</var>...])
   RETURNS <var class="keyword varname">return_type</var>
@@ -69,32 +96,40 @@
         <strong class="ph b">Statement type:</strong> DDL
       </p>
 
+
     <p class="p">
       <strong class="ph b">Varargs notation:</strong>
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         Variable-length argument lists are supported for C++ UDFs, but currently not for Java UDFs.
       </p>
+
     </div>
+
 
     <p class="p">
       If the underlying implementation of your function accepts a variable number of arguments:
     </p>
+
 
     <ul class="ul">
       <li class="li">
         The variable arguments must go last in the argument list.
       </li>
 
+
       <li class="li">
         The variable arguments must all be of the same type.
       </li>
 
+
       <li class="li">
         You must include at least one instance of the variable arguments in every function call invoked from SQL.
       </li>
+
 
       <li class="li">
         You designate the variable portion of the argument list in the <code class="ph codeph">CREATE FUNCTION</code> statement
@@ -106,16 +141,20 @@
   RETURNS <var class="keyword varname">type</var> LOCATION '<var class="keyword varname">path</var>' SYMBOL='<var class="keyword varname">entry_point</var>';
 </code></pre>
       </li>
+
     </ul>
+
 
     <p class="p">
       See <a class="xref" href="impala_udf.html#udf_varargs">Variable-Length Argument Lists</a> for how to code a C++ UDF to accept
       variable-length argument lists.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Scalar and aggregate functions:</strong>
     </p>
+
 
     <p class="p">
       The simplest kind of user-defined function returns a single scalar value each time it is called, typically
@@ -126,6 +165,7 @@
       entire table.
     </p>
 
+
     <p class="p">
       You create UDAs by using the <code class="ph codeph">CREATE AGGREGATE FUNCTION</code> syntax. The clauses
       <code class="ph codeph">INIT_FN</code>, <code class="ph codeph">UPDATE_FN</code>, <code class="ph codeph">MERGE_FN</code>,
@@ -133,9 +173,11 @@
       <code class="ph codeph">INTERMEDIATE</code> only apply when you create a UDA rather than a scalar UDF.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">*_FN</code> clauses specify functions to call at different phases of function processing.
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -143,6 +185,7 @@
         setup, such as initializing member variables in internal data structures. This function is often a stub for
         simple UDAs. You can omit this clause and a default (no-op) function will be used.
       </li>
+
 
       <li class="li">
         <strong class="ph b">Update:</strong> The function you specify with the <code class="ph codeph">UPDATE_FN</code> clause is called once for each
@@ -152,6 +195,7 @@
         on its original value and the value of the first argument.
       </li>
 
+
       <li class="li">
         <strong class="ph b">Merge:</strong> The function you specify with the <code class="ph codeph">MERGE_FN</code> clause is called an arbitrary
         number of times, to combine intermediate values produced by different nodes or different threads as Impala
@@ -159,12 +203,14 @@
         which you write an updated value based on its original value and the value of the first argument.
       </li>
 
+
       <li class="li">
         <strong class="ph b">Serialize:</strong> The function you specify with the <code class="ph codeph">SERIALIZE_FN</code> clause frees memory
         allocated to intermediate results. It is required if any memory was allocated by the Allocate function in
         the Init, Update, or Merge functions, or if the intermediate type contains any pointers. See
         <span class="xref">the UDA code samples</span> for details.
       </li>
+
 
       <li class="li">
         <strong class="ph b">Finalize:</strong> The function you specify with the <code class="ph codeph">FINALIZE_FN</code> clause does any required
@@ -174,12 +220,15 @@
         the intermediate type. or if any memory was allocated by the Allocate function in the Init, Update, or
         Merge functions. See <span class="xref">the UDA code samples</span> for details.
       </li>
+
     </ul>
+
 
     <p class="p">
       If you use a consistent naming convention for each of the underlying functions, Impala can automatically
       determine the names based on the first such clause, so the others are optional.
     </p>
+
 
     
 
@@ -187,18 +236,22 @@
       For end-to-end examples of UDAs, see <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
         Currently, Impala UDFs cannot accept arguments or return values of the Impala complex types
         (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -207,16 +260,19 @@
         most suited to reusing existing Hive UDFs. (Impala can run Java-based Hive UDFs but not Hive UDAs.)
       </li>
 
+
       <li class="li">
         <span class="keyword">Impala 2.5</span> introduces UDF improvements to persistence for both C++ and Java UDFs,
         and better compatibility between Impala and Hive for Java UDFs.
         See <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a> for details.
       </li>
 
+
       <li class="li">
         The body of the UDF is represented by a <code class="ph codeph">.so</code> or <code class="ph codeph">.jar</code> file, which you store
         in HDFS and the <code class="ph codeph">CREATE FUNCTION</code> statement distributes to each Impala node.
       </li>
+
 
       <li class="li">
         Impala calls the underlying code during SQL statement evaluation, as many times as needed to process all
@@ -228,16 +284,19 @@
         Impala query is in progress.
       </li>
 
+
       <li class="li">
         The names of the function arguments in the UDF are not significant, only their number, positions, and data
         types.
       </li>
+
 
       <li class="li">
         You can overload the same function name by creating multiple versions of the function, each with a
         different argument signature. For security reasons, you cannot make a UDF with the same name as any
         built-in function.
       </li>
+
 
       <li class="li">
         In the UDF code, you represent the function return result as a <code class="ph codeph">struct</code>. This
@@ -248,6 +307,7 @@
         <code class="ph codeph">NULL</code>.
       </li>
 
+
       <li class="li">
         In the UDF code, you represent the function arguments as an initial pointer to a UDF context structure,
         followed by references to zero or more <code class="ph codeph">struct</code>s, corresponding to each of the arguments.
@@ -256,15 +316,18 @@
         holding any non-<code class="ph codeph">NULL</code> argument value.
       </li>
 
+
       <li class="li">
         For sample code and build instructions for UDFs,
         see <span class="xref">the sample UDFs in the Impala github repo</span>.
       </li>
 
+
       <li class="li">
         Because the file representing the body of the UDF is stored in HDFS, it is automatically available to all
         the Impala nodes. You do not need to manually copy any UDF-related files between servers.
       </li>
+
 
       <li class="li">
         Because Impala currently does not have any <code class="ph codeph">ALTER FUNCTION</code> statement, if you need to rename
@@ -273,12 +336,15 @@
         FUNCTION</code> with the desired properties.
       </li>
 
+
       <li class="li">
         Because each UDF is associated with a particular database, either issue a <code class="ph codeph">USE</code> statement
         before doing any <code class="ph codeph">CREATE FUNCTION</code> statements, or specify the name of the function as
         <code class="ph codeph"><var class="keyword varname">db_name</var>.<var class="keyword varname">function_name</var></code>.
       </li>
+
     </ul>
+
 
     <p class="p">
         If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
@@ -287,9 +353,11 @@
         nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Compatibility:</strong>
       </p>
+
 
     <p class="p">
       Impala can run UDFs that were created through Hive, as long as they refer to Impala-compatible data types
@@ -297,12 +365,15 @@
       not Impala UDFs written in C++.
     </p>
 
+
     <p class="p">
         The Hive <code class="ph codeph">current_user()</code> function cannot be
         called from a Java UDF through Impala.
       </p>
 
+
     <p class="p"><strong class="ph b">Persistence:</strong></p>
+
 
     <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
@@ -316,22 +387,27 @@
         Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
+
 
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
         therefore no HDFS permissions are required.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
     <p class="p">
       For additional examples of all kinds of user-defined functions, see <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a>.
     </p>
+
 
     <p class="p">
       The following example shows how to take a Java jar file and make all the functions inside one of its classes
@@ -340,11 +416,13 @@
       This example uses the signatureless syntax for <code class="ph codeph">CREATE FUNCTION</code> and <code class="ph codeph">DROP FUNCTION</code>,
       which is available in <span class="keyword">Impala 2.5</span> and higher.
     </p>
+
     <p class="p">
       At the start, the jar file is in the local filesystem. Then it is copied into HDFS, so that it is
       available for Impala to reference through the <code class="ph codeph">CREATE FUNCTION</code> statement and
       queries that refer to the Impala function name.
     </p>
+
 <pre class="pre codeblock"><code>
 $ jar -tvf udf-examples.jar
      0 Mon Feb 22 04:06:50 PST 2016 META-INF/
@@ -368,6 +446,7 @@ Found 2 items
       and the fully qualified class name inside the jar. Each of the functions inside the class becomes an
       Impala function, each one overloaded under the specified Impala function name.
     </p>
+
 <pre class="pre codeblock"><code>
 [localhost:21000] &gt; create function testudf location '/user/impala/udfs/udf-examples.jar' symbol='org.apache.impala.TestUdf';
 [localhost:21000] &gt; show functions;
@@ -402,6 +481,7 @@ Found 2 items
       sum, concatenate, and so on their multiple arguments. Impala determines which
       overloaded function to use based on the number and types of the arguments.
     </p>
+
 <pre class="pre codeblock"><code>
 insert into bigint_x values (1), (2), (4), (3);
 select testudf(x) from bigint_x;
@@ -452,6 +532,7 @@ select testudf(x,x) from string_x;
       results in a set of overloaded functions all named <code class="ph codeph">my_func</code>,
       to go along with the overloaded functions all named <code class="ph codeph">testudf</code>.
     </p>
+
 <pre class="pre codeblock"><code>
 create function my_func location '/user/impala/udfs/udf-examples.jar'
   symbol='org.apache.impala.TestUdf';
@@ -473,6 +554,7 @@ show functions;
       The corresponding <code class="ph codeph">DROP FUNCTION</code> statement with no signature
       drops all the overloaded functions with that name.
     </p>
+
 <pre class="pre codeblock"><code>
 drop function my_func;
 show functions;
@@ -490,13 +572,22 @@ show functions;
       (specifically, the Catalog Server) are restarted.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a> for more background information, usage instructions, and examples for
       Impala UDFs; <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

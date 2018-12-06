@@ -1,8 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="udfs"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala User-Defined Functions (UDFs)</title></head><body id="udfs"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala User-Defined Functions (UDFs)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="udfs" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala User-Defined Functions (UDFs)</title>
+</head>
+<body id="udfs">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala User-Defined Functions (UDFs)</h1>
+
   
 
   <div class="body conbody">
@@ -14,10 +78,12 @@
       tests and transformations that are outside the scope of the built-in SQL operators and functions.
     </p>
 
+
     <p class="p">
       You can use UDFs to simplify query logic when producing reports, or to transform data in flexible ways when
       copying from one table to another with the <code class="ph codeph">INSERT ... SELECT</code> syntax.
     </p>
+
 
     <p class="p">
       You might be familiar with this feature from other database products, under names such as stored functions or
@@ -25,9 +91,11 @@
 
     </p>
 
+
     <p class="p">
       Impala support for UDFs is available in Impala 1.2 and higher:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -36,24 +104,35 @@
         Impala.)
       </li>
 
+
       <li class="li">
         Starting in Impala 1.2, Impala can run both high-performance native code UDFs written in C++, and
         Java-based Hive UDFs that you might already have written.
       </li>
+
 
       <li class="li">
         Impala can run scalar UDFs that return a single value for each row of the result set, and user-defined
         aggregate functions (UDAFs) that return a value based on a set of rows. Currently, Impala does not support
         user-defined table functions (UDTFs) or window functions.
       </li>
+
     </ul>
 
+
     <p class="p toc inpage"></p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="udfs__udf_concepts">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="udf_concepts">
 
     <h2 class="title topictitle2" id="ariaid-title2">UDF Concepts</h2>
+
   
 
     <div class="body conbody">
@@ -65,12 +144,16 @@
         doing analysis across. The following sections discuss these different aspects of working with UDFs.
       </p>
 
+
       <p class="p toc inpage"></p>
+
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title3" id="udf_concepts__udfs_udafs">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="udfs_udafs">
 
       <h3 class="title topictitle3" id="ariaid-title3">UDFs and UDAFs</h3>
+
 
       <div class="body conbody">
 
@@ -78,6 +161,7 @@
           Depending on your use case, the user-defined functions (UDFs) you write might accept or produce different
           numbers of input and output values:
         </p>
+
 
         <ul class="ul">
           <li class="li">
@@ -87,6 +171,7 @@
 <pre class="pre codeblock"><code>select customer_name, is_frequent_customer(customer_id) from customers;
 select obfuscate(sensitive_column) from sensitive_data;</code></pre>
           </li>
+
 
           <li class="li">
             A user-defined aggregate function (UDAF) accepts a group of values and returns a single value. You use
@@ -101,19 +186,25 @@ select closest_restaurant(latitude, longitude) from places;
 select most_profitable_location(store_id, sales, expenses, tax_rate, depreciation) from franchise_data group by year;</code></pre>
           </li>
 
+
           <li class="li">
             Currently, Impala does not support other categories of user-defined functions, such as user-defined
             table functions (UDTFs) or window functions.
           </li>
 
 
-        </ul>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="udf_concepts__native_udfs">
+        </ul>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="native_udfs">
 
       <h3 class="title topictitle3" id="ariaid-title4">Native Impala UDFs</h3>
+
 
       <div class="body conbody">
 
@@ -122,12 +213,16 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
           Where practical, use C++ UDFs because the compiled native code can yield higher performance, with
           UDF execution time often 10x faster for a C++ UDF than the equivalent Java UDF.
         </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="udf_concepts__udfs_hive">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="udfs_hive">
 
       <h3 class="title topictitle3" id="ariaid-title5">Using Hive UDFs with Impala</h3>
+
 
       <div class="body conbody">
 
@@ -136,15 +231,24 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
           subject to the following conditions:
         </p>
 
+
         <ul class="ul">
           <li class="li">
             The parameters and return value must all use scalar data types supported by Impala. For example, complex or nested
             types are not supported.
           </li>
 
+
+          <li class="li">
+            Hive/Java UDFs must extend
+              <code class="ph codeph">org.apache.hadoop.hive.ql.exec.UDF</code> class.
+          </li>
+
+
           <li class="li">
             Currently, Hive UDFs that accept or return the <code class="ph codeph">TIMESTAMP</code> type are not supported.
           </li>
+
 
           <li class="li">
             Prior to <span class="keyword">Impala 2.5</span> the return type must be a <span class="q">"Writable"</span> type such as <code class="ph codeph">Text</code> or
@@ -154,26 +258,32 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             UDF arguments and return values can be Java primitive types.</span>
           </li>
 
+
           <li class="li">
             Hive UDAFs and UDTFs are not supported.
           </li>
+
 
           <li class="li">
             Typically, a Java UDF will execute several times slower in Impala than the equivalent native UDF
             written in C++.
           </li>
+
           <li class="li">
             In <span class="keyword">Impala 2.5</span> and higher, you can transparently call Hive Java UDFs through Impala,
             or call Impala Java UDFs through Hive. This feature does not apply to built-in Hive functions.
             Any Impala Java UDFs created with older versions must be re-created using new <code class="ph codeph">CREATE FUNCTION</code>
             syntax, without any signature for arguments or the return value.
           </li>
+
         </ul>
+
 
         <p class="p">
           To take full advantage of the Impala architecture and performance features, you can also write
           Impala-specific UDFs in C++.
         </p>
+
 
         <p class="p">
           For background about Java-based Hive UDFs, see the
@@ -182,11 +292,13 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
           related blog posts.
         </p>
 
+
         <p class="p">
           The ideal way to understand how to reuse Java-based UDFs (originally written for Hive) with Impala is to
           take some of the Hive built-in functions (implemented as Java UDFs) and take the applicable JAR files
           through the UDF deployment process for Impala, creating new UDFs with different names:
         </p>
+
 
         <ol class="ol">
           <li class="li">
@@ -194,6 +306,7 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             like <span class="ph filepath">/usr/lib/hive/lib/hive-exec-0.10.0.jar</span>, with different version
             numbers corresponding to your specific level of <span class="keyword"></span>.
           </li>
+
 
           <li class="li">
             Use <code class="ph codeph">jar tf <var class="keyword varname">jar_file</var></code> to see a list of the classes inside the JAR.
@@ -205,10 +318,12 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             <code class="ph codeph">org.apache.hadoop.hive.ql.udf.UDFOPNegative</code>.
           </li>
 
+
           <li class="li">
             Copy that file to an HDFS location that Impala can read. (In the examples here, we renamed the file to
             <span class="ph filepath">hive-builtins.jar</span> in HDFS for simplicity.)
           </li>
+
 
           <li class="li">
             For each Java-based UDF that you want to call through Impala, issue a <code class="ph codeph">CREATE FUNCTION</code>
@@ -221,14 +336,17 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             for the SQL functions, because Impala UDFs cannot have the same name as Impala built-in functions.
           </li>
 
+
           <li class="li">
             Call the function from your queries, passing arguments of the correct type to match the function
             signature. These arguments could be references to columns, arithmetic or other kinds of expressions,
             the results of <code class="ph codeph">CAST</code> functions to ensure correct data types, and so on.
           </li>
+
         </ol>
 
-        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+        <div class="note note"><span class="notetitle">Note:</span>
           <div class="p">
         In <span class="keyword">Impala 2.9</span> and higher, you can refresh the user-defined functions (UDFs)
         that Impala recognizes, at the database level, by running the <code class="ph codeph">REFRESH FUNCTIONS</code>
@@ -244,7 +362,9 @@ REFRESH FUNCTIONS shared_udfs;
 SELECT udf_created_by_hive(c1) FROM ...
 </code></pre>
       </div>
+
         </div>
+
 
         <div class="example"><h4 class="title sectiontitle">Java UDF Example: Reusing lower() Function</h4>
 
@@ -257,6 +377,7 @@ SELECT udf_created_by_hive(c1) FROM ...
             same name as built-in functions. From SQL, we call the function in a basic way (in a query with no
             <code class="ph codeph">WHERE</code> clause), directly on a column, and on the results of a string expression:
           </p>
+
 
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create database udfs;
@@ -307,6 +428,7 @@ Returned 4 row(s) in 0.22s</code></pre>
 
         </div>
 
+
         <div class="example"><h4 class="title sectiontitle">Java UDF Example: Reusing negative() Function</h4>
 
           
@@ -319,6 +441,7 @@ Returned 4 row(s) in 0.22s</code></pre>
             although we can call the integer version of the function by casting the argument. Then we overload the
             same function name to also accept a floating-point argument.
           </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table t (x int);
 [localhost:21000] &gt; insert into t values (1), (2), (4), (100);
@@ -360,24 +483,33 @@ Returned 1 row(s) in 0.11s</code></pre>
           
 
         </div>
-      </div>
-    </article>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="udfs__udf_runtime">
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="udf_runtime">
     <h2 class="title topictitle2" id="ariaid-title6">Runtime Environment for UDFs</h2>
+
     <div class="body conbody">
       <p class="p">
         By default, Impala copies UDFs into <span class="ph filepath">/tmp</span>,
         and you can configure this location through the <code class="ph codeph">--local_library_dir</code>
         startup flag for the <span class="keyword cmdname">impalad</span> daemon.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="udfs__udf_demo_env">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="udf_demo_env">
 
     <h2 class="title topictitle2" id="ariaid-title7">Installing the UDF Development Package</h2>
+
 
     <div class="body conbody">
 
@@ -387,6 +519,7 @@ Returned 1 row(s) in 0.11s</code></pre>
         header files, sample source, and build configuration files.
       </p>
 
+
       <ol class="ol">
         
 
@@ -394,18 +527,22 @@ Returned 1 row(s) in 0.11s</code></pre>
           Locate the appropriate <code class="ph codeph">.repo</code> or list file for your operating system version.
         </li>
 
+
         <li class="li">
           Use the familiar <code class="ph codeph">yum</code>, <code class="ph codeph">zypper</code>, or <code class="ph codeph">apt-get</code> commands
           depending on your operating system. For the package name, specify <code class="ph codeph">impala-udf-devel</code>
           (RHEL-based distributions) or <code class="ph codeph">impala-udf-dev</code> (Ubuntu and Debian).
         </li>
+
       </ol>
 
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         The UDF development code does not rely on Impala being installed on the same machine. You can write and
         compile UDFs on a minimal development system, then deploy them on a different one for use with Impala.
       </div>
+
 
       <p class="p">
         When you are ready to start writing your own UDFs, download the sample code and build scripts from
@@ -413,12 +550,16 @@ Returned 1 row(s) in 0.11s</code></pre>
         Then see <a class="xref" href="impala_udf.html#udf_coding">Writing User-Defined Functions (UDFs)</a> for how to code UDFs, and
         <a class="xref" href="impala_udf.html#udf_tutorial">Examples of Creating and Using UDFs</a> for how to build and run UDFs.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="udfs__udf_coding">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="udf_coding">
 
     <h2 class="title topictitle2" id="ariaid-title8">Writing User-Defined Functions (UDFs)</h2>
+
 
     <div class="body conbody">
 
@@ -427,9 +568,11 @@ Returned 1 row(s) in 0.11s</code></pre>
         samples, as described in <a class="xref" href="#udf_demo_env">Installing the UDF Development Package</a>.
       </p>
 
+
       <p class="p">
         When writing UDFs:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -438,18 +581,24 @@ Returned 1 row(s) in 0.11s</code></pre>
           integers require.
         </li>
 
+
         <li class="li">
           Use best practices for function-oriented programming: choose arguments carefully, avoid side effects,
           make each function do a single thing, and so on.
         </li>
+
       </ul>
 
+
       <p class="p toc inpage"></p>
+
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title9" id="udf_coding__udf_exploring">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="udf_exploring">
 
       <h3 class="title topictitle3" id="ariaid-title9">Getting Started with UDF Coding</h3>
+
   
 
       <div class="body conbody">
@@ -458,6 +607,7 @@ Returned 1 row(s) in 0.11s</code></pre>
           To understand the layout and member variables and functions of the predefined UDF data types, examine the
           header file <span class="ph filepath">/usr/include/impala_udf/udf.h</span>:
         </p>
+
 
 <pre class="pre codeblock"><code>// This is the only Impala header required to develop UDFs and UDAs. This header
 // contains the types that need to be used and the FunctionContext object. The context
@@ -469,6 +619,7 @@ Returned 1 row(s) in 0.11s</code></pre>
           within the sample build environment, which defines a simple function
           named <code class="ph codeph">AddUdf()</code>:
         </p>
+
 
 <pre class="pre codeblock"><code>#ifndef IMPALA_UDF_SAMPLE_UDF_H
 #define IMPALA_UDF_SAMPLE_UDF_H
@@ -487,6 +638,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <span class="ph filepath">udf-sample.cc</span> within the sample build environment:
         </p>
 
+
 <pre class="pre codeblock"><code>#include "udf-sample.h"
 
 // In this sample we are declaring a UDF that adds two ints and returns an int.
@@ -497,11 +649,14 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
 // Multiple UDFs can be defined in the same file</code></pre>
       </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="udf_coding__udfs_args">
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="udfs_args">
 
       <h3 class="title topictitle3" id="ariaid-title10">Data Types for Function Arguments and Return Values</h3>
+
 
       <div class="body conbody">
 
@@ -510,15 +665,18 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           a SQL data type that you could specify for a table column.
         </p>
 
+
         <p class="p">
         Currently, Impala UDFs cannot accept arguments or return values of the Impala complex types
         (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
       </p>
 
+
         <p class="p">
           Each data type has a corresponding structure defined in the C++ and Java header files, with two member
           fields and some predefined comparison operators and constructors:
         </p>
+
 
         <ul class="ul">
           <li class="li">
@@ -526,14 +684,18 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               <code class="ph codeph">is_null</code> indicates whether the value is <code class="ph codeph">NULL</code> or not.
               <code class="ph codeph">val</code> holds the actual argument or return value when it is non-<code class="ph codeph">NULL</code>.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               Each struct also defines a <code class="ph codeph">null()</code> member function that constructs an instance of the
               struct with the <code class="ph codeph">is_null</code> flag set.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -544,6 +706,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               udf_returning_string(col2)</code> without you declaring any comparison operators within the UDF
               itself.
             </p>
+
             <p class="p">
               For convenience within your UDF code, each struct defines <code class="ph codeph">==</code> and <code class="ph codeph">!=</code>
               operators for comparisons with other structs of the same type. These are for typical C++ comparisons
@@ -552,29 +715,29 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               <code class="ph codeph">null</code> comparisons is different from SQL (where <code class="ph codeph">NULL == NULL</code> is
               <code class="ph codeph">NULL</code> rather than <code class="ph codeph">true</code>), but more in line with typical C++ behavior.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               Each kind of struct has one or more constructors that define a filled-in instance of the struct,
               optionally with default values.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
-              Each kind of struct has a <code class="ph codeph">null()</code> member function that returns an instance of the
-              struct with the <code class="ph codeph">is_null</code> flag set.
+              Impala cannot process UDFs that accept composite or nested types
+              as arguments or return them as result values. This limitation
+              applies both to Impala UDFs written in C++ and Java-based Hive
+              UDFs.
             </p>
+
           </li>
 
-          <li class="li">
-            <p class="p">
-              Because Impala currently does not support composite or nested types, Impala cannot process UDFs that
-              accept such types as arguments or return them as result values. This limitation applies both to
-              Impala UDFs written in C++ and Java-based Hive UDFs.
-            </p>
-          </li>
 
           <li class="li">
             <p class="p">
@@ -582,19 +745,25 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               argument types. For overloaded functions, you must use different C++ or Java entry point names in the
               underlying functions.
             </p>
+
           </li>
+
         </ul>
+
 
         <p class="p">
           The data types defined on the C++ side (in <span class="ph filepath">/usr/include/impala_udf/udf.h</span>) are:
         </p>
+
 
         <ul class="ul">
           <li class="li">
             <p class="p">
               <code class="ph codeph">IntVal</code> represents an <code class="ph codeph">INT</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -604,19 +773,25 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               columns and expressions as arguments. Impala automatically casts smaller integer types to larger ones
               when appropriate, but does not implicitly cast large integer types to smaller ones.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">SmallIntVal</code> represents a <code class="ph codeph">SMALLINT</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">TinyIntVal</code> represents a <code class="ph codeph">TINYINT</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -628,25 +803,33 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               takes a pointer to a <code class="ph codeph">FunctionContext</code> struct and a length, that does allocate space
               for a new copy of the string data, for use in UDFs that return string values.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">BooleanVal</code> represents a <code class="ph codeph">BOOLEAN</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">FloatVal</code> represents a <code class="ph codeph">FLOAT</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
               <code class="ph codeph">DoubleVal</code> represents a <code class="ph codeph">DOUBLE</code> column.
             </p>
+
           </li>
+
 
           <li class="li">
             <p class="p">
@@ -655,16 +838,22 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               the epoch date. It also has a <code class="ph codeph">time_of_day</code> field, a 64-bit integer representing the
               current time of day in nanoseconds.
             </p>
+
           </li>
 
 
-        </ul>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title11" id="udf_coding__udf_varargs">
+        </ul>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="udf_varargs">
 
       <h3 class="title topictitle3" id="ariaid-title11">Variable-Length Argument Lists</h3>
+
 
       <div class="body conbody">
 
@@ -675,9 +864,11 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           numbers, three numbers, four numbers, and so on.
         </p>
 
+
         <p class="p">
           To accept a variable-length argument list, code the signature of your function like this:
         </p>
+
 
 <pre class="pre codeblock"><code>StringVal Concat(FunctionContext* context, const StringVal&amp; separator,
   int num_var_args, const StringVal* args);</code></pre>
@@ -689,6 +880,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <code class="ph codeph">STRING</code> arguments:
         </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create function my_concat(string, string ...) returns string location '/user/test_user/udfs/sample.so' symbol='Concat';
 </code></pre>
 
@@ -697,16 +889,21 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           argument list.
         </p>
 
+
         <p class="p">
           When Impala calls the function, it fills in the initial set of required arguments, then passes the number
           of extra arguments and a pointer to the first of those optional arguments.
         </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title12" id="udf_coding__udf_null">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="udf_null">
 
       <h3 class="title topictitle3" id="ariaid-title12">Handling NULL Values</h3>
+
 
       <div class="body conbody">
 
@@ -719,6 +916,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           (as in <code class="ph codeph">AVG()</code>), or treat it the same as a numeric zero or empty string.
         </p>
 
+
         <p class="p">
           Each parameter type, such as <code class="ph codeph">IntVal</code> or <code class="ph codeph">StringVal</code>, has an
           <code class="ph codeph">is_null</code> Boolean member.
@@ -730,17 +928,22 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
         </p>
 
+
         <p class="p">
           If your function returns <code class="ph codeph">NULL</code> when passed a <code class="ph codeph">NULL</code> value, or in other
           cases such as when a search string is not found, you can construct a null instance of the return type by
           using its <code class="ph codeph">null()</code> member function.
         </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title13" id="udf_coding__udf_malloc">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title13" id="udf_malloc">
 
       <h3 class="title topictitle3" id="ariaid-title13">Memory Allocation for UDFs</h3>
+
   
 
       <div class="body conbody">
@@ -753,12 +956,16 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <code class="ph codeph">FunctionContext*</code> argument followed by a length, and copy the data into the newly
           allocated memory buffer.
         </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="udf_coding__udf_threads">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="udf_threads">
 
       <h3 class="title topictitle3" id="ariaid-title14">Thread-Safe Work Area for UDFs</h3>
+
 
       <div class="body conbody">
 
@@ -771,6 +978,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           parallelized using multiple threads.
         </p>
 
+
         <p class="p">
           Within this work area, you can set up predefined lookup tables, or record the results of complex
           operations on data types such as <code class="ph codeph">STRING</code> or <code class="ph codeph">TIMESTAMP</code>. Saving the
@@ -781,9 +989,11 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           and do a fast lookup to find the result for subsequent iterations of the UDF.
         </p>
 
+
         <p class="p">
           Each such function must have the signature:
         </p>
+
 
 <pre class="pre codeblock"><code>void <var class="keyword varname">function_name</var>(impala_udf::FunctionContext*, impala_udf::FunctionContext::FunctionScope)
 </code></pre>
@@ -792,12 +1002,16 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           Currently, only <code class="ph codeph">THREAD_SCOPE</code> is implemented, not <code class="ph codeph">FRAGMENT_SCOPE</code>. See
           <span class="ph filepath">udf.h</span> for details about the scope values.
         </p>
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title15" id="udf_coding__udf_error_handling">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="udf_error_handling">
 
       <h3 class="title topictitle3" id="ariaid-title15">Error Handling for UDFs</h3>
+
   
 
       <div class="body conbody">
@@ -807,10 +1021,12 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <code class="ph codeph">FunctionContext*</code> argument passed to your function.
         </p>
 
+
         <p class="p">
           A UDF can record one or more warnings, for conditions that indicate minor, recoverable problems that do
           not cause the query to stop. The signature for this function is:
         </p>
+
 
 <pre class="pre codeblock"><code>bool AddWarning(const char* warning_msg);</code></pre>
 
@@ -819,14 +1035,19 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           query from returning any results. The signature for this function is:
         </p>
 
+
 <pre class="pre codeblock"><code>void SetError(const char* error_msg);</code></pre>
       </div>
-    </article>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title16" id="udfs__udafs">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="udafs">
 
     <h2 class="title topictitle2" id="ariaid-title16">Writing User-Defined Aggregate Functions (UDAFs)</h2>
+
 
     <div class="body conbody">
 
@@ -838,12 +1059,16 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         <code class="ph codeph">HAVING</code> clause).
       </p>
 
+
       <p class="p toc inpage"></p>
+
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title17" id="udafs__uda_functions">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title17" id="uda_functions">
 
       <h3 class="title topictitle3" id="ariaid-title17">The Underlying Functions for a UDA</h3>
+
 
       <div class="body conbody">
 
@@ -853,11 +1078,13 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           represented by multiple underlying functions:
         </p>
 
+
         <ul class="ul">
           <li class="li">
             An initialization function that sets any counters to zero, creates empty buffers, and does any other
             one-time setup for a query.
           </li>
+
 
           <li class="li">
             An update function that processes the arguments for each row in the query result set and accumulates an
@@ -865,20 +1092,25 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
             string buffer, or set flags.
           </li>
 
+
           <li class="li">
             A merge function that combines the intermediate results from two different nodes.
           </li>
+
 
           <li class="li">
             A serialize function that flattens any intermediate values containing pointers, and frees any memory
             allocated during the init, update, and merge phases.
           </li>
 
+
           <li class="li">
             A finalize function that either passes through the combined result unchanged, or does one final
             transformation.
           </li>
+
         </ul>
+
 
         <p class="p">
           In the SQL syntax, you create a UDAF by using the statement <code class="ph codeph">CREATE AGGREGATE FUNCTION</code>.
@@ -886,6 +1118,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <code class="ph codeph">UPDATE_FN</code>, <code class="ph codeph">MERGE_FN</code>, <code class="ph codeph">SERIALIZE_FN</code>, and
           <code class="ph codeph">FINALIZE_FN</code>.
         </p>
+
 
         <p class="p">
           
@@ -898,9 +1131,11 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
 
 
+
         <p class="p">
           <span class="xref"><span class="ph filepath">uda-sample.h</span></span>:
         </p>
+
 
 
 
@@ -909,12 +1144,16 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         </p>
 
 
-      </div>
-    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title18" id="udafs__udf_intermediate">
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title18" id="udf_intermediate">
 
       <h3 class="title topictitle3" id="ariaid-title18">Intermediate Results for UDAs</h3>
+
 
       <div class="body conbody">
 
@@ -926,6 +1165,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           course of a UDA, then in the end return a numeric or Boolean result.
         </p>
 
+
         <p class="p">
           In such a case, specify the data type of the intermediate results using the optional <code class="ph codeph">INTERMEDIATE
           <var class="keyword varname">type_name</var></code> clause of the <code class="ph codeph">CREATE AGGREGATE FUNCTION</code> statement.
@@ -934,6 +1174,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           representing the number of bytes in the intermediate result buffer.
         </p>
 
+
         <p class="p">
           For an example of this technique, see the <code class="ph codeph">trunc_sum()</code> aggregate function, which accumulates
           intermediate results of type <code class="ph codeph">DOUBLE</code> and returns <code class="ph codeph">BIGINT</code> at the end.
@@ -941,13 +1182,18 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           and <a class="xref" href="https://github.com/apache/impala/blob/master/be/src/testutil/test-udas.cc" target="_blank">the implementation of the underlying TruncSum*() functions</a>
           on Github.
         </p>
-      </div>
-    </article>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title19" id="udfs__udf_building">
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title19" id="udf_building">
 
     <h2 class="title topictitle2" id="ariaid-title19">Building and Deploying UDFs</h2>
+
   
 
     <div class="body conbody">
@@ -957,6 +1203,7 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         libraries for use in Impala queries.
       </p>
 
+
       <p class="p">
         Impala ships with a sample build environment for UDFs, that you can study, experiment with, and adapt for
         your own use. This sample build environment starts with the <span class="keyword cmdname">cmake</span> configuration command,
@@ -965,11 +1212,13 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         build steps based on the rules in the <span class="ph filepath">Makefile</span>.
       </p>
 
+
       <p class="p">
         Impala loads the shared library from an HDFS location. After building a shared library containing one or
         more UDFs, use <code class="ph codeph">hdfs dfs</code> or <code class="ph codeph">hadoop fs</code> commands to copy the binary file to
         an HDFS location readable by Impala.
       </p>
+
 
       <p class="p">
         The final step in deployment is to issue a <code class="ph codeph">CREATE FUNCTION</code> statement in the
@@ -980,13 +1229,15 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         <var class="keyword varname">db_name</var>.<var class="keyword varname">function_name</var></code>.
       </p>
 
+
       <p class="p">
         As you update the UDF code and redeploy updated versions of a shared library, use <code class="ph codeph">DROP
         FUNCTION</code> and <code class="ph codeph">CREATE FUNCTION</code> to let Impala pick up the latest version of the
         code.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
         Java UDFs are also persisted, if they were created with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs,
@@ -998,15 +1249,19 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
         you restart the <span class="keyword cmdname">catalogd</span> daemon.
         Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
       </p>
+
         <p class="p">
           See <a class="xref" href="impala_create_function.html#create_function">CREATE FUNCTION Statement</a> and <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
           for the new syntax for the persistent Java UDFs.
         </p>
+
       </div>
+
 
       <p class="p">
         Prerequisites for the build environment are:
       </p>
+
 
 <pre class="pre codeblock"><code># Use the appropriate package installation command for your Linux distribution.
 sudo yum install gcc-c++ cmake boost-devel
@@ -1019,9 +1274,11 @@ sudo yum install impala-udf-devel
         up your build environment.
       </p>
 
+
       <p class="p">
         To build the original samples:
       </p>
+
 
 <pre class="pre codeblock"><code># Process CMakeLists.txt and set up appropriate Makefiles.
 cmake .
@@ -1033,11 +1290,13 @@ make</code></pre>
         The sample code to examine, experiment with, and adapt is in these files:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <span class="ph filepath">udf-sample.h</span>: Header file that declares the signature for a scalar UDF
           (<code class="ph codeph">AddUDF</code>).
         </li>
+
 
         <li class="li">
           <span class="ph filepath">udf-sample.cc</span>: Sample source for a simple UDF that adds two integers. Because
@@ -1045,9 +1304,11 @@ make</code></pre>
           functions in this file and add their signatures to the corresponding header file.
         </li>
 
+
         <li class="li">
           <span class="ph filepath">udf-sample-test.cc</span>: Basic unit tests for the sample UDF.
         </li>
+
 
         <li class="li">
           <span class="ph filepath">uda-sample.h</span>: Header file that declares the signature for sample aggregate
@@ -1056,6 +1317,7 @@ make</code></pre>
           processing for multiple phases, there are several underlying C++ functions such as
           <code class="ph codeph">CountInit</code>, <code class="ph codeph">AvgUpdate</code>, and <code class="ph codeph">StringConcatFinalize</code>.
         </li>
+
 
         <li class="li">
           <span class="ph filepath">uda-sample.cc</span>: Sample source for simple UDAFs that demonstrate how to manage the
@@ -1067,6 +1329,7 @@ make</code></pre>
               combined number is returned verbatim by the finalize function.
             </li>
 
+
             <li class="li">
               The UDAF that imitates the <code class="ph codeph">AVG</code> function keeps track of two numbers, a count of rows
               processed and the sum of values for a column. These numbers are updated and merged as with
@@ -1074,23 +1337,32 @@ make</code></pre>
               average value.
             </li>
 
+
             <li class="li">
               The UDAF that concatenates string values into a comma-separated list demonstrates how to manage
               storage for a string that increases in length as the function is called for multiple rows.
             </li>
+
           </ul>
+
         </li>
+
 
         <li class="li">
           <span class="ph filepath">uda-sample-test.cc</span>: basic unit tests for the sample UDAFs.
         </li>
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title20" id="udfs__udf_performance">
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title20" id="udf_performance">
 
     <h2 class="title topictitle2" id="ariaid-title20">Performance Considerations for UDFs</h2>
+
   
 
     <div class="body conbody">
@@ -1101,18 +1373,23 @@ make</code></pre>
         optimizations you can make within the function body can pay off in a big way when the function is called
         over and over when processing a huge result set.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title21" id="udfs__udf_tutorial">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="udf_tutorial">
 
     <h2 class="title topictitle2" id="ariaid-title21">Examples of Creating and Using UDFs</h2>
+
 
     <div class="body conbody">
 
       <p class="p">
         This section demonstrates how to create and use all kinds of user-defined functions (UDFs).
       </p>
+
 
       
 
@@ -1131,10 +1408,12 @@ make</code></pre>
           <code class="ph codeph">StripVowels()</code> (returns a new string with vowels removed).
         </p>
 
+
         <p class="p">
           First, we add the signatures for these functions to <span class="ph filepath">udf-sample.h</span> in the demo build
           environment:
         </p>
+
 
 <pre class="pre codeblock"><code>BooleanVal HasVowels(FunctionContext* context, const StringVal&amp; input);
 IntVal CountVowels(FunctionContext* context, const StringVal&amp; arg1);
@@ -1143,6 +1422,7 @@ StringVal StripVowels(FunctionContext* context, const StringVal&amp; arg1);</cod
         <p class="p">
           Then, we add the bodies of these functions to <span class="ph filepath">udf-sample.cc</span>:
         </p>
+
 
 <pre class="pre codeblock"><code>BooleanVal HasVowels(FunctionContext* context, const StringVal&amp; input)
 {
@@ -1215,6 +1495,7 @@ StringVal StripVowels(FunctionContext* context, const StringVal&amp; arg1)
           where Impala can read it:
         </p>
 
+
 <pre class="pre codeblock"><code>$ make
 [  0%] Generating udf_samples/uda-sample.ll
 [ 16%] Built target uda-sample-ir
@@ -1235,6 +1516,7 @@ $ hdfs dfs -put ./udf_samples/libudfsample.so /user/hive/udfs/libudfsample.so</c
           issue <code class="ph codeph">CREATE FUNCTION</code> statements to set up the SQL function names, and call the
           functions in some queries:
         </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create database udf_testing;
 [localhost:21000] &gt; use udf_testing;
@@ -1333,6 +1615,7 @@ Returned 4 row(s) in 0.24s</code></pre>
 
       </div>
 
+
       <div class="example" id="udf_tutorial__udf_sample_uda"><h3 class="title sectiontitle">Sample C++ UDA: SumOfSquares</h3>
 
         
@@ -1342,6 +1625,7 @@ Returned 4 row(s) in 0.24s</code></pre>
           its input values.
         </p>
 
+
         <p class="p">
           The coding for a UDA is a little more involved than a scalar UDF, because the processing is split into
           several phases, each implemented by a different function. Each phase is relatively straightforward: the
@@ -1349,11 +1633,13 @@ Returned 4 row(s) in 0.24s</code></pre>
           with some accumulated intermediate value.
         </p>
 
+
         <p class="p">
           As in our sample UDF from the previous example, we add function signatures to a header file (in this
           case, <span class="ph filepath">uda-sample.h</span>). Because this is a math-oriented UDA, we make two versions of
           each function, one accepting an integer value and the other accepting a floating-point value.
         </p>
+
 
 <pre class="pre codeblock"><code>void SumOfSquaresInit(FunctionContext* context, BigIntVal* val);
 void SumOfSquaresInit(FunctionContext* context, DoubleVal* val);
@@ -1370,6 +1656,7 @@ DoubleVal SumOfSquaresFinalize(FunctionContext* context, const DoubleVal&amp; va
         <p class="p">
           We add the function bodies to a C++ source file (in this case, <span class="ph filepath">uda-sample.cc</span>):
         </p>
+
 
 <pre class="pre codeblock"><code>void SumOfSquaresInit(FunctionContext* context, BigIntVal* val) {
   val-&gt;is_null = false;
@@ -1407,6 +1694,7 @@ DoubleVal SumOfSquaresFinalize(FunctionContext* context, const DoubleVal&amp; va
           As with the sample UDF, we build a shared library and put it into HDFS:
         </p>
 
+
 <pre class="pre codeblock"><code>$ make
 [  0%] Generating udf_samples/uda-sample.ll
 [ 16%] Built target uda-sample-ir
@@ -1428,6 +1716,7 @@ $ hdfs dfs -put ./udf_samples/libudasample.so /user/hive/udfs/libudasample.so</c
           To create the SQL function, we issue a <code class="ph codeph">CREATE AGGREGATE FUNCTION</code> statement and specify
           the underlying C++ function names for the different phases:
         </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; use udf_testing;
 
@@ -1464,6 +1753,7 @@ Returned 1 row(s) in 0.35s</code></pre>
           AGGREGATE FUNCTION</code> statement:
         </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select sum_of_squares(y) from sos;
 ERROR: AnalysisException: No matching function with signature: udfs.sum_of_squares(DOUBLE).
 
@@ -1499,6 +1789,7 @@ Returned 1 row(s) in 0.35s</code></pre>
           values:
         </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert overwrite sos values (1, 1), (2, 0), (3, 1), (4, 0);
 Inserted 4 rows in 1.24s
 
@@ -1513,12 +1804,16 @@ Inserted 4 rows in 1.24s
 Returned 2 row(s) in 0.43s</code></pre>
 
       </div>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title22" id="udfs__udf_security">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="udf_security">
 
     <h2 class="title topictitle2" id="ariaid-title22">Security Considerations for User-Defined Functions</h2>
+
   
 
     <div class="body conbody">
@@ -1527,11 +1822,13 @@ Returned 2 row(s) in 0.43s</code></pre>
         When the Impala authorization feature is enabled:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           To call a UDF in a query, you must have the required read privilege for any databases and tables used in
           the query.
         </li>
+
 
         <li class="li">
           Because incorrectly coded UDFs could cause performance or capacity problems, for example by going into
@@ -1539,17 +1836,23 @@ Returned 2 row(s) in 0.43s</code></pre>
           That is, to execute the <code class="ph codeph">CREATE FUNCTION</code> statement requires the <code class="ph codeph">ALL</code>
           privilege on the server.
         </li>
+
       </ul>
+
 
       <p class="p">
         See <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for details about authorization in Impala.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title23" id="udfs__udf_limits">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="udf_limits">
 
     <h2 class="title topictitle2" id="ariaid-title23">Limitations and Restrictions for Impala UDFs</h2>
+
 
     <div class="body conbody">
 
@@ -1557,18 +1860,22 @@ Returned 2 row(s) in 0.43s</code></pre>
         The following limitations and restrictions apply to Impala UDFs in the current release:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           Impala does not support Hive UDFs that accept or return composite or nested types, or other types not
           available in Impala tables.
         </li>
 
+
         <li class="li">
           <p class="p">
         The Hive <code class="ph codeph">current_user()</code> function cannot be
         called from a Java UDF through Impala.
       </p>
+
         </li>
+
 
         <li class="li">
           All Impala UDFs must be deterministic, that is, produce the same output each time when passed the same
@@ -1577,9 +1884,11 @@ Returned 2 row(s) in 0.43s</code></pre>
           from disk or over the network.
         </li>
 
+
         <li class="li">
           An Impala UDF must not spawn other threads or processes.
         </li>
+
 
         <li class="li">
           Prior to <span class="keyword">Impala 2.5</span> when the <span class="keyword cmdname">catalogd</span> process is restarted,
@@ -1589,15 +1898,22 @@ Returned 2 row(s) in 0.43s</code></pre>
           to remove the limitation entirely.
         </li>
 
+
         <li class="li">
           Impala currently does not support user-defined table functions (UDTFs).
         </li>
+
 
         <li class="li">
           The <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code> types cannot be used as input arguments or return
           values for UDFs.
         </li>
+
       </ul>
+
     </div>
-  </article>
-</article></main></body></html>
+
+  </div>
+
+</body>
+</html>

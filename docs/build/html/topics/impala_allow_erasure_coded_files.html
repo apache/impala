@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="ALLOW_ERASURE_CODED_FILES Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="allow_erasure_coded_files" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>ALLOW_ERASURE_CODED_FILES Query Option</title>
+</head>
+<body id="allow_erasure_coded_files">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">ALLOW_ERASURE_CODED_FILES Query Option</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      Use the <code class="ph codeph">ALLOW_ERASURE_CODED_FILES</code> query option to enable or disable the
+      support of erasure coded files in Impala. Until Impala is fully tested and certified with
+      erasure coded files, this query option is set to <code class="ph codeph">FALSE</code> by default.
+    </p>
+
+
+    <p class="p">
+      When the <code class="ph codeph">ALLOW_ERASURE_CODED_FILES</code> query option is set to
+      <code class="ph codeph">FALSE</code>, Impala returns an error when a query requires scanning an erasure
+      coded file.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> <code class="ph codeph">BOOLEAN</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">FALSE</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

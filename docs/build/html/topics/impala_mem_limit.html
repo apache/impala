@@ -1,18 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="mem_limit"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>MEM_LIMIT Query Option</title></head><body id="mem_limit"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="MEM_LIMIT Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="mem_limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>MEM_LIMIT Query Option</title>
+</head>
+<body id="mem_limit">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">MEM_LIMIT Query Option</h1>
+
   
   
 
   <div class="body conbody">
 
     <p class="p">
-      
-      When resource management is not enabled, defines the maximum amount of memory a query can allocate on each node.
-      Therefore, the total memory that can be used by a query is the <code class="ph codeph">MEM_LIMIT</code> times the number of nodes.
+      The MEM_LIMIT query option defines the maximum amount of memory a query
+      can allocate on each node. The total memory that can be used by a query is
+      the <code class="ph codeph">MEM_LIMIT</code> times the number of nodes.
     </p>
+
 
     <p class="p">
       There are two levels of memory limit for Impala.
@@ -25,6 +46,7 @@
       and must always be less than the <span class="keyword cmdname">impalad</span> memory limit.
     </p>
 
+
     <p class="p">
       If query processing exceeds the specified memory limit on any node, either the per-query limit or the
       <span class="keyword cmdname">impalad</span> limit, Impala cancels the query automatically.
@@ -32,24 +54,11 @@
       might briefly exceed the limit without the query being cancelled.
     </p>
 
-    <p class="p">
-      When resource management is enabled, the mechanism for this option changes. If set, it overrides the
-      automatic memory estimate from Impala. Impala requests this amount of memory from YARN on each node, and the
-      query does not proceed until that much memory is available. The actual memory used by the query could be
-      lower, since some queries use much less memory than others. With resource management, the
-      <code class="ph codeph">MEM_LIMIT</code> setting acts both as a hard limit on the amount of memory a query can use on any
-      node (enforced by YARN) and a guarantee that that much memory will be available on each node while the query
-      is being executed. When resource management is enabled but no <code class="ph codeph">MEM_LIMIT</code> setting is
-      specified, Impala estimates the amount of memory needed on each node for each query, requests that much
-      memory from YARN before starting the query, and then internally sets the <code class="ph codeph">MEM_LIMIT</code> on each
-      node to the requested amount of memory during the query. Thus, if the query takes more memory than was
-      originally estimated, Impala detects that the <code class="ph codeph">MEM_LIMIT</code> is exceeded and cancels the query
-      itself.
-    </p>
 
     <p class="p">
       <strong class="ph b">Type:</strong> numeric
     </p>
+
 
     <p class="p">
       <strong class="ph b">Units:</strong> A numeric argument represents memory size in bytes; you can also use a suffix of <code class="ph codeph">m</code> or <code class="ph codeph">mb</code>
@@ -57,13 +66,16 @@
       formats, subsequent queries fail with an error.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Default:</strong> 0 (unlimited)
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       The <code class="ph codeph">MEM_LIMIT</code> setting is primarily useful in a high-concurrency setting,
@@ -71,6 +83,7 @@
       You can prevent any query from accidentally using much more memory than expected,
       which could negatively impact other Impala queries.
     </p>
+
 
     <p class="p">
       Use the output of the <code class="ph codeph">SUMMARY</code> command in <span class="keyword cmdname">impala-shell</span>
@@ -80,14 +93,17 @@
       the <code class="ph codeph">SUMMARY</code> command.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following examples show how to set the <code class="ph codeph">MEM_LIMIT</code> query option
       using a fixed number of bytes, or suffixes representing gigabytes or megabytes.
     </p>
+
 
 <pre class="pre codeblock"><code>
 [localhost:21000] &gt; set mem_limit=3000000000;
@@ -140,6 +156,7 @@ MEM_LIMIT set to 3mb
       values lead to errors for subsequent queries.
     </p>
 
+
 <pre class="pre codeblock"><code>
 [localhost:21000] &gt; set mem_limit=3tb;
 MEM_LIMIT set to 3tb
@@ -162,6 +179,7 @@ ERROR: Failed to parse query memory limit from 'xyz'.
       Then it sets an artificially low <code class="ph codeph">MEM_LIMIT</code>
       setting so that the same query cannot run.
     </p>
+
 
 <pre class="pre codeblock"><code>
 [localhost:21000] &gt; select count(*) from customer;
@@ -203,4 +221,10 @@ Query did not have enough memory to get the minimum required buffers in the bloc
 </code></pre>
 
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

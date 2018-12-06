@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="PARQUET_DICTIONARY_FILTERING Query Option (Impala 2.9 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="parquet_dictionary_filtering" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>PARQUET_DICTIONARY_FILTERING Query Option (Impala 2.9 or higher only)</title>
+</head>
+<body id="parquet_dictionary_filtering">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">PARQUET_DICTIONARY_FILTERING Query Option (<span class="keyword">Impala 2.9</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">PARQUET_DICTIONARY_FILTERING</code> query option controls whether Impala
+      uses dictionary filtering for Parquet files.
+    </p>
+
+
+    <p class="p">
+      To efficiently process a highly selective scan query, when this option is enabled, Impala
+      checks the values in the Parquet dictionary page and determines if the whole row group can
+      be thrown out.
+    </p>
+
+
+    <div class="p">
+      A column chunk is purely dictionary encoded and can be used by dictionary filtering if any
+      of the following conditions are met:
+      <ol class="ol">
+        <li class="li">
+          If the <code class="ph codeph">encoding_stats</code> is in the Parquet file, dictionary filtering
+          uses it to determine if there are only dictionary encoded pages (i.e. there are no
+          data pages with an encoding other than PLAIN_DICTIONARY).
+        </li>
+
+
+        <li class="li">
+          If the encoding stats are not present, dictionary filtering looks at the encodings.
+          The column is purely dictionary encoded if both of the conditions satisfy:
+          <ul class="ul">
+            <li class="li">
+              PLAIN_DICTIONARY is present.
+            </li>
+
+
+            <li class="li">
+              Only PLAIN_DICTIONARY, RLE, or BIT_PACKED encodings are listed.
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        <li class="li">
+          Dictionary filtering works for the Parquet dictionaries with less than 40000 values if
+          the file was written by <span class="keyword"> or lower</span>.
+        </li>
+
+      </ol>
+
+    </div>
+
+
+    <p class="p">
+      In the query runtime profile output for each Impalad instance, the
+      <code class="ph codeph">NumDictFilteredRowGroups</code> field in the SCAN node section shows the number
+      of row groups that were skipped based on dictionary filtering.
+    </p>
+
+
+    <p class="p">
+      Note that row groups can be filtered out by Parquet statistics, and in such cases,
+      dictionary filtering will not be considered.
+    </p>
+
+
+    <div class="p">
+      The supported values for the query option are:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">true</code> (<code class="ph codeph">1</code>): Use dictionary filtering.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">false</code> (<code class="ph codeph">0</code>): Do not use dictionary filtering
+        </li>
+
+
+        <li class="li">
+          Any other values are treated as <code class="ph codeph">false</code>.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> Boolean
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">true</code> (<code class="ph codeph">1</code>)
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.9.0</span>
+      </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

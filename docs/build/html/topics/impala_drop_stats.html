@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="drop_stats"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DROP STATS Statement</title></head><body id="drop_stats"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DROP STATS Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="drop_stats" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DROP STATS Statement</title>
+</head>
+<body id="drop_stats">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">DROP STATS Statement</h1>
+
   
   
 
@@ -14,9 +34,11 @@
       <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>DROP STATS [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var>
 DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var> PARTITION (<var class="keyword varname">partition_spec</var>)
@@ -33,10 +55,12 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
         specification, and specify constant values for all the partition key columns.
       </p>
 
+
     <p class="p">
       <code class="ph codeph">DROP STATS</code> removes all statistics from the table, whether created by <code class="ph codeph">COMPUTE
       STATS</code> or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>.
     </p>
+
 
     <p class="p">
       <code class="ph codeph">DROP INCREMENTAL STATS</code> only affects incremental statistics for a single partition, specified
@@ -46,9 +70,11 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
 
 
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       You typically use this statement when the statistics for a table or a partition have become stale due to data
@@ -56,6 +82,7 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
       or <code class="ph codeph">INSERT</code>, <code class="ph codeph">INSERT OVERWRITE</code>, or <code class="ph codeph">LOAD DATA</code> statements, or
       adding or dropping partitions.
     </p>
+
 
     <p class="p">
       When a table or partition has no associated statistics, Impala treats it as essentially zero-sized when
@@ -65,12 +92,14 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
       the table or partition after removing any stale statistics.
     </p>
 
+
     <p class="p">
       Dropping the statistics is not required for an unpartitioned table or a partitioned table covered by the
       original type of statistics. A subsequent <code class="ph codeph">COMPUTE STATS</code> statement replaces any existing
       statistics with new ones, for all partitions, regardless of whether the old ones were outdated. Therefore,
       this statement was rarely used before the introduction of incremental statistics.
     </p>
+
 
     <p class="p">
       Dropping the statistics is required for a partitioned table containing incremental statistics, to make a
@@ -79,17 +108,21 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
       available in Impala 2.1.0 and higher.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Statement type:</strong> DDL
       </p>
+
 
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 
+
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
     <p class="p">
       The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
       typically the <code class="ph codeph">impala</code> user, does not need any
@@ -98,9 +131,11 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
       not HDFS files and directories.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following example shows a partitioned table that has associated statistics produced by the
@@ -108,9 +143,11 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
       from specific partitions, then the entire table.
     </p>
 
+
     <p class="p">
       Initially, all table and column statistics are filled in.
     </p>
+
 
 
 
@@ -166,11 +203,13 @@ show column stats item_partitioned;
       the column-level statistics are unaffected.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       (It is possible that the row count might be preserved in future after a <code class="ph codeph">DROP INCREMENTAL
       STATS</code> statement. Check the resolution of the issue
       <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1615" target="_blank">IMPALA-1615</a>.)
     </div>
+
 
 <pre class="pre codeblock"><code>drop incremental stats item_partitioned partition (i_category='Sports');
 drop incremental stats item_partitioned partition (i_category='Electronics');
@@ -226,6 +265,7 @@ show column stats item_partitioned
       <code class="ph codeph">INCREMENTAL</code> clause). Now, both table-level and column-level statistics are reset.
     </p>
 
+
 <pre class="pre codeblock"><code>drop stats item_partitioned;
 
 show table stats item_partitioned
@@ -277,9 +317,17 @@ show column stats item_partitioned
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
       <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>, <a class="xref" href="impala_show.html#show_table_stats">SHOW TABLE STATS Statement</a>,
       <a class="xref" href="impala_show.html#show_column_stats">SHOW COLUMN STATS Statement</a>, <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>
     </p>
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

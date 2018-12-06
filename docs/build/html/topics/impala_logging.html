@@ -1,8 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="logging"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala Logging</title></head><body id="logging"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Impala Logging" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="logging" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Impala Logging</title>
+</head>
+<body id="logging">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Using Impala Logging</h1>
+
   
   
 
@@ -12,22 +45,27 @@
       The Impala logs record information about:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         Any errors Impala encountered. If Impala experienced a serious error during startup, you must diagnose and
         troubleshoot that problem before you can do anything further with Impala.
       </li>
 
+
       <li class="li">
         How Impala is configured.
       </li>
 
+
       <li class="li">
         Jobs Impala has completed.
       </li>
+
     </ul>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         Formerly, the logs contained the query profile for each query, showing low-level details of how the work is
         distributed among nodes and how intermediate and final results are transmitted across the network. To save
@@ -38,10 +76,12 @@
         query execution.
       </p>
 
+
       <p class="p">
         The auditing feature introduced in Impala 1.1.1 produces a separate set of audit log files when
         enabled. See <a class="xref" href="impala_auditing.html#auditing">Auditing Impala Operations</a> for details.
       </p>
+
 
       <p class="p">
         In <span class="keyword">Impala 2.9</span> and higher, you can control how many
@@ -51,19 +91,25 @@
         option for regular log files.
       </p>
 
+
       <p class="p">
         The lineage feature introduced in Impala 2.2.0 produces a separate lineage log file when
         enabled. See <a class="xref" href="impala_lineage.html#lineage">Viewing Lineage Information for Impala Data</a> for details.
       </p>
+
     </div>
+
 
     <p class="p toc inpage"></p>
 
+
   </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="logging__logs_details">
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="logs_details">
 
     <h2 class="title topictitle2" id="ariaid-title2">Locations and Names of Impala Log Files</h2>
+
 
     <div class="body conbody">
 
@@ -74,11 +120,13 @@
           <a class="xref" href="impala_processes.html#processes">Starting Impala</a>.
         </li>
 
+
         <li class="li">
           The significant files for the <code class="ph codeph">impalad</code> process are <span class="ph filepath">impalad.INFO</span>,
           <span class="ph filepath">impalad.WARNING</span>, and <span class="ph filepath">impalad.ERROR</span>. You might also see a file
           <span class="ph filepath">impalad.FATAL</span>, although this is only present in rare conditions.
         </li>
+
 
         <li class="li">
           The significant files for the <code class="ph codeph">statestored</code> process are
@@ -87,26 +135,31 @@
           although this is only present in rare conditions.
         </li>
 
+
         <li class="li">
           The significant files for the <code class="ph codeph">catalogd</code> process are <span class="ph filepath">catalogd.INFO</span>,
           <span class="ph filepath">catalogd.WARNING</span>, and <span class="ph filepath">catalogd.ERROR</span>. You might also see a file
           <span class="ph filepath">catalogd.FATAL</span>, although this is only present in rare conditions.
         </li>
 
+
         <li class="li">
           Examine the <code class="ph codeph">.INFO</code> files to see configuration settings for the processes.
         </li>
+
 
         <li class="li">
           Examine the <code class="ph codeph">.WARNING</code> files to see all kinds of problem information, including such
           things as suboptimal settings and also serious runtime errors.
         </li>
 
+
         <li class="li">
           Examine the <code class="ph codeph">.ERROR</code> and/or <code class="ph codeph">.FATAL</code> files to see only the most serious
           errors, if the processes crash, or queries fail to complete. These messages are also in the
           <code class="ph codeph">.WARNING</code> file.
         </li>
+
 
         <li class="li">
           A new set of log files is produced each time the associated daemon is restarted. These log files have
@@ -115,29 +168,35 @@
           files.
         </li>
 
+
         <li class="li">
           The init script for the <code class="ph codeph">impala-server</code> service also produces a consolidated log file
           <code class="ph codeph">/var/logs/impalad/impala-server.log</code>, with all the same information as the
           corresponding<code class="ph codeph">.INFO</code>, <code class="ph codeph">.WARNING</code>, and <code class="ph codeph">.ERROR</code> files.
         </li>
 
+
         <li class="li">
           The init script for the <code class="ph codeph">impala-state-store</code> service also produces a consolidated log file
           <code class="ph codeph">/var/logs/impalad/impala-state-store.log</code>, with all the same information as the
           corresponding<code class="ph codeph">.INFO</code>, <code class="ph codeph">.WARNING</code>, and <code class="ph codeph">.ERROR</code> files.
         </li>
+
       </ul>
+
 
       <p class="p">
         Impala stores information using the <code class="ph codeph">glog_v</code> logging system. You will see some messages
         referring to C++ file names. Logging is affected by:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           The <code class="ph codeph">GLOG_v</code> environment variable specifies which types of messages are logged. See
           <a class="xref" href="#log_levels">Setting Logging Levels</a> for details.
         </li>
+
 
         <li class="li">
           The <code class="ph codeph">--logbuflevel</code> startup flag for the <span class="keyword cmdname">impalad</span> daemon specifies how
@@ -146,15 +205,20 @@
           important messages such as informational ones are buffered in memory rather than being flushed to disk
           immediately.
         </li>
+
       </ul>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="logging__logs_managing">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="logs_managing">
 
     <h2 class="title topictitle2" id="ariaid-title3">Managing Impala Logs</h2>
+
   
 
     <div class="body conbody">
@@ -163,13 +227,17 @@
         Review Impala log files on each host, when you have traced an issue back to a specific system.
       </p>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="logging__logs_rotate">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="logs_rotate">
 
     <h2 class="title topictitle2" id="ariaid-title4">Rotating Impala Logs</h2>
+
   
 
     <div class="body conbody">
@@ -179,35 +247,72 @@
         to remove the old files if they are no longer needed.
       </p>
 
-      <p class="p">
-        Impala can automatically remove older unneeded log files, a feature known as <dfn class="term">log rotation</dfn>.
-
-      </p>
 
       <p class="p">
-        In Impala 2.2 and higher, the <code class="ph codeph">--max_log_files</code> configuration option specifies how many log
-        files to keep at each severity level. You can specify an appropriate setting for each Impala-related daemon
-        (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>, and <span class="keyword cmdname">catalogd</span>). The default
-        value is 10, meaning that Impala preserves the latest 10 log files for each severity level
-        (<code class="ph codeph">INFO</code>, <code class="ph codeph">WARNING</code>, <code class="ph codeph">ERROR</code>, and <code class="ph codeph">FATAL</code>).
-        Impala checks to see if any old logs need to be removed based on the interval specified in the
-        <code class="ph codeph">logbufsecs</code> setting, every 5 seconds by default.
+        Impala can automatically remove older unneeded log files, a feature
+        known as <dfn class="term">log rotation</dfn>.
       </p>
 
 
+      <div class="p">
+        In Impala 2.2 and higher, the <code class="ph codeph">--max_log_files</code>
+        configuration option specifies how many log files to keep at each
+        severity level (<code class="ph codeph">INFO</code>, <code class="ph codeph">WARNING</code>,
+          <code class="ph codeph">ERROR</code>, and <code class="ph codeph">FATAL</code>). You can specify
+        an appropriate setting for each Impala-related daemon
+          (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>, and
+          <span class="keyword cmdname">catalogd</span>).
+        <ul class="ul">
+          <li class="li">
+            A value of 0 preserves all log files, in which case you would set
+            up set up manual log rotation using your Linux tool or technique of
+            choice.
+          </li>
+
+          <li class="li">
+            A value of 1 preserves only the very latest log file.
+          </li>
+
+          <li class="li">
+            The default value is 10.
+          </li>
+
+        </ul>
+
+      </div>
 
       <p class="p">
-        A value of 0 preserves all log files, in which case you would set up set up manual log rotation using your
-        Linux tool or technique of choice. A value of 1 preserves only the very latest log file.
+        Impala checks to see if any old logs need to be removed based on the
+        interval specified in the <code class="ph codeph">--logbufsecs</code> setting, every 5
+        seconds by default.
       </p>
+
+      <p class="p">
+        For some log levels, Impala logs are first temporarily buffered in
+        memory and only written to disk periodically. The
+          <code class="ph codeph">--logbufsecs</code> setting controls the maximum time that
+        log messages are buffered for. For example, with the default value of 5
+        seconds, there may be up to a 5 second delay before a logged message
+        shows up in the log file.
+      </p>
+
+      <p class="p">
+        It is not recommended that you set <code class="ph codeph">--logbufsecs</code> to 0
+        as the setting makes the Impala daemon to spin in the thread that tries
+        to delete old log files.
+      </p>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="logging__logs_debug">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="logs_debug">
 
     <h2 class="title topictitle2" id="ariaid-title5">Reviewing Impala Logs</h2>
+
 
     <div class="body conbody">
 
@@ -220,22 +325,27 @@
         subsets of messages indicating potential problems.)
       </p>
 
+
       <p class="p">
         On a machine named <code class="ph codeph">impala.example.com</code> with default settings, you could view the Impala
         logs on that machine by using a browser to access <code class="ph codeph">http://impala.example.com:25000/logs</code>.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
           The web interface limits the amount of logging information displayed. To view every log entry, access the
           log files directly through the file system.
         </p>
+
       </div>
+
 
       <p class="p">
         You can view the contents of the <code class="ph codeph">impalad.INFO</code> log file in the file system. With the
         default configuration settings, the start of the log file appears as follows:
       </p>
+
 
 <pre class="pre codeblock"><code>[user@example impalad]$ pwd
 /var/log/impalad
@@ -253,18 +363,22 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
 --classpath=
 --hostname=impala.example.com</code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         The preceding example shows only a small part of the log file. Impala log files are often several megabytes
         in size.
       </div>
 
+
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="logging__log_format">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="log_format">
 
     <h2 class="title topictitle2" id="ariaid-title6">Understanding Impala Log Contents</h2>
+
 
     <div class="body conbody">
 
@@ -273,27 +387,34 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         is started and may include:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           Machine name.
         </li>
 
+
         <li class="li">
           Impala version number.
         </li>
+
 
         <li class="li">
           Flags used to start Impala.
         </li>
 
+
         <li class="li">
           CPU information.
         </li>
 
+
         <li class="li">
           The number of available disks.
         </li>
+
       </ul>
+
 
       <p class="p">
         There is information about each job Impala has run. Because each Impala job creates an additional set of
@@ -301,27 +422,35 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         information on jobs. These detailed log entries may include:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           The composition of the query.
         </li>
 
+
         <li class="li">
           The degree of data locality.
         </li>
 
+
         <li class="li">
           Statistics on data throughput and response times.
         </li>
+
       </ul>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="logging__log_levels">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="log_levels">
 
     <h2 class="title topictitle2" id="ariaid-title7">Setting Logging Levels</h2>
+
 
     <div class="body conbody">
 
@@ -331,12 +460,14 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         similar to the following on each node before starting <code class="ph codeph">impalad</code>:
       </p>
 
+
 <pre class="pre codeblock"><code>export GLOG_v=1</code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      <div class="note note"><span class="notetitle">Note:</span>
         For performance reasons, do not enable the most verbose logging level of 3 unless there is
         no other alternative for troubleshooting.
       </div>
+
 
       <p class="p">
         For more information on how to configure GLOG, including how to set variable logging levels for different
@@ -344,7 +475,8 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         <a class="xref" href="https://github.com/google/glog" target="_blank">documentation for the glog project on github</a>.
       </p>
 
-      <section class="section" id="log_levels__loglevels_details"><h3 class="title sectiontitle">Understanding What is Logged at Different Logging Levels</h3>
+
+      <div class="section" id="log_levels__loglevels_details"><h3 class="title sectiontitle">Understanding What is Logged at Different Logging Levels</h3>
 
         
 
@@ -353,15 +485,18 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
           records everything GLOG_v=1 records, as well as additional information.
         </p>
 
+
         <p class="p">
           Increasing logging levels imposes performance overhead and increases log size. Where practical, use
           GLOG_v=1 for most cases: this level has minimal performance impact but still captures useful
           troubleshooting information.
         </p>
 
+
         <p class="p">
           Additional information logged at each level is as follows:
         </p>
+
 
         <ul class="ul">
           <li class="li">
@@ -369,10 +504,12 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
             <code class="ph codeph">impalad</code> instance, including runtime profiles.
           </li>
 
+
           <li class="li">
             GLOG_v=2 - Everything from the previous level plus information for each RPC initiated. This level also
             records query execution progress information, including details on each file that is read.
           </li>
+
 
           <li class="li">
             GLOG_v=3 - Everything from the previous level plus logging of every row that is read. This level is
@@ -380,17 +517,23 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
             exceptionally large and detailed log files, potentially leading to its own set of performance and
             capacity problems.
           </li>
+
         </ul>
 
-      </section>
+
+      </div>
+
 
     </div>
 
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="logging__redaction">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="redaction">
 
     <h2 class="title topictitle2" id="ariaid-title8">Redacting Sensitive Information from Impala Log Files</h2>
+
     
 
     <div class="body conbody">
@@ -404,6 +547,7 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         they would normally be recorded in log files or displayed in administration or debugging user interfaces.
       </p>
 
+
       <p class="p">
         In a security context, the log redaction feature is complementary to the Sentry authorization framework.
         Sentry prevents unauthorized users from being able to directly access table data. Redaction prevents
@@ -411,13 +555,18 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         information (PII) that might appear in queries issued by those authorized users.
       </p>
 
+
       <p class="p">
         See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details about how to enable this feature and set
         up the regular expressions to detect and redact sensitive information within SQL statement text.
       </p>
 
+
     </div>
 
-  </article>
 
-</article></main></body></html>
+  </div>
+
+
+</body>
+</html>

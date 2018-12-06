@@ -1,8 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admission.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_timeouts.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_proxy.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_disk_space.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="admin"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Administration</title></head><body id="admin"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Administration" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admission.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_timeouts.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_proxy.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_disk_space.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="admin" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Administration</title>
+</head>
+<body id="admin">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Administration</h1>
+
   
   
 
@@ -15,11 +39,14 @@
       such as HDFS or even the hardware of the cluster itself to resolve or avoid problems.
     </p>
 
+
     <p class="p toc"></p>
+
 
     <p class="p">
       <strong class="ph b">Related tasks:</strong>
     </p>
+
 
     <p class="p">
       As an administrator, you can expect to perform installation, upgrade, and configuration tasks for Impala on
@@ -27,9 +54,11 @@
       <a class="xref" href="impala_upgrading.html#upgrading">Upgrading Impala</a>, and <a class="xref" href="impala_config.html#config">Managing Impala</a> for details.
     </p>
 
+
     <p class="p">
       For security tasks typically performed by administrators, see <a class="xref" href="impala_security.html#security">Impala Security</a>.
     </p>
+
 
     <div class="p">
       Administrators also decide how to allocate cluster resources so that all Hadoop components can run smoothly
@@ -40,13 +69,32 @@
           control feature. See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for details.
         </li>
 
+
         <li class="li">
           Dividing cluster resources such as memory between Impala and other components, using YARN for overall
           resource management, and Llama to mediate resource requests from Impala to YARN. See
           <a class="xref" href="impala_resource_management.html#resource_management">Resource Management for Impala</a> for details.
         </li>
+
       </ul>
+
     </div>
 
+
   </div>
-<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_admission.html">Admission Control and Query Queuing</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_resource_management.html">Resource Management for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_timeouts.html">Setting Timeout Periods for Daemons, Queries, and Sessions</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_proxy.html">Using Impala through a Proxy for High Availability</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_disk_space.html">Managing Disk Space for Impala Data</a></strong><br></li></ul></nav></article></main></body></html>
+
+<div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_admission.html">Admission Control and Query Queuing</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_resource_management.html">Resource Management for Impala</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_timeouts.html">Setting Timeout Periods for Daemons, Queries, and Sessions</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_proxy.html">Using Impala through a Proxy for High Availability</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_disk_space.html">Managing Disk Space for Impala Data</a></strong><br />
+</li>
+</ul>
+</div></body>
+</html>

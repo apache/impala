@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="perf_cookbook"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Performance Guidelines and Best Practices</title></head><body id="perf_cookbook"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Performance Guidelines and Best Practices" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="perf_cookbook" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Performance Guidelines and Best Practices</title>
+</head>
+<body id="perf_cookbook">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Performance Guidelines and Best Practices</h1>
+
   
   
 
@@ -15,9 +35,11 @@
       emphasize which performance techniques typically provide the highest return on investment
     </p>
 
+
     <p class="p toc inpage"></p>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_file_format"><h2 class="title sectiontitle">Choose the appropriate file format for the data.</h2>
+
+    <div class="section" id="perf_cookbook__perf_cookbook_file_format"><h2 class="title sectiontitle">Choose the appropriate file format for the data</h2>
 
       
 
@@ -29,16 +51,19 @@
         Parquet file format.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         For smaller volumes of data, a few gigabytes or less for each table or partition, you might not see
         significant performance differences between file formats. At small data volumes, reduced I/O from an
         efficient compressed file format can be counterbalanced by reduced opportunity for parallel execution. When
         planning for a production deployment or conducting benchmarks, always use realistic data volumes to get a
         true picture of performance and scalability.
       </div>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_small_files"><h2 class="title sectiontitle">Avoid data ingestion processes that produce many small files.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_small_files"><h2 class="title sectiontitle">Avoid data ingestion processes that produce many small files</h2>
 
       
 
@@ -50,12 +75,14 @@
         that and skip the conversion step inside Impala.
       </p>
 
+
       <p class="p">
         Always use <code class="ph codeph">INSERT ... SELECT</code> to copy significant volumes of data from table to table
         within Impala. Avoid <code class="ph codeph">INSERT ... VALUES</code> for any substantial volume of data or
         performance-critical tables, because each such statement produces a separate tiny data file. See
         <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> for examples of the <code class="ph codeph">INSERT ... SELECT</code> syntax.
       </p>
+
 
       <p class="p">
         For example, if you have thousands of partitions in a Parquet table, each with less than
@@ -65,9 +92,11 @@
         SELECT</code> to copy all the data to a different table; the data will be reorganized into a smaller
         number of larger files by this process.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_partitioning"><h2 class="title sectiontitle">Choose partitioning granularity based on actual data volume.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_partitioning"><h2 class="title sectiontitle">Choose partitioning granularity based on actual data volume</h2>
 
       
 
@@ -78,6 +107,7 @@
         data, potentially yielding a huge savings in disk I/O.
       </p>
 
+
       <p class="p">
         When deciding which column(s) to use for partitioning, choose the right level of granularity. For example,
         should you partition by year, month, and day, or only by year and month? Choose a partitioning strategy
@@ -85,10 +115,12 @@
         HDFS bulk I/O and Impala distributed queries.
       </p>
 
+
       <p class="p">
         Over-partitioning can also cause query planning to take longer than necessary, as Impala prunes the
         unnecessary partitions. Ideally, keep the number of partitions in the table under 30 thousand.
       </p>
+
 
       <p class="p">
         When preparing data files to go in a partition directory, create several large files rather than many small
@@ -98,6 +130,7 @@
         cluster).
       </p>
 
+
       <p class="p">
         If you need to reduce the overall number of partitions and increase the amount of data in each partition,
         first look for partition key columns that are rarely referenced or are referenced in non-critical queries
@@ -105,6 +138,7 @@
         hour, but if most queries roll up the results by day, perhaps you only need to partition by year, month,
         and day.
       </p>
+
 
       <p class="p">
         If you need to reduce the granularity even more, consider creating <span class="q">"buckets"</span>, computed values
@@ -114,13 +148,16 @@
         <a class="xref" href="impala_datetime_functions.html#datetime_functions">Impala Date and Time Functions</a> for details.
       </p>
 
+
       <p class="p">
         See <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a> for full details and performance considerations for
         partitioning.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_partition_keys"><h2 class="title sectiontitle">Use smallest appropriate integer types for partition key columns.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_partition_keys"><h2 class="title sectiontitle">Use smallest appropriate integer types for partition key columns</h2>
 
       
 
@@ -134,9 +171,11 @@
         <code class="ph codeph">TIMESTAMP</code> value, and <code class="ph codeph">CAST()</code> the return value to the appropriate integer
         type.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_parquet_block_size"><h2 class="title sectiontitle">Choose an appropriate Parquet block size.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_parquet_block_size"><h2 class="title sectiontitle">Choose an appropriate Parquet block size</h2>
 
       
 
@@ -146,11 +185,13 @@
         conservative estimates about compression, resulting in files that were smaller than 1 GB.)
       </p>
 
+
       <p class="p">
         Each Parquet file written by Impala is a single block, allowing the whole file to be processed as a unit by a single host.
         As you copy Parquet files into HDFS or between HDFS filesystems, use <code class="ph codeph">hdfs dfs -pb</code> to preserve the original
         block size.
       </p>
+
 
       <p class="p">
         If there is only one or a few data block in your Parquet table, or in a partition that is the only one
@@ -165,9 +206,11 @@
         gigabytes.)</span> Run benchmarks with different file sizes to find the right balance point for your
         particular data volume.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_stats"><h2 class="title sectiontitle">Gather statistics for all tables used in performance-critical or high-volume join queries.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_stats"><h2 class="title sectiontitle">Gather statistics for all tables used in performance-critical or high-volume join queries</h2>
 
       
 
@@ -175,15 +218,18 @@
         Gather the statistics with the <code class="ph codeph">COMPUTE STATS</code> statement. See
         <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a> for details.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_network"><h2 class="title sectiontitle">Minimize the overhead of transmitting results back to the client.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_network"><h2 class="title sectiontitle">Minimize the overhead of transmitting results back to the client</h2>
 
       
 
       <p class="p">
         Use techniques such as:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -194,10 +240,12 @@
           unaggregated result set could be huge, requiring substantial time to transmit across the network.
         </li>
 
+
         <li class="li">
           Filtering. Use all applicable tests in the <code class="ph codeph">WHERE</code> clause of a query to eliminate rows
           that are not relevant, rather than producing a big result set and filtering it using application logic.
         </li>
+
 
         <li class="li">
           <code class="ph codeph">LIMIT</code> clause. If you only need to see a few sample values from a result set, or the top
@@ -205,6 +253,7 @@
           to reduce the size of the result set rather than asking for the full result set and then throwing most of
           the rows away.
         </li>
+
 
         <li class="li">
           Avoid overhead from pretty-printing the result set and displaying it on the screen. When you retrieve the
@@ -215,10 +264,13 @@
           <a class="xref" href="impala_shell_options.html#shell_options">impala-shell Configuration Options</a> for details about the
           <span class="keyword cmdname">impala-shell</span> command-line options.
         </li>
-      </ul>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_explain"><h2 class="title sectiontitle">Verify that your queries are planned in an efficient logical manner.</h2>
+      </ul>
+
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_explain"><h2 class="title sectiontitle">Verify that your queries are planned in an efficient logical manner</h2>
 
       
 
@@ -227,9 +279,11 @@
         <a class="xref" href="impala_explain.html#explain">EXPLAIN Statement</a> and <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for
         details.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_profile"><h2 class="title sectiontitle">Verify performance characteristics of queries.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_profile"><h2 class="title sectiontitle">Verify performance characteristics of queries</h2>
 
       
 
@@ -238,9 +292,11 @@
         within expected ranges by examining the query profile for a query after running it. See
         <a class="xref" href="impala_explain_plan.html#perf_profile">Using the Query Profile for Performance Tuning</a> for details.
       </p>
-    </section>
 
-    <section class="section" id="perf_cookbook__perf_cookbook_os"><h2 class="title sectiontitle">Use appropriate operating system settings.</h2>
+    </div>
+
+
+    <div class="section" id="perf_cookbook__perf_cookbook_os"><h2 class="title sectiontitle">Use appropriate operating system settings</h2>
 
       
 
@@ -250,7 +306,95 @@
         that changing the <code class="ph codeph">vm.swappiness</code> Linux kernel setting to a non-zero value improves
         overall performance.
       </p>
-    </section>
+
+    </div>
+
+    <div class="section" id="perf_cookbook__perf_cookbook_hotspot"><h2 class="title sectiontitle">Hotspot analysis</h2>
+
+
+      <p class="p">
+        In the context of Impala, a hotspot is defined as “an Impala daemon
+        that for a single query or a workload is spending a far greater amount
+        of time processing data relative to its neighbours”.
+      </p>
+
+
+      <p class="p">
+        Before discussing the options to tackle this issue some background is
+        first required to understand how this problem can occur.
+      </p>
+
+
+      <p class="p">
+        By default, the scheduling of scan based plan fragments is
+        deterministic. This means that for multiple queries needing to read the
+        same block of data, the same node will be picked to host the scan. The
+        default scheduling logic does not take into account node workload from
+        prior queries. The complexity of materializing a tuple depends on a few
+        factors, namely: decoding and decompression. If the tuples are densely
+        packed into data pages due to good encoding/compression ratios, there
+        will be more work required when reconstructing the data. Each
+        compression codec offers different performance tradeoffs and should be
+        considered before writing the data. Due to the deterministic nature of
+        the scheduler, single nodes can become bottlenecks for highly concurrent
+        queries that use the same tables.
+      </p>
+
+
+      <p class="p">
+        If, for example, a Parquet based dataset is tiny, e.g. a small
+        dimension table, such that it fits into a single HDFS block (Impala by
+        default will create 256 MB blocks when Parquet is used, each containing
+        a single row group) then there are a number of options that can be
+        considered to resolve the potential scheduling hotspots when querying
+        this data:
+      </p>
+
+
+      <ul class="ul">
+        <li class="li">
+          In <span class="keyword">Impala 2.5</span> and higher, the scheduler’s
+          deterministic behaviour can be changed using the following query
+          options: <code class="ph codeph">REPLICA_PREFERENCE</code> and
+            <code class="ph codeph">RANDOM_REPLICA</code>. For a detailed description of each
+          of these modes see <span class="keyword">IMPALA-2696</span>.
+        </li>
+
+
+        <li class="li">
+          HDFS caching can be used to cache block replicas. This will cause
+          the Impala scheduler to randomly pick (from <span class="keyword">Impala 2.2</span> and higher) a node that is hosting a cached block replica for the
+          scan. Note, although HDFS caching has benefits, it serves only to help
+          with the reading of raw block data and not cached tuple data, but with
+          the right number of cached replicas (by default, HDFS only caches one
+          replica), even load distribution can be achieved for smaller
+          datasets.
+        </li>
+
+
+        <li class="li">
+          Do not compress the table data. The uncompressed table data spans more
+          nodes and eliminates skew caused by compression.
+        </li>
+
+
+        <li class="li">
+          Reduce the Parquet file size via the
+            <code class="ph codeph">PARQUET_FILE_SIZE</code> query option when writing the
+          table data. Using this approach the data will span more nodes. However
+          it’s not recommended to drop the size below 32 MB.
+        </li>
+
+      </ul>
+
+    </div>
+
 
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div>
+</div>
+</div></body>
+</html>

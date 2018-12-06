@@ -1,89 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="bit_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Bit Functions</title></head><body id="bit_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Bit Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="bit_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Bit Functions</title>
+</head>
+<body id="bit_functions">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Bit Functions</h1>
+
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      Bit manipulation functions perform bitwise operations involved in scientific processing or computer science algorithms.
-      For example, these functions include setting, clearing, or testing bits within an integer value, or changing the
-      positions of bits with or without wraparound.
+      Bit manipulation functions perform bitwise operations involved in scientific processing or
+      computer science algorithms. For example, these functions include setting, clearing, or
+      testing bits within an integer value, or changing the positions of bits with or without
+      wraparound.
     </p>
 
-    <p class="p">
-      If a function takes two integer arguments that are required to be of the same type, the smaller argument is promoted
-      to the type of the larger one if required. For example, <code class="ph codeph">BITAND(1,4096)</code> treats both arguments as
-      <code class="ph codeph">SMALLINT</code>, because 1 can be represented as a <code class="ph codeph">TINYINT</code> but 4096 requires a <code class="ph codeph">SMALLINT</code>.
-    </p>
 
     <p class="p">
-     Remember that all Impala integer values are signed. Therefore, when dealing with binary values where the most significant
-     bit is 1, the specified or returned values might be negative when represented in base 10.
+      If a function takes two integer arguments that are required to be of the same type, the
+      smaller argument is promoted to the type of the larger one if required. For example,
+      <code class="ph codeph">BITAND(1,4096)</code> treats both arguments as <code class="ph codeph">SMALLINT</code>,
+      because 1 can be represented as a <code class="ph codeph">TINYINT</code> but 4096 requires a
+      <code class="ph codeph">SMALLINT</code>.
     </p>
 
+
     <p class="p">
-      Whenever any argument is <code class="ph codeph">NULL</code>, either the input value, bit position, or number of shift or rotate positions,
-      the return value from any of these functions is also <code class="ph codeph">NULL</code>
+      Remember that all Impala integer values are signed. Therefore, when dealing with binary
+      values where the most significant bit is 1, the specified or returned values might be
+      negative when represented in base 10.
     </p>
+
+
+    <p class="p">
+      Whenever any argument is <code class="ph codeph">NULL</code>, either the input value, bit position, or
+      number of shift or rotate positions, the return value from any of these functions is also
+      <code class="ph codeph">NULL</code>
+    </p>
+
 
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
     <p class="p">
-      The bit functions operate on all the integral data types: <a class="xref" href="impala_int.html#int">INT Data Type</a>,
-      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, and
+      The bit functions operate on all the integral data types:
+      <a class="xref" href="impala_int.html#int">INT Data Type</a>, <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
+      <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, and
       <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>.
     </p>
+
 
     <p class="p">
       <strong class="ph b">Function reference:</strong>
     </p>
+
 
     <p class="p">
       Impala supports the following bit functions:
     </p>
 
 
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="#bit_functions__bitand">BITAND</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__bitnot">BITNOT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__bitor">BITOR</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__bitxor">BITXOR</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__countset">COUNTSET</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__getbit">GETBIT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__rotateleft">ROTATELEFT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__rotateright">ROTATERIGHT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__setbit">SETBIT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__shiftleft">SHIFTLEFT</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#bit_functions__shiftright">SHIFTRIGHT</a>
+      </li>
+
+    </ul>
+
 
     <dl class="dl">
-
       
 
         <dt class="dt dlterm" id="bit_functions__bitand">
-          <code class="ph codeph">bitand(integer_type a, same_type b)</code>
+          BITAND(integer_type a, same_type b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in both of the arguments.
-          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in
+          both of the arguments. If the arguments are of different sizes, the smaller is
+          promoted to the type of the larger.
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">bitand()</code> function is equivalent to the <code class="ph codeph">&amp;</code> binary operator.
+            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">BITAND()</code> function is equivalent to the
+            <code class="ph codeph">&amp;</code> binary operator.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples show the results of ANDing integer values.
-            255 contains all 1 bits in its lowermost 7 bits.
-            32767 contains all 1 bits in its lowermost 15 bits.
-            
-            You can use the <code class="ph codeph">bin()</code> function to check the binary representation of any
-            integer value, although the result is always represented as a 64-bit value.
-            If necessary, the smaller argument is promoted to the
-            type of the larger one.
+            The following examples show the results of ANDing integer values. 255 contains all 1
+            bits in its lowermost 7 bits. 32767 contains all 1 bits in its lowermost 15 bits.
+
+            You can use the <code class="ph codeph">BIN()</code> function to check the binary representation
+            of any integer value, although the result is always represented as a 64-bit value.
+            If necessary, the smaller argument is promoted to the type of the larger one.
           </p>
+
 <pre class="pre codeblock"><code>select bitand(255, 32767); /* 0000000011111111 &amp; 0111111111111111 */
 +--------------------+
 | bitand(255, 32767) |
@@ -121,35 +221,46 @@ select bitand(-1,15); /* 11111111 &amp; 00001111 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__bitnot">
-          <code class="ph codeph">bitnot(integer_type a)</code>
+          BITNOT(integer_type a)
         </dt>
 
+
         <dd class="dd">
-          
           <strong class="ph b">Purpose:</strong> Inverts all the bits of the input argument.
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">bitnot()</code> function is equivalent to the <code class="ph codeph">~</code> unary operator.
+            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">BITNOT()</code> function is equivalent to the
+            <code class="ph codeph">~</code> unary operator.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            These examples illustrate what happens when you flip all the bits of an integer value.
-            The sign always changes. The decimal representation is one different between the positive and
-            negative values.
-            
+            These examples illustrate what happens when you flip all the bits of an integer
+            value. The sign always changes. The decimal representation is one different between
+            the positive and negative values.
+
           </p>
+
 <pre class="pre codeblock"><code>select bitnot(127); /* 01111111 -&gt; 10000000 */
 +-------------+
 | bitnot(127) |
@@ -180,33 +291,45 @@ select bitnot(-128); /* 10000000 -&gt; 01111111 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__bitor">
-          <code class="ph codeph">bitor(integer_type a, same_type b)</code>
+          BITOR(integer_type a, same_type b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in either of the arguments.
-          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in
+          either of the arguments. If the arguments are of different sizes, the smaller is
+          promoted to the type of the larger.
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">bitor()</code> function is equivalent to the <code class="ph codeph">|</code> binary operator.
+            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">BITOR()</code> function is equivalent to the
+            <code class="ph codeph">|</code> binary operator.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
             The following examples show the results of ORing integer values.
           </p>
+
 <pre class="pre codeblock"><code>select bitor(1,4); /* 00000001 | 00000100 */
 +-------------+
 | bitor(1, 4) |
@@ -230,36 +353,49 @@ select bitor(0,7); /* 00000000 | 00000111 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__bitxor">
-          <code class="ph codeph">bitxor(integer_type a, same_type b)</code>
+          BITXOR(integer_type a, same_type b)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in one but not both of the arguments.
-          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <strong class="ph b">Purpose:</strong> Returns an integer value representing the bits that are set to 1 in
+          one but not both of the arguments. If the arguments are of different sizes, the
+          smaller is promoted to the type of the larger.
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">bitxor()</code> function is equivalent to the <code class="ph codeph">^</code> binary operator.
+            <strong class="ph b">Usage notes:</strong> The <code class="ph codeph">BITXOR()</code> function is equivalent to the
+            <code class="ph codeph">^</code> binary operator.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
-            The following examples show the results of XORing integer values.
-            XORing a non-zero value with zero returns the non-zero value.
-            XORing two identical values returns zero, because all the 1 bits from the first argument are also 1 bits in the second argument.
-            XORing different non-zero values turns off some bits and leaves others turned on, based on whether the same bit is set in both arguments.
+            The following examples show the results of XORing integer values. XORing a non-zero
+            value with zero returns the non-zero value. XORing two identical values returns
+            zero, because all the 1 bits from the first argument are also 1 bits in the second
+            argument. XORing different non-zero values turns off some bits and leaves others
+            turned on, based on whether the same bit is set in both arguments.
           </p>
+
 <pre class="pre codeblock"><code>select bitxor(0,15); /* 00000000 ^ 00001111 */
 +---------------+
 | bitxor(0, 15) |
@@ -290,38 +426,51 @@ select bitxor(3,7); /* 00000011 ^ 00000111 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__countset">
-          <code class="ph codeph">countset(integer_type a [, int zero_or_one])</code>
+          COUNTSET(integer_type a [, INT zero_or_one])
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> By default, returns the number of 1 bits in the specified integer value.
-          If the optional second argument is set to zero, it returns the number of 0 bits instead.
+          <strong class="ph b">Purpose:</strong> By default, returns the number of 1 bits in the specified integer
+          value. If the optional second argument is set to zero, it returns the number of 0 bits
+          instead.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
             In discussions of information theory, this operation is referred to as the
-            <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Hamming_weight" target="_blank">population count</a>"</span>
-            or <span class="q">"popcount"</span>.
+            <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Hamming_weight" target="_blank">population
+            count</a>"</span> or <span class="q">"popcount"</span>.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
             The following examples show how to count the number of 1 bits in an integer value.
           </p>
+
 <pre class="pre codeblock"><code>select countset(1); /* 00000001 */
 +-------------+
 | countset(1) |
@@ -366,41 +515,52 @@ select countset(7,0); /* 00000111 = 5 0 bits; third argument can only be 0 or 1 
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__getbit">
-          <code class="ph codeph">getbit(integer_type a, int position)</code>
+          GETBIT(integer_type a, INT position)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Returns a 0 or 1 representing the bit at a
-          specified position. The positions are numbered right to left, starting at zero.
-          The position argument cannot be negative.
+          <strong class="ph b">Purpose:</strong> Returns a 0 or 1 representing the bit at a specified position. The
+          positions are numbered right to left, starting at zero. The position argument cannot
+          be negative.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            When you use a literal input value, it is treated as an 8-bit, 16-bit,
-            and so on value, the smallest type that is appropriate.
-            The type of the input value limits the range of the positions.
-            Cast the input value to the appropriate type if you need to
+            When you use a literal input value, it is treated as an 8-bit, 16-bit, and so on
+            value, the smallest type that is appropriate. The type of the input value limits the
+            range of the positions. Cast the input value to the appropriate type if you need to
             ensure it is treated as a 64-bit, 32-bit, and so on value.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
+
           <p class="p">
             The following examples show how to test a specific bit within an integer value.
           </p>
+
 <pre class="pre codeblock"><code>select getbit(1,0); /* 00000001 */
 +--------------+
 | getbit(1, 0) |
@@ -448,47 +608,55 @@ select getbit(cast(-1 as int),25); /* 11111111111111111111111111111111 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__rotateleft">
-          <code class="ph codeph">rotateleft(integer_type a, int positions)</code>
+          ROTATELEFT(integer_type a, INT positions)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Rotates an integer value left by a specified number of bits.
-          As the most significant bit is taken out of the original value,
-          if it is a 1 bit, it is <span class="q">"rotated"</span> back to the least significant bit.
-          Therefore, the final value has the same number of 1 bits as the original value,
-          just in different positions.
-          In computer science terms, this operation is a
-          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Circular_shift" target="_blank">circular shift</a>"</span>.
+          <strong class="ph b">Purpose:</strong> Rotates an integer value left by a specified number of bits. As the
+          most significant bit is taken out of the original value, if it is a 1 bit, it is
+          <span class="q">"rotated"</span> back to the least significant bit. Therefore, the final value has the
+          same number of 1 bits as the original value, just in different positions. In computer
+          science terms, this operation is a
+          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Circular_shift" target="_blank">circular
+          shift</a>"</span>.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Specifying a second argument of zero leaves the original value unchanged.
-            Rotating a -1 value by any number of positions still returns -1,
-            because the original value has all 1 bits and all the 1 bits are
-            preserved during rotation.
-            Similarly, rotating a 0 value by any number of positions still returns 0.
-            Rotating a value by the same number of bits as in the value returns the same value.
-            Because this is a circular operation, the number of positions is not limited
-            to the number of bits in the input value.
-            For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns an
-            identical result in each case.
+            Specifying a second argument of zero leaves the original value unchanged. Rotating a
+            -1 value by any number of positions still returns -1, because the original value has
+            all 1 bits and all the 1 bits are preserved during rotation. Similarly, rotating a 0
+            value by any number of positions still returns 0. Rotating a value by the same
+            number of bits as in the value returns the same value. Because this is a circular
+            operation, the number of positions is not limited to the number of bits in the input
+            value. For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns
+            an identical result in each case.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>select rotateleft(1,4); /* 00000001 -&gt; 00010000 */
 +------------------+
 | rotateleft(1, 4) |
@@ -520,47 +688,55 @@ select rotateleft(-127,3); /* 10000001 -&gt; 00001100 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__rotateright">
-          <code class="ph codeph">rotateright(integer_type a, int positions)</code>
+          ROTATERIGHT(integer_type a, INT positions)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Rotates an integer value right by a specified number of bits.
-          As the least significant bit is taken out of the original value,
-          if it is a 1 bit, it is <span class="q">"rotated"</span> back to the most significant bit.
-          Therefore, the final value has the same number of 1 bits as the original value,
-          just in different positions.
-          In computer science terms, this operation is a
-          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Circular_shift" target="_blank">circular shift</a>"</span>.
+          <strong class="ph b">Purpose:</strong> Rotates an integer value right by a specified number of bits. As the
+          least significant bit is taken out of the original value, if it is a 1 bit, it is
+          <span class="q">"rotated"</span> back to the most significant bit. Therefore, the final value has the
+          same number of 1 bits as the original value, just in different positions. In computer
+          science terms, this operation is a
+          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Circular_shift" target="_blank">circular
+          shift</a>"</span>.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            Specifying a second argument of zero leaves the original value unchanged.
-            Rotating a -1 value by any number of positions still returns -1,
-            because the original value has all 1 bits and all the 1 bits are
-            preserved during rotation.
-            Similarly, rotating a 0 value by any number of positions still returns 0.
-            Rotating a value by the same number of bits as in the value returns the same value.
-            Because this is a circular operation, the number of positions is not limited
-            to the number of bits in the input value.
-            For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns an
-            identical result in each case.
+            Specifying a second argument of zero leaves the original value unchanged. Rotating a
+            -1 value by any number of positions still returns -1, because the original value has
+            all 1 bits and all the 1 bits are preserved during rotation. Similarly, rotating a 0
+            value by any number of positions still returns 0. Rotating a value by the same
+            number of bits as in the value returns the same value. Because this is a circular
+            operation, the number of positions is not limited to the number of bits in the input
+            value. For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns
+            an identical result in each case.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>select rotateright(16,4); /* 00010000 -&gt; 00000001 */
 +--------------------+
 | rotateright(16, 4) |
@@ -591,44 +767,51 @@ select rotateright(-127,3); /* 10000001 -&gt; 00110000 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__setbit">
-          <code class="ph codeph">setbit(integer_type a, int position [, int zero_or_one])</code>
+          SETBIT(integer_type a, INT position [, INT zero_or_one])
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> By default, changes a bit at a specified position to a 1, if it is not already.
-          If the optional third argument is set to zero, the specified bit is set to 0 instead.
+          <strong class="ph b">Purpose:</strong> By default, changes a bit at a specified position to a 1, if it is not
+          already. If the optional third argument is set to zero, the specified bit is set to 0
+          instead.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
-          If the bit at the specified position was already 1 (by default)
-          or 0 (with a third argument of zero), the return value is
-          the same as the first argument.
-          The positions are numbered right to left, starting at zero.
-          (Therefore, the return value could be different from the first argument
-          even if the position argument is zero.)
-          The position argument cannot be negative.
+
+          If the bit at the specified position was already 1 (by default) or 0 (with a third
+          argument of zero), the return value is the same as the first argument. The positions
+          are numbered right to left, starting at zero. (Therefore, the return value could be
+          different from the first argument even if the position argument is zero.) The position
+          argument cannot be negative.
           <p class="p">
-            When you use a literal input value, it is treated as an 8-bit, 16-bit,
-            and so on value, the smallest type that is appropriate.
-            The type of the input value limits the range of the positions.
-            Cast the input value to the appropriate type if you need to
+            When you use a literal input value, it is treated as an 8-bit, 16-bit, and so on
+            value, the smallest type that is appropriate. The type of the input value limits the
+            range of the positions. Cast the input value to the appropriate type if you need to
             ensure it is treated as a 64-bit, 32-bit, and so on value.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>select setbit(0,0); /* 00000000 -&gt; 00000001 */
 +--------------+
 | setbit(0, 0) |
@@ -683,46 +866,58 @@ select setbit(7,2,0); /* 00000111 -&gt; 00000011; third argument of 0 clears ins
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__shiftleft">
-          <code class="ph codeph">shiftleft(integer_type a, int positions)</code>
+          SHIFTLEFT(integer_type a, INT positions)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Shifts an integer value left by a specified number of bits.
-          As the most significant bit is taken out of the original value,
-          it is discarded and the least significant bit becomes 0.
-          In computer science terms, this operation is a <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Logical_shift" target="_blank">logical shift</a>"</span>.
+          <strong class="ph b">Purpose:</strong> Shifts an integer value left by a specified number of bits. As the
+          most significant bit is taken out of the original value, it is discarded and the least
+          significant bit becomes 0. In computer science terms, this operation is a
+          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Logical_shift" target="_blank">logical
+          shift</a>"</span>.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-            The final value has either the same number of 1 bits as the original value, or fewer.
-            Shifting an 8-bit value by 8 positions, a 16-bit value by 16 positions, and so on produces
-            a result of zero.
+            The final value has either the same number of 1 bits as the original value, or
+            fewer. Shifting an 8-bit value by 8 positions, a 16-bit value by 16 positions, and
+            so on produces a result of zero.
           </p>
+
+
           <p class="p">
-            Specifying a second argument of zero leaves the original value unchanged.
-            Shifting any value by 0 returns the original value.
-            Shifting any value by 1 is the same as multiplying it by 2,
-            as long as the value is small enough; larger values eventually
-            become negative when shifted, as the sign bit is set.
-            Starting with the value 1 and shifting it left by N positions gives
-            the same result as 2 to the Nth power, or <code class="ph codeph">pow(2,<var class="keyword varname">N</var>)</code>.
+            Specifying a second argument of zero leaves the original value unchanged. Shifting
+            any value by 0 returns the original value. Shifting any value by 1 is the same as
+            multiplying it by 2, as long as the value is small enough; larger values eventually
+            become negative when shifted, as the sign bit is set. Starting with the value 1 and
+            shifting it left by N positions gives the same result as 2 to the Nth power, or
+            <code class="ph codeph">POW(2,<var class="keyword varname">N</var>)</code>.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>select shiftleft(1,0); /* 00000001 -&gt; 00000001 */
 +-----------------+
 | shiftleft(1, 0) |
@@ -767,43 +962,55 @@ select shiftleft(-1,4); /* 11111111 -&gt; 11110000 */
 </code></pre>
         </dd>
 
+
       
 
       
 
         <dt class="dt dlterm" id="bit_functions__shiftright">
-          <code class="ph codeph">shiftright(integer_type a, int positions)</code>
+          SHIFTRIGHT(integer_type a, INT positions)
         </dt>
 
+
         <dd class="dd">
-          
-          <strong class="ph b">Purpose:</strong> Shifts an integer value right by a specified number of bits.
-          As the least significant bit is taken out of the original value,
-          it is discarded and the most significant bit becomes 0.
-          In computer science terms, this operation is a <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Logical_shift" target="_blank">logical shift</a>"</span>.
+          <strong class="ph b">Purpose:</strong> Shifts an integer value right by a specified number of bits. As the
+          least significant bit is taken out of the original value, it is discarded and the most
+          significant bit becomes 0. In computer science terms, this operation is a
+          <span class="q">"<a class="xref" href="https://en.wikipedia.org/wiki/Logical_shift" target="_blank">logical
+          shift</a>"</span>.
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
+
           <p class="p">
-          Therefore, the final value has either the same number of 1 bits as the original value, or fewer.
-          Shifting an 8-bit value by 8 positions, a 16-bit value by 16 positions, and so on produces
-          a result of zero.
+            Therefore, the final value has either the same number of 1 bits as the original
+            value, or fewer. Shifting an 8-bit value by 8 positions, a 16-bit value by 16
+            positions, and so on produces a result of zero.
           </p>
+
+
           <p class="p">
-            Specifying a second argument of zero leaves the original value unchanged.
-            Shifting any value by 0 returns the original value.
-            Shifting any positive value right by 1 is the same as dividing it by 2.
-            Negative values become positive when shifted right.
+            Specifying a second argument of zero leaves the original value unchanged. Shifting
+            any value by 0 returns the original value. Shifting any positive value right by 1 is
+            the same as dividing it by 2. Negative values become positive when shifted right.
           </p>
+
+
           <p class="p">
         <strong class="ph b">Return type:</strong> Same as the input value
       </p>
+
+
           <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
+
+
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 <pre class="pre codeblock"><code>select shiftright(16,0); /* 00010000 -&gt; 00010000 */
 +-------------------+
 | shiftright(16, 0) |
@@ -841,8 +1048,17 @@ select shiftright(-1,5); /* 11111111 -&gt; 00000111 */
 </code></pre>
         </dd>
 
-      
+
 
     </dl>
+
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div></body>
+</html>

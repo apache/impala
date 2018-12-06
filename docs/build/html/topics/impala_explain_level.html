@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="explain_level"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>EXPLAIN_LEVEL Query Option</title></head><body id="explain_level"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="EXPLAIN_LEVEL Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="explain_level" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>EXPLAIN_LEVEL Query Option</title>
+</head>
+<body id="explain_level">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">EXPLAIN_LEVEL Query Option</h1>
+
   
   
 
@@ -17,21 +37,26 @@
       <code class="ph codeph">WHERE</code> clauses are implemented within a distributed query.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Type:</strong> <code class="ph codeph">STRING</code> or <code class="ph codeph">INT</code>
     </p>
+
 
     <p class="p">
       <strong class="ph b">Default:</strong> <code class="ph codeph">1</code>
     </p>
 
+
     <p class="p">
       <strong class="ph b">Arguments:</strong>
     </p>
 
+
     <p class="p">
       The allowed range of numeric values for this option is 0 to 3:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -40,10 +65,12 @@
         long to read easily.
       </li>
 
+
       <li class="li">
         <code class="ph codeph">1</code> or <code class="ph codeph">STANDARD</code>: The default level of detail, showing the logical way that
         work is split up for the distributed query.
       </li>
+
 
       <li class="li">
         <code class="ph codeph">2</code> or <code class="ph codeph">EXTENDED</code>: Includes additional detail about how the query planner
@@ -51,21 +78,25 @@
         statistics, using query hints, adding or removing predicates, and so on.
       </li>
 
+
       <li class="li">
         <code class="ph codeph">3</code> or <code class="ph codeph">VERBOSE</code>: The maximum level of detail, showing how work is split up
         within each node into <span class="q">"query fragments"</span> that are connected in a pipeline. This extra detail is
         primarily useful for low-level performance testing and tuning within Impala itself, rather than for
         rewriting the SQL code at the user level.
       </li>
+
     </ul>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       Prior to Impala 1.3, the allowed argument range for <code class="ph codeph">EXPLAIN_LEVEL</code> was 0 to 1: level 0 had
       the mnemonic <code class="ph codeph">NORMAL</code>, and level 1 was <code class="ph codeph">VERBOSE</code>. In Impala 1.3 and higher,
       <code class="ph codeph">NORMAL</code> is not a valid mnemonic value, and <code class="ph codeph">VERBOSE</code> still applies to the
       highest level of detail but now corresponds to level 3. You might need to adjust the values if you have any
       older <code class="ph codeph">impala-shell</code> script files that set the <code class="ph codeph">EXPLAIN_LEVEL</code> query option.
     </div>
+
 
     <p class="p">
       Changing the value of this option controls the amount of detail in the output of the <code class="ph codeph">EXPLAIN</code>
@@ -79,9 +110,11 @@
       <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for details about how to use the extended information.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       As always, read the <code class="ph codeph">EXPLAIN</code> output from bottom to top. The lowest lines represent the
@@ -90,11 +123,13 @@
       the final results being sent back to the coordinator node.
     </p>
 
+
     <p class="p">
       The numbers in the left column are generated internally during the initial planning phase and do not
       represent the actual order of operations, so it is not significant if they appear out of order in the
       <code class="ph codeph">EXPLAIN</code> output.
     </p>
+
 
     <p class="p">
       At all <code class="ph codeph">EXPLAIN</code> levels, the plan contains a warning if any tables in the query are missing
@@ -103,6 +138,7 @@
       query performance.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">PROFILE</code> command in <span class="keyword cmdname">impala-shell</span> always starts with an explain plan
       showing full detail, the same as with <code class="ph codeph">EXPLAIN_LEVEL=3</code>. <span class="ph">After the explain
@@ -110,14 +146,17 @@
       <span class="keyword cmdname">impala-shell</span>.</span>
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       These examples use a trivial, empty table to illustrate how the essential aspects of query planning are shown
       in <code class="ph codeph">EXPLAIN</code> output:
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table t1 (x int, s string);
 [localhost:21000] &gt; set explain_level=1;
@@ -208,6 +247,7 @@
       <code class="ph codeph">COMPUTE STATS</code> statement for the table:
     </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats t1;
 +-----------------------------------------+
 | summary                                 |
@@ -243,6 +283,7 @@
       <code class="ph codeph">[SHUFFLE]</code> hint to change the join mechanism between the first two tables from a broadcast
       join to a shuffle join.
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; set explain_level=1;
 [localhost:21000] &gt; explain select one.*, two.*, three.* from t1 one, t1 two, t1 three where one.x = two.x and two.x = three.x;
@@ -315,6 +356,7 @@
       final stage of join processing.
     </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; set explain_level=0;
 [localhost:21000] &gt; explain select one.*, two.*, three.*
                   &gt; from t1 one join [shuffle] t1 two join t1 three
@@ -339,4 +381,10 @@
 
 
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

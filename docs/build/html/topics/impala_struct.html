@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="struct"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>STRUCT Complex Type (Impala 2.3 or higher only)</title></head><body id="struct"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="STRUCT Complex Type (Impala 2.3 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="struct" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>STRUCT Complex Type (Impala 2.3 or higher only)</title>
+</head>
+<body id="struct">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">STRUCT Complex Type (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+
 
   
 
@@ -13,9 +33,11 @@
       or the <code class="ph codeph">VALUE</code> part of a <code class="ph codeph">MAP</code>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code><var class="keyword varname">column_name</var> STRUCT &lt; <var class="keyword varname">name</var> : <var class="keyword varname">type</var> [COMMENT '<var class="keyword varname">comment_string</var>'], ... &gt;
 
@@ -28,10 +50,12 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       you to create nested data structures with a maximum nesting depth of 100.
     </p>
 
+
     <p class="p">
       A <code class="ph codeph">STRUCT</code> can be the top-level type for a column, or can itself be an item within an <code class="ph codeph">ARRAY</code> or the
       value part of the key-value pair in a <code class="ph codeph">MAP</code>.
     </p>
+
 
     <p class="p">
       When a <code class="ph codeph">STRUCT</code> is used as an <code class="ph codeph">ARRAY</code> element or a <code class="ph codeph">MAP</code> value, you use a join clause to
@@ -43,9 +67,11 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       <code class="ph codeph"><var class="keyword varname">map_name</var>.<var class="keyword varname">field</var></code>.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
         Because complex types are often used in combination,
@@ -55,11 +81,13 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
         background information and usage examples.
       </p>
 
+
     <p class="p">
       A <code class="ph codeph">STRUCT</code> is similar conceptually to a table row: it contains a fixed number of named fields, each with a predefined
       type. To combine two related tables, while using complex types to minimize repetition, the typical way to represent that data is as an
       <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> elements.
     </p>
+
 
     <p class="p">
       Because a <code class="ph codeph">STRUCT</code> has a fixed number of named fields, it typically does not make sense to have a
@@ -69,6 +97,7 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       lets you associate a variable number of row-like objects with each row of the table.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">STRUCT</code> type is straightforward to reference within a query. You do not need to include the
       <code class="ph codeph">STRUCT</code> column in a join clause or give it a table alias, as is required for the <code class="ph codeph">ARRAY</code> and
@@ -76,6 +105,7 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       <code class="ph codeph"><var class="keyword varname">struct_column_name</var>.<var class="keyword varname">field_name</var></code>, without any pseudocolumn such as
       <code class="ph codeph">ITEM</code> or <code class="ph codeph">VALUE</code>.
     </p>
+
 
     <p class="p">
         You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code>
@@ -94,9 +124,11 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
         <code class="ph codeph">KEY</code> and <code class="ph codeph">VALUE</code> columns.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Internal details:</strong>
       </p>
+
 
     <p class="p">
       Within the Parquet data file, the values for each <code class="ph codeph">STRUCT</code> field are stored adjacent to each other, so that they can be
@@ -105,57 +137,74 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       unnecessary I/O by reading only the portions of the Parquet data file containing the requested <code class="ph codeph">STRUCT</code> fields.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
       </p>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
     <ul class="ul">
         <li class="li">
           <p class="p">
             Columns with this data type can only be used in tables or partitions with the Parquet file format.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             Columns with this data type cannot be used as partition key columns in a partitioned table.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The <code class="ph codeph">COMPUTE STATS</code> statement does not produce any statistics for columns of this data type.
           </p>
+
         </li>
+
         <li class="li">
-          <p class="p" id="struct__d6e3246">
+          <p class="p" id="struct__d6e3270">
             The maximum length of the column definition for any complex type, including declarations for any nested types,
             is 4000 characters.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_limits">Limitations and Restrictions for Complex Types</a> for a full list of limitations
             and associated guidelines about complex type columns.
           </p>
+
         </li>
+
       </ul>
+
 
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
     <p class="p">
         Currently, the data types <code class="ph codeph">CHAR</code>, <code class="ph codeph">VARCHAR</code>,
         <code class="ph codeph">ARRAY</code>, <code class="ph codeph">MAP</code>, and <code class="ph codeph">STRUCT</code> cannot be used with Kudu tables.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       Many of the complex type examples refer to tables
       such as <code class="ph codeph">CUSTOMER</code> and <code class="ph codeph">REGION</code>
       adapted from the tables used in the TPC-H benchmark.
@@ -163,11 +212,13 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       for the table definitions.
       </div>
 
+
     <p class="p">
       The following example shows a table with various kinds of <code class="ph codeph">STRUCT</code> columns, both at the top level and nested within
       other complex types. Practice the <code class="ph codeph">CREATE TABLE</code> and query notation for complex type columns using empty tables, until
       you can visualize a complex data structure and construct corresponding SQL statements reliably.
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE struct_demo
 (
@@ -198,6 +249,7 @@ STORED AS PARQUET;
       <code class="ph codeph">ARRAY</code>, you can extend the qualified name passed to <code class="ph codeph">DESCRIBE</code> until the output shows just the
       <code class="ph codeph">STRUCT</code> fields.
     </p>
+
 
 <pre class="pre codeblock"><code>DESCRIBE struct_demo;
 +-------------------+--------------------------+
@@ -239,6 +291,7 @@ STORED AS PARQUET;
       they were columns of a table:
     </p>
 
+
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.employee_info;
 +----------+--------+
 | name     | type   |
@@ -254,6 +307,7 @@ STORED AS PARQUET;
       Because <code class="ph codeph">PLACES_LIVED</code> is a <code class="ph codeph">STRUCT</code> inside an <code class="ph codeph">ARRAY</code>, the initial
       <code class="ph codeph">DESCRIBE</code> shows the structure of the <code class="ph codeph">ARRAY</code>:
     </p>
+
 
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.places_lived;
 +------+------------------+
@@ -274,6 +328,7 @@ STORED AS PARQUET;
       <code class="ph codeph">STRUCT</code>:
     </p>
 
+
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.places_lived.item;
 +---------+--------+
 | name    | type   |
@@ -289,6 +344,7 @@ STORED AS PARQUET;
       Likewise, <code class="ph codeph">MEMORABLE_MOMENTS</code> has a <code class="ph codeph">STRUCT</code> inside a <code class="ph codeph">MAP</code>, which requires an extra
       level of qualified name to see just the <code class="ph codeph">STRUCT</code> part:
     </p>
+
 
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.memorable_moments;
 +-------+------------------+
@@ -309,6 +365,7 @@ STORED AS PARQUET;
       table-like structure:
     </p>
 
+
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.memorable_moments.value;
 +---------+--------+
 | name    | type   |
@@ -323,6 +380,7 @@ STORED AS PARQUET;
     <p class="p">
       For a <code class="ph codeph">STRUCT</code> inside a <code class="ph codeph">STRUCT</code>, we can see the fields of the outer <code class="ph codeph">STRUCT</code>:
     </p>
+
 
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.current_address;
 +----------------+-----------------------+
@@ -343,6 +401,7 @@ STORED AS PARQUET;
       Then we can use a further qualified name to see just the fields of the inner <code class="ph codeph">STRUCT</code>:
     </p>
 
+
 <pre class="pre codeblock"><code>DESCRIBE struct_demo.current_address.street_address;
 +---------------+--------+
 | name          | type   |
@@ -361,6 +420,7 @@ STORED AS PARQUET;
       <code class="ph codeph">ARRAY</code>, you can extend the qualified name passed to <code class="ph codeph">DESCRIBE</code> until the output shows just the
       <code class="ph codeph">STRUCT</code> fields.
     </p>
+
 
 
 
@@ -458,6 +518,7 @@ FROM struct_demo;
       mobile, and so on kinds of phone numbers.
     </p>
 
+
 <pre class="pre codeblock"><code>CREATE TABLE contact_info_many_structs
 (
   id BIGINT, name STRING,
@@ -470,6 +531,7 @@ FROM struct_demo;
       Because structs are naturally suited to composite values where the fields have different data types, you might use them to decompose
       things such as addresses:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE TABLE contact_info_detailed_address
 (
@@ -485,9 +547,11 @@ FROM struct_demo;
       properties of the street names, which areas have a higher proportion of <span class="q">"Roads"</span>, <span class="q">"Courts"</span> or <span class="q">"Boulevards"</span>, and so on.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
     <p class="p">
       <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a>, <a class="xref" href="impala_array.html#array">ARRAY Complex Type (Impala 2.3 or higher only)</a>,
@@ -495,6 +559,13 @@ FROM struct_demo;
       <a class="xref" href="impala_map.html#map">MAP Complex Type (Impala 2.3 or higher only)</a>
     </p>
 
+
   </div>
 
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div>
+</div>
+</div></body>
+</html>

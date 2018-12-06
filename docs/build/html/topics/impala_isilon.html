@@ -1,8 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_isilon"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala with Isilon Storage</title></head><body id="impala_isilon"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Impala with Isilon Storage" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_isilon" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Impala with Isilon Storage</title>
+</head>
+<body id="impala_isilon">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Using Impala with Isilon Storage</h1>
+
   
 
   
@@ -17,6 +36,7 @@
       certified on <span class="keyword">Impala 2.2.4</span> or higher.
     </p>
 
+
     <div class="p">
         Because the EMC Isilon storage devices use a global value for the block size
         rather than a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code>
@@ -28,6 +48,7 @@
 <pre class="pre codeblock"><code>isi hdfs settings modify --default-block-size=256MB</code></pre>
       </div>
 
+
     <p class="p">
       The typical use case for Impala and Isilon together is to use Isilon for the
       default filesystem, replacing HDFS entirely. In this configuration,
@@ -37,6 +58,7 @@
       to a path within the Isilon filesystem.
       For example:
     </p>
+
 <pre class="pre codeblock"><code>-- If the default filesystem is Isilon, all Impala data resides there
 -- and all Impala databases and tables are located there.
 CREATE TABLE t1 (x INT, s STRING);
@@ -58,6 +80,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       <code class="ph codeph">INSERT</code> work the same with Isilon storage as with HDFS.
     </p>
 
+
     <p class="p">
       When the Impala spill-to-disk feature is activated by a query that approaches
       the memory limit, Impala writes all the temporary data to a local (not Isilon)
@@ -71,6 +94,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       not recommended due to the need to transfer the data both ways using remote I/O.
     </p>
 
+
     <p class="p">
       When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
       When the data resides on Isilon storage, all the I/O consists of remote reads.
@@ -83,7 +107,10 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       <span class="keyword cmdname">impalad</span> daemon.
     </p>
 
+
     
   </div>
 
-</article></main></body></html>
+
+</body>
+</html>

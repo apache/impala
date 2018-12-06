@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ldap"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Enabling LDAP Authentication for Impala</title></head><body id="ldap"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Enabling LDAP Authentication for Impala" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="ldap" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Enabling LDAP Authentication for Impala</title>
+</head>
+<body id="ldap">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Enabling LDAP Authentication for Impala</h1>
+
   
 
   <div class="body conbody">
@@ -17,25 +37,35 @@
         <span class="keyword cmdname">impala-shell</span>, Hue, a Business Intelligence tool, JDBC
       or ODBC application, and so on. </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       Regardless of the authentication mechanism used, Impala always creates HDFS directories and data files
       owned by the same user (typically <code class="ph codeph">impala</code>). To implement user-level access to different
       databases, tables, columns, partitions, and so on, use the Sentry authorization feature, as explained in
       <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>.
     </div>
 
+
     <p class="p">
       An alternative form of authentication you can use is Kerberos, described in
       <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a>.
     </p>
 
+
     <p class="p toc inpage"></p>
+
 
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_authentication.html">Impala Authentication</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="ldap__ldap_prereqs">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_authentication.html">Impala Authentication</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="ldap_prereqs">
 
     <h2 class="title topictitle2" id="ariaid-title2">Requirements for Using Impala with LDAP</h2>
+
   
 
     <div class="body conbody">
@@ -45,16 +75,21 @@
         secure LDAP authentication through SSL and TLS.
       </p>
 
+
       <p class="p">
         The Impala LDAP support lets you use Impala with systems such as Active Directory that use LDAP behind the
         scenes.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="ldap__ldap_client_server">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="ldap_client_server">
 
     <h2 class="title topictitle2" id="ariaid-title3">Client-Server Considerations for LDAP</h2>
+
 
     <div class="body conbody">
 
@@ -62,17 +97,22 @@
         Only client-&gt;Impala connections can be authenticated by LDAP.
       </p>
 
+
       <p class="p"> You must use the Kerberos authentication mechanism for connections
         between internal Impala components, such as between the
           <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>, and
           <span class="keyword cmdname">catalogd</span> daemons. See <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a> on how to set up Kerberos for
         Impala. </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="ldap__ldap_config">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="ldap_config">
 
     <h2 class="title topictitle2" id="ariaid-title4">Server-Side LDAP Setup</h2>
+
 
     <div class="body conbody">
 
@@ -80,14 +120,17 @@
         These requirements apply on the server side when configuring and starting Impala:
       </p>
 
+
       <p class="p">
         To enable LDAP authentication, set the following startup options for <span class="keyword cmdname">impalad</span>:
       </p>
+
 
       <ul class="ul">
         <li class="li">
           <code class="ph codeph">--enable_ldap_auth</code> enables LDAP-based authentication between the client and Impala.
         </li>
+
 
         <li class="li">
           <code class="ph codeph">--ldap_uri</code> sets the URI of the LDAP server to use. Typically, the URI is prefixed with
@@ -100,6 +143,7 @@
 
 
 
+
         <li class="li">
           For <code class="ph codeph">ldaps://</code> connections secured by SSL,
           <code class="ph codeph">--ldap_ca_certificate="<var class="keyword varname">/path/to/certificate/pem</var>"</code> specifies the
@@ -108,13 +152,18 @@
         </li>
 
 
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="ldap__ldap_bind_strings">
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="ldap_bind_strings">
 
     <h2 class="title topictitle2" id="ariaid-title5">Support for Custom Bind Strings</h2>
+
 
     <div class="body conbody">
 
@@ -124,6 +173,7 @@
         necessary so that Impala can use Sentry for role-based access, which uses short names.
       </p>
 
+
       <p class="p">
         However, LDAP servers often require more complex, structured usernames for authentication. Impala supports
         three ways of transforming the short name (for example, <code class="ph codeph">'henry'</code>) to a more complicated
@@ -131,16 +181,19 @@
         when starting the <span class="keyword cmdname">impalad</span> daemon on each DataNode:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <code class="ph codeph">--ldap_domain</code>: Replaces the username with a string
           <code class="ph codeph"><var class="keyword varname">username</var>@<var class="keyword varname">ldap_domain</var></code>.
         </li>
 
+
         <li class="li">
           <code class="ph codeph">--ldap_baseDN</code>: Replaces the username with a <span class="q">"distinguished name"</span> (DN) of the form:
           <code class="ph codeph">uid=<var class="keyword varname">userid</var>,ldap_baseDN</code>. (This is equivalent to a Hive option).
         </li>
+
 
         <li class="li">
           <code class="ph codeph">--ldap_bind_pattern</code>: This is the most general option, and replaces the username with the
@@ -149,17 +202,23 @@
           <code class="ph codeph">"user=#UID,OU=foo,CN=bar"</code> with a username of <code class="ph codeph">henry</code> will construct a
           bind name of <code class="ph codeph">"user=henry,OU=foo,CN=bar"</code>.
         </li>
+
       </ul>
+
 
       <p class="p">
         These options are mutually exclusive; Impala does not start if more than one of these options is specified.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="ldap__ldap_security">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="ldap_security">
 
     <h2 class="title topictitle2" id="ariaid-title6">Secure LDAP Connections</h2>
+
 
     <div class="body conbody">
 
@@ -169,18 +228,22 @@
         TLS.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Secure LDAP connections through SSL:</strong>
       </p>
+
 
       <p class="p">
         For SSL-enabled LDAP connections, specify a prefix of <code class="ph codeph">ldaps://</code> instead of
         <code class="ph codeph">ldap://</code>. Also, the default port for SSL-enabled LDAP connections is 636 instead of 389.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Secure LDAP connections through TLS:</strong>
       </p>
+
 
       <p class="p">
         <a class="xref" href="http://en.wikipedia.org/wiki/Transport_Layer_Security" target="_blank">TLS</a>,
@@ -189,24 +252,31 @@
         TLS, specify the following flags as startup options to the <span class="keyword cmdname">impalad</span> daemon:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <code class="ph codeph">--ldap_tls</code> tells Impala to start a TLS connection to the LDAP server, and to fail
           authentication if it cannot be done.
         </li>
 
+
         <li class="li">
           <code class="ph codeph">--ldap_ca_certificate="<var class="keyword varname">/path/to/certificate/pem</var>"</code> specifies the
           location of the certificate in standard <code class="ph codeph">.PEM</code> format. Store this certificate on the local
           filesystem, in a location that only the <code class="ph codeph">impala</code> user and other trusted users can read.
         </li>
-      </ul>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="ldap__ldap_impala_shell">
+      </ul>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="ldap_impala_shell">
 
     <h2 class="title topictitle2" id="ariaid-title7">LDAP Authentication for impala-shell Interpreter</h2>
+
 
     <div class="body conbody">
 
@@ -215,10 +285,12 @@
         <span class="keyword cmdname">impala-shell</span> command interpreter and enter the password when prompted:
       </p>
 
+
       <ul class="ul">
         <li class="li">
           <code class="ph codeph">-l</code> enables LDAP authentication.
         </li>
+
 
         <li class="li">
           <code class="ph codeph">-u</code> sets the user. Per Active Directory, the user is the short username, not the full
@@ -228,67 +300,99 @@
 
         </li>
 
+
         <li class="li">
           <span class="keyword cmdname">impala-shell</span> automatically prompts for the password.
         </li>
+
       </ul>
+
 
       <p class="p">
         For the full list of available <span class="keyword cmdname">impala-shell</span> options, see
         <a class="xref" href="impala_shell_options.html#shell_options">impala-shell Configuration Options</a>.
       </p>
 
+
       <p class="p">
         <strong class="ph b">LDAP authentication for JDBC applications:</strong> See <a class="xref" href="impala_jdbc.html#impala_jdbc">Configuring Impala to Work with JDBC</a> for the
         format to use with the JDBC connection string for servers using LDAP authentication.
       </p>
+
     </div>
-  </article>
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="ldap__ldap_impala_hue">
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="ldap_impala_hue">
     <h2 class="title topictitle2" id="ariaid-title8">Enabling LDAP for Impala in Hue</h2>
+
     
     <div class="body conbody">
-      <section class="section" id="ldap_impala_hue__ldap_impala_hue_cmdline"><h3 class="title sectiontitle">Enabling LDAP for Impala in Hue Using the Command Line</h3>
+      <div class="section" id="ldap_impala_hue__ldap_impala_hue_cmdline"><h3 class="title sectiontitle">Enabling LDAP for Impala in Hue Using the Command Line</h3>
         
         <div class="p">LDAP authentication for the Impala app in Hue can be enabled by
           setting the following properties under the <code class="ph codeph">[impala]</code>
-          section in <code class="ph codeph">hue.ini</code>. <table class="table" id="ldap_impala_hue__ldap_impala_hue_configs"><caption></caption><colgroup><col style="width:33.33333333333333%"><col style="width:66.66666666666666%"></colgroup><tbody class="tbody">
+          section in <code class="ph codeph">hue.ini</code>.
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="ldap_impala_hue__ldap_impala_hue_configs" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:33.33333333333333%" /><col style="width:66.66666666666666%" /></colgroup><tbody class="tbody">
                 <tr class="row">
-                  <td class="entry nocellnorowborder"><code class="ph codeph">auth_username</code></td>
-                  <td class="entry nocellnorowborder">LDAP username of Hue user to be authenticated.</td>
+                  <td class="entry nocellnorowborder" style="vertical-align:top;"><code class="ph codeph">auth_username</code></td>
+
+                  <td class="entry cell-norowborder" style="vertical-align:top;">LDAP username of Hue user to be authenticated.</td>
+
                 </tr>
+
                 <tr class="row">
-                  <td class="entry nocellnorowborder"><code class="ph codeph">auth_password</code></td>
-                  <td class="entry nocellnorowborder">
+                  <td class="entry row-nocellborder" style="vertical-align:top;"><code class="ph codeph">auth_password</code></td>
+
+                  <td class="entry cellrowborder" style="vertical-align:top;">
                     <p class="p">LDAP password of Hue user to be authenticated.</p>
+
                   </td>
+
                 </tr>
-              </tbody></table>These login details are only used by Impala to authenticate to
+
+              </tbody>
+</table>
+</div>
+These login details are only used by Impala to authenticate to
           LDAP. The Impala service trusts Hue to have already validated the user
           being impersonated, rather than simply passing on the credentials.</div>
-      </section>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="ldap__ldap_delegation">
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="ldap_delegation">
     <h2 class="title topictitle2" id="ariaid-title9">Enabling Impala Delegation for LDAP Users</h2>
+
     <div class="body conbody">
       <p class="p">
         See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Hue and BI Tools</a> for details about the delegation feature
         that lets certain users submit queries using the credentials of other users.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="ldap__ldap_restrictions">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="ldap_restrictions">
 
     <h2 class="title topictitle2" id="ariaid-title10">LDAP Restrictions for Impala</h2>
+
 
     <div class="body conbody">
 
       <p class="p">
         The LDAP support is preliminary. It currently has only been tested against Active Directory.
       </p>
+
     </div>
-  </article>
-</article></main></body></html>
+
+  </div>
+
+</body>
+</html>

@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="explain"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>EXPLAIN Statement</title></head><body id="explain"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="EXPLAIN Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="explain" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>EXPLAIN Statement</title>
+</head>
+<body id="explain">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">EXPLAIN Statement</h1>
+
   
   
 
@@ -15,9 +35,11 @@
       network. Use <code class="ph codeph">explain</code> followed by a complete <code class="ph codeph">SELECT</code> query. For example:
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>EXPLAIN { <var class="keyword varname">select_query</var> | <var class="keyword varname">ctas_stmt</var> | <var class="keyword varname">insert_stmt</var> }
 </code></pre>
@@ -27,11 +49,13 @@
       <code class="ph codeph">WITH</code> clause. See <a class="xref" href="impala_select.html#select">SELECT Statement</a> for details.
     </p>
 
+
     <p class="p">
       The <var class="keyword varname">insert_stmt</var> is an <code class="ph codeph">INSERT</code> statement that inserts into or overwrites an
       existing table. It can use either the <code class="ph codeph">INSERT ... SELECT</code> or <code class="ph codeph">INSERT ...
       VALUES</code> syntax. See <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> for details.
     </p>
+
 
     <p class="p">
       The <var class="keyword varname">ctas_stmt</var> is a <code class="ph codeph">CREATE TABLE</code> statement using the <code class="ph codeph">AS
@@ -39,9 +63,11 @@
       <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> for details.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       You can interpret the output to judge whether the query is performing efficiently, and adjust the query
@@ -51,12 +77,14 @@
       performance tuning steps.
     </p>
 
+
     <p class="p">
       The <code class="ph codeph">EXPLAIN</code> output reminds you if table or column statistics are missing from any table
       involved in the query. These statistics are important for optimizing queries involving large tables or
       multi-table joins. See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for how to gather statistics,
       and <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for how to use this information for query tuning.
     </p>
+
 
     <div class="p">
         Read the <code class="ph codeph">EXPLAIN</code> plan from bottom to top:
@@ -67,15 +95,18 @@
             take to scan a table based on total data size and the size of the cluster.
           </li>
 
+
           <li class="li">
             As you work your way up, next you see the operations that will be parallelized and performed on each
             Impala node.
           </li>
 
+
           <li class="li">
             At the higher levels, you see how data flows when intermediate result sets are combined and transmitted
             from one node to another.
           </li>
+
 
           <li class="li">
             See <a class="xref" href="../shared/../topics/impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a> for details about the
@@ -83,8 +114,11 @@
             <code class="ph codeph">EXPLAIN</code> plan depending on whether you are doing high-level or low-level tuning,
             dealing with logical or physical aspects of the query.
           </li>
+
         </ul>
+
       </div>
+
 
     <p class="p">
       If you come from a traditional database background and are not familiar with data warehousing, keep in mind
@@ -96,14 +130,17 @@
       able to optimize a query so that it executes in seconds rather than minutes.
     </p>
 
+
     <p class="p">
       For more information and examples to help you interpret <code class="ph codeph">EXPLAIN</code> output, see
       <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a>.
     </p>
 
+
     <p class="p">
       <strong class="ph b">Extended EXPLAIN output:</strong>
     </p>
+
 
     <p class="p">
       For performance tuning of complex queries, and capacity planning (such as using the admission control and
@@ -114,19 +151,23 @@
       <code class="ph codeph">extended</code>, or <code class="ph codeph">verbose</code>.
     </p>
 
+
     <p class="p">
       When extended <code class="ph codeph">EXPLAIN</code> output is enabled, <code class="ph codeph">EXPLAIN</code> statements print
       information about estimated memory requirements, minimum number of virtual cores, and so on.
       
     </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a> for details and examples.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       This example shows how the standard <code class="ph codeph">EXPLAIN</code> output moves from the lowest (physical) level to
@@ -135,6 +176,7 @@
       node; the intermediate results are transmitted back to the coordinator node (labelled here as the
       <code class="ph codeph">EXCHANGE</code> node); lastly, the intermediate results are summed to display the final result.
     </p>
+
 
 <pre class="pre codeblock" id="explain__explain_plan_simple"><code>[impalad-host:21000] &gt; explain select count(*) from customer_address;
 +----------------------------------------------------------+
@@ -163,6 +205,7 @@
       <code class="ph codeph">COMPUTE STATS</code> statement performs this analysis, so a subsequent <code class="ph codeph">EXPLAIN</code>
       statement has additional information to use in deciding how to optimize the distributed query.
     </p>
+
 
     
 
@@ -216,19 +259,23 @@ EXPLAIN_LEVEL set to extended
     <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
+
     <p class="p">
         If these statements in your environment contain sensitive literal values such as credit card numbers or tax
         identifiers, Impala can redact this sensitive information when displaying the statements in log files and
         other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 
+
     <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
     <p class="p">
       
       The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
@@ -239,14 +286,17 @@ EXPLAIN_LEVEL set to extended
       if the source table is partitioned.)
     </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
     <p class="p">
       The <code class="ph codeph">EXPLAIN</code> statement displays equivalent plan
       information for queries against Kudu tables as for queries
       against HDFS-based tables.
     </p>
+
 
     <p class="p">
       To see which predicates Impala can <span class="q">"push down"</span> to Kudu for
@@ -261,6 +311,7 @@ EXPLAIN_LEVEL set to extended
       some operators in the <code class="ph codeph">WHERE</code> clause are evaluated
       immediately by Kudu and others are evaluated later by Impala:
     </p>
+
 
 <pre class="pre codeblock"><code>
 EXPLAIN SELECT x,y from kudu_table WHERE
@@ -282,9 +333,11 @@ EXPLAIN SELECT x,y from kudu_table WHERE
       require any casting, can be pushed to Kudu.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
     <p class="p">
       <a class="xref" href="impala_select.html#select">SELECT Statement</a>,
       <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>,
@@ -292,5 +345,12 @@ EXPLAIN SELECT x,y from kudu_table WHERE
       <a class="xref" href="impala_explain_plan.html#explain_plan">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

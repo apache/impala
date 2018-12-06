@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="SCAN_BYTES_LIMIT Query Option (Impala 3.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="scan_bytes_limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>SCAN_BYTES_LIMIT Query Option (Impala 3.1 or higher only)</title>
+</head>
+<body id="scan_bytes_limit">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">SCAN_BYTES_LIMIT Query Option (<span class="keyword">Impala 3.1</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">SCAN_BYTES_LIMIT</code> query option sets a limit on the bytes scanned by
+      HDFS and HBase SCAN operations. If a query is still executing when the query’s
+      coordinator detects that it has exceeded the limit, the query is terminated with an error.
+      The option is intended to prevent runaway queries that scan more data than is intended.
+    </p>
+
+
+    <p class="p">
+      For example, an Impala administrator could set a default value of
+      <code class="ph codeph">SCAN_BYTES_LIMIT=100GB</code> for a resource pool to automatically kill queries
+      that scan more than 100 GB of data (see
+      <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_admission.html" target="_blank">Impala
+      Admission Control and Query Queuing</a> for information about default query options).
+      If a user accidentally omits a partition filter in a <code class="ph codeph">WHERE</code> clause and
+      runs a large query that scans a lot of data, the query will be automatically terminated
+      after it scans more data than the <code class="ph codeph">SCAN_BYTES_LIMIT</code>.
+    </p>
+
+
+    <div class="p">
+      You can override the default value per-query or per-session, in the same way as other
+      query options, if you do not want the default <code class="ph codeph">SCAN_BYTES_LIMIT</code> value to
+      apply to a specific query or session.
+      <div class="note note"><span class="notetitle">Note:</span>
+        <ul class="ul">
+          <li dir="ltr" class="li">
+            <p dir="ltr" class="p">
+              Only data actually read from the underlying storage layer is counted towards the
+              limit. E.g. Impala’s Parquet scanner employs several techniques to skip over
+              data in a file that is not relevant to a specific query, so often only a fraction
+              of the file size is counted towards <code class="ph codeph">SCAN_BYTES_LIMIT</code>.
+            </p>
+
+          </li>
+
+
+          <li dir="ltr" class="li">
+            <p dir="ltr" class="p">
+              As of Impala 3.1, bytes scanned by Kudu tablet servers are not counted towards the
+              limit.
+            </p>
+
+          </li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+
+    <p class="p">
+      Because the checks are done periodically, the query may scan over the limit at times.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong> <code class="ph codeph">SET SCAN_BYTES_LIMIT=bytes;</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+
+    <div class="p">
+      <strong class="ph b">Units:</strong>
+      <ul class="ul">
+        <li class="li">
+          A numeric argument represents memory size in bytes.
+        </li>
+
+
+        <li class="li">
+          Specify a suffix of <code class="ph codeph">m</code> or <code class="ph codeph">mb</code> for megabytes.
+        </li>
+
+
+        <li class="li">
+          Specify a suffix of <code class="ph codeph">g</code> or <code class="ph codeph">gb</code> for gigabytes.
+        </li>
+
+
+        <li class="li">
+          If you specify a suffix with unrecognized formats, subsequent queries fail with an
+          error.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">0</code> (no limit)
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

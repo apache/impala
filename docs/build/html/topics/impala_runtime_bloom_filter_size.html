@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="runtime_bloom_filter_size"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>RUNTIME_BLOOM_FILTER_SIZE Query Option (Impala 2.5 or higher only)</title></head><body id="runtime_bloom_filter_size"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="RUNTIME_BLOOM_FILTER_SIZE Query Option (Impala 2.5 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="runtime_bloom_filter_size" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>RUNTIME_BLOOM_FILTER_SIZE Query Option (Impala 2.5 or higher only)</title>
+</head>
+<body id="runtime_bloom_filter_size">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">RUNTIME_BLOOM_FILTER_SIZE Query Option (<span class="keyword">Impala 2.5</span> or higher only)</h1>
+
   
   
 
@@ -14,40 +34,49 @@
       feature.
     </p>
 
-    <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+
+    <div class="note important"><span class="importanttitle">Important:</span>
       <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, this query option only applies as a fallback, when statistics
         are not available. By default, Impala estimates the optimal size of the Bloom filter structure
         regardless of the setting for this option. (This is a change from the original behavior in
         <span class="keyword">Impala 2.5</span>.)
       </p>
+
       <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, when the value of this query option is used for query planning,
         it is constrained by the minimum and maximum sizes specified by the
         <code class="ph codeph">RUNTIME_FILTER_MIN_SIZE</code> and <code class="ph codeph">RUNTIME_FILTER_MAX_SIZE</code> query options.
         The filter size is adjusted upward or downward if necessary to fit within the minimum/maximum range.
       </p>
+
     </div>
+
 
     <p class="p">
         <strong class="ph b">Type:</strong> integer
       </p>
 
+
     <p class="p">
       <strong class="ph b">Default:</strong> 1048576 (1 MB)
     </p>
+
 
     <p class="p">
       <strong class="ph b">Maximum:</strong> 16 MB
     </p>
 
+
     <p class="p">
         <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.5.0</span>
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       This setting affects optimizations for large and complex queries, such
@@ -58,6 +87,7 @@
       
     </p>
 
+
     <p class="p">
       If your query filters on high-cardinality columns (for example, millions of different values)
       and you do not get the expected speedup from the runtime filtering mechanism, consider
@@ -66,11 +96,13 @@
       more accurate.
     </p>
 
+
     <p class="p">
         Because the runtime filtering feature applies mainly to resource-intensive
         and long-running queries, only adjust this query option when tuning long-running queries
         involving some combination of large partitioned tables and joins involving large tables.
       </p>
+
 
     <p class="p">
       Because the effectiveness of this setting depends so much on query characteristics and data distribution,
@@ -79,9 +111,11 @@
       unsetting it immediately afterward.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
 
     <p class="p">
         This query option affects only Bloom filters, not the min/max filters
@@ -89,9 +123,11 @@
         performance of queries against Kudu tables.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
     <p class="p">
       <a class="xref" href="impala_runtime_filtering.html">Runtime Filtering for Impala Queries (Impala 2.5 or higher only)</a>,
       
@@ -100,5 +136,12 @@
       <a class="xref" href="impala_runtime_filter_max_size.html#runtime_filter_max_size">RUNTIME_FILTER_MAX_SIZE Query Option (Impala 2.6 or higher only)</a>
     </p>
 
+
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

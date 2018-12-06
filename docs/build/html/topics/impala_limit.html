@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="limit"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>LIMIT Clause</title></head><body id="limit"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="LIMIT Clause" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>LIMIT Clause</title>
+</head>
+<body id="limit">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">LIMIT Clause</h1>
+
   
 
   <div class="body conbody">
@@ -13,9 +33,11 @@
       processing a distributed query.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>LIMIT <var class="keyword varname">constant_integer_expression</var></code></pre>
 
@@ -25,13 +47,16 @@
       cannot refer to a column or use a subquery.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+
     <p class="p">
       This clause is useful in contexts such as:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -39,22 +64,27 @@
         the 50 hostnames that refer the most traffic to a web site.
       </li>
 
+
       <li class="li">
         To demonstrate some sample values from a table or a particular query. (To display some arbitrary items, use
         a query with no <code class="ph codeph">ORDER BY</code> clause. An <code class="ph codeph">ORDER BY</code> clause causes additional
         memory and/or disk usage during the query.)
       </li>
 
+
       <li class="li">
         To keep queries from returning huge result sets by accident if a table is larger than expected, or a
         <code class="ph codeph">WHERE</code> clause matches more rows than expected.
       </li>
+
     </ul>
+
 
     <p class="p">
       Originally, the value for the <code class="ph codeph">LIMIT</code> clause had to be a numeric literal. In Impala 1.2.1 and
       higher, it can be a numeric expression.
     </p>
+
 
     <p class="p">
         Prior to Impala 1.4.0, Impala required any query including an
@@ -65,9 +95,11 @@
         Impala automatically uses a temporary disk work area to perform the sort operation.
       </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_order_by.html#order_by">ORDER BY Clause</a> for details.
     </p>
+
 
     <p class="p">
         In Impala 1.2.1 and higher, you can combine a <code class="ph codeph">LIMIT</code> clause with an <code class="ph codeph">OFFSET</code>
@@ -79,23 +111,28 @@
         users using application logic.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
     <p class="p">
         Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators cannot include a
         <code class="ph codeph">LIMIT</code> clause.
       </p>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following example shows how the <code class="ph codeph">LIMIT</code> clause caps the size of the result set, with the
       limit being applied after any other clauses such as <code class="ph codeph">WHERE</code>.
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create database limits;
 [localhost:21000] &gt; use limits;
@@ -136,6 +173,7 @@ Returned 2 row(s) in 0.27s</code></pre>
       together:
     </p>
 
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select x as "Top 3" from numbers order by x desc limit 3;
 +-------+
 | top 3 |
@@ -158,6 +196,7 @@ Returned 2 row(s) in 0.27s</code></pre>
       You can use constant values besides integer literals as the <code class="ph codeph">LIMIT</code> argument:
     </p>
 
+
 <pre class="pre codeblock"><code>-- Other expressions that yield constant integer values work too.
 SELECT x FROM t1 LIMIT 1e6;                        -- Limit is one million.
 SELECT x FROM t1 LIMIT length('hello world');      -- Limit is 11.
@@ -165,4 +204,10 @@ SELECT x FROM t1 LIMIT 2+2;                        -- Limit is 4.
 SELECT x FROM t1 LIMIT cast(truncate(9.9) AS INT); -- Limit is 9.
 </code></pre>
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div>
+</div>
+</div></body>
+</html>

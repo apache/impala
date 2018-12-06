@@ -1,8 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_cookbook.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_joins.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_stats.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_benchmarking.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_resources.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_filtering.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_hdfs_caching.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_testing.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_explain_plan.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_skew.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="performance"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Tuning Impala for Performance</title></head><body id="performance"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Tuning Impala for Performance" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_cookbook.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_joins.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_stats.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_benchmarking.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_resources.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_filtering.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_hdfs_caching.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_testing.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_explain_plan.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_skew.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="performance" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Tuning Impala for Performance</title>
+</head>
+<body id="performance">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Tuning Impala for Performance</h1>
+
   
   
 
@@ -12,6 +41,7 @@
       The following sections explain the factors affecting the performance of Impala features, and procedures for
       tuning, monitoring, and benchmarking Impala queries and other SQL operations.
     </p>
+
 
     <p class="p">
       This section also describes techniques for maximizing Impala scalability. Scalability is tied to performance:
@@ -23,13 +53,16 @@
       without running out of memory.
     </p>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <p class="p">
         Before starting any performance tuning or benchmarking, make sure your system is configured with all the
         recommended minimum hardware requirements from <a class="xref" href="impala_prereqs.html#prereqs_hardware">Hardware Requirements</a> and
         software settings from <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a>.
       </p>
+
     </div>
+
 
     <ul class="ul">
       <li class="li">
@@ -38,12 +71,14 @@
         the data in a table.
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a>. Joins are the main class of queries that you can tune at
         the SQL level, as opposed to changing physical factors such as the file format or the hardware
         configuration. The related topics <a class="xref" href="impala_perf_stats.html#perf_column_stats">Overview of Column Statistics</a> and
         <a class="xref" href="impala_perf_stats.html#perf_table_stats">Overview of Table Statistics</a> are also important primarily for join performance.
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_perf_stats.html#perf_table_stats">Overview of Table Statistics</a> and
@@ -55,15 +90,18 @@
         <code class="ph codeph">ANALYZE TABLE</code> statement in Hive.)
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_perf_testing.html#performance_testing">Testing Impala Performance</a>. Do some post-setup testing to ensure Impala is
         using optimal settings for performance, before conducting any benchmark tests.
       </li>
 
+
       <li class="li">
         <a class="xref" href="impala_perf_benchmarking.html#perf_benchmarks">Benchmarking Impala Queries</a>. The configuration and sample data that you use
         for initial experiments with Impala is often not appropriate for doing performance tests.
       </li>
+
 
       <li class="li">
         <a class="xref" href="impala_perf_resources.html#mem_limits">Controlling Impala Resource Usage</a>. The more memory Impala can utilize, the better query
@@ -72,15 +110,19 @@
         Impala can use.
       </li>
 
+
       
 
       <li class="li">
         <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a>. Queries against data stored in the Amazon Simple Storage Service (S3)
         have different performance characteristics than when the data is stored in HDFS.
       </li>
+
     </ul>
 
+
     <p class="p toc"></p>
+
 
     <p class="p">
         A good source of tips related to scalability and performance tuning is the
@@ -88,11 +130,11 @@
         presentation. These slides are updated periodically as new features come out and new benchmarks are performed.
       </p>
 
+
   </div>
 
 
 
-  
 
   
 
@@ -113,4 +155,30 @@
   
 
   
-<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_perf_cookbook.html">Impala Performance Guidelines and Best Practices</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_joins.html">Performance Considerations for Join Queries</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_stats.html">Table and Column Statistics</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_benchmarking.html">Benchmarking Impala Queries</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_resources.html">Controlling Impala Resource Usage</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_runtime_filtering.html">Runtime Filtering for Impala Queries (Impala 2.5 or higher only)</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_hdfs_caching.html">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_testing.html">Testing Impala Performance</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_explain_plan.html">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_perf_skew.html">Detecting and Correcting HDFS Block Skew Conditions</a></strong><br></li></ul></nav></article></main></body></html>
+
+  
+<div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_cookbook.html">Impala Performance Guidelines and Best Practices</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_joins.html">Performance Considerations for Join Queries</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_stats.html">Table and Column Statistics</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_benchmarking.html">Benchmarking Impala Queries</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_resources.html">Controlling Impala Resource Usage</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_runtime_filtering.html">Runtime Filtering for Impala Queries (Impala 2.5 or higher only)</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_hdfs_caching.html">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_testing.html">Testing Impala Performance</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_explain_plan.html">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_skew.html">Detecting and Correcting HDFS Block Skew Conditions</a></strong><br />
+</li>
+</ul>
+</div></body>
+</html>

@@ -1,70 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="delegation"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Configuring Impala Delegation for Hue and BI Tools</title></head><body id="delegation"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Configuring Impala Delegation for Hue and BI Tools" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="delegation" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Configuring Impala Delegation for Hue and BI Tools</title>
+</head>
+<body id="delegation">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Configuring Impala Delegation for Hue and BI Tools</h1>
+
 
   
 
   <div class="body conbody">
 
     <p class="p">
-
-      When users submit Impala queries through a separate application, such as Hue or a business intelligence tool,
-      typically all requests are treated as coming from the same user. In Impala 1.2 and higher, authentication is
-      extended by a new feature that allows applications to pass along credentials for the users that connect to
-      them (known as <span class="q">"delegation"</span>), and issue Impala queries with the privileges for those users. Currently,
-      the delegation feature is available only for Impala queries submitted through application interfaces such as
-      Hue and BI tools; for example, Impala cannot issue queries using the privileges of the HDFS user.
+      When users submit Impala queries through a separate application, such as Hue or a business
+      intelligence tool, typically all requests are treated as coming from the same user. In
+      Impala 1.2 and higher, Impala supports <span class="q">"delegation"</span> where users whose names you
+      specify can delegate the execution of a query to another user. The query runs with the
+      privileges of the delegated user, not the original authenticated user.
     </p>
+
 
     <p class="p">
-      The delegation feature is enabled by a startup option for <span class="keyword cmdname">impalad</span>:
-      <code class="ph codeph">--authorized_proxy_user_config</code>. When you specify this option, users whose names you specify
-      (such as <code class="ph codeph">hue</code>) can delegate the execution of a query to another user. The query runs with the
-      privileges of the delegated user, not the original user such as <code class="ph codeph">hue</code>. The name of the
-      delegated user is passed using the HiveServer2 configuration property <code class="ph codeph">impala.doas.user</code>.
+      Starting in <span class="keyword">Impala 3.1</span> and higher, you can
+      delegate using groups. Instead of listing a large number of delegated users, you can
+      create a group of those users and specify the delegated group name in the Impalad startup
+      option. The client sends the delegated user name, and Impala performs an authorization to
+      see if the delegated user belongs to a delegated group.
     </p>
+
 
     <p class="p">
-      You can specify a list of users that the application user can delegate to, or <code class="ph codeph">*</code> to allow a
-      superuser to delegate to any other user. For example:
+      The name of the delegated user is passed using the HiveServer2 protocol configuration
+      property <code class="ph codeph">impala.doas.user</code> when the client connects to Impala.
     </p>
 
-<pre class="pre codeblock"><code>impalad --authorized_proxy_user_config 'hue=user1,user2;admin=*' ...</code></pre>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-      Make sure to use single quotes or escape characters to ensure that any <code class="ph codeph">*</code> characters do not
-      undergo wildcard expansion when specified in command-line arguments.
+    <p class="p">
+      Currently, the delegation feature is available only for Impala queries submitted through
+      application interfaces such as Hue and BI tools. For example, Impala cannot issue queries
+      using the privileges of the HDFS user.
+    </p>
+
+
+    <div class="note attention"><span class="attentiontitle">Attention:</span>
+      <ul class="ul">
+        <li class="li">
+          When the delegation is enabled in Impala, the Impala clients should take an extra
+          caution to prevent unauthorized access for the delegate-able users.
+        </li>
+
+
+        <li class="li">
+          Impala requires Apache Sentry on the cluster to enable delegation. Without Apache
+          Sentry installed, the delegation feature will fail with the following error: User
+          <em class="ph i">user1</em> is not authorized to delegate to <em class="ph i">user2</em>. User/group delegation is
+          disabled.
+        </li>
+
+      </ul>
+
     </div>
 
+
     <p class="p">
-      See <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details about adding or changing
-      <span class="keyword cmdname">impalad</span> startup options. See
-      <a class="xref" href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" target="_blank">this
-      blog post</a> for background information about the delegation capability in HiveServer2.
+      The delegation feature is enabled by the startup options for <span class="keyword cmdname">impalad</span>:
+      <code class="ph codeph">--authorized_proxy_user_config</code> and
+      <code class="ph codeph">--authorized_proxy_group_config</code>.
     </p>
+
+
+    <p class="p">
+      The syntax for the options are:
+    </p>
+
+
+<pre class="pre codeblock"><code>--authorized_proxy_user_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_user1</var>,<var class="keyword varname">delegated_user2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
+
+<pre class="pre codeblock"><code>--authorized_proxy_group_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_group1</var>,<var class="keyword varname">delegated_group2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
+
+    <ul class="ul">
+      <li class="li">
+        The list of authorized users/groups are delimited with <code class="ph codeph">;</code>
+      </li>
+
+
+      <li class="li">
+        The list of delegated users/groups are delimited with <code class="ph codeph">,</code> by default.
+      </li>
+
+
+      <li class="li">
+        Use the <code class="ph codeph">--authorized_proxy_user_config_delimiter</code> startup option to
+        override the default user delimiter (the comma character) to another character.
+      </li>
+
+
+      <li class="li">
+        Use the <code class="ph codeph">--authorized_proxy_group_config_delimiter</code> startup option to
+        override the default group delimiter ( (the comma character) to another character.
+      </li>
+
+
+      <li class="li">
+        Wildcard (<code class="ph codeph">*</code>) is supported to delegated to any users or any groups, e.g.
+        <code class="ph codeph">--authorized_proxy_group_config=hue=*</code>. Make sure to use single quotes
+        or escape characters to ensure that any <code class="ph codeph">*</code> characters do not undergo
+        wildcard expansion when specified in command-line arguments.
+      </li>
+
+    </ul>
+
+
+    <p class="p">
+      When you start Impala with the
+      <code class="ph codeph">--authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
+      or
+      <code class="ph codeph">--authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
+      option:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        Authentication is based on the user on the left hand side
+        (<var class="keyword varname">authenticated_user</var>).
+      </li>
+
+
+      <li class="li">
+        Authorization is based on the right hand side user(s) or group(s)
+        (<var class="keyword varname">delegated_user</var>, <var class="keyword varname">delegated_group</var>).
+      </li>
+
+
+      <li class="li">
+        When opening a client connection, the client must provide a delegated username via the
+        HiveServer2 protocol property,<code class="ph codeph">impala.doas.user</code> or
+        <code class="ph codeph">DelegationUID</code>.
+      </li>
+
+
+      <li class="li">
+        It is not necessary for <var class="keyword varname">authenticated_user</var> to have the permission to
+        access/edit files.
+      </li>
+
+
+      <li class="li">
+        It is not necessary for the delegated users to have access to the service via Kerberos.
+      </li>
+
+
+      <li class="li">
+        <var class="keyword varname">delegated_user</var> and <var class="keyword varname">delegated_group</var> must exist in
+        the OS.
+      </li>
+
+
+      <li class="li">
+        For group delegation, use the JNI-based mapping providers for group delegation, such as
+        JniBasedUnixGroupsMappingWithFallback and JniBasedUnixGroupsNetgroupMappingWithFallback.
+      </li>
+
+
+      <li class="li">
+        ShellBasedUnixGroupsNetgroupMapping and ShellBasedUnixGroupsMapping Hadoop group mapping
+        providers are not supported in Impala group delegation.
+      </li>
+
+
+      <li class="li">
+        In Impala, <code class="ph codeph">user()</code> returns <var class="keyword varname">authenticated_user</var> and
+        <code class="ph codeph">effective_user()</code> returns the delegated user that the client specified.
+      </li>
+
+    </ul>
+
+
+    <div class="p">
+      The user or group delegation process works as follows:
+      <ol class="ol">
+        <li class="li">
+          The Impalad daemon starts with one of the following options:
+          <ul class="ul">
+            <li class="li">
+              <code class="ph codeph">--authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">--authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        <li class="li">
+          A client connects to Impala via the HiveServer2 protocol with the
+          <code class="ph codeph">impala.doas.user</code> configuration property, e.g. connected user is
+          <var class="keyword varname">authenticated_user</var> with
+          <code class="ph codeph">impala.doas.user=<var class="keyword varname">delegated_user</var></code>.
+        </li>
+
+
+        <li class="li">
+          The client user <var class="keyword varname">authenticated_user</var> sends a request to Impala as the
+          delegated user <var class="keyword varname">delegated_user</var>.
+        </li>
+
+
+        <li class="li">
+          Impala checks authorization:
+          <ul class="ul">
+            <li class="li">
+              In user delegation, Impala checks if <var class="keyword varname">delegated_user</var> is in the
+              list of authorized delegate users for the user
+              <var class="keyword varname">authenticated_user</var>.
+            </li>
+
+
+            <li class="li">
+              In group delegate, Impala checks if <var class="keyword varname">delegated_user</var> belongs to
+              one of the delegated groups for the user <var class="keyword varname">authenticated_user</var>,
+              <var class="keyword varname">delegated_group</var> in this example.
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        <li class="li">
+          If the user is an authorized delegated user for <var class="keyword varname">authenticated_user</var>,
+          the request is executed as the delegate user <var class="keyword varname">delegated_user</var>.
+        </li>
+
+      </ol>
+
+    </div>
+
+
+    <p class="p">
+      See <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details about adding or
+      changing <span class="keyword cmdname">impalad</span> startup options.
+    </p>
+
+
+    <p class="p">
+      See
+      <a class="xref" href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" target="_blank">this
+      blog post</a> for background information about the delegation capability in
+      HiveServer2.
+    </p>
+
+
     <p class="p">
       To set up authentication for the delegated users:
     </p>
 
+
     <ul class="ul">
       <li class="li">
         <p class="p">
-          On the server side, configure either user/password authentication through LDAP, or Kerberos
-          authentication, for all the delegated users. See <a class="xref" href="impala_ldap.html#ldap">Enabling LDAP Authentication for Impala</a> or
+          On the server side, configure either user/password authentication through LDAP, or
+          Kerberos authentication, for all the delegated users. See
+          <a class="xref" href="impala_ldap.html#ldap">Enabling LDAP Authentication for Impala</a> or
           <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a> for details.
         </p>
+
       </li>
+
 
       <li class="li">
         <p class="p">
-          On the client side, to learn how to enable delegation, consult the documentation
-          for the ODBC driver you are using.
+          On the client side, to learn how to enable delegation, consult the documentation for
+          the ODBC driver you are using.
         </p>
+
       </li>
+
     </ul>
+
 
   </div>
 
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_authentication.html">Impala Authentication</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_authentication.html">Impala Authentication</a></div>
+</div>
+</div></body>
+</html>

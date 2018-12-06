@@ -1,8 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="insert"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>INSERT Statement</title></head><body id="insert"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="INSERT Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="insert" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>INSERT Statement</title>
+</head>
+<body id="insert">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">INSERT Statement</h1>
+
   
   
 
@@ -14,9 +36,11 @@
       TABLE</code> statement, or pre-defined tables and partitions created through Hive.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>[<var class="keyword varname">with_clause</var>]
   INSERT <span class="ph">[<var class="keyword varname">hint_clause</var>]</span> { INTO | OVERWRITE } [TABLE] <var class="keyword varname">table_name</var>
@@ -42,20 +66,23 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
   (With this hint format, the square brackets are part of the syntax.)
 </code></pre>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+    <div class="note note"><span class="notetitle">Note:</span>
         The square bracket style of hint is now deprecated and might be removed in
         a future release. For that reason, any newly added hints are not available
         with the square bracket syntax.
       </div>
 
+
     <p class="p">
       <strong class="ph b">Appending or replacing (INTO and OVERWRITE clauses):</strong>
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">INSERT INTO</code> syntax appends data to a table. The existing data files are left as-is, and
       the inserted data is put into one or more new data files.
     </p>
+
 
     <p class="p">
       The <code class="ph codeph">INSERT OVERWRITE</code> syntax replaces the data in a table.
@@ -65,9 +92,11 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       mechanism.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
+
 
     <p class="p">
       The <code class="ph codeph">INSERT</code> statement currently does not support writing data files
@@ -78,13 +107,16 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       See <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about working with complex types.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
 
+
     <p class="p">
         Currently, the <code class="ph codeph">INSERT OVERWRITE</code> syntax cannot be used with Kudu tables.
       </p>
+
 
     <p class="p">
       Kudu tables require a unique primary key for each row. If an <code class="ph codeph">INSERT</code>
@@ -98,6 +130,7 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       syntax.)
     </p>
 
+
     <p class="p">
       For situations where you prefer to replace rows with duplicate primary key values,
       rather than discarding the new data, you can use the <code class="ph codeph">UPSERT</code>
@@ -107,23 +140,28 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       <span class="q">"upserted"</span> data.
     </p>
 
+
     <p class="p">
       If you really want to store new rows, not replace existing ones, but cannot do so
       because of the primary key uniqueness constraint, consider recreating the table
       with additional columns included in the primary key.
     </p>
 
+
     <p class="p">
       See <a class="xref" href="impala_kudu.html#impala_kudu">Using Impala to Query Kudu Tables</a> for more details about using Impala with Kudu.
     </p>
+
 
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+
     <p class="p">
       Impala currently supports:
     </p>
+
 
     <ul class="ul">
       <li class="li">
@@ -132,27 +170,32 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
         <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax, which bypasses the actual <code class="ph codeph">INSERT</code> keyword.
       </li>
 
+
       <li class="li">
         An optional <a class="xref" href="impala_with.html#with"><code class="ph codeph">WITH</code> clause</a> before the
         <code class="ph codeph">INSERT</code> keyword, to define a subquery referenced in the <code class="ph codeph">SELECT</code> portion.
       </li>
+
 
       <li class="li">
         Create one or more new rows using constant expressions through <code class="ph codeph">VALUES</code> clause. (The
         <code class="ph codeph">VALUES</code> clause was added in Impala 1.0.1.)
       </li>
 
+
       <li class="li">
         <p class="p">
           By default, the first column of each newly inserted row goes into the first column of the table, the
           second column into the second column, and so on.
         </p>
+
         <p class="p">
           You can also specify the columns to be inserted, an arbitrarily ordered subset of the columns in the
           destination table, by specifying a column list immediately after the name of the destination table. This
           feature lets you adjust the inserted columns to match the layout of a <code class="ph codeph">SELECT</code> statement,
           rather than the other way around. (This feature was added in Impala 1.1.)
         </p>
+
         <p class="p">
           The number of columns mentioned in the column list (known as the <span class="q">"column permutation"</span>) must match
           the number of columns in the <code class="ph codeph">SELECT</code> list or the <code class="ph codeph">VALUES</code> tuples. The
@@ -160,7 +203,9 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
           of each input row are reordered to match. If the number of columns in the column permutation is less than
           in the destination table, all unmentioned columns are set to <code class="ph codeph">NULL</code>.
         </p>
+
       </li>
+
 
       <li class="li">
         An optional hint clause immediately either before the <code class="ph codeph">SELECT</code> keyword or after the
@@ -172,9 +217,11 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
         <span class="ph">large</span> memory buffers being allocated to buffer the data for each
         partition. For usage details, see <a class="xref" href="impala_parquet.html#parquet_etl">Loading Data into Parquet Tables</a>.
       </li>
+
     </ul>
 
-    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note"><span class="notetitle">Note:</span>
       <ul class="ul">
         <li class="li">
           Insert commands that partition or add files result in changes to Hive metadata. Because Impala uses Hive
@@ -182,27 +229,34 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
           <a class="xref" href="impala_refresh.html#refresh">REFRESH</a> function.
         </li>
 
+
         <li class="li">
           Currently, Impala can only insert data into tables that use the text and Parquet formats. For other file
           formats, insert the data using Hive and use Impala to query it.
         </li>
+
 
         <li class="li">
           As an alternative to the <code class="ph codeph">INSERT</code> statement, if you have existing data files elsewhere in
           HDFS, the <code class="ph codeph">LOAD DATA</code> statement can move those files into a table. This statement works
           with tables of any file format.
         </li>
+
       </ul>
+
     </div>
+
 
     <p class="p">
         <strong class="ph b">Statement type:</strong> DML (but still affected by
         <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL</a> query option)
       </p>
 
+
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
     <p class="p">
       When you insert the results of an expression, particularly of a built-in function call, into a small numeric
@@ -213,9 +267,11 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       in the <code class="ph codeph">INSERT</code> statement to make the conversion explicit.
     </p>
 
+
     <p class="p">
         <strong class="ph b">File format considerations:</strong>
       </p>
+
 
     <p class="p">
       Because Impala can read certain file formats that it cannot write,
@@ -225,12 +281,14 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       <code class="ph codeph">INSERT</code> statement.
     </p>
 
+
     <p class="p">
         Any <code class="ph codeph">INSERT</code> statement for a Parquet table requires enough free space in the HDFS filesystem
         to write one block. Because Parquet data files use a block size of 1 GB by default, an
         <code class="ph codeph">INSERT</code> might fail (even for a very small amount of data) if your HDFS is running low on
         space.
       </p>
+
 
     <p class="p">
         If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
@@ -239,7 +297,8 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
         nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
-    <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+
+    <div class="note important"><span class="importanttitle">Important:</span>
         After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
         STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
         table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
@@ -248,9 +307,11 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
         are very large, used in join queries, or both.
       </div>
 
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
     <p class="p">
       The following example sets up new tables with the same definition as the <code class="ph codeph">TAB1</code> table from the
@@ -258,6 +319,7 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       formats, and demonstrates inserting data into the tables created with the <code class="ph codeph">STORED AS TEXTFILE</code>
       and <code class="ph codeph">STORED AS PARQUET</code> clauses:
     </p>
+
 
 <pre class="pre codeblock"><code>CREATE DATABASE IF NOT EXISTS file_formats;
 USE file_formats;
@@ -278,6 +340,7 @@ STORED AS PARQUET;</code></pre>
       batches of data alongside the existing data. For example, after running 2 <code class="ph codeph">INSERT INTO TABLE</code>
       statements with 5 rows each, the table contains 10 rows total:
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert into table text_table select * from default.tab1;
 Inserted 5 rows in 0.41s
@@ -301,11 +364,13 @@ Returned 1 row(s) in 0.26s</code></pre>
       efficient form to perform intensive analysis on that subset.
     </p>
 
+
     <p class="p">
       For example, here we insert 5 rows into a table using the <code class="ph codeph">INSERT INTO</code> clause, then replace
       the data by inserting 3 rows with the <code class="ph codeph">INSERT OVERWRITE</code> clause. Afterward, the table only
       contains the 3 rows from the final <code class="ph codeph">INSERT</code> statement.
     </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert into table parquet_table select * from default.tab1;
 Inserted 5 rows in 0.35s
@@ -326,7 +391,8 @@ Returned 1 row(s) in 0.43s</code></pre>
       match the table definition.
     </p>
 
-    <div class="note note note_note" id="insert__insert_values_warning"><span class="note__title notetitle">Note:</span> 
+
+    <div class="note note" id="insert__insert_values_warning"><span class="notetitle">Note:</span>
       The <code class="ph codeph">INSERT ... VALUES</code> technique is not suitable for loading large quantities of data into
       HDFS-based tables, because the insert operations cannot be parallelized, and each one produces a separate
       data file. Use it for setting up small dimension tables or tiny amounts of data for experimenting with SQL
@@ -337,10 +403,12 @@ Returned 1 row(s) in 0.43s</code></pre>
       and use a separate database to make cleanup easier if the operation does produce many tiny files.
     </div>
 
+
     <p class="p">
       The following example shows how to insert one row or multiple rows, with expressions of different types,
       using literal values, expressions, and function return values:
     </p>
+
 
 <pre class="pre codeblock"><code>create table val_test_1 (c1 int, c2 float, c3 string, c4 boolean, c5 timestamp);
 insert into val_test_1 values (100, 99.9/10, 'abc', true, now());
@@ -351,6 +419,7 @@ insert overwrite val_test_2 values (1, 'a'), (2, 'b'), (-1,'xyzzy');</code></pre
       These examples show the type of <span class="q">"not implemented"</span> error that you see when attempting to insert data into
       a table with a file format that Impala currently does not write to:
     </p>
+
 
 <pre class="pre codeblock"><code>DROP TABLE IF EXISTS sequence_table;
 CREATE TABLE sequence_table
@@ -375,6 +444,7 @@ Backend 0:SEQUENCE_FILE not implemented. </code></pre>
       data from only some columns, or specify the columns in the select list in a different order than they
       actually appear in the table:
     </p>
+
 
 <pre class="pre codeblock"><code>-- Start with 2 identical tables.
 create table t1 (c1 int, c2 int);
@@ -407,6 +477,7 @@ insert into t2 (y) select c1 from t1;
         stored in sorted order is impractical.
       </p>
 
+
     <p class="p">
       <strong class="ph b">Concurrency considerations:</strong> Each <code class="ph codeph">INSERT</code> operation creates new data files with unique
       names, so you can run multiple <code class="ph codeph">INSERT INTO</code> statements simultaneously without filename
@@ -419,11 +490,18 @@ insert into t2 (y) select c1 from t1;
       issuing an <code class="ph codeph">hdfs dfs -rm -r</code> command, specifying the full path of the work subdirectory, whose
       name ends in <code class="ph codeph">_dir</code>.
     </p>
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="insert__values">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="values">
 
     <h2 class="title topictitle2" id="ariaid-title2">VALUES Clause</h2>
+
 
     <div class="body conbody">
 
@@ -432,7 +510,8 @@ insert into t2 (y) select c1 from t1;
         typically within an <code class="ph codeph"><a class="xref" href="impala_insert.html#insert">INSERT</a></code> statement.
       </p>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         The <code class="ph codeph">INSERT ... VALUES</code> technique is not suitable for loading large quantities of data into
         HDFS-based tables, because the insert operations cannot be parallelized, and each one produces a separate
         data file. Use it for setting up small dimension tables or tiny amounts of data for experimenting with SQL
@@ -443,24 +522,29 @@ insert into t2 (y) select c1 from t1;
         clause, and use a separate database to make cleanup easier if the operation does produce many tiny files.
       </div>
 
+
       <p class="p">
         The following examples illustrate:
       </p>
+
 
       <ul class="ul">
         <li class="li">
           How to insert a single row using a <code class="ph codeph">VALUES</code> clause.
         </li>
 
+
         <li class="li">
           How to insert multiple rows using a <code class="ph codeph">VALUES</code> clause.
         </li>
+
 
         <li class="li">
           How the row or rows from a <code class="ph codeph">VALUES</code> clause can be appended to a table through
           <code class="ph codeph">INSERT INTO</code>, or replace the contents of the table through <code class="ph codeph">INSERT
           OVERWRITE</code>.
         </li>
+
 
         <li class="li">
           How the entries in a <code class="ph codeph">VALUES</code> clause can be literals, function results, or any other kind
@@ -470,7 +554,9 @@ insert into t2 (y) select c1 from t1;
           <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a> for other things you can include in expressions with the
           <code class="ph codeph">VALUES</code> clause.
         </li>
+
       </ul>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; describe val_example;
 Query: describe val_example
@@ -509,6 +595,7 @@ Inserted 2 rows in 0.16s
         use the syntax:
       </p>
 
+
 <pre class="pre codeblock"><code>INSERT INTO <var class="keyword varname">destination</var>
   (<var class="keyword varname">col_x</var>, <var class="keyword varname">col_y</var>, <var class="keyword varname">col_z</var>)
   VALUES
@@ -522,10 +609,12 @@ Inserted 2 rows in 0.16s
 
 
 
+
       <p class="p">
         To use a <code class="ph codeph">VALUES</code> clause like a table in other statements, wrap it in parentheses and use
         <code class="ph codeph">AS</code> clauses to specify aliases for the entire object and any columns you need to refer to:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select * from (values(4,5,6),(7,8,9)) as t;
 +---+---+---+
@@ -547,9 +636,11 @@ Inserted 2 rows in 0.16s
         values as part of a longer statement involving joins or <code class="ph codeph">UNION ALL</code>.
       </p>
 
+
       <p class="p">
         <strong class="ph b">HDFS considerations:</strong>
       </p>
+
 
       <p class="p">
         Impala physically writes all inserted files under the ownership of its default user, typically
@@ -557,12 +648,14 @@ Inserted 2 rows in 0.16s
         directory.
       </p>
 
+
       <p class="p">
         The permission requirement is independent of the authorization performed by the Sentry framework. (If the
         connected user is not authorized to insert into a table, Sentry blocks that operation immediately,
         regardless of the privileges available to the <code class="ph codeph">impala</code> user.) Files created by Impala are
         not owned by and do not inherit permissions from the connected user.
       </p>
+
 
       <p class="p">
         The number of data files produced by an <code class="ph codeph">INSERT</code> statement depends on the size of the
@@ -574,6 +667,7 @@ Inserted 2 rows in 0.16s
         of megabytes are considered <span class="q">"tiny"</span>.)
       </p>
 
+
       <p class="p">
         The <code class="ph codeph">INSERT</code> statement has always left behind a hidden work directory inside the data
         directory of the table. Formerly, this hidden work directory was named
@@ -584,13 +678,16 @@ Inserted 2 rows in 0.16s
         adjust them to use the new name.
       </p>
 
+
       <p class="p">
         <strong class="ph b">HBase considerations:</strong>
       </p>
 
+
       <p class="p">
         You can use the <code class="ph codeph">INSERT</code> statement with HBase tables as follows:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -599,14 +696,18 @@ Inserted 2 rows in 0.16s
             VALUES</code> syntax. This is a good use case for HBase tables with Impala, because HBase tables are
             not subject to the same kind of fragmentation from many small insert operations as HDFS tables are.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
             You can insert any number of rows at once into an HBase table using the <code class="ph codeph">INSERT ...
             SELECT</code> syntax.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -617,13 +718,17 @@ Inserted 2 rows in 0.16s
             copying from an HDFS table, the HBase table might contain fewer rows than were inserted, if the key
             column in the source table contained duplicate values.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
             You cannot <code class="ph codeph">INSERT OVERWRITE</code> into an HBase table. New rows are always appended.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -636,16 +741,21 @@ Inserted 2 rows in 0.16s
             <code class="ph codeph">DESCRIBE</code> statement for the table, and adjust the order of the select list in the
             <code class="ph codeph">INSERT</code> statement.
           </p>
+
         </li>
+
       </ul>
+
 
       <p class="p">
         See <a class="xref" href="impala_hbase.html#impala_hbase">Using Impala to Query HBase Tables</a> for more details about using Impala with HBase.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Amazon S3 considerations:</strong>
       </p>
+
       <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
         and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
@@ -657,6 +767,7 @@ Inserted 2 rows in 0.16s
         If you bring data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
         issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the S3 data.
       </p>
+
       <p class="p">
         Because of differences between S3 and traditional filesystems, DML operations
         for S3 tables can take longer than for tables on HDFS. For example, both the
@@ -672,32 +783,42 @@ Inserted 2 rows in 0.16s
         It does not apply to <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA</code> statements.
         See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a> for details.
       </p>
+
       <p class="p">See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.</p>
+
 
       <p class="p">
         <strong class="ph b">ADLS considerations:</strong>
       </p>
-      <p class="p">
-        In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
-        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
-        Azure Data Lake Store (ADLS).
-        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
-        partitions is specified by an <code class="ph codeph">adl://</code> prefix in the
-        <code class="ph codeph">LOCATION</code> attribute of
-        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
-        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
-        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the ADLS data.
-      </p>
+
+      <p class="p"> In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements
+          (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and
+          <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table
+        or partition that resides in the Azure Data Lake Store (ADLS). ADLS Gen2
+        is supported in <span class="keyword">Impala 3.1</span> and higher.</p>
+<p class="p">In the<code class="ph codeph">CREATE TABLE</code> or
+          <code class="ph codeph">ALTER TABLE</code> statements, specify the ADLS location for
+        tables and partitions with the <code class="ph codeph">adl://</code> prefix for ADLS
+        Gen1 and <code class="ph codeph">abfs://</code> or <code class="ph codeph">abfss://</code> for ADLS
+        Gen2 in the <code class="ph codeph">LOCATION</code> attribute.</p>
+<p class="p">If you bring data into ADLS
+        using the normal ADLS transfer mechanisms instead of Impala DML
+        statements, issue a <code class="ph codeph">REFRESH</code> statement for the table
+        before using Impala to query the ADLS data. </p>
+
       <p class="p">See <a class="xref" href="impala_adls.html#adls">Using Impala with the Azure Data Lake Store (ADLS)</a> for details about reading and writing ADLS data with Impala.</p>
+
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
+
       <p class="p">
         If these statements in your environment contain sensitive literal values such as credit card numbers or tax
         identifiers, Impala can redact this sensitive information when displaying the statements in log files and
         other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Cancellation:</strong> Can be cancelled. To cancel this statement, use Ctrl-C from the
@@ -707,9 +828,11 @@ Inserted 2 rows in 0.16s
         (port 25000).
       </p>
 
+
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
         typically the <code class="ph codeph">impala</code> user, must have read
@@ -723,9 +846,11 @@ Inserted 2 rows in 0.16s
         the original data files in the table, only on the table directories themselves.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Restrictions:</strong>
       </p>
+
 
       <p class="p">
         For <code class="ph codeph">INSERT</code> operations into <code class="ph codeph">CHAR</code> or <code class="ph codeph">VARCHAR</code> columns, you
@@ -733,9 +858,11 @@ Inserted 2 rows in 0.16s
         <code class="ph codeph">CHAR</code> or <code class="ph codeph">VARCHAR</code> type with the appropriate length.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related startup options:</strong>
       </p>
+
 
       <p class="p">
         By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories underneath a partitioned
@@ -743,24 +870,32 @@ Inserted 2 rows in 0.16s
         make each subdirectory have the same permissions as its parent directory in HDFS, specify the
         <code class="ph codeph">--insert_inherit_permissions</code> startup option for the <span class="keyword cmdname">impalad</span> daemon.
       </p>
+
     </div>
-  </article>
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="insert__partition_insert">
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="partition_insert">
     <h2 class="title topictitle2" id="ariaid-title3">Inserting Into Partitioned Tables with PARTITION Clause</h2>
+
     <div class="body conbody">
       <p class="p">
         For a partitioned table, the optional <code class="ph codeph">PARTITION</code> clause
         identifies which partition or partitions the values are inserted
         into.
       </p>
+
       <p class="p">
         All examples in this section will use the table declared as below:
       </p>
+
 <pre class="pre codeblock"><code>CREATE TABLE t1 (w INT) PARTITIONED BY (x INT, y STRING);</code></pre>
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="partition_insert__static_partition_insert">
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="static_partition_insert">
       <h3 class="title topictitle3" id="ariaid-title4">Static Partition Inserts</h3>
+
       <div class="body conbody">
         <p class="p">
           In a static partition insert where a partition key column is given a
@@ -768,17 +903,21 @@ Inserted 2 rows in 0.16s
           <code class="ph codeph">(year=2012, month=2)</code>, the rows are inserted with the
           same values specified for those partition key columns.
         </p>
+
         <p class="p">
           The number of columns in the <code class="ph codeph">SELECT</code> list must equal
           the number of columns in the column permutation.
         </p>
+
         <p class="p">
           The <code class="ph codeph">PARTITION</code> clause must be used for static
           partitioning inserts.
         </p>
+
         <p class="p">
           Example:
         </p>
+
         <div class="p">
           The following statement will insert the
             <code class="ph codeph">some_other_table.c1</code> values for the
@@ -788,10 +927,14 @@ Inserted 2 rows in 0.16s
           <code class="ph codeph">‘a’</code>.<pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x=10, y='a')
             SELECT c1 FROM some_other_table;</code></pre>
         </div>
+
       </div>
-    </article>
-    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="partition_insert__dynamic_partition_insert">
+
+    </div>
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="dynamic_partition_insert">
         <h3 class="title topictitle3" id="ariaid-title5">Dynamic Partition Inserts</h3>
+
         <div class="body conbody">
           <p class="p">
             In a dynamic partition insert where a partition key
@@ -805,50 +948,75 @@ Inserted 2 rows in 0.16s
           in the column permutation plus the number of partition key columns not
           assigned a constant value.
           </p>
+
           <p class="p">
-            See <a class="xref" href="https://www.cloudera.com/documentation/enterprise/latest/topics/impala_partitioning.html#partition_static_dynamic" target="_blank"><u class="ph u">Static and Dynamic Partitioning
-                Clauses</u></a> for examples and performance characteristics
-            of static and dynamic partitioned inserts.
+            See <a class="xref" href="impala_partitioning.html#partition_static_dynamic">Static and Dynamic Partitioning Clauses</a> for examples and performance characteristics of static and dynamic
+          partitioned inserts.
           </p>
+
           <p class="p">
             The following rules apply to dynamic partition
             inserts.
           </p>
+
           <ul class="ul">
             <li class="li">
               <p class="p">
                 The columns are bound in the order they appear in the
                   <code class="ph codeph">INSERT</code> statement.
               </p>
+
               <p class="p">
                 The table below shows the values inserted with the
                 <code class="ph codeph">INSERT</code> statements of different column
               orders.
               </p>
+
             </li>
+
           </ul>
-          <table class="table frame-all" id="dynamic_partition_insert__table_vyx_dp3_ldb"><caption></caption><colgroup><col><col><col><col></colgroup><tbody class="tbody">
+
+
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="dynamic_partition_insert__table_vyx_dp3_ldb" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /><col /></colgroup><tbody class="tbody">
                 <tr class="row">
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">w</code> Value</td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">x</code> Value</td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">y</code> Value</td>
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"> </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;">Column <code class="ph codeph">w</code> Value</td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;">Column <code class="ph codeph">x</code> Value</td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;">Column <code class="ph codeph">y</code> Value</td>
+
                 </tr>
+
                 <tr class="row">
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">INSERT INTO t1 (w, x, y) VALUES (1, 2,
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">INSERT INTO t1 (w, x, y) VALUES (1, 2,
                       'c');</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">1</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">2</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">‘c’</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">1</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">2</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">‘c’</code></td>
+
                 </tr>
+
                 <tr class="row">
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">INSERT INTO t1 (x,w) PARTITION (y) VALUES (1,
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">INSERT INTO t1 (x,w) PARTITION (y) VALUES (1,
                       2, 'c');</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">2</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">1</code></td>
-                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">‘c’</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">2</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">1</code></td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;"><code class="ph codeph">‘c’</code></td>
+
                 </tr>
-              </tbody></table>
+
+              </tbody>
+</table>
+</div>
+
           <ul class="ul">
             <li class="li">
               When a partition clause is specified but the non-partition
@@ -863,10 +1031,12 @@ Inserted 2 rows in 0.16s
               and <code class="ph codeph">‘c’</code> to <code class="ph codeph">y</code>
             columns.
               </p>
+
 <pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
 INSERT INTO t1 (w) PARTITION (x, y) VALUES (1, 2, ‘c’);
 INSERT INTO t1 PARTITION (x, y='c') VALUES (1, 2);</code></pre>
             </li>
+
             <li class="li">
               The <code class="ph codeph">PARTITION</code> clause is not required for
             dynamic partition, but all the partition columns must be explicitly
@@ -876,12 +1046,14 @@ INSERT INTO t1 PARTITION (x, y='c') VALUES (1, 2);</code></pre>
               <p class="p">
                 Example:
               </p>
+
               <p class="p">The following statements are valid because the partition
               columns, <code class="ph codeph">x</code> and <code class="ph codeph">y</code>, are present in
               the <code class="ph codeph">INSERT</code> statements, either in the
                 <code class="ph codeph">PARTITION</code> clause or in the column
               list.
               </p>
+
 <pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
 INSERT INTO t1 (w, x) PARTITION (y) VALUES (1, 2, ‘c’);</code></pre>
               <p class="p">
@@ -890,8 +1062,10 @@ INSERT INTO t1 (w, x) PARTITION (y) VALUES (1, 2, ‘c’);</code></pre>
               and <code class="ph codeph">y</code>, are not present in the
                 <code class="ph codeph">INSERT</code> statement.
               </p>
+
 <pre class="pre codeblock"><code>INSERT INTO t1 VALUES (1, 2, 'c');</code></pre>
           </li>
+
             <li class="li">
               If partition columns do not exist in the source table, you can
               specify a specific value for that column in the
@@ -902,10 +1076,17 @@ INSERT INTO t1 (w, x) PARTITION (y) VALUES (1, 2, ‘c’);</code></pre>
                 <code class="ph codeph">20</code>, specified in the <code class="ph codeph">PARTITION</code>
               clause, is inserted into the <code class="ph codeph">x</code> column.
               </p>
+
 <pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x=20, y) SELECT * FROM source;</code></pre>
           </li>
+
           </ul>
+
         </div>
-      </article>
-    </article>
-  </article></main></body></html>
+
+      </div>
+
+    </div>
+
+  </body>
+</html>

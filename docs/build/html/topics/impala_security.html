@@ -1,8 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_guidelines.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_files.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_install.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_metastore.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_webui.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_ssl.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authorization.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_auditing.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_lineage.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="security"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Security</title></head><body id="security"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Security" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_security_guidelines.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_security_files.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_security_install.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_security_metastore.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_security_webui.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_ssl.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_authorization.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_auditing.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_lineage.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="security" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Security</title>
+</head>
+<body id="security">
+
 
   <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Impala Security</span></h1>
+
   
 
   <div class="body conbody">
@@ -16,6 +45,7 @@
       consumed, filtered, and visualized by cluster-management components focused on governance.
     </p>
 
+
     <p class="p">
       The Impala security features have several objectives. At the most basic level, security prevents
       accidents or mistakes that could disrupt application processing, delete or corrupt data, or reveal data to
@@ -27,6 +57,7 @@
       concurrently and are prevented from interfering with each other.
     </p>
 
+
     <p class="p">
       The material in this section presumes that you are already familiar with administering secure Linux systems.
       That is, you should know the general security practices for Linux and Hadoop, and their associated commands
@@ -36,9 +67,11 @@
       cluster, and know how to apply configuration changes or run a set of commands across all the nodes.
     </p>
 
+
     <p class="p">
       The security features are divided into these broad categories:
     </p>
+
 
     <dl class="dl">
       
@@ -46,6 +79,7 @@
         <dt class="dt dlterm">
           authorization
         </dt>
+
 
         <dd class="dd">
           Which users are allowed to access which resources, and what operations are they allowed to perform?
@@ -58,6 +92,7 @@
           authorization.
         </dd>
 
+
       
 
       
@@ -66,11 +101,13 @@
           authentication
         </dt>
 
+
         <dd class="dd">
           How does Impala verify the identity of the user to confirm that they really are allowed to exercise the
           privileges assigned to that user? Impala relies on the Kerberos subsystem for authentication. See
           <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a> for details about setting up and managing authentication.
         </dd>
+
 
       
 
@@ -79,6 +116,7 @@
         <dt class="dt dlterm">
           auditing
         </dt>
+
 
         <dd class="dd">
           What operations were attempted, and did they succeed or not? This feature provides a way to look back and
@@ -89,11 +127,39 @@
           auditing.
         </dd>
 
+
       
     </dl>
 
+
     <p class="p toc"></p>
+
 
     
   </div>
-<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_security_guidelines.html">Security Guidelines for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_files.html">Securing Impala Data and Log Files</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_install.html">Installation Considerations for Impala Security</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_metastore.html">Securing the Hive Metastore Database</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_webui.html">Securing the Impala Web User Interface</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_ssl.html">Configuring TLS/SSL for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_authorization.html">Enabling Sentry Authorization for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_authentication.html">Impala Authentication</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_auditing.html">Auditing Impala Operations</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_lineage.html">Viewing Lineage Information for Impala Data</a></strong><br></li></ul></nav></article></main></body></html>
+
+<div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_security_guidelines.html">Security Guidelines for Impala</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_security_files.html">Securing Impala Data and Log Files</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_security_install.html">Installation Considerations for Impala Security</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_security_metastore.html">Securing the Hive Metastore Database</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_security_webui.html">Securing the Impala Web User Interface</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_ssl.html">Configuring TLS/SSL for Impala</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_authorization.html">Enabling Sentry Authorization for Impala</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_authentication.html">Impala Authentication</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_auditing.html">Auditing Impala Operations</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_lineage.html">Viewing Lineage Information for Impala Data</a></strong><br />
+</li>
+</ul>
+</div></body>
+</html>

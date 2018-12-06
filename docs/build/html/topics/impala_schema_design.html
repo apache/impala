@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_planning.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="schema_design"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Guidelines for Designing Impala Schemas</title></head><body id="schema_design"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Guidelines for Designing Impala Schemas" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_planning.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="schema_design" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Guidelines for Designing Impala Schemas</title>
+</head>
+<body id="schema_design">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Guidelines for Designing Impala Schemas</h1>
+
   
   
 
@@ -14,14 +34,17 @@
       proof-of-concept work, porting exercise, or before deploying to production.
     </p>
 
+
     <p class="p">
       If you are adapting an existing database or Hive schema for use with Impala, read the guidelines in this
       section and then see <a class="xref" href="impala_porting.html#porting">Porting SQL from Other Database Systems to Impala</a> for specific porting and compatibility tips.
     </p>
 
+
     <p class="p toc inpage"></p>
 
-    <section class="section" id="schema_design__schema_design_text_vs_binary"><h2 class="title sectiontitle">Prefer binary file formats over text-based formats.</h2>
+
+    <div class="section" id="schema_design__schema_design_text_vs_binary"><h2 class="title sectiontitle">Prefer binary file formats over text-based formats.</h2>
 
       
 
@@ -32,6 +55,7 @@
         a Hadoop ETL pipeline.
       </p>
 
+
       <p class="p">
         Although Impala can create and query tables with the RCFile and SequenceFile file formats, such tables are
         relatively bulky due to the text-based nature of those formats, and are not optimized for data
@@ -39,28 +63,35 @@
         operations for tables with these file formats.
       </p>
 
+
       <p class="p">
         Guidelines:
       </p>
+
 
       <ul class="ul">
         <li class="li">
           For an efficient and scalable format for large, performance-critical tables, use the Parquet file format.
         </li>
 
+
         <li class="li">
           To deliver intermediate data during the ETL process, in a format that can also be used by other Hadoop
           components, Avro is a reasonable choice.
         </li>
 
+
         <li class="li">
           For convenient import of raw data, use a text table instead of RCFile or SequenceFile, and convert to
           Parquet in a later stage of the ETL process.
         </li>
-      </ul>
-    </section>
 
-    <section class="section" id="schema_design__schema_design_compression"><h2 class="title sectiontitle">Use Snappy compression where practical.</h2>
+      </ul>
+
+    </div>
+
+
+    <div class="section" id="schema_design__schema_design_compression"><h2 class="title sectiontitle">Use Snappy compression where practical.</h2>
 
       
 
@@ -69,9 +100,11 @@
         savings. In cases where you have a choice of compression codecs, such as with the Parquet and Avro file
         formats, use Snappy compression unless you find a compelling reason to use a different codec.
       </p>
-    </section>
 
-    <section class="section" id="schema_design__schema_design_numeric_types"><h2 class="title sectiontitle">Prefer numeric types over strings.</h2>
+    </div>
+
+
+    <div class="section" id="schema_design__schema_design_numeric_types"><h2 class="title sectiontitle">Prefer numeric types over strings.</h2>
 
       
 
@@ -84,11 +117,13 @@
         using numeric types will save space in binary formats such as Parquet, and in memory when doing queries,
         particularly resource-intensive queries such as joins.
       </p>
-    </section>
+
+    </div>
 
 
 
-    <section class="section" id="schema_design__schema_design_partitioning"><h2 class="title sectiontitle">Partition, but do not over-partition.</h2>
+
+    <div class="section" id="schema_design__schema_design_partitioning"><h2 class="title sectiontitle">Partition, but do not over-partition.</h2>
 
       
 
@@ -97,6 +132,7 @@
         <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a> to set up partitioning for your biggest, most
         intensively queried tables.
       </p>
+
 
       <p class="p">
         If you are moving to Impala from a traditional database system, or just getting started in the Big Data
@@ -107,6 +143,7 @@
         node might have very little work to do. Consider reducing the number of partition key columns so that each
         partition directory contains several gigabytes worth of data.
       </p>
+
 
       <p class="p">
         For example, consider a Parquet table where each data file is 1 HDFS block, with a maximum block size of 1
@@ -119,14 +156,17 @@
         during queries, so are most cores on those machines.
       </p>
 
+
       <p class="p">
         You can reduce the Parquet block size to as low as 128 MB or 64 MB to increase the number of files per
         partition and improve parallelism. But also consider reducing the level of partitioning so that analytic
         queries have enough data to work with.
       </p>
-    </section>
 
-    <section class="section" id="schema_design__schema_design_compute_stats"><h2 class="title sectiontitle">Always compute stats after loading data.</h2>
+    </div>
+
+
+    <div class="section" id="schema_design__schema_design_compute_stats"><h2 class="title sectiontitle">Always compute stats after loading data.</h2>
 
       
 
@@ -137,12 +177,14 @@
         on a table after loading or replacing data in a table or partition.
       </p>
 
+
       <p class="p">
         Having accurate statistics can make the difference between a successful operation, or one that fails due to
         an out-of-memory error or a timeout. When you encounter performance or capacity issues, always use the
         <code class="ph codeph">SHOW STATS</code> statement to check if the statistics are present and up-to-date for all tables
         in the query.
       </p>
+
 
       <p class="p">
         When doing a join query, Impala consults the statistics for each joined table to determine their relative
@@ -151,14 +193,17 @@
         the work of constructing the data files for each partition.
       </p>
 
+
       <p class="p">
         See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for the syntax of the <code class="ph codeph">COMPUTE
         STATS</code> statement, and <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for all the performance
         considerations for table and column statistics.
       </p>
-    </section>
 
-    <section class="section" id="schema_design__schema_design_explain"><h2 class="title sectiontitle">Verify sensible execution plans with EXPLAIN and SUMMARY.</h2>
+    </div>
+
+
+    <div class="section" id="schema_design__schema_design_explain"><h2 class="title sectiontitle">Verify sensible execution plans with EXPLAIN and SUMMARY.</h2>
 
       
 
@@ -170,6 +215,7 @@
         techniques, see <a class="xref" href="impala_performance.html#performance">Tuning Impala for Performance</a>.
       </p>
 
+
       <p class="p">
         After you run a query, you can see performance-related information about how it actually ran by issuing the
         <code class="ph codeph">SUMMARY</code> command in <span class="keyword cmdname">impala-shell</span>. Prior to Impala 1.4, you would use
@@ -177,8 +223,16 @@
         experienced users. <code class="ph codeph">SUMMARY</code>, new in Impala 1.4, summarizes the most useful information for
         all stages of execution, for all nodes rather than splitting out figures for each node.
       </p>
-    </section>
+
+    </div>
+
 
 
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_planning.html">Planning for Impala Deployment</a></div></div></nav></article></main></body></html>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_planning.html">Planning for Impala Deployment</a></div>
+</div>
+</div></body>
+</html>

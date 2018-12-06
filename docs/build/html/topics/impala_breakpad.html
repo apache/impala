@@ -1,8 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_troubleshooting.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="breakpad"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Breakpad Minidumps for Impala (Impala 2.6 or higher only)</title></head><body id="breakpad"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Breakpad Minidumps for Impala (Impala 2.6 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_troubleshooting.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="breakpad" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Breakpad Minidumps for Impala (Impala 2.6 or higher only)</title>
+</head>
+<body id="breakpad">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Breakpad Minidumps for Impala (<span class="keyword">Impala 2.6</span> or higher only)</h1>
+
   
   
 
@@ -18,29 +38,60 @@
       memory, which improves reliability if the crash occurs while the system is low on memory.
     </p>
 
-    <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+
+    <div class="note important"><span class="importanttitle">Important:</span>
       Because of the internal mechanisms involving Impala memory allocation and Linux
       signalling for out-of-memory (OOM) errors, if an Impala-related daemon experiences a
       crash due to an OOM condition, it does <em class="ph i">not</em> generate a minidump for that error.
     <p class="p">
 
     </p>
+
     </div>
+
 
 
     <p class="p toc inpage"></p>
 
+
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="breakpad__breakpad_minidump_enable">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="breakpad_minidump_enable">
     <h2 class="title topictitle2" id="ariaid-title2">Enabling or Disabling Minidump Generation</h2>
+
     <div class="body conbody">
       <p class="p">
-        By default, a minidump file is generated when an Impala-related daemon crashes.
-        To turn off generation of the minidump files, change the
-        <span class="ph uicontrol">minidump_path</span> configuration setting of one or more Impala-related daemons
-        to the empty string, and restart the corresponding services or daemons.
+        By default, a minidump file is generated when an Impala-related daemon
+        crashes.
       </p>
+
+
+      <div class="p">
+        To turn off generation of the minidump files, use one of the following
+        options:
+
+        <ul class="ul">
+          <li class="li">
+            Set the <code class="ph codeph">--enable_minidumps</code> configuration setting
+            to <code class="ph codeph">false</code>. Restart the corresponding services or
+            daemons.
+          </li>
+
+
+          <li class="li">
+            Set the <code class="ph codeph">--minidump_path</code> configuration setting to
+            an empty string. Restart the corresponding services or daemons.
+          </li>
+
+        </ul>
+
+      </div>
+
 
       <p class="p">
         In <span class="keyword">Impala 2.7</span> and higher,
@@ -48,11 +99,15 @@
         Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
         without triggering a crash.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="breakpad__breakpad_minidump_location">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="breakpad_minidump_location">
     <h2 class="title topictitle2" id="ariaid-title3">Specifying the Location for Minidump Files</h2>
+
     <div class="body conbody">
       <div class="p">
         By default, all minidump files are written to the following location
@@ -64,36 +119,47 @@
               Clusters not managed by cluster management software:
               <span class="ph filepath"><var class="keyword varname">impala_log_dir</var>/<var class="keyword varname">daemon_name</var>/minidumps/<var class="keyword varname">daemon_name</var></span>
             </p>
+
           </li>
+
         </ul>
+
         The minidump files for <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>,
         and <span class="keyword cmdname">statestored</span> are each written to a separate directory.
       </div>
+
       <p class="p">
         To specify a different location, set the
         
         <span class="ph uicontrol">minidump_path</span>
         configuration setting of one or more Impala-related daemons, and restart the corresponding services or daemons.
       </p>
+
       <p class="p">
         If you specify a relative path for this setting, the value is interpreted relative to
         the default <span class="ph uicontrol">minidump_path</span> directory.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="breakpad__breakpad_minidump_number">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="breakpad_minidump_number">
     <h2 class="title topictitle2" id="ariaid-title4">Controlling the Number of Minidump Files</h2>
+
     <div class="body conbody">
       <p class="p">
         Like any files used for logging or troubleshooting, consider limiting the number of
         minidump files, or removing unneeded ones, depending on the amount of free storage
         space on the hosts in the cluster.
       </p>
+
       <p class="p">
         Because the minidump files are only used for problem resolution, you can remove any such files that
         are not needed to debug current issues.
       </p>
+
       <p class="p">
         To control how many minidump files Impala keeps around at any one time,
         set the <span class="ph uicontrol">max_minidumps</span> configuration setting for
@@ -101,11 +167,15 @@
         The default for this setting is 9. A zero or negative value is interpreted as
         <span class="q">"unlimited"</span>.
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="breakpad__breakpad_minidump_logging">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="breakpad_minidump_logging">
     <h2 class="title topictitle2" id="ariaid-title5">Detecting Crash Events</h2>
+
     <div class="body conbody">
 
       <p class="p">
@@ -115,11 +185,15 @@
         if core dumps are also enabled.
       </p>
 
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="breakpad__breakpad_demo">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="breakpad_demo">
     <h2 class="title topictitle2" id="ariaid-title6">Demonstration of Breakpad Feature</h2>
+
     <div class="body conbody">
       <p class="p">
         The following example uses the command <span class="keyword cmdname">kill -11</span> to
@@ -127,10 +201,12 @@
         process on a single DataNode, then examines the relevant log files and minidump file.
       </p>
 
+
       <p class="p">
         First, as root on a worker node, kill the <span class="keyword cmdname">impalad</span> process with a
         <code class="ph codeph">SIGSEGV</code> error. The original process ID was 23114.
       </p>
+
 
 <pre class="pre codeblock"><code>
 # ps ax | grep impalad
@@ -152,6 +228,7 @@
         <code class="ph codeph">.INFO</code> file and the <code class="ph codeph">.ERROR</code> file, but not the
         <code class="ph codeph">.WARNING</code> file. In this case, a large core file was also produced.
       </p>
+
 <pre class="pre codeblock"><code>
 # cd /var/log/impalad
 # ls -la | grep 23114
@@ -167,6 +244,7 @@
         a report of a core dump. With the breakpad minidump feature enabled, now we might
         disable core dumps or keep fewer of them around.
       </p>
+
 <pre class="pre codeblock"><code>
 # cat impalad.worker_node_123.impala.log.INFO.20160623-140343.23114
 ...
@@ -207,6 +285,7 @@ Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-
         making it much easier to supply diagnostic information to <span class="keyword">the appropriate support channel</span>.
       </p>
 
+
 <pre class="pre codeblock"><code>
 # pwd
 /var/log/impalad
@@ -218,6 +297,9 @@ Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-
 
 </code></pre>
     </div>
-  </article>
 
-</article></main></body></html>
+  </div>
+
+
+</body>
+</html>

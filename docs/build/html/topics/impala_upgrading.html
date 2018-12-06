@@ -1,136 +1,558 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="upgrading"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Upgrading Impala</title></head><body id="upgrading"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Upgrading Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="upgrading" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Upgrading Impala</title>
+</head>
+<body id="upgrading">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">Upgrading Impala</h1>
+
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      Upgrading Impala involves building or acquiring new Impala-related binaries,
-      and then restarting Impala services.
+      Upgrading Impala involves building or acquiring new Impala-related binaries, and then
+      restarting Impala services.
     </p>
 
-    </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="upgrading__upgrade_manual">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="upgrade_manual">
 
     <h2 class="title topictitle2" id="ariaid-title2">Upgrading Impala</h2>
+
 
     <div class="body conbody">
 
       <ul class="ul">
         <li class="li">
           <p class="p">
-            Shut down all Impala-related daemons on
-            all relevant hosts in the cluster:
+            Shut down all Impala-related daemons on all relevant hosts in the cluster:
           </p>
+
           <ol class="ol">
             <li class="li">
               Stop <code class="ph codeph">impalad</code> on each Impala node in your cluster:
 <pre class="pre codeblock"><code>$ sudo service impala-server stop</code></pre>
             </li>
 
+
             <li class="li">
               Stop any instances of the state store in your cluster:
 <pre class="pre codeblock"><code>$ sudo service impala-state-store stop</code></pre>
             </li>
 
+
             <li class="li">
               Stop any instances of the catalog service in your cluster:
 <pre class="pre codeblock"><code>$ sudo service impala-catalog stop</code></pre>
             </li>
+
           </ol>
+
         </li>
+
+
         <li class="li">
           <p class="p">
-            Follow the build procedure in the
-            <span class="ph filepath">README.md</span> file
-            to produce new Impala binaries.
+            Follow the build procedure in the <span class="ph filepath">README.md</span> file to produce new
+            Impala binaries.
           </p>
+
         </li>
+
+
         <li class="li">
           <p class="p">
-            Replace the binaries for all Impala-related
-            daemons on all relevant hosts in the cluster.
+            Replace the binaries for all Impala-related daemons on all relevant hosts in the
+            cluster.
           </p>
+
         </li>
+
+
         <li class="li">
-          Check if there are new recommended or required configuration settings to put into place in the
-          configuration files, typically under <span class="ph filepath">/etc/impala/conf</span>. See
-          <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a> for settings related to performance and
-          scalability.
+          Check if there are new recommended or required configuration settings to put into
+          place in the configuration files, typically under
+          <span class="ph filepath">/etc/impala/conf</span>. See
+          <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a> for settings related
+          to performance and scalability.
         </li>
+
+
         <li class="li">
           <p class="p">
-            Restart all Impala-related daemons on
-            all relevant hosts in the cluster:
+            Restart all Impala-related daemons on all relevant hosts in the cluster:
           </p>
+
           <ol class="ol">
             <li class="li">
-              Restart the Impala state store service on the desired nodes in your cluster. Expect to see a process
-              named <code class="ph codeph">statestored</code> if the service started successfully.
+              Restart the Impala state store service on the desired nodes in your cluster.
+              Expect to see a process named <code class="ph codeph">statestored</code> if the service started
+              successfully.
 <pre class="pre codeblock"><code>$ sudo service impala-state-store start
 $ ps ax | grep [s]tatestored
  6819 ?        Sl     0:07 /usr/lib/impala/sbin/statestored -log_dir=/var/log/impala -state_store_port=24000
 </code></pre>
               <p class="p">
-                Restart the state store service <em class="ph i">before</em> the Impala server service to avoid <span class="q">"Not
-                connected"</span> errors when you run <code class="ph codeph">impala-shell</code>.
+                Restart the state store service <em class="ph i">before</em> the Impala server service to avoid
+                <span class="q">"Not connected"</span> errors when you run <code class="ph codeph">impala-shell</code>.
               </p>
+
             </li>
 
+
             <li class="li">
-              Restart the Impala catalog service on whichever host it runs on in your cluster. Expect to see a
-              process named <code class="ph codeph">catalogd</code> if the service started successfully.
+              Restart the Impala catalog service on whichever host it runs on in your cluster.
+              Expect to see a process named <code class="ph codeph">catalogd</code> if the service started
+              successfully.
 <pre class="pre codeblock"><code>$ sudo service impala-catalog restart
 $ ps ax | grep [c]atalogd
  6068 ?        Sl     4:06 /usr/lib/impala/sbin/catalogd
 </code></pre>
             </li>
 
+
             <li class="li">
-              Restart the Impala daemon service on each node in your cluster. Expect to see a process named
-              <code class="ph codeph">impalad</code> if the service started successfully.
+              Restart the Impala daemon service on each node in your cluster. Expect to see a
+              process named <code class="ph codeph">impalad</code> if the service started successfully.
 <pre class="pre codeblock"><code>$ sudo service impala-server start
 $ ps ax | grep [i]mpalad
  7936 ?        Sl     0:12 /usr/lib/impala/sbin/impalad -log_dir=/var/log/impala -state_store_port=24000
  -state_store_host=127.0.0.1 -be_port=22000
 </code></pre>
             </li>
+
           </ol>
+
         </li>
+
       </ul>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         <p class="p">
-          If the services did not start successfully (even though the <code class="ph codeph">sudo service</code> command might
-          display <code class="ph codeph">[OK]</code>), check for errors in the Impala log file, typically in
-          <span class="ph filepath">/var/log/impala</span>.
+          If the services did not start successfully (even though the <code class="ph codeph">sudo
+          service</code> command might display <code class="ph codeph">[OK]</code>), check for errors in the
+          Impala log file, typically in <span class="ph filepath">/var/log/impala</span>.
         </p>
+
       </div>
+
+
     </div>
-  </article>
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="upgrading__concept_a2p_szq_jdb">
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="concept_a2p_szq_jdb">
+
     <h2 class="title topictitle2" id="ariaid-title3">Impala Upgrade Considerations</h2>
-    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="concept_a2p_szq_jdb__concept_mkn_ygr_jdb">
-      <h3 class="title topictitle3" id="ariaid-title4">Default Setting Changes</h3>
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="impala_privileges_30">
+      <h3 class="title topictitle3" id="ariaid-title4">Grant REFRESH Privilege to Impala Roles with SELECT or INSERT
+        Privilege when Upgrading to <span class="keyword">Impala 3.0</span></h3>
+
       <div class="body conbody">
-        <table class="simpletable frame-all" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb"><col style="width:33.33333333333333%"><col style="width:33.33333333333333%"><col style="width:33.33333333333333%"><thead><tr class="sthead">
-            <th class="stentry" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__1">Release Changed</th>
-            <th class="stentry" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__2">Setting</th>
-            <th class="stentry" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__3">Default Value</th>
-          </tr></thead><tbody><tr class="strow">
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__1"><span class="keyword">Impala 2.12</span></td>
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__2"><code class="ph codeph">compact_catalog_topic</code></td>
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__3"><code class="ph codeph">true</code></td>
-          </tr><tr class="strow">
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__1"><span class="keyword">Impala 2.12</span></td>
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__2"><code class="ph codeph">max_cached_file_handle</code></td>
-            <td class="stentry" headers="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb__stentry__3"><code class="ph codeph">20000</code></td>
-          </tr></tbody></table>
+        <p class="p"> To use the fine grained privileges feature in <span class="keyword">Impala 3.0</span>, if a role has the <code class="ph codeph">SELECT</code> or
+            <code class="ph codeph">INSERT</code> privilege on an object in Impala before
+          upgrading to <span class="keyword">Impala 3.0</span>, grant that role the
+            <code class="ph codeph">REFRESH</code> privilege after the upgrade. </p>
+
       </div>
-    </article>
-  </article>
-</article></main></body></html>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="IMPALA-3916">
+
+      <h3 class="title topictitle3" id="ariaid-title5">List of Reserved Words Updated in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The list of <a href="impala_reserved_words.html"><span class="keyword">reserved words</span></a> in Impala was
+          updated in <span class="keyword">Impala 3.0</span>. If you need to use a
+          reserved word as an identifier, e.g. a table name, enclose the word in back-ticks.
+        </p>
+
+
+        <div class="p">
+          If you need to use the reserved words from previous versions of Impala, set the
+          <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code> startup flag. Note that this
+          startup option will be deprecated in a future release.
+<pre class="pre codeblock"><code>--reserved_words_version=2.11.0</code></pre>
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="IMPALA-4924">
+
+      <h3 class="title topictitle3" id="ariaid-title6">Decimal V2 Used by Default in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          In Impala, two different implementations of <code class="ph codeph">DECIMAL</code> types are
+          supported. Starting in <span class="keyword">Impala 3.0</span>, <code class="ph codeph">DECIMAL</code> V2
+          is used by default. See <a href="impala_decimal.html"><span class="keyword">DECIMAL Type</span></a>
+          for detail information.
+        </p>
+
+
+        <div class="p">
+          If you need to continue using the first version of the <code class="ph codeph">DECIMAL</code> type
+          for the backward compatibility of your queries, set the <code class="ph codeph">DECIMAL_V2</code>
+          query option to <code class="ph codeph">FALSE</code>:
+<pre class="pre codeblock"><code>SET DECIMAL_V2=FALSE;</code></pre>
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="IMPALA-5191">
+
+      <h3 class="title topictitle3" id="ariaid-title7">Behavior of Column Aliases Changed in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          To conform to the SQL standard, Impala no longer performs alias substitution in the
+          subexpressions of <code class="ph codeph">GROUP BY</code>, <code class="ph codeph">HAVING</code>, and
+          <code class="ph codeph">ORDER BY</code>. See <a href="impala_aliases.html"><span class="keyword">Overview of Impala Aliases</span></a> for examples of
+          supported and unsupported aliases syntax.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="IMPALA-5037">
+
+      <h3 class="title topictitle3" id="ariaid-title8">Default PARQUET_ARRAY_RESOLUTION Changed in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The default value for the <code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> was changed to
+          <code class="ph codeph">THREE_LEVEL</code> in <span class="keyword">Impala 3.0</span>, to
+          match the Parquet standard 3-level encoding.
+        </p>
+
+
+        <p class="p">
+          See <a href="impala_parquet_array_resolution.html"><span class="keyword">PARQUET_ARRAY_RESOLUTION Query Option (Impala 2.9 or higher only)</span></a> for the information about the query
+          option.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="IMPALA-5293">
+
+      <h3 class="title topictitle3" id="ariaid-title9">Enable Clustering Hint for Inserts</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          In <span class="keyword">Impala 3.0</span>, the
+          <a href="impala_hints.html"><span class="keyword">clustered</span></a> hint is enabled by default.
+          The hint adds a local sort by the partitioning columns to a query plan.
+        </p>
+
+
+        <p class="p">
+          The <code class="ph codeph">clustered</code> hint is only effective for HDFS and Kudu tables.
+        </p>
+
+
+        <p class="p">
+          As in previous versions, the <code class="ph codeph">noclustered</code> hint prevents clustering. If
+          a table has ordering columns defined, the <code class="ph codeph">noclustered</code> hint is ignored
+          with a warning.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="IMPALA-4319">
+
+      <h3 class="title topictitle3" id="ariaid-title10">Deprecated Query Options Removed in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <div class="p">
+          The following query options have been deprecated for several releases and removed:
+          <ul class="ul">
+            <li class="li">
+              <code class="ph codeph">DEFAULT_ORDER_BY_LIMIT</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">ABORT_ON_DEFAULT_LIMIT_EXCEEDED</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">V_CPU_CORES</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">RESERVATION_REQUEST_TIMEOUT</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">RM_INITIAL_MEM</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">SCAN_NODE_CODEGEN_THRESHOLD</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">MAX_IO_BUFFERS</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">RM_INITIAL_MEM</code>
+            </li>
+
+
+            <li class="li">
+              <code class="ph codeph">DISABLE_CACHED_READS</code>
+            </li>
+
+          </ul>
+
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="impala-6648">
+
+      <h3 class="title topictitle3" id="ariaid-title11">Fine-grained Privileges Added in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          Starting in <span class="keyword">Impala 3.0</span>, finer grained privileges are enforced,
+          such as the <code class="ph codeph">REFRESH</code>, <code class="ph codeph">CREATE</code>, <code class="ph codeph">DROP</code>,
+          and <code class="ph codeph">ALTER</code> privileges. In particular, running <code class="ph codeph">REFRESH</code>
+          or <code class="ph codeph">INVALIDATE METADATA</code> now requires the new <code class="ph codeph">REFRESH</code>
+          privilege. Users who did not previously have the <code class="ph codeph">ALL</code> privilege will
+          no longer be able to run <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE
+          METADATA</code> after an upgrade. Those users need to have the
+          <code class="ph codeph">REFRESH</code> or <code class="ph codeph">ALL</code> privilege granted to run
+          <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code>.
+        </p>
+
+
+        <p class="p">
+          See <a href="impala_grant.html"><span class="keyword">GRANT Statement (Impala 2.0 or higher only)</span></a> for the new privileges, the scope, and other information
+          about the new privileges.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="IMPALA-3998">
+
+      <h3 class="title topictitle3" id="ariaid-title12">refresh_after_connect Impala Shell Option Removed in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The deprecated <code class="ph codeph">refresh_after_connect</code> option was removed from Impala
+          Shell in <span class="keyword">Impala 3.0</span>
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title13" id="impala-5607">
+
+      <h3 class="title topictitle3" id="ariaid-title13">Return Type Changed for EXTRACT and DATE_PART Functions in <span class="keyword">Impala 3.0</span></h3>
+
+
+      <div class="body conbody">
+
+        <div class="p">
+          The following changes were made to the <code class="ph codeph">EXTRACT</code> and
+          <code class="ph codeph">DATE_PART</code> functions:
+          <ul class="ul">
+            <li class="li">
+              The output type of the <code class="ph codeph">EXTRACT</code> and <code class="ph codeph">DATE_PART</code>
+              functions was changed to <code class="ph codeph">BIGINT</code>.
+            </li>
+
+
+            <li class="li">
+              <p class="p">
+                Extracting the millisecond part from a <code class="ph codeph">TIMESTAMP</code> returns the
+                seconds component and the milliseconds component. For example, <code class="ph codeph">EXTRACT
+                (CAST('2006-05-12 18:27:28.123456789' AS TIMESTAMP), 'MILLISECOND')</code>
+                will return <code class="ph codeph">28123</code>.
+              </p>
+
+            </li>
+
+          </ul>
+
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="concept_mkn_ygr_jdb">
+
+      <h3 class="title topictitle3" id="ariaid-title14">Default Setting Changes</h3>
+
+
+      <div class="body conbody">
+
+        <table cellpadding="4" cellspacing="0" summary="" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb" border="1" class="simpletable"><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><thead><tr class="sthead">
+
+            <th style="vertical-align:bottom;text-align:left;" id="d208645e603" class="stentry">Release Changed</th>
+
+
+            <th style="vertical-align:bottom;text-align:left;" id="d208645e606" class="stentry">Setting</th>
+
+
+            <th style="vertical-align:bottom;text-align:left;" id="d208645e609" class="stentry">Default Value</th>
+
+
+          </tr>
+</thead><tbody><tr class="strow">
+
+            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 2.12</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">compact_catalog_topic</code><code class="ph codeph">impalad</code> flag</td>
+
+
+            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">true</code>
+
+            </td>
+
+
+          </tr>
+<tr class="strow">
+
+            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 2.12</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">max_cached_file_handles</code><code class="ph codeph">impalad</code> flag</td>
+
+
+            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">20000</code>
+
+            </td>
+
+
+          </tr>
+<tr class="strow">
+
+            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 3.0</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> query
+              option</td>
+
+
+            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">THREE_LEVEL</code>
+
+            </td>
+
+
+          </tr>
+</tbody></table>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+</body>
+</html>

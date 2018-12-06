@@ -1,8 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="install"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Installing Impala</title></head><body id="install"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Installing Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="install" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Installing Impala</title>
+</head>
+<body id="install">
+
 
   <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Installing Impala</span></h1>
+
   
 
   <div class="body conbody">
@@ -20,9 +39,11 @@
       that returns rapid responses to queries.
     </p>
 
+
     <p class="p">
       Follow these steps to set up Impala on a cluster by building from source:
     </p>
+
 
 
 
@@ -33,18 +54,24 @@
           <a class="xref" href="http://impala.apache.org/downloads.html" target="_blank">the Impala downloads page</a>
           for the link to the latest release.
         </p>
+
       </li>
+
       <li class="li">
         <p class="p">
           Check the <span class="ph filepath">README.md</span> file for a pointer
           to the build instructions.
         </p>
+
       </li>
+
       <li class="li">
         <p class="p">
           Please check the MD5 and SHA1 and GPG signature, the latter by using the code signing keys of the release managers.
         </p>
+
       </li>
+
       <li class="li">
         <div class="p">
           Developers interested in working on Impala can clone the Impala source repository:
@@ -52,14 +79,19 @@
 git clone https://git-wip-us.apache.org/repos/asf/impala.git
 </code></pre>
         </div>
+
       </li>
+
     </ul>
+
 
   </div>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="install__install_details">
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="install_details">
 
     <h2 class="title topictitle2" id="ariaid-title2">What is Included in an Impala Installation</h2>
+
 
     <div class="body conbody">
 
@@ -69,9 +101,11 @@ git clone https://git-wip-us.apache.org/repos/asf/impala.git
         most of the query processing work) on <em class="ph i">all</em> DataNodes in the cluster.
       </p>
 
+
       <p class="p">
         Impala primarily consists of these executables, which should be available after you build from source:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -80,7 +114,9 @@ git clone https://git-wip-us.apache.org/repos/asf/impala.git
             <a class="xref" href="impala_processes.html#processes">Run one impalad process</a> on each node in the cluster
             that has a DataNode.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -89,7 +125,9 @@ git clone https://git-wip-us.apache.org/repos/asf/impala.git
             instance of this daemon</a> on a node in your cluster. Most production deployments run this daemon
             on the namenode.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -104,7 +142,9 @@ git clone https://git-wip-us.apache.org/repos/asf/impala.git
             <a class="xref" href="impala_processes.html#processes">Run one instance of this daemon</a> on a node in your cluster,
             preferably on the same host as the <code class="ph codeph">statestored</code> daemon.
           </p>
+
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -113,14 +153,21 @@ git clone https://git-wip-us.apache.org/repos/asf/impala.git
             anywhere on your network, not necessarily DataNodes or even within the same cluster as Impala. It can
             connect remotely to any instance of the Impala daemon.
           </p>
+
         </li>
+
       </ul>
+
 
       <p class="p">
         Before starting working with Impala, ensure that you have all necessary prerequisites. See
         <a class="xref" href="impala_prereqs.html#prereqs">Impala Requirements</a> for details.
       </p>
-    </div>
-  </article>
 
-</article></main></body></html>
+    </div>
+
+  </div>
+
+
+</body>
+</html>

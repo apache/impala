@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="IDLE_SESSION_TIMEOUT Query Option (Impala 2.12 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="idle_session_timeout" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>IDLE_SESSION_TIMEOUT Query Option (Impala 2.12 or higher only)</title>
+</head>
+<body id="idle_session_timeout">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">IDLE_SESSION_TIMEOUT Query Option (<span class="keyword">Impala 2.12</span> or higher only)</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">IDLE_SESSION_TIMEOUT</code> query option sets the time in seconds after
+      which an idle session is cancelled. A session is idle when no activity is occurring for
+      any of the queries in that session, and the session has not started any new queries. Once
+      a session is expired, you cannot issue any new query requests to it. The session remains
+      open, but the only operation you can perform is to close it.
+    </p>
+
+
+    <p class="p">
+      The <code class="ph codeph">IDLE_SESSION_TIMEOUT</code> query option overrides the
+      <code class="ph codeph">--idle_session_timeout</code> startup option. See
+      <a class="xref" href="impala_timeouts.html#timeouts">Setting Timeout Periods for Daemons, Queries, and Sessions</a> for the
+      <code class="ph codeph">--idle_session_timeout</code> startup option.
+    </p>
+
+
+    <p class="p">
+      The <code class="ph codeph">IDLE_SESSION_TIMEOUT</code> query option allows JDBC/ODBC connections to set
+      the session timeout as a query option with the <code class="ph codeph">SET</code> statement.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>SET IDLE_SESSION_TIMEOUT=<var class="keyword varname">seconds</var>;</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+
+    <div class="p">
+      <strong class="ph b">Default:</strong> 0
+      <ul class="ul">
+        <li class="li">
+          If <code class="ph codeph">--idle_session_timeout</code> is not set, the session never expires.
+        </li>
+
+
+        <li class="li">
+          If <code class="ph codeph">--idle_session_timeout</code> is set, use that timeout value.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.12</span>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Related information:</strong>
+    </p>
+
+
+    <p class="p">
+      <a class="xref" href="impala_timeouts.html#timeouts">Setting Timeout Periods for Daemons, Queries, and Sessions</a>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

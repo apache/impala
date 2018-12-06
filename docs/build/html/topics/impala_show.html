@@ -1,8 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html
-  SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="show"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SHOW Statement</title></head><body id="show"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2018" />
+<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="SHOW Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.0.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="show" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>SHOW Statement</title>
+</head>
+<body id="show">
+
 
   <h1 class="title topictitle1" id="ariaid-title1">SHOW Statement</h1>
+
   
   
 
@@ -14,15 +58,18 @@
       objects.
     </p>
 
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
+
 
 <pre class="pre codeblock"><code>SHOW DATABASES [[LIKE] '<var class="keyword varname">pattern</var>']
 SHOW SCHEMAS [[LIKE] '<var class="keyword varname">pattern</var>'] - an alias for SHOW DATABASES
 SHOW TABLES [IN <var class="keyword varname">database_name</var>] [[LIKE] '<var class="keyword varname">pattern</var>']
 <span class="ph">SHOW [AGGREGATE | ANALYTIC] FUNCTIONS [IN <var class="keyword varname">database_name</var>] [[LIKE] '<var class="keyword varname">pattern</var>']</span>
 <span class="ph">SHOW CREATE TABLE [<var class="keyword varname">database_name</var>].<var class="keyword varname">table_name</var></span>
+<span class="ph">SHOW CREATE VIEW [<var class="keyword varname">database_name</var>].<var class="keyword varname">view_name</var></span>
 <span class="ph">SHOW TABLE STATS [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var></span>
 <span class="ph">SHOW COLUMN STATS [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var></span>
 <span class="ph">SHOW PARTITIONS [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var></span>
@@ -33,13 +80,13 @@ SHOW FILES IN [<var class="keyword varname">database_name</var>.]<var class="key
 SHOW CURRENT ROLES
 SHOW ROLE GRANT GROUP <var class="keyword varname">group_name</var>
 SHOW GRANT ROLE <var class="keyword varname">role_name</var></span>
+
+<span class="ph">SHOW GRANT USER <var class="keyword varname">user_name</var>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON SERVER
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON DATABASE <var class="keyword varname">database_name</var>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON TABLE <var class="keyword varname">table_name</var>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON URI <var class="keyword varname">uri</var></span>
 </code></pre>
-
-
-
-
-
-
 
     <p class="p">
       Issue a <code class="ph codeph">SHOW <var class="keyword varname">object_type</var></code> statement to see the appropriate objects in the
@@ -47,12 +94,14 @@ SHOW GRANT ROLE <var class="keyword varname">role_name</var></span>
       to see objects in a specific database.
     </p>
 
+
     <p class="p">
       The optional <var class="keyword varname">pattern</var> argument is a quoted string literal, using Unix-style
       <code class="ph codeph">*</code> wildcards and allowing <code class="ph codeph">|</code> for alternation. The preceding
       <code class="ph codeph">LIKE</code> keyword is also optional. All object names are stored in lowercase, so use all
       lowercase letters in the pattern string. For example:
     </p>
+
 
 <pre class="pre codeblock"><code>show databases 'a*';
 show databases like 'a*';
@@ -64,13 +113,21 @@ show tables '*dim*|*fact*';</code></pre>
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 
+
     <p class="p toc inpage"></p>
+
 
   </div>
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="show__show_files">
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="show_files">
 
     <h2 class="title topictitle2" id="ariaid-title2">SHOW FILES Statement</h2>
+
   
 
     <div class="body conbody">
@@ -82,6 +139,7 @@ show tables '*dim*|*fact*';</code></pre>
         for a partitioned table. The size includes a suffix of <code class="ph codeph">B</code> for bytes,
         <code class="ph codeph">MB</code> for megabytes, and <code class="ph codeph">GB</code> for gigabytes.
       </p>
+
 
       <div class="p">
         In <span class="keyword">Impala 2.8</span> and higher, you can use general
@@ -96,16 +154,19 @@ show files in sample_table partition (month like 'J%');
 </code></pre>
       </div>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+
+      <div class="note note"><span class="notetitle">Note:</span>
         This statement applies to tables and partitions stored on HDFS, or in the Amazon Simple Storage System (S3).
         It does not apply to views.
         It does not apply to tables mapped onto HBase <span class="ph">or Kudu</span>,
         because those data management systems do not use the same file-based storage layout.
       </div>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         You can use this statement to verify the results of your ETL process: that is, that
@@ -117,11 +178,13 @@ show files in sample_table partition (month like 'J%');
         multiple output files from parallel queries and partitioned inserts.
       </p>
 
+
       <p class="p">
         The output from this statement does not include files that Impala considers to be hidden
         or invisible, such as those whose names start with a dot or an underscore, or that
         end with the suffixes <code class="ph codeph">.copying</code> or <code class="ph codeph">.tmp</code>.
       </p>
+
 
       <p class="p">
         The information for partitioned tables complements the output of the <code class="ph codeph">SHOW PARTITIONS</code>
@@ -131,9 +194,11 @@ show files in sample_table partition (month like 'J%');
       </p>
 
 
+
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
         typically the <code class="ph codeph">impala</code> user, must have read
@@ -141,14 +206,17 @@ show files in sample_table partition (month like 'J%');
         and execute permission for the database directory and all its parent directories.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example shows a <code class="ph codeph">SHOW FILES</code> statement
         for an unpartitioned table using text format:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table unpart_text (x bigint, s string);
 [localhost:21000] &gt; insert into unpart_text (x, s) select id, name
@@ -175,6 +243,7 @@ show files in sample_table partition (month like 'J%');
         parallel queries that are expecting multi-megabyte input files. The example shows how you might compact the small files by doing
         an <code class="ph codeph">INSERT ... SELECT</code> into a different table, possibly converting the data to Parquet in the process:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert into unpart_text values (10,'hello'), (20, 'world');
 [localhost:21000] &gt; insert into unpart_text values (-1,'foo'), (-1000, 'bar');
@@ -213,6 +282,7 @@ show files in sample_table partition (month like 'J%');
         with data in two different partitions, and two empty partitions.
         The partitions with no data are not represented in the <code class="ph codeph">SHOW FILES</code> output.
       </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table part_text (x bigint, y int, s string)
                                         &gt; partitioned by (year bigint, month bigint, day bigint);
 [localhost:21000] &gt; insert overwrite part_text (x, y, s) partition (year=2014,month=1,day=1)
@@ -254,6 +324,7 @@ where id between 1 and 1000000;
         are parallelized differently than for text tables. (Also, the amount of data is so small
         that it can be written to Parquet without involving all the hosts in this 4-node cluster.)
       </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table part_parq (x bigint, y int, s string) partitioned by (year bigint, month bigint, day bigint) stored as parquet;
 [localhost:21000] &gt; insert into part_parq partition (year,month,day) select x, y, s, year, month, day from partitioned_text;
 [localhost:21000] &gt; show partitions part_parq;
@@ -280,6 +351,7 @@ where id between 1 and 1000000;
   The following example shows output from the <code class="ph codeph">SHOW FILES</code> statement
   for a table where the data files are stored in Amazon S3:
 </p>
+
 <pre class="pre codeblock"><code>[localhost:21000] &gt; show files in s3_testing.sample_data_s3;
 +-----------------------------------------------------------------------+---------+
 | path                                                                  | size    |
@@ -289,11 +361,14 @@ where id between 1 and 1000000;
 </code></pre>
 
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="show__show_roles">
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="show_roles">
 
     <h2 class="title topictitle2" id="ariaid-title3">SHOW ROLES Statement</h2>
+
   
 
     <div class="body conbody">
@@ -301,31 +376,37 @@ where id between 1 and 1000000;
       <p class="p">
         The <code class="ph codeph">SHOW ROLES</code> statement displays roles. This syntax is available in <span class="keyword">Impala 2.0</span> and later
         only, when you are using the Sentry authorization framework along with the Sentry service, as described in
-        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service (Impala 1.4 or higher only)</a>. It does not apply when you use the Sentry framework
+        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply when you use the Sentry framework
         with privileges defined in a policy file.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         Depending on the roles set up within your organization by the <code class="ph codeph">CREATE ROLE</code> statement, the
         output might look something like this:
       </p>
+
 
 <pre class="pre codeblock"><code>show roles;
 +-----------+
@@ -344,19 +425,25 @@ where id between 1 and 1000000;
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="show__show_current_role">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="show_current_role">
 
     <h2 class="title topictitle2" id="ariaid-title4">SHOW CURRENT ROLE</h2>
+
   
 
     <div class="body conbody">
@@ -364,31 +451,37 @@ where id between 1 and 1000000;
       <p class="p">
         The <code class="ph codeph">SHOW CURRENT ROLE</code> statement displays roles assigned to the current user. This syntax
         is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization framework along with
-        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service (Impala 1.4 or higher only)</a>. It does not
+        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not
         apply when you use the Sentry framework with privileges defined in a policy file.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         Depending on the roles set up within your organization by the <code class="ph codeph">CREATE ROLE</code> statement, the
         output might look something like this:
       </p>
+
 
 <pre class="pre codeblock"><code>show current roles;
 +-----------+
@@ -404,19 +497,25 @@ where id between 1 and 1000000;
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="show__show_role_grant">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="show_role_grant">
 
     <h2 class="title topictitle2" id="ariaid-title5">SHOW ROLE GRANT Statement</h2>
+
   
 
 
@@ -428,22 +527,26 @@ where id between 1 and 1000000;
         statement is only allowed for Sentry administrative users and others users that are part of the specified
         group. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization
         framework along with the Sentry service, as described in
-        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service (Impala 1.4 or higher only)</a>. It does not apply when you use the Sentry framework
+        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply when you use the Sentry framework
         with privileges defined in a policy file.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
 
 
@@ -452,19 +555,25 @@ where id between 1 and 1000000;
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
       </p>
-    </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="show__show_grant_role">
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="show_grant_role">
 
     <h2 class="title topictitle2" id="ariaid-title6">SHOW GRANT ROLE Statement</h2>
+
   
 
 
@@ -475,24 +584,77 @@ where id between 1 and 1000000;
         The <code class="ph codeph">SHOW GRANT ROLE</code> statement list all the grants for the given role name. This statement
         is only allowed for Sentry administrative users and other users that have been granted the specified role.
         This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization framework
-        along with the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service (Impala 1.4 or higher only)</a>. It
+        along with the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It
         does not apply when you use the Sentry framework with privileges defined in a policy file.
       </p>
+
+
+      <p class="p">
+        <strong class="ph b">Security considerations:</strong>
+      </p>
+
+
+      <p class="p">
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
+      </p>
+
+
+
+
+      <p class="p">
+        <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
+        therefore no HDFS permissions are required.
+      </p>
+
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+
+      <p class="p">
+        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+      </p>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="show_grant_user">
+    <h2 class="title topictitle2" id="ariaid-title7">SHOW GRANT USER Statement</h2>
+
+
+    <div class="body conbody">
+      <p class="p"> The <code class="ph codeph">SHOW GRANT USER</code> statement shows the list of
+        privileges for a given user. This statement is only allowed for Sentry
+        administrative users. However, the current user can run <code class="ph codeph">SHOW
+          GRANT USER</code> for themselves. </p>
+
+      <p class="p">This syntax is available in <span class="keyword">Impala 3.1</span> and later
+        only, when you are using the Sentry authorization framework along with
+        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply
+        when you use the Sentry framework with privileges defined in a policy
+        file. </p>
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
-
-
 
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
@@ -506,12 +668,16 @@ where id between 1 and 1000000;
       <p class="p">
         <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="show__show_databases">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title7">SHOW DATABASES</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="show_databases">
+
+    <h2 class="title topictitle2" id="ariaid-title8">SHOW DATABASES</h2>
+
   
 
     <div class="body conbody">
@@ -524,10 +690,12 @@ where id between 1 and 1000000;
         <code class="ph codeph">INSERT</code> statements.
       </p>
 
+
       <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, the output includes a second column showing any associated comment
         for each database.
       </p>
+
 
       <p class="p">
         The output of <code class="ph codeph">SHOW DATABASES</code> includes the special <code class="ph codeph">_impala_builtins</code>
@@ -535,22 +703,27 @@ where id between 1 and 1000000;
         FUNCTIONS</code>.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         This example shows how you might locate a particular table on an unfamiliar system. The
@@ -558,6 +731,7 @@ where id between 1 and 1000000;
         on every system. You can issue <code class="ph codeph">SHOW TABLES IN <var class="keyword varname">db_name</var></code> without going
         into a database, or <code class="ph codeph">SHOW TABLES</code> once you are inside a particular database.
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; show databases;
 +------------------+----------------------------------------------+
@@ -592,9 +766,11 @@ Returned 1 row(s) in 0.01s</code></pre>
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
       <p class="p">
         <a class="xref" href="impala_databases.html#databases">Overview of Impala Databases</a>, <a class="xref" href="impala_create_database.html#create_database">CREATE DATABASE Statement</a>,
@@ -602,12 +778,16 @@ Returned 1 row(s) in 0.01s</code></pre>
         <a class="xref" href="impala_show.html#show_tables">SHOW TABLES Statement</a>,
         <a class="xref" href="impala_show.html#show_functions">SHOW FUNCTIONS Statement</a>
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="show__show_tables">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title8">SHOW TABLES Statement</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="show_tables">
+
+    <h2 class="title topictitle2" id="ariaid-title9">SHOW TABLES Statement</h2>
+
   
 
     <div class="body conbody">
@@ -618,18 +798,22 @@ Returned 1 row(s) in 0.01s</code></pre>
         <code class="ph codeph">LIKE</code> clause, only those whose name match a pattern with <code class="ph codeph">*</code> wildcards.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
@@ -640,9 +824,11 @@ Returned 1 row(s) in 0.01s</code></pre>
         in an arbitrary HDFS directory based on its <code class="ph codeph">LOCATION</code> attribute.)
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following examples demonstrate the <code class="ph codeph">SHOW TABLES</code> statement.
@@ -651,6 +837,7 @@ Returned 1 row(s) in 0.01s</code></pre>
         lists all the table names. <code class="ph codeph">SHOW TABLES</code> with no qualifiers lists
         all the table names in the current database.
       </p>
+
 
 <pre class="pre codeblock"><code>create database empty_db;
 show tables in empty_db;
@@ -684,6 +871,7 @@ show tables;
         The ability to do wildcard matches for table names makes it helpful to establish naming conventions for tables to
         conveniently locate a group of related tables.
       </p>
+
 
 <pre class="pre codeblock"><code>create table fact_tbl (x int);
 create table dim_tbl_1 (s string);
@@ -724,9 +912,11 @@ show tables like '*dim*|t*';
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
       <p class="p">
         <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>, <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
@@ -736,12 +926,16 @@ show tables like '*dim*|t*';
         <a class="xref" href="impala_show.html#show_databases">SHOW DATABASES</a>,
         <a class="xref" href="impala_show.html#show_functions">SHOW FUNCTIONS Statement</a>
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="show__show_create_table">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title9">SHOW CREATE TABLE Statement</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="show_create_table">
+
+    <h2 class="title topictitle2" id="ariaid-title10">SHOW CREATE TABLE Statement</h2>
+
   
 
     <div class="body conbody">
@@ -759,26 +953,43 @@ show tables like '*dim*|t*';
       </p>
 
       <p class="p">
+        If you specify a view name in the <code class="ph codeph">SHOW CREATE TABLE</code>,
+        it returns a <code class="ph codeph">CREATE VIEW</code> statement with column names
+        and the original SQL statement to reproduce the view. You need the
+          <code class="ph codeph">VIEW_METADATA</code> privilege on the view and
+          <code class="ph codeph">SELECT</code> privilege on all underlying views and tables to
+        successfully run the <code class="ph codeph">SHOW CREATE VIEW</code> statement for a
+        view. The <code class="ph codeph">SHOW CREATE VIEW</code> is available as an alias for
+          <code class="ph codeph">SHOW CREATE TABLE</code>.
+      </p>
+
+
+      <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         For Kudu tables:
       </p>
+
 
       <ul class="ul">
         <li class="li">
@@ -788,20 +999,27 @@ show tables like '*dim*|t*';
             If you do not specify those attributes in the original <code class="ph codeph">CREATE TABLE</code> statement,
             the <code class="ph codeph">SHOW CREATE TABLE</code> output displays the defaults that were used.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The specifications of any <code class="ph codeph">RANGE</code> clauses are not displayed in full.
             To see the definition of the range clauses for a Kudu table, use the <code class="ph codeph">SHOW RANGE PARTITIONS</code> statement.
           </p>
+
         </li>
+
         <li class="li">
           <p class="p">
             The <code class="ph codeph">TBLPROPERTIES</code> output reflects the Kudu master address
             and the internal Kudu name associated with the Impala table.
           </p>
+
         </li>
+
       </ul>
+
 
 <pre class="pre codeblock"><code>
 show CREATE TABLE numeric_grades_default_letter;
@@ -814,10 +1032,9 @@ show CREATE TABLE numeric_grades_default_letter;
 |   student STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,                  |
 |   PRIMARY KEY (score)                                                                          |
 | )                                                                                              |
-| PARTITION BY <strong class="ph b">RANGE (score) (...)</strong>                                                               |
+| PARTITION BY <strong class="ph b">RANGE (score) (...)</strong>                                                          |
 | STORED AS KUDU                                                                                 |
-| TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051',                              |
-|   'kudu.table_name'='impala::USER.numeric_grades_default_letter')                              |
+| TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051')                              |
 +------------------------------------------------------------------------------------------------+
 
 show range partitions numeric_grades_default_letter;
@@ -835,10 +1052,12 @@ show range partitions numeric_grades_default_letter;
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         The following example shows how various clauses from the <code class="ph codeph">CREATE TABLE</code> statement are
         represented in the output of <code class="ph codeph">SHOW CREATE TABLE</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>create table show_create_table_demo (id int comment "Unique ID", y double, s string)
   partitioned by (year smallint)
@@ -869,6 +1088,7 @@ show create table show_create_table_demo;
         sequence of <code class="ph codeph">ALTER TABLE</code> statements.
       </p>
 
+
 <pre class="pre codeblock"><code>alter table show_create_table_demo drop column s;
 alter table show_create_table_demo set fileformat textfile;
 
@@ -893,16 +1113,42 @@ show create table show_create_table_demo;
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>, <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>,
         <a class="xref" href="impala_show.html#show_tables">SHOW TABLES Statement</a>
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="show__show_table_stats">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title10">SHOW TABLE STATS Statement</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="show_create_view">
+    <h2 class="title topictitle2" id="ariaid-title11">SHOW CREATE VIEW Statement</h2>
+
+    <div class="body conbody">
+      <p class="p"> The <code class="ph codeph">SHOW CREATE VIEW</code>, it returns a <code class="ph codeph">CREATE
+          VIEW</code> statement with column names and the original SQL
+        statement to reproduce the view. You need the
+          <code class="ph codeph">VIEW_METADATA</code> privilege on the view and
+          <code class="ph codeph">SELECT</code> privilege on all underlying views and tables to
+        successfully run the <code class="ph codeph">SHOW CREATE VIEW</code> statement for a
+        view. </p>
+
+      <p class="p">
+        The <code class="ph codeph">SHOW CREATE VIEW</code> is an alias for <code class="ph codeph">SHOW
+          CREATE TABLE</code>.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="show_table_stats">
+
+    <h2 class="title topictitle2" id="ariaid-title12">SHOW TABLE STATS Statement</h2>
+
   
 
     <div class="body conbody">
@@ -913,10 +1159,12 @@ show create table show_create_table_demo;
         complex join queries.
       </p>
 
+
       <p class="p">
         Any values that are not available (because the <code class="ph codeph">COMPUTE STATS</code> statement has not been run
         yet) are displayed as <code class="ph codeph">-1</code>.
       </p>
+
 
       <p class="p">
         <code class="ph codeph">SHOW TABLE STATS</code> provides some general information about the table, such as the number of
@@ -928,6 +1176,7 @@ show create table show_create_table_demo;
         <code class="ph codeph">SHOW PARTITIONS</code> statement in this case.)
       </p>
 
+
       <p class="p">
         The output of <code class="ph codeph">SHOW COLUMN STATS</code> is primarily only useful after the <code class="ph codeph">COMPUTE
         STATS</code> statement has been run on the table. A <code class="ph codeph">-1</code> in the <code class="ph codeph">#Distinct
@@ -936,26 +1185,32 @@ show create table show_create_table_demo;
         <code class="ph codeph">-1</code>, even after <code class="ph codeph">COMPUTE STATS</code> has been run.
       </p>
 
+
       <p class="p">
         These <code class="ph codeph">SHOW</code> statements work on actual tables only, not on views.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
+
 
       <p class="p">
         Because Kudu tables do not have characteristics derived from HDFS, such
@@ -966,6 +1221,7 @@ show create table show_create_table_demo;
         <code class="ph codeph">SHOW TABLE STATS</code> consists of 20 rows, each representing
         one of the numbered partitions. For example:
       </p>
+
 
 <pre class="pre codeblock"><code>
 show table stats kudu_table;
@@ -988,14 +1244,17 @@ show table stats kudu_table;
         all Kudu tables.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following examples show how the <code class="ph codeph">SHOW TABLE STATS</code> statement displays physical
         information about a table and the associated data files:
       </p>
+
 
 <pre class="pre codeblock"><code>show table stats store_sales;
 +-------+--------+----------+--------------+--------+-------------------+
@@ -1019,6 +1278,7 @@ show table stats customer;
         STATS</code> statement produces regular stats rather than incremental stats, therefore the
         <code class="ph codeph">Incremental stats</code> field remains <code class="ph codeph">false</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>compute stats customer;
 +------------------------------------------+
@@ -1052,6 +1312,7 @@ show table stats store_sales;
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
         typically the <code class="ph codeph">impala</code> user, must have read and execute
@@ -1063,23 +1324,30 @@ show table stats store_sales;
         permission for the database directory, and any parent directories of the database directory in HDFS.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
       <p class="p">
         <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>, <a class="xref" href="impala_show.html#show_column_stats">SHOW COLUMN STATS Statement</a>
       </p>
 
+
       <p class="p">
         See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for usage information and examples.
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="show__show_column_stats">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title11">SHOW COLUMN STATS Statement</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="show_column_stats">
+
+    <h2 class="title topictitle2" id="ariaid-title13">SHOW COLUMN STATS Statement</h2>
+
   
 
     <div class="body conbody">
@@ -1090,18 +1358,22 @@ show table stats store_sales;
         complex join queries.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         The output for <code class="ph codeph">SHOW COLUMN STATS</code> includes
@@ -1111,15 +1383,18 @@ show table stats store_sales;
         metastore database that Impala uses.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following examples show the output of the <code class="ph codeph">SHOW COLUMN STATS</code> statement for some tables,
         before the <code class="ph codeph">COMPUTE STATS</code> statement is run. Impala deduces some information, such as
         maximum and average size for fixed-length columns, and leaves and unknown values as <code class="ph codeph">-1</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>show column stats customer;
 +------------------------+--------+------------------+--------+----------+----------+
@@ -1181,6 +1456,7 @@ show column stats store_sales;
         changed to reflect the actual table data. The <code class="ph codeph">#Nulls</code> column remains <code class="ph codeph">-1</code>
         because Impala does not use the number of <code class="ph codeph">NULL</code> values to influence query planning.
       </p>
+
 
 <pre class="pre codeblock"><code>compute stats customer;
 +------------------------------------------+
@@ -1253,6 +1529,7 @@ show column stats store_sales;
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
         typically the <code class="ph codeph">impala</code> user, must have read and execute
@@ -1264,23 +1541,30 @@ show column stats store_sales;
         permission for the database directory, and any parent directories of the database directory in HDFS.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
       <p class="p">
         <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>, <a class="xref" href="impala_show.html#show_table_stats">SHOW TABLE STATS Statement</a>
       </p>
 
+
       <p class="p">
         See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for usage information and examples.
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="show__show_partitions">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title12">SHOW PARTITIONS Statement</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="show_partitions">
+
+    <h2 class="title topictitle2" id="ariaid-title14">SHOW PARTITIONS Statement</h2>
+
   
 
     <div class="body conbody">
@@ -1294,27 +1578,33 @@ show column stats store_sales;
         <code class="ph codeph">CENSUS</code> table partitioned on the <code class="ph codeph">YEAR</code> column:
       </p>
 
+
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
       </p>
 
+
       <p class="p">
         The optional <code class="ph codeph">RANGE</code> clause only applies to Kudu tables. It displays only the partitions
         defined by the <code class="ph codeph">RANGE</code> clause of <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code>.
       </p>
+
 
       <p class="p">
         Although you can specify <code class="ph codeph">&lt;</code> or
@@ -1327,14 +1617,17 @@ show column stats store_sales;
         partition covers the same range as originally specified.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
+
 
       <p class="p">
         The following example shows the output for a Parquet, text, or other
         HDFS-backed table partitioned on the <code class="ph codeph">YEAR</code> column:
       </p>
+
 
 <pre class="pre codeblock"><code>[localhost:21000] &gt; show partitions census;
 +-------+-------+--------+------+---------+
@@ -1358,6 +1651,7 @@ show column stats store_sales;
         in the <code class="ph codeph">PARTITIONS <var class="keyword varname">N</var></code>
         clause of <code class="ph codeph">CREATE TABLE</code>.
       </p>
+
 
 <pre class="pre codeblock"><code>
 show partitions million_rows_hash;
@@ -1385,6 +1679,7 @@ Fetched 50 row(s) in 0.05s
         using the range partitioning mechanism:
       </p>
 
+
 <pre class="pre codeblock"><code>
 show range partitions million_rows_range;
 +-----------------------+
@@ -1401,6 +1696,7 @@ show range partitions million_rows_range;
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong>
       </p>
+
       <p class="p">
         The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
         typically the <code class="ph codeph">impala</code> user, must have read and execute
@@ -1412,23 +1708,30 @@ show range partitions million_rows_range;
         permission for the database directory, and any parent directories of the database directory in HDFS.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
+
 
       <p class="p">
         See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for usage information and examples.
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_show.html#show_table_stats">SHOW TABLE STATS Statement</a>, <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a>
       </p>
+
     </div>
-  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="show__show_functions">
+  </div>
 
-    <h2 class="title topictitle2" id="ariaid-title13">SHOW FUNCTIONS Statement</h2>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="show_functions">
+
+    <h2 class="title topictitle2" id="ariaid-title15">SHOW FUNCTIONS Statement</h2>
+
   
 
     <div class="body conbody">
@@ -1441,9 +1744,11 @@ show range partitions million_rows_range;
         several UDFs with the same name, each accepting different argument data types.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+
 
       <p class="p">
         In <span class="keyword">Impala 2.5</span> and higher, the <code class="ph codeph">SHOW FUNCTIONS</code> output includes
@@ -1458,31 +1763,38 @@ show range partitions million_rows_range;
         to share across Impala and Hive.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
+
       <p class="p">
-        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <code class="ph codeph">SHOW</code>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
+        how to set up authorization and add privileges for specific objects.
       </p>
+
 
       <p class="p">
         <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
         therefore no HDFS permissions are required.
       </p>
 
+
       <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
       <p class="p">
         To display Impala built-in functions, specify the special database name <code class="ph codeph">_impala_builtins</code>:
       </p>
+
 
 <pre class="pre codeblock"><code>show functions in _impala_builtins;
 +--------------+-------------------------------------------------+-------------+---------------+
@@ -1512,14 +1824,19 @@ show functions in _impala_builtins like '*week*';
         <strong class="ph b">Related information:</strong>
       </p>
 
+
       <p class="p">
         <a class="xref" href="impala_functions_overview.html#functions">Overview of Impala Functions</a>, <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a>,
         <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a>,
         <a class="xref" href="impala_show.html#show_databases">SHOW DATABASES</a>,
         <a class="xref" href="impala_show.html#show_tables">SHOW TABLES Statement</a>
       </p>
+
     </div>
-  </article>
+
+  </div>
+
 
   
-</article></main></body></html>
+</body>
+</html>
