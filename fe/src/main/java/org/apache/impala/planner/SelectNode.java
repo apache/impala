@@ -83,7 +83,13 @@ public class SelectNode extends PlanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    // TODO: add an estimate
+    // The select node initializes a single row-batch which it recycles on every
+    // GetNext() call made to its child node. The memory attached to that
+    // row-batch is the only memory counted against this node. Since that
+    // attached memory depends on how the nodes under it manage memory
+    // ownership, it becomes increasingly difficult to accurately estimate this
+    // node's peak mem usage. Considering that, we estimate zero bytes for it to
+    // make sure it does not affect overall estimations in any way.
     nodeResourceProfile_ = ResourceProfile.noReservation(0);
   }
 

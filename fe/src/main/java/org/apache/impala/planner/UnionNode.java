@@ -132,7 +132,16 @@ public class UnionNode extends PlanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    // TODO: add an estimate
+    // The union node directly returns the rows for children marked as pass
+    // through. For others, it initializes a single row-batch which it recycles
+    // on every GetNext() call made to the child node. The memory attached to
+    // that row-batch is the only memory counted against this node and the
+    // memory allocated for materialization is counted against the parent's
+    // row-batch passed to it. Since that attached memory depends on how the
+    // nodes under it manage memory ownership, it becomes increasingly difficult
+    // to accurately estimate this node's peak mem usage. Considering that, we
+    // estimate zero bytes for it to make sure it does not affect overall
+    // estimations in any way.
     nodeResourceProfile_ = ResourceProfile.noReservation(0);
   }
 

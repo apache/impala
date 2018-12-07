@@ -333,7 +333,13 @@ public class DataSourceScanNode extends ScanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    // TODO: What's a good estimate of memory consumption?
+    // This node fetches a thrift representation of the rows from the data
+    // source. The memory used by it is unfortunately allocated on the heap and
+    // is never accounted for against its associated mem tracker. Therefore this
+    // node will never show any memory usage on the query summary. However,
+    // since it does contribute to untracked memory, retaining the conservative
+    // estimate of 1 GB to account for the thrift row-batch structure would
+    // ensure it does not change the current behavior.
     nodeResourceProfile_ = ResourceProfile.noReservation(1024L * 1024L * 1024L);
   }
 
