@@ -738,6 +738,18 @@ class TestImpalaShellInteractive(object):
     assert "ERROR: Errors parsing query options" in results.stderr
     assert "Invalid timezone name 'BLA'" in results.stderr
 
+  def test_with_clause(self):
+    # IMPALA-7939: Fix issue where CTE that contains "insert", "upsert", "update", or
+    # "delete" is categorized as a DML statement.
+    for keyword in ["insert", "upsert", "update", "delete", "\\'insert\\'",
+                    "\\'upsert\\'", "\\'update\\'", "\\'delete\\'"]:
+      p = ImpalaShell()
+      p.send_cmd("with foo as "
+                 "(select * from functional.alltypestiny where string_col='%s') "
+                 "select * from foo limit 1" % keyword)
+      result = p.get_result()
+      assert "Fetched 0 row" in result.stderr
+
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""

@@ -1144,16 +1144,14 @@ class ImpalaShell(object, cmd.Cmd):
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
     query = self._create_beeswax_query(args)
-    # Set posix=True and add "'" to escaped quotes
-    # to deal with escaped quotes in string literals
-    lexer = shlex.shlex(strip_comments(query.query.lstrip())
-                        .encode('utf-8'), posix=True)
-    lexer.escapedquotes += "'"
+    # Use shlex to deal with escape quotes in string literals.
+    # Set posix=False to preserve the quotes.
+    tokens = shlex.split(strip_comments(query.query.lstrip()).encode('utf-8'),
+                         posix=False)
     try:
       # Because the WITH clause may precede DML or SELECT queries,
       # just checking the first token is insufficient.
       is_dml = False
-      tokens = list(lexer)
       if filter(self.DML_REGEX.match, tokens): is_dml = True
       return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
     except ValueError as e:
