@@ -66,7 +66,7 @@ class ImpalaClient(object):
 
   def __init__(self, impalad, kerberos_host_fqdn, use_kerberos=False,
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
-               ldap_password=None, use_ldap=False, client_connect_timeout_ms=5000,
+               ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True):
     self.connected = False
     self.impalad_host = impalad[0].encode('ascii', 'ignore')
