@@ -267,13 +267,22 @@ class SynchronousWorkItem {
     discard_result(done_promise_.Set(status));
   }
 
-  /// Wait for the operation to complete or time out with the specified limit.
+  /// Wait for the operation to complete or time out with the specified limit
+  /// 'timeout_millis' given that the caller has already waited 'time_used_millis'.
   /// If the operation times out, it returns TErrorCode::THREAD_POOL_TASK_TIMED_OUT.
   /// Otherwise, it returns the status returned by Execute().
-  Status Wait(int64_t timeout_millis) {
-    bool timed_out;
-    Status status = done_promise_.Get(timeout_millis, &timed_out);
+  Status Wait(int64_t timeout_millis, int64_t time_used_millis) {
+    // If the time used has already exceeded the timeout, go directly to returning
+    // THREAD_POOL_TASK_TIMED_OUT.
+    bool timed_out = (time_used_millis >= timeout_millis);
+    Status status;
+    if (!timed_out) {
+      int64_t timeout_left_millis = timeout_millis - time_used_millis;
+      status = done_promise_.Get(timeout_left_millis, &timed_out);
+    }
     if (timed_out) {
+      // IMPALA-7946: Always throw an error using the original timeout, not the
+      // timeout remaining.
       Status timeout_status = Status(TErrorCode::THREAD_POOL_TASK_TIMED_OUT,
           GetDescription(), timeout_millis / MILLIS_PER_SEC);
       LOG(WARNING) << timeout_status.GetDetail();
@@ -328,16 +337,9 @@ class SynchronousThreadPool : public ThreadPool<std::shared_ptr<SynchronousWorkI
       return failed_to_submit_status;
     }
 
-    int64_t offer_time_millis =
+    int64_t time_used_millis =
         offer_timer.ElapsedTime() / (NANOS_PER_MICRO * MICROS_PER_MILLI);
-    int64_t timeout_left = timeout_milliseconds - offer_time_millis;
-    if (timeout_left <= 0) {
-      Status timeout_status = Status(TErrorCode::THREAD_POOL_TASK_TIMED_OUT,
-          work->GetDescription(), timeout_milliseconds / MILLIS_PER_SEC);
-      LOG(WARNING) << timeout_status.GetDetail();
-      return timeout_status;
-    }
-    return work->Wait(timeout_left);
+    return work->Wait(timeout_milliseconds, time_used_millis);
   }
 
  private:
