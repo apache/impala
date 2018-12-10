@@ -15,11 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(fe ALL DEPENDS
-  thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
-)
+FROM impala_base
 
-add_custom_target(test-configuration
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/create-test-configuration.sh
-)
+# Externally-facing ports
+# Debug webserver
+EXPOSE 25010
+
+CMD ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/statestored"]

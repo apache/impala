@@ -37,6 +37,12 @@ CTestTestfile.cmake
 build.ninja
 rules.ninja
 
+# Build timestamp files
+.*timestamp
+
+# Docker build files
+docker/build_context
+
 Testing/
 llvm-ir/
 shell/gen-py/

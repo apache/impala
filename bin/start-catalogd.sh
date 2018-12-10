@@ -72,4 +72,4 @@ fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
 export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
-exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/catalog/catalogd ${CATALOGD_ARGS}
+exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/service/catalogd ${CATALOGD_ARGS}

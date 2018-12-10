@@ -15,11 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(fe ALL DEPENDS
-  thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
-)
+FROM ubuntu:16.04
 
-add_custom_target(test-configuration
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/create-test-configuration.sh
-)
+RUN apt-get update && \
+  apt-get install -y openjdk-8-jre-headless \
+  libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
+  tzdata
+
+# Copy build artifacts required for the daemon processes.
+# Need to have multiple copy commands to preserve directory structure.
+COPY bin /opt/impala/bin
+COPY conf /opt/impala/conf
+COPY lib /opt/impala/lib
+COPY www /opt/impala/www
+copy kudu /opt/kudu
+
+WORKDIR /opt/impala/

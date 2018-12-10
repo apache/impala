@@ -3,3 +3,8 @@
 `test-with-docker.py` runs the Impala build and tests inside of Docker
 containers, parallelizing the test execution across test suites. See that file
 for more details.
+
+This also contains **experimental** infrastructure to build `impala_base`,
+`catalogd`, `impalad` and `statestored` container images from the output of
+an Impala build. The containers can be built via the CMake target docker_images.
+See CMakeLists.txt for the build targets.
