@@ -21,7 +21,8 @@ import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
-from subprocess import check_call, check_output
+from subprocess import check_call
+from tests.util.shell_util import exec_process
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -42,7 +43,9 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
 
     # Find the NameNode's pid via pgrep. This would raise an error if it did not
     # find a pid, so there is at least one match.
-    pgrep_output = check_output(["pgrep", "-f", "namenode.NameNode"])
+    rc, pgrep_output, stderr = exec_process("pgrep -f namenode.NameNode")
+    assert rc == 0, \
+        "Error finding NameNode pid\nstdout={0}\nstderr={1}".format(pgrep_output, stderr)
     # In our test environment, this should only match one pid
     assert(pgrep_output.count("\n") == 1)
     namenode_pid = pgrep_output.strip()
