@@ -249,107 +249,154 @@ under the License.
           href="impala_revoke.xml#revoke"/>.
       </p>
 
-      <p>
-        URIs represent the file paths you specify as part of statements such as <codeph>CREATE
-        EXTERNAL TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what look
-        like UNIX paths, but these locations can also be prefixed with <codeph>hdfs://</codeph>
-        to make clear that they are really URIs. To set privileges for a URI, specify the name
-        of a directory, and the privilege applies to all the files in that directory and any
-        directories underneath it.
-      </p>
+    </conbody>
 
-      <p>
-        URIs must start with <codeph>hdfs://</codeph>, <codeph>s3a://</codeph>,
-        <codeph>adl://</codeph>, or <codeph>file://</codeph>. If a URI starts with an absolute
-        path, the path will be appended to the default filesystem prefix. For example, if you
-        specify:
+    <concept id="changing_privileges">
+
+      <title>Changing Privileges</title>
+
+      <conbody>
+
+        <p>
+          If you make a change to privileges in Sentry from outside of Impala, e.g. adding a
+          user, removing a user, modifying privileges, there are two options to propagate the
+          change:
+        </p>
+
+        <ul>
+          <li>
+            Use the <codeph>catalogd</codeph> flag,
+            <codeph>--sentry_catalog_polling_frequency_s</codeph> to specify how often to do a
+            Sentry refresh. The flag is set to 60 seconds by default.
+          </li>
+
+          <li>
+            Run the <codeph>INVALIDATE METADATA</codeph> statement to force a Sentry refresh.
+            <codeph>INVALIDATE METADATA</codeph> forces a Sentry refresh regardless of the
+            <codeph>--sentry_catalog_polling_fequency_s</codeph> flag.
+          </li>
+        </ul>
+
+        <p>
+          If you make a change to privileges within Impala, <codeph>INVALIDATE METADATA</codeph>
+          is not required.
+        </p>
+
+        <note type="warning">
+          As <codeph>INVALIDATE METADATA</codeph> is an expensive operation, you should use it
+          judiciously.
+        </note>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="granting_on_uri">
+
+      <title>Granting Privileges on URI</title>
+
+      <conbody>
+
+        <p>
+          URIs represent the file paths you specify as part of statements such as <codeph>CREATE
+          EXTERNAL TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what
+          look like UNIX paths, but these locations can also be prefixed with
+          <codeph>hdfs://</codeph> to make clear that they are really URIs. To set privileges
+          for a URI, specify the name of a directory, and the privilege applies to all the files
+          in that directory and any directories underneath it.
+        </p>
+
+        <p>
+          URIs must start with <codeph>hdfs://</codeph>, <codeph>s3a://</codeph>,
+          <codeph>adl://</codeph>, or <codeph>file://</codeph>. If a URI starts with an absolute
+          path, the path will be appended to the default filesystem prefix. For example, if you
+          specify:
 <codeblock>
 GRANT ALL ON URI '/tmp';
 </codeblock>
-        The above statement effectively becomes the following where the default filesystem is
-        HDFS.
+          The above statement effectively becomes the following where the default filesystem is
+          HDFS.
 <codeblock>
 GRANT ALL ON URI 'hdfs://localhost:20500/tmp';
 </codeblock>
-      </p>
+        </p>
 
-      <p>
-        When defining URIs for HDFS, you must also specify the NameNode. For example:
+        <p>
+          When defining URIs for HDFS, you must also specify the NameNode. For example:
 <codeblock>GRANT ALL ON URI file:///path/to/dir TO &lt;role>
 GRANT ALL ON URI hdfs://namenode:port/path/to/dir TO &lt;role></codeblock>
-        <note type="warning">
-          <p>
+          <note type="warning">
             Because the NameNode host and port must be specified, it is strongly recommended
             that you use High Availability (HA). This ensures that the URI will remain constant
             even if the NameNode changes. For example:
-          </p>
 <codeblock>GRANT ALL ON URI hdfs://ha-nn-uri/path/to/dir TO &lt;role></codeblock>
-        </note>
-      </p>
-
-    </conbody>
-
-  </concept>
-
-  <concept id="concept_k45_lbm_f2b">
-
-    <title>Examples of Setting up Authorization for Security Scenarios</title>
-
-    <conbody>
-
-      <p>
-        The following examples show how to set up authorization to deal with various scenarios.
-      </p>
-
-      <example>
-
-        <title>A User with No Privileges</title>
-
-        <p>
-          If a user has no privileges at all, that user cannot access any schema objects in the
-          system. The error messages do not disclose the names or existence of objects that the
-          user is not authorized to read.
+          </note>
         </p>
 
-        <p>
-          This is the experience you want a user to have if they somehow log into a system where
-          they are not an authorized Impala user. Or in a real deployment, a user might have no
-          privileges because they are not a member of any of the authorized groups.
-        </p>
+      </conbody>
 
-      </example>
+    </concept>
 
-      <example>
+    <concept id="concept_k45_lbm_f2b">
 
-        <title>Examples of Privileges for Administrative Users</title>
+      <title>Examples of Setting up Authorization for Security Scenarios</title>
+
+      <conbody>
 
         <p>
-          In this example, the SQL statements grant the <codeph>entire_server</codeph> role all
-          privileges on both the databases and URIs within the server.
+          The following examples show how to set up authorization to deal with various
+          scenarios.
         </p>
+
+        <example>
+
+          <title>A User with No Privileges</title>
+
+          <p>
+            If a user has no privileges at all, that user cannot access any schema objects in
+            the system. The error messages do not disclose the names or existence of objects
+            that the user is not authorized to read.
+          </p>
+
+          <p>
+            This is the experience you want a user to have if they somehow log into a system
+            where they are not an authorized Impala user. Or in a real deployment, a user might
+            have no privileges because they are not a member of any of the authorized groups.
+          </p>
+
+        </example>
+
+        <example>
+
+          <title>Examples of Privileges for Administrative Users</title>
+
+          <p>
+            In this example, the SQL statements grant the <codeph>entire_server</codeph> role
+            all privileges on both the databases and URIs within the server.
+          </p>
 
 <codeblock>CREATE ROLE entire_server;
 GRANT ROLE entire_server TO GROUP admin_group;
 GRANT ALL ON SERVER server1 TO ROLE entire_server;
 </codeblock>
 
-      </example>
+        </example>
 
-      <example>
+        <example>
 
-        <title>A User with Privileges for Specific Databases and Tables</title>
+          <title>A User with Privileges for Specific Databases and Tables</title>
 
-        <p>
-          If a user has privileges for specific tables in specific databases, the user can
-          access those things but nothing else. They can see the tables and their parent
-          databases in the output of <codeph>SHOW TABLES</codeph> and <codeph>SHOW
-          DATABASES</codeph>, <codeph>USE</codeph> the appropriate databases, and perform the
-          relevant actions (<codeph>SELECT</codeph> and/or <codeph>INSERT</codeph>) based on the
-          table privileges. To actually create a table requires the <codeph>ALL</codeph>
-          privilege at the database level, so you might define separate roles for the user that
-          sets up a schema and other users or applications that perform day-to-day operations on
-          the tables.
-        </p>
+          <p>
+            If a user has privileges for specific tables in specific databases, the user can
+            access those things but nothing else. They can see the tables and their parent
+            databases in the output of <codeph>SHOW TABLES</codeph> and <codeph>SHOW
+            DATABASES</codeph>, <codeph>USE</codeph> the appropriate databases, and perform the
+            relevant actions (<codeph>SELECT</codeph> and/or <codeph>INSERT</codeph>) based on
+            the table privileges. To actually create a table requires the <codeph>ALL</codeph>
+            privilege at the database level, so you might define separate roles for the user
+            that sets up a schema and other users or applications that perform day-to-day
+            operations on the tables.
+          </p>
 
 <codeblock>
 CREATE ROLE one_database;
@@ -365,38 +412,38 @@ CREATE ROLE student;
 GRANT ROLE student TO GROUP visitors;
 GRANT SELECT ON TABLE db1.training TO ROLE student;</codeblock>
 
-      </example>
+        </example>
 
-      <example>
+        <example>
 
-        <title>Privileges for Working with External Data Files</title>
+          <title>Privileges for Working with External Data Files</title>
 
-        <p>
-          When data is being inserted through the <codeph>LOAD DATA</codeph> statement, or is
-          referenced from an HDFS location outside the normal Impala database directories, the
-          user also needs appropriate permissions on the URIs corresponding to those HDFS
-          locations.
-        </p>
+          <p>
+            When data is being inserted through the <codeph>LOAD DATA</codeph> statement, or is
+            referenced from an HDFS location outside the normal Impala database directories, the
+            user also needs appropriate permissions on the URIs corresponding to those HDFS
+            locations.
+          </p>
 
-        <p>
-          In this example:
-        </p>
+          <p>
+            In this example:
+          </p>
 
-        <ul>
-          <li>
-            The <codeph>external_table</codeph> role can insert into and query the Impala table,
-            <codeph>external_table.sample</codeph>.
-          </li>
+          <ul>
+            <li>
+              The <codeph>external_table</codeph> role can insert into and query the Impala
+              table, <codeph>external_table.sample</codeph>.
+            </li>
 
-          <li>
-            The <codeph>staging_dir</codeph> role can specify the HDFS path
-            <filepath>/user/impala-user/external_data</filepath> with the <codeph>LOAD
-            DATA</codeph> statement. When Impala queries or loads data files, it operates on all
-            the files in that directory, not just a single file, so any Impala
-            <codeph>LOCATION</codeph> parameters refer to a directory rather than an individual
-            file.
-          </li>
-        </ul>
+            <li>
+              The <codeph>staging_dir</codeph> role can specify the HDFS path
+              <filepath>/user/impala-user/external_data</filepath> with the <codeph>LOAD
+              DATA</codeph> statement. When Impala queries or loads data files, it operates on
+              all the files in that directory, not just a single file, so any Impala
+              <codeph>LOCATION</codeph> parameters refer to a directory rather than an
+              individual file.
+            </li>
+          </ul>
 
 <codeblock>CREATE ROLE external_table;
 GRANT ROLE external_table TO GROUP impala_users;
@@ -406,43 +453,44 @@ CREATE ROLE staging_dir;
 GRANT ROLE staging TO GROUP impala_users;
 GRANT ALL ON URI 'hdfs://127.0.0.1:8020/user/impala-user/external_data' TO ROLE staging_dir;</codeblock>
 
-      </example>
+        </example>
 
-      <example>
+        <example>
 
-        <title>Separating Administrator Responsibility from Read and Write Privileges</title>
+          <title>Separating Administrator Responsibility from Read and Write Privileges</title>
 
-        <p>
-          To create a database, you need the full privilege on that database while day-to-day
-          operations on tables within that database can be performed with lower levels of
-          privilege on specific table. Thus, you might set up separate roles for each database
-          or application: an administrative one that could create or drop the database, and a
-          user-level one that can access only the relevant tables.
-        </p>
+          <p>
+            To create a database, you need the full privilege on that database while day-to-day
+            operations on tables within that database can be performed with lower levels of
+            privilege on specific table. Thus, you might set up separate roles for each database
+            or application: an administrative one that could create or drop the database, and a
+            user-level one that can access only the relevant tables.
+          </p>
 
-        <p>
-          In this example, the responsibilities are divided between users in 3 different groups:
-        </p>
+          <p>
+            In this example, the responsibilities are divided between users in 3 different
+            groups:
+          </p>
 
-        <ul>
-          <li>
-            Members of the <codeph>supergroup</codeph> group have the
-            <codeph>training_sysadmin</codeph> role and so can set up a database named
-            <codeph>training</codeph>.
-          </li>
+          <ul>
+            <li>
+              Members of the <codeph>supergroup</codeph> group have the
+              <codeph>training_sysadmin</codeph> role and so can set up a database named
+              <codeph>training</codeph>.
+            </li>
 
-          <li>
-            Members of the <codeph>impala_users</codeph> group have the
-            <codeph>instructor</codeph> role and so can create, insert into, and query any
-            tables in the <codeph>training</codeph> database, but cannot create or drop the
-            database itself.
-          </li>
+            <li>
+              Members of the <codeph>impala_users</codeph> group have the
+              <codeph>instructor</codeph> role and so can create, insert into, and query any
+              tables in the <codeph>training</codeph> database, but cannot create or drop the
+              database itself.
+            </li>
 
-          <li>
-            Members of the <codeph>visitor</codeph> group have the <codeph>student</codeph> role
-            and so can query those tables in the <codeph>training</codeph> database.
-          </li>
-        </ul>
+            <li>
+              Members of the <codeph>visitor</codeph> group have the <codeph>student</codeph>
+              role and so can query those tables in the <codeph>training</codeph> database.
+            </li>
+          </ul>
 
 <codeblock>CREATE ROLE training_sysadmin;
 GRANT ROLE training_sysadmin TO GROUP supergroup;
@@ -456,9 +504,11 @@ CREATE ROLE visitor;
 GRANT ROLE student TO GROUP visitor;
 GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
 
-      </example>
+        </example>
 
-    </conbody>
+      </conbody>
+
+    </concept>
 
   </concept>
 
