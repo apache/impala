@@ -213,6 +213,21 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'Actual: ' in result.stderr
     assert 'Problem parsing file' in result.stderr
 
+  def test_completed_query_errors_1(self):
+    args = ('-q "set abort_on_error=true;'
+            ' select id from functional_parquet.bad_column_metadata t"')
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert 'ERROR: Column metadata states there are 11 values, ' in result.stderr
+    assert 'but read 10 values from column id.' in result.stderr
+
+  def test_completed_query_errors_2(self):
+    args = ('-q "set abort_on_error=true;'
+            ' select id, cnt from functional_parquet.bad_column_metadata t,'
+            ' (select 1 cnt) u"')
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert 'ERROR: Column metadata states there are 11 values, ' in result.stderr
+    assert 'but read 10 values from column id.' in result.stderr
+
   def test_no_warnings_in_log_with_quiet_mode(self):
     """Regression test for IMPALA-4222."""
     args = ('-q "set abort_on_error=false;'
