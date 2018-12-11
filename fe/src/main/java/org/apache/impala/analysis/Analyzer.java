@@ -333,7 +333,6 @@ public class Analyzer {
         rules.add(EqualityDisjunctsToInRule.INSTANCE);
         rules.add(NormalizeCountStarRule.INSTANCE);
         rules.add(SimplifyDistinctFromRule.INSTANCE);
-        rules.add(RemoveRedundantStringCast.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }
