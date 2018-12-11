@@ -109,4 +109,8 @@ struct TBackendGflags {
   41: required i64 catalog_partial_fetch_rpc_queue_timeout_s
 
   42: required i64 exchg_node_buffer_size_bytes
+
+  43: required i32 kudu_mutation_buffer_size
+
+  44: required i32 kudu_error_buffer_size
 }

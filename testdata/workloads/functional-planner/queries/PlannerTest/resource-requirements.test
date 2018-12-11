@@ -2422,7 +2422,7 @@ from tpch.lineitem inner join /* +shuffle */ tpch.orders on l_orderkey = o_order
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=51.00MB Threads=3
 Per-Host Resource Estimates: Memory=446MB
-Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN 
+Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN
 -- +shuffle
 tpch.orders ON l_orderkey = o_orderkey
 
@@ -2462,7 +2462,7 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=52.00MB Threads=6
 Per-Host Resource Estimates: Memory=300MB
-Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN 
+Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN
 -- +shuffle
 tpch.orders ON l_orderkey = o_orderkey
 
@@ -2523,7 +2523,7 @@ Per-Host Resources: mem-estimate=89.00MB mem-reservation=9.00MB thread-reservati
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=104.00MB Threads=7
 Per-Host Resource Estimates: Memory=481MB
-Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN 
+Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN
 -- +shuffle
 tpch.orders ON l_orderkey = o_orderkey
 
@@ -4953,11 +4953,11 @@ join (
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=99.00MB Threads=5
 Per-Host Resource Estimates: Memory=180MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.orders t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.orders t1 INNER JOIN (SELECT
 -- +straight_join
-t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT 
+t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT
 -- +straight_join
 t3.o_orderkey k3, t4.o_orderkey k4 FROM tpch_parquet.orders t3 INNER JOIN
 tpch_parquet.orders t4 ON t3.o_orderkey = t4.o_orderkey) v2 ON v2.k3 =
@@ -5037,11 +5037,11 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=100.50MB Threads=10
 Per-Host Resource Estimates: Memory=260MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.orders t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.orders t1 INNER JOIN (SELECT
 -- +straight_join
-t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT 
+t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT
 -- +straight_join
 t3.o_orderkey k3, t4.o_orderkey k4 FROM tpch_parquet.orders t3 INNER JOIN
 tpch_parquet.orders t4 ON t3.o_orderkey = t4.o_orderkey) v2 ON v2.k3 =
@@ -5156,11 +5156,11 @@ Per-Host Resources: mem-estimate=88.84MB mem-reservation=59.00MB thread-reservat
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=176.50MB Threads=11
 Per-Host Resource Estimates: Memory=454MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.orders t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.orders t1 INNER JOIN (SELECT
 -- +straight_join
-t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT 
+t2.o_orderkey k2, k3, k4 FROM tpch_parquet.orders t2 INNER JOIN (SELECT
 -- +straight_join
 t3.o_orderkey k3, t4.o_orderkey k4 FROM tpch_parquet.orders t3 INNER JOIN
 tpch_parquet.orders t4 ON t3.o_orderkey = t4.o_orderkey) v2 ON v2.k3 =
@@ -5315,11 +5315,11 @@ join (
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=176.00KB Threads=5
 Per-Host Resource Estimates: Memory=138MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.nation t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.nation t1 INNER JOIN (SELECT
 -- +straight_join
-t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT 
+t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT
 -- +straight_join
 t3.n_nationkey k3, t4.s_suppkey k4 FROM tpch_parquet.nation t3 INNER JOIN
 tpch_parquet.supplier t4) v2) v1
@@ -5386,11 +5386,11 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=176.00KB Threads=9
 Per-Host Resource Estimates: Memory=161MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.nation t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.nation t1 INNER JOIN (SELECT
 -- +straight_join
-t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT 
+t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT
 -- +straight_join
 t3.n_nationkey k3, t4.s_suppkey k4 FROM tpch_parquet.nation t3 INNER JOIN
 tpch_parquet.supplier t4) v2) v1
@@ -5485,11 +5485,11 @@ Per-Host Resources: mem-estimate=97.55MB mem-reservation=32.00KB thread-reservat
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=352.00KB Threads=9
 Per-Host Resource Estimates: Memory=311MB
-Analyzed query: SELECT 
+Analyzed query: SELECT
 -- +straight_join
-* FROM tpch_parquet.nation t1 INNER JOIN (SELECT 
+* FROM tpch_parquet.nation t1 INNER JOIN (SELECT
 -- +straight_join
-t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT 
+t2.n_nationkey k2, k3, k4 FROM tpch_parquet.nation t2 INNER JOIN (SELECT
 -- +straight_join
 t3.n_nationkey k3, t4.s_suppkey k4 FROM tpch_parquet.nation t3 INNER JOIN
 tpch_parquet.supplier t4) v2) v1
@@ -5829,4 +5829,53 @@ Per-Host Resources: mem-estimate=806.43MB mem-reservation=74.00MB thread-reserva
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6001215
    in pipelines: 00(GETNEXT)
+====
+# kudu insert
+insert into functional_kudu.tinyinttable values(1);
+---- PLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=1
+Per-Host Resource Estimates: Memory=20MB
+Codegen disabled by planner
+Analyzed query: SELECT CAST(1 AS TINYINT) UNION SELECT CAST(1 AS TINYINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=0B thread-reservation=1
+INSERT INTO KUDU [functional_kudu.tinyinttable]
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=1B cardinality=1
+   in pipelines:
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=2
+Per-Host Resource Estimates: Memory=22MB
+Codegen disabled by planner
+Analyzed query: SELECT CAST(1 AS TINYINT) UNION SELECT CAST(1 AS TINYINT)
+
+F01:PLAN FRAGMENT [KUDU(KuduPartition(1))] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=22.02MB mem-reservation=2.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.tinyinttable]
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(1) ASC NULLS LAST, 1 ASC NULLS LAST
+|  materialized: KuduPartition(1)
+|  mem-estimate=2.00MB mem-reservation=2.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=5B cardinality=1
+|  in pipelines:
+|
+01:EXCHANGE [KUDU(KuduPartition(1))]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=1B cardinality=1
+|  in pipelines:
+|
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=1B cardinality=1
+   in pipelines:
 ====
