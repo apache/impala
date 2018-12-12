@@ -22,6 +22,8 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
+. $IMPALA_HOME/bin/set-pythonpath.sh
+
 LD_LIBRARY_PATH+=":$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
