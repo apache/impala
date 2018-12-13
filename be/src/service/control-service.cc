@@ -114,7 +114,9 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
     // This is expected occasionally (since a report RPC might be in flight while
     // cancellation is happening). Return an error to the caller to get it to stop.
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
-        "query ID (probably closed or cancelled): $0", PrintId(query_id));
+                                   "query ID (probably closed or cancelled): $0 "
+                                   "remote host=$1",
+        PrintId(query_id), rpc_context->remote_address().ToString());
     VLOG(1) << err;
     RespondAndReleaseRpc(Status::Expected(err), response, rpc_context);
     return;
