@@ -109,7 +109,10 @@ QueryState* QueryExecMgr::GetOrCreateQueryState(
 
     auto it = map_ref->find(query_ctx.query_id);
     if (it == map_ref->end()) {
-      // register new QueryState
+      // Register new QueryState. This marks when the query first starts executing on
+      // this backend.
+      ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTED->Increment(1);
+      ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->Increment(1);
       qs = new QueryState(query_ctx, mem_limit);
       map_ref->insert(make_pair(query_ctx.query_id, qs));
       *created = true;
@@ -177,7 +180,9 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
     if (cnt > 0) return;
     map_ref->erase(it);
   }
-  // TODO: send final status report during gc, but do this from a different thread
   delete qs_from_map;
   VLOG(1) << "ReleaseQueryState(): deleted query_id=" << PrintId(query_id);
+  // BACKEND_NUM_QUERIES_EXECUTING is used to detect the backend being quiesced, so we
+  // decrement it after we're completely done with the query.
+  ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->Increment(-1);
 }

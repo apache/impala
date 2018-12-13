@@ -199,6 +199,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// latest status reports received from those backends).
   ResourceUtilization ComputeQueryResourceUtilization();
 
+  /// Return the backends in 'candidates' that still have at least one fragment instance
+  /// executing on them. The returned backends may not be in the same order as the input.
+  std::vector<TNetworkAddress> GetActiveBackends(
+      const std::vector<TNetworkAddress>& candidates);
+
  private:
   class BackendState;
   struct FilterTarget;

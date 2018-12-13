@@ -747,6 +747,9 @@ struct TShutdownStatus {
   // Number of client requests still registered with the Impala server that is being shut
   // down.
   4: required i64 client_requests_registered
+
+  // Number of queries still executing on backend.
+  5: required i64 backend_queries_executing
 }
 
 struct TRemoteShutdownResult {

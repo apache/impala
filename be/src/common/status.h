@@ -78,10 +78,6 @@ class StatusPB;
 ///
 ///   return Status::OK();
 /// }
-///
-/// TODO: macros:
-/// RETURN_IF_ERROR(status) << "msg"
-/// MAKE_ERROR() << "msg"
 class NODISCARD Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
@@ -115,36 +111,46 @@ class NODISCARD Status {
 
   /// Status using only the error code as a parameter. This can be used for error messages
   /// that don't take format parameters.
-  explicit Status(TErrorCode::type code);
+  explicit Status(TErrorCode::type code) : Status(false, code) {}
 
   /// These constructors are used if the caller wants to indicate a non-successful
-  /// execution and supply a client-facing error message. This is the preferred way of
-  /// instantiating a non-successful Status.
-  Status(TErrorCode::type error, const ArgType& arg0);
-  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1);
+  /// execution and supply a client-facing error message. Using TErrorCode and
+  /// parameterised error messages is the preferred way of instantiating a
+  /// non-successful Status instead of the std::string constructor. These constructors
+  /// log the error message and a traceback, which can be expensive, so these should only
+  /// be used for rare, low-frequency errors. Status::Expected() does not log a traceback
+  /// and should be used for higher-frequency errors.
+  Status(TErrorCode::type error, const ArgType& arg0) : Status(false, error, arg0) {}
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1)
+    : Status(false, error, arg0, arg1) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2);
+      const ArgType& arg2)
+    : Status(false, error, arg0, arg1, arg2) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3);
+      const ArgType& arg2, const ArgType& arg3)
+    : Status(false, error, arg0, arg1, arg2, arg3) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-      const ArgType& arg5);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4, arg5) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-      const ArgType& arg5, const ArgType& arg6);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4, arg5, arg6) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
-      const ArgType& arg8);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7, const ArgType& arg8)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {}
   Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
-      const ArgType& arg8, const ArgType& arg9);
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7, const ArgType& arg8, const ArgType& arg9)
+    : Status(false, error, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {}
 
   /// Used when the ErrorMsg is created as an intermediate value that is either passed to
   /// the Status or to the RuntimeState.
@@ -167,9 +173,37 @@ class NODISCARD Status {
   /// Retains the TErrorCode value and the message
   explicit Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
-  /// Create a status instance that represents an expected error and will not be logged
+  /// The below Status::Expected() functions create a status instance that represents
+  /// an expected error. They behave the same as the constructors with the same
+  /// argument types, except they do not log the error message and traceback.
   static Status Expected(const ErrorMsg& e);
   static Status Expected(const std::string& error_msg);
+  static Status Expected(TErrorCode::type error);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0);
+  static Status Expected(
+      TErrorCode::type error, const ArgType& arg0, const ArgType& arg1);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7, const ArgType& arg8);
+  static Status Expected(TErrorCode::type error, const ArgType& arg0,
+      const ArgType& arg1, const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7, const ArgType& arg8,
+      const ArgType& arg9);
 
   /// same as copy c'tor
   ALWAYS_INLINE Status& operator=(const Status& status) {
@@ -271,10 +305,32 @@ class NODISCARD Status {
 
   static const char* LLVM_CLASS_NAME;
  private:
-
   // Status constructors that can suppress logging via 'silent' parameter
   Status(const ErrorMsg& error_msg, bool silent);
   Status(const std::string& error_msg, bool silent);
+  Status(bool silent, TErrorCode::type code);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7, const ArgType& arg8);
+  Status(bool silent, TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+      const ArgType& arg6, const ArgType& arg7, const ArgType& arg8, const ArgType& arg9);
 
   // A non-inline function for copying status' message.
   void CopyMessageFrom(const Status& status) noexcept;

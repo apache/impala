@@ -61,6 +61,7 @@
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
+#include "service/cancellation-work.h"
 #include "service/impala-http-handler.h"
 #include "service/impala-internal-service.h"
 #include "service/client-request-state.h"
@@ -259,41 +260,6 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
 // Interval between checks for query expiration.
 const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
-
-// Work item for ImpalaServer::cancellation_thread_pool_.
-class CancellationWork {
- public:
-  CancellationWork(const TUniqueId& query_id, const Status& cause, bool unregister)
-      : query_id_(query_id), cause_(cause), unregister_(unregister) {
-  }
-
-  CancellationWork() {
-  }
-
-  const TUniqueId& query_id() const { return query_id_; }
-  const Status& cause() const { return cause_; }
-  bool unregister() const { return unregister_; }
-
-  bool operator<(const CancellationWork& other) const {
-    return query_id_ < other.query_id_;
-  }
-
-  bool operator==(const CancellationWork& other) const {
-    return query_id_ == other.query_id_;
-  }
-
- private:
-  // Id of query to be canceled.
-  TUniqueId query_id_;
-
-  // Error status containing a list of failed impalads causing the cancellation.
-  Status cause_;
-
-  // If true, unregister the query rather than cancelling it. Calling UnregisterQuery()
-  // does call CancelInternal eventually, but also ensures that the query is torn down and
-  // archived.
-  bool unregister_;
-};
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     : exec_env_(exec_env),
@@ -1418,16 +1384,57 @@ TQueryOptions ImpalaServer::SessionState::QueryOptions() {
 
 void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     const CancellationWork& cancellation_work) {
+  const TUniqueId& query_id = cancellation_work.query_id();
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+  // Query was already unregistered.
+  if (request_state == nullptr) {
+    VLOG_QUERY << "CancelFromThreadPool(): query " << PrintId(query_id)
+               << " already unregistered.";
+    return;
+  }
+
+  Status error;
+  switch (cancellation_work.cause()) {
+    case CancellationWorkCause::TERMINATED_BY_SERVER:
+      error = cancellation_work.error();
+      break;
+    case CancellationWorkCause::BACKEND_FAILED: {
+      // We only want to proceed with cancellation if the backends are still in use for
+      // the query.
+      vector<TNetworkAddress> active_backends;
+      Coordinator* coord = request_state->GetCoordinator();
+      if (coord == nullptr) {
+        // Query hasn't started yet - it still will run on all backends.
+        active_backends = cancellation_work.failed_backends();
+      } else {
+        active_backends = coord->GetActiveBackends(cancellation_work.failed_backends());
+      }
+      if (active_backends.empty()) {
+        VLOG_QUERY << "CancelFromThreadPool(): all failed backends already completed for "
+                   << "query " << PrintId(query_id);
+        return;
+      }
+      stringstream msg;
+      for (int i = 0; i < active_backends.size(); ++i) {
+        msg << TNetworkAddressToString(active_backends[i]);
+        if (i + 1 != active_backends.size()) msg << ", ";
+      }
+      error = Status::Expected(TErrorCode::UNREACHABLE_IMPALADS, msg.str());
+      break;
+    }
+    default:
+      DCHECK(false) << static_cast<int>(cancellation_work.cause());
+  }
+
   if (cancellation_work.unregister()) {
-    Status status = UnregisterQuery(cancellation_work.query_id(), true,
-        &cancellation_work.cause());
+    Status status = UnregisterQuery(cancellation_work.query_id(), true, &error);
     if (!status.ok()) {
       VLOG_QUERY << "Query de-registration (" << PrintId(cancellation_work.query_id())
                  << ") failed";
     }
   } else {
-    Status status = CancelInternal(cancellation_work.query_id(), true,
-        &cancellation_work.cause());
+    VLOG_QUERY << "CancelFromThreadPool(): cancelling query_id=" << PrintId(query_id);
+    Status status = request_state->Cancel(true, &error);
     if (!status.ok()) {
       VLOG_QUERY << "Query cancellation (" << PrintId(cancellation_work.query_id())
                  << ") did not succeed: " << status.GetDetail();
@@ -1787,16 +1794,16 @@ void ImpalaServer::MembershipCallback(
       for (cancellation_entry = queries_to_cancel.begin();
           cancellation_entry != queries_to_cancel.end();
           ++cancellation_entry) {
-        stringstream cause_msg;
-        cause_msg << "Failed due to unreachable impalad(s): ";
+        stringstream backends_ss;
         for (int i = 0; i < cancellation_entry->second.size(); ++i) {
-          cause_msg << TNetworkAddressToString(cancellation_entry->second[i]);
-          if (i + 1 != cancellation_entry->second.size()) cause_msg << ", ";
+          backends_ss << TNetworkAddressToString(cancellation_entry->second[i]);
+          if (i + 1 != cancellation_entry->second.size()) backends_ss << ", ";
         }
-        string cause_str = cause_msg.str();
-        LOG(INFO) << "Query " << PrintId(cancellation_entry->first) << ": " << cause_str;
-        cancellation_thread_pool_->Offer(CancellationWork(cancellation_entry->first,
-            Status::Expected(cause_msg.str()), false));
+        VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry->first)
+                   << ", adding to queue to check for cancellation: "
+                   << backends_ss.str();
+        cancellation_thread_pool_->Offer(CancellationWork::BackendFailure(
+            cancellation_entry->first, cancellation_entry->second));
       }
     }
   }
@@ -2048,9 +2055,10 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
               session_state.second->inflight_queries.end());
         }
         // Unregister all open queries from this session.
-        Status status = Status::Expected("Session expired due to inactivity");
-        for (const TUniqueId& query_id: inflight_queries) {
-          cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
+        Status status = Status::Expected(TErrorCode::INACTIVE_SESSION_EXPIRED);
+        for (const TUniqueId& query_id : inflight_queries) {
+          cancellation_thread_pool_->Offer(
+              CancellationWork::TerminatedByServer(query_id, status, true));
         }
       }
     }
@@ -2113,11 +2121,10 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           int32_t exec_time_limit_s = crs->query_options().exec_time_limit_s;
           VLOG_QUERY << "Expiring query " << PrintId(expiration_event->query_id)
                      << " due to execution time limit of " << exec_time_limit_s << "s.";
-          const string& err_msg = Substitute(
-              "Query $0 expired due to execution time limit of $1",
-              PrintId(expiration_event->query_id),
-              PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S));
-          ExpireQuery(crs.get(), Status::Expected(err_msg));
+          ExpireQuery(crs.get(),
+              Status::Expected(TErrorCode::EXEC_TIME_LIMIT_EXCEEDED,
+                  PrintId(expiration_event->query_id),
+                  PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S)));
           expiration_event = queries_by_timestamp_.erase(expiration_event);
           continue;
         }
@@ -2152,15 +2159,13 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           }
         } else if (!crs->is_active()) {
           // Otherwise time to expire this query
-          VLOG_QUERY
-              << "Expiring query due to client inactivity: "
-              << PrintId(expiration_event->query_id) << ", last activity was at: "
-              << ToStringFromUnixMillis(crs->last_active_ms());
-          const string& err_msg = Substitute(
-              "Query $0 expired due to client inactivity (timeout is $1)",
-              PrintId(expiration_event->query_id),
-              PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S));
-          ExpireQuery(crs.get(), Status::Expected(err_msg));
+          VLOG_QUERY << "Expiring query due to client inactivity: "
+                     << PrintId(expiration_event->query_id) << ", last activity was at: "
+                     << ToStringFromUnixMillis(crs->last_active_ms());
+          ExpireQuery(crs.get(),
+              Status::Expected(TErrorCode::INACTIVE_QUERY_EXPIRED,
+                  PrintId(expiration_event->query_id),
+                  PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S)));
           expiration_event = queries_by_timestamp_.erase(expiration_event);
         } else {
           // Iterator is moved on in every other branch.
@@ -2187,20 +2192,19 @@ Status ImpalaServer::CheckResourceLimits(ClientRequestState* crs) {
   int64_t cpu_limit_s = crs->query_options().cpu_limit_s;
   int64_t cpu_limit_ns = cpu_limit_s * 1000'000'000L;
   if (cpu_limit_ns > 0 && cpu_time_ns > cpu_limit_ns) {
-    const string& err_msg = Substitute("Query $0 terminated due to CPU limit of $1",
+    Status err = Status::Expected(TErrorCode::CPU_LIMIT_EXCEEDED,
         PrintId(crs->query_id()), PrettyPrinter::Print(cpu_limit_s, TUnit::TIME_S));
-    VLOG_QUERY << err_msg;
-    return Status::Expected(err_msg);
+    VLOG_QUERY << err.msg().msg();
+    return err;
   }
 
   int64_t scan_bytes = utilization.bytes_read;
   int64_t scan_bytes_limit = crs->query_options().scan_bytes_limit;
   if (scan_bytes_limit > 0 && scan_bytes > scan_bytes_limit) {
-    const string& err_msg = Substitute(
-        "Query $0 terminated due to scan bytes limit of $1", PrintId(crs->query_id()),
-        PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES));
-    VLOG_QUERY << err_msg;
-    return Status::Expected(err_msg);
+    Status err = Status::Expected(TErrorCode::SCAN_BYTES_LIMIT_EXCEEDED,
+        PrintId(crs->query_id()), PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES));
+    VLOG_QUERY << err.msg().msg();
+    return err;
   }
   // Query is within the resource limits, check again later.
   return Status::OK();
@@ -2208,7 +2212,8 @@ Status ImpalaServer::CheckResourceLimits(ClientRequestState* crs) {
 
 void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {
   DCHECK(!status.ok());
-  cancellation_thread_pool_->Offer(CancellationWork(crs->query_id(), status, false));
+  cancellation_thread_pool_->Offer(
+      CancellationWork::TerminatedByServer(crs->query_id(), status, false));
   ImpaladMetrics::NUM_QUERIES_EXPIRED->Increment(1L);
   crs->set_expired();
 }
@@ -2409,15 +2414,19 @@ TShutdownStatus ImpalaServer::GetShutdownStatus() const {
   result.finstances_executing =
       ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
   result.client_requests_registered = ImpaladMetrics::NUM_QUERIES_REGISTERED->GetValue();
+  result.backend_queries_executing =
+      ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->GetValue();
   return result;
 }
 
 string ImpalaServer::ShutdownStatusToString(const TShutdownStatus& shutdown_status) {
   return Substitute("startup grace period left: $0, deadline left: $1, "
-      "fragment instances: $2, queries registered: $3",
+      "queries registered on coordinator: $2, queries executing: $3, "
+      "fragment instances: $4",
       PrettyPrinter::Print(shutdown_status.grace_remaining_ms, TUnit::TIME_MS),
       PrettyPrinter::Print(shutdown_status.deadline_remaining_ms, TUnit::TIME_MS),
-      shutdown_status.finstances_executing, shutdown_status.client_requests_registered);
+      shutdown_status.client_requests_registered,
+      shutdown_status.backend_queries_executing, shutdown_status.finstances_executing);
 }
 
 Status ImpalaServer::StartShutdown(
@@ -2467,7 +2476,7 @@ Status ImpalaServer::StartShutdown(
     TShutdownStatus shutdown_status = GetShutdownStatus();
     LOG(INFO) << "Shutdown status: " << ShutdownStatusToString(shutdown_status);
     if (shutdown_status.grace_remaining_ms <= 0
-        && shutdown_status.finstances_executing == 0
+        && shutdown_status.backend_queries_executing == 0
         && shutdown_status.client_requests_registered == 0) {
       break;
     } else if (shutdown_status.deadline_remaining_ms <= 0) {

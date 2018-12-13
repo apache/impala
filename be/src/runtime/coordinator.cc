@@ -17,6 +17,8 @@
 
 #include "runtime/coordinator.h"
 
+#include <unordered_set>
+
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>
@@ -823,6 +825,21 @@ Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() 
     query_resource_utilization.Merge(backend_state->ComputeResourceUtilization());
   }
   return query_resource_utilization;
+}
+
+vector<TNetworkAddress> Coordinator::GetActiveBackends(
+    const vector<TNetworkAddress>& candidates) {
+  // Build set from vector so that runtime of this function is O(backend_states.size()).
+  unordered_set<TNetworkAddress> candidate_set(candidates.begin(), candidates.end());
+  vector<TNetworkAddress> result;
+  lock_guard<SpinLock> l(backend_states_init_lock_);
+  for (BackendState* backend_state : backend_states_) {
+    if (candidate_set.find(backend_state->impalad_address()) != candidate_set.end()
+        && !backend_state->IsDone()) {
+      result.push_back(backend_state->impalad_address());
+    }
+  }
+  return result;
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {

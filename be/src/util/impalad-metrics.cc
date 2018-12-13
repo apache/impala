@@ -34,6 +34,10 @@ const char* ImpaladMetricKeys::IMPALA_SERVER_READY = "impala-server.ready";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES = "impala-server.num-queries";
 const char* ImpaladMetricKeys::NUM_QUERIES_REGISTERED =
     "impala-server.num-queries-registered";
+const char* ImpaladMetricKeys::BACKEND_NUM_QUERIES_EXECUTED =
+    "impala-server.backend-num-queries-executed";
+const char* ImpaladMetricKeys::BACKEND_NUM_QUERIES_EXECUTING =
+    "impala-server.backend-num-queries-executing";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
     "impala-server.num-fragments";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT =
@@ -128,9 +132,11 @@ const char* ImpaladMetricKeys::HEDGED_READ_OPS_WIN =
 // =======
 // Counters
 IntGauge* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
+IntCounter* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTED = NULL;
+IntGauge* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING = NULL;
+IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
 IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = NULL;
-IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 IntCounter* ImpaladMetrics::NUM_QUERIES_EXPIRED = NULL;
 IntCounter* ImpaladMetrics::NUM_QUERIES_SPILLED = NULL;
 IntCounter* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
@@ -249,10 +255,14 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0);
   NUM_QUERIES_SPILLED = m->AddCounter(
       ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0);
+  BACKEND_NUM_QUERIES_EXECUTED = m->AddCounter(
+      ImpaladMetricKeys::BACKEND_NUM_QUERIES_EXECUTED, 0);
+  BACKEND_NUM_QUERIES_EXECUTING = m->AddGauge(
+      ImpaladMetricKeys::BACKEND_NUM_QUERIES_EXECUTING, 0);
   IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0);
   IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = m->AddGauge(
-      ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT, 0L);
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT, 0);
   IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->AddGauge(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0);
   IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->AddGauge(

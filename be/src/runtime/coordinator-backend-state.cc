@@ -257,7 +257,6 @@ void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
 void Coordinator::BackendState::LogFirstInProgress(
     std::vector<Coordinator::BackendState*> backend_states) {
   for (Coordinator::BackendState* backend_state : backend_states) {
-    lock_guard<mutex> l(backend_state->lock_);
     if (!backend_state->IsDone()) {
       VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id())
                  << ": first in-progress backend: "
@@ -267,7 +266,14 @@ void Coordinator::BackendState::LogFirstInProgress(
   }
 }
 
-inline bool Coordinator::BackendState::IsDone() const {
+bool Coordinator::BackendState::IsDone() {
+  unique_lock<mutex> lock(lock_);
+  return IsDoneLocked(lock);
+}
+
+inline bool Coordinator::BackendState::IsDoneLocked(
+    const unique_lock<boost::mutex>& lock) const {
+  DCHECK(lock.owns_lock() && lock.mutex() == &lock_);
   return num_remaining_instances_ == 0 || !status_.ok();
 }
 
@@ -282,7 +288,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   last_report_time_ms_ = MonotonicMillis();
 
   // If this backend completed previously, don't apply the update.
-  if (IsDone()) return false;
+  if (IsDoneLocked(lock)) return false;
 
   int idx = 0;
   const bool has_profile = thrift_profiles.profile_trees.size() > 0;
@@ -358,7 +364,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   }
 
   // TODO: keep backend-wide stopwatch?
-  return IsDone();
+  return IsDoneLocked(lock);
 }
 
 void Coordinator::BackendState::UpdateExecStats(
@@ -380,13 +386,13 @@ void Coordinator::BackendState::UpdateExecStats(
 }
 
 bool Coordinator::BackendState::Cancel() {
-  lock_guard<mutex> l(lock_);
+  unique_lock<mutex> l(lock_);
 
   // Nothing to cancel if the exec rpc was not sent
   if (!rpc_sent_) return false;
 
   // don't cancel if it already finished (for any reason)
-  if (IsDone()) return false;
+  if (IsDoneLocked(l)) return false;
 
   /// If the status is not OK, we still try to cancel - !OK status might mean
   /// communication failure between backend and coordinator, but fragment
@@ -432,12 +438,9 @@ bool Coordinator::BackendState::Cancel() {
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
   DCHECK(rpc_params.dst_query_id == query_id());
-  {
-    // If the backend is already done, it's not waiting for this filter, so we skip
-    // sending it in this case.
-    lock_guard<mutex> l(lock_);
-    if (IsDone()) return;
-  }
+  // If the backend is already done, it's not waiting for this filter, so we skip
+  // sending it in this case.
+  if (IsDone()) return;
 
   if (fragments_.count(rpc_params.dst_fragment_idx) == 0) return;
   Status status;
@@ -626,10 +629,10 @@ void Coordinator::FragmentStats::AddExecStats() {
 }
 
 void Coordinator::BackendState::ToJson(Value* value, Document* document) {
-  lock_guard<mutex> l(lock_);
+  unique_lock<mutex> l(lock_);
   ResourceUtilization resource_utilization = ComputeResourceUtilizationLocked();
   value->AddMember("num_instances", fragments_.size(), document->GetAllocator());
-  value->AddMember("done", IsDone(), document->GetAllocator());
+  value->AddMember("done", IsDoneLocked(l), document->GetAllocator());
   value->AddMember("peak_per_host_mem_consumption",
       resource_utilization.peak_per_host_mem_consumption, document->GetAllocator());
   value->AddMember("bytes_read", resource_utilization.bytes_read,

@@ -121,8 +121,10 @@ class QuerySchedule;
 ///     -> Queuing delay in the admission controller (which may be unbounded).
 /// 3. The startup grace period elapses.
 /// 4. The background shutdown thread periodically checks to see if the Impala daemon is
-///    quiesced (i.e. no client requests are registered and no fragment instances are
-///    executing). If it is quiesced then it cleanly shuts down by exiting the process.
+///    quiesced (i.e. no client requests are registered and no queries are executing on
+///    the backend). If it is quiesced then it cleanly shuts down by exiting the process.
+///    The statestore will detect that the process is not responding to heartbeats and
+///    remove any entries.
 /// 5. The shutdown deadline elapses. The Impala daemon exits regardless of whether
 ///    it was successfully quiesced or not.
 ///

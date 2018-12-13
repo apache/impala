@@ -46,6 +46,12 @@ class ImpaladMetricKeys {
   /// Number of fragments currently running on this server.
   static const char* IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT;
 
+  /// Number of queries that started executing on this backend.
+  static const char* BACKEND_NUM_QUERIES_EXECUTED;
+
+  /// Number of queries currently executing on this backend.
+  static const char* BACKEND_NUM_QUERIES_EXECUTING;
+
   /// Number of open HiveServer2 sessions
   static const char* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
 
@@ -205,6 +211,12 @@ class ImpaladMetrics {
  public:
   // Counters
   static IntGauge* HASH_TABLE_TOTAL_BYTES;
+  static IntCounter* BACKEND_NUM_QUERIES_EXECUTED;
+  /// BACKEND_NUM_QUERIES_EXECUTING is used to determine when the backend has quiesced
+  /// and can be safely shut down without causing query failures. See IMPALA-7931 for
+  /// an example of a race that can occur if this is decremented before a query is
+  /// truly finished.
+  static IntGauge* BACKEND_NUM_QUERIES_EXECUTING;
   static IntCounter* IMPALA_SERVER_NUM_FRAGMENTS;
   static IntGauge* IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT;
   static IntCounter* IMPALA_SERVER_NUM_QUERIES;

@@ -61,6 +61,9 @@ DEFINE_int32(report_status_retry_interval_ms, 100,
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
+DEFINE_int32_hidden(stress_status_report_delay_ms, 0, "Stress option to inject a delay "
+    "before status reports. Has no effect on release builds.");
+
 using namespace impala;
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
@@ -291,6 +294,13 @@ void QueryState::ConstructReport(bool instances_started,
 }
 
 void QueryState::ReportExecStatus() {
+#ifndef NDEBUG
+  if (FLAGS_stress_status_report_delay_ms) {
+    LOG(INFO) << "Sleeping " << FLAGS_stress_status_report_delay_ms << "ms before "
+              << "reporting for query " << PrintId(query_id());
+    SleepForMs(FLAGS_stress_status_report_delay_ms);
+  }
+#endif
   bool instances_started = fis_map_.size() > 0;
 
   // This will send a report even if we are cancelled.  If the query completed correctly

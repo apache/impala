@@ -113,6 +113,10 @@ class Coordinator::BackendState {
   Status GetStatus(bool* is_fragment_failure = nullptr,
       TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
 
+  /// Return true if execution at this backend is done. Thread-safe. Caller must not hold
+  /// lock_.
+  bool IsDone();
+
   /// Return peak memory consumption and aggregated resource usage across all fragment
   /// instances for this backend.
   ResourceUtilization ComputeResourceUtilization();
@@ -283,8 +287,8 @@ class Coordinator::BackendState {
       const FilterRoutingTable& filter_routing_table,
       TExecQueryFInstancesParams* rpc_params);
 
-  /// Return true if execution at this backend is done. Caller must hold lock_.
-  bool IsDone() const;
+  /// Version of IsDone() where caller must hold lock_ via lock;
+  bool IsDoneLocked(const boost::unique_lock<boost::mutex>& lock) const;
 
   /// Same as ComputeResourceUtilization() but caller must hold lock.
   ResourceUtilization ComputeResourceUtilizationLocked();

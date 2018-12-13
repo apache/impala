@@ -380,6 +380,19 @@ error_codes = (
 
   ("THREAD_POOL_TASK_TIMED_OUT", 124,
    "$0 failed to finish before the $1 second timeout"),
+
+  ("UNREACHABLE_IMPALADS", 125, "Failed due to unreachable impalad(s): $0"),
+
+  ("INACTIVE_SESSION_EXPIRED", 126, "Session expired due to inactivity"),
+
+  ("INACTIVE_QUERY_EXPIRED", 127,
+   "Query $0 expired due to client inactivity (timeout is $1)"),
+
+  ("EXEC_TIME_LIMIT_EXCEEDED", 128, "Query $0 expired due to execution time limit of $1"),
+
+  ("CPU_LIMIT_EXCEEDED", 129, "Query $0 terminated due to CPU limit of $1"),
+
+  ("SCAN_BYTES_LIMIT_EXCEEDED", 130, "Query $0 terminated due to scan bytes limit of $1"),
 )
 
 import sys

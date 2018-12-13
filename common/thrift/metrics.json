@@ -480,21 +480,41 @@
     "key": "impala-server.num-files-open-for-insert"
   },
   {
+    "description": "The total number of queries that executed on this backend over the life of the process.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Queries Executed On Backend",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.backend-num-queries-executed"
+  },
+  {
+    "description": "The number of queries currently executing on this backend.",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "Queries Executing On Backend",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala-server.backend-num-queries-executing"
+  },
+  {
     "description": "The total number of query fragments processed over the life of the process.",
     "contexts": [
       "IMPALAD"
     ],
-    "label": "Query Fragments",
+    "label": "Query Fragment Instances",
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "impala-server.num-fragments"
   },
   {
-    "description": "The number of query fragments currently executing.",
+    "description": "The number of query fragment instances currently executing.",
     "contexts": [
         "IMPALAD"
     ],
-    "label": "Query Fragments",
+    "label": "Query Fragment Instances Executing",
     "units": "UNIT",
     "kind": "GAUGE",
     "key": "impala-server.num-fragments-in-flight"
