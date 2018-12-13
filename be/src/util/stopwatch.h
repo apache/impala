@@ -184,6 +184,12 @@ class MonotonicStopWatch {
       if (time_ceiling_ < start_) return 0;
       if (time_ceiling_ < end) end = time_ceiling_;
     }
+    // IMPALA-7963: On some buggy kernels, time can go backwards slightly. Log a warning
+    // and return 0 in this case.
+    if (end < start_) {
+      LOG(INFO) << "WARNING: time went backwards from " << start_ << " to " << end;
+      return 0;
+    }
     return end - start_;
   }
 };
