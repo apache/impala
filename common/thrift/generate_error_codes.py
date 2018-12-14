@@ -306,8 +306,9 @@ error_codes = (
   # TODO: IMPALA-4697: the merged errors do not show up in the query error log,
   # so we must point users to the impalad error log.
   ("SCRATCH_ALLOCATION_FAILED", 101, "Could not create files in any configured scratch "
-   "directories (--scratch_dirs=$0) on backend '$1'. See logs for previous errors that may "
-   "have prevented creating or writing scratch files."),
+   "directories (--scratch_dirs=$0) on backend '$1'. $2 of scratch is currently in "
+   "use by this Impala Daemon ($3 by this query). See logs for previous errors that "
+   "may have prevented creating or writing scratch files."),
 
   ("SCRATCH_READ_TRUNCATED", 102, "Error reading $0 bytes from scratch file '$1' "
    "on backend $2 at offset $3: could only read $4 bytes"),

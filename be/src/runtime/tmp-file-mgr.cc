@@ -34,6 +34,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -262,12 +263,7 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
     ++files_allocated;
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
-  if (tmp_files_.size() == 0) {
-    Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
-        join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString());
-    for (Status& err : scratch_errors_) err_status.MergeStatus(err);
-    return err_status;
-  }
+  if (tmp_files_.size() == 0) return ScratchAllocationFailedStatus();
   // Start allocating on a random device to avoid overloading the first device.
   next_allocation_index_ = rand() % tmp_files_.size();
   return Status::OK();
@@ -317,11 +313,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     current_bytes_allocated_ += num_bytes;
     return Status::OK();
   }
-  Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
-      join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString());
-  // Include all previous errors that may have caused the failure.
-  for (Status& err : scratch_errors_) err_status.MergeStatus(err);
-  return err_status;
+  return ScratchAllocationFailedStatus();
 }
 
 void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
@@ -477,6 +469,16 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   // If this fails, the status will include all the errors in 'scratch_errors_'.
   RETURN_IF_ERROR(AllocateSpace(handle->len(), &tmp_file, &file_offset));
   return handle->RetryWrite(io_ctx_.get(), tmp_file, file_offset);
+}
+
+Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus() {
+  Status status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
+        join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString(),
+        PrettyPrinter::PrintBytes(scratch_space_bytes_used_counter_->value()),
+        PrettyPrinter::PrintBytes(current_bytes_allocated_));
+  // Include all previous errors that may have caused the failure.
+  for (Status& err : scratch_errors_) status.MergeStatus(err);
+  return status;
 }
 
 string TmpFileMgr::FileGroup::DebugString() {
