@@ -46,6 +46,7 @@
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
 #include "util/periodic-counter-updater.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
@@ -221,7 +222,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
       file_desc->file_compression = split.file_compression;
       RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
           native_file_path, &file_desc->fs, &fs_cache));
-      num_unqueued_files_.Add(1);
       per_type_files_[partition_desc->file_format()].push_back(file_desc);
     } else {
       // File already processed
@@ -447,6 +447,9 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
 Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
   DCHECK(!initial_ranges_issued_);
   initial_ranges_issued_ = true;
+  // We want to decrement this remaining_scan_range_submissions in all cases.
+  auto remaining_scan_range_submissions_trigger =
+    MakeScopeExitTrigger([&](){ UpdateRemainingScanRangeSubmissions(-1); });
 
   // No need to issue ranges with limit 0.
   if (ReachedLimit()) {
@@ -462,6 +465,8 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
     for (HdfsFileDesc* file: v.second) {
       if (FilePassesFilterPredicates(filter_ctxs_, v.first, file)) {
         matching_files->push_back(file);
+      } else {
+        SkipFile(v.first, file);
       }
     }
   }
@@ -490,6 +495,9 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
         DCHECK(false) << "Unexpected file type " << entry.first;
     }
   }
+  // Except for BaseSequenceScanner, IssueInitialRanges() takes care of
+  // issuing all the ranges. For BaseSequenceScanner, IssueInitialRanges()
+  // will have incremented the counter.
   return Status::OK();
 }
 
@@ -504,7 +512,6 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(
       static_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
   if (!PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
           filter_ctxs)) {
-    SkipFile(format, file);
     return false;
   }
   return true;
@@ -592,13 +599,11 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
 }
 
 Status HdfsScanNodeBase::AddDiskIoRanges(const vector<ScanRange*>& ranges,
-    int num_files_queued, EnqueueLocation enqueue_location) {
+    EnqueueLocation enqueue_location) {
   DCHECK(!progress_.done()) << "Don't call AddScanRanges() after all ranges finished.";
+  DCHECK_GT(remaining_scan_range_submissions_.Load(), 0);
   DCHECK_GT(ranges.size(), 0);
-  RETURN_IF_ERROR(reader_context_->AddScanRanges(ranges, enqueue_location));
-  num_unqueued_files_.Add(-num_files_queued);
-  DCHECK_GE(num_unqueued_files_.Load(), 0);
-  return Status::OK();
+  return reader_context_->AddScanRanges(ranges, enqueue_location);
 }
 
 HdfsFileDesc* HdfsScanNodeBase::GetFileDesc(int64_t partition_id, const string& filename) {

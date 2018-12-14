@@ -76,7 +76,6 @@ HdfsTextScanner::~HdfsTextScanner() {
 Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   vector<ScanRange*> compressed_text_scan_ranges;
-  int compressed_text_files = 0;
   map<string, vector<HdfsFileDesc*>> plugin_text_files;
   for (int i = 0; i < files.size(); ++i) {
     THdfsCompression::type compression = files[i]->file_compression;
@@ -91,7 +90,6 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
       case THdfsCompression::SNAPPY:
       case THdfsCompression::SNAPPY_BLOCKED:
       case THdfsCompression::BZIP2:
-        ++compressed_text_files;
         for (int j = 0; j < files[i]->splits.size(); ++j) {
           // In order to decompress gzip-, snappy- and bzip2-compressed text files, we
           // need to read entire files. Only read a file if we're assigned the first split
@@ -145,8 +143,8 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     }
   }
   if (compressed_text_scan_ranges.size() > 0) {
-    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(
-        compressed_text_scan_ranges, compressed_text_files, EnqueueLocation::TAIL));
+    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(compressed_text_scan_ranges,
+          EnqueueLocation::TAIL));
   }
   for (const auto& entry : plugin_text_files) {
     DCHECK_GT(entry.second.size(), 0) << "List should be non-empty";

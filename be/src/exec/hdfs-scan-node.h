@@ -83,12 +83,12 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   bool done() const { return done_; }
 
-  /// Adds ranges to the io mgr queue and starts up new scanner threads if possible. The
-  /// enqueue_location parameter determines the location at which the scan ranges are
+  /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
+  /// The enqueue_location parameter determines the location at which the scan ranges are
   /// added to the queue.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      int num_files_queued, EnqueueLocation enqueue_location =
-                                EnqueueLocation::TAIL) override WARN_UNUSED_RESULT;
+      EnqueueLocation enqueue_location = EnqueueLocation::TAIL)
+      override WARN_UNUSED_RESULT;
 
   /// Adds a materialized row batch for the scan node.  This is called from scanner
   /// threads. This function will block if the row batch queue is full.
@@ -119,7 +119,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   /// Protects file_type_counts_. Cannot be taken together with any other lock
   /// except lock_, and if so, lock_ must be taken first.
-  SpinLock file_type_counts_;
+  SpinLock file_type_counts_lock_;
 
   /// Flag signaling that all scanner threads are done.  This could be because they
   /// are finished, an error/cancellation occurred, or the limit was reached.
@@ -139,6 +139,9 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// Number of times scanner threads were not created because of reservation increase
   /// being denied.
   RuntimeProfile::Counter* scanner_thread_reservations_denied_counter_ = nullptr;
+
+  /// Number of times scanner thread didn't find work to do.
+  RuntimeProfile::Counter* scanner_thread_workless_loops_counter_ = nullptr;
 
   /// Compute the estimated memory consumption of a scanner thread in bytes for the
   /// purposes of deciding whether to start a new scanner thread.

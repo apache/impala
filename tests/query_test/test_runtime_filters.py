@@ -56,7 +56,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
     self.run_test_case('QueryTest/runtime_filters_wait', vector)
     duration_s = time.time() - now
     assert duration_s < (WAIT_TIME_MS / 1000), \
-        "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
+        "Query took too long (%ss, possibly waiting for missing filters?)" \
+        % str(duration_s)
 
   def test_file_filtering(self, vector):
     if 'kudu' in str(vector.get_value('table_format')):
@@ -93,7 +94,8 @@ class TestBloomFilters(ImpalaTestSuite):
     self.run_test_case('QueryTest/bloom_filters_wait', vector)
     duration_s = time.time() - now
     assert duration_s < (WAIT_TIME_MS / 1000), \
-        "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
+        "Query took too long (%ss, possibly waiting for missing filters?)" \
+        % str(duration_s)
 
 
 @SkipIfLocal.multiple_impalad

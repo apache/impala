@@ -76,6 +76,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
 HdfsScanNode::~HdfsScanNode() {
 }
 
+
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedGetNextEventAdder ea(this, eos);
@@ -108,7 +109,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   Status status = GetNextInternal(state, row_batch, eos);
   if (!status.ok() || *eos) {
     unique_lock<mutex> l(lock_);
-    lock_guard<SpinLock> l2(file_type_counts_);
+    lock_guard<SpinLock> l2(file_type_counts_lock_);
     StopAndFinalizeCounters();
   }
   return status;
@@ -162,6 +163,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   thread_state_.Prepare(this, EstimateScannerThreadMemConsumption());
   scanner_thread_reservations_denied_counter_ =
       ADD_COUNTER(runtime_profile(), "NumScannerThreadReservationsDenied", TUnit::UNIT);
+  scanner_thread_workless_loops_counter_ =
+      ADD_COUNTER(runtime_profile(), "ScannerThreadWorklessLoops", TUnit::UNIT);
   return Status::OK();
 }
 
@@ -186,12 +189,21 @@ void HdfsScanNode::Close(RuntimeState* state) {
     state->resource_pool()->RemoveThreadAvailableCb(thread_avail_cb_id_);
   }
   thread_state_.Close(this);
+#ifndef NDEBUG
+  // At this point, the other threads have been joined, and
+  // remaining_scan_range_submissions_ should be 0, if the
+  // query started and wasn't cancelled or exited early.
+  if (ranges_issued_barrier_.pending() == 0 && initial_ranges_issued_
+      && progress_.done()) {
+    DCHECK_EQ(remaining_scan_range_submissions_.Load(), 0);
+  }
+#endif
   HdfsScanNodeBase::Close(state);
 }
 
 void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
     const std::vector<THdfsCompression::type>& compression_type, bool skipped) {
-  lock_guard<SpinLock> l(file_type_counts_);
+  lock_guard<SpinLock> l(file_type_counts_lock_);
   HdfsScanNodeBase::RangeComplete(file_type, compression_type, skipped);
 }
 
@@ -206,10 +218,9 @@ void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
 }
 
 Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
-    int num_files_queued, EnqueueLocation enqueue_location) {
+    EnqueueLocation enqueue_location) {
+  DCHECK_GT(remaining_scan_range_submissions_.Load(), 0);
   RETURN_IF_ERROR(reader_context_->AddScanRanges(ranges, enqueue_location));
-  num_unqueued_files_.Add(-num_files_queued);
-  DCHECK_GE(num_unqueued_files_.Load(), 0);
   if (!ranges.empty()) ThreadTokenAvailableCb(runtime_state_->resource_pool());
   return Status::OK();
 }
@@ -383,10 +394,10 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
     // to return if there's an error.
     ranges_issued_barrier_.Wait(SCANNER_THREAD_WAIT_TIME_MS, &unused);
 
-    // Take a snapshot of num_unqueued_files_ before calling StartNextScanRange().
-    // We don't want num_unqueued_files_ to go to zero between the return from
+    // Take a snapshot of remaining_scan_range_submissions before calling
+    // StartNextScanRange().  We don't want it to go to zero between the return from
     // StartNextScanRange() and the check for when all ranges are complete.
-    int num_unqueued_files = num_unqueued_files_.Load();
+    int remaining_scan_range_submissions = remaining_scan_range_submissions_.Load();
     ScanRange* scan_range;
     Status status = StartNextScanRange(&scanner_thread_reservation, &scan_range);
     if (!status.ok()) {
@@ -412,7 +423,7 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
 
-    if (scan_range == nullptr && num_unqueued_files == 0) {
+    if (scan_range == nullptr && remaining_scan_range_submissions == 0) {
       unique_lock<mutex> l(lock_);
       // All ranges have been queued and DiskIoMgr has no more new ranges for this scan
       // node to process. This means that every range is either done or being processed by
@@ -429,6 +440,8 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       VLOG_QUERY << "Soft memory limit exceeded. Extra scanner thread exiting.";
       break;
     }
+
+    if (scan_range == nullptr) COUNTER_ADD(scanner_thread_workless_loops_counter_, 1);
   }
 
   {
@@ -463,7 +476,8 @@ void HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     scan_range->Cancel(Status::CancelledInternal("HDFS partition pruning"));
     HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
     if (metadata->is_sequence_header) {
-      // File ranges haven't been issued yet, skip entire file
+      // File ranges haven't been issued yet, skip entire file.
+      UpdateRemainingScanRangeSubmissions(-1);
       SkipFile(partition->file_format(), desc);
     } else {
       // Mark this scan range as done.

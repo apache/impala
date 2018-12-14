@@ -67,9 +67,10 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }
-  // Issue the header ranges only. GetNextInternal() will issue the files' scan ranges
-  // and those ranges will need scanner threads, so no files are marked completed yet.
-  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, 0, EnqueueLocation::TAIL));
+  // When the header is parsed, we will issue more AddDiskIoRanges in
+  // the scanner threads.
+  scan_node->UpdateRemainingScanRangeSubmissions(header_ranges.size());
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, EnqueueLocation::TAIL));
   return Status::OK();
 }
 
@@ -157,6 +158,7 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     header_ = state_->obj_pool()->Add(AllocateFileHeader());
     Status status = ReadFileHeader();
     if (!status.ok()) {
+      scan_node_->UpdateRemainingScanRangeSubmissions(-1);
       RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
       // We need to complete the ranges for this file.
       CloseFileRanges(stream_->filename());
@@ -168,8 +170,9 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     HdfsFileDesc* desc = scan_node_->GetFileDesc(
         context_->partition_descriptor()->id(), stream_->filename());
     // Issue the scan range with priority since it would result in producing a RowBatch.
-    RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc, EnqueueLocation::HEAD));
-    return Status::OK();
+    status = scan_node_->AddDiskIoRanges(desc, EnqueueLocation::HEAD);
+    scan_node_->UpdateRemainingScanRangeSubmissions(-1);
+    return status;
   }
   if (eos_) return Status::OK();
 
@@ -328,8 +331,8 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   const vector<ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
     COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());
-    scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);
   }
+  scan_node_->SkipFile(file_format(), desc);
 }
 
 int BaseSequenceScanner::ReadPastSize(int64_t file_offset) {

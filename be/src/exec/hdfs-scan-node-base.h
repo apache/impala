@@ -263,23 +263,26 @@ class HdfsScanNodeBase : public ScanNode {
       int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
       bool expected_local, int mtime, const io::ScanRange* original_split = NULL);
 
-  /// Adds ranges to the io mgr queue. 'num_files_queued' indicates how many file's scan
-  /// ranges have been added completely.  A file's scan ranges are added completely if no
-  /// new scanner threads will be needed to process that file besides the additional
-  /// threads needed to process those in 'ranges'.
-  /// Can be overridden to add scan-node specific actions like starting scanner threads.
+  /// Adds ranges to the io mgr queue. Can be overridden to add scan-node specific
+  /// actions like starting scanner threads. Must not be called once
+  /// remaining_scan_range_submissions_ is 0.
   /// The enqueue_location specifies whether the scan ranges are added to the head or
   /// tail of the queue.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      int num_files_queued,
       EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT;
 
-  /// Adds all splits for file_desc to the io mgr queue and indicates one file has
-  /// been added completely. If the enqueue_location is set to HEAD, the scan ranges that
-  /// belong to this file are processed ahead of other scan ranges currently queued.
+  /// Adds all splits for file_desc to the io mgr queue.
   inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc,
       EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT {
-    return AddDiskIoRanges(file_desc->splits, 1, enqueue_location);
+    return AddDiskIoRanges(file_desc->splits);
+  }
+
+  /// When this counter goes to 0, AddDiskIoRanges() can no longer be called.
+  /// Furthermore, this implies that scanner threads failing to
+  /// acquire a new scan range with StartNextScanRange() can exit.
+  inline void UpdateRemainingScanRangeSubmissions(int32_t delta) {
+    remaining_scan_range_submissions_.Add(delta);
+    DCHECK_GE(remaining_scan_range_submissions_.Load(), 0);
   }
 
   /// Allocates and initializes a new template tuple allocated from pool with values
@@ -459,8 +462,14 @@ class HdfsScanNodeBase : public ScanNode {
   /// this variable.
   bool initial_ranges_issued_ = false;
 
-  /// Number of files that have not been issued from the scanners.
-  AtomicInt32 num_unqueued_files_;
+  /// When this counter drops to 0, AddDiskIoRanges() will not be called again, and
+  /// therefore scanner threads that can't get work should exit. For most
+  /// file formats (except for sequence-based formats), this is 0 after
+  /// IssueInitialRanges(). Note that some scanners (namely Parquet) issue
+  /// additional work to the IO subsystem without using AddDiskIoRanges(),
+  /// but that is managed within the scanner, and doesn't require
+  /// additional scanner threads.
+  AtomicInt32 remaining_scan_range_submissions_ = { 1 };
 
   /// Per scanner type codegen'd fn.
   typedef boost::unordered_map<THdfsFileFormat::type, void*> CodegendFnMap;
