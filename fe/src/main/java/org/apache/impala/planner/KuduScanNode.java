@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
@@ -65,7 +67,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Scan of a single Kudu table.
@@ -93,14 +94,14 @@ public class KuduScanNode extends ScanNode {
 
   // Indexes for the set of hosts that will be used for the query.
   // From analyzer.getHostIndex().getIndex(address)
-  private final Set<Integer> hostIndexSet_ = Sets.newHashSet();
+  private final Set<Integer> hostIndexSet_ = new HashSet<>();
 
   // List of conjuncts that can be pushed down to Kudu. Used for computing stats and
   // explain strings.
-  private final List<Expr> kuduConjuncts_ = Lists.newArrayList();
+  private final List<Expr> kuduConjuncts_ = new ArrayList<>();
 
   // Exprs in kuduConjuncts_ converted to KuduPredicates.
-  private final List<KuduPredicate> kuduPredicates_ = Lists.newArrayList();
+  private final List<KuduPredicate> kuduPredicates_ = new ArrayList<>();
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN KUDU");
@@ -199,7 +200,7 @@ public class KuduScanNode extends ScanNode {
     List<KuduScanToken> scanTokens = createScanTokens(client, rpcTable);
     for (KuduScanToken token: scanTokens) {
       LocatedTablet tablet = token.getTablet();
-      List<TScanRangeLocation> locations = Lists.newArrayList();
+      List<TScanRangeLocation> locations = new ArrayList<>();
       if (tablet.getReplicas().isEmpty()) {
         throw new ImpalaRuntimeException(String.format(
             "At least one tablet does not have any replicas. Tablet ID: %s",
@@ -237,7 +238,7 @@ public class KuduScanNode extends ScanNode {
    */
   private List<KuduScanToken> createScanTokens(KuduClient client,
       org.apache.kudu.client.KuduTable rpcTable) {
-    List<String> projectedCols = Lists.newArrayList();
+    List<String> projectedCols = new ArrayList<>();
     for (SlotDescriptor desc: getTupleDesc().getSlotsOrderedByOffset()) {
       projectedCols.add(((KuduColumn) desc.getColumn()).getKuduName());
     }
@@ -459,7 +460,7 @@ public class KuduScanNode extends ScanNode {
     SlotRef ref = (SlotRef) predicate.getChild(0);
 
     // KuduPredicate takes a list of values as Objects.
-    List<Object> values = Lists.newArrayList();
+    List<Object> values = new ArrayList<>();
     for (int i = 1; i < predicate.getChildren().size(); ++i) {
       if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) return false;
       LiteralExpr literal = (LiteralExpr) predicate.getChild(i);

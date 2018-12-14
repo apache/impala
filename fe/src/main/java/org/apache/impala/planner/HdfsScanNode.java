@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -208,7 +209,7 @@ public class HdfsScanNode extends ScanNode {
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
   // tuple. Uses a linked hash map for consistent display in explain.
   private final Map<TupleDescriptor, List<Expr>> collectionConjuncts_ =
-      Maps.newLinkedHashMap();
+      new LinkedHashMap<>();
 
   // TupleDescriptors of collection slots that have an IsNotEmptyPredicate. See
   // SelectStmt#registerIsNotEmptyPredicates.
@@ -218,7 +219,7 @@ public class HdfsScanNode extends ScanNode {
   // While correct, they may be conservative. See the tests for parquet collection
   // filtering for examples that could benefit from being more aggressive
   // (yet still correct).
-  private final Set<TupleDescriptor> notEmptyCollections_ = Sets.newHashSet();
+  private final Set<TupleDescriptor> notEmptyCollections_ = new HashSet<>();
 
   // Map from SlotDescriptor to indices in PlanNodes.conjuncts_ and
   // collectionConjuncts_ that are eligible for dictionary filtering. Slots in the
@@ -226,7 +227,7 @@ public class HdfsScanNode extends ScanNode {
   // slots in the TupleDescriptors of nested types map to indices into
   // collectionConjuncts_.
   private final Map<SlotDescriptor, List<Integer>> dictionaryFilterConjuncts_ =
-      Maps.newLinkedHashMap();
+      new LinkedHashMap<>();
 
   // Number of partitions that have the row count statistic.
   private int numPartitionsWithNumRows_ = 0;
@@ -247,12 +248,12 @@ public class HdfsScanNode extends ScanNode {
 
   // List of conjuncts for min/max values of parquet::Statistics, that are used to skip
   // data when scanning Parquet files.
-  private final List<Expr> minMaxConjuncts_ = Lists.newArrayList();
+  private final List<Expr> minMaxConjuncts_ = new ArrayList<>();
 
   // Map from TupleDescriptor to list of PlanNode conjuncts that have been transformed
   // into conjuncts in 'minMaxConjuncts_'.
   private final Map<TupleDescriptor, List<Expr>> minMaxOriginalConjuncts_ =
-      Maps.newLinkedHashMap();
+      new LinkedHashMap<>();
 
   // Tuple that is used to materialize statistics when scanning Parquet files. For each
   // column it can contain 0, 1, or 2 slots, depending on whether the column needs to be
@@ -317,7 +318,7 @@ public class HdfsScanNode extends ScanNode {
     sd.setIsMaterialized(true);
     sd.setIsNullable(false);
     sd.setLabel("parquet-stats: num_rows");
-    ArrayList<Expr> args = Lists.newArrayList();
+    List<Expr> args = new ArrayList<>();
     args.add(new SlotRef(sd));
     FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
     sumFn.analyzeNoThrow(analyzer);
@@ -568,7 +569,7 @@ public class HdfsScanNode extends ScanNode {
   private void addMinMaxOriginalConjunct(TupleDescriptor tupleDesc, Expr expr) {
     List<Expr> exprs = minMaxOriginalConjuncts_.get(tupleDesc);
     if (exprs == null) {
-      exprs = new ArrayList<Expr>();
+      exprs = new ArrayList<>();
       minMaxOriginalConjuncts_.put(tupleDesc, exprs);
     }
     exprs.add(expr);
@@ -681,8 +682,8 @@ public class HdfsScanNode extends ScanNode {
    * collections).
    */
   private void addDictionaryFilter(Analyzer analyzer, Expr conjunct, int conjunctIdx) {
-    List<TupleId> tupleIds = Lists.newArrayList();
-    List<SlotId> slotIds = Lists.newArrayList();
+    List<TupleId> tupleIds = new ArrayList<>();
+    List<SlotId> slotIds = new ArrayList<>();
     conjunct.getIds(tupleIds, slotIds);
     // Only single-slot conjuncts are eligible for dictionary filtering. When pruning
     // a row-group, the conjunct must be evaluated only against a single row-group
@@ -716,7 +717,7 @@ public class HdfsScanNode extends ScanNode {
     SlotDescriptor slotKey = analyzer.getSlotDesc(slotId);
     List<Integer> slotList = dictionaryFilterConjuncts_.get(slotKey);
     if (slotList == null) {
-      slotList = Lists.newArrayList();
+      slotList = new ArrayList<>();
       dictionaryFilterConjuncts_.put(slotKey, slotList);
     }
     slotList.add(conjunctIdx);
@@ -775,7 +776,7 @@ public class HdfsScanNode extends ScanNode {
     totalBytes_ = 0;
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
-    fileFormats_ = Sets.newHashSet();
+    fileFormats_ = new HashSet<>();
     for (FeFsPartition partition: partitions_) {
       List<FileDescriptor> fileDescs = partition.getFileDescriptors();
       if (sampledFiles != null) {
@@ -921,7 +922,7 @@ public class HdfsScanNode extends ScanNode {
         continue;
       }
       // Collect the network address and volume ID of all replicas of this block.
-      List<TScanRangeLocation> locations = Lists.newArrayList();
+      List<TScanRangeLocation> locations = new ArrayList<>();
       for (int j = 0; j < replicaHostCount; ++j) {
         TScanRangeLocation location = new TScanRangeLocation();
         // Translate from the host index (local to the HdfsTable) to network address.
@@ -1108,7 +1109,7 @@ public class HdfsScanNode extends ScanNode {
   protected void computeNumNodes(Analyzer analyzer, long cardinality) {
     Preconditions.checkNotNull(scanRangeSpecs_);
     ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
-    HashSet<TNetworkAddress> localHostSet = Sets.newHashSet();
+    Set<TNetworkAddress> localHostSet = new HashSet<>();
     int totalNodes = 0;
     int numLocalRanges = 0;
     int numRemoteRanges = 0;
@@ -1179,7 +1180,7 @@ public class HdfsScanNode extends ScanNode {
     msg.hdfs_scan_node.setRandom_replica(randomReplica_);
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
     if (!collectionConjuncts_.isEmpty()) {
-      Map<Integer, List<TExpr>> tcollectionConjuncts = Maps.newLinkedHashMap();
+      Map<Integer, List<TExpr>> tcollectionConjuncts = new LinkedHashMap<>();
       for (Map.Entry<TupleDescriptor, List<Expr>> entry:
         collectionConjuncts_.entrySet()) {
         tcollectionConjuncts.put(entry.getKey().getId().asInt(),
@@ -1202,7 +1203,7 @@ public class HdfsScanNode extends ScanNode {
       }
       msg.hdfs_scan_node.setMin_max_tuple_id(minMaxTuple_.getId().asInt());
     }
-    Map<Integer, List<Integer>> dictMap = Maps.newLinkedHashMap();
+    Map<Integer, List<Integer>> dictMap = new LinkedHashMap<>();
     for (Map.Entry<SlotDescriptor, List<Integer>> entry :
       dictionaryFilterConjuncts_.entrySet()) {
       dictMap.put(entry.getKey().getId().asInt(), entry.getValue());
@@ -1296,14 +1297,14 @@ public class HdfsScanNode extends ScanNode {
   private String getDictionaryConjunctsExplainString(
       String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    Map<TupleDescriptor, List<Integer>> perTupleConjuncts = Maps.newLinkedHashMap();
+    Map<TupleDescriptor, List<Integer>> perTupleConjuncts = new LinkedHashMap<>();
     for (Map.Entry<SlotDescriptor, List<Integer>> entry :
       dictionaryFilterConjuncts_.entrySet()) {
       SlotDescriptor slotDescriptor = entry.getKey();
       TupleDescriptor tupleDescriptor = slotDescriptor.getParent();
       List<Integer> indexes = perTupleConjuncts.get(tupleDescriptor);
       if (indexes == null) {
-        indexes = Lists.newArrayList();
+        indexes = new ArrayList<>();
         perTupleConjuncts.put(tupleDescriptor, indexes);
       }
       indexes.addAll(entry.getValue());
@@ -1325,7 +1326,7 @@ public class HdfsScanNode extends ScanNode {
         tupleName = " on " + tupleDescriptor.getAlias();
       }
       Preconditions.checkNotNull(conjuncts);
-      List<Expr> exprList = Lists.newArrayList();
+      List<Expr> exprList = new ArrayList<>();
       for (Integer idx : totalIdxList) {
         Preconditions.checkState(idx.intValue() < conjuncts.size());
         exprList.add(conjuncts.get(idx));
@@ -1492,7 +1493,7 @@ public class HdfsScanNode extends ScanNode {
    * if/when that is added.
    */
   private List<Long> computeMinColumnMemReservations() {
-    List<Long> columnByteSizes = Lists.newArrayList();
+    List<Long> columnByteSizes = new ArrayList<>();
     FeFsTable table = (FeFsTable) desc_.getTable();
     boolean havePosSlot = false;
     for (SlotDescriptor slot: desc_.getSlots()) {

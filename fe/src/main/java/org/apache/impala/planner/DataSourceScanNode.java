@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -150,9 +151,9 @@ public class DataSourceScanNode extends ScanNode {
    */
   private void prepareDataSource() throws InternalException {
     // Binary predicates that will be offered to the data source.
-    List<List<TBinaryPredicate>> offeredPredicates = Lists.newArrayList();
+    List<List<TBinaryPredicate>> offeredPredicates = new ArrayList<>();
     // The index into conjuncts_ for each element in offeredPredicates.
-    List<Integer> conjunctsIdx = Lists.newArrayList();
+    List<Integer> conjunctsIdx = new ArrayList<>();
     for (int i = 0; i < conjuncts_.size(); ++i) {
       Expr conjunct = conjuncts_.get(i);
       List<TBinaryPredicate> disjuncts = getDisjuncts(conjunct);
@@ -199,7 +200,7 @@ public class DataSourceScanNode extends ScanNode {
     }
 
     numRowsEstimate_ = prepareResult.getNum_rows_estimate();
-    acceptedPredicates_ = Lists.newArrayList();
+    acceptedPredicates_ = new ArrayList<>();
     List<Integer> acceptedPredicatesIdx = prepareResult.isSetAccepted_conjuncts() ?
         prepareResult.getAccepted_conjuncts() : ImmutableList.<Integer>of();
     for (Integer acceptedIdx: acceptedPredicatesIdx) {
@@ -215,7 +216,7 @@ public class DataSourceScanNode extends ScanNode {
    * TODO: Move this to Expr.
    */
   private List<TBinaryPredicate> getDisjuncts(Expr conjunct) {
-    List<TBinaryPredicate> disjuncts = Lists.newArrayList();
+    List<TBinaryPredicate> disjuncts = new ArrayList<>();
     if (getDisjunctsHelper(conjunct, disjuncts)) return disjuncts;
     return null;
   }
@@ -297,7 +298,7 @@ public class DataSourceScanNode extends ScanNode {
    */
   private void removeAcceptedConjuncts(List<Integer> acceptedPredicatesIdx,
       List<Integer> conjunctsIdx) {
-    acceptedConjuncts_ = Lists.newArrayList();
+    acceptedConjuncts_ = new ArrayList<>();
     // Because conjuncts_ is modified in place using positional indexes from
     // conjunctsIdx, we remove the accepted predicates in reverse order.
     for (int i = acceptedPredicatesIdx.size() - 1; i >= 0; --i) {

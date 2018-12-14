@@ -17,8 +17,11 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
@@ -33,12 +36,8 @@ import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
@@ -75,8 +74,6 @@ import com.google.common.collect.Sets;
  *   fix that
  */
 public class PlanFragment extends TreeNode<PlanFragment> {
-  private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
-
   private final PlanFragmentId fragmentId_;
   private PlanId planId_;
   private CohortId cohortId_;
@@ -143,7 +140,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * Collect and return all PlanNodes that belong to the exec tree of this fragment.
    */
   public List<PlanNode> collectPlanNodes() {
-    List<PlanNode> nodes = Lists.newArrayList();
+    List<PlanNode> nodes = new ArrayList<>();
     collectPlanNodesHelper(planRoot_, nodes);
     return nodes;
   }
@@ -190,11 +187,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (node instanceof HashJoinNode
         && ((JoinNode) node).getDistributionMode() == DistributionMode.PARTITIONED) {
       // Contains all exchange nodes in this fragment below the current join node.
-      List<ExchangeNode> exchNodes = Lists.newArrayList();
+      List<ExchangeNode> exchNodes = new ArrayList<>();
       node.collect(ExchangeNode.class, exchNodes);
 
       // Contains partition-expr lists of all hash-partitioning sender fragments.
-      List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
+      List<List<Expr>> senderPartitionExprs = new ArrayList<>();
       for (ExchangeNode exchNode: exchNodes) {
         Preconditions.checkState(!exchNode.getChildren().isEmpty());
         PlanFragment senderFragment = exchNode.getChild(0).getFragment();
@@ -232,7 +229,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public void computeResourceProfile(Analyzer analyzer) {
     // Compute resource profiles for all plan nodes and sinks in the fragment.
     sink_.computeResourceProfile(analyzer.getQueryOptions());
-    HashSet<RuntimeFilterId> filterSet = Sets.newHashSet();
+    Set<RuntimeFilterId> filterSet = new HashSet<>();
     for (PlanNode node: collectPlanNodes()) {
       node.computeNodeResourceProfile(analyzer.getQueryOptions());
       for (RuntimeFilter filter: node.getRuntimeFilters()) {
@@ -504,7 +501,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public void verifyTree() {
     // PlanNode.fragment_ is set correctly
     List<PlanNode> nodes = collectPlanNodes();
-    List<PlanNode> exchNodes = Lists.newArrayList();
+    List<PlanNode> exchNodes = new ArrayList<>();
     for (PlanNode node: nodes) {
       if (node instanceof ExchangeNode) exchNodes.add(node);
       Preconditions.checkState(node.getFragment() == this);
@@ -512,7 +509,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     // all ExchangeNodes have registered input fragments
     Preconditions.checkState(exchNodes.size() == getChildren().size());
-    List<PlanFragment> childFragments = Lists.newArrayList();
+    List<PlanFragment> childFragments = new ArrayList<>();
     for (PlanNode exchNode: exchNodes) {
       PlanFragment childFragment = exchNode.getChild(0).getFragment();
       Preconditions.checkState(!childFragments.contains(childFragment));

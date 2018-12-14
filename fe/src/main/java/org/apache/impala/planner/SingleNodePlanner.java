@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -75,7 +76,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -205,7 +205,7 @@ public class SingleNodePlanner {
    * materialize them.
    */
   private PlanNode createEmptyNode(QueryStmt stmt, Analyzer analyzer) {
-    ArrayList<TupleId> tupleIds = Lists.newArrayList();
+    List<TupleId> tupleIds = new ArrayList<>();
     stmt.getMaterializedTupleIds(tupleIds);
     if (tupleIds.isEmpty()) {
       // Constant selects do not have materialized tuples at this stage.
@@ -230,7 +230,7 @@ public class SingleNodePlanner {
    * Mark all collection-typed slots in stmt as non-materialized.
    */
   private void unmarkCollectionSlots(QueryStmt stmt) {
-    List<TableRef> tblRefs = Lists.newArrayList();
+    List<TableRef> tblRefs = new ArrayList<>();
     stmt.collectFromClauseTableRefs(tblRefs);
     for (TableRef ref: tblRefs) {
       if (!ref.isRelative()) continue;
@@ -268,7 +268,7 @@ public class SingleNodePlanner {
         List<Expr> groupingExprs = multiAggInfo != null ?
             multiAggInfo.getGroupingExprs() :
             Collections.<Expr>emptyList();
-        List<Expr> inputPartitionExprs = Lists.newArrayList();
+        List<Expr> inputPartitionExprs = new ArrayList<>();
         root = analyticPlanner.createSingleNodePlan(
             root, groupingExprs, inputPartitionExprs);
         if (multiAggInfo != null && !inputPartitionExprs.isEmpty()
@@ -394,7 +394,7 @@ public class SingleNodePlanner {
 
     // collect eligible candidates for the leftmost input; list contains
     // (plan, materialized size)
-    ArrayList<Pair<TableRef, Long>> candidates = Lists.newArrayList();
+    List<Pair<TableRef, Long>> candidates = new ArrayList<>();
     for (Pair<TableRef, PlanNode> entry: parentRefPlans) {
       TableRef ref = entry.first;
       JoinOperator joinOp = ref.getJoinOp();
@@ -408,7 +408,7 @@ public class SingleNodePlanner {
       if (plan.getCardinality() == -1) {
         // use 0 for the size to avoid it becoming the leftmost input
         // TODO: Consider raw size of scanned partitions in the absence of stats.
-        candidates.add(new Pair(ref, new Long(0)));
+        candidates.add(new Pair<TableRef, Long>(ref, new Long(0)));
         if (LOG.isTraceEnabled()) {
           LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
         }
@@ -417,7 +417,7 @@ public class SingleNodePlanner {
       Preconditions.checkState(ref.isAnalyzed());
       long materializedSize =
           (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
-      candidates.add(new Pair(ref, new Long(materializedSize)));
+      candidates.add(new Pair<TableRef, Long>(ref, new Long(materializedSize)));
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
@@ -429,6 +429,7 @@ public class SingleNodePlanner {
     // consumption of the materialized hash tables required for the join sequence
     Collections.sort(candidates,
         new Comparator<Pair<TableRef, Long>>() {
+          @Override
           public int compare(Pair<TableRef, Long> a, Pair<TableRef, Long> b) {
             long diff = b.second - a.second;
             return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
@@ -456,7 +457,7 @@ public class SingleNodePlanner {
       LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
     }
     // the refs that have yet to be joined
-    List<Pair<TableRef, PlanNode>> remainingRefs = Lists.newArrayList();
+    List<Pair<TableRef, PlanNode>> remainingRefs = new ArrayList<>();
     PlanNode root = null;  // root of accumulated join plan
     for (Pair<TableRef, PlanNode> entry: refPlans) {
       if (entry.first == leftmostRef) {
@@ -473,8 +474,8 @@ public class SingleNodePlanner {
     // (IMPALA-860), s.t. all the tables appearing to the left/right of an outer/semi
     // join in the original query still remain to the left/right after join ordering.
     // This prevents join re-ordering across outer/semi joins which is generally wrong.
-    Map<TableRef, Set<TableRef>> precedingRefs = Maps.newHashMap();
-    List<TableRef> tmpTblRefs = Lists.newArrayList();
+    Map<TableRef, Set<TableRef>> precedingRefs = new HashMap<>();
+    List<TableRef> tmpTblRefs = new ArrayList<>();
     for (Pair<TableRef, PlanNode> entry: refPlans) {
       TableRef tblRef = entry.first;
       if (tblRef.getJoinOp().isOuterJoin() || tblRef.getJoinOp().isSemiJoin()) {
@@ -615,7 +616,7 @@ public class SingleNodePlanner {
     //   process repeats itself.
     selectStmt.materializeRequiredSlots(analyzer);
 
-    ArrayList<TupleId> rowTuples = Lists.newArrayList();
+    List<TupleId> rowTuples = new ArrayList<>();
     // collect output tuples of subtrees
     for (TableRef tblRef: selectStmt.getTableRefs()) {
       rowTuples.addAll(tblRef.getMaterializedTupleIds());
@@ -638,8 +639,8 @@ public class SingleNodePlanner {
 
     // Separate table refs into parent refs (uncorrelated or absolute) and
     // subplan refs (correlated or relative), and generate their plan.
-    List<TableRef> parentRefs = Lists.newArrayList();
-    List<SubplanRef> subplanRefs = Lists.newArrayList();
+    List<TableRef> parentRefs = new ArrayList<>();
+    List<SubplanRef> subplanRefs = new ArrayList<>();
     computeParentAndSubplanRefs(
         selectStmt.getTableRefs(), analyzer.isStraightJoin(), parentRefs, subplanRefs);
     MultiAggregateInfo multiAggInfo = selectStmt.getMultiAggInfo();
@@ -732,7 +733,7 @@ public class SingleNodePlanner {
     // FROM t, (SELECT ... FROM t.c1 LEFT JOIN t.c2 ON(...) JOIN t.c3 ON (...)) v
     // Table ref t.c3 has an ordering dependency on t.c2 due to the outer join, but t.c3
     // must be placed into the subplan that materializes t.c1 and t.c2.
-    List<TupleId> planTblRefIds = Lists.newArrayList();
+    List<TupleId> planTblRefIds = new ArrayList<>();
 
     // List of materialized tuple ids in the subplan context, if any. This list must
     // remain constant in this function because the subplan context is fixed. Any
@@ -753,8 +754,8 @@ public class SingleNodePlanner {
     for (TableRef ref: tblRefs) {
       boolean isParentRef = true;
       if (ref.isRelative() || ref.isCorrelated()) {
-        List<TupleId> requiredTids = Lists.newArrayList();
-        List<TupleId> requiredTblRefIds = Lists.newArrayList();
+        List<TupleId> requiredTids = new ArrayList<>();
+        List<TupleId> requiredTblRefIds = new ArrayList<>();
         if (ref.isCorrelated()) {
           requiredTids.addAll(ref.getCorrelatedTupleIds());
         } else {
@@ -810,7 +811,7 @@ public class SingleNodePlanner {
     // create plans for our table refs; use a list here instead of a map to
     // maintain a deterministic order of traversing the TableRefs during join
     // plan generation (helps with tests)
-    List<Pair<TableRef, PlanNode>> parentRefPlans = Lists.newArrayList();
+    List<Pair<TableRef, PlanNode>> parentRefPlans = new ArrayList<>();
     for (TableRef ref: parentRefs) {
       PlanNode root = createTableRefNode(ref, aggInfo, analyzer);
       Preconditions.checkNotNull(root);
@@ -900,7 +901,7 @@ public class SingleNodePlanner {
     // List of table ref ids in 'root' as well as the table ref ids of all table refs
     // placed in 'subplanRefs' so far.
     List<TupleId> tblRefIds = Lists.newArrayList(root.getTblRefIds());
-    List<TableRef> result = Lists.newArrayList();
+    List<TableRef> result = new ArrayList<>();
     Iterator<SubplanRef> subplanRefIt = subplanRefs.iterator();
     TableRef leftTblRef = null;
     while (subplanRefIt.hasNext()) {
@@ -1211,7 +1212,7 @@ public class SingleNodePlanner {
       return;
     }
 
-    List<Expr> preds = Lists.newArrayList();
+    List<Expr> preds = new ArrayList<>();
     for (Expr e: unassignedConjuncts) {
       if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) {
         preds.add(e);
@@ -1294,12 +1295,12 @@ public class SingleNodePlanner {
     // If the optimization for partition key scans with metadata is enabled,
     // try evaluating with metadata first. If not, fall back to scanning.
     if (fastPartitionKeyScans && tupleDesc.hasClusteringColsOnly()) {
-      HashSet<List<Expr>> uniqueExprs = new HashSet<List<Expr>>();
+      Set<List<Expr>> uniqueExprs = new HashSet<>();
 
       for (FeFsPartition partition: partitions) {
         // Ignore empty partitions to match the behavior of the scan based approach.
         if (partition.getSize() == 0) continue;
-        List<Expr> exprs = Lists.newArrayList();
+        List<Expr> exprs = new ArrayList<>();
         for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
           // UnionNode.init() will go through all the slots in the tuple descriptor so
           // there needs to be an entry in 'exprs' for each slot. For unmaterialized
@@ -1344,7 +1345,7 @@ public class SingleNodePlanner {
     ScanNode scanNode = null;
 
     // Get all predicates bound by the tuple.
-    List<Expr> conjuncts = Lists.newArrayList();
+    List<Expr> conjuncts = new ArrayList<>();
     TupleId tid = tblRef.getId();
     conjuncts.addAll(analyzer.getBoundPredicates(tid));
 
@@ -1388,7 +1389,7 @@ public class SingleNodePlanner {
     }
     // TODO: move this to HBaseScanNode.init();
     Preconditions.checkState(scanNode instanceof HBaseScanNode);
-    List<ValueRange> keyRanges = Lists.newArrayList();
+    List<ValueRange> keyRanges = new ArrayList<>();
     // determine scan predicates for clustering cols
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
       SlotDescriptor slotDesc = analyzer.getColumnSlot(
@@ -1429,7 +1430,7 @@ public class SingleNodePlanner {
    */
   private List<BinaryPredicate> getHashLookupJoinConjuncts(
       List<TupleId> lhsTblRefIds, List<TupleId> rhsTblRefIds, Analyzer analyzer) {
-    List<BinaryPredicate> result = Lists.newArrayList();
+    List<BinaryPredicate> result = new ArrayList<>();
     List<Expr> candidates = analyzer.getEqJoinConjuncts(lhsTblRefIds, rhsTblRefIds);
     Preconditions.checkNotNull(candidates);
     for (Expr e: candidates) {
@@ -1443,7 +1444,7 @@ public class SingleNodePlanner {
     if (!result.isEmpty()) return result;
 
     // Construct join conjuncts derived from equivalence class membership.
-    HashSet<TupleId> lhsTblRefIdsHs = new HashSet<>(lhsTblRefIds);
+    Set<TupleId> lhsTblRefIdsHs = new HashSet<>(lhsTblRefIds);
     for (TupleId rhsId: rhsTblRefIds) {
       TableRef rhsTblRef = analyzer.getTableRef(rhsId);
       Preconditions.checkNotNull(rhsTblRef);
@@ -1508,7 +1509,7 @@ public class SingleNodePlanner {
       innerRef.setJoinOp(JoinOperator.INNER_JOIN);
     }
 
-    List<Expr> otherJoinConjuncts = Lists.newArrayList();
+    List<Expr> otherJoinConjuncts = new ArrayList<>();
     if (innerRef.getJoinOp().isOuterJoin()) {
       // Also assign conjuncts from On clause. All remaining unassigned conjuncts
       // that can be evaluated by this join are assigned in createSelectPlan().

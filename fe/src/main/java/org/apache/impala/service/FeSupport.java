@@ -244,7 +244,7 @@ public class FeSupport {
    * exprs. In the future, we can extend it to support arbitrary exprs without
    * SlotRefs.
    */
-  public static TResultRow EvalPredicateBatch(ArrayList<Expr> exprs,
+  public static TResultRow EvalPredicateBatch(List<Expr> exprs,
       TQueryCtx queryCtx) throws InternalException {
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExprBatch exprBatch = new TExprBatch();

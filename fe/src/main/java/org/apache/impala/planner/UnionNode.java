@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Node that merges the results of its child plans, Normally, this is done by
@@ -59,16 +58,16 @@ public class UnionNode extends PlanNode {
   // Expr lists corresponding to the input query stmts.
   // The ith resultExprList belongs to the ith child.
   // All exprs are resolved to base tables.
-  protected List<List<Expr>> resultExprLists_ = Lists.newArrayList();
+  protected List<List<Expr>> resultExprLists_ = new ArrayList<>();
 
   // Expr lists that originate from constant select stmts.
   // We keep them separate from the regular expr lists to avoid null children.
-  protected List<List<Expr>> constExprLists_ = Lists.newArrayList();
+  protected List<List<Expr>> constExprLists_ = new ArrayList<>();
 
   // Materialized result/const exprs corresponding to materialized slots.
   // Set in init() and substituted against the corresponding child's output smap.
-  protected List<List<Expr>> materializedResultExprLists_ = Lists.newArrayList();
-  protected List<List<Expr>> materializedConstExprLists_ = Lists.newArrayList();
+  protected List<List<Expr>> materializedResultExprLists_ = new ArrayList<>();
+  protected List<List<Expr>> materializedConstExprLists_ = new ArrayList<>();
 
   // Indicates if this UnionNode is inside a subplan.
   protected boolean isInSubplan_;
@@ -80,7 +79,7 @@ public class UnionNode extends PlanNode {
 
   protected UnionNode(PlanNodeId id, TupleId tupleId) {
     super(id, tupleId.asList(), "UNION");
-    unionResultExprs_ = Lists.newArrayList();
+    unionResultExprs_ = new ArrayList<>();
     tupleId_ = tupleId;
     isInSubplan_ = false;
   }
@@ -217,8 +216,8 @@ public class UnionNode extends PlanNode {
    * BE.
    */
    void computePassthrough(Analyzer analyzer) {
-    List<List<Expr>> newResultExprLists = Lists.newArrayList();
-    ArrayList<PlanNode> newChildren = Lists.newArrayList();
+    List<List<Expr>> newResultExprLists = new ArrayList<>();
+    List<PlanNode> newChildren = new ArrayList<>();
     for (int i = 0; i < children_.size(); i++) {
       if (isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
         newResultExprLists.add(resultExprLists_.get(i));
@@ -263,7 +262,7 @@ public class UnionNode extends PlanNode {
     List<SlotDescriptor> slots = analyzer.getDescTbl().getTupleDesc(tupleId_).getSlots();
     for (int i = 0; i < resultExprLists_.size(); ++i) {
       List<Expr> exprList = resultExprLists_.get(i);
-      List<Expr> newExprList = Lists.newArrayList();
+      List<Expr> newExprList = new ArrayList<>();
       Preconditions.checkState(exprList.size() == slots.size());
       for (int j = 0; j < exprList.size(); ++j) {
         if (slots.get(j).isMaterialized()) newExprList.add(exprList.get(j));
@@ -277,7 +276,7 @@ public class UnionNode extends PlanNode {
     materializedConstExprLists_.clear();
     for (List<Expr> exprList: constExprLists_) {
       Preconditions.checkState(exprList.size() == slots.size());
-      List<Expr> newExprList = Lists.newArrayList();
+      List<Expr> newExprList = new ArrayList<>();
       for (int i = 0; i < exprList.size(); ++i) {
         if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));
       }
@@ -288,11 +287,11 @@ public class UnionNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     Preconditions.checkState(materializedResultExprLists_.size() == children_.size());
-    List<List<TExpr>> texprLists = Lists.newArrayList();
+    List<List<TExpr>> texprLists = new ArrayList<>();
     for (List<Expr> exprList: materializedResultExprLists_) {
       texprLists.add(Expr.treesToThrift(exprList));
     }
-    List<List<TExpr>> constTexprLists = Lists.newArrayList();
+    List<List<TExpr>> constTexprLists = new ArrayList<>();
     for (List<Expr> constTexprList: materializedConstExprLists_) {
       constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
@@ -317,7 +316,7 @@ public class UnionNode extends PlanNode {
       output.append(detailPrefix + "constant-operands=" + constExprLists_.size() + "\n");
     }
     if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
-      List<String> passThroughNodeIds = Lists.newArrayList();
+      List<String> passThroughNodeIds = new ArrayList<>();
       for (int i = 0; i < firstMaterializedChildIdx_; ++i) {
         passThroughNodeIds.add(children_.get(i).getId().toString());
       }
@@ -337,7 +336,7 @@ public class UnionNode extends PlanNode {
   public void computePipelineMembership() {
     // The union streams each child's input through, so is part of every pipeline that
     // its child is a part of.
-    pipelines_ = Lists.newArrayList();
+    pipelines_ = new ArrayList<>();
     for (PlanNode child: children_) {
       child.computePipelineMembership();
       for (PipelineMembership childPipeline : child.getPipelines()) {

@@ -62,12 +62,12 @@ public class DistributedPlanner {
    * right now (the coordination only happens if the same select block does both
    * the aggregation and analytic computation).
    */
-  public ArrayList<PlanFragment> createPlanFragments(
+  public List<PlanFragment> createPlanFragments(
       PlanNode singleNodePlan) throws ImpalaException {
     Preconditions.checkState(!ctx_.isSingleNodeExec());
     AnalysisContext.AnalysisResult analysisResult = ctx_.getAnalysisResult();
     QueryStmt queryStmt = ctx_.getQueryStmt();
-    ArrayList<PlanFragment> fragments = Lists.newArrayList();
+    List<PlanFragment> fragments = new ArrayList<>();
     // For inserts or CTAS, unless there is a limit, leave the root fragment
     // partitioned, otherwise merge everything into a single coordinator fragment,
     // so we can pass it back to the client.
@@ -92,9 +92,9 @@ public class DistributedPlanner {
    * partitioned; the partition function is derived from the inputs.
    */
   private PlanFragment createPlanFragments(
-      PlanNode root, boolean isPartitioned, ArrayList<PlanFragment> fragments)
+      PlanNode root, boolean isPartitioned, List<PlanFragment> fragments)
       throws ImpalaException {
-    ArrayList<PlanFragment> childFragments = Lists.newArrayList();
+    List<PlanFragment> childFragments = new ArrayList<>();
     for (PlanNode child: root.getChildren()) {
       // allow child fragments to be partitioned, unless they contain a limit clause
       // (the result set with the limit constraint needs to be computed centrally);
@@ -186,7 +186,7 @@ public class DistributedPlanner {
    */
   public PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
-      ArrayList<PlanFragment> fragments)
+      List<PlanFragment> fragments)
       throws ImpalaException {
     if (insertStmt.hasNoShuffleHint()) return inputFragment;
 
@@ -304,7 +304,7 @@ public class DistributedPlanner {
    */
   private PlanFragment createNestedLoopJoinFragment(NestedLoopJoinNode node,
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
-      ArrayList<PlanFragment> fragments) throws ImpalaException {
+      List<PlanFragment> fragments) throws ImpalaException {
     node.setDistributionMode(DistributionMode.BROADCAST);
     node.setChild(0, leftChildFragment.getPlanRoot());
     connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
@@ -319,7 +319,7 @@ public class DistributedPlanner {
       Analyzer analyzer, boolean lhsHasCompatPartition, boolean rhsHasCompatPartition,
       PlanFragment leftChildFragment, PlanFragment rightChildFragment,
       List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs,
-      ArrayList<PlanFragment> fragments) throws ImpalaException {
+      List<PlanFragment> fragments) throws ImpalaException {
     Preconditions.checkState(node.getDistributionMode() == DistributionMode.PARTITIONED);
     // The lhs and rhs input fragments are already partitioned on the join exprs.
     // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
@@ -439,7 +439,7 @@ public class DistributedPlanner {
    */
   private PlanFragment createHashJoinFragment(
       HashJoinNode node, PlanFragment rightChildFragment,
-      PlanFragment leftChildFragment, ArrayList<PlanFragment> fragments)
+      PlanFragment leftChildFragment, List<PlanFragment> fragments)
       throws ImpalaException {
     // For both join types, the total cost is calculated as the amount of data
     // sent over the network, plus the amount of data inserted into the hash table.
@@ -466,8 +466,8 @@ public class DistributedPlanner {
     // repartition: both left- and rightChildFragment are partitioned on the
     // join exprs, and a hash table is built with the rightChildFragment's output.
     PlanNode lhsTree = leftChildFragment.getPlanRoot();
-    List<Expr> lhsJoinExprs = Lists.newArrayList();
-    List<Expr> rhsJoinExprs = Lists.newArrayList();
+    List<Expr> lhsJoinExprs = new ArrayList<>();
+    List<Expr> rhsJoinExprs = new ArrayList<>();
     for (Expr joinConjunct: node.getEqJoinConjuncts()) {
       // no remapping necessary
       lhsJoinExprs.add(joinConjunct.getChild(0).clone());
@@ -624,7 +624,7 @@ public class DistributedPlanner {
       DataPartition srcPartition, List<Expr> joinExprs, Analyzer analyzer) {
     Preconditions.checkState(srcPartition.isHashPartitioned());
     List<Expr> srcPartExprs = srcPartition.getPartitionExprs();
-    List<Expr> resultPartExprs = Lists.newArrayList();
+    List<Expr> resultPartExprs = new ArrayList<>();
     for (Expr srcPartExpr : srcPartExprs) {
       for (int j = 0; j < srcJoinExprs.size(); ++j) {
         if (analyzer.exprsHaveValueTransfer(srcPartExpr, srcJoinExprs.get(j), false)) {
@@ -650,7 +650,7 @@ public class DistributedPlanner {
    *   UnionNode via a RANDOM exchange, and remain unchanged otherwise.
    */
   private PlanFragment createUnionNodeFragment(UnionNode unionNode,
-      ArrayList<PlanFragment> childFragments, ArrayList<PlanFragment> fragments)
+      List<PlanFragment> childFragments, List<PlanFragment> fragments)
       throws ImpalaException {
     Preconditions.checkState(unionNode.getChildren().size() == childFragments.size());
 
@@ -717,7 +717,7 @@ public class DistributedPlanner {
    * the child fragment.
    */
   private PlanFragment createSelectNodeFragment(SelectNode selectNode,
-      ArrayList<PlanFragment> childFragments) {
+      List<PlanFragment> childFragments) {
     Preconditions.checkState(selectNode.getChildren().size() == childFragments.size());
     PlanFragment childFragment = childFragments.get(0);
     // set the child explicitly, an ExchangeNode might have been inserted
@@ -733,7 +733,7 @@ public class DistributedPlanner {
    */
   private PlanFragment createCardinalityCheckNodeFragment(
       CardinalityCheckNode cardinalityCheckNode,
-      ArrayList<PlanFragment> childFragments) throws ImpalaException {
+      List<PlanFragment> childFragments) throws ImpalaException {
     PlanFragment childFragment = childFragments.get(0);
     // The cardinality check must execute on a single node.
     if (childFragment.getOutputPartition().isPartitioned()) {
@@ -793,7 +793,7 @@ public class DistributedPlanner {
    * createAggregationFragment() for the phase 2 AggregationNode.
    */
   private PlanFragment createAggregationFragment(AggregationNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments)
+      PlanFragment childFragment, List<PlanFragment> fragments)
       throws ImpalaException {
     if (!childFragment.isPartitioned() || node.getAggPhase() == AggPhase.TRANSPOSE) {
       // nothing to distribute; do full aggregation directly within childFragment
@@ -893,7 +893,7 @@ public class DistributedPlanner {
    */
   private PlanFragment createPhase2DistinctAggregationFragment(
       AggregationNode phase2AggNode, PlanFragment childFragment,
-      ArrayList<PlanFragment> fragments) throws ImpalaException {
+      List<PlanFragment> fragments) throws ImpalaException {
     // The phase-1 aggregation node is already in the child fragment.
     Preconditions.checkState(phase2AggNode.getChild(0) == childFragment.getPlanRoot());
     // When a query has both grouping and distinct exprs, Impala can optionally include
@@ -981,7 +981,7 @@ public class DistributedPlanner {
    * unpartitioned in the absence of such exprs.
    */
   private PlanFragment createAnalyticFragment(PlanNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments)
+      PlanFragment childFragment, List<PlanFragment> fragments)
       throws ImpalaException {
     Preconditions.checkState(
         node instanceof SortNode || node instanceof AnalyticEvalNode);
@@ -1027,7 +1027,7 @@ public class DistributedPlanner {
    * the correct result.
    */
   private PlanFragment createOrderByFragment(SortNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments)
+      PlanFragment childFragment, List<PlanFragment> fragments)
       throws ImpalaException {
     node.setChild(0, childFragment.getPlanRoot());
     childFragment.addPlanRoot(node);

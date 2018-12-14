@@ -36,8 +36,6 @@ import com.google.common.base.Preconditions;
  * this Expr produce the values for the partition columns.
  */
 public class KuduPartitionExpr extends Expr {
-  private final static Logger LOG = LoggerFactory.getLogger(KuduPartitionExpr.class);
-
   // The table to use the partitioning scheme from.
   private final int targetTableId_;
   private final FeKuduTable targetTable_;

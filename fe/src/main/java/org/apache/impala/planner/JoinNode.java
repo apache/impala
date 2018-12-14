@@ -17,7 +17,9 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,8 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Logical join operator. Subclasses correspond to implementations of the join operator
@@ -260,7 +260,7 @@ public abstract class JoinNode extends PlanNode {
     }
 
     // Collect join conjuncts that are eligible to participate in cardinality estimation.
-    List<EqJoinConjunctScanSlots> eqJoinConjunctSlots = Lists.newArrayList();
+    List<EqJoinConjunctScanSlots> eqJoinConjunctSlots = new ArrayList<>();
     for (Expr eqJoinConjunct: eqJoinConjuncts_) {
       EqJoinConjunctScanSlots slots = EqJoinConjunctScanSlots.create(eqJoinConjunct);
       if (slots != null) eqJoinConjunctSlots.add(slots);
@@ -306,7 +306,7 @@ public abstract class JoinNode extends PlanNode {
       double rhsNumRows = fkPkCandidate.get(0).rhsNumRows();
       if (jointNdv >= Math.round(rhsNumRows * (1.0 - FK_PK_MAX_STATS_DELTA_PERC))) {
         // We cannot disprove that the RHS is a PK.
-        if (result == null) result = Lists.newArrayList();
+        if (result == null) result = new ArrayList<>();
         result.addAll(fkPkCandidate);
       }
     }
@@ -439,12 +439,12 @@ public abstract class JoinNode extends PlanNode {
     public static Map<Pair<TupleId, TupleId>, List<EqJoinConjunctScanSlots>>
         groupByJoinedTupleIds(List<EqJoinConjunctScanSlots> eqJoinConjunctSlots) {
       Map<Pair<TupleId, TupleId>, List<EqJoinConjunctScanSlots>> scanSlotsByJoinedTids =
-          Maps.newLinkedHashMap();
+          new LinkedHashMap<>();
       for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
         Pair<TupleId, TupleId> tids = Pair.create(slots.lhsTid(), slots.rhsTid());
         List<EqJoinConjunctScanSlots> scanSlots = scanSlotsByJoinedTids.get(tids);
         if (scanSlots == null) {
-          scanSlots = Lists.newArrayList();
+          scanSlots = new ArrayList<>();
           scanSlotsByJoinedTids.put(tids, scanSlots);
         }
         scanSlots.add(slots);
@@ -700,7 +700,7 @@ public abstract class JoinNode extends PlanNode {
   public void computePipelineMembership() {
     children_.get(0).computePipelineMembership();
     children_.get(1).computePipelineMembership();
-    pipelines_ = Lists.newArrayList();
+    pipelines_ = new ArrayList<>();
     for (PipelineMembership probePipeline : children_.get(0).getPipelines()) {
       if (probePipeline.getPhase() == TExecNodePhase.GETNEXT) {
           pipelines_.add(new PipelineMembership(

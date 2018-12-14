@@ -144,6 +144,7 @@ public abstract class StatementBase extends StmtNode {
    * It is the caller's responsibility to know if/when the statement was indeed rewritten.
    * @param options
    */
+  @Override
   public String toSql(ToSqlOptions options) { return ""; }
 
   public void setIsExplain() { isExplain_ = true; }

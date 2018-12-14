@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
@@ -39,7 +40,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Node the implements various types of sorts:
@@ -134,7 +134,7 @@ public class SortNode extends PlanNode {
     // populate resolvedTupleExprs_ and outputSmap_
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
     List<Expr> slotExprs = info_.getMaterializedExprs();
-    resolvedTupleExprs_ = Lists.newArrayList();
+    resolvedTupleExprs_ = new ArrayList<>();
     outputSmap_ = new ExprSubstitutionMap();
     for (int i = 0; i < slotExprs.size(); ++i) {
       if (!sortTupleSlots.get(i).isMaterialized()) continue;
@@ -172,7 +172,7 @@ public class SortNode extends PlanNode {
 
   @Override
   protected String debugString() {
-    List<String> strings = Lists.newArrayList();
+    List<String> strings = new ArrayList<>();
     for (Boolean isAsc : info_.getIsAscOrder()) {
       strings.add(isAsc ? "a" : "d");
     }
@@ -221,7 +221,7 @@ public class SortNode extends PlanNode {
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      List<Expr> nonSlotRefExprs = Lists.newArrayList();
+      List<Expr> nonSlotRefExprs = new ArrayList<>();
       for (Expr e: info_.getMaterializedExprs()) {
         if (e instanceof SlotRef) continue;
         nonSlotRefExprs.add(e);

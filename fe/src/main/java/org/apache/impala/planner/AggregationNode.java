@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -40,8 +41,6 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -51,8 +50,6 @@ import com.google.common.collect.Lists;
  *
  */
 public class AggregationNode extends PlanNode {
-  private final static Logger LOG = LoggerFactory.getLogger(AggregationNode.class);
-
   // Default per-instance memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic.
   private final static long DEFAULT_PER_INSTANCE_MEM = 128L * 1024L * 1024L;
@@ -333,9 +330,9 @@ public class AggregationNode extends PlanNode {
     }
     if (maxNumExprs == 0) return Collections.emptyList();
 
-    List<Expr> result = Lists.newArrayList();
+    List<Expr> result = new ArrayList<>();
     for (int i = 0; i < maxNumExprs; ++i) {
-      List<CaseWhenClause> caseWhenClauses = Lists.newArrayList();
+      List<CaseWhenClause> caseWhenClauses = new ArrayList<>();
       for (AggregateInfo aggInfo : aggInfos_) {
         TupleId tid;
         if (aggInfo.isDistinctAgg()) {
@@ -376,7 +373,7 @@ public class AggregationNode extends PlanNode {
     msg.agg_node.setEstimated_input_cardinality(getChild(0).getCardinality());
     for (int i = 0; i < aggInfos_.size(); ++i) {
       AggregateInfo aggInfo = aggInfos_.get(i);
-      List<TExpr> aggregateFunctions = Lists.newArrayList();
+      List<TExpr> aggregateFunctions = new ArrayList<>();
       for (FunctionCallExpr e : aggInfo.getMaterializedAggregateExprs()) {
         aggregateFunctions.add(e.treeToThrift());
       }

@@ -111,8 +111,6 @@ import com.google.common.base.Preconditions;
  * the transposition to the output of the new simplified aggregation.
  */
 public class MultiAggregateInfo {
-  private final static Logger LOG = LoggerFactory.getLogger(MultiAggregateInfo.class);
-
   public static enum AggPhase {
     FIRST,
     FIRST_MERGE,

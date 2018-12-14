@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -36,7 +37,6 @@ import org.apache.impala.thrift.TTableSinkType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -65,7 +65,7 @@ public class HdfsTableSink extends TableSink {
   // Stores the indices into the list of non-clustering columns of the target table that
   // are stored in the 'sort.columns' table property. This is sent to the backend to
   // populate the RowGroup::sorting_columns list in parquet files.
-  private List<Integer> sortColumns_ = Lists.newArrayList();
+  private List<Integer> sortColumns_ = new ArrayList<>();
 
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {

@@ -17,7 +17,7 @@
 
 package org.apache.impala.planner;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.TupleId;
@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  * construct a valid row empty batch.
  */
 public class EmptySetNode extends PlanNode {
-  public EmptySetNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
+  public EmptySetNode(PlanNodeId id, List<TupleId> tupleIds) {
     super(id, tupleIds, "EMPTYSET");
     Preconditions.checkArgument(tupleIds.size() > 0);
   }

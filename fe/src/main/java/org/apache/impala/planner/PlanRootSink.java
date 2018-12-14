@@ -29,6 +29,7 @@ import org.apache.impala.thrift.TQueryOptions;
  */
 public class PlanRootSink extends DataSink {
 
+  @Override
   public void appendSinkExplainString(String prefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
     output.append(String.format("%sPLAN-ROOT SINK\n", prefix));
@@ -45,6 +46,7 @@ public class PlanRootSink extends DataSink {
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
+  @Override
   protected void toThriftImpl(TDataSink tsink) {
   }
 

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -88,7 +89,7 @@ public class HBaseScanNode extends ScanNode {
   private boolean isEmpty_ = false;
 
   // List of HBase Filters for generating thrift message. Filled in finalize().
-  private final List<THBaseFilter> filters_ = new ArrayList<THBaseFilter>();
+  private final List<THBaseFilter> filters_ = new ArrayList<>();
 
   // The suggested value for "hbase.client.scan.setCaching", which batches maxCaching
   // rows per fetch request to the HBase region server. If the value is too high,
@@ -325,7 +326,7 @@ public class HBaseScanNode extends ScanNode {
     // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>.
     // The List<HRegionLocations>'s end up being sorted by start key/end key, because
     // regionsLoc is sorted that way.
-    Map<String, List<HRegionLocation>> locationMap = Maps.newHashMap();
+    Map<String, List<HRegionLocation>> locationMap = new HashMap<>();
     for (HRegionLocation regionLoc: regionsLoc) {
       String locHostPort = regionLoc.getHostnamePort();
       if (locationMap.containsKey(locHostPort)) {
@@ -513,7 +514,7 @@ public class HBaseScanNode extends ScanNode {
     // The first column in an HBase table is always the key column.
     HBaseColumn keyCol = (HBaseColumn) tbl.getColumns().get(0);
 
-    List<HBaseColumn> colsToFetchFromHBase = new ArrayList<HBaseColumn>();
+    List<HBaseColumn> colsToFetchFromHBase = new ArrayList<>();
     for (SlotDescriptor slot : desc_.getSlots()) {
       HBaseColumn col = (HBaseColumn) tbl.getColumn(slot.getLabel());
       // Will add key column separately, since its always fetched.
