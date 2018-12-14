@@ -3826,10 +3826,11 @@ sudo pip-python install ssl</codeblock>
   </codeblock>
           </li>
           <li>
-            <p>
-              Decide on a large enough value for the <cmdname>catalogd</cmdname> heap.
-              You express it as an environment variable value as follows:
-            </p>
+            <p> Decide on a large enough value for the
+                <cmdname>catalogd</cmdname> heap. You use the
+                <codeph>JAVA_TOOL_OPTIONS</codeph> environment variable to set
+              the maximum heap size. For example, the following environment
+              variable setting specifies the maximum heap size of 8 GB. </p>
   <codeblock>
   JAVA_TOOL_OPTIONS="-Xmx8g"
   </codeblock>
