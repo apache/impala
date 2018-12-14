@@ -31,6 +31,7 @@ setup_report_build_error
 : ${EXPLORATION_STRATEGY:=core}
 : ${NUM_TEST_ITERATIONS:=1}
 : ${MAX_PYTEST_FAILURES:=10}
+: ${TIMEOUT_FOR_RUN_ALL_TESTS_MINS:=1200}
 KERB_ARGS=""
 
 . "${IMPALA_HOME}/bin/impala-config.sh" > /dev/null 2>&1
@@ -80,7 +81,7 @@ fi
 : ${CODE_COVERAGE:=false}
 
 # parse command line options
-while getopts "e:n:c" OPTION
+while getopts "e:n:c:t:" OPTION
 do
   case "$OPTION" in
     e)
@@ -92,15 +93,22 @@ do
     c)
       CODE_COVERAGE=true
       ;;
+    t)
+      TIMEOUT_FOR_RUN_ALL_TESTS_MINS="$OPTARG"
+      ;;
     ?)
       echo "run-all-tests.sh [-e <exploration_strategy>] [-n <num_iters>]"
       echo "[-e] The exploration strategy to use. Default exploration is 'core'."
       echo "[-n] The number of times to run the tests. Default is 1."
       echo "[-c] Set this option to generate code coverage reports."
+      echo "[-t] The timeout in minutes for running all tests."
       exit 1;
       ;;
   esac
 done
+
+"${IMPALA_HOME}/bin/run-all-tests-timeout-check.sh" $TIMEOUT_FOR_RUN_ALL_TESTS_MINS &
+TIMEOUT_PID=$!
 
 # IMPALA-3947: "Exhaustive" tests are actually based on workload. This
 # means what we colloquially call "exhaustive" tests are actually
@@ -220,10 +228,15 @@ do
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
   fi
 
-  # Finally, run the process failure tests.
+  # Run the process failure tests.
   # Disabled temporarily until we figure out the proper timeouts required to make the test
   # succeed.
   # ${IMPALA_HOME}/tests/run-process-failure-tests.sh
+
+  # Finally, kill the spawned timeout process and its child sleep process.
+  pkill -P $TIMEOUT_PID
+  kill $TIMEOUT_PID
+
   if [[ $TEST_RET_CODE == 1 ]]; then
     exit $TEST_RET_CODE
   fi
