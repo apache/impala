@@ -203,3 +203,6 @@ else
   # functional subdirectory.
   symlink_subdirs ${IMPALA_AUX_TEST_HOME}/tests ${IMPALA_HOME}/tests
 fi
+
+# Touch a file to mark when this script was last run.
+touch "${CONFIG_DIR}/.test_config_timestamp"

@@ -22,7 +22,7 @@
 <configuration>
   <property>
     <name>hbase.rootdir</name>
-    <value>hdfs://localhost:20500/hbase</value>
+    <value>hdfs://${INTERNAL_LISTEN_HOST}:20500/hbase</value>
     <description>The directory shared by RegionServers.
     </description>
   </property>
@@ -112,7 +112,7 @@
 
   <property>
     <name>hbase.zookeeper.quorum</name>
-    <value>localhost</value> <!-- The comma-separated
+    <value>${INTERNAL_LISTEN_HOST}</value> <!-- The comma-separated
     list of hostnames of the ZooKeeper Quorum hosts -->
   </property>
 

@@ -280,8 +280,15 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     # Maximum number of minidumps that the impalads should keep for this test.
     max_minidumps = 2
     self.start_cluster_with_args(minidump_path=self.tmp_dir,
-                                 max_minidumps=max_minidumps)
-    assert self.count_minidumps('impalad') == min(cluster_size, max_minidumps)
+                                 max_minidumps=max_minidumps,
+                                 logbufsecs=1)
+    # Wait for log maintenance thread to clean up minidumps asynchronously.
+    start = time.time()
+    expected_impalad_minidumps = min(cluster_size, max_minidumps)
+    while (self.count_minidumps('impalad') != expected_impalad_minidumps
+        and time.time() - start < 10):
+      time.sleep(0.1)
+    assert self.count_minidumps('impalad') == expected_impalad_minidumps
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
 

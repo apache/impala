@@ -26,7 +26,7 @@
 <!-- resource).                                                                                 -->
 <property>
  <name>hive.metastore.uris</name>
- <value>thrift://localhost:9083</value>
+ <value>thrift://${INTERNAL_LISTEN_HOST}:9083</value>
 </property>
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
@@ -66,7 +66,7 @@
 </property>
 <property>
   <name>hive.stats.dbconnectionstring</name>
-  <value>jdbc:mysql://localhost:3306/${METASTORE_DB}_Stats?createDatabaseIfNotExist=true&amp;user=hiveuser&amp;password=password</value>
+  <value>jdbc:mysql://${INTERNAL_LISTEN_HOST}:3306/${METASTORE_DB}_Stats?createDatabaseIfNotExist=true&amp;user=hiveuser&amp;password=password</value>
 </property>
 <property>
   <name>hive.stats.jdbcdriver</name>

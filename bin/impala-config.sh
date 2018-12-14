@@ -269,6 +269,12 @@ export azure_storage_account_name="${azure_storage_account_name-}"
 export azure_storage_container_name="${azure_storage_container_name-}"
 export HDFS_REPLICATION="${HDFS_REPLICATION-3}"
 export ISILON_NAMENODE="${ISILON_NAMENODE-}"
+# Internal and external interfaces that test cluster services will listen on. The
+# internal interface is used for ports that should not be accessed from outside the
+# host that the cluster is running on. The external interface is used for ports
+# that may need to be accessed from outside, e.g. web UIs.
+export INTERNAL_LISTEN_HOST="${INTERNAL_LISTEN_HOST-localhost}"
+export EXTERNAL_LISTEN_HOST="${EXTERNAL_LISTEN_HOST-0.0.0.0}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
@@ -441,7 +447,7 @@ export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
 CORES=$(($(getconf _NPROCESSORS_ONLN) / 2))
 export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
 
-export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-127.0.0.1}"
+export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-${INTERNAL_LISTEN_HOST}}"
 export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
 export KUDU_MASTER_WEBUI_PORT="${KUDU_MASTER_WEBUI_PORT:-8051}"
 

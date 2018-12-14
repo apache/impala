@@ -4,7 +4,11 @@
 <configuration>
   <property>
     <name>dfs.namenode.http-address</name>
-    <value>0.0.0.0:${HDFS_WEBUI_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${HDFS_WEBUI_PORT}</value>
+  </property>
+  <property>
+    <name>dfs.namenode.http-address</name>
+    <value>${EXTERNAL_LISTEN_HOST}:${HDFS_WEBUI_PORT}</value>
   </property>
 
   <property>
@@ -31,22 +35,22 @@
 
   <property>
     <name>dfs.datanode.address</name>
-    <value>127.0.0.1:${DATANODE_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.http.address</name>
-    <value>127.0.0.1:${DATANODE_HTTP_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_HTTP_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.ipc.address</name>
-    <value>127.0.0.1:${DATANODE_IPC_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_IPC_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.https.address</name>
-    <value>127.0.0.1:${DATANODE_HTTPS_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_HTTPS_PORT}</value>
   </property>
 
   <!-- Configuration to enable disk location metadata -->
@@ -126,7 +130,7 @@
   <!-- Location of the KMS key provider -->
   <property>
     <name>dfs.encryption.key.provider.uri</name>
-    <value>kms://http@127.0.0.1:9600/kms</value>
+    <value>kms://http@${INTERNAL_LISTEN_HOST}:9600/kms</value>
   </property>
 
 

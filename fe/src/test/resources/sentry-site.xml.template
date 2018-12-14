@@ -32,7 +32,7 @@
 </property>
 <property>
  <name>sentry.service.server.rpc-address</name>
- <value>localhost</value>
+ <value>${INTERNAL_LISTEN_HOST}</value>
 </property>
 <property>
  <name>sentry.service.server.rpc-port</name>
@@ -40,14 +40,14 @@
 </property>
 <property>
  <name>sentry.service.client.server.rpc-address</name>
- <value>localhost</value>
+ <value>${INTERNAL_LISTEN_HOST}</value>
 </property>
 <property>
 <!--
  TODO(IMPALA-5686): Remove this or the previous property when Sentry standardizes on one.
 -->
  <name>sentry.service.client.server.rpc-addresses</name>
- <value>localhost</value>
+ <value>${INTERNAL_LISTEN_HOST}</value>
 </property>
 <property>
  <name>sentry.service.client.server.rpc-port</name>

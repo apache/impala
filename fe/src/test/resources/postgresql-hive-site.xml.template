@@ -26,7 +26,7 @@
 <!-- resource).                                                                                 -->
 <property>
  <name>hive.metastore.uris</name>
- <value>thrift://localhost:9083</value>
+ <value>thrift://${INTERNAL_LISTEN_HOST}:9083</value>
 </property>
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
@@ -179,7 +179,7 @@
 
 <property>
   <name>hbase.zookeeper.quorum</name>
-  <value>localhost</value>
+  <value>${INTERNAL_LISTEN_HOST}</value>
 </property>
 <!-- END IMPALA-4125 -->
 

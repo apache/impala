@@ -5,12 +5,12 @@
 <configuration>
   <property>
     <name>yarn.resourcemanager.webapp.address</name>
-    <value>0.0.0.0:${YARN_WEBUI_PORT}</value>
+    <value>${EXTERNAL_LISTEN_HOST}:${YARN_WEBUI_PORT}</value>
   </property>
 
   <property>
     <name>yarn.nodemanager.address</name>
-    <value>127.0.0.1:${NODEMANAGER_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${NODEMANAGER_PORT}</value>
   </property>
 
   <property>
@@ -50,12 +50,12 @@
 
   <property>
     <name>yarn.nodemanager.localizer.address</name>
-    <value>127.0.0.1:${NODEMANAGER_LOCALIZER_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${NODEMANAGER_LOCALIZER_PORT}</value>
   </property>
 
   <property>
     <name>yarn.nodemanager.webapp.address</name>
-    <value>127.0.0.1:${NODEMANAGER_WEBUI_PORT}</value>
+    <value>${INTERNAL_LISTEN_HOST}:${NODEMANAGER_WEBUI_PORT}</value>
   </property>
 
   <property>
