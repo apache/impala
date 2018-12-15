@@ -30,7 +30,6 @@ from time import sleep, time
 from optparse import OptionParser, SUPPRESS_HELP
 from testdata.common import cgroups
 from tests.common.environ import build_flavor_timeout
-from tests.common.impala_cluster import ImpalaCluster
 
 logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
     datefmt="%H:%M:%S")
@@ -371,8 +370,7 @@ def wait_for_impala_process_count(impala_cluster, retries=10):
   if msg:
     raise RuntimeError(msg)
 
-
-def wait_for_cluster(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
 
   A cluster is deemed "ready" if:
@@ -425,6 +423,20 @@ def wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS
     raise RuntimeError("Unable to open client ports within {num_seconds} seconds.".format(
         num_seconds=timeout_in_seconds))
 
+def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+  """Checks if the cluster is "ready" by executing a simple query in a loop"""
+  start_time = time()
+  IMPALA_SHELL = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
+  cmd = "{impala_shell} -i localhost:21000 -q '{query}'".format(
+      impala_shell=IMPALA_SHELL,
+      query="select 1")
+  while os.system(cmd) != 0:
+    if time() - timeout_in_seconds > start_time:
+      raise RuntimeError("Cluster did not start within {num_seconds} seconds".format(
+        num_seconds=timeout_in_seconds))
+    LOG.info("Cluster not yet available. Sleeping...")
+    sleep(2)
+
 if __name__ == "__main__":
   if options.kill_only:
     kill_cluster_processes(force=options.force_kill)
@@ -476,12 +488,31 @@ if __name__ == "__main__":
   else:
     kill_cluster_processes(force=options.force_kill)
 
-  if options.restart_impalad_only:
-    impala_cluster = ImpalaCluster()
-    if not impala_cluster.statestored or not impala_cluster.catalogd:
-      LOG.info("No running statestored or catalogd detected. "
-          "Restarting entire cluster.")
-      options.restart_impalad_only = False
+  try:
+    import json
+    wait_for_cluster = wait_for_cluster_web
+  except ImportError:
+    LOG.exception("json module not found, checking "
+        "for cluster startup through the command-line")
+    wait_for_cluster = wait_for_cluster_cmdline
+
+  # If ImpalaCluster cannot be imported, fall back to the command-line to check
+  # whether impalads/statestore are up.
+  try:
+    from tests.common.impala_cluster import ImpalaCluster
+    if options.restart_impalad_only:
+      impala_cluster = ImpalaCluster()
+      if not impala_cluster.statestored or not impala_cluster.catalogd:
+        LOG.info("No running statestored or catalogd detected. "
+            "Restarting entire cluster.")
+        options.restart_impalad_only = False
+  except ImportError:
+    LOG.exception("ImpalaCluster module not found.")
+    # TODO: Update this code path to work similar to the ImpalaCluster code path when
+    # restarting only impalad processes. Specifically, we should do a full cluster
+    # restart if either the statestored or catalogd processes are down, even if
+    # restart_only_impalad=True.
+    wait_for_cluster = wait_for_cluster_cmdline
 
   try:
     if options.restart_catalogd_only:
