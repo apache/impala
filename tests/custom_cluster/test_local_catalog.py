@@ -234,10 +234,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
       def stress_thread(client):
         # Loops, picks a random query in each iteration, runs it,
         # and looks for retries and InconsistentMetadataFetchExceptions.
-        # Limit the number of queries run. Too many queries takes up too
-        # much memory which can get OOM killed in tests.
         attempt = 0
-        while inconsistent_seen[0] == 0 and attempt < 100:
+        while inconsistent_seen[0] == 0 and attempt < 200:
           q = random.choice(queries)
           attempt += 1
           try:
@@ -298,8 +296,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     """
     queries = [
       'refresh functional.alltypes',
-      'select count(*) from functional.alltypes where month=4',
-      'select count(*) from functional.alltypes where month=5']
+      'refresh functional.alltypes partition (year=2009, month=4)',
+      'select count(*) from functional.alltypes where month=4']
     seen = self._check_metadata_retries(queries)
     assert seen > 0, "Did not observe inconsistent metadata"
 
