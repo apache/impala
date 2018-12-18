@@ -96,10 +96,11 @@ class ExclusiveHdfsFileHandle : public HdfsFileHandle {
 /// is checked out, it cannot be evicted from the cache. In this case, a cache can
 /// exceed the specified capacity.
 ///
-/// The file handle cache is currently not suitable for remote files that maintain a
-/// connection as part of the handle. Most remote systems have a limit on the number
-/// of concurrent connections, and file handles in the cache would be counted towards
-/// that limit.
+/// Some remote file systems such as S3 keep a connection as part of the file handle.
+/// The file handle cache is not suitable for those systems, as the cache size can
+/// exceed the limit on the number of concurrent connections. HDFS does not maintain
+/// a connection in the file handle, so remote HDFS file handles do not have this
+/// restriction.
 ///
 /// If there is a file handle in the cache and the underlying file is deleted,
 /// the file handle might keep the file from being deleted at the OS level. This can

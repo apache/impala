@@ -37,6 +37,8 @@ DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to u
 DEFINE_int64(abfs_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
     "reading from ABFS.");
 
+DECLARE_bool(cache_remote_file_handles);
+
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
 // consumer thread, i.e. only one disk thread will push to a scan range at
@@ -195,7 +197,18 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
 
   // No locks in this section.  Only working on local vars.  We don't want to hold a
   // lock across the read call.
-  Status read_status = file_reader_->Open(is_file_handle_caching_enabled());
+  // To use the file handle cache:
+  // 1. It must be enabled at the daemon level.
+  // 2. The file is a local HDFS file (expected_local_) OR it is a remote HDFS file and
+  //    'cache_remote_file_handles' is true
+  // Note: S3, ADLS, and ABFS file handles are not cached.
+  bool use_file_handle_cache = false;
+  if (is_file_handle_caching_enabled() &&
+      (expected_local_ ||
+       (FLAGS_cache_remote_file_handles && disk_id_ == io_mgr_->RemoteDfsDiskId()))) {
+    use_file_handle_cache = true;
+  }
+  Status read_status = file_reader_->Open(use_file_handle_cache);
   bool eof = false;
   if (read_status.ok()) {
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);

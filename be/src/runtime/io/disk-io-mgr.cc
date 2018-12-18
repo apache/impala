@@ -126,6 +126,12 @@ DEFINE_uint64(unused_file_handle_timeout_sec, 21600, "Maximum time, in seconds, 
 DEFINE_uint64(num_file_handle_cache_partitions, 16, "Number of partitions used by the "
     "file handle cache.");
 
+// Given the extra complexity of remote accesses and semantics, caching for remote HDFS
+// file handles is currently not enabled by default. This parameter enables caching
+// for remote HDFS file handles. It does not impact S3, ADLS, or ABFS file handles.
+DEFINE_bool(cache_remote_file_handles, false, "Enable the file handle cache for "
+    "remote HDFS files.");
+
 AtomicInt32 DiskIoMgr::next_disk_id_;
 
 string DiskIoMgr::DebugString() {

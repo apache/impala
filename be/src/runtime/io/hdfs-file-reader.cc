@@ -48,11 +48,9 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
   RETURN_IF_ERROR(scan_range_->cancel_status_);
 
   if (exclusive_hdfs_fh_ != nullptr) return Status::OK();
-  // With file handle caching, the reader does not maintain its own
-  // hdfs file handle. File handle caching is only used for local files,
-  // so s3 and remote filesystems should obtain an exclusive file handle
-  // for each scan range.
-  if (use_file_handle_cache && expected_local_) return Status::OK();
+  // If using file handle caching, the reader does not maintain its own
+  // hdfs file handle, so it can skip opening a file handle.
+  if (use_file_handle_cache) return Status::OK();
   auto io_mgr = scan_range_->io_mgr_;
   // Get a new exclusive file handle.
   RETURN_IF_ERROR(io_mgr->GetExclusiveHdfsFileHandle(hdfs_fs_,
