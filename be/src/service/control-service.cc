@@ -79,7 +79,11 @@ Status ControlService::Init() {
 Status ControlService::GetProxy(const TNetworkAddress& address, const string& hostname,
     unique_ptr<ControlServiceProxy>* proxy) {
   // Create a ControlService proxy to the destination.
-  return ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy);
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy));
+  // Use a network plane different from DataStreamService's to avoid being blocked by
+  // large payloads in DataStreamService.
+  (*proxy)->set_network_plane("control");
+  return Status::OK();
 }
 
 bool ControlService::Authorize(const google::protobuf::Message* req,

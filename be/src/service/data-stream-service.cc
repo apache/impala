@@ -81,7 +81,9 @@ Status DataStreamService::Init() {
 Status DataStreamService::GetProxy(const TNetworkAddress& address, const string& hostname,
     unique_ptr<DataStreamServiceProxy>* proxy) {
   // Create a DataStreamService proxy to the destination.
-  return ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy);
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy));
+  (*proxy)->set_network_plane("datastream");
+  return Status::OK();
 }
 
 bool DataStreamService::Authorize(const google::protobuf::Message* req,
