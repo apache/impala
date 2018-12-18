@@ -173,7 +173,7 @@ class TestFailpoints(ImpalaTestSuite):
         self.execute_query(query,
             query_options={'debug_action': debug_action})
       except ImpalaBeeswaxException as e:
-        assert 'Query aborted:Debug Action: FIS_FAIL_THREAD_CREATION:FAIL@0.5' \
+        assert 'Debug Action: FIS_FAIL_THREAD_CREATION:FAIL@0.5' \
             in str(e), str(e)
         break
 
