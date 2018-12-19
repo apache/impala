@@ -77,6 +77,7 @@ class TestInsertQueries(ImpalaTestSuite):
             (v.get_value('table_format').file_format == 'parquet' and \
             v.get_value('compression_codec') == 'none'))
 
+  @pytest.mark.execute_serially
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
     table_format = vector.get_value('table_format')
