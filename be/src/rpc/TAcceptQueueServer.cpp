@@ -29,11 +29,10 @@ DEFINE_int32(accepted_cnxn_queue_depth, 10000,
     "(Advanced) The size of the post-accept, pre-setup connection queue in each thrift "
     "server set up to service Impala internal and external connections.");
 
-DEFINE_int32_hidden(accepted_cnxn_setup_thread_pool_size, 1,
+DEFINE_int32(accepted_cnxn_setup_thread_pool_size, 2,
     "(Advanced) The size of the thread pool that is used to process the "
     "post-accept, pre-setup connection queue in each thrift server set up to service "
-    "Impala internal and external connections. Warning: This is untested for values "
-    "greater than 1 which might exhibit unpredictable behavior and/or cause crashes.");
+    "Impala internal and external connections.");
 
 namespace apache {
 namespace thrift {
@@ -216,14 +215,10 @@ void TAcceptQueueServer::serve() {
   }
 
   if (FLAGS_accepted_cnxn_setup_thread_pool_size > 1) {
-    LOG(WARNING) << "connection_setup_thread_pool_size is set to "
-                 << FLAGS_accepted_cnxn_setup_thread_pool_size
-                 << ". Values greater than 1 are untested and might exhibit "
-                    "unpredictable behavior and/or cause crashes.";
+    LOG(INFO) << "connection_setup_thread_pool_size is set to "
+              << FLAGS_accepted_cnxn_setup_thread_pool_size;
   }
   // New - this is the thread pool used to process the internal accept queue.
-  // TODO: IMPALA-7565: Make sure the related thrift code is thread safe and subsequently
-  // enable multi-threading by default.
   ThreadPool<shared_ptr<TTransport>> connection_setup_pool("setup-server", "setup-worker",
       FLAGS_accepted_cnxn_setup_thread_pool_size, FLAGS_accepted_cnxn_queue_depth,
       [this](int tid, const shared_ptr<TTransport>& item) {

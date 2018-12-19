@@ -177,6 +177,7 @@ boost::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   socket->setSendTimeout(0);
   {
     lock_guard<mutex> l(transportMap_mutex_);
+    DCHECK(transportMap_.find(trans) == transportMap_.end());
     transportMap_[trans] = ret_transport;
   }
   return ret_transport;
