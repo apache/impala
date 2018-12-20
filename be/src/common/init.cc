@@ -212,12 +212,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   // Set the default hostname. The user can override this with the hostname flag.
   ABORT_IF_ERROR(GetHostname(&FLAGS_hostname));
 
-#ifdef NDEBUG
-  // Symbolize stacktraces by default in debug mode.
   FLAGS_symbolize_stacktrace = false;
-# else
-  FLAGS_symbolize_stacktrace = true;
-#endif
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
   if (!FLAGS_redaction_rules_file.empty()) {
