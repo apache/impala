@@ -226,4 +226,15 @@
   <value>${INTERNAL_LISTEN_HOST}:2181</value>
   <description>The ZooKeeper token store connect string.</description>
 </property>
+
+<!-- This property is required to issue invalidates based on metastore events.
+See IMPALA-7954 for details -->
+<property>
+  <name>hive.metastore.notifications.add.thrift.objects</name>
+  <value>true</value>
+</property>
+<property>
+  <name>hive.metastore.alter.notifications.basic</name>
+  <value>false</value>
+</property>
 </configuration>

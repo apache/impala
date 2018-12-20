@@ -125,6 +125,10 @@ public class BackendConfig {
     return backendCfg_.catalog_partial_fetch_rpc_queue_timeout_s;
   }
 
+  public long getHMSPollingIntervalInSeconds() {
+    return backendCfg_.hms_event_polling_interval_s;
+  }
+
   public boolean isOrcScannerEnabled() {
     return backendCfg_.enable_orc_scanner;
   }

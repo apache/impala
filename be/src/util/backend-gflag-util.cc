@@ -70,6 +70,7 @@ DECLARE_int64(catalog_partial_fetch_rpc_queue_timeout_s);
 DECLARE_int64(exchg_node_buffer_size_bytes);
 DECLARE_int32(kudu_mutation_buffer_size);
 DECLARE_int32(kudu_error_buffer_size);
+DECLARE_int32(hms_event_polling_interval_s);
 
 namespace impala {
 
@@ -139,6 +140,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
       FLAGS_exchg_node_buffer_size_bytes);
   cfg.__set_kudu_mutation_buffer_size(FLAGS_kudu_mutation_buffer_size);
   cfg.__set_kudu_error_buffer_size(FLAGS_kudu_error_buffer_size);
+  cfg.__set_hms_event_polling_interval_s(FLAGS_hms_event_polling_interval_s);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

@@ -113,4 +113,6 @@ struct TBackendGflags {
   43: required i32 kudu_mutation_buffer_size
 
   44: required i32 kudu_error_buffer_size
+
+  45: required i32 hms_event_polling_interval_s
 }

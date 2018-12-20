@@ -38,10 +38,14 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.events.ExternalEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -225,6 +229,9 @@ public class CatalogServiceCatalog extends Catalog {
 
   private CatalogdTableInvalidator catalogdTableInvalidator_;
 
+  // Manages the event processing from metastore for issuing invalidates on tables
+  private ExternalEventsProcessor metastoreEventProcessor_;
+
   /**
    * See the gflag definition in be/.../catalog-server.cc for details on these modes.
    */
@@ -281,7 +288,39 @@ public class CatalogServiceCatalog extends Catalog {
         BackendConfig.INSTANCE.getBackendCfg().catalog_topic_mode.toUpperCase());
     catalogdTableInvalidator_ = CatalogdTableInvalidator.create(this,
         BackendConfig.INSTANCE);
+    metastoreEventProcessor_ = getEventsProcessor();
     Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
+    // start polling for metastore events
+    metastoreEventProcessor_.start();
+  }
+
+  /**
+   * Returns a Metastore event processor object if
+   * <code>BackendConfig#getHMSPollingIntervalInSeconds</code> returns a non-zero
+   *.value of polling interval. Otherwise, returns a no-op events processor. It is
+   * important to fetch the current notification event id at the Catalog service
+   * initialization time so that event processor starts to sync at the event id
+   * corresponding to the catalog start time.
+   */
+  private ExternalEventsProcessor getEventsProcessor() throws ImpalaException {
+    long eventPollingInterval = BackendConfig.INSTANCE.getHMSPollingIntervalInSeconds();
+    if (eventPollingInterval <= 0) {
+      LOG.info(String
+          .format("Metastore event processing is disabled. Event polling interval is %d",
+              eventPollingInterval));
+      return NoOpEventProcessor.getInstance();
+    }
+    try (MetaStoreClient metaStoreClient = getMetaStoreClient()) {
+      CurrentNotificationEventId currentNotificationId =
+          metaStoreClient.getHiveClient().getCurrentNotificationEventId();
+      return MetastoreEventsProcessor.getInstance(
+          this, currentNotificationId.getEventId(), eventPollingInterval);
+    } catch (TException e) {
+      LOG.error("Unable to fetch the current notification event id from metastore."
+          + "Metastore event processing will be disabled.", e);
+      throw new CatalogException(
+          "Fatal error while initializing metastore event processor", e);
+    }
   }
 
   // Timeout for acquiring a table lock
@@ -1162,10 +1201,22 @@ public class CatalogServiceCatalog extends Catalog {
     refreshAuthorization(true, /*catalog objects added*/ new ArrayList<>(),
         /*catalog objects removed*/ new ArrayList<>());
 
+    // Even though we get the current notification event id before stopping the event
+    // processing here there is a small window of time where we could re-process some of
+    // the event ids, if there is external DDL activity on metastore during reset.
+    // Unfortunately, there is no good way to avoid this since HMS does not provide
+    // APIs which can fetch all the tables/databases at a given id. It is OKAY to
+    // re-process some of these events since event processor relies on creationTime of
+    // the objects to uniquely identify tables from create and drop events. In case of
+    // alter events, however it is likely that some tables would be unnecessarily
+    // invalidated. That would happen when during reset, there were external alter events
+    // and by the time we processed them, Catalog had already loaded them.
+    long currentEventId = metastoreEventProcessor_.getCurrentEventId();
+    // stop the event processing since the cache is anyways being cleared
+    metastoreEventProcessor_.stop();
     // Update the HDFS cache pools
     CachePoolReader reader = new CachePoolReader(true);
     reader.run();
-
     versionLock_.writeLock().lock();
     // In case of an empty new catalog, the version should still change to reflect the
     // reset operation itself and to unblock impalads by making the catalog version >
@@ -1217,6 +1268,8 @@ public class CatalogServiceCatalog extends Catalog {
       throw new CatalogException("Error initializing Catalog. Catalog may be empty.", e);
     } finally {
       versionLock_.writeLock().unlock();
+      // restart the event processing for id just before the reset
+      metastoreEventProcessor_.start(currentEventId);
     }
     LOG.info("Invalidated all metadata.");
     return currentCatalogVersion;
@@ -1233,6 +1286,25 @@ public class CatalogServiceCatalog extends Catalog {
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
       addDb(newDb);
       return newDb;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Adds a database name to the metadata cache if not exists and returns the
+   * true is a new Db Object was added. Used by MetastoreEventProcessor to handle
+   * CREATE_DATABASE events
+   */
+  public boolean addDbIfNotExists(
+      String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        return addDb(dbName, msDb) != null;
+      }
+      return false;
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -1275,6 +1347,31 @@ public class CatalogServiceCatalog extends Catalog {
     }
     db.setCatalogVersion(incrementAndGetCatalogVersion());
     deleteLog_.addRemovedObject(db.toTCatalogObject());
+  }
+
+  /**
+   * Adds table with the given db and table name to the catalog if it does not exists.
+   * @return true if the table was successfully added and false if the table already
+   * exists
+   * @throws CatalogException if the db is not found
+   */
+  public boolean addTableIfNotExists(String dbName, String tblName)
+      throws CatalogException {
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new CatalogException(String.format("Db %s does not exist", dbName));
+      }
+      Table existingTable = db.getTable(tblName);
+      if (existingTable != null) return false;
+      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+      incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
+      db.addTable(incompleteTable);
+      return true;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
   }
 
   /**
@@ -1353,6 +1450,50 @@ public class CatalogServiceCatalog extends Catalog {
       updatedTbl.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(updatedTbl);
       return updatedTbl;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Remove a catalog table based on the given metastore table if it exists and its
+   * createTime matches with the metastore table
+   *
+   * @param msTable Metastore table to be used to remove Table
+   * @param tblWasfound is set to true if the table was found in the catalog
+   * @param tblMatched is set to true if the table is found and it matched with the
+   * createTime of the cached metastore table in catalog or if the existing table is a
+   * incomplete table
+   * @return Removed table object. Return null if the table was not removed
+   */
+  public Table removeTableIfExists(org.apache.hadoop.hive.metastore.api.Table msTable,
+      Reference<Boolean> tblWasfound, Reference<Boolean> tblMatched) {
+    tblWasfound.setRef(false);
+    tblMatched.setRef(false);
+    // make sure that the createTime of the input table is valid
+    Preconditions.checkState(msTable.getCreateTime() > 0);
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(msTable.getDbName());
+      if (db == null) return null;
+
+      Table tblToBeRemoved = db.getTable(msTable.getTableName());
+      if (tblToBeRemoved == null) return null;
+
+      tblWasfound.setRef(true);
+      // make sure that you are removing the same instance of the table object which
+      // is given by comparing the metastore createTime. In case the found table is a
+      // Incomplete table remove it
+      if (tblToBeRemoved instanceof IncompleteTable
+          || (msTable.getCreateTime()
+                 == tblToBeRemoved.getMetaStoreTable().getCreateTime())) {
+        tblMatched.setRef(true);
+        Table removedTbl = db.removeTable(tblToBeRemoved.getName());
+        removedTbl.setCatalogVersion(incrementAndGetCatalogVersion());
+        deleteLog_.addRemovedObject(removedTbl.toMinimalTCatalogObject());
+        return removedTbl;
+      }
+      return null;
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -1462,8 +1603,8 @@ public class CatalogServiceCatalog extends Catalog {
    * 3. T_old, null: Old table was removed but new table was not added.
    * 4. T_old, T_new: Old table was removed and new table was added.
    */
-  public Pair<Table, Table> renameTable(TTableName oldTableName, TTableName newTableName)
-      throws CatalogException {
+  public Pair<Table, Table> renameTable(
+      TTableName oldTableName, TTableName newTableName) {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(oldTableName.getDb_name());
     if (db == null) return null;
@@ -1474,6 +1615,36 @@ public class CatalogServiceCatalog extends Catalog {
       if (oldTable == null) return Pair.create(null, null);
       return Pair.create(oldTable,
           addTable(newTableName.getDb_name(), newTableName.getTable_name()));
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Renames the table by atomically removing oldTable and adding the newTable. If the
+   * oldTable is not found this operation becomes a add new table if not exists
+   * operation.
+   *
+   * @return a pair of booleans. The first of the pair is set if the oldTableName was
+   *     found and removed. The second boolean is set if the new table didn't exist before
+   *     and hence was added.
+   */
+  public Pair<Boolean, Boolean> renameOrAddTableIfNotExists(TTableName oldTableName,
+      TTableName newTableName)
+      throws CatalogException {
+    boolean oldTableRemoved = false;
+    boolean newTableAdded;
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(oldTableName.db_name);
+      if (db != null) {
+        // remove the oldTable if it exists
+        oldTableRemoved =
+            removeTable(oldTableName.db_name, oldTableName.table_name) != null;
+      }
+      // add the new tbl if it doesn't exist
+      newTableAdded = addTableIfNotExists(newTableName.db_name, newTableName.table_name);
+      return new Pair<>(oldTableRemoved, newTableAdded);
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -1647,6 +1818,31 @@ public class CatalogServiceCatalog extends Catalog {
           addedDb.getCatalogVersion() < newTable.getCatalogVersion());
     }
     return newTable.toTCatalogObject();
+  }
+
+  /**
+   * Invalidate the table if it exists by overwriting existing entry by a Incomplete
+   * Table.
+   * @return null if the table does not exist else return the invalidated table
+   */
+  public Table invalidateTableIfExists(String dbName, String tblName) {
+    Table incompleteTable;
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) return null;
+      if (!db.containsTable(tblName)) return null;
+      incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+      incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
+      db.addTable(incompleteTable);
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+    if (loadInBackground_) {
+      tableLoadingMgr_.backgroundLoad(
+          new TTableName(dbName.toLowerCase(), tblName.toLowerCase()));
+    }
+    return incompleteTable;
   }
 
   /**
@@ -2294,5 +2490,11 @@ public class CatalogServiceCatalog extends Catalog {
   @VisibleForTesting
   void setCatalogdTableInvalidator(CatalogdTableInvalidator cleaner) {
     catalogdTableInvalidator_ = cleaner;
+  }
+
+  @VisibleForTesting
+  public void setMetastoreEventProcessor(
+      ExternalEventsProcessor metastoreEventProcessor) {
+    this.metastoreEventProcessor_ = metastoreEventProcessor;
   }
 }
