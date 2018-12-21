@@ -22,7 +22,6 @@ import os
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
-from shutil import rmtree
 from subprocess import check_call
 from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder
 
@@ -104,6 +103,7 @@ class TestInsertParquetQueries(ImpalaTestSuite):
 
   @SkipIfEC.oom
   @SkipIfLocal.multiple_impalad
+  @SkipIfS3.eventually_consistent
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_parquet(self, vector, unique_database):
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \
