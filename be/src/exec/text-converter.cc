@@ -109,7 +109,7 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     const char* null_col_val, int len, bool check_null, bool strict_mode) {
   DCHECK(fn != nullptr);
   if (slot_desc->type().type == TYPE_CHAR) {
-    return Status("TextConverter::CodegenWriteSlot(): Char isn't supported for"
+    return Status::Expected("TextConverter::CodegenWriteSlot(): Char isn't supported for"
         " CodegenWriteSlot");
   }
 
