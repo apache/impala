@@ -38,6 +38,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
+#include "util/cgroup-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/decimal-util.h"
@@ -282,6 +283,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << DiskInfo::DebugString();
   LOG(INFO) << MemInfo::DebugString();
   LOG(INFO) << OsInfo::DebugString();
+  LOG(INFO) << CGroupUtil::DebugString();
   LOG(INFO) << "Process ID: " << getpid();
   LOG(INFO) << "Default AES cipher mode for spill-to-disk: "
             << EncryptionKey::ModeToString(EncryptionKey::GetSupportedDefaultMode());

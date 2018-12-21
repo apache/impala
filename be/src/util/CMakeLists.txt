@@ -35,6 +35,7 @@ add_library(Util
   bit-util.cc
   bloom-filter.cc
   bloom-filter-ir.cc
+  cgroup-util.cc
   coding-util.cc
   codec.cc
   common-metrics.cc

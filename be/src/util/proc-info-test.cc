@@ -24,6 +24,8 @@
 
 #include "common/init.h"
 #include "service/fe-support.h"
+#include "testutil/gtest-util.h"
+#include "util/cgroup-util.h"
 #include "util/mem-info.h"
 #include "util/process-state-info.h"
 #include "util/test-info.h"
@@ -37,6 +39,25 @@ TEST(MemInfo, Basic) {
   ASSERT_LT(MemInfo::vm_overcommit(), 3);
   ASSERT_GE(MemInfo::vm_overcommit(), 0);
   ASSERT_GT(MemInfo::commit_limit(), 0);
+}
+
+TEST(CGroupInfo, Basic) {
+  int64_t mem_limit;
+  ASSERT_OK(CGroupUtil::FindCGroupMemLimit(&mem_limit));
+  EXPECT_GT(mem_limit, 0);
+}
+
+// Test error handling when cgroup is not present.
+TEST(CGroupInfo, ErrorHandling) {
+  string path;
+  Status err = CGroupUtil::FindGlobalCGroup("fake-cgroup", &path);
+  LOG(INFO) << err.msg().msg();
+  EXPECT_FALSE(err.ok());
+  err = CGroupUtil::FindAbsCGroupPath("fake-cgroup", &path);
+  EXPECT_FALSE(err.ok());
+  pair<string, string> p;
+  err = CGroupUtil::FindCGroupMounts("fake-cgroup", &p);
+  EXPECT_FALSE(err.ok());
 }
 
 TEST(ProcessStateInfo, Basic) {

@@ -27,18 +27,18 @@
 
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
+#include "util/cgroup-util.h"
 #include "util/common-metrics.h"
+#include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/disk-info.h"
+#include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/pprof-path-handlers.h"
-#include "util/mem-info.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
 #include "util/process-state-info.h"
-#include "util/jni-util.h"
 
 #include "common/names.h"
 
@@ -266,16 +266,17 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
   document->AddMember("disk_info", disk_info, document->GetAllocator());
   Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
   document->AddMember("os_info", os_info, document->GetAllocator());
-  Value process_state_info(ProcessStateInfo().DebugString().c_str(),
-    document->GetAllocator());
-  document->AddMember("process_state_info", process_state_info,
-    document->GetAllocator());
+  Value process_state_info(
+      ProcessStateInfo().DebugString().c_str(), document->GetAllocator());
+  document->AddMember("process_state_info", process_state_info, document->GetAllocator());
+  Value cgroup_info(CGroupUtil::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("cgroup_info", cgroup_info, document->GetAllocator());
 
   if (CommonMetrics::PROCESS_START_TIME != nullptr) {
-    Value process_start_time(CommonMetrics::PROCESS_START_TIME->GetValue().c_str(),
-      document->GetAllocator());
-    document->AddMember("process_start_time", process_start_time,
-      document->GetAllocator());
+    Value process_start_time(
+        CommonMetrics::PROCESS_START_TIME->GetValue().c_str(), document->GetAllocator());
+    document->AddMember(
+        "process_start_time", process_start_time, document->GetAllocator());
   }
 
   ExecEnv* env = ExecEnv::GetInstance();

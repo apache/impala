@@ -99,23 +99,6 @@ void ProcessStateInfo::ReadProcIO() {
   if (ioinfo.is_open()) ioinfo.close();
 }
 
-void ProcessStateInfo::ReadProcCgroup() {
-  ifstream cgroupinfo("/proc/self/cgroup", ios::in);
-  string line;
-  while (cgroupinfo.good() && !cgroupinfo.eof()) {
-    getline(cgroupinfo, line);
-    vector<string> fields;
-    split(fields, line, is_any_of(":"), token_compress_on);
-    if (fields.size() < 3) continue;
-    process_state_map_["cgroup/hierarchy_id"] = fields[0];
-    process_state_map_["cgroup/subsystems"] = fields[1];
-    process_state_map_["cgroup/control_group"] = fields[2];
-    break;
-  }
-
-  if (cgroupinfo.is_open()) cgroupinfo.close();
-}
-
 void ProcessStateInfo::ReadProcSched() {
   ifstream schedinfo("/proc/self/sched", ios::in);
   string line;
@@ -170,7 +153,6 @@ ProcessStateInfo::ProcessStateInfo(bool get_extended_metrics)
   ReadProcStatus();
   if (get_extended_metrics) {
     ReadProcIO();
-    ReadProcCgroup();
     ReadProcSched();
     ReadProcFileDescriptorCount();
   }
@@ -216,25 +198,21 @@ string ProcessStateInfo::DebugString() const {
            << PrettyPrinter::Print(GetBytes("io/write_bytes"), TUnit::BYTES) << endl
            << "    Read I/O: " << GetInt64("io/syscr") << endl
            << "    Write I/O: " << GetInt64("io/syscw") << endl
-           << "  CGroups: " << endl
-           << "    Hierarchy: " << GetString("cgroup/hierarchy_id") << endl
-           << "    Subsystems: " << GetString("cgroup/subsystems") <<endl
-           << "    Control Group: " << GetString("cgroup/control_group") << endl
            << "  Schedule: " << endl
            << "    Sum Execute Time: " << GetString("sched/se.sum_exec_runtime") << endl
            << "    Max Wait Time: " << GetString("sched/se.statistics.wait_max") << endl
            << "    Sum Wait Time: " << GetString("sched/se.statistics.wait_sum") << endl
            << "    Wait Count: " << GetInt64("sched/se.statistics.wait_count") << endl
-           << "    Sum I/O Wait Time: "
-           << GetString("sched/se.statistics.iowait_sum") << endl
-           << "    I/O Wait Count: "
-           << GetInt64("sched/se.statistics.iowait_count") << endl
+           << "    Sum I/O Wait Time: " << GetString("sched/se.statistics.iowait_sum")
+           << endl
+           << "    I/O Wait Count: " << GetInt64("sched/se.statistics.iowait_count")
+           << endl
            << "    Wakeup Count with cpu migration: "
            << GetInt64("sched/se.statistics.nr_wakeups_migrate") << endl
            << "    Switches: " << GetInt64("sched/nr_switches") << endl
            << "    Voluntary Switches: " << GetInt("sched/nr_voluntary_switches") << endl
-           << "    Involuntary Switches: "
-           << GetInt("sched/nr_involuntary_switches") << endl
+           << "    Involuntary Switches: " << GetInt("sched/nr_involuntary_switches")
+           << endl
            << "    Process Priority: " << GetInt("sched/prio") << endl
            << "  File Descriptors: " << endl
            << "    Number of File Descriptors: " << GetInt("fd/count") << endl;
