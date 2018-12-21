@@ -115,4 +115,3 @@ TEST(ParseMemSpecs, Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

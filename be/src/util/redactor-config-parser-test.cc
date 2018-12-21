@@ -182,4 +182,3 @@ TEST(ParserTest, RuleNumberInErrorMessage) {
 
 }
 
-IMPALA_TEST_MAIN();

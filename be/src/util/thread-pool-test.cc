@@ -157,4 +157,3 @@ TEST(ThreadPoolTest, SynchronousThreadPoolTest) {
 
 }
 
-IMPALA_TEST_MAIN();

@@ -151,4 +151,3 @@ TEST(FifoMultimap, PopShouldPopMostRecent) {
   ASSERT_EQ(0, c.size());
 }
 
-IMPALA_TEST_MAIN();

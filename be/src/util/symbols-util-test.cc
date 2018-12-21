@@ -324,4 +324,3 @@ TEST(SymbolsUtil, ManglingPrepareOrClose) {
 
 }
 
-IMPALA_TEST_MAIN();

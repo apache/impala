@@ -1,0 +1,1 @@
+../lib/python/impala_py_lib/jenkins/junitxml_prune_notrun.py

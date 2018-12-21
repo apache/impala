@@ -17,17 +17,11 @@
 #ifndef IMPALA_REDACTOR_TEST_UTILS_H
 #define IMPALA_REDACTOR_TEST_UTILS_H
 
-#include <cstdlib>  // rand
-#include <cstdio>  // file stuff
-#include <errno.h>
-#include <pthread.h>
-#include <time.h>
 #include <string>
 
 #include <gtest/gtest.h>
 
 #include "gutil/strings/substitute.h"
-#include "util/redactor.h"
 
 namespace impala {
 
@@ -35,49 +29,16 @@ namespace impala {
 /// upon test completion.
 class TempRulesFile {
  public:
-  TempRulesFile(const std::string& contents)
-    : name_("/tmp/rules_XXXXXX"),
-      deleted_(false) {
-    int fd = mkstemp(&name_[0]);
-    if (fd == -1) {
-      std::cout << "Error creating temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-    if (close(fd) != 0) {
-      std::cout << "Error closing temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-    OverwriteContents(contents);
-  }
+  // Creates a temporary file with the specified contents.
+  TempRulesFile(const std::string& contents);
 
   ~TempRulesFile() { Delete(); }
 
-  void Delete() {
-    if (deleted_) return;
-    deleted_ = true;
-    if (remove(name()) != 0) {
-      std::cout << "Error deleting temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-  }
+  // Delete this temporary file
+  void Delete();
 
-  void OverwriteContents(const std::string& contents) {
-    FILE* handle = fopen(name(), "w");
-    if (handle == NULL) {
-      std::cout << "Error creating temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-    int status = fputs(contents.c_str(), handle);
-    if (status < 0) {
-      std::cout << "Error writing to temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-    status = fclose(handle);
-    if (status != 0) {
-      std::cout << "Error closing temp file; " << strerror(errno) << std::endl;
-      abort();
-    }
-  }
+  // Overwrite the temporary file with the specified contents.
+  void OverwriteContents(const std::string& contents);
 
   /// Returns the absolute path to the file.
   const char* name() const { return name_.c_str(); }
@@ -87,44 +48,20 @@ class TempRulesFile {
   bool deleted_;
 };
 
-unsigned int RandSeed() {
-  struct timespec now;
-  clock_gettime(CLOCK_REALTIME, &now);
-  return now.tv_nsec + pthread_self();
-}
+// Produces a random seed based on the current time and the thread id.
+unsigned int RandSeed();
 
 /// Randomly fills the contents of 'string' up to the given length.
-void RandomlyFillString(char* string, const int length) {
-  ASSERT_GT(length, 0);
-  unsigned int rand_seed = RandSeed();
-  int char_count = static_cast<int>('~') - static_cast<int>(' ') + 1;
-  for (int i = 0; i < length - 1; ++i) {
-    string[i] = ' ' + rand_r(&rand_seed) % char_count;
-  }
-  string[length - 1] = '\0';
-}
+void RandomlyFillString(char* string, const int length);
 
-void AssertErrorMessageContains(const std::string& message, const char* expected) {
-  ASSERT_TRUE(message.find(expected) != std::string::npos)
-      << "Expected substring <<" << expected << ">> is not in <<" << message << ">>";
-}
+/// Assert 'message' contains 'expected'
+void AssertErrorMessageContains(const std::string& message, const char* expected);
 
-void AssertRedactedEquals(const char* message, const char* expected) {
-  std::string temp(message);
-  Redact(&temp);
-  ASSERT_EQ(expected, temp);
+/// Redact the 'message' and assert that it matches 'expected'
+void AssertRedactedEquals(const char* message, const char* expected);
 
-  /// Test the signature with the 'changed' argument.
-  temp = std::string(message);
-  bool changed = false;
-  Redact(&temp, &changed);
-  ASSERT_EQ(expected, temp);
-  ASSERT_EQ(temp == message, !changed);
-}
-
-void AssertUnredacted(const char* message) {
-  AssertRedactedEquals(message, message);
-}
+/// Assert that redaction does nothing for the specified message
+void AssertUnredacted(const char* message);
 
 /// Putting these assertion utilities above into functions messes up failure messages
 /// such that failures appear to be coming from this file instead of from the file

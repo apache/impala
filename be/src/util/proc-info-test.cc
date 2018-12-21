@@ -78,9 +78,3 @@ TEST(MappedMapInfo, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  impala::InitFeSupport();
-  return RUN_ALL_TESTS();
-}

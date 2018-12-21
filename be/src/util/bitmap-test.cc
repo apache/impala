@@ -120,5 +120,3 @@ TEST(Bitmap, MemUsage) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

@@ -71,4 +71,3 @@ TEST(DiskInfoTest, Basic) {
 }
 }
 
-IMPALA_TEST_MAIN();

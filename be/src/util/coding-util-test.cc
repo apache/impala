@@ -121,4 +121,3 @@ TEST(HtmlEscapingTest, Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

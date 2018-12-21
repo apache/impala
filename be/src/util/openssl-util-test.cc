@@ -210,4 +210,3 @@ TEST_F(OpenSSLUtilTest, RandSeeding) {
 }
 }
 
-IMPALA_TEST_MAIN();

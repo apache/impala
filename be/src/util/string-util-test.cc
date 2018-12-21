@@ -112,4 +112,3 @@ TEST(CommaSeparatedContainsTest, Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

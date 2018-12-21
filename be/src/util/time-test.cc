@@ -135,4 +135,3 @@ TEST(TimeTest, Basic) {
 } // TEST
 } // namespace impala
 
-IMPALA_TEST_MAIN();

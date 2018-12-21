@@ -62,4 +62,3 @@ TEST(OsUtil, RunShellProcess) {
   });
 }
 
-IMPALA_TEST_MAIN();

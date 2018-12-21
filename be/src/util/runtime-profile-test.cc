@@ -1143,4 +1143,3 @@ INSTANTIATE_TEST_CASE_P(VariousNumbers, TimeSeriesCounterResampleTest,
 
 } // namespace impala
 
-IMPALA_TEST_MAIN();

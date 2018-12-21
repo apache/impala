@@ -93,4 +93,3 @@ TEST(LoggingSupport, DeleteOldLogs) {
   filesystem::remove_all(dir);
 }
 
-IMPALA_TEST_MAIN();

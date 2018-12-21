@@ -505,10 +505,3 @@ TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
   filter8->Close();
   filter16->Close();
 }
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  InitFeSupport();
-  return RUN_ALL_TESTS();
-}

@@ -25,11 +25,9 @@ namespace impala {
 extern std::vector<Rule>* g_rules;
 
 // If the rules were never set, nothing should be redacted.
-TEST(RedactorTest, Unconfigured) {
+TEST(RedactorUnconfigTest, Unconfigured) {
   ASSERT_EQ(NULL, g_rules);
   ASSERT_UNREDACTED("foo33");
 }
 
 }
-
-IMPALA_TEST_MAIN();

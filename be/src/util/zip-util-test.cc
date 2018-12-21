@@ -79,9 +79,3 @@ TEST(ZipUtilTest, Basic) {
   // Cleanup
   filesystem::remove_all(uniq_dir);
 }
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}

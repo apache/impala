@@ -118,4 +118,3 @@ TEST(FilesystemUtil, Paths) {
   EXPECT_EQ(string("def"), relpath);
 }
 
-IMPALA_TEST_MAIN();

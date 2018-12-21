@@ -156,4 +156,3 @@ TEST(BitPackingTest, RandomUnpack) {
 }
 }
 
-IMPALA_TEST_MAIN();

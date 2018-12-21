@@ -111,10 +111,3 @@ TEST(HdfsUtilTest, CheckGetBaseName) {
   EXPECT_EQ("c", GetBaseName("/c"));
   EXPECT_EQ("c", GetBaseName("/a//b/c/"));
 }
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  InitFeSupport();
-  return RUN_ALL_TESTS();
-}

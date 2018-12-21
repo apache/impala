@@ -140,4 +140,3 @@ TEST(PrettyPrinterTest, StringList) {
 
 }
 
-IMPALA_TEST_MAIN();

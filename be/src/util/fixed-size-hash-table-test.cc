@@ -79,4 +79,3 @@ TEST(FixedSizeHash, TestAllOperations) {
 
 }
 
-IMPALA_TEST_MAIN();

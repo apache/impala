@@ -328,5 +328,3 @@ TEST(RedactorTest, MultiThreaded) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

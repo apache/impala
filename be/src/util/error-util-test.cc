@@ -139,4 +139,3 @@ TEST(ErrorMsg, PrintMap) {
 
 }
 
-IMPALA_TEST_MAIN();

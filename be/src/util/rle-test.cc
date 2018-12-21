@@ -827,4 +827,3 @@ TEST_F(RleTest, MeasureOutputLengths) {
 }
 }
 
-IMPALA_TEST_MAIN();

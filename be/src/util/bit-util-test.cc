@@ -329,4 +329,3 @@ TEST(BitUtil, CpuInfoIsSupportedHoist) {
 
 }
 
-IMPALA_TEST_MAIN();

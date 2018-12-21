@@ -102,4 +102,3 @@ TEST(DebugUtil, PreCDH5QueryIdParsing) {
 
 }
 
-IMPALA_TEST_MAIN();

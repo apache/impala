@@ -72,4 +72,3 @@ TEST(BenchmarkTest, DISABLED_Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

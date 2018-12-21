@@ -88,4 +88,3 @@ TEST_F(SystemStateInfoTest, ComputeCpuRatios) {
 
 } // namespace impala
 
-IMPALA_TEST_MAIN();

@@ -204,4 +204,3 @@ TEST(BitArray, TestValues) {
 
 }
 
-IMPALA_TEST_MAIN();

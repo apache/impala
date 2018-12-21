@@ -58,6 +58,10 @@ add_executable(impalad
   daemon-main.cc
 )
 
+add_executable(unifiedbetests
+  unified-betest-main.cc
+)
+
 # All Impala daemons run from the same binary. The code that is run is determined by the
 # name (i.e. argv[0]) of the command that executes the binary, so we create symlinks for
 # statestored and catalogd. The symlinks are relative so they can be installed along with
@@ -85,6 +89,10 @@ target_link_libraries(impalad
   ${JAVA_JSIG_LIBRARY}
   ${IMPALA_LINK_LIBS}
 )
+
+target_link_libraries(unifiedbetests
+  ${JAVA_JSIG_LIBRARY} ${UNIFIED_TEST_LINK_LIBS})
+ADD_DEPENDENCIES(unified-be-test-executable unifiedbetests)
 
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server
 ADD_BE_LSAN_TEST(hs2-util-test hs2-util-test.cc)

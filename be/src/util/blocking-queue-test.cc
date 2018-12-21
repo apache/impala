@@ -204,4 +204,3 @@ TEST(BlockingQueueTest, TestMultipleThreadsWithBytesLimit) {
 
 }
 
-IMPALA_TEST_MAIN();

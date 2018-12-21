@@ -398,4 +398,3 @@ TEST(DictTest, TestSkippingValues) {
 
 }
 
-IMPALA_TEST_MAIN();

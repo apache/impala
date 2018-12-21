@@ -505,4 +505,3 @@ TEST(StringToBool, Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

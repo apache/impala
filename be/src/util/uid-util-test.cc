@@ -38,4 +38,3 @@ TEST(UidUtil, FragmentInstanceId) {
 
 }
 
-IMPALA_TEST_MAIN();

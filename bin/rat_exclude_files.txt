@@ -12,6 +12,7 @@
 be/src/testutil/htpasswd
 be/src/testutil/*.key
 bin/generate_junitxml.py
+bin/junitxml_prune_notrun.py
 tests/*/__init__.py
 testdata/common/__init__.py
 fe/src/test/resources/regionservers
