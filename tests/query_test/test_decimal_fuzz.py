@@ -41,10 +41,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
   def add_test_dimensions(cls):
     cls.ImpalaTestMatrix = ImpalaTestMatrix()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    if cls.exploration_strategy() == 'exhaustive':
-      cls.iterations = 50000
-    else:
-      cls.iterations = 10000
+    cls.iterations = 10000
 
   def weighted_choice(self, options):
     total_weight = sum(options.itervalues())
