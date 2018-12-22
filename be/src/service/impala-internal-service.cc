@@ -46,6 +46,7 @@ void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& retu
   DCHECK(params.__isset.query_ctx);
   DCHECK(params.__isset.fragment_ctxs);
   DCHECK(params.__isset.fragment_instance_ctxs);
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), params.query_ctx.query_id);
   VLOG_QUERY << "ExecQueryFInstances():" << " query_id="
              << PrintId(params.query_ctx.query_id)
              << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address)

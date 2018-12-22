@@ -29,13 +29,23 @@ TEST(ThreadDebugInfo, Ids) {
   // This test checks if SetInstanceId() stores the
   // string representation of a TUniqueId correctly.
   ThreadDebugInfo thread_debug_info;
-  TUniqueId uid;
-  uid.hi = 123;
-  uid.lo = 456;
-  thread_debug_info.SetInstanceId(uid);
-  string uid_str = PrintId(uid);
+  TUniqueId instance_id;
+  instance_id.hi = 123;
+  instance_id.lo = 456;
+  thread_debug_info.SetInstanceId(instance_id);
+  string instance_id_str = PrintId(instance_id);
 
-  EXPECT_EQ(uid_str, thread_debug_info.GetInstanceId());
+  EXPECT_EQ(instance_id, thread_debug_info.GetInstanceId());
+  EXPECT_EQ(instance_id_str, PrintId(thread_debug_info.GetInstanceId()));
+
+  TUniqueId query_id;
+  query_id.hi = 1234;
+  query_id.lo = 4567;
+  thread_debug_info.SetQueryId(query_id);
+  string query_id_str = PrintId(query_id);
+
+  EXPECT_EQ(query_id, thread_debug_info.GetQueryId());
+  EXPECT_EQ(query_id_str, PrintId(thread_debug_info.GetQueryId()));
 }
 
 TEST(ThreadDebugInfo, ThreadName) {
@@ -78,23 +88,56 @@ TEST(ThreadDebugInfo, ThreadCreateRelationships) {
 
   ThreadDebugInfo parent_tdi;
   parent_tdi.SetThreadName(parent_name);
-  TUniqueId uid;
-  uid.hi = 123;
-  uid.lo = 456;
-  parent_tdi.SetInstanceId(uid);
+  TUniqueId instance_id;
+  instance_id.hi = 123;
+  instance_id.lo = 456;
+  parent_tdi.SetInstanceId(instance_id);
+
+  TUniqueId query_id;
+  query_id.hi = 123;
+  query_id.lo = 456;
+  parent_tdi.SetQueryId(query_id);
 
   std::unique_ptr<Thread> child_thread;
-  auto f = [uid, child_name, parent_name, &parent_tdi]() {
+  auto f = [instance_id, query_id, child_name, parent_name, &parent_tdi]() {
     // In child's thread the global ThreadDebugInfo object points to the child's own
     // ThreadDebugInfo object which was automatically created in Thread::SuperviseThread
     ThreadDebugInfo* child_tdi = GetThreadDebugInfo();
     EXPECT_EQ(child_name, child_tdi->GetThreadName());
-    EXPECT_EQ(PrintId(uid), child_tdi->GetInstanceId());
+    EXPECT_EQ(instance_id, child_tdi->GetInstanceId());
+    EXPECT_EQ(query_id, child_tdi->GetQueryId());
     EXPECT_EQ(parent_name, child_tdi->GetParentThreadName());
     EXPECT_EQ(parent_tdi.GetSystemThreadId(), child_tdi->GetParentSystemThreadId());
   };
   ASSERT_OK(Thread::Create("Test", child_name, f, &child_thread));
   child_thread->Join();
+}
+
+TEST(ThreadDebugInfo, Scoping) {
+  TUniqueId id;
+  id.hi = 123;
+  id.lo = 456;
+  TUniqueId id2;
+  id.hi = 234;
+  id.lo = 345;
+
+  ThreadDebugInfo tdi;
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetQueryId());
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetInstanceId());
+  {
+    ScopedThreadContext s(&tdi, id);
+    ASSERT_EQ(id, tdi.GetQueryId());
+    ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetInstanceId());
+  }
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetQueryId());
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetInstanceId());
+  {
+    ScopedThreadContext s(&tdi, id, id2);
+    ASSERT_EQ(id, tdi.GetQueryId());
+    ASSERT_EQ(id2, tdi.GetInstanceId());
+  }
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetQueryId());
+  ASSERT_EQ(ThreadDebugInfo::ZERO_THREAD_ID, tdi.GetInstanceId());
 }
 
 }

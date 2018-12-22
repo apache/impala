@@ -571,7 +571,7 @@ void QueryState::ReleaseBackendResourceRefcount() {
 }
 
 void QueryState::ExecFInstance(FragmentInstanceState* fis) {
-  GetThreadDebugInfo()->SetInstanceId(fis->instance_id());
+  ScopedThreadContext debugctx(GetThreadDebugInfo(), fis->query_id(), fis->instance_id());
 
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);

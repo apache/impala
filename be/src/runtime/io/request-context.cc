@@ -20,6 +20,7 @@
 #include "runtime/exec-env.h"
 
 #include "common/names.h"
+#include "common/thread-debug-info.h"
 
 using namespace impala;
 using namespace impala::io;
@@ -619,6 +620,11 @@ RequestContext::RequestContext(
   // PerDiskState is not movable, so we need to initialize the vector in this awkward way.
   for (int i = 0; i < disk_queues.size(); ++i) {
     disk_states_[i].set_disk_queue(disk_queues[i]);
+  }
+  ThreadDebugInfo* tdi = GetThreadDebugInfo();
+  if (tdi != nullptr) {
+    set_query_id(tdi->GetQueryId());
+    set_instance_id(tdi->GetInstanceId());
   }
 }
 

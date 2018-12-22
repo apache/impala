@@ -43,6 +43,7 @@
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
 #include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "common/version.h"
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
@@ -897,6 +898,7 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
     shared_ptr<SessionState> session_state,
     shared_ptr<ClientRequestState>* request_state) {
   PrepareQueryContext(query_ctx);
+  ScopedThreadContext debug_ctx(GetThreadDebugInfo(), query_ctx->query_id);
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
   // Redact the SQL stmt and update the query context
@@ -1015,7 +1017,7 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   // single generator under a lock (since random_generator is not
   // thread-safe).
   query_ctx->query_id = UuidToQueryId(random_generator()());
-
+  GetThreadDebugInfo()->SetQueryId(query_ctx->query_id);
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,

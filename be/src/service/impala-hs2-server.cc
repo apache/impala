@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/thread-debug-info.h"
 #include "service/impala-server.h"
 #include "service/impala-server.inline.h"
 
@@ -122,6 +123,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   }
   TQueryCtx query_ctx;
   PrepareQueryContext(&query_ctx);
+  ScopedThreadContext tdi_context(GetThreadDebugInfo(), query_ctx.query_id);
   session->ToThrift(session_id, &query_ctx.session);
   request->__set_session(query_ctx.session);
 

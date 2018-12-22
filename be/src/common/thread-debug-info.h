@@ -29,6 +29,8 @@
 
 namespace impala {
 
+class ScopedThreadContext;
+
 /// Stores information about the current thread that can be useful in a debug session.
 /// An object of this class needs to be allocated on the stack in order to include
 /// it in minidumps. While this object is alive, it is available through the global
@@ -51,17 +53,20 @@ public:
     CloseThreadDebugInfo();
   }
 
-  const char* GetInstanceId() const { return instance_id_; }
+  const TUniqueId& GetQueryId() const { return query_id_; }
+  const TUniqueId& GetInstanceId() const { return instance_id_; }
   const char* GetThreadName() const { return thread_name_; }
   int64_t GetSystemThreadId() const { return system_thread_id_; }
   int64_t GetParentSystemThreadId() const { return parent_.system_thread_id_; }
   const char* GetParentThreadName() const { return parent_.thread_name_; }
 
-  /// Saves the string representation of param 'instance_id' to member 'instance_id_'
+  /// Saves 'query_id' to member 'query_id_'
+  void SetQueryId(const TUniqueId& query_id) {
+    query_id_ = query_id;
+  }
+  /// Saves 'instance_id' to member 'instance_id_'
   void SetInstanceId(const TUniqueId& instance_id) {
-    std::string id_str = PrintId(instance_id);
-    DCHECK_LT(id_str.length(), TUNIQUE_ID_STRING_SIZE);
-    id_str.copy(instance_id_, id_str.length());
+    instance_id_ = instance_id;
   }
 
   /// Saves param 'thread_name' to member 'thread_name_'.
@@ -90,8 +95,9 @@ public:
   void SetParentInfo(const ThreadDebugInfo* parent) {
     if (parent == nullptr) return;
     parent_.system_thread_id_ = parent->system_thread_id_;
-    strings::strlcpy(instance_id_, parent->instance_id_, TUNIQUE_ID_STRING_SIZE);
     strings::strlcpy(parent_.thread_name_, parent->thread_name_, THREAD_NAME_SIZE);
+    query_id_ = parent->query_id_;
+    instance_id_ = parent->instance_id_;
   }
 
 private:
@@ -100,9 +106,9 @@ private:
   /// Resets the thread local pointer to nullptr.
   static void CloseThreadDebugInfo();
 
-  static constexpr int64_t TUNIQUE_ID_STRING_SIZE = 34;
   static constexpr int64_t THREAD_NAME_SIZE = 256;
   static constexpr int64_t THREAD_NAME_TAIL_LENGTH = 8;
+  static const TUniqueId ZERO_THREAD_ID;
 
   /// This struct contains information we want to store about the parent.
   struct ParentInfo {
@@ -113,9 +119,34 @@ private:
   ParentInfo parent_;
   int64_t system_thread_id_ = 0;
   char thread_name_[THREAD_NAME_SIZE] = {};
-  char instance_id_[TUNIQUE_ID_STRING_SIZE] = {};
+  // Will be "0" (the default TUniqueId with hi=lo=0) when thread isn't
+  // part of query or instance execution.
+  TUniqueId query_id_;
+  TUniqueId instance_id_;
+
+  friend class ScopedThreadContext;
+  friend class ThreadDebugInfo_Scoping_Test;
 
   DISALLOW_COPY_AND_ASSIGN(ThreadDebugInfo);
+};
+
+/// An RAII-style wrapper to clear thread debug info query and instance
+/// context at destruction.
+class ScopedThreadContext {
+  public:
+    ~ScopedThreadContext() {
+      thread_debug_info_->SetQueryId(ThreadDebugInfo::ZERO_THREAD_ID);
+      thread_debug_info_->SetInstanceId(ThreadDebugInfo::ZERO_THREAD_ID);
+    }
+    ScopedThreadContext(ThreadDebugInfo* thread_debug_info, const TUniqueId& query_id,
+        const TUniqueId& instance_id = ThreadDebugInfo::ZERO_THREAD_ID) {
+      thread_debug_info_ = thread_debug_info;
+      thread_debug_info->SetQueryId(query_id);
+      thread_debug_info->SetInstanceId(instance_id);
+    }
+  private:
+    ThreadDebugInfo* thread_debug_info_;
+    DISALLOW_COPY_AND_ASSIGN(ScopedThreadContext);
 };
 
 /// Returns a pointer to the ThreadDebugInfo object for this thread.

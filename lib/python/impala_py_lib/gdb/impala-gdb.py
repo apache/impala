@@ -48,8 +48,10 @@ def get_fragment_instances():
                 # No valid thread_debug_info
                 if not tdi:
                     break
-                fi = str(tdi['instance_id_'])
-                if ':' in fi:
+                hi = long(tdi['instance_id_']['hi'])
+                lo = long(tdi['instance_id_']['lo'])
+                fi = "%lx:%lx" % (hi, lo)
+                if fi != "0:0":
                     fragment_instances[fi.strip('"')].append(thread.num)
                 break
             f = gdb.Frame.older(f)

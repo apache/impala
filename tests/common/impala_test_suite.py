@@ -850,3 +850,45 @@ class ImpalaTestSuite(BaseTestSuite):
     if actual_state != expected_state:
       raise Timeout("query '%s' did not reach expected state '%s', last known state '%s'"
                     % (handle.get_handle().id, expected_state, actual_state))
+
+  def assert_impalad_log_contains(self, level, line_regex, expected_count=1):
+    """
+    Convenience wrapper around assert_log_contains for impalad logs.
+    """
+    self.assert_log_contains("impalad", level, line_regex, expected_count)
+
+  def assert_catalogd_log_contains(self, level, line_regex, expected_count=1):
+    """
+    Convenience wrapper around assert_log_contains for catalogd logs.
+    """
+    self.assert_log_contains("catalogd", level, line_regex, expected_count)
+
+  def assert_log_contains(self, daemon, level, line_regex, expected_count=1):
+    """
+    Assert that the daemon log with specified level (e.g. ERROR, WARNING, INFO) contains
+    expected_count lines with a substring matching the regex. When expected_count is -1,
+    at least one match is expected.
+    When using this method to check log files of running processes, the caller should
+    make sure that log buffering has been disabled, for example by adding
+    '-logbuflevel=-1' to the daemon startup options.
+    """
+    pattern = re.compile(line_regex)
+    found = 0
+    if hasattr(self, "impala_log_dir"):
+      log_dir = self.impala_log_dir
+    else:
+      log_dir = EE_TEST_LOGS_DIR
+    log_file_path = os.path.join(log_dir, daemon + "." + level)
+    # Resolve symlinks to make finding the file easier.
+    log_file_path = os.path.realpath(log_file_path)
+    with open(log_file_path) as log_file:
+      for line in log_file:
+        if pattern.search(line):
+          found += 1
+    if expected_count == -1:
+      assert found > 0, "Expected at least one line in file %s matching regex '%s'"\
+        ", but found none." % (log_file_path, line_regex)
+    else:
+      assert found == expected_count, "Expected %d lines in file %s matching regex '%s'"\
+        ", but found %d lines. Last line was: \n%s" %\
+        (expected_count, log_file_path, line_regex, found, line)

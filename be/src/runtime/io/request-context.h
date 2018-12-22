@@ -177,6 +177,16 @@ class RequestContext {
     disks_accessed_bitmap_ = disks_accessed_bitmap;
   }
 
+  TUniqueId instance_id() const { return instance_id_; }
+  void set_instance_id(const TUniqueId& instance_id) {
+    instance_id_ = instance_id;
+  }
+
+  TUniqueId query_id() const { return query_id_; }
+  void set_query_id(const TUniqueId& query_id) {
+    query_id_ = query_id;
+  }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(RequestContext);
   class PerDiskState;
@@ -389,6 +399,9 @@ class RequestContext {
   /// Per disk states to synchronize multiple disk threads accessing the same request
   /// context. One state per IoMgr disk queue.
   std::vector<PerDiskState> disk_states_;
+
+  TUniqueId instance_id_;
+  TUniqueId query_id_;
 };
 }
 }

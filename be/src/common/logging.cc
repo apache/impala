@@ -37,6 +37,7 @@
 #include "util/logging-support.h"
 #include "util/redactor.h"
 #include "util/test-info.h"
+#include "common/thread-debug-info.h"
 
 #include "common/names.h"
 
@@ -46,9 +47,37 @@ DECLARE_bool(redirect_stdout_stderr);
 DECLARE_string(audit_event_log_dir);
 
 using boost::uuids::random_generator;
+using impala::TUniqueId;
 
 namespace {
 bool logging_initialized = false;
+// A 0 unique id, which indicates that one has not been set.
+const TUniqueId ZERO_UNIQUE_ID;
+
+// Prepends fragment id, when available. If unavailable, looks
+// for query id. If unavailable, prepends nothing.
+void PrependFragment(string* s, bool* changed) {
+  impala::ThreadDebugInfo* tdi = impala::GetThreadDebugInfo();
+  if (tdi != nullptr) {
+    for (auto id : { tdi->GetInstanceId(), tdi->GetQueryId() }) {
+      if (id == ZERO_UNIQUE_ID) continue;
+      s->insert(0, PrintId(id) + "] ");
+      if (changed != nullptr) *changed = true;
+      return;
+    }
+  }
+}
+
+// Manipulates log messages by:
+// - Applying redaction rules (if necessary)
+// - Prepending fragment id (if available)
+void MessageListener(string* s, bool* changed) {
+  if (!FLAGS_redaction_rules_file.empty()) {
+    impala::Redact(s, changed);
+  }
+  PrependFragment(s, changed);
+}
+
 }
 
 mutex logging_mutex;
@@ -99,10 +128,7 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
   }
 
   google::InitGoogleLogging(arg);
-  if (!FLAGS_redaction_rules_file.empty()) {
-    // This depends on a patched glog. The patch is at thirdparty/patches/glog.
-    google::InstallLogMessageListenerFunction(impala::Redact);
-  }
+  google::InstallLogMessageListenerFunction(MessageListener);
 
   // Needs to be done after InitGoogleLogging
   if (FLAGS_log_filename.empty()) {

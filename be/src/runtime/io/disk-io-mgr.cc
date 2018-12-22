@@ -18,6 +18,7 @@
 #include "runtime/io/disk-io-mgr.h"
 
 #include "common/global-flags.h"
+#include "common/thread-debug-info.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/handle-cache.inline.h"
@@ -420,6 +421,11 @@ void DiskQueue::DiskThreadLoop(DiskIoMgr* io_mgr) {
       DCHECK(shut_down_);
       return;
     }
+    // We are now working on behalf of a query, so set thread state appropriately.
+    // See also IMPALA-6254 and IMPALA-6417.
+    ScopedThreadContext tdi_scope(GetThreadDebugInfo(), worker_context->query_id(),
+        worker_context->instance_id());
+
     if (range->request_type() == RequestType::READ) {
       ScanRange* scan_range = static_cast<ScanRange*>(range);
       ReadOutcome outcome = scan_range->DoRead(disk_id_);

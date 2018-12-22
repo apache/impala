@@ -73,6 +73,8 @@ std::string PrintThriftEnum(const TUnit::type& value);
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
+/// Converts id to a string represantation. If necessary, the gdb equivalent is:
+///    printf "%lx:%lx\n", id.hi, id.lo
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
 
 /// Returns the fully qualified path, e.g. "database.table.array_col.item.field"

@@ -21,6 +21,8 @@ namespace impala {
 
 thread_local ThreadDebugInfo* thread_debug_info;
 
+const TUniqueId ThreadDebugInfo::ZERO_THREAD_ID = {};
+
 void ThreadDebugInfo::InitializeThreadDebugInfo(
     ThreadDebugInfo* thread_debug_info_param) {
   DCHECK(thread_debug_info == nullptr);
