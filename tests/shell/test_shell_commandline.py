@@ -793,3 +793,9 @@ class TestImpalaShell(ImpalaTestSuite):
       test_port = s.getsockname()[1]
       args = '-q "select foo; select bar;" --ssl -t 2000 -i localhost:%d' % (test_port)
       run_impala_shell_cmd(args, expect_success=False)
+
+  def test_client_identifier(self):
+    """Confirms that a version string is passed along."""
+    args = "--query 'select 0; profile'"
+    result = run_impala_shell_cmd(args)
+    assert 'client_identifier=impala shell' in result.stdout.lower()

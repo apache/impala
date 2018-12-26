@@ -45,7 +45,7 @@ from shell_output import OverwritingStdErrOutputStream
 from subprocess import call
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
-VERSION_STRING = "build version not available"
+VERSION_STRING = "impala shell build version not available"
 READLINE_UNAVAILABLE_ERROR = "The readline module was either not found or disabled. " \
                              "Command history will not be collected."
 
@@ -791,12 +791,20 @@ class ImpalaShell(object, cmd.Cmd):
 
     # Use a temporary to avoid changing set_query_options during iteration.
     new_query_options = {}
+    default_query_option_keys = set(self.imp_client.default_query_options)
     for set_option, value in self.set_query_options.iteritems():
-      if set_option not in set(self.imp_client.default_query_options):
+      if set_option not in default_query_option_keys:
         print ('%s is not supported for the impalad being '
                'connected to, ignoring.' % set_option)
       else:
         new_query_options[set_option] = value
+
+    if "CLIENT_IDENTIFIER" not in new_query_options \
+        and "CLIENT_IDENTIFIER" in default_query_option_keys:
+      # Programmatically set default CLIENT_IDENTIFIER to our version string,
+      # if the Impala version supports this option.
+      new_query_options["CLIENT_IDENTIFIER"] = VERSION_STRING
+
     self.set_query_options = new_query_options
 
   def _connect(self):
@@ -1617,8 +1625,6 @@ if __name__ == "__main__":
   elif user_config != config_to_load:
     print_to_stderr('%s not found.\n' % user_config)
     sys.exit(1)
-
-  query_options = {}
 
   # default shell options loaded in from impala_shell_config_defaults.py
   # options defaults overwritten by those in config file

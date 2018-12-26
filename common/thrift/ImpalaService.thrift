@@ -346,6 +346,11 @@ enum TImpalaQueryOptions {
   // operator which is capable of spilling to disk (unlike the TopN operator which keeps
   // everything in memory). 0 or -1 means this has no effect.
   TOPN_BYTES_LIMIT,
+
+  // An opaque string, not used by Impala itself, that can be used to identify
+  // the client, like a User-Agent in HTTP. Drivers should set this to
+  // their version number. May also be used by tests to help identify queries.
+  CLIENT_IDENTIFIER
 }
 
 // The summary of a DML statement.

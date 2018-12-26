@@ -720,6 +720,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_topn_bytes_limit(topn_bytes_limit);
         break;
       }
+      case TImpalaQueryOptions::CLIENT_IDENTIFIER: {
+        query_options->__set_client_identifier(value);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
