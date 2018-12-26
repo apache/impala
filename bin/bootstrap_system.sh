@@ -37,6 +37,10 @@
 #      adduser --disabled-password --gecos '' impdev
 #      echo 'impdev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 #   3. Run this script as that user: su - impdev -c /bootstrap_development.sh
+#
+# This script has some specializations for CentOS/Redhat 6/7 and Ubuntu.
+# Of note, inside of Docker, Redhat 7 doesn't allow you to start daemons
+# with systemctl, so sshd and postgresql are started manually in those cases.
 
 set -eu -o pipefail
 
@@ -67,9 +71,21 @@ set -x
 
 # Determine whether we're running on redhat or ubuntu
 REDHAT=
+REDHAT6=
+REDHAT7=
 UBUNTU=
+IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
+  echo "Identified redhat system."
+  if grep 'release 7\.' /etc/redhat-release; then
+    REDHAT7=true
+    echo "Identified redhat7 system."
+  fi
+  if grep 'release 6\.' /etc/redhat-release; then
+    REDHAT6=true
+    echo "Identified redhat6 system."
+  fi
   # TODO: restrict redhat versions
 else
   source /etc/lsb-release
@@ -86,6 +102,10 @@ else
   fi
   UBUNTU=true
 fi
+if grep docker /proc/1/cgroup; then
+  IN_DOCKER=true
+  echo "Identified we are running inside of Docker."
+fi
 
 # Helper function to execute following command only on Ubuntu
 function ubuntu {
@@ -97,6 +117,31 @@ function ubuntu {
 # Helper function to execute following command only on RedHat
 function redhat {
   if [[ "$REDHAT" == true ]]; then
+    "$@"
+  fi
+}
+
+# Helper function to execute following command only on RedHat6
+function redhat6 {
+  if [[ "$REDHAT6" == true ]]; then
+    "$@"
+  fi
+}
+# Helper function to execute following command only on RedHat7
+function redhat7 {
+  if [[ "$REDHAT7" == true ]]; then
+    "$@"
+  fi
+}
+# Helper function to execute following command only in docker
+function indocker {
+  if [[ "$IN_DOCKER" == true ]]; then
+    "$@"
+  fi
+}
+# Helper function to execute following command only outside of docker
+function notindocker {
+  if [[ "$IN_DOCKER" != true ]]; then
     "$@"
   fi
 }
@@ -177,7 +222,10 @@ if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
 then
   ubuntu sudo service ssh start
   # TODO: CentOS/RH 7 uses systemd, and this doesn't work.
-  redhat sudo service sshd start
+  redhat6 sudo service sshd start
+  redhat7 notindocker sudo service sshd start
+  redhat7 indocker sudo /usr/bin/ssh-keygen -A
+  redhat7 indocker sudo /usr/sbin/sshd
 fi
 
 # TODO: config ccache to give it plenty of space
@@ -187,7 +235,8 @@ fi
 echo ">>> Configuring system"
 
 ubuntu sudo service ntp stop
-redhat sudo service ntpd stop
+redhat6 sudo service ntpd stop
+redhat7 notindocker sudo service ntpd stop
 sudo ntpdate us.pool.ntp.org
 # If on EC2, use Amazon's ntp servers
 if which dmidecode && { sudo dmidecode -s bios-version | grep amazon; }
@@ -201,7 +250,8 @@ fi
 # is strictly needed by Kudu.
 # TODO: Make privileged docker start ntpd
 ubuntu sudo service ntp start || grep docker /proc/1/cgroup
-redhat sudo service ntpd start || grep docker /proc/1/cgroup
+redhat6 sudo service ntpd start || grep docker /proc/1/cgroup
+notindocker redhat7 sudo service ntpd start
 
 # IMPALA-3932, IMPALA-3926
 if [[ $UBUNTU = true && $DISTRIB_RELEASE = 16.04 ]]
@@ -211,8 +261,12 @@ then
   eval "$SET_LD_LIBRARY_PATH"
 fi
 
-redhat sudo service postgresql initdb
-sudo service postgresql stop
+redhat6 sudo service postgresql initdb
+redhat6 sudo service postgresql stop
+redhat7 notindocker sudo service postgresql initdb
+redhat7 notindocker sudo service postgresql stop
+redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
+ubuntu sudo service postgresql stop
 
 # These configurations expose connectiong to PostgreSQL via md5-hashed
 # passwords over TCP to localhost, and the local socket is trusted
@@ -224,7 +278,13 @@ redhat sudo sed -ri 's/local +all +all +ident/local all all trust/g' \
 # Accept md5 passwords from localhost
 redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
 
-sudo service postgresql start
+ubuntu sudo service postgresql start
+redhat6 sudo service postgresql start
+redhat7 notindocker service postgresql start
+# Important to redirect pg_ctl to a logfile, lest it keep the stdout
+# file descriptor open, preventing the shell from exiting.
+redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
+  "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
 
 # Set up postgress for HMS
 if ! [[ 1 = $(sudo -u postgres psql -At -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';") ]]
@@ -281,10 +341,10 @@ sudo chown $(whoami) /var/lib/hadoop-hdfs/
 # TODO: restrict this to only the users it is needed for
 echo "* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
-# Default on CentOS limits a user to 1024 processes (threads) , which isn't
+# Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
-redhat sudo sed -i 's,\*\s*soft\s*nproc\s*1024,* soft nproc unlimited,' \
-  /etc/security/limits.d/90-nproc.conf
+redhat sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
+  /etc/security/limits.d/*-nproc.conf
 
 echo ">>> Checking out Impala"
 

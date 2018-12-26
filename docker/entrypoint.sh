@@ -42,6 +42,19 @@
 #      where <suite> is one of: BE_TEST JDBC_TEST CLUSTER_TEST
 #                               EE_TEST_SERIAL EE_TEST_PARALLEL
 
+# Starts or stops postgres
+# The centos:7 Docker image doesn't allow systemctl to start postgresql,
+# so we start it explicitly with pg_ctl.
+function _pg_ctl() {
+  if [ -f /etc/redhat-release ]; then
+    if which systemctl; then
+      sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c "pg_ctl $1 -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
+      return
+    fi
+  fi
+  sudo service postgresql $1
+}
+
 # Boostraps the container by creating a user and adding basic tools like Python and git.
 # Takes a uid as an argument for the user to be created.
 function build() {
@@ -129,11 +142,16 @@ function start_minicluster {
   pushd /home/impdev/Impala
 
   # Required for metastore
-  sudo service postgresql start
+  _pg_ctl start
 
   # Required for starting HBase
   if [ -f /etc/redhat-release ]; then
-    sudo service sshd start
+    if which systemctl; then
+      # centos7 doesn't support systemd running inside of docker to start daemons
+      sudo /usr/sbin/sshd
+    else
+      sudo service sshd start
+    fi
   else
     sudo service ssh start
   fi
@@ -235,7 +253,7 @@ function build_impdev() {
   testdata/bin/kill-all.sh
 
   # Shutting down PostgreSQL nicely speeds up it's start time for new containers.
-  sudo service postgresql stop
+  _pg_ctl stop
 
   # Clean up things we don't need to reduce image size
   find be -name '*.o' -execdir rm '{}' + # ~1.6GB
