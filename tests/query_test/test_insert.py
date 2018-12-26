@@ -107,6 +107,16 @@ class TestInsertQueries(ImpalaTestSuite):
         "select substr(s, 200 * 1024 * 1024, 5) from {0}".format(table_name))
     assert result.data == ["ZAZAZ"]
 
+    # IMPALA-7648: test that we gracefully fail when there is not enough memory
+    # to fit the scanned string in memory.
+    self.client.set_configuration_option("mem_limit", "50M")
+    try:
+      self.client.execute("select s from {0}".format(table_name))
+      assert False, "Expected query to fail"
+    except Exception, e:
+      assert "Memory limit exceeded" in str(e)
+
+
   @classmethod
   def setup_class(cls):
     super(TestInsertQueries, cls).setup_class()
