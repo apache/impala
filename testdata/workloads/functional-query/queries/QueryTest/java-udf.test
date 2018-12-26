@@ -309,3 +309,11 @@ string
 'toasst'
 'yess'
 ====
+---- QUERY
+# Regression test for IMPALA-8016; this UDF loads another class in the same jar.
+select import_nearby_classes("placeholder");
+---- TYPES
+string
+---- RESULTS
+'Hello'
+====

@@ -96,4 +96,8 @@ symbol='org.apache.impala.TestUdfException';
 create function replace_string(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.ReplaceStringUdf';
+
+create function import_nearby_classes(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.ImportsNearbyClassesUdf';
 ====
