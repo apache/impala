@@ -186,13 +186,20 @@ class TestObservability(ImpalaTestSuite):
     profile = self.execute_query("select 1", query_opts).runtime_profile
     assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in profile,\
         profile
+    assert "CLIENT_IDENTIFIER=" + \
+        "query_test/test_observability.py::TestObservability::()::test_query_options" \
+        in profile
     # For this query, the planner sets NUM_NODES=1, NUM_SCANNER_THREADS=1,
     # RUNTIME_FILTER_MODE=0 and MT_DOP=0
     expected_str = ("Query Options (set by configuration and planner): "
-        "MEM_LIMIT=8589934592,NUM_NODES=1,NUM_SCANNER_THREADS=1,"
-        "RUNTIME_FILTER_MODE=0,MT_DOP=0{erasure_coding}\n")
+        "MEM_LIMIT=8589934592,"
+        "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
+        "RUNTIME_FILTER_MODE=0,MT_DOP=0,{erasure_coding}"
+        "CLIENT_IDENTIFIER="
+        "query_test/test_observability.py::TestObservability::()::test_query_options"
+        "\n")
     expected_str = expected_str.format(
-        erasure_coding=",ALLOW_ERASURE_CODED_FILES=1" if IS_EC else "")
+        erasure_coding="ALLOW_ERASURE_CODED_FILES=1," if IS_EC else "")
     assert expected_str in profile
 
   def test_exec_summary(self):

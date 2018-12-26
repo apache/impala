@@ -27,6 +27,7 @@ import logging
 import os
 import pytest
 
+import tests.common
 from tests.common.environ import build_flavor_timeout
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
@@ -590,3 +591,13 @@ def pytest_collection_modifyitems(items, config, session):
 
   logging.info("pytest shard selection enabled %s. Of %d items, selected %d items by hash.",
       config.option.shard_tests, num_items, len(items))
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_logstart(nodeid, location):
+  # Beeswax doesn't support commas or equals in configuration, so they are replaced.
+  # Spaces are removed to make the string a little bit shorter.
+  # The string is shortened so that it is entirely spit out by ThriftDebugString, rather
+  # than being elided.
+  tests.common.current_node = \
+      nodeid.replace(",", ";").replace(" ", "").replace("=", "-")[0:255]

@@ -24,6 +24,7 @@ import logging
 import re
 
 import impala.dbapi as impyla
+import tests.common
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 
 
@@ -151,6 +152,9 @@ class BeeswaxConnection(ImpalaConnection):
 
   def clear_configuration(self):
     self.__beeswax_client.clear_query_options()
+    # A hook in conftest sets tests.common.current_node.
+    if hasattr(tests.common, "current_node"):
+      self.set_configuration_option("client_identifier", tests.common.current_node)
 
   def connect(self):
     LOG.info("-- connecting to: %s" % self.__host_port)
@@ -241,6 +245,8 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def clear_configuration(self):
     self.__query_options.clear()
+    if hasattr(tests.common, "current_node"):
+      self.set_configuration_option("client_identifier", tests.common.current_node)
 
   def connect(self):
     LOG.info("-- connecting to {0} with impyla".format(self.__host_port))
@@ -382,10 +388,15 @@ class ImpylaHS2ResultSet(object):
 
 def create_connection(host_port, use_kerberos=False, protocol='beeswax'):
   if protocol == 'beeswax':
-    return BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
+    c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
   else:
     assert protocol == 'hs2'
-    return ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos)
+    c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos)
+
+  # A hook in conftest sets tests.common.current_node.
+  if hasattr(tests.common, "current_node"):
+    c.set_configuration_option("client_identifier", tests.common.current_node)
+  return c
 
 def create_ldap_connection(host_port, user, password, use_ssl=False):
   return BeeswaxConnection(host_port=host_port, user=user, password=password,
