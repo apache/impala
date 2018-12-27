@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,10 +52,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import com.google.common.collect.ImmutableList;
-
-import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
+import com.google.common.collect.Lists;
 
 /**
  * Wrapper class for parsing, analyzing and rewriting a SQL stmt.
@@ -466,7 +466,7 @@ public class AnalysisContext {
     // types and column labels to restore them after the rewritten stmt has been
     // reset() and re-analyzed. For a CTAS statement, the types represent column types
     // of the table that will be created, including the partition columns, if any.
-    List<Type> origResultTypes = Lists.newArrayList();
+    List<Type> origResultTypes = new ArrayList<>();
     for (Expr e : analysisResult_.stmt_.getResultExprs()) {
       origResultTypes.add(e.getType());
     }

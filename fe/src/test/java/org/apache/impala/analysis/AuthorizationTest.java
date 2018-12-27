@@ -21,6 +21,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -128,7 +129,7 @@ public class AuthorizationTest extends FrontendTestBase {
   private static final List<TestContext> testCtxs_;
 
   @Parameters
-  public static Collection testVectors() { return testCtxs_; }
+  public static Collection<TestContext> testVectors() { return testCtxs_; }
 
   /**
    * Create test contexts used for parameterizing this test. We create these statically
@@ -137,7 +138,7 @@ public class AuthorizationTest extends FrontendTestBase {
    * relative to the work done in the tests.
    */
   static {
-    testCtxs_ = Lists.newArrayList();
+    testCtxs_ = new ArrayList<>();
     // Create and init file based auth config.
     AuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
     filePolicyAuthzConfig.validateConfig();
@@ -455,7 +456,7 @@ public class AuthorizationTest extends FrontendTestBase {
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
     // select (id, int_col, year) on functional.alltypessmall
-    List<TPrivilege> privileges = Lists.newArrayList();
+    List<TPrivilege> privileges = new ArrayList<>();
     for (String columnName: Arrays.asList("id", "int_col", "year")) {
       TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
           false);
@@ -543,7 +544,7 @@ public class AuthorizationTest extends FrontendTestBase {
       sentryService.grantRolePrivilege(USER, roleName, privilege);
     }
 
-    List<TPrivilege> privileges = Lists.newArrayList();
+    List<TPrivilege> privileges = new ArrayList<>();
     for (int i = 0; i < 10; ++i) {
       TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
           false);

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
@@ -225,8 +226,8 @@ public abstract class ModifyStmt extends StatementBase {
       List<SelectListItem> selectList, List<Integer> referencedColumns)
       throws AnalysisException {
     // The order of the referenced columns equals the order of the result expressions
-    HashSet<SlotId> uniqueSlots = new HashSet<>();
-    HashSet<SlotId> keySlots = new HashSet<>();
+    Set<SlotId> uniqueSlots = new HashSet<>();
+    Set<SlotId> keySlots = new HashSet<>();
 
     // Mapping from column name to index
     List<Column> cols = table_.getColumnsInHiveOrder();

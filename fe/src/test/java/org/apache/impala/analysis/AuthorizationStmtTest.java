@@ -17,8 +17,16 @@
 
 package org.apache.impala.analysis;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -52,15 +60,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 /**
  * This class contains authorization tests for SQL statements.
@@ -2599,7 +2600,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // IMPALA-6086: Make sure use of a permanent function requires SELECT (or higher)
     // privilege on the database, and expr rewrite/constant-folding preserves
     // privilege requests for functions.
-    ArrayList<Type> argTypes = new ArrayList<Type>();
+    List<Type> argTypes = new ArrayList<Type>();
     argTypes.add(Type.STRING);
     fn = addFunction("functional", "to_lower", argTypes, Type.STRING,
         "/test-warehouse/libTestUdf.so",
@@ -2700,7 +2701,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     return "User '%s' does not have privileges to DROP functions in: " + object;
   }
 
-  private ScalarFunction addFunction(String db, String fnName, ArrayList<Type> argTypes,
+  private ScalarFunction addFunction(String db, String fnName, List<Type> argTypes,
       Type retType, String uriPath, String symbolName) {
     ScalarFunction fn = ScalarFunction.createForTesting(db, fnName, argTypes, retType,
         uriPath, symbolName, null, null, TFunctionBinaryType.NATIVE);
@@ -2709,7 +2710,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private ScalarFunction addFunction(String db, String fnName) {
-    return addFunction(db, fnName, new ArrayList<Type>(), Type.INT, "/dummy",
+    return addFunction(db, fnName, new ArrayList<>(), Type.INT, "/dummy",
         "dummy.class");
   }
 
@@ -2735,7 +2736,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private static TPrivilegeLevel[] allExcept(TPrivilegeLevel... excludedPrivLevels) {
-    HashSet<TPrivilegeLevel> excludedSet = Sets.newHashSet(excludedPrivLevels);
+    Set<TPrivilegeLevel> excludedSet = Sets.newHashSet(excludedPrivLevels);
     List<TPrivilegeLevel> privLevels = new ArrayList<>();
     for (TPrivilegeLevel level: TPrivilegeLevel.values()) {
       if (!excludedSet.contains(level)) {
@@ -3165,7 +3166,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private void verifyPrivilegeReqs(AnalysisContext ctx, String stmt,
       Set<String> expectedPrivilegeNames) throws ImpalaException {
     AnalysisResult analysisResult = parseAndAnalyze(stmt, ctx, frontend_);
-    Set<String> actualPrivilegeNames = Sets.newHashSet();
+    Set<String> actualPrivilegeNames = new HashSet<>();
     for (PrivilegeRequest privReq: analysisResult.getAnalyzer().getPrivilegeReqs()) {
       actualPrivilegeNames.add(privReq.getName());
     }

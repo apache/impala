@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.common.AnalysisException;
@@ -29,7 +30,7 @@ import com.google.common.collect.Lists;
  * Select list items plus optional distinct clause and optional plan hints.
  */
 public class SelectList {
-  private List<PlanHint> planHints_ = Lists.newArrayList();
+  private List<PlanHint> planHints_ = new ArrayList<>();
   private boolean isDistinct_;
 
   /////////////////////////////////////////
@@ -47,7 +48,7 @@ public class SelectList {
 
   public SelectList() {
     isDistinct_ = false;
-    items_ = Lists.newArrayList();
+    items_ = new ArrayList<>();
   }
 
   public SelectList(List<SelectListItem> items, boolean isDistinct,
@@ -62,7 +63,7 @@ public class SelectList {
    */
   public SelectList(SelectList other) {
     planHints_ = Lists.newArrayList(other.planHints_);
-    items_ = Lists.newArrayList();
+    items_ = new ArrayList<>();
     for (SelectListItem item: other.items_) {
       items_.add(item.clone());
     }

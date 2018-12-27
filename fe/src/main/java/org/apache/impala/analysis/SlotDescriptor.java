@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,7 +50,7 @@ public class SlotDescriptor {
 
   // Expr(s) materialized into this slot; multiple exprs for unions. Should be empty if
   // path_ is set.
-  private List<Expr> sourceExprs_ = Lists.newArrayList();
+  private List<Expr> sourceExprs_ = new ArrayList<>();
 
   // if false, this slot doesn't need to be materialized in parent tuple
   // (and physical layout parameters are invalid)

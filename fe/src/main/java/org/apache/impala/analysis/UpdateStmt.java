@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import static java.lang.String.format;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.common.Pair;
@@ -27,7 +28,6 @@ import org.apache.impala.planner.TableSink;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 
 /**
  * Representation of an Update statement.
@@ -54,7 +54,7 @@ public class UpdateStmt extends ModifyStmt {
 
   public UpdateStmt(UpdateStmt other) {
     super(other.targetTablePath_, other.fromClause_.clone(),
-        Lists.<Pair<SlotRef, Expr>>newArrayList(), other.wherePredicate_);
+        new ArrayList<>(), other.wherePredicate_);
   }
 
   /**

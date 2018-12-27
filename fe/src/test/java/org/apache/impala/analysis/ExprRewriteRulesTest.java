@@ -393,7 +393,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   @Test
   public void testCaseWithExpr() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
-    List<ExprRewriteRule> rules = Lists.newArrayList();
+    List<ExprRewriteRule> rules = new ArrayList<>();
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
 
@@ -422,7 +422,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   @Test
   public void testCaseWithoutExpr() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
-    List<ExprRewriteRule> rules = Lists.newArrayList();
+    List<ExprRewriteRule> rules = new ArrayList<>();
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
 
@@ -455,7 +455,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   @Test
   public void testDecode() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
-    List<ExprRewriteRule> rules = Lists.newArrayList();
+    List<ExprRewriteRule> rules = new ArrayList<>();
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
 
@@ -505,7 +505,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   @Test
   public void testCoalesce() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
-    List<ExprRewriteRule> rules = Lists.newArrayList();
+    List<ExprRewriteRule> rules = new ArrayList<>();
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
 

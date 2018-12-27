@@ -27,6 +27,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.common.Id;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TEdgeType;
+import org.apache.impala.thrift.TLineageGraph;
+import org.apache.impala.thrift.TMultiEdge;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TVertex;
+import org.apache.impala.util.TUniqueIdUtil;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -34,21 +44,11 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.impala.catalog.FeTable;
-import org.apache.impala.common.Id;
-import org.apache.impala.common.IdGenerator;
-import org.apache.impala.thrift.TEdgeType;
-import org.apache.impala.thrift.TQueryCtx;
-import org.apache.impala.thrift.TLineageGraph;
-import org.apache.impala.thrift.TMultiEdge;
-import org.apache.impala.thrift.TUniqueId;
-import org.apache.impala.thrift.TVertex;
-import org.apache.impala.util.TUniqueIdUtil;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -220,11 +220,11 @@ final class MultiEdge {
    * Encodes this MultiEdge object to a thrift object
    */
   public TMultiEdge toThrift() {
-    List<TVertex> sources = Lists.newArrayList();
+    List<TVertex> sources = new ArrayList<>();
     for (Vertex vertex: getOrderedSources()) {
       sources.add(vertex.toThrift());
     }
-    List<TVertex> targets = Lists.newArrayList();
+    List<TVertex> targets = new ArrayList<>();
     for (Vertex vertex: getOrderedTargets()) {
       targets.add(vertex.toThrift());
     }
@@ -295,7 +295,7 @@ public class ColumnLineageGraph {
   // Name of the user that issued this query
   private String user_;
 
-  private final List<Expr> resultDependencyPredicates_ = Lists.newArrayList();
+  private final List<Expr> resultDependencyPredicates_ = new ArrayList<>();
 
   private final List<MultiEdge> edges_ = new ArrayList<>();
 

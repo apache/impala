@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -161,14 +162,14 @@ public class ComputeStatsStmt extends StatementBase {
 
   // The list of valid partition statistics that can be used in an incremental computation
   // without themselves being recomputed. Populated in analyze().
-  private final List<TPartitionStats> validPartStats_ = Lists.newArrayList();
+  private final List<TPartitionStats> validPartStats_ = new ArrayList<>();
 
   // For incremental computations, the list of partitions (identified by list of partition
   // column values) that we expect to receive results for. Used to ensure that even empty
   // partitions emit results.
   // TODO: Consider using partition IDs (and adding them to the child queries with a
   // PARTITION_ID() builtin)
-  private final List<List<String>> expectedPartitions_ = Lists.newArrayList();
+  private final List<List<String>> expectedPartitions_ = new ArrayList<>();
 
   // If non-null, partitions that an incremental computation might apply to. Must be
   // null if this is a non-incremental computation.
@@ -235,7 +236,7 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   private List<String> getBaseColumnStatsQuerySelectList(Analyzer analyzer) {
-    List<String> columnStatsSelectList = Lists.newArrayList();
+    List<String> columnStatsSelectList = new ArrayList<>();
     // For Hdfs tables, exclude partition columns from stats gathering because Hive
     // cannot store them as part of the non-partition column stats. For HBase tables,
     // include the single clustering column (the row key).
@@ -421,7 +422,7 @@ public class ComputeStatsStmt extends StatementBase {
 
     // Build partition filters that only select partitions without valid statistics for
     // incremental computation.
-    List<String> filterPreds = Lists.newArrayList();
+    List<String> filterPreds = new ArrayList<>();
     if (isIncremental_) {
       if (partitionSet_ == null) {
         // If any column does not have stats, we recompute statistics for all partitions
@@ -534,7 +535,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
     List<String> tableStatsSelectList = Lists.newArrayList(countSql);
     // Add group by columns for incremental stats or with extrapolation disabled.
-    List<String> groupByCols = Lists.newArrayList();
+    List<String> groupByCols = new ArrayList<>();
     if (!updateTableStatsOnly()) {
       for (Column partCol: hdfsTable.getClusteringColumns()) {
         groupByCols.add(ToSqlUtils.getIdentSql(partCol.getName()));
@@ -610,7 +611,7 @@ public class ComputeStatsStmt extends StatementBase {
         && !RuntimeEnv.INSTANCE.isTestEnv()) {
       // We're configured to fetch the statistics from catalogd, so collect the relevant
       // partition ids.
-      List<FeFsPartition> partitionsToFetch = Lists.newArrayList();
+      List<FeFsPartition> partitionsToFetch = new ArrayList<>();
       for (FeFsPartition p: partitions) {
         if (excludedPartitions.contains(p.getId())) continue;
         partitionsToFetch.add(p);

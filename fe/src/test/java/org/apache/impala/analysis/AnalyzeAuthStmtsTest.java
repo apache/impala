@@ -32,9 +32,9 @@ import org.junit.Test;
 public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   public AnalyzeAuthStmtsTest() {
     catalog_.getAuthPolicy().addPrincipal(
-        new Role("myRole", new HashSet<String>()));
+        new Role("myRole", new HashSet<>()));
     catalog_.getAuthPolicy().addPrincipal(
-        new User("myUser", new HashSet<String>()));
+        new User("myUser", new HashSet<>()));
   }
 
   @Override

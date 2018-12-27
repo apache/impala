@@ -66,7 +66,7 @@ public abstract class AggregateInfoBase {
   // For analytics: indices into the analytic exprs and their corresponding aggregate
   // exprs that need to be materialized.
   // Populated in materializeRequiredSlots() which must be implemented by subclasses.
-  protected List<Integer> materializedSlots_ = Lists.newArrayList();
+  protected List<Integer> materializedSlots_ = new ArrayList<>();
 
   protected AggregateInfoBase(List<Expr> groupingExprs, List<FunctionCallExpr> aggExprs) {
     Preconditions.checkState(groupingExprs != null || aggExprs != null);

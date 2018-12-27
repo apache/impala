@@ -17,7 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.lang.reflect.Method;
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashSet;
@@ -52,8 +53,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Root of the expr node hierarchy.
@@ -619,7 +618,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       Type targetType) throws AnalysisException {
     if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return child;
     if (targetType.isIntegerType()) targetType = Type.DOUBLE;
-    List<NumericLiteral> literals = Lists.newArrayList();
+    List<NumericLiteral> literals = new ArrayList<>();
     child.collectAll(Predicates.instanceOf(NumericLiteral.class), literals);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     for (NumericLiteral l: literals) {
@@ -778,7 +777,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public static List<TExpr> treesToThrift(List<? extends Expr> exprs) {
-    List<TExpr> result = Lists.newArrayList();
+    List<TExpr> result = new ArrayList<>();
     for (Expr expr: exprs) {
       result.add(expr.treeToThrift());
     }
@@ -794,7 +793,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public List<String> childrenToSql(ToSqlOptions options) {
-    List<String> result = Lists.newArrayList();
+    List<String> result = new ArrayList<>();
     for (Expr child: children_) {
       result.add(child.toSql(options));
     }
@@ -807,7 +806,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static String debugString(List<? extends Expr> exprs) {
     if (exprs == null || exprs.isEmpty()) return "";
-    List<String> strings = Lists.newArrayList();
+    List<String> strings = new ArrayList<>();
     for (Expr expr: exprs) {
       strings.add(expr.debugString());
     }
@@ -816,7 +815,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static String toSql(List<? extends Expr> exprs, ToSqlOptions options) {
     if (exprs == null || exprs.isEmpty()) return "";
-    List<String> strings = Lists.newArrayList();
+    List<String> strings = new ArrayList<>();
     for (Expr expr: exprs) {
       strings.add(expr.toSql(options));
     }
@@ -921,7 +920,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * SlotRefs, etc. Hence, this method is placed here and not in Predicate.
    */
   public List<Expr> getConjuncts() {
-    List<Expr> list = Lists.newArrayList();
+    List<Expr> list = new ArrayList<>();
     if (this instanceof CompoundPredicate
         && ((CompoundPredicate) this).getOp() == CompoundPredicate.Operator.AND) {
       // TODO: we have to convert CompoundPredicate.AND to two expr trees for
@@ -1090,7 +1089,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> List<C> removeDuplicates(List<C> l,
       SlotRef.Comparator cmp) {
-    List<C> newList = Lists.newArrayList();
+    List<C> newList = new ArrayList<>();
     for (C expr: l) {
       boolean exists = false;
       for (C newExpr : newList) {
@@ -1514,7 +1513,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public Subquery getSubquery() {
     if (!contains(Subquery.class)) return null;
-    List<Subquery> subqueries = Lists.newArrayList();
+    List<Subquery> subqueries = new ArrayList<>();
     collect(Subquery.class, subqueries);
     Preconditions.checkState(subqueries.size() == 1);
     return subqueries.get(0);

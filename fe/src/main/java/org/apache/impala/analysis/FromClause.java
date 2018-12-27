@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -25,8 +27,6 @@ import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Wraps a list of TableRef instances that form a FROM clause, allowing them to be
@@ -118,6 +118,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     return toSql(DEFAULT);
   }
 
+  @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
     if (!tableRefs_.isEmpty()) {

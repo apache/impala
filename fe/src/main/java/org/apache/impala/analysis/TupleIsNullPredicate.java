@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -25,6 +26,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TTupleIsNullPredicate;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -137,7 +139,7 @@ public class TupleIsNullPredicate extends Predicate {
   public static Expr wrapExpr(Expr expr, List<TupleId> tids, Analyzer analyzer)
       throws InternalException {
     if (!requiresNullWrapping(expr, analyzer)) return expr;
-    List<Expr> params = Lists.newArrayList();
+    List<Expr> params = new ArrayList<>();
     params.add(new TupleIsNullPredicate(tids));
     params.add(new NullLiteral());
     params.add(expr);

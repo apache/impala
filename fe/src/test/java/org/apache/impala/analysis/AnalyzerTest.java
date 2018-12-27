@@ -41,7 +41,7 @@ public class AnalyzerTest extends FrontendTestBase {
 
   // maps from type to string that will result in literal of that type
   protected static Map<ScalarType, String> typeToLiteralValue_ =
-      new HashMap<ScalarType, String>();
+      new HashMap<>();
   static {
     typeToLiteralValue_.put(Type.BOOLEAN, "true");
     typeToLiteralValue_.put(Type.TINYINT, "1");

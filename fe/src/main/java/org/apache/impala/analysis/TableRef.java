@@ -17,6 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -33,8 +36,6 @@ import org.apache.impala.thrift.TReplicaPreference;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Superclass of all table references, including references to views, base tables
@@ -87,10 +88,10 @@ public class TableRef extends StmtNode {
   protected TableSampleClause sampleParams_;
 
   protected JoinOperator joinOp_;
-  protected List<PlanHint> joinHints_ = Lists.newArrayList();
+  protected List<PlanHint> joinHints_ = new ArrayList<>();
   protected List<String> usingColNames_;
 
-  protected List<PlanHint> tableHints_ = Lists.newArrayList();
+  protected List<PlanHint> tableHints_ = new ArrayList<>();
   protected TReplicaPreference replicaPreference_;
   protected boolean randomReplica_;
 
@@ -118,14 +119,14 @@ public class TableRef extends StmtNode {
   // we may alter the chain of table refs during plan generation, but we still rely
   // on the original list of ids for correct predicate assignment.
   // Populated in analyzeJoin().
-  protected List<TupleId> allTableRefIds_ = Lists.newArrayList();
-  protected List<TupleId> allMaterializedTupleIds_ = Lists.newArrayList();
+  protected List<TupleId> allTableRefIds_ = new ArrayList<>();
+  protected List<TupleId> allMaterializedTupleIds_ = new ArrayList<>();
 
   // All physical tuple ids that this table ref is correlated with:
   // Tuple ids of root descriptors from outer query blocks that this table ref
   // (if a CollectionTableRef) or contained CollectionTableRefs (if an InlineViewRef)
   // are rooted at. Populated during analysis.
-  protected List<TupleId> correlatedTupleIds_ = Lists.newArrayList();
+  protected List<TupleId> correlatedTupleIds_ = new ArrayList<>();
 
   // analysis output
   protected TupleDescriptor desc_;
@@ -554,7 +555,7 @@ public class TableRef extends StmtNode {
       // without violating outer join semantics.
       analyzer.registerOnClauseConjuncts(conjuncts, this);
       for (Expr e: conjuncts) {
-        List<TupleId> tupleIds = Lists.newArrayList();
+        List<TupleId> tupleIds = new ArrayList<>();
         e.getIds(tupleIds, null);
         onClauseTupleIds.addAll(tupleIds);
       }

@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ public final class ExprSubstitutionMap {
   private List<Expr> rhs_; // right-hand side
 
   public ExprSubstitutionMap() {
-    this(Lists.<Expr>newArrayList(), Lists.<Expr>newArrayList());
+    this(new ArrayList<>(), new ArrayList<>());
   }
 
   public ExprSubstitutionMap(List<Expr> lhs, List<Expr> rhs) {
@@ -140,7 +141,7 @@ public final class ExprSubstitutionMap {
 
   public String debugString() {
     Preconditions.checkState(lhs_.size() == rhs_.size());
-    List<String> output = Lists.newArrayList();
+    List<String> output = new ArrayList<>();
     for (int i = 0; i < lhs_.size(); ++i) {
       output.add(lhs_.get(i).toSql() + ":" + rhs_.get(i).toSql());
       output.add("(" + lhs_.get(i).debugString() + ":" + rhs_.get(i).debugString() + ")");

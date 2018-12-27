@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -144,7 +145,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    */
   private void analyzeAvroSchema(Analyzer analyzer)
       throws AnalysisException {
-    List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+    List<Map<String, String>> schemaSearchLocations = new ArrayList<>();
     schemaSearchLocations.add(tblProperties_);
 
     String avroSchema = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
@@ -204,7 +205,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       Map<String, String> tblProperties) throws AnalysisException {
     if (!tblProperties.containsKey(
         AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)) {
-      return Lists.newArrayList();
+      return new ArrayList<>();
     }
 
     // ALTER TABLE SET is not supported on HBase tables at all, see

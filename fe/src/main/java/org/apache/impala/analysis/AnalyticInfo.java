@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Encapsulates the analytic functions found in a single select block plus
@@ -110,7 +109,7 @@ public class AnalyticInfo extends AggregateInfoBase {
    * analytic functions.
    */
   private List<Expr> computeCommonPartitionExprs() {
-    List<Expr> result = Lists.newArrayList();
+    List<Expr> result = new ArrayList<>();
     for (Expr analyticExpr: analyticExprs_) {
       Preconditions.checkState(analyticExpr.isAnalyzed());
       List<Expr> partitionExprs = ((AnalyticExpr) analyticExpr).getPartitionExprs();
@@ -128,7 +127,7 @@ public class AnalyticInfo extends AggregateInfoBase {
   @Override
   public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     materializedSlots_.clear();
-    List<Expr> exprs = Lists.newArrayList();
+    List<Expr> exprs = new ArrayList<>();
     for (int i = 0; i < analyticExprs_.size(); ++i) {
       SlotDescriptor outputSlotDesc = outputTupleDesc_.getSlots().get(i);
       if (!outputSlotDesc.isMaterialized()) continue;

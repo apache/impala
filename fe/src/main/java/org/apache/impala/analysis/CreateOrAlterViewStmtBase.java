@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,9 +29,8 @@ import org.apache.impala.thrift.TTableName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 /**
  * Base class for CREATE VIEW and ALTER VIEW AS SELECT statements.
@@ -119,7 +119,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       }
     } else {
       // Create list of column definitions from the view-definition statement.
-      finalColDefs_ = Lists.newArrayList();
+      finalColDefs_ = new ArrayList<>();
       List<Expr> exprs = viewDefStmt_.getBaseTblResultExprs();
       List<String> labels = viewDefStmt_.getColLabels();
       Preconditions.checkState(exprs.size() == labels.size());
@@ -175,7 +175,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
    */
   protected void computeLineageGraph(Analyzer analyzer) {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
-    List<String> colDefs = Lists.newArrayList();
+    List<String> colDefs = new ArrayList<>();
     for (ColumnDef colDef: finalColDefs_) {
       colDefs.add(dbName_ + "." + getTbl() + "." + colDef.getColName());
     }
@@ -222,7 +222,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
    */
   protected String getColumnNames() {
     Preconditions.checkNotNull(columnDefs_);
-    List<String> columnNames = Lists.newArrayList();
+    List<String> columnNames = new ArrayList<>();
     for (ColumnDef colDef : columnDefs_) {
       columnNames.add(colDef.getColName());
     }

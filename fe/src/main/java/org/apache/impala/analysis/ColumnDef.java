@@ -18,16 +18,12 @@
 package org.apache.impala.analysis;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-
-import com.google.common.base.Function;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -39,6 +35,11 @@ import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
+
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW/COLUMN statement.
@@ -380,7 +381,7 @@ public class ColumnDef {
   }
 
   static List<String> toColumnNames(Collection<ColumnDef> colDefs) {
-    List<String> colNames = Lists.newArrayList();
+    List<String> colNames = new ArrayList<>();
     for (ColumnDef colDef: colDefs) {
       colNames.add(colDef.getColName());
     }

@@ -17,8 +17,7 @@
 
 package org.apache.impala.analysis;
 
-import com.google.common.collect.Lists;
-
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -37,17 +36,16 @@ class TableDataLayout {
 
   static TableDataLayout createPartitionedLayout(List<ColumnDef> partitionColumnDefs) {
     return new TableDataLayout(partitionColumnDefs,
-        Lists.<KuduPartitionParam>newArrayList());
+        new ArrayList<>());
   }
 
   static TableDataLayout createKuduPartitionedLayout(
       List<KuduPartitionParam> partitionParams) {
-    return new TableDataLayout(Lists.<ColumnDef>newArrayList(), partitionParams);
+    return new TableDataLayout(new ArrayList<>(), partitionParams);
   }
 
   static TableDataLayout createEmptyLayout() {
-    return new TableDataLayout(Lists.<ColumnDef>newArrayList(),
-        Lists.<KuduPartitionParam>newArrayList());
+    return new TableDataLayout(new ArrayList<>(), new ArrayList<>());
   }
 
   List<ColumnDef> getPartitionColumnDefs() { return partitionColDefs_; }

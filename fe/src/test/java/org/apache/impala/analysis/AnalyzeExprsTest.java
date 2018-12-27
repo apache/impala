@@ -217,7 +217,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "IS NOT DISTINCT FROM", "<", ">", ">=", "<=", "!=", "=", "<>"}) {
       // Operator can compare numeric values (literals, casts, and columns), even ones of
       // different types.
-      ArrayList<String> numericValues =
+      List<String> numericValues =
           new ArrayList<String>(Arrays.asList("0", "1", "1.1", "-7", "-7.7", "1.2e99",
               "false", "1234567890123456789012345678901234567890", "tinyint_col",
               "smallint_col", "int_col", "bigint_col", "float_col", "double_col"));
@@ -2058,8 +2058,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    * as materialized and computes their mem layout.
    */
   private void makeExprExecutable(Expr e, Analyzer analyzer) {
-    List<TupleId> tids = Lists.newArrayList();
-    List<SlotId> sids = Lists.newArrayList();
+    List<TupleId> tids = new ArrayList<>();
+    List<SlotId> sids = new ArrayList<>();
     e.getIds(tids, sids);
     for (SlotId sid: sids) {
       SlotDescriptor slotDesc = analyzer.getDescTbl().getSlotDesc(sid);
@@ -2756,9 +2756,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     queryOptions.setAppx_count_distinct(true);
 
     // Accumulates count(distinct) for all columns of alltypesTbl or decimalTbl.
-    List<String> countDistinctFns = Lists.newArrayList();
+    List<String> countDistinctFns = new ArrayList<>();
     // Accumulates count(distinct) for all columns of both alltypesTbl and decimalTbl.
-    List<String> allCountDistinctFns = Lists.newArrayList();
+    List<String> allCountDistinctFns = new ArrayList<>();
 
     Table alltypesTbl = catalog_.getOrLoadTable("functional", "alltypes");
     for (Column col: alltypesTbl.getColumns()) {

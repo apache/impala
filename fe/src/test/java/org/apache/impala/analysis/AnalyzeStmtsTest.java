@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -405,7 +406,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   private void testStarPath(String sql, List<Integer>... expectedAbsPaths) {
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
-    List<List<Integer>> actualAbsPaths = Lists.newArrayList();
+    List<List<Integer>> actualAbsPaths = new ArrayList<>();
     for (int i = 0; i < stmt.getResultExprs().size(); ++i) {
       Expr e = stmt.getResultExprs().get(i);
       Preconditions.checkState(e instanceof SlotRef);
@@ -2209,7 +2210,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Test multiple distinct aggregations.
     Table alltypesTbl = catalog_.getOrLoadTable("functional", "alltypes");
-    List<String> distinctFns = Lists.newArrayList();
+    List<String> distinctFns = new ArrayList<>();
     for (Column col : alltypesTbl.getColumns()) {
       distinctFns.add(String.format("count(distinct %s)", col.getName()));
     }
@@ -2257,7 +2258,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Positive tests: Test all scalar types and valid sampling percents.
     double validSamplePercs[] = new double[] { 0.0, 0.1, 0.2, 0.5, 0.8, 1.0 };
     for (double perc: validSamplePercs) {
-      List<String> allAggFnCalls = Lists.newArrayList();
+      List<String> allAggFnCalls = new ArrayList<>();
       for (Column col: allScalarTypes.getColumns()) {
         String aggFnCall = String.format("sampled_ndv(%s, %s)", col.getName(), perc);
         allAggFnCalls.add(aggFnCall);

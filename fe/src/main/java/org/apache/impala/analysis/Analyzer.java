@@ -1822,7 +1822,7 @@ public class Analyzer {
   }
 
   public <T extends Expr> void createEquivConjuncts(TupleId tid, List<T> conjuncts) {
-    createEquivConjuncts(tid, conjuncts, new HashSet<SlotId>());
+    createEquivConjuncts(tid, conjuncts, new HashSet<>());
   }
 
   /**

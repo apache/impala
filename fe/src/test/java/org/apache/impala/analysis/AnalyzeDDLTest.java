@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -916,7 +917,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   public void TestAlterTableSetColumnStats() {
     // Contains entries of the form 'statsKey'='statsValue' for every
     // stats key. A dummy value is used for 'statsValue'.
-    List<String> testKeyValues = Lists.newArrayList();
+    List<String> testKeyValues = new ArrayList<>();
     for (ColumnStats.StatsKey statsKey: ColumnStats.StatsKey.values()) {
       testKeyValues.add(String.format("'%s'='10'", statsKey));
     }
@@ -1462,7 +1463,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     Set<Column> actCols = parsedStmt.getValidatedColumnWhitelist();
     if (expColNames == null) assertTrue("Expected no whitelist.", actCols == null);
     assertTrue("Expected whitelist.", actCols != null);
-    Set<String> actColSet = Sets.newHashSet();
+    Set<String> actColSet = new HashSet<>();
     for (Column col: actCols) actColSet.add(col.getName());
     Set<String> expColSet = Sets.newHashSet(expColNames);
     assertEquals(actColSet, expColSet);

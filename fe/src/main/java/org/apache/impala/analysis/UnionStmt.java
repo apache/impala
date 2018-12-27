@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -28,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Representation of a union with its list of operands, and optional order by and limit.
@@ -135,12 +135,12 @@ public class UnionStmt extends QueryStmt {
 
   // filled during analyze(); contains all operands that need to go through
   // distinct aggregation
-  protected final List<UnionOperand> distinctOperands_ = Lists.newArrayList();
+  protected final List<UnionOperand> distinctOperands_ = new ArrayList<>();
 
   // filled during analyze(); contains all operands that can be aggregated with
   // a simple merge without duplicate elimination (also needs to merge the output
   // of the DISTINCT operands)
-  protected final List<UnionOperand> allOperands_ = Lists.newArrayList();
+  protected final List<UnionOperand> allOperands_ = new ArrayList<>();
 
   protected MultiAggregateInfo distinctAggInfo_; // only set if we have DISTINCT ops
 
@@ -155,7 +155,7 @@ public class UnionStmt extends QueryStmt {
 
   // List of output expressions produced by the union without the ORDER BY portion
   // (if any). Same as resultExprs_ if there is no ORDER BY.
-  private List<Expr> unionResultExprs_ = Lists.newArrayList();
+  private List<Expr> unionResultExprs_ = new ArrayList<>();
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -174,7 +174,7 @@ public class UnionStmt extends QueryStmt {
   protected UnionStmt(UnionStmt other) {
     super(other.cloneOrderByElements(),
         (other.limitElement_ == null) ? null : other.limitElement_.clone());
-    operands_ = Lists.newArrayList();
+    operands_ = new ArrayList<>();
     if (analyzer_ != null) {
       for (UnionOperand o: other.distinctOperands_) distinctOperands_.add(o.clone());
       for (UnionOperand o: other.allOperands_) allOperands_.add(o.clone());
@@ -237,7 +237,7 @@ public class UnionStmt extends QueryStmt {
     }
 
     // Collect all result expr lists and cast the exprs as necessary.
-    List<List<Expr>> resultExprLists = Lists.newArrayList();
+    List<List<Expr>> resultExprLists = new ArrayList<>();
     for (UnionOperand op: operands_) {
       resultExprLists.add(op.getQueryStmt().getResultExprs());
     }
@@ -307,7 +307,7 @@ public class UnionStmt extends QueryStmt {
 
     // collect operands' result exprs
     List<SlotDescriptor> outputSlots = tupleDesc.getSlots();
-    List<Expr> exprs = Lists.newArrayList();
+    List<Expr> exprs = new ArrayList<>();
     for (int i = 0; i < outputSlots.size(); ++i) {
       SlotDescriptor slotDesc = outputSlots.get(i);
       if (!slotDesc.isMaterialized()) continue;
@@ -465,7 +465,7 @@ public class UnionStmt extends QueryStmt {
     List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getResultExprs();
 
     // Compute column stats for the materialized slots from the source exprs.
-    List<ColumnStats> columnStats = Lists.newArrayList();
+    List<ColumnStats> columnStats = new ArrayList<>();
     for (int i = 0; i < operands_.size(); ++i) {
       List<Expr> selectExprs = operands_.get(i).getQueryStmt().getResultExprs();
       for (int j = 0; j < selectExprs.size(); ++j) {

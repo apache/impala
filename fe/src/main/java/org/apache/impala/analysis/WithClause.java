@@ -17,6 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -26,9 +29,6 @@ import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Representation of the WITH clause that may appear before a query statement or insert
@@ -102,7 +102,7 @@ public class WithClause extends StmtNode {
    */
   private WithClause(WithClause other) {
     Preconditions.checkNotNull(other);
-    views_ = Lists.newArrayList();
+    views_ = new ArrayList<>();
     for (View view: other.views_) {
       views_.add(new View(view.getName(), view.getQueryStmt().clone(),
           view.getOriginalColLabels()));
@@ -123,7 +123,7 @@ public class WithClause extends StmtNode {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    List<String> viewStrings = Lists.newArrayList();
+    List<String> viewStrings = new ArrayList<>();
     for (View view: views_) {
       // Enclose the view alias and explicit labels in quotes if Hive cannot parse it
       // without quotes. This is needed for view compatibility between Impala and Hive.

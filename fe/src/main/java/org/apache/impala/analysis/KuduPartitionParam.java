@@ -17,6 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -25,12 +28,11 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TKuduPartitionByHashParam;
 import org.apache.impala.thrift.TKuduPartitionByRangeParam;
 import org.apache.impala.thrift.TKuduPartitionParam;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Represents the partitioning of a Kudu table as defined in the PARTITION BY
@@ -92,7 +94,7 @@ public class KuduPartitionParam extends StmtNode {
 
   // Columns of this partitioning. If no columns are specified, all
   // the primary key columns of the associated table are used.
-  private final List<String> colNames_ = Lists.newArrayList();
+  private final List<String> colNames_ = new ArrayList<>();
 
   // Map of primary key column names to the associated column definitions. Must be set
   // before the call to analyze().
@@ -161,7 +163,7 @@ public class KuduPartitionParam extends StmtNode {
     } else {
       builder.append(" (");
       if (rangePartitions_ != null) {
-        List<String> partsSql = Lists.newArrayList();
+        List<String> partsSql = new ArrayList<>();
         for (RangePartition rangePartition: rangePartitions_) {
           partsSql.add(rangePartition.toSql(options));
         }

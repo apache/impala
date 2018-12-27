@@ -17,9 +17,11 @@
 
 package org.apache.impala.analysis;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
@@ -28,10 +30,9 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPartitionKeyValue;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 /**
  * Represents a partition spec - a collection of partition key/values.
@@ -126,7 +127,7 @@ public class PartitionSpec extends PartitionSpecBase {
    * Returns the Thrift representation of this PartitionSpec.
    */
   public List<TPartitionKeyValue> toThrift() {
-    List<TPartitionKeyValue> thriftPartitionSpec = Lists.newArrayList();
+    List<TPartitionKeyValue> thriftPartitionSpec = new ArrayList<>();
     for (PartitionKeyValue kv: partitionSpec_) {
       String value = PartitionKeyValue.getPartitionKeyValueString(
           kv.getLiteralValue(),  getNullPartitionKeyValue());
@@ -137,7 +138,7 @@ public class PartitionSpec extends PartitionSpecBase {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    List<String> partitionSpecStr = Lists.newArrayList();
+    List<String> partitionSpecStr = new ArrayList<>();
     for (PartitionKeyValue kv: partitionSpec_) {
       partitionSpecStr.add(kv.getColName() + "=" + kv.getValue().toSql(options));
     }

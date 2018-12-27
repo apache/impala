@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -37,7 +38,6 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.THdfsFileFormat;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a CREATE TABLE AS SELECT (CTAS) statement
@@ -96,7 +96,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     partitionKeys_ = params.partitionKeys;
     List<PartitionKeyValue> pkvs = null;
     if (partitionKeys_ != null) {
-      pkvs = Lists.newArrayList();
+      pkvs = new ArrayList<>();
       for (String key: partitionKeys_) {
         pkvs.add(new PartitionKeyValue(key, null));
       }

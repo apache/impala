@@ -17,6 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
@@ -32,9 +35,6 @@ import org.apache.impala.thrift.TPrivilegeScope;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Represents a privilege spec from a GRANT/REVOKE statement.
@@ -106,7 +106,7 @@ public class PrivilegeSpec extends StmtNode {
   }
 
   public List<TPrivilege> toThrift() {
-    List<TPrivilege> privileges = Lists.newArrayList();
+    List<TPrivilege> privileges = new ArrayList<>();
     if (scope_ == TPrivilegeScope.COLUMN) {
       // Create a TPrivilege for every referenced column
       for (String column: columnNames_) {

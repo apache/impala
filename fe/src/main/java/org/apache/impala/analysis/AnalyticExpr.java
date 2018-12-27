@@ -63,7 +63,7 @@ public class AnalyticExpr extends Expr {
   private final List<Expr> partitionExprs_;
   // These elements are modified to point to the corresponding child exprs to keep them
   // in sync through expr substitutions.
-  private List<OrderByElement> orderByElements_ = Lists.newArrayList();
+  private List<OrderByElement> orderByElements_ = new ArrayList<>();
   private AnalyticWindow window_;
 
   // If set, requires the window to be set to null in resetAnalysisState(). Required for
@@ -156,7 +156,7 @@ public class AnalyticExpr extends Expr {
       needsSpace = true;
     }
     if (!orderByElements_.isEmpty()) {
-      List<String> orderByStrings = Lists.newArrayList();
+      List<String> orderByStrings = new ArrayList<>();
       for (OrderByElement e: orderByElements_) {
         orderByStrings.add(e.toSql(options));
       }
@@ -272,7 +272,7 @@ public class AnalyticExpr extends Expr {
         new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rankExpr, one),
         new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, countExpr, one));
 
-    List<Expr> ifParams = Lists.newArrayList();
+    List<Expr> ifParams = new ArrayList<>();
     ifParams.add(
       new BinaryPredicate(BinaryPredicate.Operator.EQ, one, countExpr));
     ifParams.add(zero);
@@ -322,7 +322,7 @@ public class AnalyticExpr extends Expr {
     AnalyticExpr rowNumExpr = create("row_number", analyticExpr, true, false);
     AnalyticExpr countExpr = create("count", analyticExpr, false, false);
 
-    List<Expr> ifParams = Lists.newArrayList();
+    List<Expr> ifParams = new ArrayList<>();
     ifParams.add(
         new BinaryPredicate(BinaryPredicate.Operator.LT, bucketExpr, countExpr));
     ifParams.add(bucketExpr);
@@ -357,7 +357,7 @@ public class AnalyticExpr extends Expr {
       if (reverseOrderBy) {
         orderByElements = OrderByElement.reverse(referenceExpr.getOrderByElements());
       } else {
-        orderByElements = Lists.newArrayList();
+        orderByElements = new ArrayList<>();
         for (OrderByElement elem: referenceExpr.getOrderByElements()) {
           orderByElements.add(elem.clone());
         }

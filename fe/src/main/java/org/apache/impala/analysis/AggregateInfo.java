@@ -320,14 +320,14 @@ public class AggregateInfo extends AggregateInfoBase {
     Preconditions.checkState(mergeAggInfo_ == null);
     TupleDescriptor inputDesc = intermediateTupleDesc_;
     // construct grouping exprs
-    ArrayList<Expr> groupingExprs = new ArrayList<>();
+    List<Expr> groupingExprs = new ArrayList<>();
     for (int i = 0; i < getGroupingExprs().size(); ++i) {
       SlotRef slotRef = new SlotRef(inputDesc.getSlots().get(i));
       groupingExprs.add(slotRef);
     }
 
     // construct agg exprs
-    ArrayList<FunctionCallExpr> aggExprs = new ArrayList<>();
+    List<FunctionCallExpr> aggExprs = new ArrayList<>();
     for (int i = 0; i < getAggregateExprs().size(); ++i) {
       FunctionCallExpr inputExpr = getAggregateExprs().get(i);
       Preconditions.checkState(inputExpr.isAggregateFunction());

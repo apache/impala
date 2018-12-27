@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.catalog.ArrayType;
@@ -135,8 +136,8 @@ public class Path {
 
   // List of matched types and field positions set during resolution. The matched
   // types/positions describe the physical path through the schema tree.
-  private final List<Type> matchedTypes_ = Lists.newArrayList();
-  private final List<Integer> matchedPositions_ = Lists.newArrayList();
+  private final List<Type> matchedTypes_ = new ArrayList<>();
+  private final List<Integer> matchedPositions_ = new ArrayList<>();
 
   // Remembers the indices into rawPath_ and matchedTypes_ of the first collection
   // matched during resolution.
@@ -282,7 +283,7 @@ public class Path {
    */
   public static List<TableName> getCandidateTables(List<String> path, String sessionDb) {
     Preconditions.checkArgument(path != null && !path.isEmpty());
-    List<TableName> result = Lists.newArrayList();
+    List<TableName> result = new ArrayList<>();
     int end = Math.min(2, path.size());
     for (int tblNameIdx = 0; tblNameIdx < end; ++tblNameIdx) {
       String dbName = (tblNameIdx == 0) ? sessionDb : path.get(0);
@@ -391,7 +392,7 @@ public class Path {
    * mydb.test.a.item.f1
    */
   public List<String> getCanonicalPath() {
-    List<String> result = Lists.newArrayList();
+    List<String> result = new ArrayList<>();
     getCanonicalPath(result);
     return result;
   }
@@ -429,7 +430,7 @@ public class Path {
   public List<Integer> getAbsolutePath() {
     if (absolutePath_ != null) return absolutePath_;
     Preconditions.checkState(isResolved_);
-    absolutePath_ = Lists.newArrayList();
+    absolutePath_ = new ArrayList<>();
     if (rootDesc_ != null) absolutePath_.addAll(rootDesc_.getPath().getAbsolutePath());
     absolutePath_.addAll(matchedPositions_);
     return absolutePath_;
