@@ -1248,7 +1248,8 @@ public class Frontend {
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
       throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
-    LOG.info("Analyzing query: " + queryCtx.client_request.stmt);
+    LOG.info("Analyzing query: " + queryCtx.client_request.stmt + " db: "
+        + queryCtx.session.database);
 
     int attempt = 0;
     String retryMsg = "";
