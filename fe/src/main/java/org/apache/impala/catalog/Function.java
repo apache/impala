@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang.NotImplementedException;
@@ -39,7 +40,6 @@ import org.apache.impala.thrift.TSymbolType;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 
 /**
@@ -333,7 +333,7 @@ public class Function extends CatalogObjectImpl {
     Preconditions.checkArgument(fn.isSetArg_types());
     Preconditions.checkArgument(fn.isSetRet_type());
     Preconditions.checkArgument(fn.isSetHas_var_args());
-    List<Type> argTypes = Lists.newArrayList();
+    List<Type> argTypes = new ArrayList<>();
     for (TColumnType t: fn.getArg_types()) {
       argTypes.add(Type.fromThrift(t));
     }

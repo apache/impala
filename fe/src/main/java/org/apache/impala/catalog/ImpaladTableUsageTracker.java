@@ -17,8 +17,12 @@
 
 package org.apache.impala.catalog;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.service.BackendConfig;
@@ -32,10 +36,8 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Random;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 /**
  * Track the names and the number of usages of the recently used tables and report the
@@ -44,7 +46,7 @@ import java.util.Random;
 public class ImpaladTableUsageTracker {
   private static final Logger LOG = Logger.getLogger(ImpaladTableUsageTracker.class);
   private final static long REPORT_INTERVAL_MS = 10000;
-  private HashMap<TTableName, TTableUsage> unreportedUsages;
+  private Map<TTableName, TTableUsage> unreportedUsages;
   private Thread reportThread_;
 
   private ImpaladTableUsageTracker(boolean enabled) {

@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 
@@ -228,7 +229,7 @@ public class CatalogObjectToFromThriftTest {
       new HdfsPartition(hdfsTable, part.toHmsPartition(),
         Lists.newArrayList(LiteralExpr.create("11.1", ScalarType.createDecimalType(1, 0)),
             LiteralExpr.create("11.1", ScalarType.createDecimalType(1, 0))),
-        null, Lists.<HdfsPartition.FileDescriptor>newArrayList(),
+        null, new ArrayList<>(),
         TAccessLevel.READ_WRITE);
       fail("Expected metadata to be malformed.");
     } catch (SqlCastException e) {

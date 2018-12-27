@@ -31,6 +31,7 @@ import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -71,19 +72,19 @@ public abstract class Type {
   public static final ScalarType FIXED_UDA_INTERMEDIATE =
       ScalarType.createFixedUdaIntermediateType(-1);
 
-  private static ArrayList<ScalarType> integerTypes;
-  private static ArrayList<ScalarType> numericTypes;
-  private static ArrayList<ScalarType> supportedTypes;
-  private static ArrayList<ScalarType> unsupportedTypes;
+  private static List<ScalarType> integerTypes;
+  private static List<ScalarType> numericTypes;
+  private static List<ScalarType> supportedTypes;
+  private static List<ScalarType> unsupportedTypes;
 
   static {
-    integerTypes = Lists.newArrayList();
+    integerTypes = new ArrayList<>();
     integerTypes.add(TINYINT);
     integerTypes.add(SMALLINT);
     integerTypes.add(INT);
     integerTypes.add(BIGINT);
 
-    numericTypes = Lists.newArrayList();
+    numericTypes = new ArrayList<>();
     numericTypes.add(TINYINT);
     numericTypes.add(SMALLINT);
     numericTypes.add(INT);
@@ -92,7 +93,7 @@ public abstract class Type {
     numericTypes.add(DOUBLE);
     numericTypes.add(DECIMAL);
 
-    supportedTypes = Lists.newArrayList();
+    supportedTypes = new ArrayList<>();
     supportedTypes.add(NULL);
     supportedTypes.add(BOOLEAN);
     supportedTypes.add(TINYINT);
@@ -107,22 +108,22 @@ public abstract class Type {
     supportedTypes.add(TIMESTAMP);
     supportedTypes.add(DECIMAL);
 
-    unsupportedTypes = Lists.newArrayList();
+    unsupportedTypes = new ArrayList<>();
     unsupportedTypes.add(BINARY);
     unsupportedTypes.add(DATE);
     unsupportedTypes.add(DATETIME);
   }
 
-  public static ArrayList<ScalarType> getIntegerTypes() {
+  public static List<ScalarType> getIntegerTypes() {
     return integerTypes;
   }
-  public static ArrayList<ScalarType> getNumericTypes() {
+  public static List<ScalarType> getNumericTypes() {
     return numericTypes;
   }
-  public static ArrayList<ScalarType> getSupportedTypes() {
+  public static List<ScalarType> getSupportedTypes() {
     return supportedTypes;
   }
-  public static ArrayList<ScalarType> getUnsupportedTypes() {
+  public static List<ScalarType> getUnsupportedTypes() {
     return unsupportedTypes;
   }
 
@@ -229,7 +230,7 @@ public abstract class Type {
 
   public TColumnType toThrift() {
     TColumnType container = new TColumnType();
-    container.setTypes(new ArrayList<TTypeNode>());
+    container.setTypes(new ArrayList<>());
     toThrift(container);
     return container;
   }
@@ -367,8 +368,8 @@ public abstract class Type {
     return toThrift(Lists.newArrayList(types));
   }
 
-  public static List<TColumnType> toThrift(ArrayList<Type> types) {
-    ArrayList<TColumnType> result = Lists.newArrayList();
+  public static List<TColumnType> toThrift(List<Type> types) {
+    List<TColumnType> result = new ArrayList<>();
     for (Type t: types) {
       result.add(t.toThrift());
     }
@@ -429,7 +430,7 @@ public abstract class Type {
       }
       case STRUCT: {
         Preconditions.checkState(nodeIdx + node.getStruct_fieldsSize() < col.getTypesSize());
-        ArrayList<StructField> structFields = Lists.newArrayList();
+        List<StructField> structFields = new ArrayList<>();
         ++nodeIdx;
         for (int i = 0; i < node.getStruct_fieldsSize(); ++i) {
           TStructField thriftField = node.getStruct_fields().get(i);

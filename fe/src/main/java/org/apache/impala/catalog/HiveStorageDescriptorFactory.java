@@ -39,7 +39,7 @@ public class HiveStorageDescriptorFactory {
 
     StorageDescriptor sd = new StorageDescriptor();
     sd.setSerdeInfo(new org.apache.hadoop.hive.metastore.api.SerDeInfo());
-    sd.getSerdeInfo().setParameters(new HashMap<String, String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     // The compressed flag is not used to determine whether the table is compressed or
     // not. Instead, we use the input format or the filename.
     sd.setCompressed(false);

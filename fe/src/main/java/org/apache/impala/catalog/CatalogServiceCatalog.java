@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -62,8 +61,8 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
-import org.apache.impala.thrift.TPartialCatalogInfo;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
+import org.apache.impala.thrift.TPartialCatalogInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
@@ -73,8 +72,8 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
-import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
+import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
 import org.apache.log4j.Logger;
@@ -83,10 +82,10 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
 import com.codahale.metrics.Timer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 
@@ -339,12 +338,13 @@ public class CatalogServiceCatalog extends Catalog {
       incrementVersions_ = incrementVersions;
     }
 
+    @Override
     public void run() {
       if (LOG.isTraceEnabled()) LOG.trace("Reloading cache pool names from HDFS");
 
       // Map of cache pool name to CachePoolInfo. Stored in a map to allow Set operations
       // to be performed on the keys.
-      Map<String, CachePoolInfo> currentCachePools = Maps.newHashMap();
+      Map<String, CachePoolInfo> currentCachePools = new HashMap<>();
       try {
         DistributedFileSystem dfs = FileSystemUtil.getDistributedFileSystem();
         RemoteIterator<CachePoolEntry> itr = dfs.listCachePools();
@@ -462,7 +462,7 @@ public class CatalogServiceCatalog extends Catalog {
     // Table must be loaded.
     Preconditions.checkState(table.isLoaded());
 
-    Map<String, ByteBuffer> stats = Maps.newHashMap();
+    Map<String, ByteBuffer> stats = new HashMap<>();
     HdfsTable hdfsTable = (HdfsTable) table;
     hdfsTable.getLock().lock();
     try {
@@ -938,8 +938,8 @@ public class CatalogServiceCatalog extends Catalog {
     }
 
     // Contains map of overloaded function names to all functions matching that name.
-    HashMap<String, List<Function>> dbFns = db.getAllFunctions();
-    List<Function> fns = new ArrayList<Function>(dbFns.size());
+    Map<String, List<Function>> dbFns = db.getAllFunctions();
+    List<Function> fns = new ArrayList<>(dbFns.size());
     for (List<Function> fnOverloads: dbFns.values()) {
       for (Function fn: fnOverloads) {
         fns.add(fn);
@@ -1006,7 +1006,7 @@ public class CatalogServiceCatalog extends Catalog {
     Db tmpDb;
     try {
       List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
-          Lists.newArrayList();
+          new ArrayList<>();
       for (String javaFn : msClient.getHiveClient().getFunctions(dbName, "*")) {
         javaFns.add(msClient.getHiveClient().getFunction(dbName, javaFn));
       }
@@ -1068,7 +1068,7 @@ public class CatalogServiceCatalog extends Catalog {
       MetaStoreClient msClient, String dbName, Db existingDb) {
     try {
       List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
-          Lists.newArrayList();
+          new ArrayList<>();
       for (String javaFn: msClient.getHiveClient().getFunctions(dbName, "*")) {
         javaFns.add(msClient.getHiveClient().getFunction(dbName, javaFn));
       }
@@ -1091,7 +1091,7 @@ public class CatalogServiceCatalog extends Catalog {
       loadJavaFunctions(newDb, javaFns);
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
 
-      List<TTableName> tblsToBackgroundLoad = Lists.newArrayList();
+      List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
       for (String tableName: msClient.getHiveClient().getAllTables(dbName)) {
         Table incompleteTbl = IncompleteTable.createUninitializedTable(newDb, tableName);
         incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
@@ -1184,8 +1184,8 @@ public class CatalogServiceCatalog extends Catalog {
 
       // Build a new DB cache, populate it, and replace the existing cache in one
       // step.
-      ConcurrentHashMap<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
-      List<TTableName> tblsToBackgroundLoad = Lists.newArrayList();
+      Map<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
+      List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         for (String dbName: msClient.getHiveClient().getAllDatabases()) {
           dbName = dbName.toLowerCase();
@@ -1664,7 +1664,7 @@ public class CatalogServiceCatalog extends Catalog {
    * If a user with the same name already exists it will be overwritten.
    */
   public User addUser(String userName) {
-    Principal user = addPrincipal(userName, Sets.<String>newHashSet(),
+    Principal user = addPrincipal(userName, new HashSet<>(),
         TPrincipalType.USER);
     Preconditions.checkState(user instanceof User);
     return (User) user;
@@ -2073,8 +2073,8 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TGetCatalogUsageResponse getCatalogUsage() {
     TGetCatalogUsageResponse usage = new TGetCatalogUsageResponse();
-    usage.setLarge_tables(Lists.<TTableUsageMetrics>newArrayList());
-    usage.setFrequently_accessed_tables(Lists.<TTableUsageMetrics>newArrayList());
+    usage.setLarge_tables(new ArrayList<>());
+    usage.setFrequently_accessed_tables(new ArrayList<>());
     for (Table largeTable: CatalogUsageMonitor.INSTANCE.getLargestTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(largeTable.getTableName().toThrift());

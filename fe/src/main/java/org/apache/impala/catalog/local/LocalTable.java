@@ -185,14 +185,14 @@ abstract class LocalTable implements FeTable {
   }
 
   @Override
-  public ArrayList<Column> getColumns() {
+  public List<Column> getColumns() {
     // TODO(todd) why does this return ArrayList instead of List?
     return new ArrayList<>(cols_.colsByPos_);
   }
 
   @Override
   public List<Column> getColumnsInHiveOrder() {
-    ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
+    List<Column> columns = Lists.newArrayList(getNonClusteringColumns());
     columns.addAll(getClusteringColumns());
     return columns;
   }
@@ -327,7 +327,7 @@ abstract class LocalTable implements FeTable {
 
 
     private static StructType columnsToStructType(List<Column> cols) {
-      ArrayList<StructField> fields = Lists.newArrayListWithCapacity(cols.size());
+      List<StructField> fields = Lists.newArrayListWithCapacity(cols.size());
       for (Column col : cols) {
         fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
       }

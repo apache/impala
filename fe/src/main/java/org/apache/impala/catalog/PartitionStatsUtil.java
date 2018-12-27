@@ -17,25 +17,25 @@
 
 package org.apache.impala.catalog;
 
-import org.apache.impala.common.Reference;
-import org.apache.impala.thrift.TPartitionStats;
-import org.apache.impala.common.JniUtil;
-import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.util.CompressionUtil;
-import org.apache.impala.util.MetaStoreUtil;
-
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.codec.binary.Base64;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.apache.thrift.TSerializer;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.Reference;
+import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.util.CompressionUtil;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
-import com.google.common.base.Preconditions;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
 
 /**
  * Handles serialising and deserialising intermediate statistics from the Hive MetaStore
@@ -188,7 +188,7 @@ public class PartitionStatsUtil {
 
   static private List<String> chunkStringForHms(String data, int chunkLen) {
     int idx = 0;
-    List<String> ret = Lists.newArrayList();
+    List<String> ret = new ArrayList<>();
     while (idx < data.length()) {
       int remaining = data.length() - idx;
       int chunkSize = (chunkLen > remaining) ? remaining : chunkLen;

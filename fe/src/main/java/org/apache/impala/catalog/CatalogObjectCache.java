@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -55,8 +56,7 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
   // new entries may require two cache accesses that must be performed atomically.
   // TODO: For simplicity, consider using a (non-concurrent) HashMap and marking
   // all methods as synchronized.
-  private final ConcurrentHashMap<String, T> metadataCache_ =
-      new ConcurrentHashMap<String, T>();
+  private final Map<String, T> metadataCache_ = new ConcurrentHashMap<String, T>();
 
   /**
    * Adds a new catalogObject to the cache. If a catalogObject with the same name already

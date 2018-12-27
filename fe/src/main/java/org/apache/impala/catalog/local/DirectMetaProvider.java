@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -292,7 +293,7 @@ class DirectMetaProvider implements MetaProvider {
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
     Path partDir = new Path(msPartition.getSd().getLocation());
 
-    List<LocatedFileStatus> stats = Lists.newArrayList();
+    List<LocatedFileStatus> stats = new ArrayList<>();
     try {
       FileSystem fs = partDir.getFileSystem(CONF);
       RemoteIterator<LocatedFileStatus> it = fs.listFiles(partDir, /*recursive=*/false);

@@ -20,23 +20,21 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-
 import org.apache.impala.thrift.TColumnType;
-import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Describes a STRUCT type. STRUCT types have a list of named struct fields.
  */
 public class StructType extends Type {
-  private final HashMap<String, StructField> fieldMap_ = Maps.newHashMap();
+  private final Map<String, StructField> fieldMap_ = new HashMap<>();
   private final List<StructField> fields_;
 
   public StructType(List<StructField> fields) {
@@ -49,13 +47,13 @@ public class StructType extends Type {
   }
 
   public StructType() {
-    fields_ = Lists.newArrayList();
+    fields_ = new ArrayList<>();
   }
 
   @Override
   public String toSql(int depth) {
     if (depth >= MAX_NESTING_DEPTH) return "STRUCT<...>";
-    ArrayList<String> fieldsSql = Lists.newArrayList();
+    List<String> fieldsSql = new ArrayList<>();
     for (StructField f: fields_) fieldsSql.add(f.toSql(depth + 1));
     return String.format("STRUCT<%s>", Joiner.on(",").join(fieldsSql));
   }
@@ -63,7 +61,7 @@ public class StructType extends Type {
   @Override
   protected String prettyPrint(int lpad) {
     String leftPadding = StringUtils.repeat(' ', lpad);
-    ArrayList<String> fieldsSql = Lists.newArrayList();
+    List<String> fieldsSql = new ArrayList<>();
     for (StructField f: fields_) fieldsSql.add(f.prettyPrint(lpad + 2));
     return String.format("%sSTRUCT<\n%s\n%s>",
         leftPadding, Joiner.on(",\n").join(fieldsSql), leftPadding);
@@ -100,7 +98,7 @@ public class StructType extends Type {
     Preconditions.checkNotNull(fields_);
     Preconditions.checkState(!fields_.isEmpty());
     node.setType(TTypeNodeType.STRUCT);
-    node.setStruct_fields(new ArrayList<TStructField>());
+    node.setStruct_fields(new ArrayList<>());
     for (StructField field: fields_) {
       field.toThrift(container, node);
     }

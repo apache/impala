@@ -23,8 +23,7 @@ import java.util.Map;
 public class TestSchemaUtils {
   // maps from PrimitiveType to column name
   // in alltypes table
-  private static Map<Type, String> typeToColumnNameMap_ =
-      new HashMap<Type, String>();
+  private static Map<Type, String> typeToColumnNameMap_ = new HashMap<>();
   static {
     typeToColumnNameMap_.put(Type.BOOLEAN, "bool_col");
     typeToColumnNameMap_.put(Type.TINYINT, "tinyint_col");

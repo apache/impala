@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,7 +53,6 @@ import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Base class for table metadata.
@@ -94,10 +94,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
-  protected final ArrayList<Column> colsByPos_ = Lists.newArrayList();
+  protected final ArrayList<Column> colsByPos_ = new ArrayList<>();
 
   // map from lowercase column name to Column object.
-  private final Map<String, Column> colsByName_ = Maps.newHashMap();
+  private final Map<String, Column> colsByName_ = new HashMap<>();
 
   // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
   protected final ArrayType type_ = new ArrayType(new StructType());
@@ -135,6 +135,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   public ReentrantLock getLock() { return tableLock_; }
+  @Override
   public abstract TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions);
 
@@ -214,7 +215,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // stats. This method allows each table type to volunteer the set of columns we should
   // ask the metastore for in loadAllColumnStats().
   protected List<String> getColumnNamesWithHmsStats() {
-    List<String> ret = Lists.newArrayList();
+    List<String> ret = new ArrayList<>();
     for (String name: colsByName_.keySet()) ret.add(name);
     return ret;
   }
@@ -356,8 +357,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     table.setAccess_level(accessLevel_);
 
     // Populate both regular columns and clustering columns (if there are any).
-    table.setColumns(new ArrayList<TColumn>());
-    table.setClustering_columns(new ArrayList<TColumn>());
+    table.setColumns(new ArrayList<>());
+    table.setClustering_columns(new ArrayList<>());
     for (int i = 0; i < colsByPos_.size(); ++i) {
       TColumn colDesc = colsByPos_.get(i).toThrift();
       // Clustering columns come first.
@@ -453,7 +454,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   @Override // FeTable
-  public ArrayList<Column> getColumns() { return colsByPos_; }
+  public List<Column> getColumns() { return colsByPos_; }
 
   @Override // FeTable
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }
@@ -474,7 +475,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   @Override // FeTable
   public List<Column> getColumnsInHiveOrder() {
-    ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
+    List<Column> columns = Lists.newArrayList(getNonClusteringColumns());
     columns.addAll(getClusteringColumns());
     return Collections.unmodifiableList(columns);
   }

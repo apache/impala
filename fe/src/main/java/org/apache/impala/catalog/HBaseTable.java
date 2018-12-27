@@ -17,8 +17,10 @@
 
 package org.apache.impala.catalog;
 
-import com.codahale.metrics.Timer;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -29,10 +31,8 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import com.codahale.metrics.Timer;
+import com.google.common.base.Preconditions;
 
 /**
  * Impala representation of HBase table metadata,
@@ -146,7 +146,7 @@ public class HBaseTable extends Table implements FeHBaseTable {
    * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() {
+  public List<Column> getColumnsInHiveOrder() {
     return getColumns();
   }
 

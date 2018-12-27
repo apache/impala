@@ -17,10 +17,10 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.thrift.TPrimitiveType;
-import com.google.common.collect.Lists;
 
 public enum PrimitiveType {
   INVALID_TYPE("INVALID_TYPE", -1, TPrimitiveType.INVALID_TYPE),
@@ -99,7 +99,7 @@ public enum PrimitiveType {
   public TPrimitiveType toThrift() { return thriftType_; }
 
   public static List<TPrimitiveType> toThrift(PrimitiveType[] types) {
-    List<TPrimitiveType> result = Lists.newArrayList();
+    List<TPrimitiveType> result = new ArrayList<>();
     for (PrimitiveType t: types) {
       result.add(t.toThrift());
     }

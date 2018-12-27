@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -34,7 +35,6 @@ import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 
 /**
 * Class that manages scheduling the loading of table metadata from the Hive Metastore and
@@ -114,13 +114,13 @@ public class TableLoadingMgr {
   // attempts to load the same table by a different thread become no-ops.
   // This map is different from loadingTables_ because the latter tracks all in-flight
   // loads - even those being processed by threads other than table loading threads.
-  private final ConcurrentHashMap<TTableName, AtomicBoolean> tableLoadingBarrier_ =
-      new ConcurrentHashMap<TTableName, AtomicBoolean>();
+  private final Map<TTableName, AtomicBoolean> tableLoadingBarrier_ =
+      new ConcurrentHashMap<>();
 
   // Map of table name to a FutureTask associated with the table load. Used to
   // prevent duplicate loads of the same table.
-  private final ConcurrentHashMap<TTableName, FutureTask<Table>> loadingTables_ =
-      new ConcurrentHashMap<TTableName, FutureTask<Table>>();
+  private final Map<TTableName, FutureTask<Table>> loadingTables_ =
+      new ConcurrentHashMap<>();
 
   // Map of table name to the cache directives that are being waited on for that table.
   // Once all directives have completed, the table's metadata will be refreshed and
@@ -128,7 +128,7 @@ public class TableLoadingMgr {
   // A caching operation may take a long time to complete, so to maximize query
   // throughput it is preferable to allow the user to continue to run queries against
   // the table while a cache request completes in the background.
-  private final Map<TTableName, List<Long>> pendingTableCacheDirs_ = Maps.newHashMap();
+  private final Map<TTableName, List<Long>> pendingTableCacheDirs_ = new HashMap<>();
 
   // The number of parallel threads to use to load table metadata. Should be set to a
   // value that provides good throughput while not putting too much stress on the

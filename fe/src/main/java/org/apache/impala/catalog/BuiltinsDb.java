@@ -804,7 +804,7 @@ public class BuiltinsDb extends Db {
     Db db = this;
     // Count (*)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
-        new ArrayList<Type>(), Type.BIGINT, Type.BIGINT,
+        new ArrayList<>(), Type.BIGINT, Type.BIGINT,
         prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
         prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
         prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",

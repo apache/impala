@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -30,8 +31,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import avro.shaded.com.google.common.collect.Lists;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
@@ -52,6 +51,7 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.junit.Test;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 public class PartialCatalogInfoTest {
@@ -97,7 +97,7 @@ public class PartialCatalogInfoTest {
     Preconditions.checkState(requestCount > 0);
     final ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(requestCount);
     final List<Future<TGetPartialCatalogObjectResponse>> tasksToWaitFor =
-        Lists.newArrayList();
+        new ArrayList<>();
     for (int i = 0; i < requestCount; ++i) {
       tasksToWaitFor.add(threadPoolExecutor.submit(new
           CallableGetPartialCatalogObjectRequest(request)));

@@ -17,10 +17,11 @@
 
 package org.apache.impala.catalog;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -90,7 +91,7 @@ public class TopicUpdateLog {
 
   // Entries in the topic update log stored as a map of catalog object keys to
   // Entry objects.
-  private final ConcurrentHashMap<String, Entry> topicLogEntries_ =
+  private final Map<String, Entry> topicLogEntries_ =
       new ConcurrentHashMap<>();
 
   /**

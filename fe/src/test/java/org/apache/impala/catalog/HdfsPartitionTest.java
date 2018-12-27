@@ -18,7 +18,8 @@
 package org.apache.impala.catalog;
 
 import static org.apache.impala.catalog.HdfsPartition.comparePartitionKeyValues;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,13 +49,13 @@ public class HdfsPartitionTest {
     FeSupport.loadLibrary();
   }
 
-  private List<LiteralExpr> valuesNull_= Lists.newArrayList();
-  private List<LiteralExpr> valuesDecimal_ = Lists.newArrayList();
-  private List<LiteralExpr> valuesDecimal1_ = Lists.newArrayList();
-  private List<LiteralExpr> valuesDecimal2_ = Lists.newArrayList();
-  private List<LiteralExpr> valuesMixed_= Lists.newArrayList();
-  private List<LiteralExpr> valuesMixed1_ = Lists.newArrayList();
-  private List<LiteralExpr> valuesMixed2_ = Lists.newArrayList();
+  private List<LiteralExpr> valuesNull_= new ArrayList<>();
+  private List<LiteralExpr> valuesDecimal_ = new ArrayList<>();
+  private List<LiteralExpr> valuesDecimal1_ = new ArrayList<>();
+  private List<LiteralExpr> valuesDecimal2_ = new ArrayList<>();
+  private List<LiteralExpr> valuesMixed_= new ArrayList<>();
+  private List<LiteralExpr> valuesMixed1_ = new ArrayList<>();
+  private List<LiteralExpr> valuesMixed2_ = new ArrayList<>();
 
   public HdfsPartitionTest() {
     valuesNull_.add(NullLiteral.create(Type.BIGINT));
@@ -77,7 +78,7 @@ public class HdfsPartitionTest {
 
   @Test
   public void testCompare() {
-    List<List<LiteralExpr>> allLists = Lists.newArrayList();
+    List<List<LiteralExpr>> allLists = new ArrayList<>();
     allLists.add(valuesNull_);
     allLists.add(valuesDecimal_);
     allLists.add(valuesDecimal1_);
@@ -96,7 +97,7 @@ public class HdfsPartitionTest {
       }
     }
 
-    List<LiteralExpr> valuesTest = Lists.newArrayList();
+    List<LiteralExpr> valuesTest = new ArrayList<>();
     valuesTest.add(NumericLiteral.create(3));
     verifyAntiSymmetric(valuesDecimal1_, valuesTest, valuesNull_);
     valuesTest.add(NullLiteral.create(Type.BIGINT));

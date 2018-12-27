@@ -17,13 +17,13 @@
 
 package org.apache.impala.catalog;
 
-import com.google.common.collect.Maps;
-import com.google.common.base.Strings;
-import com.google.common.base.Preconditions;
-import com.google.common.primitives.Shorts;
-
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.primitives.Shorts;
 
 /**
  * A singleton class that maps HDFS storage-UUIDs to per-host 0-based, sequential disk
@@ -44,12 +44,12 @@ public class DiskIdMapper {
     // Maps each storage ID UUID string returned by the BlockLocation API, to a per-node
     // sequential 0-based disk id used by the BE scanners. This assumes that
     // the storage ID of a particular disk is unique across all the nodes in the cluster.
-    private ConcurrentHashMap<String, Short> storageUuidToDiskId_ =
+    private Map<String, Short> storageUuidToDiskId_ =
         new ConcurrentHashMap<String, Short>();
 
     // Per-host ID generator for storage UUID to Short ID mapping. This maps each host
     // to the corresponding latest 0-based ID stored in a short.
-    private final HashMap<String, Short> storageIdGenerator_ = Maps.newHashMap();
+    private final Map<String, Short> storageIdGenerator_ = new HashMap<>();
 
     /**
      * Returns a disk id (0-based) index for storageUuid on host 'host'. Generates a

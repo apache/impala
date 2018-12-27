@@ -17,8 +17,12 @@
 
 package org.apache.impala.catalog;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.ClusterStatus;
@@ -54,11 +58,7 @@ import org.apache.impala.util.StatsHelper;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.log4j.Logger;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import com.google.common.base.Preconditions;
 
 public interface FeHBaseTable extends FeTable {
   /**
@@ -161,7 +161,7 @@ public interface FeHBaseTable extends FeTable {
 
       // Populate tmp cols in the order they appear in the Hive metastore.
       // We will reorder the cols below.
-      List<HBaseColumn> tmpCols = Lists.newArrayList();
+      List<HBaseColumn> tmpCols = new ArrayList<>();
       // Store the key column separately.
       // TODO: Change this to an ArrayList once we support composite row keys.
       HBaseColumn keyCol = null;

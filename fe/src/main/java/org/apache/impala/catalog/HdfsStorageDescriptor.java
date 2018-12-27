@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -31,7 +32,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Interner;
 import com.google.common.collect.Interners;
-import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
 
 /**
@@ -100,7 +100,7 @@ public class HdfsStorageDescriptor {
     // which means we need to use a default instead.
     // We tried long and hard to find default values for delimiters in Hive,
     // but could not find them.
-    Map<String, Byte> delimMap = Maps.newHashMap();
+    Map<String, Byte> delimMap = new HashMap<>();
 
     for (String delimKey: DELIMITER_KEYS) {
       String delimValue = serdeInfo.getParameters().get(delimKey);

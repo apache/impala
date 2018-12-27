@@ -17,17 +17,13 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaException;
@@ -43,11 +39,15 @@ import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TPartialDbInfo;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -84,7 +84,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // on this map. When a new Db object is initialized, this list is updated with the
   // UDF/UDAs already persisted, if any, in the metastore DB. Functions are sorted in a
   // canonical order defined by FunctionResolutionOrder.
-  private final HashMap<String, List<Function>> functions_;
+  private final Map<String, List<Function>> functions_;
 
   // If true, this database is an Impala system database.
   // (e.g. can't drop it, can't add tables to it, etc).
@@ -94,7 +94,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     thriftDb_ = new TDatabase(name.toLowerCase());
     thriftDb_.setMetastore_db(msDb);
     tableCache_ = new CatalogObjectCache<Table>();
-    functions_ = new HashMap<String, List<Function>>();
+    functions_ = new HashMap<>();
   }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
@@ -113,7 +113,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.metastore_db;
     Preconditions.checkNotNull(msDb);
     Map<String, String> hmsParams = msDb.getParameters();
-    if (hmsParams == null) hmsParams = Maps.newHashMap();
+    if (hmsParams == null) hmsParams = new HashMap<>();
     hmsParams.put(k,v);
     msDb.setParameters(hmsParams);
   }
@@ -147,6 +147,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
   /**
    * Gets all table names in the table cache.
    */
+  @Override
   public List<String> getAllTableNames() {
     return Lists.newArrayList(tableCache_.keySet());
   }
@@ -281,7 +282,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
       }
       List<Function> fns = functions_.get(fn.functionName());
       if (fns == null) {
-        fns = Lists.newArrayList();
+        fns = new ArrayList<>();
         functions_.put(fn.functionName(), fns);
       }
       if (addToDbParams && !addFunctionToDbParams(fn)) return false;
@@ -366,7 +367,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * This is not thread safe so a higher level lock must be taken while iterating
    * over the returned functions.
    */
-  public HashMap<String, List<Function>> getAllFunctions() {
+  public Map<String, List<Function>> getAllFunctions() {
     return functions_;
   }
 
@@ -374,7 +375,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * Returns a list of transient functions in this Db.
    */
   protected List<Function> getTransientFunctions() {
-    List<Function> result = Lists.newArrayList();
+    List<Function> result = new ArrayList<>();
     synchronized (functions_) {
       for (String fnKey: functions_.keySet()) {
         for (Function fn: functions_.get(fnKey)) {
@@ -390,10 +391,11 @@ public class Db extends CatalogObjectImpl implements FeDb {
   /**
    * Returns all functions that match the pattern of 'matcher'.
    */
+  @Override
   public List<Function> getFunctions(TFunctionCategory category,
       PatternMatcher matcher) {
     Preconditions.checkNotNull(matcher);
-    List<Function> result = Lists.newArrayList();
+    List<Function> result = new ArrayList<>();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
         if (!matcher.matches(fns.getKey())) continue;
@@ -416,7 +418,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     Preconditions.checkNotNull(name);
     synchronized (functions_) {
       List<Function> candidates = functions_.get(name);
-      if (candidates == null) return Lists.newArrayList();
+      if (candidates == null) return new ArrayList<>();
       return FunctionUtils.getVisibleFunctions(candidates);
     }
   }
@@ -427,7 +429,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     Preconditions.checkNotNull(name);
     synchronized (functions_) {
       List<Function> candidates = functions_.get(name);
-      if (candidates == null) return Lists.newArrayList();
+      if (candidates == null) return new ArrayList<>();
       return FunctionUtils.getVisibleFunctionsInCategory(candidates, category);
     }
   }

@@ -92,7 +92,7 @@ public class KuduTable extends Table implements FeKuduTable {
   private String kuduMasters_;
 
   // Primary key column names, the column names are all in lower case.
-  private final List<String> primaryKeyColumnNames_ = Lists.newArrayList();
+  private final List<String> primaryKeyColumnNames_ = new ArrayList<>();
 
   // Partitioning schemes of this Kudu table. Both range and hash-based partitioning are
   // supported.
@@ -118,7 +118,7 @@ public class KuduTable extends Table implements FeKuduTable {
    * Returns the columns in the order they have been created
    */
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() { return getColumns(); }
+  public List<Column> getColumnsInHiveOrder() { return getColumns(); }
 
   public static boolean isKuduTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return KUDU_STORAGE_HANDLER.equals(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
@@ -285,7 +285,7 @@ public class KuduTable extends Table implements FeKuduTable {
 
   private static List<KuduPartitionParam> loadPartitionByParamsFromThrift(
       List<TKuduPartitionParam> params) {
-    List<KuduPartitionParam> ret= Lists.newArrayList();
+    List<KuduPartitionParam> ret= new ArrayList<>();
     for (TKuduPartitionParam param: params) {
       if (param.isSetBy_hash_param()) {
         TKuduPartitionByHashParam hashParam = param.getBy_hash_param();
@@ -318,7 +318,7 @@ public class KuduTable extends Table implements FeKuduTable {
     Preconditions.checkNotNull(partitionBy_);
     // IMPALA-5154: partitionBy_ may be empty if Kudu table created outside Impala,
     // partition_by must be explicitly created because the field is required.
-    tbl.partition_by = Lists.newArrayList();
+    tbl.partition_by = new ArrayList<>();
     for (KuduPartitionParam partitionParam: partitionBy_) {
       tbl.addToPartition_by(partitionParam.toThrift());
     }

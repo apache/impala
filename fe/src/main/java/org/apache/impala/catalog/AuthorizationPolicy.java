@@ -17,11 +17,13 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.net.ntp.TimeStamp;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
@@ -30,17 +32,15 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
-import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.util.TResultRowBuilder;
 import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 
-import org.apache.impala.util.TResultRowBuilder;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -80,12 +80,12 @@ public class AuthorizationPolicy implements PrivilegeCache {
   private final CatalogObjectCache<User> userCache_ = new CatalogObjectCache<>(false);
 
   // Map of principal ID -> user/role name. Used to match privileges to users/roles.
-  private final Map<Integer, String> principalIds_ = Maps.newHashMap();
+  private final Map<Integer, String> principalIds_ = new HashMap<>();
 
   // Map of group name (case sensitive) to set of role names (case insensitive) that
   // have been granted to this group. Kept in sync with roleCache_. Provides efficient
   // lookups of Role by group name.
-  Map<String, Set<String>> groupsToRoles_ = Maps.newHashMap();
+  Map<String, Set<String>> groupsToRoles_ = new HashMap<>();
 
   /**
    * Adds a new principal to the policy. If a principal with the same name already
@@ -125,7 +125,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     for (String groupName: principal.getGrantGroups()) {
       Set<String> grantedRoles = groupsToRoles_.get(groupName);
       if (grantedRoles == null) {
-        grantedRoles = Sets.newHashSet();
+        grantedRoles = new HashSet<>();
         groupsToRoles_.put(groupName, grantedRoles);
       }
       grantedRoles.add(principal.getName().toLowerCase());
@@ -268,7 +268,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * Gets all roles granted to the specified group.
    */
   public synchronized List<Role> getGrantedRoles(String groupName) {
-    List<Role> grantedRoles = Lists.newArrayList();
+    List<Role> grantedRoles = new ArrayList<>();
     Set<String> roleNames = groupsToRoles_.get(groupName);
     if (roleNames != null) {
       for (String roleName: roleNames) {
@@ -379,7 +379,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     role.addGrantGroup(groupName);
     Set<String> grantedRoles = groupsToRoles_.get(groupName);
     if (grantedRoles == null) {
-      grantedRoles = Sets.newHashSet();
+      grantedRoles = new HashSet<>();
       groupsToRoles_.put(groupName, grantedRoles);
     }
     grantedRoles.add(roleName.toLowerCase());
@@ -409,7 +409,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
   @Override
   public synchronized Set<String> listPrivileges(Set<String> groups,
       ActiveRoleSet roleSet) {
-    Set<String> privileges = Sets.newHashSet();
+    Set<String> privileges = new HashSet<>();
     if (roleSet != ActiveRoleSet.ALL) {
       throw new UnsupportedOperationException("Impala does not support role subsets.");
     }
@@ -473,7 +473,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     TResultSet result = new TResultSet();
     result.setSchema(new TResultSetMetadata());
     addColumnOutputColumns(result.getSchema());
-    result.setRows(Lists.<TResultRow>newArrayList());
+    result.setRows(new ArrayList<>());
 
     Role role = getRole(principalName);
     if (role != null) {
@@ -550,7 +550,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     result.getSchema().addToColumns(new TColumn("principal_name",
         Type.STRING.toThrift()));
     addColumnOutputColumns(result.getSchema());
-    result.setRows(Lists.<TResultRow>newArrayList());
+    result.setRows(new ArrayList<>());
 
     // A user should be considered to not exist if they do not have any groups.
     Set<String> groupNames = fe.getAuthzChecker().getUserGroups(
@@ -567,7 +567,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
 
     // Get the groups that user belongs to, get the roles those groups belong to and
     // return those privileges as well.
-    List<Role> roles = Lists.newArrayList();
+    List<Role> roles = new ArrayList<>();
     for (String groupName: groupNames) {
       roles.addAll(fe.getCatalog().getAuthPolicy().getGrantedRoles(groupName));
     }

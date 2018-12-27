@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
@@ -28,7 +29,6 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolType;
-import org.apache.kudu.shaded.com.google.common.collect.Lists;
 
 import com.google.common.base.Preconditions;
 
@@ -209,7 +209,7 @@ public class AggregateFunction extends Function {
    */
   public static List<Expr> getCanonicalDistinctAggChildren(FunctionCallExpr aggFn) {
     Preconditions.checkState(aggFn.isDistinct());
-    List<Expr> result = Lists.newArrayList();
+    List<Expr> result = new ArrayList<>();
     if (aggFn.getFnName().getFunction().equalsIgnoreCase("group_concat")) {
       result.add(aggFn.getChild(0).ignoreImplicitCast());
     } else {

@@ -176,7 +176,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     Preconditions.checkNotNull(partitionBy_);
     // IMPALA-5154: partitionBy_ may be empty if Kudu table created outside Impala,
     // partition_by must be explicitly created because the field is required.
-    tbl.partition_by = Lists.newArrayList();
+    tbl.partition_by = new ArrayList<>();
     for (KuduPartitionParam partitionParam: partitionBy_) {
       tbl.addToPartition_by(partitionParam.toThrift());
     }

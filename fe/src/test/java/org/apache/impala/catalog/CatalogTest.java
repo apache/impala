@@ -70,7 +70,6 @@ import org.junit.Test;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
@@ -430,7 +429,7 @@ public class CatalogTest {
     assertEquals(24, partitions.size());
     Set<HdfsStorageDescriptor> uniqueSds = Collections.newSetFromMap(
         new IdentityHashMap<HdfsStorageDescriptor, Boolean>());
-    Set<Long> months = Sets.newHashSet();
+    Set<Long> months = new HashSet<>();
     for (FeFsPartition p: partitions) {
       assertEquals(2, p.getPartitionValues().size());
 
@@ -740,7 +739,7 @@ public class CatalogTest {
 
   private List<String> getFunctionSignatures(String db) throws DatabaseNotFoundException {
     List<Function> fns = catalog_.getFunctions(db);
-    List<String> names = Lists.newArrayList();
+    List<String> names = new ArrayList<>();
     for (Function fn: fns) {
       names.add(fn.signatureString());
     }
@@ -752,9 +751,9 @@ public class CatalogTest {
     List<String> fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 0);
 
-    ArrayList<Type> args1 = Lists.newArrayList();
-    ArrayList<Type> args2 = Lists.<Type>newArrayList(Type.INT);
-    ArrayList<Type> args3 = Lists.<Type>newArrayList(Type.TINYINT);
+    List<Type> args1 = new ArrayList<>();
+    List<Type> args2 = Lists.<Type>newArrayList(Type.INT);
+    List<Type> args3 = Lists.<Type>newArrayList(Type.TINYINT);
 
     catalog_.removeFunction(
         new Function(new FunctionName("default", "Foo"), args1,
@@ -837,7 +836,7 @@ public class CatalogTest {
     assertEquals(fnNames.size(), 0);
 
     // Test to check if catalog can handle loading corrupt udfs
-    HashMap<String, String> dbParams = Maps.newHashMap();
+    Map<String, String> dbParams = new HashMap<>();
     String badFnKey = "impala_registered_function_badFn";
     String badFnVal = Base64.encodeBase64String("badFn".getBytes());
     String dbName = "corrupt_udf_test";
@@ -899,7 +898,7 @@ public class CatalogTest {
     assertNull(catalog_.getAuthPolicy().getPrincipal("role1", TPrincipalType.USER));
     assertNull(catalog_.getAuthPolicy().getPrincipal("role2", TPrincipalType.ROLE));
     // Add the same role, the old role will be deleted.
-    role = catalog_.addRole("role1", new HashSet<String>());
+    role = catalog_.addRole("role1", new HashSet<>());
     assertSame(role, authPolicy.getPrincipal("role1", TPrincipalType.ROLE));
     // Delete the role.
     assertSame(role, catalog_.removeRole("role1"));
@@ -912,7 +911,7 @@ public class CatalogTest {
     for (int i = 0; i < size; i++) {
       String name = prefix + i;
       catalog_.addUser(name);
-      catalog_.addRole(name, new HashSet<String>());
+      catalog_.addRole(name, new HashSet<>());
     }
 
     for (int i = 0; i < size; i++) {

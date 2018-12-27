@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -40,7 +41,6 @@ import org.apache.kudu.client.PartitionSchema.RangeSchema;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Frontend interface for interacting with a Kudu-backed table.
@@ -100,13 +100,13 @@ public interface FeKuduTable extends FeTable {
 
     public static List<KuduPartitionParam> loadPartitionByParams(
         org.apache.kudu.client.KuduTable kuduTable) {
-      List<KuduPartitionParam> ret = Lists.newArrayList();
+      List<KuduPartitionParam> ret = new ArrayList<>();
 
       Preconditions.checkNotNull(kuduTable);
       Schema tableSchema = kuduTable.getSchema();
       PartitionSchema partitionSchema = kuduTable.getPartitionSchema();
       for (HashBucketSchema hashBucketSchema: partitionSchema.getHashBucketSchemas()) {
-        List<String> columnNames = Lists.newArrayList();
+        List<String> columnNames = new ArrayList<>();
         for (int colId: hashBucketSchema.getColumnIds()) {
           columnNames.add(getColumnNameById(tableSchema, colId));
         }
@@ -116,7 +116,7 @@ public interface FeKuduTable extends FeTable {
       RangeSchema rangeSchema = partitionSchema.getRangeSchema();
       List<Integer> columnIds = rangeSchema.getColumns();
       if (columnIds.isEmpty()) return ret;
-      List<String> columnNames = Lists.newArrayList();
+      List<String> columnNames = new ArrayList<>();
       for (int colId: columnIds) columnNames.add(getColumnNameById(tableSchema, colId));
       // We don't populate the split values because Kudu's API doesn't currently support
       // retrieving the split values for range partitions.

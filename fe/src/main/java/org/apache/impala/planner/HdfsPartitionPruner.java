@@ -252,7 +252,7 @@ public class HdfsPartitionPruner {
     // Get the partition column position and retrieve the associated partition
     // value metadata.
     int partitionPos = slot.getDesc().getColumn().getPosition();
-    TreeMap<LiteralExpr, HashSet<Long>> partitionValueMap =
+    TreeMap<LiteralExpr, Set<Long>> partitionValueMap =
         tbl_.getPartitionValueMap(partitionPos);
     if (partitionValueMap.isEmpty()) return new HashSet<>();
 
@@ -297,7 +297,7 @@ public class HdfsPartitionPruner {
     }
 
     // Determine the partition key value range of this predicate.
-    NavigableMap<LiteralExpr, HashSet<Long>> rangeValueMap = null;
+    NavigableMap<LiteralExpr, Set<Long>> rangeValueMap = null;
     LiteralExpr firstKey = partitionValueMap.firstKey();
     LiteralExpr lastKey = partitionValueMap.lastKey();
     boolean upperInclusive = false;
@@ -357,7 +357,7 @@ public class HdfsPartitionPruner {
     SlotRef slot = inPredicate.getBoundSlot();
     Preconditions.checkNotNull(slot);
     int partitionPos = slot.getDesc().getColumn().getPosition();
-    TreeMap<LiteralExpr, HashSet<Long>> partitionValueMap =
+    TreeMap<LiteralExpr, Set<Long>> partitionValueMap =
         tbl_.getPartitionValueMap(partitionPos);
 
     if (inPredicate.isNotIn()) {

@@ -17,13 +17,14 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.thrift.THdfsFileFormat;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 
 /**
  * Supported HDFS file formats. Every file format specifies:
@@ -234,7 +235,7 @@ public enum HdfsFileFormat {
    * Returns a list with all formats for which isComplexTypesSupported() is true.
    */
   public static List<HdfsFileFormat> complexTypesFormats() {
-    List<HdfsFileFormat> result = Lists.newArrayList();
+    List<HdfsFileFormat> result = new ArrayList<>();
     for (HdfsFileFormat f: values()) {
       if (f.isComplexTypesSupported()) result.add(f);
     }

@@ -17,6 +17,10 @@
 
 package org.apache.impala.catalog.local;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -29,10 +33,6 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Set;
 
 public class LocalHbaseTable extends LocalTable implements FeHBaseTable {
   // Name of table in HBase.
@@ -102,7 +102,7 @@ public class LocalHbaseTable extends LocalTable implements FeHBaseTable {
   }
 
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() {
+  public List<Column> getColumnsInHiveOrder() {
     return getColumns();
   }
 

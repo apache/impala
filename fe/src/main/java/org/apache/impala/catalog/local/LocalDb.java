@@ -17,7 +17,9 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,13 +39,10 @@ import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 
@@ -54,8 +53,6 @@ import com.google.common.collect.Maps;
  * each catalog instance.
  */
 class LocalDb implements FeDb {
-  private static final Logger LOG = LoggerFactory.getLogger(LocalDb.class);
-
   private final LocalCatalog catalog_;
   /** The lower-case name of the database. */
   private final String name_;
@@ -149,7 +146,7 @@ class LocalDb implements FeDb {
    */
   private void loadTableNames() {
     if (tables_ != null) return;
-    Map<String, LocalTable> newMap = Maps.newHashMap();
+    Map<String, LocalTable> newMap = new HashMap<>();
     try {
       List<String> names = catalog_.getMetaProvider().loadTableNames(name_);
       for (String tableName : names) {
@@ -242,7 +239,7 @@ class LocalDb implements FeDb {
   public List<Function> getFunctions(
       TFunctionCategory category, PatternMatcher matcher) {
     loadFunctionNames();
-    List<Function> result = Lists.newArrayList();
+    List<Function> result = new ArrayList<>();
     Iterable<String> fnNames = Iterables.filter(functions_.keySet(), matcher);
     for (String fnName : fnNames) {
       result.addAll(getFunctions(category, fnName));

@@ -27,12 +27,12 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import com.google.common.collect.ImmutableList;
 
 public class HdfsStorageDescriptorTest {
@@ -96,32 +96,32 @@ public class HdfsStorageDescriptorTest {
   public void testDelimiters() throws InvalidStorageDescriptorException {
     StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(THdfsFileFormat.TEXT,
         RowFormat.DEFAULT_ROW_FORMAT);
-    sd.setParameters(new HashMap<String, String>());
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.setParameters(new HashMap<>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "-2");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "-128");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "127");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "\001");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "|");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\t");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "ab");
     try {
       HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
@@ -132,7 +132,7 @@ public class HdfsStorageDescriptorTest {
           e.getMessage());
     }
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "128");
     try {
       HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
@@ -143,7 +143,7 @@ public class HdfsStorageDescriptorTest {
           e.getMessage());
     }
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\128");
     try {
       HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
@@ -154,7 +154,7 @@ public class HdfsStorageDescriptorTest {
           e.getMessage());
     }
 
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "-129");
     try {
       HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
@@ -166,7 +166,7 @@ public class HdfsStorageDescriptorTest {
     }
 
     // Test that a unicode character out of the valid range will not be accepted.
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "\u1111");
     try {
       HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
@@ -178,7 +178,7 @@ public class HdfsStorageDescriptorTest {
     }
 
     // Validate that unicode character in the valid range will be accepted.
-    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().setParameters(new HashMap<>());
     sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\u0001");
     assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
 

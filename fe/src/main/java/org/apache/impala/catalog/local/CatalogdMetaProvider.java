@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,10 +42,10 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.Principal;
-import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
+import org.apache.impala.catalog.Principal;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
@@ -608,7 +609,6 @@ public class CatalogdMetaProvider implements MetaProvider {
     return ret;
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public List<PartitionRef> loadPartitionList(final TableMetaRef table)
       throws TException {
@@ -652,7 +652,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     final int numMisses = partitionRefs.size() - numHits;
 
     // Load the remainder from the catalogd.
-    List<PartitionRef> missingRefs = Lists.newArrayList();
+    List<PartitionRef> missingRefs = new ArrayList<>();
     for (PartitionRef ref: partitionRefs) {
       if (!refToMeta.containsKey(ref)) missingRefs.add(ref);
     }
@@ -1049,7 +1049,7 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   @VisibleForTesting
   void invalidateCacheForObject(TCatalogObject obj) {
-    List<String> invalidated = Lists.newArrayList();
+    List<String> invalidated = new ArrayList<>();
     switch (obj.type) {
     case TABLE:
     case VIEW:

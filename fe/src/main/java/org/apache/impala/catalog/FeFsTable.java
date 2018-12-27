@@ -16,8 +16,10 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +38,6 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
-import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTableStats;
@@ -46,8 +47,6 @@ import org.apache.impala.util.TResultRowBuilder;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Frontend interface for interacting with a filesystem-backed table.
@@ -158,7 +157,7 @@ public interface FeFsTable extends FeTable {
    * @return a map from value to a set of partitions for which column 'col'
    * has that value.
    */
-  TreeMap<LiteralExpr, HashSet<Long>> getPartitionValueMap(int col);
+  TreeMap<LiteralExpr, Set<Long>> getPartitionValueMap(int col);
 
   /**
    * @return the set of partitions which have a null value for column
@@ -242,7 +241,7 @@ public interface FeFsTable extends FeTable {
       resultSchema.addToColumns(new TColumn("Path", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
-      result.setRows(Lists.<TResultRow>newArrayList());
+      result.setRows(new ArrayList<>());
 
       List<? extends FeFsPartition> orderedPartitions;
       if (partitionSet == null) {
@@ -338,14 +337,14 @@ public interface FeFsTable extends FeTable {
       // selected.
       Random rnd = new Random(randomSeed);
       long selectedBytes = 0;
-      Map<Long, List<FileDescriptor>> result = Maps.newHashMap();
+      Map<Long, List<FileDescriptor>> result = new HashMap<>();
       while (selectedBytes < targetBytes && numFilesRemaining > 0) {
         int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
         FeFsPartition part = parts[selectedIdx];
         Long partId = Long.valueOf(part.getId());
         List<FileDescriptor> sampleFileIdxs = result.get(partId);
         if (sampleFileIdxs == null) {
-          sampleFileIdxs = Lists.newArrayList();
+          sampleFileIdxs = new ArrayList<>();
           result.put(partId, sampleFileIdxs);
         }
         FileDescriptor fd = part.getFileDescriptors().get(fileIdxs[selectedIdx]);
@@ -364,7 +363,7 @@ public interface FeFsTable extends FeTable {
      */
     public static List<? extends FeFsPartition> getPartitionsFromPartitionSet(
         FeFsTable table, List<List<TPartitionKeyValue>> partitionSet) {
-      List<Long> partitionIds = Lists.newArrayList();
+      List<Long> partitionIds = new ArrayList<>();
       for (List<TPartitionKeyValue> kv : partitionSet) {
         PrunablePartition partition = getPartitionFromThriftPartitionSpec(table, kv);
         if (partition != null) partitionIds.add(partition.getId());
@@ -381,8 +380,8 @@ public interface FeFsTable extends FeTable {
         List<TPartitionKeyValue> partitionSpec) {
       // First, build a list of the partition values to search for in the same order they
       // are defined in the table.
-      List<String> targetValues = Lists.newArrayList();
-      Set<String> keys = Sets.newHashSet();
+      List<String> targetValues = new ArrayList<>();
+      Set<String> keys = new HashSet<>();
       for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
         for (TPartitionKeyValue kv: partitionSpec) {
           if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {

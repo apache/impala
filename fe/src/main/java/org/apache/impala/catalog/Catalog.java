@@ -17,9 +17,11 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,7 +38,6 @@ import org.apache.impala.util.PatternMatcher;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -72,9 +73,8 @@ public abstract class Catalog {
   // Thread safe cache of database metadata. Uses an AtomicReference so reset()
   // operations can atomically swap dbCache_ references.
   // TODO: Update this to use a CatalogObjectCache?
-  protected AtomicReference<ConcurrentHashMap<String, Db>> dbCache_ =
-      new AtomicReference<ConcurrentHashMap<String, Db>>(
-          new ConcurrentHashMap<String, Db>());
+  protected AtomicReference<Map<String, Db>> dbCache_ =
+      new AtomicReference<>(new ConcurrentHashMap<String, Db>());
 
   // Cache of data sources.
   protected final CatalogObjectCache<DataSource> dataSources_;
@@ -338,7 +338,7 @@ public abstract class Catalog {
   public static List<String> filterStringsByPattern(Iterable<String> candidates,
       PatternMatcher matcher) {
     Preconditions.checkNotNull(matcher);
-    List<String> filtered = Lists.newArrayList();
+    List<String> filtered = new ArrayList<>();
     for (String candidate: candidates) {
       if (matcher.matches(candidate)) filtered.add(candidate);
     }
@@ -363,7 +363,7 @@ public abstract class Catalog {
   public static <T extends HasName> List<T> filterCatalogObjectsByPattern(
       Iterable<? extends T> candidates, PatternMatcher matcher) {
     Preconditions.checkNotNull(matcher);
-    List<T> filtered = Lists.newArrayList();
+    List<T> filtered = new ArrayList<>();
     for (T candidate: candidates) {
       if (matcher.matches(candidate.getName())) filtered.add(candidate);
     }
@@ -373,7 +373,7 @@ public abstract class Catalog {
 
   public HdfsPartition getHdfsPartition(String dbName, String tableName,
       org.apache.hadoop.hive.metastore.api.Partition msPart) throws CatalogException {
-    List<TPartitionKeyValue> partitionSpec = Lists.newArrayList();
+    List<TPartitionKeyValue> partitionSpec = new ArrayList<>();
     Table table = getTable(dbName, tableName);
     if (!(table instanceof HdfsTable)) {
       throw new PartitionNotFoundException(
