@@ -250,6 +250,10 @@ class ExecEnv {
 
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
   void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);
+
+  /// Initialise 'mem_tracker_' with a limit of 'bytes_limit'. Must be called after
+  /// InitBufferPool() and RegisterMemoryMetrics().
+  void InitMemTracker(int64_t bytes_limit);
 };
 
 } // namespace impala

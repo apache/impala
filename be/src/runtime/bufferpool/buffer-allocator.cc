@@ -475,8 +475,10 @@ void BufferPool::BufferAllocator::ReleaseMemory(int64_t bytes_to_free) {
     FreeBufferArena* arena = per_core_arenas_[core_to_check].get();
     // Free but don't claim any memory.
     bytes_freed += arena->FreeSystemMemory(bytes_to_free - bytes_freed, 0, nullptr).first;
-    if (bytes_freed >= bytes_to_free) return;
+    if (bytes_freed >= bytes_to_free) break;
   }
+  VLOG(1) << "BufferAllocator::ReleaseMemory(): Freed "
+          << PrettyPrinter::PrintBytes(bytes_freed);
 }
 
 int BufferPool::BufferAllocator::GetFreeListSize(int core, int64_t len) {

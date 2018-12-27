@@ -266,7 +266,7 @@ class MemTracker {
       if (mode == MemLimit::HARD && bytes_over_limit_metric_ != nullptr) {
         bytes_over_limit_metric_->SetValue(consumption() - limit_);
       }
-      return mode == MemLimit::HARD ? GcMemory(limit_) : true;
+      return GcMemory(GetLimit(mode));
     }
     return false;
   }

@@ -33,8 +33,8 @@
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
-#include "runtime/test-env.h"
 #include "runtime/query-state.h"
+#include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "testutil/cpu-util.h"
 #include "testutil/death-test-util.h"
@@ -42,8 +42,8 @@
 #include "testutil/rand-util.h"
 #include "util/blocking-queue.h"
 #include "util/filesystem-util.h"
-#include "util/spinlock.h"
 #include "util/metrics.h"
+#include "util/spinlock.h"
 
 #include "common/names.h"
 
@@ -2247,7 +2247,45 @@ TEST_F(BufferPoolTest, ConcurrentBufferOperations) {
   pool.DeregisterClient(&client);
   global_reservations_.Close();
 }
+
+// IMPALA-7446: the buffer pool GC hook that's set up in ExecEnv should
+// free cached buffers.
+TEST_F(BufferPoolTest, BufferPoolGc) {
+  const int64_t BUFFER_SIZE = 1024L * 1024L * 1024L;
+  // Set up a small buffer pool and process mem limit that fits only a single buffer.
+  // A large buffer size is used so that untracked memory is small relative to the
+  // buffer.
+  test_env_.reset(new TestEnv);
+  test_env_->SetBufferPoolArgs(1024, BUFFER_SIZE);
+  // Make sure we have a process memory tracker that uses TCMalloc metrics to match
+  // GC behaviour of a real impalad and reproduce IMPALA-7446. We need to add some
+  // extra headroom for other allocations and overhead.
+  test_env_->SetProcessMemTrackerArgs(BUFFER_SIZE * 3 / 2, true);
+  ASSERT_OK(test_env_->Init());
+  BufferPool* buffer_pool = test_env_->exec_env()->buffer_pool();
+  // Set up a client with unlimited reservation.
+  MemTracker* client_tracker = obj_pool_.Add(
+      new MemTracker(-1, "client", test_env_->exec_env()->process_mem_tracker()));
+  BufferPool::ClientHandle client;
+  ASSERT_OK(buffer_pool->RegisterClient("", nullptr,
+      test_env_->exec_env()->buffer_reservation(), client_tracker,
+      numeric_limits<int>::max(), NewProfile(), &client));
+
+  BufferPool::BufferHandle buffer;
+  ASSERT_TRUE(client.IncreaseReservation(BUFFER_SIZE));
+  // Make sure that buffers/pages were gc'ed and/or recycled.
+  EXPECT_EQ(0, buffer_pool->GetSystemBytesAllocated());
+  ASSERT_OK(buffer_pool->AllocateBuffer(&client, BUFFER_SIZE, &buffer));
+  buffer_pool->FreeBuffer(&client, &buffer);
+  ASSERT_OK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0));
+  // Before IMPALA-7446 was fixed, this reservation increase would fail because the
+  // free buffer counted against the process memory limit.
+  ASSERT_TRUE(client.IncreaseReservation(BUFFER_SIZE));
+  ASSERT_OK(buffer_pool->AllocateBuffer(&client, BUFFER_SIZE, &buffer));
+  buffer_pool->FreeBuffer(&client, &buffer);
+  buffer_pool->DeregisterClient(&client);
 }
+} // namespace impala
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);

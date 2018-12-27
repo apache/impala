@@ -62,6 +62,7 @@
 #include "util/openssl-util.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
+#include "util/test-info.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 
@@ -305,29 +306,7 @@ Status ExecEnv::Init() {
   // Resolve hostname to IP address.
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
 
-  mem_tracker_.reset(
-      new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
-  // Add BufferPool MemTrackers for cached memory that is not tracked against queries
-  // but is included in process memory consumption.
-  obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
-      "Buffer Pool: Free Buffers", mem_tracker_.get()));
-  obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
-      "Buffer Pool: Clean Pages", mem_tracker_.get()));
-  if (FLAGS_mem_limit_includes_jvm) {
-    // Add JVM metrics that should count against the process memory limit.
-    obj_pool_->Add(new MemTracker(
-        JvmMemoryMetric::HEAP_MAX_USAGE, -1, "JVM: max heap size", mem_tracker_.get()));
-    obj_pool_->Add(new MemTracker(JvmMemoryMetric::NON_HEAP_COMMITTED, -1,
-        "JVM: non-heap committed", mem_tracker_.get()));
-  }
-  // Also need a MemTracker for unused reservations as a negative value. Unused
-  // reservations are counted against queries but not against the process memory
-  // consumption. This accounts for that difference.
-  IntGauge* negated_unused_reservation = obj_pool_->Add(new NegatedGauge(
-      MakeTMetricDef("negated_unused_reservation", TMetricKind::GAUGE, TUnit::BYTES),
-      BufferPoolMetric::UNUSED_RESERVATION_BYTES));
-  obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
-      "Buffer Pool: Unused Reservation", mem_tracker_.get()));
+  InitMemTracker(bytes_limit);
 
   // Initializes the RPCMgr, ControlServices and DataStreamServices.
   krpc_address_.__set_hostname(ip_address_);
@@ -451,6 +430,47 @@ void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
       new BufferPool(metrics_.get(), min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
+}
+
+void ExecEnv::InitMemTracker(int64_t bytes_limit) {
+  DCHECK(AggregateMemoryMetrics::TOTAL_USED != nullptr) << "Memory metrics not reg'd";
+  mem_tracker_.reset(
+      new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
+  if (FLAGS_mem_limit_includes_jvm) {
+    // Add JVM metrics that should count against the process memory limit.
+    obj_pool_->Add(new MemTracker(
+        JvmMemoryMetric::HEAP_MAX_USAGE, -1, "JVM: max heap size", mem_tracker_.get()));
+    obj_pool_->Add(new MemTracker(JvmMemoryMetric::NON_HEAP_COMMITTED, -1,
+        "JVM: non-heap committed", mem_tracker_.get()));
+  }
+  if (buffer_pool_ != nullptr) {
+    // Tests can create multiple buffer pools, meaning that the metrics are not usable.
+    if (!TestInfo::is_test()) {
+      // Add BufferPool MemTrackers for cached memory that is not tracked against queries
+      // but is included in process memory consumption.
+      obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
+          "Buffer Pool: Free Buffers", mem_tracker_.get()));
+      obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
+          "Buffer Pool: Clean Pages", mem_tracker_.get()));
+      // Also need a MemTracker for unused reservations as a negative value. Unused
+      // reservations are counted against queries but not against the process memory
+      // consumption. This accounts for that difference.
+      IntGauge* negated_unused_reservation = obj_pool_->Add(new NegatedGauge(
+          MakeTMetricDef("negated_unused_reservation", TMetricKind::GAUGE, TUnit::BYTES),
+          BufferPoolMetric::UNUSED_RESERVATION_BYTES));
+      obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
+          "Buffer Pool: Unused Reservation", mem_tracker_.get()));
+    }
+    mem_tracker_->AddGcFunction([buffer_pool=buffer_pool_.get()] (int64_t bytes_to_free)
+    {
+        // Only free memory in excess of the current reservation - the buffer pool
+        // does not need to give up cached memory that is offset by an unused reservation.
+        int64_t reserved = BufferPoolMetric::RESERVED->GetValue();
+        int64_t allocated_from_sys = BufferPoolMetric::SYSTEM_ALLOCATED->GetValue();
+        if (reserved >= allocated_from_sys) return;
+        buffer_pool->ReleaseMemory(min(bytes_to_free, allocated_from_sys - reserved));
+    });
+  }
 }
 
 TNetworkAddress ExecEnv::GetThriftBackendAddress() const {

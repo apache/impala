@@ -172,7 +172,8 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     self.__load_semi_join_tables(unique_database)
     self.run_test_case('QueryTest/semi-joins', new_vector, unique_database)
 
+  @pytest.mark.execute_serially
   def test_semi_joins_exhaustive(self, vector):
+    """Expensive and memory-intensive semi-join tests."""
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
-    new_vector = copy(vector)
-    self.run_test_case('QueryTest/semi-joins-exhaustive', new_vector)
+    self.run_test_case('QueryTest/semi-joins-exhaustive', vector)

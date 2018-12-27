@@ -23,11 +23,12 @@
 #include "gutil/strings/substitute.h"
 #include "rpc/rpc-mgr.h"
 #include "runtime/query-exec-mgr.h"
-#include "runtime/tmp-file-mgr.h"
 #include "runtime/query-state.h"
+#include "runtime/tmp-file-mgr.h"
 #include "service/control-service.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
+#include "util/memory-metrics.h"
 
 #include "common/names.h"
 
@@ -49,11 +50,11 @@ Status TestEnv::Init() {
   if (static_metrics_ == NULL) {
     static_metrics_.reset(new MetricGroup("test-env-static-metrics"));
     ImpaladMetrics::CreateMetrics(static_metrics_.get());
+    RETURN_IF_ERROR(RegisterMemoryMetrics(static_metrics_.get(), true, nullptr, nullptr));
   }
 
   exec_env_.reset(new ExecEnv);
   // Populate the ExecEnv state that the backend tests need.
-  exec_env_->mem_tracker_.reset(new MemTracker(-1, "Process"));
   RETURN_IF_ERROR(exec_env_->disk_io_mgr()->Init());
   exec_env_->tmp_file_mgr_.reset(new TmpFileMgr);
   if (have_tmp_file_mgr_args_) {
@@ -65,6 +66,11 @@ Status TestEnv::Init() {
   if (enable_buffer_pool_) {
     exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
         static_cast<int64_t>(0.1 * buffer_pool_capacity_));
+  }
+  if (process_mem_tracker_use_metrics_) {
+    exec_env_->InitMemTracker(process_mem_limit_);
+  } else {
+    exec_env_->mem_tracker_.reset(new MemTracker(process_mem_limit_, "Process"));
   }
 
   // Initialize RpcMgr and control service.
@@ -88,6 +94,11 @@ void TestEnv::SetTmpFileMgrArgs(
 void TestEnv::SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity) {
   buffer_pool_min_buffer_len_ = min_buffer_len;
   buffer_pool_capacity_ = capacity;
+}
+
+void TestEnv::SetProcessMemTrackerArgs(int64_t bytes_limit, bool use_metrics) {
+  process_mem_limit_ = bytes_limit;
+  process_mem_tracker_use_metrics_ = use_metrics;
 }
 
 TestEnv::~TestEnv() {
