@@ -385,7 +385,10 @@ function test_suite() {
 function configure_timezone() {
   if [ -e "${LOCALTIME_LINK_TARGET}" ]; then
     ln -sf "${LOCALTIME_LINK_TARGET}" /etc/localtime
-    date +%Z > /etc/timezone
+    # Only Debian-based distros have this file.
+    if [ -f /etc/timezone ]; then
+      echo "${LOCALTIME_LINK_TARGET}" | sed -e 's,.*zoneinfo/,,' > /etc/timezone
+    fi
   else
     echo '$LOCALTIME_LINK_TARGET not configured.' 1>&2
   fi
