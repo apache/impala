@@ -76,4 +76,6 @@ public class EmptySetNode extends PlanNode {
     msg.node_type = TPlanNodeType.EMPTY_SET_NODE;
   }
 
+  @Override
+  protected boolean displayCardinality(TExplainLevel detailLevel) { return false; }
 }

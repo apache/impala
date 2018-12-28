@@ -9,6 +9,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
 |  limit: 10
+|  row-size=48B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -17,6 +18,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|  row-size=48B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -25,15 +27,18 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min(timestamp_col), max(timestamp_col)
+|  row-size=35B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=19B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
 |  limit: 10
+|  row-size=48B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -42,6 +47,7 @@ PLAN-ROOT SINK
 |    output: count:merge(smallint_col)
 |  Class 2
 |    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|  row-size=48B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -52,6 +58,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|  row-size=48B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -60,6 +67,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|  row-size=35B cardinality=31
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
@@ -70,9 +78,11 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min(timestamp_col), max(timestamp_col)
+|  row-size=35B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=19B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with one distinct agg.
 select b from (
@@ -86,23 +96,28 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: min(timestamp_col)
 |  limit: 10
+|  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 04:AGGREGATE [FINALIZE]
 |  output: min:merge(timestamp_col)
 |  limit: 10
+|  row-size=16B cardinality=1
 |
 03:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: min(timestamp_col)
+|  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=16B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with a non-distinct agg.
 select d from (
@@ -116,23 +131,28 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: max(timestamp_col)
 |  limit: 10
+|  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 04:AGGREGATE [FINALIZE]
 |  output: max:merge(timestamp_col)
 |  limit: 10
+|  row-size=16B cardinality=1
 |
 03:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(timestamp_col)
+|  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=16B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with distinct
 # and non-distinct aggss.
@@ -147,35 +167,43 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: count(smallint_col), max:merge(timestamp_col)
 |  limit: 10
+|  row-size=24B cardinality=1
 |
 01:AGGREGATE
 |  output: max(timestamp_col)
 |  group by: smallint_col
+|  row-size=18B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
 |  output: count:merge(smallint_col), max:merge(timestamp_col)
 |  limit: 10
+|  row-size=24B cardinality=1
 |
 06:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE
 |  output: count(smallint_col), max:merge(timestamp_col)
+|  row-size=24B cardinality=1
 |
 05:AGGREGATE
 |  output: max:merge(timestamp_col)
 |  group by: smallint_col
+|  row-size=18B cardinality=10
 |
 04:EXCHANGE [HASH(smallint_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: max(timestamp_col)
 |  group by: smallint_col
+|  row-size=18B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
 ====

@@ -13,28 +13,28 @@ row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
 'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1
 '  PLAN-ROOT SINK'
-row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
 '  |'
 '  04:EXCHANGE [UNPARTITIONED]'
-row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
-'     tuple-ids=0,1 row-size=402B cardinality=5757710'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'     tuple-ids=0,1 row-size=402B cardinality=5.76M'
 '     in pipelines: 00(GETNEXT)'
 ''
 'F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3'
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
 '  DATASTREAM SINK [FRAGMENT=F02, EXCHANGE=04, UNPARTITIONED]'
-row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
 '  02:HASH JOIN [INNER JOIN, BROADCAST]'
 '  |  hash predicates: l_orderkey = o_orderkey'
 '  |  fk/pk conjuncts: l_orderkey = o_orderkey'
 '  |  runtime filters: RF000[bloom] <- o_orderkey'
-row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B spill-buffer=[0-9.]*MB thread-reservation=.*
-'  |  tuple-ids=0,1 row-size=402B cardinality=5757710'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B spill-buffer=[0-9.]*MB thread-reservation=.*
+'  |  tuple-ids=0,1 row-size=402B cardinality=5.76M'
 '  |  in pipelines: 00(GETNEXT), 01(OPEN)'
 '  |'
 '  |--03:EXCHANGE [BROADCAST]'
-row_regex:.*  |     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
-'  |     tuple-ids=1 row-size=171B cardinality=1500000'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'  |     tuple-ids=1 row-size=171B cardinality=1.50M'
 '  |     in pipelines: 01(GETNEXT)'
 '  |'
 '  00:SCAN HDFS [tpch.lineitem, RANDOM]'
@@ -43,9 +43,9 @@ row_regex:.*partitions=1/1 files=1 size=.*
 '     stored statistics:'
 row_regex:.*table: rows=6001215 size=.*
 '       columns: all'
-row_regex:.*|     extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
-row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1.*
-'     tuple-ids=0 row-size=231B cardinality=6001215'
+row_regex:.*extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1.*
+'     tuple-ids=0 row-size=231B cardinality=6.00M'
 '     in pipelines: 00(GETNEXT)'
 ''
 'F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2'
@@ -59,7 +59,7 @@ row_regex:.*table: rows=1500000 size=.*
 '       columns: all'
 row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
-'     tuple-ids=1 row-size=171B cardinality=1500000'
+'     tuple-ids=1 row-size=171B cardinality=1.50M'
 '     in pipelines: 01(GETNEXT)'
 ====
 ---- QUERY

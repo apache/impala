@@ -49,9 +49,9 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -68,8 +68,8 @@ import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
-import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.TFileSplitGeneratorSpec;
+import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPlanNode;
@@ -91,8 +91,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Scan of a single table.
@@ -261,10 +259,13 @@ public class HdfsScanNode extends ScanNode {
   // parquet::Statistics.
   private TupleDescriptor minMaxTuple_;
 
-  // Slot that is used to record the Parquet metatdata for the count(*) aggregation if
+  // Slot that is used to record the Parquet metadata for the count(*) aggregation if
   // this scan node has the count(*) optimization enabled.
   private SlotDescriptor countStarSlot_ = null;
 
+  // Conjuncts used to trim the set of partitions passed to this node.
+  // Used only to display EXPLAIN information.
+  private final List<Expr> partitionConjuncts_;
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -272,12 +273,14 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<? extends FeFsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
+      List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
+      AggregateInfo aggInfo, List<Expr> partConjuncts) {
     super(id, desc, "SCAN HDFS");
     Preconditions.checkState(desc.getTable() instanceof FeFsTable);
     tbl_ = (FeFsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
+    partitionConjuncts_ = partConjuncts;
     sampleParams_ = hdfsTblRef.getSampleParams();
     replicaPreference_ = hdfsTblRef.getReplicaPreference();
     randomReplica_ = hdfsTblRef.getRandomReplica();
@@ -1224,20 +1227,27 @@ public class HdfsScanNode extends ScanNode {
     }
     output.append("]\n");
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (partitionConjuncts_ != null && !partitionConjuncts_.isEmpty()) {
+        output.append(detailPrefix)
+          .append(String.format("partition predicates: %s\n",
+              getExplainString(partitionConjuncts_, detailLevel)));
+      }
       if (tbl_.getNumClusteringCols() == 0) numPartitions_ = 1;
-      output.append(String.format("%spartitions=%s/%s files=%s size=%s", detailPrefix,
-          numPartitions_, table.getPartitions().size(), totalFiles_,
-          PrintUtils.printBytes(totalBytes_)));
-      output.append("\n");
+      output.append(detailPrefix)
+        .append(String.format("partitions=%d/%d files=%d size=%s\n",
+            numPartitions_, table.getPartitions().size(), totalFiles_,
+            PrintUtils.printBytes(totalBytes_)));
       if (!conjuncts_.isEmpty()) {
-        output.append(String.format("%spredicates: %s\n", detailPrefix,
+        output.append(detailPrefix)
+          .append(String.format("predicates: %s\n",
             getExplainString(conjuncts_, detailLevel)));
       }
       if (!collectionConjuncts_.isEmpty()) {
         for (Map.Entry<TupleDescriptor, List<Expr>> entry:
           collectionConjuncts_.entrySet()) {
           String alias = entry.getKey().getAlias();
-          output.append(String.format("%spredicates on %s: %s\n", detailPrefix, alias,
+          output.append(detailPrefix)
+            .append(String.format("predicates on %s: %s\n", alias,
               getExplainString(entry.getValue(), detailLevel)));
         }
       }
@@ -1255,14 +1265,16 @@ public class HdfsScanNode extends ScanNode {
       } else if (extrapolatedNumRows_ == -1) {
         extrapRows = "unavailable";
       }
-      output.append(String.format("%sextrapolated-rows=%s", detailPrefix, extrapRows));
+      output.append(detailPrefix)
+        .append(String.format("extrapolated-rows=%s", extrapRows));
       output.append(String.format(" max-scan-range-rows=%s",
           maxScanRangeNumRows_ == -1 ? "unavailable" : maxScanRangeNumRows_));
       output.append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
-        output.append(String.format("%smissing disk ids: "
+        output.append(detailPrefix)
+          .append(String.format("missing disk ids: "
                 + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
-            detailPrefix, numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
+            numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
             totalFiles_, numScanRangesNoDiskIds_,
             scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
       }
@@ -1283,10 +1295,12 @@ public class HdfsScanNode extends ScanNode {
       TupleDescriptor tupleDesc = entry.getKey();
       List<Expr> exprs = entry.getValue();
       if (tupleDesc == getTupleDesc()) {
-        output.append(String.format("%sparquet statistics predicates: %s\n", prefix,
+        output.append(prefix)
+        .append(String.format("parquet statistics predicates: %s\n",
             getExplainString(exprs, detailLevel)));
       } else {
-        output.append(String.format("%sparquet statistics predicates on %s: %s\n", prefix,
+        output.append(prefix)
+        .append(String.format("parquet statistics predicates on %s: %s\n",
             tupleDesc.getAlias(), getExplainString(exprs, detailLevel)));
       }
     }

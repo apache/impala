@@ -93,6 +93,15 @@ public class CardinalityTest extends PlannerTestBase {
         "SELECT COUNT(*) FROM functional.alltypes GROUP BY bool_col", 2);
   }
 
+  @Test
+  public void testNullColumnJoinCardinality() throws ImpalaException {
+    // IMPALA-7565: Make sure there is no division by zero during cardinality calculation
+    // in a many to many join on null columns (ndv = 0).
+    String query = "select * from functional.nulltable t1 "
+        + "inner join [shuffle] functional.nulltable t2 on t1.d = t2.d";
+    checkCardinality(query, 1, 1);
+  }
+
   /**
    * Joins should multiply out cardinalities.
    */

@@ -16,6 +16,7 @@
 // under the License.
 
 package org.apache.impala.testutil;
+
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
@@ -80,8 +81,10 @@ public class TestUtils {
 
     public PathFilter(String prefix) { filterKey_ = prefix; }
 
+    @Override
     public boolean matches(String input) { return input.contains(filterKey_); }
 
+    @Override
     public String transform(String input) {
       String result = input.replaceFirst(filterKey_, "");
       result = result.replaceAll(PATH_FILTER, " ");
@@ -109,8 +112,10 @@ public class TestUtils {
       this.valueRegex = valueRegex;
     }
 
+    @Override
     public boolean matches(String input) { return input.contains(keyPrefix); }
 
+    @Override
     public String transform(String input) {
       return input.replaceAll(keyPrefix + valueRegex, keyPrefix);
     }
@@ -120,6 +125,15 @@ public class TestUtils {
   // mean anything is wrong with the plan, so we want to filter the file size out.
   public static final IgnoreValueFilter FILE_SIZE_FILTER =
       new IgnoreValueFilter("size", BYTE_VALUE_REGEX);
+
+  // Ignore the row-size=8B entries
+  public static final IgnoreValueFilter ROW_SIZE_FILTER =
+      new IgnoreValueFilter("row-size", "\\S+");
+
+  // Ignore cardinality=27.30K or cardinality=unavailable
+  // entries
+  public static final IgnoreValueFilter CARDINALITY_FILTER =
+      new IgnoreValueFilter("cardinality", "\\S+");
 
   // Ignore the exact estimated row count, which depends on the file sizes.
   static IgnoreValueFilter SCAN_RANGE_ROW_COUNT_FILTER =
@@ -160,6 +174,7 @@ public class TestUtils {
     }
     int mismatch = -1; // line in actual w/ mismatch
     int maxLen = Math.min(actual.size(), expected.size());
+    outer:
     for (int i = 0; i < maxLen; ++i) {
       String expectedStr = expected.get(i).trim();
       String actualStr = actual.get(i);
@@ -192,33 +207,31 @@ public class TestUtils {
       }
 
       // do a whitespace-insensitive comparison
-      Scanner e = new Scanner(expectedStr);
-      Scanner a = new Scanner(actualStr);
-      while (a.hasNext() && e.hasNext()) {
-        if (containsPrefix) {
-          if (!a.next().contains(e.next())) {
+      try (Scanner e = new Scanner(expectedStr);
+           Scanner a = new Scanner(actualStr)) {
+        while (a.hasNext() && e.hasNext()) {
+          String aToken = a.next();
+          String eToken = e.next();
+          if (containsPrefix) {
+            if (!aToken.contains(eToken)) {
+              mismatch = i;
+              break outer;
+            }
+          } else if (!aToken.equals(eToken)) {
             mismatch = i;
-            break;
-          }
-        } else {
-          if (!a.next().equals(e.next())) {
-            mismatch = i;
-            break;
+            break outer;
           }
         }
-      }
-      if (mismatch != -1) {
-        break;
-      }
 
-      if (ignoreAfter) {
-        if (e.hasNext() && !a.hasNext()) {
+        if (ignoreAfter) {
+          if (e.hasNext() && !a.hasNext()) {
+            mismatch = i;
+            break outer;
+          }
+        } else if (a.hasNext() != e.hasNext()) {
           mismatch = i;
-          break;
+          break outer;
         }
-      } else if (a.hasNext() != e.hasNext()) {
-        mismatch = i;
-        break;
       }
     }
     if (mismatch == -1 && actual.size() < expected.size()) {

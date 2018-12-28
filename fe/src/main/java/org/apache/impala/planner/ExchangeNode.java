@@ -173,6 +173,17 @@ public class ExchangeNode extends PlanNode {
     return output.toString();
   }
 
+  /**
+   * An Exchange simply moves rows over the network: its row width
+   * and cardinality are identical to its input. So, for standard
+   * level, there is no need to repeat these values. Retained in
+   * higher levels for backward compatibility.
+   */
+  @Override
+  protected boolean displayCardinality(TExplainLevel detailLevel) {
+    return detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal();
+  }
+
   @Override
   protected String getDisplayLabelDetail() {
     // For the non-fragmented explain levels, print the data partition

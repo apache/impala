@@ -5,22 +5,27 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: distinctpc(l_orderkey)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
+   row-size=8B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: distinctpc:merge(l_orderkey)
+|  row-size=8B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: distinctpc(l_orderkey)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
+   row-size=8B cardinality=6.00M
 ====
 # Distinct estimate with distinct
 select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
@@ -29,34 +34,42 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(l_orderkey), distinctpc:merge(l_orderkey)
+|  row-size=16B cardinality=1
 |
 01:AGGREGATE
 |  output: distinctpc(l_orderkey)
 |  group by: l_orderkey
+|  row-size=16B cardinality=1.56M
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
+   row-size=8B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(l_orderkey), distinctpc:merge(l_orderkey)
+|  row-size=16B cardinality=1
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE
 |  output: count(l_orderkey), distinctpc:merge(l_orderkey)
+|  row-size=16B cardinality=1
 |
 04:AGGREGATE
 |  output: distinctpc:merge(l_orderkey)
 |  group by: l_orderkey
+|  row-size=16B cardinality=1.56M
 |
 03:EXCHANGE [HASH(l_orderkey)]
 |
 01:AGGREGATE [STREAMING]
 |  output: distinctpc(l_orderkey)
 |  group by: l_orderkey
+|  row-size=16B cardinality=1.56M
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
+   row-size=8B cardinality=6.00M
 ====

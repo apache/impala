@@ -9,6 +9,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.stringpartitionkey]
+   partition predicates: CAST(string_col AS TIMESTAMP) = TIMESTAMP '2009-01-01 00:00:00'
    partitions=1/2 files=1 size=2B
    stored statistics:
      table: rows=1 size=2B

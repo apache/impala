@@ -1280,7 +1280,9 @@ public class SingleNodePlanner {
     // Do partition pruning before deciding which slots to materialize because we might
     // end up removing some predicates.
     HdfsPartitionPruner pruner = new HdfsPartitionPruner(tupleDesc);
-    List<? extends FeFsPartition> partitions = pruner.prunePartitions(analyzer, conjuncts, false);
+    Pair<List<? extends FeFsPartition>, List<Expr>> pair =
+        pruner.prunePartitions(analyzer, conjuncts, false);
+    List<? extends FeFsPartition> partitions = pair.first;
 
     // Mark all slots referenced by the remaining conjuncts as materialized.
     analyzer.materializeSlots(conjuncts);
@@ -1323,9 +1325,9 @@ public class SingleNodePlanner {
       unionNode.init(analyzer);
       return unionNode;
     } else {
-      ScanNode scanNode =
+      HdfsScanNode scanNode =
           new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions,
-              hdfsTblRef, aggInfo);
+              hdfsTblRef, aggInfo, pair.second);
       scanNode.init(analyzer);
       return scanNode;
     }
@@ -1409,7 +1411,6 @@ public class SingleNodePlanner {
     ((HBaseScanNode)scanNode).setKeyRanges(keyRanges);
     scanNode.addConjuncts(conjuncts);
     scanNode.init(analyzer);
-
     return scanNode;
   }
 
@@ -1424,7 +1425,7 @@ public class SingleNodePlanner {
    * - for outer joins: same type of conjuncts as inner joins, but only from the
    *   ON or USING clause
    * Predicates that are redundant based on equivalence classes are intentionally
-   * returneded by this function because the removal of redundant predicates and the
+   * returned by this function because the removal of redundant predicates and the
    * creation of new predicates for enforcing slot equivalences go hand-in-hand
    * (see analyzer.createEquivConjuncts()).
    */

@@ -74,8 +74,8 @@ import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduScanToken;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -357,7 +357,8 @@ public class PlannerTestBase extends FrontendTestBase {
 
   private void handleException(String query, String expectedErrorMsg,
       StringBuilder errorLog, StringBuilder actualOutput, Throwable e) {
-    actualOutput.append(e.toString() + "\n");
+    String actualErrorMsg = e.getClass().getSimpleName() + ": " + e.getMessage();
+    actualOutput.append(actualErrorMsg).append("\n");
     if (expectedErrorMsg == null) {
       // Exception is unexpected
       errorLog.append(String.format("Query:\n%s\nError Stack:\n%s\n", query,
@@ -365,7 +366,6 @@ public class PlannerTestBase extends FrontendTestBase {
     } else {
       // Compare actual and expected error messages.
       if (expectedErrorMsg != null && !expectedErrorMsg.isEmpty()) {
-        String actualErrorMsg = e.getClass().getSimpleName() + ": " + e.getMessage();
         if (!actualErrorMsg.toLowerCase().startsWith(expectedErrorMsg.toLowerCase())) {
           errorLog.append("query:\n" + query + "\nExpected error message: '"
               + expectedErrorMsg + "'\nActual error message: '" + actualErrorMsg + "'\n");
@@ -534,6 +534,10 @@ public class PlannerTestBase extends FrontendTestBase {
           Lists.<ResultFilter>newArrayList(TestUtils.FILE_SIZE_FILTER);
       if (!testOptions.contains(PlannerTestOption.VALIDATE_RESOURCES)) {
         resultFilters.addAll(TestUtils.RESOURCE_FILTERS);
+      }
+      if (!testOptions.contains(PlannerTestOption.VALIDATE_CARDINALITY)) {
+        resultFilters.add(TestUtils.ROW_SIZE_FILTER);
+        resultFilters.add(TestUtils.CARDINALITY_FILTER);
       }
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
@@ -804,6 +808,11 @@ public class PlannerTestBase extends FrontendTestBase {
     // ignore differences in resource values). Operator- and fragment-level resource
     // requirements are only included if EXTENDED_EXPLAIN is also enabled.
     VALIDATE_RESOURCES,
+    // Verify the row size and cardinality fields in the plan. Default is
+    // to ignore these values (for backward compatibility.) Turn this option
+    // on for test that validate cardinality calculations: joins, scan
+    // cardinality, etc.
+    VALIDATE_CARDINALITY
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {

@@ -6,6 +6,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -14,6 +15,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: count(smallint_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -22,14 +24,17 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -38,6 +43,7 @@ PLAN-ROOT SINK
 |    output: sum:merge(int_col)
 |  Class 2
 |    output: count:merge(smallint_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -48,6 +54,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: count(smallint_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -56,6 +63,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
 |
@@ -66,9 +74,11 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct without grouping. First needs intermediate tuple.
 select avg(distinct tinyint_col), sum(distinct int_col), count(distinct smallint_col)
@@ -78,6 +88,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -86,6 +97,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: count(smallint_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -94,14 +106,17 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -110,6 +125,7 @@ PLAN-ROOT SINK
 |    output: sum:merge(int_col)
 |  Class 2
 |    output: count:merge(smallint_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -120,6 +136,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: count(smallint_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -128,6 +145,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(smallint_col) END)]
 |
@@ -138,9 +156,11 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct without grouping. Last needs intermediate tuple.
 select count(distinct tinyint_col), sum(distinct int_col), avg(distinct smallint_col)
@@ -150,6 +170,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -158,6 +179,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: avg(smallint_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -166,14 +188,17 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -182,6 +207,7 @@ PLAN-ROOT SINK
 |    output: sum:merge(int_col)
 |  Class 2
 |    output: avg:merge(smallint_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -192,6 +218,7 @@ PLAN-ROOT SINK
 |    output: sum(int_col)
 |  Class 2
 |    output: avg(smallint_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -200,6 +227,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
 |
@@ -210,9 +238,11 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct without grouping. All need intermediate tuples
 select avg(distinct tinyint_col), avg(distinct int_col), avg(distinct smallint_col)
@@ -222,6 +252,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -230,6 +261,7 @@ PLAN-ROOT SINK
 |    output: avg(int_col)
 |  Class 2
 |    output: avg(smallint_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -238,14 +270,17 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -254,6 +289,7 @@ PLAN-ROOT SINK
 |    output: avg:merge(int_col)
 |  Class 2
 |    output: avg:merge(smallint_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -264,6 +300,7 @@ PLAN-ROOT SINK
 |    output: avg(int_col)
 |  Class 2
 |    output: avg(smallint_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -272,6 +309,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 7 THEN murmur_hash(smallint_col) END)]
 |
@@ -282,9 +320,11 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
+|  row-size=7B cardinality=70
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct with grouping.
 select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
@@ -296,6 +336,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -307,6 +348,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -315,9 +357,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -326,6 +370,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -337,6 +382,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
 |
@@ -350,6 +396,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -358,6 +405,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
 |
@@ -368,9 +416,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct with grouping. First needs intermediate tuple.
 select bigint_col, avg(distinct tinyint_col), sum(distinct int_col),
@@ -382,6 +432,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 7 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -393,6 +444,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -401,9 +453,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -412,6 +466,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 7 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -423,6 +478,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END)]
 |
@@ -436,6 +492,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -444,6 +501,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(smallint_col) END)]
 |
@@ -454,9 +512,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct with grouping. Last needs intermediate tuple.
 select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
@@ -468,6 +528,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 7 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -479,6 +540,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -487,9 +549,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -498,6 +562,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 7 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -509,6 +574,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
 |
@@ -522,6 +588,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -530,6 +597,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
 |
@@ -540,9 +608,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct with grouping. All need intermediate tuples
 select bigint_col, avg(distinct tinyint_col), avg(distinct int_col),
@@ -554,6 +624,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 9 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -565,6 +636,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -573,9 +645,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -584,6 +658,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 9 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -595,6 +670,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 8 THEN murmur_hash(bigint_col) END)]
 |
@@ -608,6 +684,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -616,6 +693,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 7 THEN murmur_hash(smallint_col) END)]
 |
@@ -626,9 +704,11 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
+|  row-size=31B cardinality=700
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping.
 select count(distinct tinyint_col), count(distinct smallint_col), count(int_col)
@@ -638,6 +718,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -646,6 +727,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -654,14 +736,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -670,6 +755,7 @@ PLAN-ROOT SINK
 |    output: count:merge(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -680,6 +766,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -688,6 +775,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=11B cardinality=31
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
@@ -698,9 +786,11 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. First distinct needs
 # intermediate agg tuple.
@@ -711,6 +801,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -719,6 +810,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -727,14 +819,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -743,6 +838,7 @@ PLAN-ROOT SINK
 |    output: count:merge(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -753,6 +849,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -761,6 +858,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count:merge(int_col)
+|  row-size=11B cardinality=31
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 6 THEN 0 END)]
 |
@@ -771,9 +869,11 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. Non-distinct needs
 # intermediate agg tuple.
@@ -784,6 +884,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -792,6 +893,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -800,14 +902,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -816,6 +921,7 @@ PLAN-ROOT SINK
 |    output: count:merge(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -826,6 +932,7 @@ PLAN-ROOT SINK
 |    output: count(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -834,6 +941,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=11B cardinality=31
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
@@ -844,9 +952,11 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
 select avg(distinct tinyint_col), avg(distinct smallint_col), avg(int_col)
@@ -856,6 +966,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|  row-size=24B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -864,6 +975,7 @@ PLAN-ROOT SINK
 |    output: avg(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 01:AGGREGATE
 |  Class 0
@@ -872,14 +984,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|  row-size=24B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -888,6 +1003,7 @@ PLAN-ROOT SINK
 |    output: avg:merge(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -898,6 +1014,7 @@ PLAN-ROOT SINK
 |    output: avg(smallint_col)
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=24B cardinality=3
 |
 05:AGGREGATE
 |  Class 0
@@ -906,6 +1023,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg:merge(int_col)
+|  row-size=11B cardinality=31
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 7 THEN 0 END)]
 |
@@ -916,9 +1034,11 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
+|  row-size=11B cardinality=31
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=7B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct with grouping.
 select bigint_col, count(distinct tinyint_col), count(distinct smallint_col),
@@ -930,6 +1050,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -941,6 +1062,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -950,9 +1072,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -961,6 +1085,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -972,6 +1097,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END)]
 |
@@ -985,6 +1111,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -994,6 +1121,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
@@ -1005,9 +1133,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. First distinct needs
 # intermediate agg tuple.
@@ -1020,6 +1150,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1031,6 +1162,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -1040,9 +1172,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -1051,6 +1185,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1062,6 +1197,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
 |
@@ -1075,6 +1211,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -1084,6 +1221,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 6 THEN 0 END)]
 |
@@ -1095,9 +1233,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. Non-distinct needs
 # intermediate agg tuple.
@@ -1110,6 +1250,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1121,6 +1262,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -1130,9 +1272,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -1141,6 +1285,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
 |  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1152,6 +1297,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END)]
 |
@@ -1165,6 +1311,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -1174,6 +1321,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
@@ -1185,9 +1333,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====
 # Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
 select bigint_col, avg(distinct tinyint_col), avg(distinct smallint_col),
@@ -1199,6 +1349,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 8 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1210,6 +1361,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 01:AGGREGATE
 |  Class 0
@@ -1219,9 +1371,11 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -1230,6 +1384,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
 |  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 8 THEN bigint_col END
+|  row-size=32B cardinality=11
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -1241,6 +1396,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END)]
 |
@@ -1254,6 +1410,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=48B cardinality=70
 |
 05:AGGREGATE
 |  Class 0
@@ -1263,6 +1420,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 7 THEN 0 END)]
 |
@@ -1274,7 +1432,9 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
+|  row-size=35B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=15B cardinality=7.30K
 ====

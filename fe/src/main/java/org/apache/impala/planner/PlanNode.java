@@ -320,6 +320,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
     // Output cardinality, cost estimates and tuple Ids only when explain plan level
     // is extended or above.
+    boolean displayCardinality = displayCardinality(detailLevel);
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       // Print resource profile.
       expBuilder.append(detailPrefix);
@@ -334,9 +335,18 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         expBuilder.append(tupleId.asInt() + nullIndicator);
         if (i + 1 != tupleIds_.size()) expBuilder.append(",");
       }
-      expBuilder.append(" row-size=" + PrintUtils.printBytes(Math.round(avgRowSize_)));
-      expBuilder.append(PrintUtils.printCardinality(" ", cardinality_));
-      expBuilder.append("\n");
+      expBuilder.append(displayCardinality ? " " : "\n");
+    }
+    // Output cardinality: in standard and above levels.
+    // In standard, on a line by itself (if wanted). In extended, on
+    // a line with tuple ids.
+    if (displayCardinality) {
+      if (detailLevel == TExplainLevel.STANDARD) expBuilder.append(detailPrefix);
+      expBuilder.append("row-size=")
+        .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
+        .append(" cardinality=")
+        .append(PrintUtils.printCardinality(cardinality_))
+        .append("\n");
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -352,7 +362,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         expBuilder.append("<not computed>");
       }
     }
-
 
     // Print the children. Do not traverse into the children of an Exchange node to
     // avoid crossing fragment boundaries.
@@ -383,6 +392,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
           children_.get(0).getExplainString(prefix, prefix, queryOptions, detailLevel));
     }
     return expBuilder.toString();
+  }
+
+  /**
+   * Per-node setting whether to include cardinality in the node overview.
+   * Some nodes omit cardinality because either a) it is not needed
+   * (Empty set, Exchange), or b) it is printed by the node itself (HDFS scan.)
+   * @return true if cardinality should be included in the generic
+   * node details, false if it should be omitted.
+   */
+  protected boolean displayCardinality(TExplainLevel detailLevel) {
+    return detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal();
   }
 
   /**

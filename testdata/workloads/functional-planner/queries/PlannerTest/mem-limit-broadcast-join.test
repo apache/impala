@@ -9,13 +9,16 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n1.n_regionkey = n2.n_regionkey
 |  runtime filters: RF000 <- n2.n_regionkey
+|  row-size=219B cardinality=125
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.nation n2]
 |     partitions=1/1 files=1 size=2.15KB
+|     row-size=109B cardinality=25
 |
 00:SCAN HDFS [tpch.nation n1]
    partitions=1/1 files=1 size=2.15KB
    runtime filters: RF000 -> n1.n_regionkey
+   row-size=109B cardinality=25
 ====

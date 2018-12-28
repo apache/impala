@@ -15,7 +15,7 @@ PLAN-ROOT SINK
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=2,1,0 row-size=44B cardinality=1500000
+|  tuple-ids=2,1,0 row-size=44B cardinality=1.50M
 |  in pipelines: 00(GETNEXT)
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
@@ -58,21 +58,21 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=289.00MB
+   partitions=1/1 files=4 size=288.99MB
    predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
    predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150000 size=288.96MB
+     table: rows=150000 size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44227
+   extrapolated-rows=disabled max-scan-range-rows=44225
    parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=15000
+   tuple-ids=0 row-size=20B cardinality=15.00K
    in pipelines: 00(GETNEXT)
 ====
 # Test HBase scan node.
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=7300
+   tuple-ids=0 row-size=20B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test hash join.
@@ -180,7 +180,7 @@ PLAN-ROOT SINK
 |  other join predicates: CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT), CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col
 |  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N row-size=28B cardinality=7300
+|  tuple-ids=0,1N row-size=28B cardinality=7.30K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -203,7 +203,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=7300
+   tuple-ids=0 row-size=8B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test nested-loop join. Same as above but and with a disjunction in the On clause.
@@ -229,7 +229,7 @@ PLAN-ROOT SINK
 |  join predicates: (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT))
 |  predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |  mem-estimate=14.26KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,1N row-size=28B cardinality=7300
+|  tuple-ids=0,1N row-size=28B cardinality=7.30K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -252,7 +252,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=7300
+   tuple-ids=0 row-size=8B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test distinct aggregation with grouping.
@@ -282,7 +282,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00', CAST(2 AS BIGINT) + CAST(id AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=17B cardinality=7300
+|  tuple-ids=1 row-size=17B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -293,7 +293,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=7300
+   tuple-ids=0 row-size=20B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test non-grouping distinct aggregation.
@@ -320,7 +320,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  group by: CAST(2 AS BIGINT) + CAST(id AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=7300
+|  tuple-ids=1 row-size=16B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -331,7 +331,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=4B cardinality=7300
+   tuple-ids=0 row-size=4B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test analytic eval node.
@@ -354,14 +354,14 @@ PLAN-ROOT SINK
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,2 row-size=53B cardinality=7300
+|  tuple-ids=3,2 row-size=53B cardinality=7.30K
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=45B cardinality=7300
+|  tuple-ids=3 row-size=45B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -372,7 +372,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=25B cardinality=7300
+   tuple-ids=0 row-size=25B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test sort node.
@@ -389,7 +389,7 @@ PLAN-ROOT SINK
 01:SORT
 |  order by: id * 7.5 ASC
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=7300
+|  tuple-ids=1 row-size=8B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -400,7 +400,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=7300
+   tuple-ids=0 row-size=8B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Test HDFS table sink.

@@ -8,20 +8,24 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ====
 # IMPALA-4166: insert with noshuffle hint into tables with sort.columns property adds
 # sort node.
@@ -33,18 +37,22 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ====
 # IMPALA-4166: insert into tables with sort.columns property adds sort node. Clustering
 # columns are added to the sort columns. noclustered hint is ignored when sort.columns
@@ -57,20 +65,24 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ====
 # IMPALA-4166: insert into tables with sort.columns property adds sort node.
 insert into table test_sort_by.t_nopart /*+ shuffle */
@@ -81,20 +93,24 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ====
 # IMPALA-4166: insert with noshuffle hint into tables with sort.columns property adds
 # sort node.
@@ -106,18 +122,22 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ====
 # IMPALA-4166: sort columns are correct when using an identity column permutation.
 insert into table test_sort_by.t_nopart (id, int_col, bool_col) /*+ shuffle */
@@ -128,20 +148,24 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ====
 # IMPALA-4166: sort columns are correct when using a non-trivial column permutation.
 insert into table test_sort_by.t_nopart (bool_col, id, int_col) /*+ shuffle */
@@ -152,20 +176,24 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=9B cardinality=7.30K
 |
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=9B cardinality=7.30K
 ====
 # IMPALA-4166: sort columns are correct when using a partial column permutation.
 insert into table test_sort_by.t_nopart (bool_col, id) /*+ shuffle */
@@ -176,20 +204,24 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 01:SORT
 |  order by: bool_col ASC NULLS LAST
+|  row-size=5B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=5B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
 |  order by: bool_col ASC NULLS LAST
+|  row-size=5B cardinality=7.30K
 |
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=5B cardinality=7.30K
 ====
 # IMPALA-4166: no sort node is added when using a partial column permutation and none of
 # the sort columns appear in the permutation.
@@ -201,6 +233,7 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
@@ -209,6 +242,7 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # IMPALA-4166: sort columns with a join
 insert into table test_sort_by.t partition(year, month) /*+ noclustered */
@@ -221,26 +255,32 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 04:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=10
 |
 03:TOP-N [LIMIT=10]
 |  order by: string_col ASC
+|  row-size=30B cardinality=10
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=34B cardinality=7.30K
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=9B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
+   row-size=25B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 07:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=17B cardinality=10
 |
 06:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: string_col ASC
@@ -248,21 +288,25 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 03:TOP-N [LIMIT=10]
 |  order by: string_col ASC
+|  row-size=30B cardinality=10
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=34B cardinality=7.30K
 |
 |--05:EXCHANGE [HASH(a.id)]
 |  |
 |  00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=9B cardinality=7.30K
 |
 04:EXCHANGE [HASH(b.id)]
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
+   row-size=25B cardinality=7.30K
 ====
 # IMPALA-4166: sort columns with a join and agg
 insert into table test_sort_by.t partition(year, month) /*+ noclustered */
@@ -275,54 +319,65 @@ WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(b.year,a.month)]
 |
 04:SORT
 |  order by: b.year ASC NULLS LAST, a.month ASC NULLS LAST, max(b.int_col) ASC NULLS LAST, min(a.bool_col) ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 03:AGGREGATE [FINALIZE]
 |  output: max(b.int_col), min(a.bool_col)
 |  group by: a.id, b.year, a.month
+|  row-size=17B cardinality=7.30K
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=21B cardinality=7.30K
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=9B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t, OVERWRITE=false, PARTITION-KEYS=(b.year,a.month)]
 |  partitions=24
 |
 09:SORT
 |  order by: b.year ASC NULLS LAST, a.month ASC NULLS LAST, max(b.int_col) ASC NULLS LAST, min(a.bool_col) ASC NULLS LAST
+|  row-size=17B cardinality=7.30K
 |
 08:EXCHANGE [HASH(b.year,a.month)]
 |
 07:AGGREGATE [FINALIZE]
 |  output: max:merge(b.int_col), min:merge(a.bool_col)
 |  group by: a.id, b.year, a.month
+|  row-size=17B cardinality=7.30K
 |
 06:EXCHANGE [HASH(a.id,b.year,a.month)]
 |
 03:AGGREGATE [STREAMING]
 |  output: max(b.int_col), min(a.bool_col)
 |  group by: a.id, b.year, a.month
+|  row-size=17B cardinality=7.30K
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=21B cardinality=7.30K
 |
 |--05:EXCHANGE [HASH(a.id)]
 |  |
 |  00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=9B cardinality=7.30K
 |
 04:EXCHANGE [HASH(b.id)]
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
+   row-size=12B cardinality=7.30K
 ====
 # IMPALA-5339: Sort columns with a union to trigger expr rewrite
 insert into table test_sort_by.t_nopart
@@ -333,24 +388,30 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 02:SORT
 |  order by: CAST(id AS INT) ASC NULLS LAST
+|  row-size=1B cardinality=2
 |
 01:AGGREGATE [FINALIZE]
 |  group by: id
+|  row-size=1B cardinality=2
 |
 00:UNION
    constant-operands=2
+   row-size=1B cardinality=2
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
 |  order by: CAST(id AS INT) ASC NULLS LAST
+|  row-size=1B cardinality=2
 |
 01:AGGREGATE [FINALIZE]
 |  group by: id
+|  row-size=1B cardinality=2
 |
 00:UNION
    constant-operands=2
+   row-size=1B cardinality=2
 ====
 # IMPALA-5339: Sort columns with a subquery to trigger expr rewrite
 insert into table test_sort_by.t_nopart
@@ -361,45 +422,56 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |
 04:SORT
 |  order by: id ASC NULLS LAST
+|  row-size=4B cardinality=0
 |
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = min(id)
 |  runtime filters: RF000 <- min(id)
+|  row-size=4B cardinality=0
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(id)
+|  |  row-size=4B cardinality=0
 |  |
 |  01:SCAN HDFS [test_sort_by.t]
 |     partitions=0/0 files=0 size=0B
+|     row-size=4B cardinality=0
 |
 00:SCAN HDFS [test_sort_by.t_nopart]
    partitions=1/0 files=0 size=0B
    runtime filters: RF000 -> id
+   row-size=4B cardinality=0
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 07:SORT
 |  order by: id ASC NULLS LAST
+|  row-size=4B cardinality=0
 |
 03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: id = min(id)
 |  runtime filters: RF000 <- min(id)
+|  row-size=4B cardinality=0
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  05:AGGREGATE [FINALIZE]
 |  |  output: min:merge(id)
+|  |  row-size=4B cardinality=0
 |  |
 |  04:EXCHANGE [UNPARTITIONED]
 |  |
 |  02:AGGREGATE
 |  |  output: min(id)
+|  |  row-size=4B cardinality=0
 |  |
 |  01:SCAN HDFS [test_sort_by.t]
 |     partitions=0/0 files=0 size=0B
+|     row-size=4B cardinality=0
 |
 00:SCAN HDFS [test_sort_by.t_nopart]
    partitions=1/0 files=0 size=0B
    runtime filters: RF000 -> id
+   row-size=4B cardinality=0
 ====

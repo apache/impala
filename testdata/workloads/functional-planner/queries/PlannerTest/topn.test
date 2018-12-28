@@ -7,9 +7,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=1]
 |  order by: name ASC
+|  row-size=16B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
+   row-size=16B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -19,9 +21,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=1]
 |  order by: name ASC
+|  row-size=16B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
+   row-size=16B cardinality=0
 ====
 select zip, count(*)
 from functional.testtbl
@@ -34,14 +38,17 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=10]
 |  order by: count(*) DESC
+|  row-size=12B cardinality=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: zip
+|  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
+   row-size=16B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -51,20 +58,24 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=10]
 |  order by: count(*) DESC
+|  row-size=12B cardinality=0
 |
 04:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: zip
+|  row-size=12B cardinality=0
 |
 03:EXCHANGE [HASH(zip)]
 |
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: zip
+|  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
+   row-size=16B cardinality=0
 ====
 select int_col, sum(float_col)
 from functional_hbase.alltypessmall
@@ -77,13 +88,16 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=4]
 |  order by: sum(float_col) ASC
+|  row-size=12B cardinality=4
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(float_col)
 |  group by: int_col
+|  row-size=12B cardinality=5
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
+   row-size=12B cardinality=5
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -93,19 +107,23 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=4]
 |  order by: sum(float_col) ASC
+|  row-size=12B cardinality=4
 |
 04:AGGREGATE [FINALIZE]
 |  output: sum:merge(float_col)
 |  group by: int_col
+|  row-size=12B cardinality=5
 |
 03:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: sum(float_col)
 |  group by: int_col
+|  row-size=12B cardinality=5
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
+   row-size=12B cardinality=5
 ====
 select int_col, sum(float_col), min(float_col)
 from functional_hbase.alltypessmall
@@ -134,18 +152,22 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=16B cardinality=10
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -155,20 +177,24 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=16B cardinality=10
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=100
 ====
 # Test that the top-n is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
@@ -177,9 +203,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=4B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -189,9 +217,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=4B cardinality=100
 ====
 # Test that the top-n is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id limit 2
@@ -200,9 +230,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=2]
 |  order by: id ASC
+|  row-size=8B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -212,9 +244,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=2]
 |  order by: id ASC
+|  row-size=8B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
 ====
 # Test that the limit/offset is propagated correctly to child nodes. The TOP-N node
 # should have the limit/offset specified in the query. Child sort nodes should have a
@@ -228,18 +262,22 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col ASC
+|  row-size=4B cardinality=10
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=16B cardinality=10
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=100
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -261,20 +299,24 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=15]
 |  order by: int_col ASC
+|  row-size=4B cardinality=10
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=16B cardinality=10
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=100
 ====
 # test distributed top-n over a union (IMPALA-831)
 select int_col, bigint_col from
@@ -287,15 +329,19 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col DESC
+|  row-size=12B cardinality=10
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -306,15 +352,19 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=15]
 |  order by: int_col DESC
+|  row-size=12B cardinality=15
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ====
 # test distributed top-n over a union distinct (IMPALA-831)
 select int_col, bigint_col from
@@ -327,18 +377,23 @@ PLAN-ROOT SINK
 |
 04:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col DESC
+|  row-size=12B cardinality=10
 |
 03:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  row-size=89B cardinality=7.40K
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -349,23 +404,29 @@ PLAN-ROOT SINK
 |
 04:TOP-N [LIMIT=15]
 |  order by: int_col DESC
+|  row-size=12B cardinality=15
 |
 06:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  row-size=89B cardinality=7.40K
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
 03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  row-size=89B cardinality=7.40K
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # test that top-n is not placed below an unpartitioned exchange with a limit
 select * from (select * from functional.alltypes limit 10) t
@@ -375,15 +436,18 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: int_col ASC
+|  row-size=89B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    limit: 10
+   row-size=89B cardinality=10
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: int_col ASC
+|  row-size=89B cardinality=10
 |
 02:EXCHANGE [UNPARTITIONED]
 |  limit: 10
@@ -391,6 +455,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    limit: 10
+   row-size=89B cardinality=10
 ====
 # test that top-n is not placed below an unpartitioned exchange with a limit
 select * from
@@ -403,21 +468,26 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=10]
 |  order by: int_col ASC
+|  row-size=89B cardinality=10
 |
 00:UNION
 |  pass-through-operands: all
 |  limit: 10
+|  row-size=89B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=10]
 |  order by: int_col ASC
+|  row-size=89B cardinality=10
 |
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
@@ -425,10 +495,13 @@ PLAN-ROOT SINK
 00:UNION
 |  pass-through-operands: all
 |  limit: 10
+|  row-size=89B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====

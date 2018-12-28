@@ -78,7 +78,7 @@ class TestExplain(ImpalaTestSuite):
     tbl_name = 'alltypes'
 
     def check_cardinality(query_result, expected_cardinality):
-      regex = re.compile('tuple-ids=\d+ row-size=\d+B cardinality=(\d+)')
+      regex = re.compile(' row-size=\d+B cardinality=(.*)$')
       for res in query_result:
         m = regex.match(res.strip())
         if m:
@@ -94,12 +94,12 @@ class TestExplain(ImpalaTestSuite):
     # Half of the partitions are filtered out, cardinality should be 3650.
     result = self.execute_query("explain select * from %s.%s where year = 2010" % (
         db_name, tbl_name), query_options={'explain_level':3})
-    check_cardinality(result.data, '3650')
+    check_cardinality(result.data, '3.65K')
 
     # None of the partitions are filtered out, cardinality should be 7300.
     result = self.execute_query("explain select * from %s.%s" % (db_name, tbl_name),
         query_options={'explain_level':3})
-    check_cardinality(result.data, '7300')
+    check_cardinality(result.data, '7.30K')
 
     # Create a partitioned table with a mixed set of available stats,
     mixed_tbl = unique_database + ".t"

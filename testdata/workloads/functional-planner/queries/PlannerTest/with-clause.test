@@ -5,6 +5,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -12,6 +13,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ====
 # Basic test with a single with-clause view that references a catalog view.
 with t as (select int_col x, bigint_col y from functional.alltypes_view)
@@ -21,6 +23,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -28,6 +31,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ====
 # Multiple views in with-clause. Only one view is used.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
@@ -38,11 +42,13 @@ PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=2B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=2B cardinality=1
 ====
 # Multiple views in with-clause. All views are used in a union.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
@@ -52,34 +58,42 @@ select * from t1 union all select * from t2 union all select * from t3
 PLAN-ROOT SINK
 |
 00:UNION
+|  row-size=12B cardinality=7.30K
 |
 |--03:UNION
 |     constant-operands=2
+|     row-size=2B cardinality=2
 |
 |--02:UNION
 |     constant-operands=1
+|     row-size=2B cardinality=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 06:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
+|  row-size=12B cardinality=7.30K
 |
 |--05:EXCHANGE [RANDOM]
 |  |
 |  03:UNION
 |     constant-operands=2
+|     row-size=2B cardinality=2
 |
 |--04:EXCHANGE [RANDOM]
 |  |
 |  02:UNION
 |     constant-operands=1
+|     row-size=2B cardinality=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ====
 # Multiple views in with-clause. All views are used in a join.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
@@ -92,21 +106,26 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=58.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=12B cardinality=100
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=5.84K
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.int_col, RF002 -> int_col
+   row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -115,25 +134,30 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=58.40K
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=12B cardinality=100
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=5.84K
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.int_col, RF002 -> int_col
+   row-size=12B cardinality=7.30K
 ====
 # Multiple dependent views in with-clause
 with t1 as (
@@ -158,37 +182,46 @@ PLAN-ROOT SINK
 |
 05:TOP-N [LIMIT=3]
 |  order by: c3 ASC, c1 DESC
+|  row-size=9B cardinality=1
 |
 04:SELECT
 |  predicates: c1 > 0
+|  row-size=9B cardinality=1
 |
 03:AGGREGATE [FINALIZE]
 |  output: max(tinyint_col)
 |  group by: int_col, max(id)
 |  limit: 10
+|  row-size=9B cardinality=5
 |
 02:TOP-N [LIMIT=5]
 |  order by: int_col ASC, tinyint_col ASC
+|  row-size=9B cardinality=5
 |
 01:AGGREGATE [FINALIZE]
 |  output: max(id)
 |  group by: int_col, tinyint_col
+|  row-size=9B cardinality=100
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=9B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 05:TOP-N [LIMIT=3]
 |  order by: c3 ASC, c1 DESC
+|  row-size=9B cardinality=1
 |
 04:SELECT
 |  predicates: c1 > 0
+|  row-size=9B cardinality=1
 |
 03:AGGREGATE [FINALIZE]
 |  output: max(tinyint_col)
 |  group by: int_col, max(id)
 |  limit: 10
+|  row-size=9B cardinality=5
 |
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC, tinyint_col ASC
@@ -196,19 +229,23 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=5]
 |  order by: int_col ASC, tinyint_col ASC
+|  row-size=9B cardinality=5
 |
 07:AGGREGATE [FINALIZE]
 |  output: max:merge(id)
 |  group by: int_col, tinyint_col
+|  row-size=9B cardinality=100
 |
 06:EXCHANGE [HASH(int_col,tinyint_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: max(id)
 |  group by: int_col, tinyint_col
+|  row-size=9B cardinality=100
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=9B cardinality=100
 ====
 # Self-join of with-clause table to make sure the on clause is properly set
 # in the cloned inline-view instances.
@@ -220,21 +257,26 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -243,27 +285,32 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ====
 # Self-join of with-clause table to make sure the using clause is properly set
 # in the cloned inline-view instances.
@@ -275,21 +322,26 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -298,27 +350,32 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ====
 # Self-join of with-clause table to make sure the join op is properly set
 # in the cloned inline-view instances.
@@ -329,18 +386,23 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: int_col = int_col
+|  row-size=36B cardinality=128
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: int_col = int_col
+|  row-size=24B cardinality=32
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=12B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -348,24 +410,29 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  row-size=36B cardinality=128
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  row-size=24B cardinality=32
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=12B cardinality=8
 ====
 # Self-join of with-clause table to make sure join hints are properly set
 # in the cloned inline-view instances.
@@ -379,21 +446,26 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -402,27 +474,32 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF000 <- int_col
+|  row-size=36B cardinality=128
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
 |
 06:EXCHANGE [HASH(int_col)]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
 |  runtime filters: RF002 <- int_col
+|  row-size=24B cardinality=32
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> int_col
+|     row-size=12B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
+   row-size=12B cardinality=8
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))
@@ -433,27 +510,35 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
+|  row-size=24B cardinality=1
 |
 00:UNION
+|  row-size=24B cardinality=2
 |
 |--02:UNION
 |     constant-operands=1
+|     row-size=24B cardinality=1
 |
 01:UNION
    constant-operands=1
+   row-size=24B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
+|  row-size=24B cardinality=1
 |
 00:UNION
+|  row-size=24B cardinality=2
 |
 |--02:UNION
 |     constant-operands=1
+|     row-size=24B cardinality=1
 |
 01:UNION
    constant-operands=1
+   row-size=24B cardinality=1
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))
@@ -464,27 +549,35 @@ PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
+|  row-size=24B cardinality=1
 |
 00:UNION
+|  row-size=24B cardinality=2
 |
 |--02:UNION
 |     constant-operands=1
+|     row-size=24B cardinality=1
 |
 01:UNION
    constant-operands=1
+   row-size=24B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
+|  row-size=24B cardinality=1
 |
 00:UNION
+|  row-size=24B cardinality=2
 |
 |--02:UNION
 |     constant-operands=1
+|     row-size=24B cardinality=1
 |
 01:UNION
    constant-operands=1
+   row-size=24B cardinality=1
 ====
 # Test with clause in an insert statement.
 with t1 as (select * from functional.alltypestiny)
@@ -495,20 +588,24 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=4
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=8
 |
 01:EXCHANGE [HASH(functional.alltypestiny.year,functional.alltypestiny.month)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ====
 # Test with clause in an insert statement and in its query statement.
 with t1 as (select * from functional.alltypestiny)
@@ -521,30 +618,38 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 |
 03:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=16
 |
 00:UNION
+|  row-size=89B cardinality=16
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=16
 |
 04:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=16
 |
 03:EXCHANGE [HASH(year,month)]
 |
 00:UNION
+|  row-size=89B cardinality=16
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ====
 # IMPALA-5293: Test with clause in an insert statement and in its query statement. Make
 # sure that noclustered hint prevents addition of a sort node before writing to HDFS.
@@ -557,12 +662,15 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 |  partitions=16
 |
 00:UNION
+|  row-size=89B cardinality=16
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=16
@@ -570,12 +678,15 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 03:EXCHANGE [HASH(year,month)]
 |
 00:UNION
+|  row-size=89B cardinality=16
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ====
 # Test with clause with a query statement that references the same column from a
 # base table multiple times (IMPALA-1412)
@@ -589,6 +700,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    predicates: bigint_col = bigint_col
+   row-size=9B cardinality=1
 ====
 # IMPALA-2414: Test basic correlated WITH clause view.
 select pos from functional.allcomplextypes t inner join
@@ -599,16 +711,21 @@ on v.pos = t.id
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=24B cardinality=0
 |
 |--04:NESTED LOOP JOIN [INNER JOIN]
 |  |  join predicates: pos = t.id
+|  |  row-size=24B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [t.int_array_col]
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
+   row-size=16B cardinality=0
 ====
 # IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
 select pos from functional.allcomplextypes t inner join
@@ -618,15 +735,20 @@ select pos from functional.allcomplextypes t inner join
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
 |  |
 |  03:UNNEST [t.int_array_col]
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
+   row-size=12B cardinality=0
 ====
 # IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
 with w1 as (select pos from functional.allcomplextypes t,
@@ -636,15 +758,20 @@ select * from w1
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=20B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
 |  |
 |  03:UNNEST [t.int_array_col]
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
+   row-size=12B cardinality=0
 ====
 # IMPALA-2414: Test multiple correlated WITH clause views that are joined.
 select pos from functional.allcomplextypes t inner join
@@ -655,26 +782,37 @@ select pos from functional.allcomplextypes t inner join
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=64B cardinality=0
 |
 |--10:NESTED LOOP JOIN [INNER JOIN]
 |  |  join predicates: value = t.id
+|  |  row-size=64B cardinality=10.00K
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=52B cardinality=1
 |  |
 |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=12B cardinality=10.00K
 |  |
 |  |--06:UNNEST [t.map_map_col.value]
+|  |     row-size=4B cardinality=10
 |  |
 |  08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=8B cardinality=1.00K
 |  |
 |  |--05:UNNEST [t.map_map_col.value]
+|  |     row-size=0B cardinality=10
 |  |
 |  07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=8B cardinality=100
 |  |
 |  |--04:UNNEST [t.int_array_col]
+|  |     row-size=0B cardinality=10
 |  |
 |  03:UNNEST [t.int_array_col]
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
+   row-size=52B cardinality=0
 ====

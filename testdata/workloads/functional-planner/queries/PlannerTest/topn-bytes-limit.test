@@ -5,9 +5,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=7]
 |  order by: id ASC
+|  row-size=4B cardinality=7
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -17,7 +19,9 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=7]
 |  order by: id ASC
+|  row-size=4B cardinality=7
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
 ====

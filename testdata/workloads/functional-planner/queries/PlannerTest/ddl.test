@@ -5,12 +5,14 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 create table t as
 select distinct a.int_col, a.string_col from functional.alltypes a
@@ -22,41 +24,54 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 03:AGGREGATE [FINALIZE]
 |  group by: a.int_col, a.string_col
+|  row-size=17B cardinality=13
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
 |  runtime filters: RF000 <- b.id
+|  row-size=25B cardinality=13
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.month = 2
 |     partitions=1/4 files=1 size=1.58KB
+|     row-size=4B cardinality=25
 |
 00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.year = 2009
    partitions=12/24 files=12 size=238.68KB
    runtime filters: RF000 -> a.id
+   row-size=21B cardinality=3.65K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 06:AGGREGATE [FINALIZE]
 |  group by: a.int_col, a.string_col
+|  row-size=17B cardinality=13
 |
 05:EXCHANGE [HASH(a.int_col,a.string_col)]
 |
 03:AGGREGATE [STREAMING]
 |  group by: a.int_col, a.string_col
+|  row-size=17B cardinality=13
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
 |  runtime filters: RF000 <- b.id
+|  row-size=25B cardinality=13
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.month = 2
 |     partitions=1/4 files=1 size=1.58KB
+|     row-size=4B cardinality=25
 |
 00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.year = 2009
    partitions=12/24 files=12 size=238.68KB
    runtime filters: RF000 -> a.id
+   row-size=21B cardinality=3.65K
 ====
 # CTAS with a view that has a limit clause (IMPALA-1411)
 create table t as
@@ -68,6 +83,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    limit: 1
+   row-size=0B cardinality=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -78,6 +94,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    limit: 1
+   row-size=0B cardinality=1
 ====
 # CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
 create table t as
@@ -91,6 +108,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    limit: 1
+   row-size=4B cardinality=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -101,6 +119,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    limit: 1
+   row-size=4B cardinality=1
 ====
 
 # CTAS with a select statement that has a limit and offset clause (IMPALA-1411)
@@ -112,9 +131,11 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 01:TOP-N [LIMIT=1 OFFSET=5]
 |  order by: id ASC
+|  row-size=89B cardinality=1
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -126,9 +147,11 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 01:TOP-N [LIMIT=6]
 |  order by: id ASC
+|  row-size=89B cardinality=6
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ====
 # CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
 create table t as
@@ -140,9 +163,11 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 01:TOP-N [LIMIT=2 OFFSET=5]
 |  order by: id ASC
+|  row-size=8B cardinality=2
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=8B cardinality=8
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -154,9 +179,11 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 01:TOP-N [LIMIT=7]
 |  order by: id ASC
+|  row-size=8B cardinality=7
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=8B cardinality=8
 ====
 # CTAS with sort columns
 create table t sort by (int_col, bool_col) as
@@ -167,18 +194,22 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # CTAS with partitions and sort columns
 create table t partitioned by (year, month) sort by (int_col, bool_col) as
@@ -189,20 +220,24 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-4167: if no (no)shuffle hint is given for CTAS into partitioned HDFS table, then
 # Impala is free to decide whether to add an exchange node or not. In this example, the
@@ -220,6 +255,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.y
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-4167: non-shuffled CTAS into partitioned table has no exchange node before write.
 # Note that plan hint tests for CTAS are minimal by design, as this logic is covered well
@@ -234,6 +270,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.y
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # CTAS with more complex select query
 create table t partitioned by (c_nationkey) sort by (c_custkey) as
@@ -247,52 +284,63 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
 |
 04:SORT
 |  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|  row-size=18B cardinality=228.68K
 |
 03:AGGREGATE [FINALIZE]
 |  output: max(o_totalprice)
 |  group by: c_custkey, c_nationkey
+|  row-size=18B cardinality=228.68K
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF000 <- c_custkey
+|  row-size=26B cardinality=228.68K
 |
 |--01:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
 |     predicates: c_nationkey < 10
+|     row-size=10B cardinality=15.00K
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 files=1 size=162.56MB
    runtime filters: RF000 -> o_custkey
+   row-size=16B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
 |  partitions=25
 |
 08:SORT
 |  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|  row-size=18B cardinality=228.68K
 |
 07:EXCHANGE [HASH(c_nationkey)]
 |
 06:AGGREGATE [FINALIZE]
 |  output: max:merge(o_totalprice)
 |  group by: c_custkey, c_nationkey
+|  row-size=18B cardinality=228.68K
 |
 05:EXCHANGE [HASH(c_custkey,c_nationkey)]
 |
 03:AGGREGATE [STREAMING]
 |  output: max(o_totalprice)
 |  group by: c_custkey, c_nationkey
+|  row-size=18B cardinality=228.68K
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF000 <- c_custkey
+|  row-size=26B cardinality=228.68K
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
 |     predicates: c_nationkey < 10
+|     row-size=10B cardinality=15.00K
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 files=1 size=162.56MB
    runtime filters: RF000 -> o_custkey
+   row-size=16B cardinality=1.50M
 ====

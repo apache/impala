@@ -9,7 +9,9 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -18,7 +20,9 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ====
 # insert into a static partition
 insert into table functional.alltypessmall
@@ -32,7 +36,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -41,7 +47,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ====
 # overwrite a static partition
 insert overwrite table functional.alltypessmall
@@ -55,7 +63,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -64,7 +74,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 5
    partitions=1/24 files=1 size=20.36KB
+   row-size=81B cardinality=310
 ====
 # insert into fully dynamic partitions
 insert into table functional.alltypessmall
@@ -79,9 +91,12 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -92,11 +107,14 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=610
 |
 01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ====
 # IMPALA-5293: noclustered hint prevents adding sort node
 insert into table functional.alltypessmall
@@ -110,7 +128,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  partitions=24
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -122,7 +142,9 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ====
 # insert into fully dynamic partitions. The source table has no stats and the insert
 # statement has a partition clause, so hash partition before the sink.
@@ -138,20 +160,26 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_co
 |
 01:SORT
 |  order by: int_col ASC NULLS LAST, int_col ASC NULLS LAST
+|  row-size=72B cardinality=unavailable
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=11.34KB
+   row-size=72B cardinality=unavailable
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
 |  partitions=unavailable
 |
 02:SORT
 |  order by: int_col ASC NULLS LAST, int_col ASC NULLS LAST
+|  row-size=72B cardinality=unavailable
 |
 01:EXCHANGE [HASH(int_col,int_col)]
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=11.34KB
+   row-size=72B cardinality=unavailable
 ====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
@@ -169,13 +197,17 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=80B cardinality=24
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: year, month
+|  row-size=80B cardinality=24
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -186,19 +218,24 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |
 04:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=80B cardinality=24
 |
 03:AGGREGATE [FINALIZE]
 |  output: min:merge(id), min:merge(bool_col), min:merge(tinyint_col), min:merge(smallint_col), min:merge(int_col), min:merge(bigint_col), min:merge(float_col), min:merge(double_col), min:merge(date_string_col), min:merge(string_col), min:merge(timestamp_col)
 |  group by: year, month
+|  row-size=80B cardinality=24
 |
 02:EXCHANGE [HASH(year,month)]
 |
 01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: year, month
+|  row-size=80B cardinality=24
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=89B cardinality=610
 ====
 # insert into a partially dynamic partition
 insert into table functional.alltypessmall
@@ -213,9 +250,12 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |
 01:SORT
 |  order by: month ASC NULLS LAST
+|  row-size=85B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=85B cardinality=610
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -226,11 +266,14 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |
 02:SORT
 |  order by: month ASC NULLS LAST
+|  row-size=85B cardinality=610
 |
 01:EXCHANGE [HASH(month)]
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=85B cardinality=610
 ====
 # insert into a partially dynamic partition
 # partitioned output doesn't require repartitioning
@@ -248,13 +291,17 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |
 02:SORT
 |  order by: month ASC NULLS LAST
+|  row-size=76B cardinality=12
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: month
+|  row-size=76B cardinality=12
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=85B cardinality=610
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -265,19 +312,24 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |
 04:SORT
 |  order by: month ASC NULLS LAST
+|  row-size=76B cardinality=12
 |
 03:AGGREGATE [FINALIZE]
 |  output: min:merge(id), min:merge(bool_col), min:merge(tinyint_col), min:merge(smallint_col), min:merge(int_col), min:merge(bigint_col), min:merge(float_col), min:merge(double_col), min:merge(date_string_col), min:merge(string_col), min:merge(timestamp_col)
 |  group by: month
+|  row-size=76B cardinality=12
 |
 02:EXCHANGE [HASH(month)]
 |
 01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: month
+|  row-size=76B cardinality=12
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month > 10
    partitions=2/24 files=2 size=40.07KB
+   row-size=85B cardinality=610
 ====
 # insert into a partially dynamic partition
 insert into table functional.alltypessmall
@@ -292,9 +344,12 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |
 01:SORT
 |  order by: year ASC NULLS LAST
+|  row-size=85B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year > 2009, month = 4
    partitions=1/24 files=1 size=19.71KB
+   row-size=85B cardinality=300
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
@@ -304,9 +359,12 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |
 01:SORT
 |  order by: year ASC NULLS LAST
+|  row-size=85B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year > 2009, month = 4
    partitions=1/24 files=1 size=19.71KB
+   row-size=85B cardinality=300
 ====
 # insert with limit from partitioned table.
 insert into table functional.alltypesnopart
@@ -318,8 +376,10 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 1
    partitions=1/24 files=1 size=19.95KB
    limit: 10
+   row-size=81B cardinality=10
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -331,8 +391,10 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = 2009, month = 1
    partitions=1/24 files=1 size=19.95KB
    limit: 10
+   row-size=81B cardinality=10
 ====
 # static partition insert from a constant select
 insert into table functional.alltypessmall
@@ -345,12 +407,14 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4
 |
 00:UNION
    constant-operands=1
+   row-size=54B cardinality=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
 00:UNION
    constant-operands=1
+   row-size=54B cardinality=1
 ====
 # dynamic partition insert from a constant select
 insert into table functional.alltypessmall
@@ -363,12 +427,14 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4
 |
 00:UNION
    constant-operands=1
+   row-size=57B cardinality=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
 00:UNION
    constant-operands=1
+   row-size=57B cardinality=1
 ====
 # static partition insert from values statement
 insert into table functional.alltypessmall
@@ -382,12 +448,14 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4
 |
 00:UNION
    constant-operands=3
+   row-size=55B cardinality=3
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
 00:UNION
    constant-operands=3
+   row-size=55B cardinality=3
 ====
 # dynamic partition insert from values statement
 insert into table functional.alltypessmall
@@ -401,18 +469,22 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4
 |
 01:SORT
 |  order by: 2010 ASC NULLS LAST, 4 ASC NULLS LAST
+|  row-size=58B cardinality=3
 |
 00:UNION
    constant-operands=3
+   row-size=58B cardinality=3
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=9
 |
 01:SORT
 |  order by: 2010 ASC NULLS LAST, 4 ASC NULLS LAST
+|  row-size=58B cardinality=3
 |
 00:UNION
    constant-operands=3
+   row-size=58B cardinality=3
 ====
 # test static partition insert from a query with grouped aggregation
 # we expect the insert fragment to be partitioned by the grouping exprs of the query stmt
@@ -427,9 +499,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 01:AGGREGATE [FINALIZE]
 |  output: count(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
@@ -437,15 +511,18 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 02:EXCHANGE [HASH(string_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ====
 # test static partition insert from a query with distinct grouped aggregation
 # we expect the insert fragment to be partitioned by the grouping exprs of the query stmt
@@ -460,12 +537,15 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 01:AGGREGATE
 |  group by: string_col, int_col
+|  row-size=17B cardinality=100
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
@@ -473,23 +553,28 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 05:EXCHANGE [HASH(string_col)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: string_col
+|  row-size=21B cardinality=10
 |
 04:AGGREGATE
 |  group by: string_col, int_col
+|  row-size=17B cardinality=100
 |
 03:EXCHANGE [HASH(string_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: string_col, int_col
+|  row-size=17B cardinality=100
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=7.30K
 ====
 # test that the planner chooses to repartition before the table sink
 # alltypes has column stats and based on the product of the NDVs of year and month
@@ -502,11 +587,13 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # test noshuffle hint to prevent repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month) [noshuffle]
@@ -517,9 +604,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # same as above but with traditional commented hint at default hint location
 insert into table functional.alltypes partition(year, month) /* +noshuffle */
@@ -530,9 +619,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # same as above but with traditional commented hint at Oracle hint location
 insert /* +noshuffle */ into table functional.alltypes partition(year, month)
@@ -543,9 +634,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # same as above but with enf-of-line commented hint
 insert into table functional.alltypes partition(year, month)
@@ -557,9 +650,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # test that the planner does not repartition before the table sink
 # alltypes has column stats and since year only has 2 distinct values the planner
@@ -574,9 +669,11 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 |
 01:SORT
 |  order by: year ASC NULLS LAST
+|  row-size=85B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=85B cardinality=7.30K
 ====
 # test shuffle hint to force repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month=1) [shuffle]
@@ -589,11 +686,13 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 |
 02:SORT
 |  order by: year ASC NULLS LAST
+|  row-size=85B cardinality=7.30K
 |
 01:EXCHANGE [HASH(year)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=85B cardinality=7.30K
 ====
 # test insert/select stmt that contains an analytic function (IMPALA-1400)
 insert into table functional.alltypestiny partition(year=2009, month=1)
@@ -610,12 +709,15 @@ WRITE TO HDFS [functional.alltypestiny, OVERWRITE=false, PARTITION-KEYS=(2009,1)
 |  partition by: id
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+|  row-size=97B cardinality=8
 |
 01:SORT
 |  order by: id ASC NULLS FIRST
+|  row-size=81B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   row-size=81B cardinality=8
 ====
 # IMPALA-3930: Test insert with shuffle hint on constant partition exprs. The table sink
 # is executed at the coordinator.
@@ -631,6 +733,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2009,1)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=81B cardinality=7.30K
 ====
 # IMPALA-3930: Same as above but with a dynamic partition insert.
 insert into table functional.alltypes partition(year, month) /* +shuffle */
@@ -645,6 +748,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2009,1)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=81B cardinality=7.30K
 ====
 # IMPALA-3930: Same as above but with a mix of static/dynamic partition exprs, and
 # with more complex constant exprs.
@@ -660,6 +764,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2009,5)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=81B cardinality=7.30K
 ====
 # Test insert into an unpartitioned table with shuffle hint.
 insert into table functional.alltypesnopart /* +shuffle */
@@ -674,6 +779,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=81B cardinality=7.30K
 ====
 # IMPALA-5293: ensure insert into partitioned table adds sort node without clustered hint.
 insert into table functional.alltypes partition(year, month)
@@ -684,20 +790,24 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 02:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-5293: ensure insert into partitioned table adds sort node without clustered hint.
 insert into table functional.alltypes partition(year, month) /*+ noshuffle */
@@ -708,18 +818,22 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-5293: ensure insert into partitioned table adds sort node without clustered hint.
 # Subquery in WHERE-clause exercises the reset() + analyze() path during rewrite.
@@ -732,49 +846,60 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 04:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=730
 |
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col = max(int_col)
 |  runtime filters: RF000 <- max(int_col)
+|  row-size=89B cardinality=730
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: max(int_col)
+|  |  row-size=4B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> int_col
+   row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
 08:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=730
 |
 07:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: int_col = max(int_col)
 |  runtime filters: RF000 <- max(int_col)
+|  row-size=89B cardinality=730
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  05:AGGREGATE [FINALIZE]
 |  |  output: max:merge(int_col)
+|  |  row-size=4B cardinality=1
 |  |
 |  04:EXCHANGE [UNPARTITIONED]
 |  |
 |  02:AGGREGATE
 |  |  output: max(int_col)
+|  |  row-size=4B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> int_col
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-5293: ensure insert into non-partitioned table does not add sort node.
 insert into table functional.alltypesnopart
@@ -785,12 +910,14 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypesnopart]
    partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypesnopart]
    partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
 ====
 # IMPALA-5293: ensure insert into non-partitioned table does not add sort node.
 insert into table functional.alltypesnopart /*+ shuffle */
@@ -801,6 +928,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypesnopart]
    partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
@@ -809,4 +937,5 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypesnopart]
    partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
 ====

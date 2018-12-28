@@ -6,9 +6,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=1]
 |  order by: int_col ASC
+|  row-size=4B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -18,9 +20,11 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=1]
 |  order by: int_col ASC
+|  row-size=4B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # returns 2 ints, with a total size of 8 bytes, which exceeds the limit of 6 and thus triggers a SORT
 select int_col from functional.alltypes order by 1 limit 2
@@ -29,9 +33,11 @@ PLAN-ROOT SINK
 |
 01:SORT [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -41,9 +47,11 @@ PLAN-ROOT SINK
 |
 01:SORT [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # test that offset is taken into account; the query only returns a single row but needs to sort two rows
 # sorting two ints requires 8 bytes of memory, which exceeds the threshold of 6
@@ -53,9 +61,11 @@ PLAN-ROOT SINK
 |
 01:SORT [LIMIT=1 OFFSET=1]
 |  order by: int_col ASC
+|  row-size=4B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -66,7 +76,9 @@ PLAN-ROOT SINK
 |
 01:SORT [LIMIT=2]
 |  order by: int_col ASC
+|  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====

@@ -4,11 +4,13 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
+   row-size=8B cardinality=0
 ====
 # Predicate on key
 update functional_kudu.testtbl set name = 'peter' where zip > 94549 and id = 5
@@ -17,11 +19,13 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id = 5, zip > 94549
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id = 5, zip > 94549
+   row-size=8B cardinality=0
 ====
 # Mixing predicate and value assignment
 update functional_kudu.testtbl set zip = 94546 where zip > 94549
@@ -30,11 +34,13 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
+   row-size=8B cardinality=0
 ====
 update a
 set a.name = b.name
@@ -46,30 +52,36 @@ UPDATE KUDU [functional_kudu.testtbl]
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
 |  runtime filters: RF001 <- b.id
+|  row-size=28B cardinality=0
 |
 |--01:SCAN HDFS [functional.testtbl b]
 |     partitions=1/1 files=0 size=0B
 |     predicates: b.id = 10
+|     row-size=20B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl a]
    kudu predicates: a.id = 10
    runtime filters: RF001 -> a.id
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
 |  runtime filters: RF001 <- b.id
+|  row-size=28B cardinality=0
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.testtbl b]
 |     partitions=1/1 files=0 size=0B
 |     predicates: b.id = 10
+|     row-size=20B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl a]
    kudu predicates: a.id = 10
    runtime filters: RF001 -> a.id
+   row-size=8B cardinality=0
 ====
 update a
 set a.name = 'values'
@@ -79,27 +91,33 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ids = a.id
+|  row-size=9B cardinality=1
 |
 |--00:SCAN KUDU [functional_kudu.testtbl a]
+|     row-size=8B cardinality=0
 |
 01:UNION
    constant-operands=1
+   row-size=1B cardinality=1
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.id = ids
 |  runtime filters: RF001 <- ids
+|  row-size=9B cardinality=1
 |
 |--04:EXCHANGE [HASH(ids)]
 |  |
 |  01:UNION
 |     constant-operands=1
+|     row-size=1B cardinality=1
 |
 03:EXCHANGE [HASH(a.id)]
 |
 00:SCAN KUDU [functional_kudu.testtbl a]
    runtime filters: RF001 -> a.id
+   row-size=8B cardinality=0
 ====
 update a
 set a.name = 'values'
@@ -111,19 +129,23 @@ UPDATE KUDU [functional_kudu.testtbl]
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.zip = zip
 |  runtime filters: RF001 <- zip
+|  row-size=12B cardinality=0
 |
 |--01:SCAN HDFS [functional.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     limit: 10
+|     row-size=4B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl a]
    runtime filters: RF001 -> a.zip
+   row-size=12B cardinality=0
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: a.zip = zip
 |  runtime filters: RF001 <- zip
+|  row-size=12B cardinality=0
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -133,9 +155,11 @@ UPDATE KUDU [functional_kudu.testtbl]
 |  01:SCAN HDFS [functional.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     limit: 10
+|     row-size=4B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl a]
    runtime filters: RF001 -> a.zip
+   row-size=12B cardinality=0
 ====
 update functional_kudu.testtbl set zip = 94546 where false
 ---- PLAN

@@ -9,14 +9,17 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====
 # Rows per node is > 3000: codegen should be enabled.
 select count(*) from functional.alltypesagg
@@ -28,14 +31,17 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
+   row-size=0B cardinality=11.00K
 ====
 # No stats on functional_parquet: codegen should be disabled.
 select count(*) from functional_parquet.alltypes
@@ -49,14 +55,17 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=188.29KB
+   partitions=24/24 files=24 size=189.28KB
+   row-size=8B cardinality=unavailable
 ====
 # > 3000 rows returned to coordinator: codegen should be enabled
 select * from functional_parquet.alltypes
@@ -71,7 +80,8 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=188.29KB
+   partitions=24/24 files=24 size=189.28KB
+   row-size=80B cardinality=unavailable
 ====
 # Optimisation is enabled for join producing < 3000 rows
 select count(*)
@@ -86,24 +96,29 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=8
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
 ====
 # Optimisation is disabled by cross join producing > 3000 rows
 select count(*) from functional.alltypes t1, functional.alltypes t2
@@ -115,21 +130,26 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=0B cardinality=53.29M
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====
 # Optimisation is enabled for union producing < 3000 rows
 select count(*) from (
@@ -145,20 +165,25 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=0B cardinality=7.31K
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=0B cardinality=8
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====
 # Optimisation is disabled by union producing > 3000 rows
 select count(*) from (
@@ -173,20 +198,25 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
+|  row-size=8B cardinality=1
 |
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=0B cardinality=14.60K
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====
 # Scan with limit on large table: the number of rows scanned is bounded,
 # codegen should be disabled
@@ -201,6 +231,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(tpch.lineitem.l_discount)
+|  row-size=16B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |  limit: 1000
@@ -208,6 +239,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    limit: 1000
+   row-size=8B cardinality=1.00K
 ====
 # Scan with limit and predicates on large table: any number of rows could be scanned:
 # codegen should be enabled
@@ -221,6 +253,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(tpch.lineitem.l_discount)
+|  row-size=16B cardinality=1
 |
 02:EXCHANGE [UNPARTITIONED]
 |  limit: 1000
@@ -229,4 +262,5 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    predicates: l_orderkey > 100
    limit: 1000
+   row-size=16B cardinality=1.00K
 ====

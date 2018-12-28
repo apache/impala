@@ -77,7 +77,7 @@ Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: zip > '2', id > '1'
      mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
-     tuple-ids=0 row-size=124B cardinality=3317
+     tuple-ids=0 row-size=124B cardinality=3.32K
      in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -87,7 +87,7 @@ Per-Host Resources: mem-estimate=517.89KB mem-reservation=0B thread-reservation=
   |
   01:EXCHANGE [UNPARTITIONED]
      mem-estimate=517.89KB mem-reservation=0B thread-reservation=0
-     tuple-ids=0 row-size=124B cardinality=3317
+     tuple-ids=0 row-size=124B cardinality=3.32K
      in pipelines: 00(GETNEXT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -97,7 +97,7 @@ Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: zip > '2', id > '1'
      mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
-     tuple-ids=0 row-size=124B cardinality=3317
+     tuple-ids=0 row-size=124B cardinality=3.32K
      in pipelines: 00(GETNEXT)
 ====
 select * from functional_kudu.zipcode_incomes where id = '1' or id = '2' or zip = '3'

@@ -3,6 +3,7 @@ select * from functional_kudu.testtbl
 PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
@@ -14,6 +15,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=28B cardinality=0
 ====
 select * from functional_kudu.testtbl where name = '10'
 ---- PLAN
@@ -21,6 +23,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: name = '10'
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
@@ -33,6 +36,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: name = '10'
+   row-size=28B cardinality=0
 ====
 select * from functional_kudu.testtbl where name = NULL
 ---- PLAN
@@ -40,6 +44,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: name = NULL
+   row-size=28B cardinality=0
 ====
 insert into functional_kudu.testtbl(id) values (10)
 ---- PLAN
@@ -47,31 +52,37 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:UNION
    constant-operands=1
+   row-size=1B cardinality=1
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 02:PARTIAL SORT
 |  order by: KuduPartition(10) ASC NULLS LAST, 10 ASC NULLS LAST
+|  row-size=5B cardinality=1
 |
 01:EXCHANGE [KUDU(KuduPartition(10))]
 |
 00:UNION
    constant-operands=1
+   row-size=1B cardinality=1
 ====
 insert into functional_kudu.testtbl(id) select int_col from functional_kudu.tinyinttable
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
+   row-size=4B cardinality=10
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 02:PARTIAL SORT
 |  order by: KuduPartition(int_col) ASC NULLS LAST, int_col ASC NULLS LAST
+|  row-size=8B cardinality=10
 |
 01:EXCHANGE [KUDU(KuduPartition(int_col))]
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
+   row-size=4B cardinality=10
 ====
 insert into functional_kudu.testtbl(id, name)
 select count(distinct id), name from functional_kudu.dimtbl
@@ -82,38 +93,47 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 02:AGGREGATE [FINALIZE]
 |  output: count(id)
 |  group by: name
+|  row-size=25B cardinality=10
 |
 01:AGGREGATE
 |  group by: name, id
+|  row-size=25B cardinality=10
 |
 00:SCAN KUDU [functional_kudu.dimtbl]
+   row-size=29B cardinality=10
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 08:PARTIAL SORT
 |  order by: KuduPartition(count(id)) ASC NULLS LAST, count(id) ASC NULLS LAST
+|  row-size=29B cardinality=10
 |
 07:EXCHANGE [KUDU(KuduPartition(count(id)))]
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(id)
 |  group by: name
+|  row-size=25B cardinality=10
 |
 05:EXCHANGE [HASH(name)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(id)
 |  group by: name
+|  row-size=25B cardinality=10
 |
 04:AGGREGATE
 |  group by: name, id
+|  row-size=25B cardinality=10
 |
 03:EXCHANGE [HASH(name,id)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: name, id
+|  row-size=25B cardinality=10
 |
 00:SCAN KUDU [functional_kudu.dimtbl]
+   row-size=29B cardinality=10
 ====
 # All predicates can be pushed down.
 select * from functional_kudu.testtbl
@@ -124,6 +144,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id <= 20, id >= 10, zip < 50, zip <= 30, zip <= 5, zip > 1, zip >= 0, name = 'foo'
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -134,6 +155,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id <= 20, id >= 10, zip < 50, zip <= 30, zip <= 5, zip > 1, zip >= 0, name = 'foo'
+   row-size=28B cardinality=0
 ====
 # Constant propagation works for Kudu
 select * from functional_kudu.alltypes t
@@ -145,6 +167,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypes t]
    predicates: CAST(t.tinyint_col AS BIGINT) = 1000
    kudu predicates: t.bigint_col = 1000, t.int_col = 10
+   row-size=97B cardinality=107
 ====
 # Test constant folding.
 select * from functional_kudu.testtbl
@@ -155,6 +178,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: id < 103, id < 40, id <= 60
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -166,6 +190,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: id < 103, id < 40, id <= 60
+   row-size=28B cardinality=0
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -176,6 +201,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: name = 'a'
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
@@ -189,6 +215,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: name = 'a'
+   row-size=28B cardinality=0
 ====
 # No predicates can be pushed down (predicate on a non-const value and
 # non-binary predicate). There is a single tablet so no partition pruning.
@@ -200,6 +227,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: name IS NULL
+   row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
@@ -213,6 +241,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: name IS NULL
+   row-size=28B cardinality=0
 ====
 # Derived EmptySets for Kudu
 select * from functional_kudu.alltypes t
@@ -230,9 +259,11 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: o_orderkey ASC
+|  row-size=8B cardinality=150.00K
 |
 00:SCAN KUDU [tpch_kudu.orders]
    predicates: o_orderkey < 10.0
+   row-size=8B cardinality=150.00K
 ====
 # IMPALA-3871: Casting literals to TIMESTAMP throw when pushed to KuduScanNode
 select t.c from
@@ -243,10 +274,12 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: c ASC
+|  row-size=22B cardinality=150.00K
 |
 00:SCAN KUDU [tpch_kudu.orders]
    predicates: CAST(o_orderdate AS TIMESTAMP) <= TIMESTAMP '1995-01-01 00:00:00'
    kudu predicates: o_orderkey < 10
+   row-size=26B cardinality=150.00K
 ====
 # IMPALA-4213: Planner not pushing some predicates with constant exprs to Kudu
 select count(*) from functional_kudu.alltypes
@@ -257,9 +290,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: id < 1475059775, id > 1475059665
+   row-size=0B cardinality=730
 ====
 insert into table functional_kudu.alltypes
 select * from functional_kudu.alltypes
@@ -267,15 +302,18 @@ select * from functional_kudu.alltypes
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN KUDU [functional_kudu.alltypes]
+   row-size=97B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
 02:PARTIAL SORT
 |  order by: KuduPartition(functional_kudu.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  row-size=93B cardinality=7.30K
 |
 01:EXCHANGE [KUDU(KuduPartition(functional_kudu.alltypes.id))]
 |
 00:SCAN KUDU [functional_kudu.alltypes]
+   row-size=97B cardinality=7.30K
 ====
 insert into table functional_kudu.testtbl
 select id, name, maxzip as zip
@@ -289,27 +327,33 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 01:AGGREGATE [FINALIZE]
 |  output: max(zip)
 |  group by: id, name
+|  row-size=24B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=28B cardinality=0
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 05:PARTIAL SORT
 |  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|  row-size=28B cardinality=0
 |
 04:EXCHANGE [KUDU(KuduPartition(id))]
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(zip)
 |  group by: id, name
+|  row-size=24B cardinality=0
 |
 02:EXCHANGE [HASH(id,name)]
 |
 01:AGGREGATE [STREAMING]
 |  output: max(zip)
 |  group by: id, name
+|  row-size=24B cardinality=0
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=28B cardinality=0
 ====
 # IMPALA-4479: Test proper folding of constant boolean exprs.
 select * from functional_kudu.alltypes
@@ -319,6 +363,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: bool_col = FALSE
+   row-size=97B cardinality=3.65K
 ====
 # IMPALA-4578: Test predicate propagation for Kudu scans.
 select /* +straight_join */ count(*)
@@ -334,26 +379,32 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: b.int_col = c.int_col
 |  other predicates: c.int_col > 20
+|  row-size=16B cardinality=1
 |
 |--02:SCAN KUDU [functional_kudu.alltypestiny c]
 |     kudu predicates: c.int_col > 20
+|     row-size=4B cardinality=1
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
 |  runtime filters: RF001 <- b.id
+|  row-size=12B cardinality=1
 |
 |--01:SCAN KUDU [functional_kudu.alltypessmall b]
 |     predicates: CAST(b.id AS STRING) > '123'
 |     kudu predicates: b.id > 10
+|     row-size=8B cardinality=10
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    predicates: CAST(a.id AS STRING) > '123'
    kudu predicates: a.id > 10
    runtime filters: RF001 -> a.id
+   row-size=4B cardinality=730
 ====
 # IMPALA-4662: Kudu analysis failure for NULL literal in IN list
 # NULL literal in values list results in applying predicate at scan node
@@ -366,6 +417,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.alltypestiny]
    predicates: id IN (1, NULL), bigint_col IN (NULL), bool_col IN (NULL), double_col IN (NULL), float_col IN (NULL), smallint_col IN (NULL), string_col IN (NULL), tinyint_col IN (NULL)
+   row-size=45B cardinality=1
 ====
 # IMPALA-3586: The operand with the Kudu scan cannot be passed through because id is
 # not-nullable (primary key).
@@ -377,11 +429,14 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  pass-through-operands: 02
+|  row-size=4B cardinality=14.60K
 |
 |--01:SCAN KUDU [functional_kudu.alltypes]
+|     row-size=4B cardinality=7.30K
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # IMPALA-3586: When both operands are Kudu scans, they should both be passed through.
 select id from functional_kudu.alltypes
@@ -392,10 +447,13 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=4B cardinality=14.60K
 |
 |--02:SCAN KUDU [functional_kudu.alltypes]
+|     row-size=4B cardinality=7.30K
 |
 01:SCAN KUDU [functional_kudu.alltypes]
+   row-size=4B cardinality=7.30K
 ====
 # Hint - noshuffle should remove the exchange node.
 insert into functional_kudu.alltypes /* +noshuffle */ select * from functional.alltypes;
@@ -404,9 +462,11 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 |
 01:PARTIAL SORT
 |  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  row-size=93B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # Hint - noclustered should remove the sort node.
 insert into functional_kudu.alltypes /* +noclustered */ select * from functional.alltypes;
@@ -417,6 +477,7 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 insert into functional_kudu.alltypes /* +noclustered,noshuffle */
 select * from functional.alltypes;
@@ -425,6 +486,7 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # Hint - noclustered should remove the sort node from CTAS.
 create /* +noclustered */ table t
@@ -437,6 +499,7 @@ INSERT INTO KUDU [default.t]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 create /* +noclustered,noshuffle */ table t
 primary key(id) partition by hash(id) partitions 3 stored as kudu as
@@ -446,6 +509,7 @@ INSERT INTO KUDU [default.t]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
 # limit, then the query should not incorrectly run with 'small query' optimization.
@@ -459,6 +523,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypesagg_idx]
    kudu predicates: functional_kudu.alltypesagg_idx.tinyint_col = 9
    limit: 10
+   row-size=103B cardinality=10
 ====
 # IMPALA-5602: If a query contains predicates that are all pushed to kudu, there is a
 # limit, and no table stats, then the query should not incorrectly run with 'small query'
@@ -473,6 +538,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [kudu_planner_test.no_stats]
    kudu predicates: tinyint_col = 9
    limit: 10
+   row-size=88B cardinality=10
 ====
 # Insert into an unpartitioned table, shouldn't partition/sort
 insert into tpch_kudu.nation
@@ -481,7 +547,8 @@ select * from tpch_parquet.nation
 INSERT INTO KUDU [tpch_kudu.nation]
 |
 00:SCAN HDFS [tpch_parquet.nation]
-   partitions=1/1 files=1 size=2.74KB
+   partitions=1/1 files=1 size=2.75KB
+   row-size=109B cardinality=25
 ====
 # Unpartitioned table, still has an exchange due to shuffle hint.
 insert into tpch_kudu.nation /* +shuffle */
@@ -492,7 +559,8 @@ INSERT INTO KUDU [tpch_kudu.nation]
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [tpch_parquet.nation]
-   partitions=1/1 files=1 size=2.74KB
+   partitions=1/1 files=1 size=2.75KB
+   row-size=109B cardinality=25
 ====
 # Unpartitioned table, clustered hint forces sort node.
 insert into tpch_kudu.nation /* +clustered */
@@ -502,9 +570,11 @@ INSERT INTO KUDU [tpch_kudu.nation]
 |
 01:PARTIAL SORT
 |  order by: n_nationkey ASC NULLS LAST
+|  row-size=109B cardinality=25
 |
 00:SCAN HDFS [tpch_parquet.nation]
    partitions=1/1 files=1 size=2.75KB
+   row-size=109B cardinality=25
 ====
 # Unpartitioned table, no sort node without clustered hint.
 insert into tpch_kudu.nation
@@ -514,6 +584,7 @@ INSERT INTO KUDU [tpch_kudu.nation]
 |
 00:SCAN HDFS [tpch_parquet.nation]
    partitions=1/1 files=1 size=2.75KB
+   row-size=109B cardinality=25
 ====
 # Partition and primary key exprs are all constant, so don't partition/sort.
 insert into functional_kudu.alltypes (id)
@@ -522,6 +593,7 @@ select 1 from functional_kudu.alltypes
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN KUDU [functional_kudu.alltypes]
+   row-size=0B cardinality=7.30K
 ====
 # Partition exprs are constant but primary key exprs aren't, so sort but don't partition.
 insert into functional_kudu.jointbl (test_id, test_name, test_zip, alltypes_id)
@@ -531,9 +603,11 @@ INSERT INTO KUDU [functional_kudu.jointbl]
 |
 01:PARTIAL SORT
 |  order by: int_col ASC NULLS LAST, id ASC NULLS LAST
+|  row-size=8B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
 ====
 # Decimal predicate.
 select * from functional_kudu.decimal_tbl where d4 = 0.123456789;
@@ -542,6 +616,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.decimal_tbl]
    kudu predicates: d4 = 0.123456789
+   row-size=56B cardinality=5
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -549,4 +624,5 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.decimal_tbl]
    kudu predicates: d4 = 0.123456789
+   row-size=56B cardinality=5
 ====

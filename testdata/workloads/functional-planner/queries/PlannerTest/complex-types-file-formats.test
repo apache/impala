@@ -4,16 +4,21 @@ select s.f1 from functional_parquet.complextypes_fileformat t, t.a
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=24B cardinality=unavailable
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=24B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=24B cardinality=1
 |  |
 |  03:UNNEST [t.a]
+|     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.complextypes_fileformat t]
-   partitions=1/1 files=1 size=227B
+   partitions=1/1 files=1 size=1.22KB
    predicates: !empty(t.a)
+   row-size=24B cardinality=unavailable
 ====
 # Complex types are not supported on ORC.
 select 1 from functional_orc_def.complextypes_fileformat t, t.a
@@ -33,7 +38,8 @@ select id from functional_orc_def.complextypes_fileformat
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
-   partitions=1/1 files=1 size=624B
+   partitions=1/1 files=1 size=621B
+   row-size=4B cardinality=unavailable
 ====
 # Complex types are not supported on ORC but count(*) and similar
 # queries should work.
@@ -43,9 +49,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
-   partitions=1/1 files=1 size=624B
+   partitions=1/1 files=1 size=621B
+   row-size=0B cardinality=unavailable
 ====
 # Complex types are not supported on Avro.
 select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
@@ -84,7 +92,8 @@ select id from functional_rc_snap.complextypes_fileformat
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_rc_snap.complextypes_fileformat]
-   partitions=1/1 files=1 size=56B
+   partitions=1/1 files=1 size=212B
+   row-size=4B cardinality=unavailable
 ====
 # Complex types are not supported on RC files but count(*) and similar
 # queries should work.
@@ -94,9 +103,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_rc_snap.complextypes_fileformat]
-   partitions=1/1 files=1 size=56B
+   partitions=1/1 files=1 size=212B
+   row-size=0B cardinality=unavailable
 ====
 # Complex types are not supported on sequence files.
 select s.f1 from functional_seq_snap.complextypes_fileformat t, t.a
@@ -111,7 +122,8 @@ select id from functional_seq_snap.complextypes_fileformat
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_seq_snap.complextypes_fileformat]
-   partitions=1/1 files=1 size=87B
+   partitions=1/1 files=1 size=281B
+   row-size=4B cardinality=unavailable
 ====
 # Scanning all partitions fails because there are partitions with a file format for which
 # complex types are not supported. The error message is abbreviated because it is
@@ -128,6 +140,7 @@ select id from functional_hbase.allcomplextypes
 PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.allcomplextypes]
+   row-size=4B cardinality=1
 ====
 # Scanning an HBase table with complex-types columns fails if a complex-typed
 # column is selected.
@@ -161,16 +174,22 @@ select s.f1 from functional.complextypes_multifileformat t, t.a where p = 2
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=24B cardinality=unavailable
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=24B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=24B cardinality=1
 |  |
 |  03:UNNEST [t.a]
+|     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional.complextypes_multifileformat t]
+   partition predicates: p = 2
    partitions=1/5 files=1 size=128B
    predicates: !empty(t.a)
+   row-size=24B cardinality=unavailable
 ====
 # Scanning an Avro partition of a multi-format table with complex types fails.
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 3
@@ -192,9 +211,12 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.complextypes_multifileformat]
+   partition predicates: p = 4
    partitions=1/5 files=1 size=128B
+   row-size=0B cardinality=unavailable
 ====
 # Scanning an ORC file partition of a multi-format table with complex types fails.
 select id from functional.complextypes_multifileformat t, t.a where p = 5
@@ -210,7 +232,10 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.complextypes_multifileformat]
+   partition predicates: p = 5
    partitions=1/5 files=1 size=128B
+   row-size=0B cardinality=unavailable
 ====

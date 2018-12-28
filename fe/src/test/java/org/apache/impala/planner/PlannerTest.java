@@ -31,6 +31,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
@@ -75,7 +76,8 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testEmpty() {
-    runPlannerTestFile("empty");
+    runPlannerTestFile("empty",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -163,29 +165,34 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testJoins() {
-    runPlannerTestFile("joins");
+    runPlannerTestFile("joins",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
   public void testJoinOrder() {
-    runPlannerTestFile("join-order");
+    runPlannerTestFile("join-order",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
   public void testOuterJoins() {
-    runPlannerTestFile("outer-joins");
+    runPlannerTestFile("outer-joins",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
   public void testImplicitJoins() {
-    runPlannerTestFile("implicit-joins");
+    runPlannerTestFile("implicit-joins",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
   public void testFkPkJoinDetection() {
     // The FK/PK detection result is included in EXTENDED or higher.
     runPlannerTestFile("fk-pk-join-detection",
-        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -278,7 +285,8 @@ public class PlannerTest extends PlannerTestBase {
   public void testTpch() {
     runPlannerTestFile("tpch-all", "tpch",
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
-            PlannerTestOption.VALIDATE_RESOURCES));
+            PlannerTestOption.VALIDATE_RESOURCES,
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -298,7 +306,8 @@ public class PlannerTest extends PlannerTestBase {
   public void testTpchNested() {
     runPlannerTestFile("tpch-nested", "tpch_nested_parquet",
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
-            PlannerTestOption.VALIDATE_RESOURCES));
+            PlannerTestOption.VALIDATE_RESOURCES,
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -539,11 +548,16 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testDefaultJoinDistributionMode() {
+  public void testDefaultJoinDistributionBroadcastMode() {
     TQueryOptions options = defaultQueryOptions();
     Preconditions.checkState(
         options.getDefault_join_distribution_mode() == TJoinDistributionMode.BROADCAST);
     runPlannerTestFile("default-join-distr-mode-broadcast", options);
+  }
+
+  @Test
+  public void testDefaultJoinDistributionShuffleMode() {
+    TQueryOptions options = defaultQueryOptions();
     options.setDefault_join_distribution_mode(TJoinDistributionMode.SHUFFLE);
     runPlannerTestFile("default-join-distr-mode-shuffle", options);
   }
@@ -707,12 +721,21 @@ public class PlannerTest extends PlannerTestBase {
         8 * 1024 * 1024);
   }
 
+  /**
+   * Verify that various expected-result filters work on a
+   * variety of sample input lines.
+   */
   @Test
-  public void testNullColumnJoinCardinality() throws ImpalaException {
-    // IMPALA-7565: Make sure there is no division by zero during cardinality calculation
-    // in a many to many join on null columns (ndv = 0).
-    String query = "select * from functional.nulltable t1 "
-        + "inner join [shuffle] functional.nulltable t2 on t1.d = t2.d";
-    checkCardinality(query, 1, 1);
+  public void testFilters() {
+    IgnoreValueFilter filter = TestUtils.CARDINALITY_FILTER;
+    assertEquals(" foo=bar cardinality=",
+        filter.transform(" foo=bar cardinality=10"));
+    assertEquals(" foo=bar cardinality=",
+        filter.transform(" foo=bar cardinality=10.3K"));
+    assertEquals(" foo=bar cardinality=",
+        filter.transform(" foo=bar cardinality=unavailable"));
+    filter = TestUtils.ROW_SIZE_FILTER;
+    assertEquals(" row-size= cardinality=10.3K",
+        filter.transform(" row-size=10B cardinality=10.3K"));
   }
 }

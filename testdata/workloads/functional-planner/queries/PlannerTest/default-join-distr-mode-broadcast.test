@@ -9,15 +9,18 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: x.a = y.a
 |  runtime filters: RF000 <- y.a
+|  row-size=48B cardinality=unavailable
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.tinytable y]
 |     partitions=1/1 files=1 size=38B
+|     row-size=24B cardinality=unavailable
 |
 00:SCAN HDFS [functional.tinytable x]
    partitions=1/1 files=1 size=38B
    runtime filters: RF000 -> x.a
+   row-size=24B cardinality=unavailable
 ====
 # Left join input has an unknown cardinality.
 select /* +straight_join */ * from
@@ -30,15 +33,18 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: x.a = y.string_col
 |  runtime filters: RF000 <- y.string_col
+|  row-size=113B cardinality=unavailable
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes y]
-|     partitions=24/24 files=24 size=469.90KB
+|     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.tinytable x]
    partitions=1/1 files=1 size=38B
    runtime filters: RF000 -> x.a
+   row-size=24B cardinality=unavailable
 ====
 # Right join input has an unknown cardinality.
 select /* +straight_join */ * from
@@ -51,13 +57,16 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: x.string_col = y.a
 |  runtime filters: RF000 <- y.a
+|  row-size=113B cardinality=7.30K
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.tinytable y]
 |     partitions=1/1 files=1 size=38B
+|     row-size=24B cardinality=unavailable
 |
 00:SCAN HDFS [functional.alltypes x]
-   partitions=24/24 files=24 size=469.90KB
+   partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> x.string_col
+   row-size=89B cardinality=7.30K
 ====

@@ -47,6 +47,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(int_col), avg(double_col), count(*)
+|  row-size=24B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -61,6 +62,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -93,12 +95,14 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
 |  runtime filters: RF000 <- t1.id
+|  row-size=8B cardinality=0
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> f.id
+   row-size=4B cardinality=100
 ====
 # Constant conjunct causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -111,12 +115,15 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=89B cardinality=108
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
 ====
 # Constant conjunct turns union into an empty-set node.
 select *
@@ -133,11 +140,13 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = id
+|  row-size=178B cardinality=7.30K
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -151,12 +160,15 @@ PLAN-ROOT SINK
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: FALSE
+|  row-size=178B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -171,13 +183,16 @@ PLAN-ROOT SINK
 |  hash predicates: a.id = b.id
 |  other join predicates: FALSE
 |  runtime filters: RF000 <- b.id
+|  row-size=178B cardinality=9
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> a.id
+   row-size=89B cardinality=100
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -191,12 +206,15 @@ PLAN-ROOT SINK
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: NULL
+|  row-size=178B cardinality=108
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
 ====
 # Limit 0 turns query block into an empty-set node.
 select t1.id, t2.id
@@ -234,12 +252,14 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
 |  runtime filters: RF000 <- t1.id
+|  row-size=8B cardinality=0
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> f.id
+   row-size=4B cardinality=100
 ====
 # Limit 0 causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -252,12 +272,15 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  pass-through-operands: all
+|  row-size=89B cardinality=108
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
 ====
 # Limit 0 causes empty-set union.
 select * from functional.alltypessmall
@@ -282,12 +305,15 @@ select int_col from functional.alltypesagg
 PLAN-ROOT SINK
 |
 00:UNION
+|  row-size=8B cardinality=11.00K
 |
 |--03:SCAN HDFS [functional.alltypesagg]
 |     partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(1)
+|  row-size=8B cardinality=0
 |
 01:EMPTYSET
 ====
@@ -307,6 +333,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -320,6 +347,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |
 01:SORT
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -343,6 +371,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id), count(int_col)
+|  row-size=16B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -358,6 +387,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id + int_col)
+|  row-size=8B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -373,9 +403,11 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(T1.int_col)
+|  row-size=8B cardinality=0
 |
 01:AGGREGATE
 |  group by: int_col
+|  row-size=4B cardinality=0
 |
 00:EMPTYSET
 ====
@@ -396,11 +428,14 @@ PLAN-ROOT SINK
 |
 02:UNION
 |  pass-through-operands: all
+|  row-size=2B cardinality=0
 |
 01:AGGREGATE [FINALIZE]
 |  group by: lead(-496, 81, NULL) OVER(...)
+|  row-size=2B cardinality=0
 |
 00:UNION
+   row-size=2B cardinality=0
 ====
 # IMPALA-2088: Test empty union operands with analytic functions.
 select lead(-496, 81) over (order by t1.double_col desc, t1.id asc)
@@ -421,14 +456,18 @@ PLAN-ROOT SINK
 02:UNION
 |  constant-operands=1
 |  pass-through-operands: 01
+|  row-size=2B cardinality=9
 |
 |--03:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=8B cardinality=8
 |
 01:AGGREGATE [FINALIZE]
 |  group by: lead(-496, 81, NULL) OVER(...)
+|  row-size=2B cardinality=0
 |
 00:UNION
+   row-size=2B cardinality=0
 ====
 # IMPALA-2216: Make sure the final output exprs are substituted, even
 # if the resulting plan is an EmptySetNode.
@@ -471,42 +510,55 @@ where c_custkey < 10
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=48B cardinality=15.00K
 |
 |--16:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  row-size=48B cardinality=1
 |  |
 |  |--12:AGGREGATE [FINALIZE]
 |  |  |  output: count(*)
+|  |  |  row-size=8B cardinality=1
 |  |  |
 |  |  08:SUBPLAN
+|  |  |  row-size=0B cardinality=10
 |  |  |
 |  |  |--11:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  |  row-size=0B cardinality=1
 |  |  |  |
 |  |  |  |--09:SINGULAR ROW SRC
+|  |  |  |     row-size=12B cardinality=1
 |  |  |  |
 |  |  |  10:EMPTYSET
 |  |  |
 |  |  07:UNNEST [c.c_orders o]
+|  |     row-size=0B cardinality=10
 |  |
 |  15:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  row-size=40B cardinality=1
 |  |
 |  |--06:EMPTYSET
 |  |
 |  14:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  row-size=36B cardinality=1
 |  |
 |  |--05:EMPTYSET
 |  |
 |  13:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  row-size=28B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=56B cardinality=1
 |  |
 |  04:AGGREGATE [FINALIZE]
 |  |  output: count(*)
+|  |  row-size=8B cardinality=0
 |  |
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.99MB
    predicates: c_custkey < 10
+   row-size=56B cardinality=15.00K
 ====
 # IMPALA-2539: Test empty union operands containing relative table refs.
 select c_custkey, o_orderkey
@@ -524,23 +576,31 @@ where c_custkey = 1
 PLAN-ROOT SINK
 |
 01:SUBPLAN
+|  row-size=28B cardinality=10
 |
 |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=28B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
+|  |     row-size=44B cardinality=1
 |  |
 |  06:UNION
+|  |  row-size=8B cardinality=10
 |  |
 |  05:AGGREGATE [FINALIZE]
 |  |  group by: o_orderkey
+|  |  row-size=8B cardinality=10
 |  |
 |  03:UNION
+|  |  row-size=8B cardinality=10
 |  |
 |  04:UNNEST [c.c_orders o1]
+|     row-size=8B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.99MB
    predicates: c_custkey = 1
+   row-size=44B cardinality=1
 ====
 # IMPALA-2215: Having clause without aggregation.
 select 1 from (select 1) v having 1 > 1
@@ -564,11 +624,14 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=0
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=1B cardinality=0
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypes x]
    partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====

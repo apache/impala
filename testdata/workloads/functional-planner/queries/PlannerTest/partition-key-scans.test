@@ -5,17 +5,21 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(month), max(year), ndv(day)
+|  row-size=16B cardinality=1
 |
 00:UNION
    constant-operands=11
+   row-size=12B cardinality=11
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(month), max(year), ndv(day)
+|  row-size=16B cardinality=1
 |
 00:UNION
    constant-operands=11
+   row-size=12B cardinality=11
 ====
 # Test with explicit distinct keyword.
 select count(distinct year), ndv(day) from functional.alltypesagg
@@ -24,25 +28,31 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(year), ndv:merge(day)
+|  row-size=16B cardinality=1
 |
 01:AGGREGATE
 |  output: ndv(day)
 |  group by: year
+|  row-size=12B cardinality=1
 |
 00:UNION
    constant-operands=11
+   row-size=8B cardinality=11
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(year), ndv:merge(day)
+|  row-size=16B cardinality=1
 |
 01:AGGREGATE
 |  output: ndv(day)
 |  group by: year
+|  row-size=12B cardinality=1
 |
 00:UNION
    constant-operands=11
+   row-size=8B cardinality=11
 ====
 # Test static partition pruning.
 select min(month), max(day) from functional.alltypesagg where year = 2010 and day = 1;
@@ -51,9 +61,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(month), max(day)
+|  row-size=8B cardinality=1
 |
 00:UNION
    constant-operands=1
+   row-size=8B cardinality=1
 ====
 # Test with cases where all partitions are pruned.
 select c1, c2 from
@@ -64,8 +76,10 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(year), max(month)
+|  row-size=8B cardinality=0
 |
 00:UNION
+   row-size=8B cardinality=0
 ====
 # Test with group by and having clauses.
 select ndv(month) from functional.alltypesagg group by year having max(day)=10
@@ -76,9 +90,11 @@ PLAN-ROOT SINK
 |  output: ndv(month), max(day)
 |  group by: year
 |  having: max(day) = 10
+|  row-size=16B cardinality=0
 |
 00:UNION
    constant-operands=11
+   row-size=12B cardinality=11
 ====
 # Test with group-by clauses (no aggregate expressions) only.
 select month from functional.alltypes group by month
@@ -87,9 +103,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  group by: month
+|  row-size=4B cardinality=12
 |
 00:UNION
    constant-operands=12
+   row-size=4B cardinality=12
 ====
 # Test with distinct select list.
 select distinct month from functional.alltypes where month % 2 = 0
@@ -98,9 +116,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  group by: month
+|  row-size=4B cardinality=6
 |
 00:UNION
    constant-operands=6
+   row-size=4B cardinality=6
 ====
 # Test with joins on the partition keys.
 select min(a.month)
@@ -111,31 +131,39 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: min(a.month)
+|  row-size=4B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.year = b.year
+|  row-size=12B cardinality=24
 |
 |--01:UNION
 |     constant-operands=1
+|     row-size=4B cardinality=1
 |
 00:UNION
    constant-operands=24
+   row-size=8B cardinality=24
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: min(a.month)
+|  row-size=4B cardinality=1
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.year = b.year
+|  row-size=12B cardinality=24
 |
 |--04:EXCHANGE [UNPARTITIONED]
 |  |
 |  01:UNION
 |     constant-operands=1
+|     row-size=4B cardinality=1
 |
 00:UNION
    constant-operands=24
+   row-size=8B cardinality=24
 ====
 # Test query which contains both distinct and non-distinct aggregate
 # expressions and make sure the optimization is applied when applicable.
@@ -149,20 +177,25 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: year = year
 |  runtime filters: RF000 <- year
+|  row-size=16B cardinality=4
 |
 |--01:AGGREGATE [FINALIZE]
 |  |  group by: year
+|  |  row-size=4B cardinality=2
 |  |
 |  00:UNION
 |     constant-operands=2
+|     row-size=4B cardinality=2
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(month)
 |  group by: year
+|  row-size=12B cardinality=2
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.year
+   row-size=8B cardinality=7.30K
 ====
 # Test queries with tableRefs which cannot be evaluated by metadata.
 select min(a.year), ndv(b.timestamp_col) from
@@ -172,14 +205,18 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: min(a.year), ndv(b.timestamp_col)
+|  row-size=12B cardinality=0
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=20B cardinality=0
 |
 |--01:SCAN HDFS [functional.alltypesnopart b]
 |     partitions=1/1 files=0 size=0B
+|     row-size=16B cardinality=0
 |
 00:UNION
    constant-operands=2
+   row-size=4B cardinality=2
 ====
 # Test that non-partitioning slots which aren't materialized won't block the
 # optimization from being applied.
@@ -191,14 +228,18 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: ndv(a.year + b.year), min(a.month + b.month)
+|  row-size=16B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=16B cardinality=24
 |
 |--01:UNION
 |     constant-operands=1
+|     row-size=8B cardinality=1
 |
 00:UNION
    constant-operands=24
+   row-size=8B cardinality=24
 ====
 # IMPALA-2948. Unmaterialized slots won't block the optimization (the hash join version).
 select t1.int_col
@@ -212,16 +253,20 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.int_col = min(t2.year)
 |  runtime filters: RF000 <- min(t2.year)
+|  row-size=8B cardinality=8
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(t2.year)
+|  |  row-size=4B cardinality=1
 |  |
 |  01:UNION
 |     constant-operands=1
+|     row-size=4B cardinality=1
 |
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> t1.int_col
+   row-size=4B cardinality=8
 ====
 # Test with with clauses on the partition keys.
 with c1 as (select distinct month from functional.alltypes),
@@ -232,20 +277,26 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: ndv(month)
+|  row-size=8B cardinality=1
 |
 00:UNION
+|  row-size=4B cardinality=14
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  group by: year
+|  |  row-size=4B cardinality=2
 |  |
 |  03:UNION
 |     constant-operands=2
+|     row-size=4B cardinality=2
 |
 02:AGGREGATE [FINALIZE]
 |  group by: month
+|  row-size=4B cardinality=12
 |
 01:UNION
    constant-operands=12
+   row-size=4B cardinality=12
 ====
 # If slots other than partition keys are accessed, make sure scan nodes are generated.
 select date_string_col, min(month) from functional.alltypes group by date_string_col
@@ -255,9 +306,11 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: min(month)
 |  group by: date_string_col
+|  row-size=24B cardinality=736
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=24B cardinality=7.30K
 ====
 # Make sure non-distinct aggregation functions will generate scan nodes.
 select count(month) from functional.alltypes
@@ -266,9 +319,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(month)
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # Make sure that queries without any aggregation will generate scan nodes.
 select month from functional.alltypes order by year
@@ -277,7 +332,9 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: year ASC
+|  row-size=8B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
 ====

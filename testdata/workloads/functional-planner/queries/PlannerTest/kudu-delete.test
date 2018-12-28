@@ -3,10 +3,12 @@ delete from functional_kudu.testtbl
 DELETE FROM KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 DELETE FROM KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+   row-size=8B cardinality=0
 ====
 delete from functional_kudu.testtbl where name = 'hallo'
 ---- PLAN
@@ -14,11 +16,13 @@ DELETE FROM KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: name = 'hallo'
+   row-size=8B cardinality=0
 ---- DISTRIBUTEDPLAN
 DELETE FROM KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: name = 'hallo'
+   row-size=8B cardinality=0
 ====
 delete a from functional_kudu.testtbl a, functional.alltypes b
 where a.id = b.id and a.id in (select id from functional.alltypes)
@@ -28,44 +32,54 @@ DELETE FROM KUDU [functional_kudu.testtbl]
 04:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=12B cardinality=0
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: b.id = a.id
 |  |  runtime filters: RF002 <- a.id
+|  |  row-size=12B cardinality=0
 |  |
 |  |--00:SCAN KUDU [functional_kudu.testtbl a]
+|  |     row-size=8B cardinality=0
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF002 -> b.id
+|     row-size=4B cardinality=7.30K
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> id
+   row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 DELETE FROM KUDU [functional_kudu.testtbl]
 |
 04:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=12B cardinality=0
 |
 |--07:EXCHANGE [HASH(a.id)]
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: b.id = a.id
 |  |  runtime filters: RF002 <- a.id
+|  |  row-size=12B cardinality=0
 |  |
 |  |--05:EXCHANGE [BROADCAST]
 |  |  |
 |  |  00:SCAN KUDU [functional_kudu.testtbl a]
+|  |     row-size=8B cardinality=0
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF002 -> b.id
+|     row-size=4B cardinality=7.30K
 |
 06:EXCHANGE [HASH(id)]
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> id
+   row-size=4B cardinality=7.30K
 ====

@@ -9,6 +9,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col, a.int_col = a.tinyint_col
+   row-size=89B cardinality=730
 ====
 # Check that numeric comparison costs less than LIKE.
 select *
@@ -21,6 +22,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col = a.tinyint_col, a.string_col LIKE '%a%'
+   row-size=89B cardinality=730
 ====
 # Check that single numeric comparison costs less than compound numeric comparison.
 select *
@@ -33,6 +35,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col = a.bigint_col, (a.int_col = a.tinyint_col OR a.int_col = a.smallint_col)
+   row-size=89B cardinality=730
 ====
 # Check that a simple numeric comparison costs less than one with arithmetic.
 select *
@@ -44,6 +47,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col = a.tinyint_col, a.int_col + 5 = a.bigint_col - 10
+   row-size=89B cardinality=730
 ====
 # Check that large CASE costs more than numeric comparison.
 select *
@@ -56,6 +60,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col = a.tinyint_col, (CASE a.int_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END), (CASE a.tinyint_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END)
+   row-size=89B cardinality=730
 ====
 # Check that a LIKE with only leading/trailing wildcards costs less then LIKE with
 # non-leading/trailing wildcards.
@@ -68,6 +73,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.date_string_col LIKE '%a%', a.date_string_col LIKE 'a%a'
+   row-size=89B cardinality=730
 ====
 # Check that an IN predicate costs more than a single numeric comparison.
 select *
@@ -79,6 +85,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.id = 1, a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
+   row-size=89B cardinality=1
 ====
 # Check that a timestamp comparison costs more than a numeric comparison.
 select *
@@ -90,6 +97,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col = 0, a.timestamp_col > TIMESTAMP '2000-01-01 00:00:00'
+   row-size=89B cardinality=231
 ====
 # Check that string comparisons are ordered by string length.
 select *
@@ -102,6 +110,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.string_col = 'a', a.date_string_col = 'looooooooooooooooong string'
+   row-size=89B cardinality=3
 ====
 # Check that timestamp arithmetic adds cost.
 select *
@@ -114,6 +123,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.timestamp_col < TIMESTAMP '2020-01-01 00:00:00', a.timestamp_col - INTERVAL 1 day > TIMESTAMP '2000-01-01 00:00:00'
+   row-size=89B cardinality=730
 ====
 # Check that a function call adds cost.
 select *
@@ -125,6 +135,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.double_col > 0, ceil(a.double_col) > 0
+   row-size=89B cardinality=730
 ====
 # Check that a cast adds cost.
 select *
@@ -136,6 +147,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col > 0, CAST(a.int_col AS DOUBLE) > 0
+   row-size=89B cardinality=730
 ====
 # Check that is null costs less than string comparison.
 select *
@@ -147,6 +159,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col IS NULL, a.string_col = 'string'
+   row-size=89B cardinality=231
 ====
 # Check that long list of predicates is sorted correctly.
 select *
@@ -161,6 +174,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col, a.int_col = a.bigint_col, (a.int_col = a.tinyint_col OR a.int_col = a.smallint_col), a.string_col LIKE '%a%'
+   row-size=89B cardinality=730
 ====
 # Check that for two equal cost conjuncts, the one with the higher selectivity goes first.
 # There are more distinct id values, so it is more selective.
@@ -173,6 +187,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.id = 0, a.int_col = 0
+   row-size=89B cardinality=1
 ====
 # IMPALA-4614: Tests that the eval cost of timestamp literals is set.
 # The HAVING predicate is assigned to the scan and tests that it has
@@ -189,8 +204,10 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: timestamp_col
+|  row-size=24B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.timestamp_col < TIMESTAMP '2010-01-01 01:05:20', int_col < 10, timestamp_col < TIMESTAMP '2010-01-02 01:05:20', timestamp_col != CAST(date_string_col AS TIMESTAMP)
+   row-size=40B cardinality=730
 ====

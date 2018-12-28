@@ -4,11 +4,13 @@ PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=18B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=18B cardinality=1
 ====
 values(1+1, 2, 5.0, 'a') order by 1 limit 10
 ---- PLAN
@@ -16,17 +18,21 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: 2 ASC
+|  row-size=18B cardinality=1
 |
 00:UNION
    constant-operands=1
+   row-size=18B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: 2 ASC
+|  row-size=18B cardinality=1
 |
 00:UNION
    constant-operands=1
+   row-size=18B cardinality=1
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c'))
 ---- PLAN
@@ -34,11 +40,13 @@ PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=3
+   row-size=18B cardinality=3
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=3
+   row-size=18B cardinality=3
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 limit 10
 ---- PLAN
@@ -46,15 +54,19 @@ PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: 2 ASC
+|  row-size=18B cardinality=3
 |
 00:UNION
    constant-operands=3
+   row-size=18B cardinality=3
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 01:TOP-N [LIMIT=10]
 |  order by: 2 ASC
+|  row-size=18B cardinality=3
 |
 00:UNION
    constant-operands=3
+   row-size=18B cardinality=3
 ====

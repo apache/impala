@@ -9,20 +9,25 @@ PLAN-ROOT SINK
 |
 04:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: t3.id = coalesce(functional.alltypestiny.id, t3.id)
+|  row-size=97B cardinality=8
 |
 |--02:SCAN HDFS [functional.alltypestiny t3]
 |     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
 |  runtime filters: RF000 <- functional.alltypestiny.id
+|  row-size=93B cardinality=8
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> functional.alltypestiny.id
+   row-size=89B cardinality=8
 ====
 select *
 from
@@ -36,12 +41,15 @@ PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: t1.id < t2.id
+|  row-size=8B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 select *
 from
@@ -54,20 +62,25 @@ where
 PLAN-ROOT SINK
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=267B cardinality=53.29M
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=89B cardinality=7.30K
 ====
 select *
 from
@@ -80,20 +93,25 @@ where
 PLAN-ROOT SINK
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=267B cardinality=53.29M
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t3.id
 |  runtime filters: RF000 <- t3.id
+|  row-size=178B cardinality=7.30K
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=89B cardinality=7.30K
 ====
 # The hash join will not be executed first, because this is the first executable
 # plan we find and t1 is the largest table (which is moved to the front of
@@ -111,18 +129,23 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |  runtime filters: RF000 <- t3.id
+|  row-size=267B cardinality=58.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall t3]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
 |
 03:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=178B cardinality=58.40K
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
 |     runtime filters: RF000 -> t2.id
+|     row-size=89B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 select *
 from
@@ -134,23 +157,30 @@ from
 PLAN-ROOT SINK
 |
 06:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=356B cardinality=389.02G
 |
 |--03:SCAN HDFS [functional.alltypes t4]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 05:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t2.id = t3.id
+|  row-size=267B cardinality=53.29M
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=178B cardinality=53.29M
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # Test that the non-equi predicate on the outer join does not
 # discard detecting the implicit cross join
@@ -164,17 +194,22 @@ PLAN-ROOT SINK
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = c.id
 |  other join predicates: a.id < b.id
+|  row-size=97B cardinality=737.30K
 |
 |--02:SCAN HDFS [functional.alltypes c]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 03:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=93B cardinality=730.00K
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 files=4 size=6.32KB
+|     row-size=4B cardinality=100
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 select a.* from
 functional.alltypestiny a,
@@ -188,26 +223,33 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: d.id = a.id
 |  runtime filters: RF000 <- a.id
+|  row-size=101B cardinality=64
 |
 |--05:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=97B cardinality=64
 |  |
 |  |--04:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: b.id = c.id
 |  |  |  runtime filters: RF002 <- c.id
+|  |  |  row-size=8B cardinality=8
 |  |  |
 |  |  |--02:SCAN HDFS [functional.alltypestiny c]
 |  |  |     partitions=4/4 files=4 size=460B
+|  |  |     row-size=4B cardinality=8
 |  |  |
 |  |  01:SCAN HDFS [functional.alltypes b]
 |  |     partitions=24/24 files=24 size=478.45KB
 |  |     runtime filters: RF002 -> b.id
+|  |     row-size=4B cardinality=7.30K
 |  |
 |  00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
 |
 03:SCAN HDFS [functional.alltypes d]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> d.id
+   row-size=4B cardinality=7.30K
 ====
 # Do not allow a non-equi outer join
 select count(*)
@@ -221,25 +263,33 @@ PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 06:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=389.02G
 |
 |--03:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 05:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  join predicates: t1.id < t2.id
+|  row-size=8B cardinality=53.29M
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=4B cardinality=53.29M
 |
 |--00:SCAN HDFS [functional.alltypes t0]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 select count(*)
 from
@@ -254,29 +304,37 @@ PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 06:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=389.02G
 |
 |--03:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 05:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id < t2.id
 |  other predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=53.29M
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=4B cardinality=53.29M
 |
 |--00:SCAN HDFS [functional.alltypes t0]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
 ====
 select count(*)
 from
@@ -291,29 +349,37 @@ PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 06:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=389.07G
 |
 |--03:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 05:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id < t2.id
 |  other predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=53.30M
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 04:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=4B cardinality=53.29M
 |
 |--00:SCAN HDFS [functional.alltypes t0]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=0B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
 ====
 select count(*)
 from
@@ -324,15 +390,19 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 02:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |  join predicates: (t0.id < t1.id)
+|  row-size=4B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes t1]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t0]
    partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # Check for implicit cross joins conversion in presence of complex where
 # clauses that lead to query rewriting
@@ -348,25 +418,32 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count(*)
+|  row-size=8B cardinality=1
 |
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: avg(id) = b.id
+|  row-size=8B cardinality=8
 |
 |--04:NESTED LOOP JOIN [INNER JOIN]
 |  |  predicates: a.id < b.id
+|  |  row-size=8B cardinality=8
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
+|  |     row-size=4B cardinality=8
 |  |
 |  00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
 |
 03:AGGREGATE [FINALIZE]
 |  output: avg(id)
 |  group by: month
+|  row-size=12B cardinality=12
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
 ====
 # Check that cross joins are correctly detected and the first join becomes a hash join
 select *
@@ -377,23 +454,30 @@ functional.alltypes t4
 PLAN-ROOT SINK
 |
 06:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=356B cardinality=389.02G
 |
 |--03:SCAN HDFS [functional.alltypes t4]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 05:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=267B cardinality=53.29M
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
+|  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
+   row-size=89B cardinality=7.30K
 ====

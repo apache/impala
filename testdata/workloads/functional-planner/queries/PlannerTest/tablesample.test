@@ -33,7 +33,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=621
    mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=89B cardinality=3650
+   tuple-ids=0 row-size=89B cardinality=3.65K
    in pipelines: 00(GETNEXT)
 ====
 # Sampling and scan predicates. Scan predicates are evaluated after sampling and
@@ -68,6 +68,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = CAST(2009 AS INT)
    partitions=6/24 files=6 size=119.70KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -75,7 +76,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1241
    mem-estimate=48.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=89B cardinality=1825
+   tuple-ids=0 row-size=89B cardinality=1.82K
    in pipelines: 00(GETNEXT)
 ====
 # Edge case: sample 0%, no files should be selected
@@ -126,6 +127,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
+   partition predicates: year = CAST(2010 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -152,7 +154,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=89B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Table that has no stats.
@@ -164,7 +166,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=24.18KB
+   partitions=3/24 files=3 size=23.96KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -211,7 +213,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=4B cardinality=7300
+   tuple-ids=0 row-size=4B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
 # Sampling in WITH-clause view.

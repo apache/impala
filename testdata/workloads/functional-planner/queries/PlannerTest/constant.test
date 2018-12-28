@@ -4,9 +4,11 @@ PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=2B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 00:UNION
    constant-operands=1
+   row-size=2B cardinality=1
 ====

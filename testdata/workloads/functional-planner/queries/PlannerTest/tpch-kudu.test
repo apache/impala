@@ -27,13 +27,16 @@ PLAN-ROOT SINK
 |
 02:SORT
 |  order by: l_returnflag ASC, l_linestatus ASC
+|  row-size=122B cardinality=6
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
 |  group by: l_returnflag, l_linestatus
+|  row-size=122B cardinality=6
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate <= '1998-09-02'
+   row-size=66B cardinality=600.12K
 ====
 # Q2 - Minimum Cost Supplier Query
 select
@@ -87,70 +90,89 @@ PLAN-ROOT SINK
 |
 18:TOP-N [LIMIT=100]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
+|  row-size=230B cardinality=100
 |
 17:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: ps_partkey = p_partkey, min(ps_supplycost) = ps_supplycost
 |  runtime filters: RF002 <- p_partkey
+|  row-size=330B cardinality=1.01K
 |
 |--16:HASH JOIN [INNER JOIN]
 |  |  hash predicates: n_regionkey = r_regionkey
 |  |  runtime filters: RF011 <- r_regionkey
+|  |  row-size=330B cardinality=1.01K
 |  |
 |  |--04:SCAN KUDU [tpch_kudu.region]
 |  |     kudu predicates: r_name = 'EUROPE'
+|  |     row-size=2B cardinality=1
 |  |
 |  15:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |  runtime filters: RF013 <- n_nationkey
+|  |  row-size=328B cardinality=5.04K
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.nation]
 |  |     runtime filters: RF011 -> n_regionkey
+|  |     row-size=27B cardinality=25
 |  |
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_suppkey = ps_suppkey
 |  |  runtime filters: RF015 <- ps_suppkey
+|  |  row-size=301B cardinality=5.04K
 |  |
 |  |--13:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ps_partkey = p_partkey
 |  |  |  runtime filters: RF017 <- p_partkey
+|  |  |  row-size=99B cardinality=5.04K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
 |  |  |     predicates: p_type LIKE '%BRASS'
 |  |  |     kudu predicates: p_size = 15
+|  |  |     row-size=75B cardinality=1.26K
 |  |  |
 |  |  02:SCAN KUDU [tpch_kudu.partsupp]
 |  |     runtime filters: RF017 -> ps_partkey
+|  |     row-size=24B cardinality=800.00K
 |  |
 |  01:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF013 -> s_nationkey, RF015 -> s_suppkey
+|     row-size=203B cardinality=10.00K
 |
 12:AGGREGATE [FINALIZE]
 |  output: min(ps_supplycost)
 |  group by: ps_partkey
+|  row-size=16B cardinality=160.00K
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
 |  runtime filters: RF005 <- r_regionkey
+|  row-size=40B cardinality=160.00K
 |
 |--08:SCAN KUDU [tpch_kudu.region]
 |     kudu predicates: r_name = 'EUROPE'
+|     row-size=2B cardinality=1
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |  runtime filters: RF007 <- n_nationkey
+|  row-size=38B cardinality=800.00K
 |
 |--07:SCAN KUDU [tpch_kudu.nation]
 |     runtime filters: RF005 -> n_regionkey
+|     row-size=4B cardinality=25
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
 |  runtime filters: RF009 <- s_suppkey
+|  row-size=34B cardinality=800.00K
 |
 |--06:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF007 -> s_nationkey
+|     row-size=10B cardinality=10.00K
 |
 05:SCAN KUDU [tpch_kudu.partsupp]
    runtime filters: RF002 -> tpch_kudu.partsupp.ps_partkey, RF009 -> ps_suppkey
+   row-size=24B cardinality=800.00K
 ====
 # Q3 - Shipping Priority Query
 select
@@ -183,29 +205,36 @@ PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 2) DESC, o_orderdate ASC
+|  row-size=50B cardinality=10
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
+|  row-size=50B cardinality=17.56K
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF001 <- c_custkey
+|  row-size=78B cardinality=17.56K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
 |     kudu predicates: c_mktsegment = 'BUILDING'
+|     row-size=8B cardinality=30.00K
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF003 <- o_orderkey
+|  row-size=70B cardinality=57.58K
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate < '1995-03-15'
 |     runtime filters: RF001 -> o_custkey
+|     row-size=46B cardinality=150.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate > '1995-03-15'
    runtime filters: RF003 -> l_orderkey
+   row-size=24B cardinality=600.12K
 ====
 # Q4 - Order Priority Checking Query
 select
@@ -236,21 +265,26 @@ PLAN-ROOT SINK
 |
 04:SORT
 |  order by: o_orderpriority ASC
+|  row-size=28B cardinality=5
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: o_orderpriority
+|  row-size=28B cardinality=5
 |
 02:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF001 <- o_orderkey
+|  row-size=32B cardinality=150.00K
 |
 |--00:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
+|     row-size=32B cardinality=150.00K
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
    predicates: l_commitdate < l_receiptdate
    runtime filters: RF001 -> l_orderkey
+   row-size=60B cardinality=600.12K
 ====
 # Q5 - Local Supplier Volume Query
 select
@@ -284,49 +318,62 @@ PLAN-ROOT SINK
 |
 12:SORT
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 2) DESC
+|  row-size=35B cardinality=25
 |
 11:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
+|  row-size=35B cardinality=25
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
 |  runtime filters: RF001 <- r_regionkey
+|  row-size=97B cardinality=115.16K
 |
 |--05:SCAN KUDU [tpch_kudu.region]
 |     kudu predicates: r_name = 'ASIA'
+|     row-size=2B cardinality=1
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |  runtime filters: RF003 <- n_nationkey
+|  row-size=95B cardinality=575.77K
 |
 |--04:SCAN KUDU [tpch_kudu.nation]
 |     runtime filters: RF001 -> n_regionkey
+|     row-size=27B cardinality=25
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = s_nationkey, l_suppkey = s_suppkey
 |  runtime filters: RF006 <- s_nationkey, RF007 <- s_suppkey
+|  row-size=68B cardinality=575.77K
 |
 |--03:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF003 -> s_nationkey
+|     row-size=10B cardinality=10.00K
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF009 <- c_custkey
+|  row-size=58B cardinality=575.77K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
 |     runtime filters: RF003 -> tpch_kudu.customer.c_nationkey, RF006 -> c_nationkey
+|     row-size=10B cardinality=150.00K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF011 <- o_orderkey
+|  row-size=48B cardinality=575.77K
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate < '1995-01-01', o_orderdate >= '1994-01-01'
 |     runtime filters: RF009 -> o_custkey
+|     row-size=16B cardinality=150.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF007 -> l_suppkey, RF011 -> l_orderkey
+   row-size=32B cardinality=6.00M
 ====
 # Q6 - Forecasting Revenue Change Query
 select
@@ -345,9 +392,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * l_discount)
+|  row-size=16B cardinality=1
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
+   row-size=16B cardinality=600.12K
 ====
 # Q7 - Volume Shipping Query
 select
@@ -395,48 +444,61 @@ PLAN-ROOT SINK
 |
 12:SORT
 |  order by: supp_nation ASC, cust_nation ASC, l_year ASC
+|  row-size=58B cardinality=575.77K
 |
 11:AGGREGATE [FINALIZE]
 |  output: sum(round(l_extendedprice * (1 - l_discount), 2))
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
+|  row-size=58B cardinality=575.77K
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n2.n_nationkey
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
 |  runtime filters: RF001 <- n2.n_nationkey
+|  row-size=144B cardinality=575.77K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n2]
+|     row-size=25B cardinality=25
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n1.n_nationkey
 |  runtime filters: RF003 <- n1.n_nationkey
+|  row-size=119B cardinality=575.77K
 |
 |--04:SCAN KUDU [tpch_kudu.nation n1]
+|     row-size=25B cardinality=25
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF005 <- c_custkey
+|  row-size=94B cardinality=575.77K
 |
 |--03:SCAN KUDU [tpch_kudu.customer]
 |     runtime filters: RF001 -> c_nationkey
+|     row-size=10B cardinality=150.00K
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |  runtime filters: RF007 <- s_suppkey
+|  row-size=84B cardinality=575.77K
 |
 |--00:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF003 -> s_nationkey
+|     row-size=10B cardinality=10.00K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF009 <- o_orderkey
+|  row-size=74B cardinality=575.77K
 |
 |--02:SCAN KUDU [tpch_kudu.orders]
 |     runtime filters: RF005 -> o_custkey
+|     row-size=16B cardinality=1.50M
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate <= '1996-12-31', l_shipdate >= '1995-01-01'
    runtime filters: RF007 -> l_suppkey, RF009 -> l_orderkey
+   row-size=58B cardinality=600.12K
 ====
 # Q8 - National Market Share Query
 select
@@ -483,62 +545,79 @@ PLAN-ROOT SINK
 |
 16:SORT
 |  order by: o_year ASC
+|  row-size=36B cardinality=761
 |
 15:AGGREGATE [FINALIZE]
 |  output: sum(CASE WHEN n2.n_name = 'BRAZIL' THEN round(l_extendedprice * (1 - l_discount), 2) ELSE 0 END), sum(round(l_extendedprice * (1 - l_discount), 2))
 |  group by: year(o_orderdate)
+|  row-size=36B cardinality=761
 |
 14:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n2.n_nationkey
 |  runtime filters: RF001 <- n2.n_nationkey
+|  row-size=141B cardinality=761
 |
 |--06:SCAN KUDU [tpch_kudu.nation n2]
+|     row-size=25B cardinality=25
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: n1.n_regionkey = r_regionkey
 |  runtime filters: RF003 <- r_regionkey
+|  row-size=116B cardinality=761
 |
 |--07:SCAN KUDU [tpch_kudu.region]
 |     kudu predicates: r_name = 'AMERICA'
+|     row-size=2B cardinality=1
 |
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |  runtime filters: RF005 <- n1.n_nationkey
+|  row-size=114B cardinality=3.80K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n1]
 |     runtime filters: RF003 -> n1.n_regionkey
+|     row-size=4B cardinality=25
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: c_custkey = o_custkey
 |  runtime filters: RF007 <- o_custkey
+|  row-size=110B cardinality=3.80K
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_suppkey = s_suppkey
 |  |  runtime filters: RF009 <- s_suppkey
+|  |  row-size=100B cardinality=3.80K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.supplier]
 |  |     runtime filters: RF001 -> s_nationkey
+|  |     row-size=10B cardinality=10.00K
 |  |
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o_orderkey = l_orderkey
 |  |  runtime filters: RF011 <- l_orderkey
+|  |  row-size=90B cardinality=3.80K
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l_partkey = p_partkey
 |  |  |  runtime filters: RF013 <- p_partkey
+|  |  |  row-size=48B cardinality=39.63K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
 |  |  |     kudu predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|  |  |     row-size=8B cardinality=1.32K
 |  |  |
 |  |  02:SCAN KUDU [tpch_kudu.lineitem]
 |  |     runtime filters: RF009 -> l_suppkey, RF013 -> l_partkey
+|  |     row-size=40B cardinality=6.00M
 |  |
 |  03:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate <= '1996-12-31', o_orderdate >= '1995-01-01'
 |     runtime filters: RF011 -> o_orderkey
+|     row-size=42B cardinality=150.00K
 |
 04:SCAN KUDU [tpch_kudu.customer]
    runtime filters: RF005 -> c_nationkey, RF007 -> c_custkey
+   row-size=10B cardinality=150.00K
 ====
 # Q9 - Product Type Measure Query
 select
@@ -579,46 +658,59 @@ PLAN-ROOT SINK
 |
 12:SORT
 |  order by: nation ASC, o_year DESC
+|  row-size=39B cardinality=61.70K
 |
 11:AGGREGATE [FINALIZE]
 |  output: sum(round(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity, 2))
 |  group by: n_name, year(o_orderdate)
+|  row-size=39B cardinality=61.70K
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |  runtime filters: RF001 <- n_nationkey
+|  row-size=198B cardinality=574.29K
 |
 |--05:SCAN KUDU [tpch_kudu.nation]
+|     row-size=25B cardinality=25
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
 |  runtime filters: RF004 <- ps_partkey, RF005 <- ps_suppkey
+|  row-size=173B cardinality=574.29K
 |
 |--03:SCAN KUDU [tpch_kudu.partsupp]
+|     row-size=24B cardinality=800.00K
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |  runtime filters: RF007 <- s_suppkey
+|  row-size=149B cardinality=574.29K
 |
 |--01:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF001 -> s_nationkey, RF005 -> tpch_kudu.supplier.s_suppkey
+|     row-size=10B cardinality=10.00K
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF009 <- o_orderkey
+|  row-size=139B cardinality=574.29K
 |
 |--04:SCAN KUDU [tpch_kudu.orders]
+|     row-size=34B cardinality=1.50M
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  runtime filters: RF011 <- p_partkey
+|  row-size=105B cardinality=598.58K
 |
 |--00:SCAN KUDU [tpch_kudu.part]
 |     predicates: p_name LIKE '%green%'
 |     runtime filters: RF004 -> tpch_kudu.part.p_partkey
+|     row-size=57B cardinality=20.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF004 -> l_partkey, RF005 -> l_suppkey, RF007 -> l_suppkey, RF009 -> l_orderkey, RF011 -> l_partkey
+   row-size=48B cardinality=6.00M
 ====
 # Q10 - Returned Item Reporting Query
 # Converted select from multiple tables to joins
@@ -661,34 +753,43 @@ PLAN-ROOT SINK
 |
 08:TOP-N [LIMIT=20]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 1) DESC
+|  row-size=230B cardinality=20
 |
 07:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
+|  row-size=230B cardinality=191.92K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n_nationkey
 |  runtime filters: RF001 <- n_nationkey
+|  row-size=278B cardinality=191.92K
 |
 |--03:SCAN KUDU [tpch_kudu.nation]
+|     row-size=25B cardinality=25
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: c_custkey = o_custkey
 |  runtime filters: RF003 <- o_custkey
+|  row-size=253B cardinality=191.92K
 |
 |--04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_orderkey = o_orderkey
 |  |  runtime filters: RF005 <- o_orderkey
+|  |  row-size=40B cardinality=191.92K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.orders]
 |  |     kudu predicates: o_orderdate < '1994-01-01', o_orderdate >= '1993-10-01'
+|  |     row-size=16B cardinality=150.00K
 |  |
 |  02:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_returnflag = 'R'
 |     runtime filters: RF005 -> l_orderkey
+|     row-size=24B cardinality=2.00M
 |
 00:SCAN KUDU [tpch_kudu.customer]
    runtime filters: RF001 -> c_nationkey, RF003 -> c_custkey
+   row-size=213B cardinality=150.00K
 ====
 # Q11 - Important Stock Identification
 # Modifications: query was rewritten to not have a subquery in the having clause
@@ -731,50 +832,64 @@ PLAN-ROOT SINK
 |
 13:SORT
 |  order by: value DESC
+|  row-size=24B cardinality=32.00K
 |
 12:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: round(sum(ps_supplycost * ps_availqty), 2) > round(sum(ps_supplycost * ps_availqty) * 0.0001, 2)
+|  row-size=40B cardinality=32.00K
 |
 |--11:AGGREGATE [FINALIZE]
 |  |  output: sum(ps_supplycost * ps_availqty)
+|  |  row-size=16B cardinality=1
 |  |
 |  10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |  runtime filters: RF005 <- n_nationkey
+|  |  row-size=36B cardinality=32.00K
 |  |
 |  |--08:SCAN KUDU [tpch_kudu.nation]
 |  |     kudu predicates: n_name = 'GERMANY'
+|  |     row-size=2B cardinality=1
 |  |
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ps_suppkey = s_suppkey
 |  |  runtime filters: RF007 <- s_suppkey
+|  |  row-size=34B cardinality=800.00K
 |  |
 |  |--07:SCAN KUDU [tpch_kudu.supplier]
 |  |     runtime filters: RF005 -> s_nationkey
+|  |     row-size=10B cardinality=10.00K
 |  |
 |  06:SCAN KUDU [tpch_kudu.partsupp]
 |     runtime filters: RF007 -> ps_suppkey
+|     row-size=24B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(ps_supplycost * ps_availqty)
 |  group by: ps_partkey
+|  row-size=24B cardinality=32.00K
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |  runtime filters: RF001 <- n_nationkey
+|  row-size=44B cardinality=32.00K
 |
 |--02:SCAN KUDU [tpch_kudu.nation]
 |     kudu predicates: n_name = 'GERMANY'
+|     row-size=2B cardinality=1
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
 |  runtime filters: RF003 <- s_suppkey
+|  row-size=42B cardinality=800.00K
 |
 |--01:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF001 -> s_nationkey
+|     row-size=10B cardinality=10.00K
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
    runtime filters: RF003 -> ps_suppkey
+   row-size=32B cardinality=800.00K
 ====
 # Q12 - Shipping Mode and Order Priority Query
 select
@@ -812,21 +927,26 @@ PLAN-ROOT SINK
 |
 04:SORT
 |  order by: l_shipmode ASC
+|  row-size=32B cardinality=7
 |
 03:AGGREGATE [FINALIZE]
 |  output: sum(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
 |  group by: l_shipmode
+|  row-size=32B cardinality=7
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: o_orderkey = l_orderkey
 |  runtime filters: RF001 <- l_orderkey
+|  row-size=139B cardinality=320.78K
 |
 |--01:SCAN KUDU [tpch_kudu.lineitem]
 |     predicates: l_commitdate < l_receiptdate, l_shipdate < l_commitdate
 |     kudu predicates: l_shipmode IN ('MAIL', 'SHIP'), l_receiptdate < '1995-01-01', l_receiptdate >= '1994-01-01'
+|     row-size=106B cardinality=320.78K
 |
 00:SCAN KUDU [tpch_kudu.orders]
    runtime filters: RF001 -> o_orderkey
+   row-size=32B cardinality=1.50M
 ====
 # Q13 - Customer Distribution Query
 select
@@ -856,24 +976,30 @@ PLAN-ROOT SINK
 |
 05:SORT
 |  order by: count(*) DESC, c_count DESC
+|  row-size=16B cardinality=150.00K
 |
 04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: count(o_orderkey)
+|  row-size=16B cardinality=150.00K
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(o_orderkey)
 |  group by: c_custkey
+|  row-size=16B cardinality=150.00K
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF001 <- c_custkey
+|  row-size=89B cardinality=150.00K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
+|     row-size=8B cardinality=150.00K
 |
 01:SCAN KUDU [tpch_kudu.orders]
    predicates: NOT o_comment LIKE '%special%requests%'
    runtime filters: RF001 -> o_custkey
+   row-size=81B cardinality=150.00K
 ====
 # Q14 - Promotion Effect
 select
@@ -896,16 +1022,20 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
+|  row-size=32B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  runtime filters: RF001 <- p_partkey
+|  row-size=69B cardinality=598.58K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
+|     row-size=45B cardinality=200.00K
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF001 -> l_partkey
+   row-size=24B cardinality=600.12K
 ====
 # Q15 - Top Supplier Query
 with revenue_view as (
@@ -945,33 +1075,42 @@ PLAN-ROOT SINK
 |
 08:SORT
 |  order by: s_suppkey ASC
+|  row-size=118B cardinality=10.00K
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: round(sum(l_extendedprice * (1 - l_discount)), 1) = max(total_revenue)
+|  row-size=138B cardinality=10.00K
 |
 |--05:AGGREGATE [FINALIZE]
 |  |  output: max(round(sum(l_extendedprice * (1 - l_discount)), 1))
+|  |  row-size=16B cardinality=1
 |  |
 |  04:AGGREGATE [FINALIZE]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
+|  |  row-size=24B cardinality=9.71K
 |  |
 |  03:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
+|     row-size=24B cardinality=600.12K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: s_suppkey = l_suppkey
 |  runtime filters: RF001 <- l_suppkey
+|  row-size=138B cardinality=10.00K
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
+|  |  row-size=24B cardinality=9.71K
 |  |
 |  01:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
+|     row-size=24B cardinality=600.12K
 |
 00:SCAN KUDU [tpch_kudu.supplier]
    runtime filters: RF001 -> s_suppkey
+   row-size=114B cardinality=10.00K
 ====
 # Q16 - Parts/Supplier Relation Query
 select
@@ -1011,30 +1150,38 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
+|  row-size=65B cardinality=31.92K
 |
 06:AGGREGATE [FINALIZE]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
+|  row-size=65B cardinality=31.92K
 |
 05:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
+|  row-size=65B cardinality=31.92K
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
+|  row-size=89B cardinality=31.92K
 |
 |--02:SCAN KUDU [tpch_kudu.supplier]
 |     predicates: s_comment LIKE '%Customer%Complaints%'
+|     row-size=87B cardinality=1.00K
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_partkey = p_partkey
 |  runtime filters: RF001 <- p_partkey
+|  row-size=89B cardinality=31.92K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
 |     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |     kudu predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+|     row-size=73B cardinality=8.00K
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
    runtime filters: RF001 -> ps_partkey
+   row-size=16B cardinality=800.00K
 ====
 # Q17 - Small-Quantity-Order Revenue Query
 select
@@ -1061,28 +1208,35 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice)
+|  row-size=16B cardinality=1
 |
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  other join predicates: l_quantity < round(0.2 * avg(l_quantity), 2)
 |  runtime filters: RF001 <- p_partkey
+|  row-size=32B cardinality=29.93K
 |
 |--04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_partkey = p_partkey
 |  |  runtime filters: RF003 <- p_partkey
+|  |  row-size=32B cardinality=29.93K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.part]
 |  |     kudu predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
+|  |     row-size=8B cardinality=1.00K
 |  |
 |  00:SCAN KUDU [tpch_kudu.lineitem]
 |     runtime filters: RF003 -> l_partkey
+|     row-size=24B cardinality=6.00M
 |
 03:AGGREGATE [FINALIZE]
 |  output: avg(l_quantity)
 |  group by: l_partkey
+|  row-size=16B cardinality=200.52K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF001 -> tpch_kudu.lineitem.l_partkey
+   row-size=16B cardinality=6.00M
 ====
 # Q18 - Large Value tpch_kudu.customer Query
 select
@@ -1126,37 +1280,47 @@ PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
+|  row-size=92B cardinality=100
 |
 08:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  row-size=92B cardinality=600.12K
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: o_orderkey = l_orderkey
 |  runtime filters: RF001 <- l_orderkey
+|  row-size=108B cardinality=600.12K
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
+|  |  row-size=24B cardinality=156.34K
 |  |
 |  03:SCAN KUDU [tpch_kudu.lineitem]
+|     row-size=16B cardinality=6.00M
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF003 <- c_custkey
+|  row-size=108B cardinality=5.76M
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
+|     row-size=42B cardinality=150.00K
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF005 <- o_orderkey
+|  row-size=66B cardinality=5.76M
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     runtime filters: RF001 -> o_orderkey, RF003 -> o_custkey
+|     row-size=50B cardinality=1.50M
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF001 -> tpch_kudu.lineitem.l_orderkey, RF005 -> l_orderkey
+   row-size=16B cardinality=6.00M
 ====
 # Q19 - Discounted Revenue Query
 select
@@ -1201,18 +1365,22 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
+|  row-size=16B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  other predicates: ((p_brand = 'Brand#12' AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l_quantity >= 1 AND l_quantity <= 11 AND p_size <= 5) OR (p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l_quantity >= 10 AND l_quantity <= 20 AND p_size <= 10) OR (p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l_quantity >= 20 AND l_quantity <= 30 AND p_size <= 15))
 |  runtime filters: RF001 <- p_partkey
+|  row-size=92B cardinality=79.99K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
 |     kudu predicates: p_size >= 1
+|     row-size=60B cardinality=20.00K
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF001 -> l_partkey
+   row-size=32B cardinality=801.95K
 ====
 # Q20 - Potential Part Promotion Query
 select
@@ -1258,43 +1426,54 @@ PLAN-ROOT SINK
 |
 10:SORT
 |  order by: s_name ASC
+|  row-size=67B cardinality=400
 |
 09:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
 |  runtime filters: RF001 <- s_suppkey
+|  row-size=87B cardinality=400
 |
 |--08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |  runtime filters: RF009 <- n_nationkey
+|  |  row-size=87B cardinality=400
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.nation]
 |  |     kudu predicates: n_name = 'CANADA'
+|  |     row-size=2B cardinality=1
 |  |
 |  00:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF009 -> s_nationkey
+|     row-size=85B cardinality=10.00K
 |
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
 |  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
 |  runtime filters: RF004 <- ps_partkey, RF005 <- ps_suppkey
+|  row-size=24B cardinality=79.79K
 |
 |--06:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: ps_partkey = p_partkey
 |  |  runtime filters: RF007 <- p_partkey
+|  |  row-size=24B cardinality=79.79K
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.part]
 |  |     predicates: p_name LIKE 'forest%'
+|  |     row-size=57B cardinality=20.00K
 |  |
 |  02:SCAN KUDU [tpch_kudu.partsupp]
 |     runtime filters: RF001 -> ps_suppkey, RF007 -> ps_partkey
+|     row-size=24B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity)
 |  group by: l_partkey, l_suppkey
+|  row-size=32B cardinality=600.12K
 |
 04:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF001 -> tpch_kudu.lineitem.l_suppkey, RF004 -> tpch_kudu.lineitem.l_partkey, RF005 -> tpch_kudu.lineitem.l_suppkey
+   row-size=24B cardinality=600.12K
 ====
 # Q21 - Suppliers Who Kept Orders Waiting Query
 select
@@ -1344,50 +1523,63 @@ PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, s_name ASC
+|  row-size=38B cardinality=100
 |
 11:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: s_name
+|  row-size=38B cardinality=7.68K
 |
 10:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: l3.l_orderkey = l1.l_orderkey
 |  other join predicates: l3.l_suppkey != l1.l_suppkey
+|  row-size=122B cardinality=7.68K
 |
 |--09:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: l2.l_orderkey = l1.l_orderkey
 |  |  other join predicates: l2.l_suppkey != l1.l_suppkey
 |  |  runtime filters: RF001 <- l1.l_orderkey
+|  |  row-size=122B cardinality=7.68K
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: s_nationkey = n_nationkey
 |  |  |  runtime filters: RF003 <- n_nationkey
+|  |  |  row-size=122B cardinality=7.68K
 |  |  |
 |  |  |--03:SCAN KUDU [tpch_kudu.nation]
 |  |  |     kudu predicates: n_name = 'SAUDI ARABIA'
+|  |  |     row-size=2B cardinality=1
 |  |  |
 |  |  07:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l1.l_suppkey = s_suppkey
 |  |  |  runtime filters: RF005 <- s_suppkey
+|  |  |  row-size=120B cardinality=191.92K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.supplier]
 |  |  |     runtime filters: RF003 -> s_nationkey
+|  |  |     row-size=44B cardinality=10.00K
 |  |  |
 |  |  06:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l1.l_orderkey = o_orderkey
 |  |  |  runtime filters: RF007 <- o_orderkey
+|  |  |  row-size=76B cardinality=191.92K
 |  |  |
 |  |  |--02:SCAN KUDU [tpch_kudu.orders]
 |  |  |     kudu predicates: o_orderstatus = 'F'
+|  |  |     row-size=8B cardinality=500.00K
 |  |  |
 |  |  01:SCAN KUDU [tpch_kudu.lineitem l1]
 |  |     predicates: l1.l_receiptdate > l1.l_commitdate
 |  |     runtime filters: RF005 -> l1.l_suppkey, RF007 -> l1.l_orderkey
+|  |     row-size=68B cardinality=600.12K
 |  |
 |  04:SCAN KUDU [tpch_kudu.lineitem l2]
 |     runtime filters: RF001 -> l2.l_orderkey
+|     row-size=16B cardinality=6.00M
 |
 05:SCAN KUDU [tpch_kudu.lineitem l3]
    predicates: l3.l_receiptdate > l3.l_commitdate
+   row-size=68B cardinality=600.12K
 ====
 # Q22 - Global Sales Opportunity Query
 select
@@ -1431,26 +1623,34 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: cntrycode ASC
+|  row-size=36B cardinality=15.00K
 |
 06:AGGREGATE [FINALIZE]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
+|  row-size=36B cardinality=15.00K
 |
 05:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: o_custkey = c_custkey
+|  row-size=55B cardinality=15.00K
 |
 |--04:NESTED LOOP JOIN [INNER JOIN]
 |  |  predicates: c_acctbal > round(avg(c_acctbal), 1)
+|  |  row-size=55B cardinality=15.00K
 |  |
 |  |--02:AGGREGATE [FINALIZE]
 |  |  |  output: avg(c_acctbal)
+|  |  |  row-size=8B cardinality=1
 |  |  |
 |  |  01:SCAN KUDU [tpch_kudu.customer]
 |  |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |  |     kudu predicates: c_acctbal > 0
+|  |     row-size=39B cardinality=15.00K
 |  |
 |  00:SCAN KUDU [tpch_kudu.customer]
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|     row-size=47B cardinality=15.00K
 |
 03:SCAN KUDU [tpch_kudu.orders]
+   row-size=8B cardinality=1.50M
 ====

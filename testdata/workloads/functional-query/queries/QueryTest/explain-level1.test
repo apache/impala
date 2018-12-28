@@ -15,15 +15,18 @@ row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
 '02:HASH JOIN [INNER JOIN, BROADCAST]'
 '|  hash predicates: l_orderkey = o_orderkey'
 '|  runtime filters: RF000 <- o_orderkey'
+row_regex:.*row-size=.* cardinality=.*
 '|'
 '|--03:EXCHANGE [BROADCAST]'
 '|  |'
 '|  01:SCAN HDFS [tpch.orders]'
 row_regex:.*partitions=1/1 files=1 size=.*
+row_regex:.*row-size=.* cardinality=.*
 '|'
 '00:SCAN HDFS [tpch.lineitem]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '   runtime filters: RF000 -> l_orderkey'
+row_regex:.*row-size=.* cardinality=.*
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.
