@@ -1,0 +1,275 @@
+# Three table 1:M join
+# |customer| = 150K
+# |customer.c_custkey| = |customer| = 150K
+# |orders| = 1.5M
+# |orders.o_orderKey| = 100K
+# |lineitem| = 6M
+# |lineitem.l_orderkey| = 1.5M
+# |join| = |lineitem| = 6M
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=66B cardinality=5.76M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=38B cardinality=150.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: i.l_orderkey = o.o_orderkey
+|  runtime filters: RF002 <- o.o_orderkey
+|  row-size=28B cardinality=5.76M
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> o.o_custkey
+|     row-size=16B cardinality=1.50M
+|
+02:SCAN HDFS [tpch.lineitem i]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF002 -> i.l_orderkey
+   row-size=12B cardinality=6.00M
+====
+# Filter on customer table
+# |join| = 1/3 of above = 2M
+# Bug: Expected cardinality ~2M
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=66B cardinality=877.79K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=38B cardinality=15.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: i.l_orderkey = o.o_orderkey
+|  runtime filters: RF002 <- o.o_orderkey
+|  row-size=28B cardinality=5.76M
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> o.o_custkey
+|     row-size=16B cardinality=1.50M
+|
+02:SCAN HDFS [tpch.lineitem i]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF002 -> i.l_orderkey
+   row-size=12B cardinality=6.00M
+====
+# Filter on orders table
+# |join| = 1/3 of full join = 2M
+# Bug: Expected cardinality ~2M
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and o.o_clerk < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=93B cardinality=575.77K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=38B cardinality=150.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: i.l_orderkey = o.o_orderkey
+|  runtime filters: RF002 <- o.o_orderkey
+|  row-size=55B cardinality=575.77K
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     predicates: o.o_clerk < 'foo'
+|     runtime filters: RF000 -> o.o_custkey
+|     row-size=43B cardinality=150.00K
+|
+02:SCAN HDFS [tpch.lineitem i]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF002 -> i.l_orderkey
+   row-size=12B cardinality=6.00M
+====
+# Filter on items table
+# |join| = 1/3 of full join = 2M
+# Bug: Expected cardinality ~2M
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and i.l_suppkey < 1234
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=74B cardinality=600.12K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=38B cardinality=150.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = i.l_orderkey
+|  runtime filters: RF002 <- i.l_orderkey
+|  row-size=36B cardinality=600.12K
+|
+|--02:SCAN HDFS [tpch.lineitem i]
+|     partitions=1/1 files=1 size=718.94MB
+|     predicates: i.l_suppkey < 1234
+|     row-size=20B cardinality=600.12K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o.o_custkey, RF002 -> o.o_orderkey
+   row-size=16B cardinality=1.50M
+====
+# Correlated filter on two columns
+# |join| = Ave. line items per customer
+# |lineitem| / |o.custkey| = 6M / 100K = 60
+# Bug: Expected cardinality ~60
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and c.c_custkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=66B cardinality=1
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_custkey = 10
+|     row-size=38B cardinality=1
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: i.l_orderkey = o.o_orderkey
+|  runtime filters: RF002 <- o.o_orderkey
+|  row-size=28B cardinality=58
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     predicates: o.o_custkey = 10
+|     runtime filters: RF000 -> o.o_custkey
+|     row-size=16B cardinality=15
+|
+02:SCAN HDFS [tpch.lineitem i]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF002 -> i.l_orderkey
+   row-size=12B cardinality=6.00M
+====
+# Correlated filter on two columns
+# |join| = Ave. line items per customer
+# |lineitem| / |o.orderkey| = 6M / 1.5M = 4
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and o.o_orderkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = i.l_orderkey
+|  runtime filters: RF000 <- i.l_orderkey
+|  row-size=66B cardinality=4
+|
+|--02:SCAN HDFS [tpch.lineitem i]
+|     partitions=1/1 files=1 size=718.94MB
+|     predicates: i.l_orderkey = 10
+|     row-size=12B cardinality=4
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  runtime filters: RF002 <- o.o_custkey
+|  row-size=54B cardinality=1
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     predicates: o.o_orderkey = 10
+|     runtime filters: RF000 -> o.o_orderkey
+|     row-size=16B cardinality=1
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF002 -> c.c_custkey
+   row-size=38B cardinality=150.00K
+====
+# Correlated filter on two pairs of columns
+# |join| = Ave. line items per customer
+# |lineitem| / |o.orderkey| = 6M / 1.5M = 4
+# Bug: wrong join plan, expected (lineitem >< order) >< customer
+select c.c_name, o.o_orderkey, i.l_linenumber
+from tpch.customer c,
+     tpch.orders o,
+     tpch.lineitem i
+where c.c_custkey = o.o_custkey
+  and o.o_orderkey = i.l_orderkey
+  and o.o_orderkey = 10
+  and c.c_custkey = 20
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  runtime filters: RF000 <- o.o_custkey
+|  row-size=66B cardinality=1
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: i.l_orderkey = o.o_orderkey
+|  |  runtime filters: RF002 <- o.o_orderkey
+|  |  row-size=28B cardinality=1
+|  |
+|  |--01:SCAN HDFS [tpch.orders o]
+|  |     partitions=1/1 files=1 size=162.56MB
+|  |     predicates: o.o_orderkey = 10, o.o_custkey = 20
+|  |     row-size=16B cardinality=1
+|  |
+|  02:SCAN HDFS [tpch.lineitem i]
+|     partitions=1/1 files=1 size=718.94MB
+|     predicates: i.l_orderkey = 10
+|     runtime filters: RF002 -> i.l_orderkey
+|     row-size=12B cardinality=4
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey = 20
+   runtime filters: RF000 -> c.c_custkey
+   row-size=38B cardinality=1
+====

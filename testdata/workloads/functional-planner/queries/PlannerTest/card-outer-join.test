@@ -1,0 +1,812 @@
+# Right outer tests
+#
+# Right outer
+# |join| = |orders| = 1.5M
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=24B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Right outer that is the inverse of a left-outer test
+# 1/3 of customers have no orders, or 50K
+# |join| = |orders|  + 50K = 1.55M
+select c.c_custkey, o.o_orderkey
+from tpch.orders o
+right outer join tpch.customer c on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=24B cardinality=1.50M
+|
+|--01:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+00:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o.o_custkey
+   row-size=16B cardinality=1.50M
+====
+# Right outer join with zero-sized right table
+# Bug: Expected cardinality = 0
+select o.id, i.id
+from functional.alltypestiny i
+right outer join functional.alltypesnopart o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: i.id = o.id
+|  runtime filters: RF000 <- o.id
+|  row-size=8B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypesnopart o]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+00:SCAN HDFS [functional.alltypestiny i]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> i.id
+   row-size=4B cardinality=8
+====
+# Right outer join with zero-sized left table
+select o.id, i.id
+from functional.alltypesnopart i
+right outer join functional.alltypestiny o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.id = i.id
+|  row-size=8B cardinality=8
+|
+|--00:SCAN HDFS [functional.alltypesnopart i]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+01:SCAN HDFS [functional.alltypestiny o]
+   partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Right outer with left predicate
+# |join| = |customers'| * avg. orders per customer = 15
+# predicate removes null rows, so the right outer is a no-op
+# Using wrong NDV so answer is 25. See IMPALA-8045, Outer Join section
+# Bug: Expected cardinality ~25
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_name = 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_name = 'foo'
+|  row-size=54B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name = 'foo'
+|     row-size=38B cardinality=1
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Right outer with broad left predicate
+# |join| = |customers'| * avg. orders per customer = 150K/3 * 15 = 750K
+# predicate removes null rows, so the right outer is a no-op
+# Bug: Expected cardinality ~750
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_name < 'foo'
+|  row-size=54B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=38B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Right outer with right predicate
+# |clerk| = 1K
+# sel(clerk = 'foo') = 1/1000
+# |orders'| = |orders| * sel(clerk = 'foo') = 1.5K
+# |join| = |orders'| = 1.5K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk = 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  runtime filters: RF000 <- o.o_custkey
+|  row-size=51B cardinality=1.49K
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     predicates: o.o_clerk = 'foo'
+|     row-size=43B cardinality=1.49K
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> c.c_custkey
+   row-size=8B cardinality=150.00K
+====
+# Right outer with broad right predicate
+# |join| = |orders| * sel(left pred) = 500K
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=51B cardinality=150.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   row-size=43B cardinality=150.00K
+====
+# Right outer with join predicate
+# |join| = |orders| * sel(pred) = 150K
+# Bug: Expected cardinality ~150K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10
+|  row-size=30B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Right outer with broad join predicate
+# sel(c.c_nationkey + o.o_shippriority < 10) = 0.33
+# |join| = |orders| * sel(pred) = 500K
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority < 10
+|  row-size=30B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Right outer with left, right and join predicate
+# |customers'| = |customers| * sel(left pred) = 50K
+# |orders'| = |orders| * sel(right pred) = 500K
+# max(|key|) = 150K / 3 = 50K
+# sel(join pred) = 0.1
+# |join| = |orders'| * |customers'| / max(|key|) * sel(join pred)
+# = 500K * 50K / 50K * .1 = 50K
+# Since inner has more keys than outer, outer join adds no rows
+# The c.c_name < 'foo' is reapplied after the join
+# Bug: Expected cardinality ~50K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+  and o.o_clerk < 'foo'
+  and c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10, c.c_name < 'foo'
+|  row-size=87B cardinality=150.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=40B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   row-size=47B cardinality=150.00K
+====
+# Left outer tests
+#
+# Left outer
+# |join| = |orders| + unmatched customers = 1.55M
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+left outer join tpch.orders o on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=24B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o.o_custkey
+   row-size=16B cardinality=1.50M
+====
+# Left outer join which is the inverse of the right outer test
+# |join| = |orders| = 1.5M
+select c.c_custkey, o.o_orderkey
+from tpch.orders o
+left outer join tpch.customer c on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=24B cardinality=1.50M
+|
+|--01:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+00:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Left outer join with zero-sized right table
+select o.id, i.id
+from functional.alltypestiny i
+left outer join functional.alltypesnopart o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: i.id = o.id
+|  row-size=8B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypesnopart o]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+00:SCAN HDFS [functional.alltypestiny i]
+   partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Left outer join with zero-sized left table
+select o.id, i.id
+from functional.alltypesnopart i
+left outer join functional.alltypestiny o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.id = i.id
+|  runtime filters: RF000 <- i.id
+|  row-size=8B cardinality=0
+|
+|--00:SCAN HDFS [functional.alltypesnopart i]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+01:SCAN HDFS [functional.alltypestiny o]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> o.id
+   row-size=4B cardinality=8
+====
+# Left outer with left predicate
+# |customers'| = |customers| * sel(pred) = 50K
+# |join| = |customers'| * avg. orders per customer = 50 * 15 = 750K
+# (Skipping some steps in the math.)
+# Bug: Expected cardinality ~750K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+left outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=54B cardinality=228.68K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=38B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o.o_custkey
+   row-size=16B cardinality=1.50M
+====
+# Left outer with right predicate
+# The filter on the right table works with non-null values.
+# It is applied again after the (outer) join, and will remove any
+# null rows created via the outer join (undoing the join.)
+# While this may be a meaninless query, it is an interesting odd test case.
+# The meaning is thus to match customers who have orders.
+# |join| = |orders'| = |orders| * sel(pred)
+#        = 1.5M * 0.33 = 500K
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+left outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: o.o_clerk < 'foo'
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=51B cardinality=150.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   runtime filters: RF000 -> o.o_custkey
+   row-size=43B cardinality=150.00K
+====
+# Left outer with right predicate
+# Predicate matches both right columns and the generated, null
+# outer join rows.
+# Bug: Invalid IS NULL logic uses orders null count to estimate output of outer
+# join. Since orders has no nulls, we incorrectly assume the outer join does not either.
+# See IMPALA-8050
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+left outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk is null
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: o.o_clerk IS NULL
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=51B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o.o_custkey
+   row-size=43B cardinality=1.50M
+====
+# Left outer with join predicate
+# sel(c.c_nationkey + o.o_shippriority = 10) = 0.1 (guess)
+# |join| = |orders| * sel(pred) = 150K
+# Bug: Expected cardinality ~150K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10
+|  row-size=30B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# As above, but with two predicates since the estimate above happens
+# to also be the customer table cardinality.
+# Remember exponential back-off
+# |join| = 0.31 above, 0.031 net, or ~45K
+# Bug: Expected cardinality ~50K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+  and c.c_nationkey * o.o_shippriority = 100
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey * o.o_shippriority = 100, c.c_nationkey + o.o_shippriority = 10
+|  row-size=30B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Left outer with broad join predicate
+# |join| = |orders| * sel(pred) = 500K
+# (Skipping some math steps.)
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+right outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority < 10
+|  row-size=30B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Left outer with broad join predicate and right table predicate
+# sel(c.c_nationkey + o.o_shippriority < 10) = 0.33
+# |customers'| = |customers| * 0.33 = 50K
+# |orders'| = |orders| * 0.33 = 500K
+# |join| = same as inner join = 50K
+# Order key < customer key, so no extra rows from outer
+# Bug: Expected cardinality ~50K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+left outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+  and o.o_clerk < 'foo'
+  and c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10, o.o_clerk < 'foo'
+|  runtime filters: RF000 <- c.c_custkey
+|  row-size=87B cardinality=150.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=40B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   runtime filters: RF000 -> o.o_custkey
+   row-size=47B cardinality=150.00K
+====
+# Full outer join tests
+#
+# |join| = |left-only| + |inner-join| + |right-only|
+# |customers.c_custKey| = 150K
+# |orders.o_custkey| = 100K
+# |custkey| = max(above) = 150K
+# |left-only| = |left| * (1 - |o_custKey| / |custkey|)
+#             = 150K * (1 - 100K/150K) = 150K * 1/3 = 50K
+# |right-only| = |right| * (1 - |c_custKey| / |custkey|) = 0
+# |inner-join| = |left| * |right| / |custKey| = 1.5M
+# |join| = |left-only| + |inner-join| + |right-only|
+#        = 50K + 1.5M + 0 = 1.55M
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=24B cardinality=1.65M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Invers of the above
+select c.c_custkey, o.o_orderkey
+from tpch.orders o
+full outer join tpch.customer c on c.c_custkey = o.o_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=24B cardinality=1.65M
+|
+|--01:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+00:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Full outer join with zero-sized right table
+select o.id, i.id
+from functional.alltypestiny i
+full outer join functional.alltypesnopart o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: i.id = o.id
+|  row-size=8B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypesnopart o]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+00:SCAN HDFS [functional.alltypestiny i]
+   partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Full outer join with zero-sized left table
+select o.id, i.id
+from functional.alltypesnopart i
+full outer join functional.alltypestiny o using (id)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.id = i.id
+|  row-size=8B cardinality=8
+|
+|--00:SCAN HDFS [functional.alltypesnopart i]
+|     partitions=1/1 files=0 size=0B
+|     row-size=4B cardinality=0
+|
+01:SCAN HDFS [functional.alltypestiny o]
+   partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Full outer with left predicate
+# predicate removes null rows, so the right outer is a no-op
+# Using wrong NDV so answer is 25. See IMPALA-8045, Outer Join section
+# Bug: Expected cardinality ~25
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_name = 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_name = 'foo'
+|  row-size=54B cardinality=1.50M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name = 'foo'
+|     row-size=38B cardinality=1
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Full outer with broad left predicate
+# |join| = |customers'| * avg. orders per customer = 150K/3 * 15 = 750K
+# predicate removes null rows, so the right outer is a no-op
+# Bug: Using wrong NDV, so get answer of 1M, see IMPALA-8045
+# Bug: Expected cardinality ~1M
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_name < 'foo'
+|  row-size=54B cardinality=1.51M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=38B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=16B cardinality=1.50M
+====
+# Full outer with right predicate
+# |clerk| = 1K
+# sel(clerk = 'foo') = 1/1000
+# |orders'| = |orders| * sel(clerk = 'foo') = 1.5K
+# |join| = |orders'| = 1.5K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk = 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  other predicates: o.o_clerk = 'foo'
+|  row-size=51B cardinality=151.49K
+|
+|--01:SCAN HDFS [tpch.orders o]
+|     partitions=1/1 files=1 size=162.56MB
+|     predicates: o.o_clerk = 'foo'
+|     row-size=43B cardinality=1.49K
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   row-size=8B cardinality=150.00K
+====
+# Full outer with broad right predicate
+# |join| = |orders| * sel(left pred) = 500K
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where o.o_clerk < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: o.o_clerk < 'foo'
+|  row-size=51B cardinality=300.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=8B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   row-size=43B cardinality=150.00K
+====
+# Full outer with join predicate
+# |join| = |orders| * sel(pred) = 150K
+# Bug: Expected cardinality ~150K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10
+|  row-size=30B cardinality=1.65M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Full outer with broad join predicate
+# sel(c.c_nationkey + o.o_shippriority < 10) = 0.33
+# |join| = |orders| * sel(pred) = 500K
+# Bug: Expected cardinality ~500K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority < 10
+|  row-size=30B cardinality=1.65M
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   row-size=20B cardinality=1.50M
+====
+# Full outer with left, right and join predicate
+# |customers'| = |customers| * sel(left pred) = 50K
+# |orders'| = |orders| * sel(right pred) = 500K
+# |join| = |orders'| * sel(join pred) * sel(children) = 16K
+# sel(children) = 0.33
+# The c.c_name < 'foo' is reapplied after the join
+# Bug: Expected cardinality ~50K
+select c.c_custkey, o.o_orderkey
+from tpch.customer c
+full outer join tpch.orders o on c.c_custkey = o.o_custkey
+where c.c_nationkey + o.o_shippriority = 10
+  and o.o_clerk < 'foo'
+  and c.c_name < 'foo'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  other predicates: c.c_nationkey + o.o_shippriority = 10, o.o_clerk < 'foo', c.c_name < 'foo'
+|  row-size=87B cardinality=165.00K
+|
+|--00:SCAN HDFS [tpch.customer c]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c.c_name < 'foo'
+|     row-size=40B cardinality=15.00K
+|
+01:SCAN HDFS [tpch.orders o]
+   partitions=1/1 files=1 size=162.56MB
+   predicates: o.o_clerk < 'foo'
+   row-size=47B cardinality=150.00K
+====

@@ -1,0 +1,442 @@
+# Predicate tests
+# In this file, "inequality" means not equals. It is a general
+# term for <, <=, >, >=. The term "not equals" is used for the
+# != (AKA <>) operator.
+# No predicate at all. Establishes cardinality baseline.
+select * from tpch.customer
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer]
+   partitions=1/1 files=1 size=23.08MB
+   row-size=218B cardinality=150.00K
+====
+# Predicate on a single value: card = |T|/ndv
+# Unique key, NDV=|T|
+select *
+from tpch.customer c
+where c.c_custkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey = 10
+   row-size=218B cardinality=1
+====
+# Predicate on a single value: card = |T|/ndv
+# Non-unique key, NDV=25
+select *
+from tpch.customer c
+where c.c_nationkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_nationkey = 10
+   row-size=218B cardinality=6.00K
+====
+# OR'ed predicate, card = 2/ndv
+select *
+from tpch.customer c
+where c.c_custkey = 10 OR c.c_custkey = 20
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey IN (10, 20)
+   row-size=218B cardinality=2
+====
+# OR'ed predicate, distinct columns
+# card = max(card of each OR term)
+select *
+from tpch.customer c
+where c.c_custkey = 10
+   or c.c_nationkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey = 10 OR c.c_nationkey = 10
+   row-size=218B cardinality=6.00K
+====
+# As above, but with smaller table to see effect
+# NDV(id) = |T| = 8
+# NDV(bool_val) = 2
+# card = max(|T|/NDV(id),|T|/NDV(bool_val)) = max(1, 4)
+# But done by adding cardinalities, which seems right, but is wrong
+# Bug: IMPALA-8038
+select *
+from functional.alltypestiny t
+where t.id = 10
+   or t.bool_col = true
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 files=4 size=460B
+   predicates: t.id = 10 OR t.bool_col = TRUE
+   row-size=89B cardinality=5
+====
+# IN, card = x/ndv
+select *
+from tpch.customer c
+where c.c_custkey in (10, 20, 30)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey IN (10, 20, 30)
+   row-size=218B cardinality=3
+====
+# IN with duplicate values. Remove dups.
+# Bug: IMPALA-8030
+select *
+from tpch.customer c
+where c.c_custkey in (10, 20, 30, 30, 10, 20)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey IN (10, 20, 30, 30, 10, 20)
+   row-size=218B cardinality=6
+====
+# OR on same value: card = 1/ndv
+select *
+from tpch.customer c
+where c.c_custkey = 10 OR c.c_custkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey = 10
+   row-size=218B cardinality=1
+====
+# OR on same value: card = 1/ndv
+# Different expression order
+# Bug: IMPALA-8030
+select *
+from tpch.customer c
+where c.c_custkey = 10 OR 10 = c.c_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey IN (10, 10)
+   row-size=218B cardinality=2
+====
+# AND'ed predicate, card = 0
+select *
+from tpch.customer c
+where c.c_custkey = 10 AND c.c_custkey = 20
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# AND on same value: card = 1/ndv
+select *
+from tpch.customer c
+where c.c_custkey = 10 AND c.c_custkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey = 10
+   row-size=218B cardinality=1
+====
+# Not-equal, card = 1 - 1/ndv
+# Use smaller table so effect is clear
+# |T|=8, NDV=8
+# Bug: IMPALA-8039
+# Bug, expected cardinality ~7
+select *
+from functional.alltypestiny
+where id != 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   predicates: id != 10
+   row-size=89B cardinality=1
+====
+# Inequality. No useful stats.
+# Bug: IMPALA-8037, Assumes sel = 0.1
+# Bug: Expected cardinality ~49.5K
+select *
+from tpch.customer c
+where c.c_custkey < 1234
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey < 1234
+   row-size=218B cardinality=15.00K
+====
+# Inequality twice on same value. Remove duplicate.
+# Bug: IMPALA-8037
+# Bug: Expected cardinality ~49.5K
+select *
+from tpch.customer c
+where c.c_custkey < 1234
+  and c.c_custkey < 1234
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey < 1234
+   row-size=218B cardinality=15.00K
+====
+# Inequality twice on same value, but reversed "direction". Remove duplicate.
+# Bug: IMPALA-8037
+# Bug: Expected cardinality ~49.5K
+select *
+from tpch.customer c
+where c.c_custkey < 1234
+  and 1234 > c.c_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey < 1234
+   row-size=218B cardinality=15.00K
+====
+# Two inequalities of the same "direction" Assume only one applies.
+# Bugs: IMPALA-8031, IMPALA-8037
+# Bug: Expected cardinality ~28.5K
+select *
+from tpch.customer c
+where c.c_custkey < 1234
+  and c.c_custkey < 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey < 1234, c.c_custkey < 2345
+   row-size=218B cardinality=15.00K
+====
+# Two inequalities. No useful stats.
+# But with effect of exponential-backoff
+# Bug: IMPALA-8037
+# Bug: Expected cardinality ~28.5K
+select *
+from tpch.customer c
+where c.c_custkey < 1234
+  and c.c_nationkey < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey < 1234, c.c_nationkey < 100
+   row-size=218B cardinality=15.00K
+====
+# Between. No useful stats. Should assume, say 0.16
+# But, gets rewritten before computing selectivity,
+# So same as AND'ed inequalities
+# sel = 0.1, but Ramakrishnan and Gherke suggest 1/4
+# Bug: IMPALA-8037
+# Bug: Expected cardinality ~28.5K
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
+   row-size=218B cardinality=15.00K
+====
+# Compound inequality (< and >) that is the same as BETWEEN.
+# Gets compouted as AND of inequalities.
+# sel = 0.1 (single sel for all)
+# But, these conditions are not independent, so a better estimate
+# would be, say 1/6
+# Bugs: TBD
+# Bug: Expected cardinality ~28.5K
+# |<<< <<< ===| c > x
+# |=== >>> >>>| c < y
+# |<<< === >>>| c > x AND c < y
+select *
+from tpch.customer c
+where c.c_custkey >= 1234 and c.c_custkey <= 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
+   row-size=218B cardinality=15.00K
+====
+# Between and redundant inequality
+# Bug: expected cardinality ~15K
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey <= 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
+   row-size=218B cardinality=15.00K
+====
+# Partitioned scan.
+# |table| = 11K
+# |partition| = 1000
+# Five patitions match
+# |table'| = 5000
+select *
+from functional.alltypesagg a
+where a.day >= 6
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partition predicates: a.`day` >= 6
+   partitions=5/11 files=5 size=372.38KB
+   row-size=95B cardinality=5.00K
+====
+# Partitioned table, one partition matches
+select *
+from functional.alltypesagg a
+where a.day = 6
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partition predicates: a.`day` = 6
+   partitions=1/11 files=1 size=74.48KB
+   row-size=95B cardinality=1.00K
+====
+# Partitioned table, no partitions match
+select *
+from functional.alltypesagg a
+where a.day = 23
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partition predicates: a.`day` = 23
+   partitions=0/11 files=0 size=0B
+   row-size=95B cardinality=0
+====
+# IS NULL
+# Estimated from null count, which is 0 for TPCH tables.
+# TODO: Add tests for ndv stats but no null counts
+# Impala does not suport NOT NULL fields, so we have to assume the
+# field can be null. That means null is one of the distinct values.
+# sel(mktsegment is null) = 1/NDV = 0.2
+# Bug: Many, expected cardinality ~15K
+select *
+from tpch.customer c
+where c.c_mktsegment is null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_mktsegment IS NULL
+   row-size=218B cardinality=15.00K
+====
+# IS NOT NULL
+# Similar to above.
+# Bug: Expected cardinality ~15K
+select *
+from tpch.customer c
+where c.c_mktsegment is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_mktsegment IS NOT NULL
+   row-size=218B cardinality=15.00K
+====
+# |alltypesagg| = 11K. Null count of tinyint_col = 2000.
+select *
+from functional.alltypesagg
+where tinyint_col is null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col IS NULL
+   row-size=95B cardinality=2.00K
+====
+# As above.
+select *
+from functional.alltypesagg
+where tinyint_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col IS NOT NULL
+   row-size=95B cardinality=9.00K
+====
+# IS NULL on an expression. Guess 0.1 selectivity
+select *
+from tpch.customer c
+where concat(c.c_mktsegment, c_comment) is null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: concat(c.c_mktsegment, c_comment) IS NULL
+   row-size=218B cardinality=15.00K
+====
+# IS NOT NULL.
+# Bug: Should guess 0.9 selectivity, actually guesses 0.1
+# Expected cardinality ~15K
+select *
+from tpch.customer c
+where concat(c.c_mktsegment, c_comment) is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   partitions=1/1 files=1 size=23.08MB
+   predicates: concat(c.c_mktsegment, c_comment) IS NOT NULL
+   row-size=218B cardinality=15.00K
+====
+# Scan of a table with no stats and zero rows
+select *
+from functional.alltypesnopart
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesnopart]
+   partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
+====
+# Filter on the no-stats table
+select *
+from functional.alltypesnopart
+where int_col = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesnopart]
+   partitions=1/1 files=0 size=0B
+   predicates: int_col = 10
+   row-size=72B cardinality=0
+====
