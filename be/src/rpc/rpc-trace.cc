@@ -82,7 +82,7 @@ void impala::InitRpcEventTracing(Webserver* webserver, RpcMgr* rpc_mgr) {
   if (webserver != nullptr) {
     Webserver::UrlCallback json = bind<void>(
         mem_fn(&RpcEventHandlerManager::JsonCallback), handler_manager.get(), _1, _2);
-    webserver->RegisterUrlCallback("/rpcz", "rpcz.tmpl", json);
+    webserver->RegisterUrlCallback("/rpcz", "rpcz.tmpl", json, true);
 
     Webserver::UrlCallback reset = bind<void>(
         mem_fn(&RpcEventHandlerManager::ResetCallback), handler_manager.get(), _1, _2);

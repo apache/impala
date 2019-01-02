@@ -487,12 +487,12 @@ void Statestore::RegisterWebpages(Webserver* webserver) {
   Webserver::UrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
   webserver->RegisterUrlCallback("/topics", "statestore_topics.tmpl",
-      topics_callback);
+      topics_callback, true);
 
   Webserver::UrlCallback subscribers_callback =
       bind<void>(&Statestore::SubscribersHandler, this, _1, _2);
   webserver->RegisterUrlCallback("/subscribers", "statestore_subscribers.tmpl",
-      subscribers_callback);
+      subscribers_callback, true);
 
   RegisterLogLevelCallbacks(webserver, false);
 }

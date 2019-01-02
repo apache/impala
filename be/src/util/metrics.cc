@@ -90,7 +90,7 @@ Status MetricGroup::Init(Webserver* webserver) {
 
     Webserver::UrlCallback json_callback =
         bind<void>(mem_fn(&MetricGroup::TemplateCallback), this, _1, _2);
-    webserver->RegisterUrlCallback("/metrics", "metrics.tmpl", json_callback);
+    webserver->RegisterUrlCallback("/metrics", "metrics.tmpl", json_callback, true);
   }
 
   return Status::OK();

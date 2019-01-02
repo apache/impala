@@ -42,6 +42,8 @@ class TestWebPage(ImpalaTestSuite):
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   METRICS_URL = "http://localhost:{0}/metrics"
   JMX_URL = "http://localhost:{0}/jmx"
+  ADMISSION_URL = "http://localhost:{0}/admission"
+  RESET_RESOURCE_POOL_STATS_URL = "http://localhost:{0}/resource_pool_reset"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -410,3 +412,48 @@ class TestWebPage(ImpalaTestSuite):
     after = get_svc_metrics(SVC_NAME)
 
     assert before != after
+
+  @pytest.mark.execute_serially
+  def test_admission_page(self):
+    """Sanity check for the admission debug page's http end points (both admission and
+    reset stats end points)."""
+    # Make sure at least one query is submitted to the default pool since impala startup,
+    # so that it shows up in the admission control debug page. Checks for both with and
+    # without the pool_name search string.
+    self.client.execute("select 1")
+    response_json = self.__fetch_resource_pools_json()
+    assert response_json[0]['pool_name'] == "default-pool"
+
+    response_json = self.__fetch_resource_pools_json("default-pool")
+    assert response_json[0]['pool_name'] == "default-pool"
+
+    # Make sure the reset informational stats endpoint works, both with and without the
+    # pool_name search string.
+    assert response_json[0]['total_admitted'] > 0
+    self.get_and_check_status(
+      self.RESET_RESOURCE_POOL_STATS_URL + "?pool_name=default-pool",
+      ports_to_test=[25000])
+    response_json = self.__fetch_resource_pools_json("default-pool")
+    assert response_json[0]['total_admitted'] == 0
+
+    self.client.execute("select 1")
+    response_json = self.__fetch_resource_pools_json("default-pool")
+    assert response_json[0]['total_admitted'] > 0
+    self.get_and_check_status(self.RESET_RESOURCE_POOL_STATS_URL, ports_to_test=[25000])
+    response_json = self.__fetch_resource_pools_json("default-pool")
+    assert response_json[0]['total_admitted'] == 0
+
+  def __fetch_resource_pools_json(self, pool_name=None):
+    """Helper method used to fetch the resource pool json from the admission debug page.
+    If a 'pool_name' is passed to this method, it adds the pool_name search string to the
+    http request."""
+    search_string = "?json"
+    if pool_name is not None:
+      search_string += "&pool_name=" + pool_name
+    responses = self.get_and_check_status(self.ADMISSION_URL + search_string,
+                                          ports_to_test=[25000])
+    assert len(responses) == 1
+    response_json = json.loads(responses[0].text)
+    assert 'resource_pools' in response_json
+    assert len(response_json['resource_pools']) == 1
+    return response_json['resource_pools']

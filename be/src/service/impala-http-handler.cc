@@ -20,6 +20,8 @@
 #include <sstream>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread/mutex.hpp>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 #include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-util.h"
@@ -33,6 +35,7 @@
 #include "service/impala-server.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
+#include "scheduling/admission-controller.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/logging-support.h"
@@ -82,19 +85,19 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   DCHECK(webserver != NULL);
 
   webserver->RegisterUrlCallback("/backends", "backends.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::BackendsHandler));
+      MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
 
   webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::HadoopVarzHandler));
+      MakeCallback(this, &ImpalaHttpHandler::HadoopVarzHandler), true);
 
   webserver->RegisterUrlCallback("/queries", "queries.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::QueryStateHandler));
+      MakeCallback(this, &ImpalaHttpHandler::QueryStateHandler), true);
 
   webserver->RegisterUrlCallback("/sessions", "sessions.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::SessionsHandler));
+      MakeCallback(this, &ImpalaHttpHandler::SessionsHandler), true);
 
   webserver->RegisterUrlCallback("/catalog", "catalog.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::CatalogHandler));
+      MakeCallback(this, &ImpalaHttpHandler::CatalogHandler), true);
 
   webserver->RegisterUrlCallback("/catalog_object", "catalog_object.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::CatalogObjectsHandler), false);
@@ -138,6 +141,12 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   webserver->RegisterUrlCallback("/query_stmt", "query_stmt.tmpl",
       [this](const auto& args, auto* doc) {
         this->QuerySummaryHandler(false, false, args, doc); }, false);
+
+    webserver->RegisterUrlCallback("/admission", "admission_controller.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::AdmissionStateHandler), true);
+
+    webserver->RegisterUrlCallback("/resource_pool_reset", "",
+      MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
 
   RegisterLogLevelCallbacks(webserver, true);
 }
@@ -433,7 +442,6 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,
   }
   document->AddMember("query_locations", query_locations, document->GetAllocator());
 }
-
 
 void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
@@ -853,4 +861,88 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::AdmissionStateHandler(
+    const Webserver::ArgumentMap& args, Document* document) {
+  Webserver::ArgumentMap::const_iterator pool_name_arg = args.find("pool_name");
+  bool get_all_pools = (pool_name_arg == args.end());
+  Value resource_pools(kArrayType);
+  if(get_all_pools){
+    ExecEnv::GetInstance()->admission_controller()->AllPoolsToJson(
+        &resource_pools, document);
+  } else {
+    ExecEnv::GetInstance()->admission_controller()->PoolToJson(
+        pool_name_arg->second, &resource_pools, document);
+  }
+
+  // Now get running queries from CRS map.
+  struct QueryInfo {
+    TUniqueId query_id;
+    int64_t mem_limit;
+    int64_t mem_limit_for_admission;
+    unsigned long num_backends;
+  };
+  unordered_map<string, vector<QueryInfo>> running_queries;
+  server_->client_request_state_map_.DoFuncForAllEntries([&running_queries](
+      const std::shared_ptr<ClientRequestState>& request_state) {
+    // Make sure only queries past admission control are added.
+    auto query_state = request_state->operation_state();
+    if (query_state != TOperationState::INITIALIZED_STATE
+        && query_state != TOperationState::PENDING_STATE
+        && request_state->schedule() != nullptr)
+      running_queries[request_state->request_pool()].push_back(
+          {request_state->query_id(), request_state->schedule()->per_backend_mem_limit(),
+              request_state->schedule()->per_backend_mem_to_admit(),
+              static_cast<unsigned long>(
+                  request_state->schedule()->per_backend_exec_params().size())});
+  });
+
+  // Add the running queries to the resource_pools json.
+  for (int i = 0; i < resource_pools.Size(); i++) {
+    DCHECK(resource_pools[i].IsObject());
+    Value::MemberIterator it = resource_pools[i].GetObject().FindMember("pool_name");
+    DCHECK(it != resource_pools[i].GetObject().MemberEnd());
+    DCHECK(it->value.IsString());
+    string pool_name(it->value.GetString());
+    // Now add running queries to the json.
+    auto query_list = running_queries.find(pool_name);
+    if (query_list == running_queries.end()) continue;
+    vector<QueryInfo>& info_array = query_list->second;
+    Value queries_in_pool(rapidjson::kArrayType);
+    for (QueryInfo info : info_array) {
+      Value query_info(rapidjson::kObjectType);
+      Value query_id(PrintId(info.query_id).c_str(), document->GetAllocator());
+      query_info.AddMember("query_id", query_id, document->GetAllocator());
+      query_info.AddMember("mem_limit", info.mem_limit, document->GetAllocator());
+      query_info.AddMember(
+          "mem_limit_to_admit", info.mem_limit_for_admission, document->GetAllocator());
+      query_info.AddMember("num_backends", info.num_backends, document->GetAllocator());
+      queries_in_pool.PushBack(query_info, document->GetAllocator());
+    }
+    resource_pools[i].GetObject().AddMember(
+        "running_queries", queries_in_pool, document->GetAllocator());
+  }
+  // In order to embed a plain json inside the webpage generated by mustache, we need
+  // to stringify it and write it out as a json element.
+  rapidjson::StringBuffer strbuf;
+  PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+  resource_pools.Accept(writer);
+  Value raw_json(strbuf.GetString(), document->GetAllocator());
+  document->AddMember("resource_pools_plain_json", raw_json, document->GetAllocator());
+  document->AddMember("resource_pools", resource_pools, document->GetAllocator());
+  // Indicator that helps render UI elements based on this condition.
+  document->AddMember("get_all_pools", get_all_pools, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::ResetResourcePoolStatsHandler(
+    const Webserver::ArgumentMap& args, Document* document) {
+  Webserver::ArgumentMap::const_iterator pool_name_arg = args.find("pool_name");
+  bool reset_all_pools = (pool_name_arg == args.end());
+  if (reset_all_pools) {
+    ExecEnv::GetInstance()->admission_controller()->ResetAllPoolInformationalStats();
+  } else {
+    ExecEnv::GetInstance()->admission_controller()->ResetPoolInformationalStats(
+        pool_name_arg->second);
+  }
 }

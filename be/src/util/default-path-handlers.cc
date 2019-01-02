@@ -299,20 +299,20 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
 
 void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker,
     MetricGroup* metric_group) {
-  webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
-  webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler);
+  webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
+  webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
   if (JniUtil::is_jvm_inited()) {
     // JmxHandler outputs a plain JSON string and does not require a template to
     // render. However RawUrlCallback only supports PLAIN content type.
     // (TODO): Switch to RawUrlCallback when it supports JSON content-type.
-    webserver->RegisterUrlCallback("/jmx", "raw_text.tmpl", JmxHandler);
+    webserver->RegisterUrlCallback("/jmx", "raw_text.tmpl", JmxHandler, true);
   }
   if (process_mem_tracker != NULL) {
     auto callback = [process_mem_tracker, metric_group]
         (const Webserver::ArgumentMap& args, Document* doc) {
       MemUsageHandler(process_mem_tracker, metric_group, args, doc);
     };
-    webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback);
+    webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback, true);
   }
 
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
@@ -326,7 +326,7 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracke
     [](const Webserver::ArgumentMap& args, Document* doc) {
       RootHandler(args, doc);
     };
-  webserver->RegisterUrlCallback("/", "root.tmpl", root_handler);
+  webserver->RegisterUrlCallback("/", "root.tmpl", root_handler, true);
 }
 
 }

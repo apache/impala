@@ -281,7 +281,7 @@ Status CatalogServer::Start() {
 
 void CatalogServer::RegisterWebpages(Webserver* webserver) {
   webserver->RegisterUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
-      [this](const auto& args, auto* doc) { this->CatalogUrlCallback(args, doc); });
+      [this](const auto& args, auto* doc) { this->CatalogUrlCallback(args, doc); }, true);
   webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
       [this](const auto& args, auto* doc) { this->CatalogObjectsUrlCallback(args, doc); },
       false);

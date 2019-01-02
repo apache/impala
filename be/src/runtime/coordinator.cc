@@ -852,7 +852,8 @@ void Coordinator::ReleaseAdmissionControlResources() {
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
   DCHECK(admission_controller != nullptr);
-  admission_controller->ReleaseQuery(schedule_);
+  admission_controller->ReleaseQuery(
+      schedule_, ComputeQueryResourceUtilization().peak_per_host_mem_consumption);
   query_events_->MarkEvent("Released admission control resources");
 }
 

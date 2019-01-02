@@ -248,10 +248,28 @@ class AdmissionController {
   /// is cancelled or failed). This should be called for all requests that have
   /// been submitted via AdmitQuery().
   /// This does not block.
-  void ReleaseQuery(const QuerySchedule& schedule);
+  void ReleaseQuery(const QuerySchedule& schedule, int64_t peak_mem_consumption);
 
   /// Registers the request queue topic with the statestore.
   Status Init();
+
+  /// Serializes relevant stats, configurations and information associated with queued
+  /// queries for the resource pool identified by 'pool_name' to JSON by adding members to
+  /// 'resource_pools'. Is a no-op if a pool with name 'pool_name' does not exist or no
+  /// queries have been submitted to that pool yet.
+  void PoolToJson(const string& pool_name, rapidjson::Value* resource_pools,
+      rapidjson::Document* document);
+
+  /// Serializes relevant stats, configurations and information associated with queued
+  /// queries for every resource pool (to which queries have been submitted at least once)
+  /// to JSON by adding members to 'resource_pools'.
+  void AllPoolsToJson(rapidjson::Value* resource_pools, rapidjson::Document* document);
+
+  /// Calls ResetInformationalStats on the pool identified by 'pool_name'.
+  void ResetPoolInformationalStats(const string& pool_name);
+
+  /// Calls ResetInformationalStats on all pools.
+  void ResetAllPoolInformationalStats();
 
  private:
   class PoolStats;
@@ -332,7 +350,8 @@ class AdmissionController {
 
     PoolStats(AdmissionController* parent, const std::string& name)
       : name_(name), parent_(parent), agg_num_running_(0), agg_num_queued_(0),
-        agg_mem_reserved_(0), local_mem_admitted_(0) {
+        agg_mem_reserved_(0), local_mem_admitted_(0), wait_time_ms_ema_(0.0) {
+      peak_mem_histogram_.resize(HISTOGRAM_NUM_OF_BINS, 0);
       InitMetrics();
     }
 
@@ -346,7 +365,7 @@ class AdmissionController {
     /// The following methods update the pool stats when the request represented by
     /// schedule is admitted, released, queued, or dequeued.
     void Admit(const QuerySchedule& schedule);
-    void Release(const QuerySchedule& schedule);
+    void Release(const QuerySchedule& schedule, int64_t peak_mem_consumption);
     void Queue(const QuerySchedule& schedule);
     void Dequeue(const QuerySchedule& schedule, bool timed_out);
 
@@ -379,6 +398,19 @@ class AdmissionController {
 
     PoolMetrics* metrics() { return &metrics_; }
     std::string DebugString() const;
+
+    /// Updates the metric keeping track of total time in queue and the exponential
+    /// moving average of query wait time for all queries submitted to this pool.
+    void UpdateWaitTime(int64_t wait_time_ms);
+
+    /// Serializes relevant stats and configurations to JSON by adding members to 'pool'.
+    void ToJson(rapidjson::Value* pool, rapidjson::Document* document) const;
+
+    /// Resets the informational stats like those keeping track of absolute
+    /// values(totals), the peak query memory histogram, and the exponential moving
+    /// average of wait time.
+    void ResetInformationalStats();
+
    private:
     const std::string name_;
     AdmissionController* parent_;
@@ -417,6 +449,21 @@ class AdmissionController {
 
     /// Per-pool metrics, created by InitMetrics().
     PoolMetrics metrics_;
+
+    /// A histogram of the peak memory used by a query among all hosts. Its a vector of
+    /// size 'HISTOGRAM_NUM_OF_BINS' and every i-th element represents the number of
+    /// queries that had recorded a peak memory between (i, i+1] * HISTOGRAM_BIN_SIZE
+    /// Bytes, except for the last one that represents a memory range of
+    /// (HISTOGRAM_NUM_OF_BINS - 1, infinity) * HISTOGRAM_BIN_SIZE Bytes.
+    std::vector<int64_t> peak_mem_histogram_;
+    static const int64_t HISTOGRAM_NUM_OF_BINS;
+    static const int64_t HISTOGRAM_BIN_SIZE;
+
+    /// Keeps track of exponential moving average of all queries submitted to this pool
+    /// that were not rejected. A weighting multiplier of value 'EMA_MULTIPLIER' is used.
+    double wait_time_ms_ema_;
+    static const double EMA_MULTIPLIER;
+
     void InitMetrics();
   };
 
@@ -547,10 +594,15 @@ class AdmissionController {
   /// behind invalidity.
   bool IsPoolConfigValid(const TPoolConfig& pool_cfg, std::string* reason);
 
-  // Sets the per host mem limit and mem admitted in the schedule and does the necessary
-  // accounting and logging on successful submission.
-  // Caller must hold 'admission_ctrl_lock_'.
+  /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
+  /// accounting and logging on successful submission.
+  /// Caller must hold 'admission_ctrl_lock_'.
   void AdmitQuery(QuerySchedule* schedule, bool was_queued);
+
+  /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
+  /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
+  void PoolToJsonLocked(const string& pool_name, rapidjson::Value* resource_pools,
+      rapidjson::Document* document);
 };
 
 }

@@ -305,7 +305,7 @@ void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files
 void RegisterLogLevelCallbacks(Webserver* webserver, bool register_log4j_handlers) {
   webserver->RegisterUrlCallback("/log_level", "log_level.tmpl",
       MakeCallback([](const Webserver::ArgumentMap& args, Document* document){},
-      register_log4j_handlers));
+      register_log4j_handlers), true);
   webserver->RegisterUrlCallback("/set_glog_level", "log_level.tmpl",
       MakeCallback(&SetGlogLevelCallback, register_log4j_handlers), false);
   webserver->RegisterUrlCallback("/reset_glog_level", "log_level.tmpl",

@@ -380,7 +380,8 @@ void RegisterUrlCallbacks(bool include_jvm_threads, Webserver* webserver) {
       (const Webserver::ArgumentMap& args, Document* doc) {
     ThreadOverviewUrlCallback(include_jvm_threads, args, doc);
   };
-  webserver->RegisterUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE, overview_callback);
+  webserver->RegisterUrlCallback(
+      THREADS_WEB_PAGE, THREADS_TEMPLATE, overview_callback, true);
 
   auto group_callback = [] (const Webserver::ArgumentMap& args, Document* doc) {
     thread_manager->ThreadGroupUrlCallback(args, doc);

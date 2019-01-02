@@ -26,6 +26,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "scheduling/scheduler.h"
+#include "util/bit-util.h"
 #include "util/debug-util.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
@@ -39,6 +40,10 @@ DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
     "milliseconds) that a request will wait to be admitted before timing out.");
 
 namespace impala {
+
+const int64_t AdmissionController::PoolStats::HISTOGRAM_NUM_OF_BINS = 128;
+const int64_t AdmissionController::PoolStats::HISTOGRAM_BIN_SIZE = 1024L * 1024L * 1024L;
+const double AdmissionController::PoolStats::EMA_MULTIPLIER = 0.2;
 
 /// Convenience method.
 string PrintBytes(int64_t value) {
@@ -285,7 +290,8 @@ void AdmissionController::PoolStats::Admit(const QuerySchedule& schedule) {
   metrics_.total_admitted->Increment(1L);
 }
 
-void AdmissionController::PoolStats::Release(const QuerySchedule& schedule) {
+void AdmissionController::PoolStats::Release(
+    const QuerySchedule& schedule, int64_t peak_mem_consumption) {
   int64_t cluster_mem_admitted = schedule.GetClusterMemoryToAdmit();
   DCHECK_GT(cluster_mem_admitted, 0);
   local_mem_admitted_ -= cluster_mem_admitted;
@@ -301,6 +307,10 @@ void AdmissionController::PoolStats::Release(const QuerySchedule& schedule) {
   DCHECK_GE(local_stats_.num_admitted_running, 0);
   DCHECK_GE(agg_num_running_, 0);
   DCHECK_GE(local_mem_admitted_, 0);
+  int64_t histogram_bucket =
+      BitUtil::RoundUp(peak_mem_consumption, HISTOGRAM_BIN_SIZE) / HISTOGRAM_BIN_SIZE;
+  histogram_bucket = std::max(std::min(histogram_bucket, HISTOGRAM_NUM_OF_BINS), 1L) - 1;
+  peak_mem_histogram_[histogram_bucket] = ++(peak_mem_histogram_[histogram_bucket]);
 }
 
 void AdmissionController::PoolStats::Queue(const QuerySchedule& schedule) {
@@ -634,6 +644,7 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
       }
       VLOG_QUERY << "Admitted query id=" << PrintId(schedule->query_id());
       AdmitQuery(schedule, false);
+      stats->UpdateWaitTime(0);
       VLOG_RPC << "Final: " << stats->DebugString();
       return Status::OK();
     }
@@ -683,7 +694,7 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
     RequestQueue* queue = &request_queue_map_[pool_name];
     pools_for_updates_.insert(pool_name);
     PoolStats* stats = GetPoolStats(pool_name);
-    stats->metrics()->time_in_queue_ms->Increment(wait_time_ms);
+    stats->UpdateWaitTime(wait_time_ms);
     if (outcome == AdmissionOutcome::REJECTED_OR_TIMED_OUT) {
       queue->Remove(&queue_node);
       stats->Dequeue(*schedule, true);
@@ -713,12 +724,13 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
   }
 }
 
-void AdmissionController::ReleaseQuery(const QuerySchedule& schedule) {
+void AdmissionController::ReleaseQuery(
+    const QuerySchedule& schedule, int64_t peak_mem_consumption) {
   const string& pool_name = schedule.request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
     PoolStats* stats = GetPoolStats(pool_name);
-    stats->Release(schedule);
+    stats->Release(schedule, peak_mem_consumption);
     UpdateHostMemAdmitted(schedule, -schedule.per_backend_mem_to_admit());
     pools_for_updates_.insert(pool_name);
     VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
@@ -1065,6 +1077,141 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
       PROFILE_INFO_KEY_ADMISSION_RESULT, admission_result);
   schedule->summary_profile()->AddInfoString(
       PROFILE_INFO_KEY_ADMITTED_MEM, PrintBytes(schedule->GetClusterMemoryToAdmit()));
+}
+
+void AdmissionController::PoolToJsonLocked(const string& pool_name,
+    rapidjson::Value* resource_pools, rapidjson::Document* document) {
+  PoolStatsMap::iterator it = pool_stats_.find(pool_name);
+  if (it == pool_stats_.end()) return;
+  PoolStats* stats = &it->second;
+  RequestQueue& queue = request_queue_map_[pool_name];
+  // Get the pool stats
+  using namespace rapidjson;
+  Value pool_info_json(kObjectType);
+  stats->ToJson(&pool_info_json, document);
+
+  // Get the queued queries
+  Value queued_queries(kArrayType);
+  queue.Iterate([&queued_queries, document](QueueNode* node) {
+    QuerySchedule* schedule = node->schedule;
+    Value query_info(kObjectType);
+    Value query_id(PrintId(schedule->query_id()).c_str(), document->GetAllocator());
+    query_info.AddMember("query_id", query_id, document->GetAllocator());
+    query_info.AddMember(
+        "mem_limit", schedule->per_backend_mem_limit(), document->GetAllocator());
+    query_info.AddMember("mem_limit_to_admit", schedule->per_backend_mem_to_admit(),
+        document->GetAllocator());
+    query_info.AddMember("num_backends", schedule->per_backend_exec_params().size(),
+        document->GetAllocator());
+    queued_queries.PushBack(query_info, document->GetAllocator());
+    return true;
+  });
+  pool_info_json.AddMember("queued_queries", queued_queries, document->GetAllocator());
+
+  // Get the queued reason for the query at the head of the queue.
+  if (!queue.empty()) {
+    Value head_queued_reason(
+        queue.head()
+            ->profile->GetInfoString(PROFILE_INFO_KEY_LAST_QUEUED_REASON)
+            ->c_str(),
+        document->GetAllocator());
+    pool_info_json.AddMember(
+        "head_queued_reason", head_queued_reason, document->GetAllocator());
+  }
+
+  resource_pools->PushBack(pool_info_json, document->GetAllocator());
+}
+
+void AdmissionController::PoolToJson(const string& pool_name,
+    rapidjson::Value* resource_pools, rapidjson::Document* document) {
+  lock_guard<mutex> lock(admission_ctrl_lock_);
+  PoolToJsonLocked(pool_name, resource_pools, document);
+}
+
+void AdmissionController::AllPoolsToJson(
+    rapidjson::Value* resource_pools, rapidjson::Document* document) {
+  lock_guard<mutex> lock(admission_ctrl_lock_);
+  for (const PoolConfigMap::value_type& entry : pool_config_map_) {
+    const string& pool_name = entry.first;
+    PoolToJsonLocked(pool_name, resource_pools, document);
+  }
+}
+
+void AdmissionController::PoolStats::UpdateWaitTime(int64_t wait_time_ms) {
+  metrics()->time_in_queue_ms->Increment(wait_time_ms);
+  if (wait_time_ms_ema_ == 0) {
+    wait_time_ms_ema_ = wait_time_ms;
+    return;
+  }
+  wait_time_ms_ema_ =
+      wait_time_ms_ema_ * (1 - EMA_MULTIPLIER) + wait_time_ms * EMA_MULTIPLIER;
+}
+
+void AdmissionController::PoolStats::ToJson(
+    rapidjson::Value* pool, rapidjson::Document* document) const {
+  using namespace rapidjson;
+  Value pool_name(name_.c_str(), document->GetAllocator());
+  pool->AddMember("pool_name", pool_name, document->GetAllocator());
+  pool->AddMember(
+      "agg_num_running", metrics_.agg_num_running->GetValue(), document->GetAllocator());
+  pool->AddMember(
+      "agg_num_queued", metrics_.agg_num_queued->GetValue(), document->GetAllocator());
+  pool->AddMember("agg_mem_reserved", metrics_.agg_mem_reserved->GetValue(),
+      document->GetAllocator());
+  pool->AddMember("local_mem_admitted", metrics_.local_mem_admitted->GetValue(),
+      document->GetAllocator());
+  pool->AddMember(
+      "total_admitted", metrics_.total_admitted->GetValue(), document->GetAllocator());
+  pool->AddMember(
+      "total_rejected", metrics_.total_rejected->GetValue(), document->GetAllocator());
+  pool->AddMember(
+      "total_timed_out", metrics_.total_timed_out->GetValue(), document->GetAllocator());
+  pool->AddMember("pool_max_mem_resources", metrics_.pool_max_mem_resources->GetValue(),
+      document->GetAllocator());
+  pool->AddMember("pool_max_requests", metrics_.pool_max_requests->GetValue(),
+      document->GetAllocator());
+  pool->AddMember(
+      "pool_max_queued", metrics_.pool_max_queued->GetValue(), document->GetAllocator());
+  pool->AddMember("max_query_mem_limit", metrics_.max_query_mem_limit->GetValue(),
+      document->GetAllocator());
+  pool->AddMember("min_query_mem_limit", metrics_.min_query_mem_limit->GetValue(),
+      document->GetAllocator());
+  pool->AddMember("clamp_mem_limit_query_option",
+      metrics_.clamp_mem_limit_query_option->GetValue(), document->GetAllocator());
+  pool->AddMember("wait_time_ms_ema", wait_time_ms_ema_, document->GetAllocator());
+  Value histogram(kArrayType);
+  for (int bucket = 0; bucket < peak_mem_histogram_.size(); bucket++) {
+    Value histogram_elem(kArrayType);
+    histogram_elem.PushBack(bucket, document->GetAllocator());
+    histogram_elem.PushBack(peak_mem_histogram_[bucket], document->GetAllocator());
+    histogram.PushBack(histogram_elem, document->GetAllocator());
+  }
+  pool->AddMember("peak_mem_usage_histogram", histogram, document->GetAllocator());
+}
+
+void AdmissionController::ResetPoolInformationalStats(const string& pool_name) {
+  lock_guard<mutex> lock(admission_ctrl_lock_);
+  PoolStatsMap::iterator it = pool_stats_.find(pool_name);
+  if(it == pool_stats_.end()) return;
+  it->second.ResetInformationalStats();
+}
+
+void AdmissionController::ResetAllPoolInformationalStats() {
+  lock_guard<mutex> lock(admission_ctrl_lock_);
+  for (auto& it: pool_stats_) it.second.ResetInformationalStats();
+}
+
+void AdmissionController::PoolStats::ResetInformationalStats() {
+  std::fill(peak_mem_histogram_.begin(), peak_mem_histogram_.end(), 0);
+  wait_time_ms_ema_ = 0.0;
+  // Reset only metrics keeping track of totals since last reset.
+  metrics()->total_admitted->SetValue(0);
+  metrics()->total_rejected->SetValue(0);
+  metrics()->total_queued->SetValue(0);
+  metrics()->total_dequeued->SetValue(0);
+  metrics()->total_timed_out->SetValue(0);
+  metrics()->total_released->SetValue(0);
+  metrics()->time_in_queue_ms->SetValue(0);
 }
 
 void AdmissionController::PoolStats::InitMetrics() {

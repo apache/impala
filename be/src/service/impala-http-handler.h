@@ -164,6 +164,67 @@ class ImpalaHttpHandler {
   ///   }
   /// ]
   void BackendsHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+
+  /// Json callback for /admission_controller, which prints relevant details for all
+  /// resource pools.
+  ///"resource_pools": [
+  ///  {
+  ///    "pool_name": "default-pool",
+  ///    "agg_num_running": 1,
+  ///    "agg_num_queued": 4,
+  ///    "agg_mem_reserved": 10382760,
+  ///    "local_mem_admitted": 10382760,
+  ///    "local_num_admitted_running": 1,
+  ///    "local_num_queued": 4,
+  ///    "local_backend_mem_reserved": 10382760,
+  ///    "local_backend_mem_usage": 16384,
+  ///    "pool_max_mem_resources": 10485760,
+  ///    "pool_max_requests": 10,
+  ///    "pool_max_queued": 10,
+  ///    "max_query_mem_limit": 0,
+  ///    "min_query_mem_limit": 0,
+  ///    "clamp_mem_limit_query_option": true,
+  ///    "wait_time_ms_EMA": 325.4,
+  ///    "histogram": [
+  ///      [
+  ///        0,
+  ///        3
+  ///      ],
+  ///      .
+  ///      .
+  ///      [
+  ///        127,
+  ///        1
+  ///      ]
+  ///    ],
+  ///    "queued_queries": [
+  ///      {
+  ///        "query_id": "6f49e509bfa5b347:207d8ef900000000",
+  ///        "mem_limit": 10382760,
+  ///        "mem_limit_to_admit": 10382760,
+  ///        "num_backends": 1
+  ///      }
+  ///    ],
+  ///    "head_queued_reason": "<...>",
+  ///    "running_queries": [
+  ///      {
+  ///        "query_id": "b94cf355d6df041c:ba3b91400000000",
+  ///        "mem_limit": 10382760,
+  ///        "mem_limit_to_admit": 10382760,
+  ///        "num_backends": 1
+  ///      }
+  ///    ]
+  ///  }
+  ///]
+  void AdmissionStateHandler(
+      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+
+  /// Resets resource pool informational statistics. Takes an optional argument:
+  /// 'pool_name'. If its not specified, all resource pool's informational statistics are
+  /// reset otherwise it resets the statistics for a single pool identified by the
+  /// supplied argument. Produces no JSON output.
+  void ResetResourcePoolStatsHandler(
+      const Webserver::ArgumentMap& args, rapidjson::Document* document);
 };
 
 }

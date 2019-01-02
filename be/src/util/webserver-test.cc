@@ -116,7 +116,7 @@ TEST(Webserver, ArgsTest) {
   const string ARGS_TEST_PATH = "/args-test";
   bool success = false;
   Webserver::UrlCallback callback = bind<void>(AssertArgsCallback, &success , _1, _2);
-  webserver.RegisterUrlCallback(ARGS_TEST_PATH, "json-test.tmpl", callback);
+  webserver.RegisterUrlCallback(ARGS_TEST_PATH, "json-test.tmpl", callback, true);
 
   ASSERT_OK(webserver.Start());
   stringstream contents;
@@ -147,11 +147,11 @@ TEST(Webserver, JsonTest) {
   const string RAW_TEXT_PATH = "/text";
   const string NO_TEMPLATE_PATH = "/no-template";
   Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
-  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
-  webserver.RegisterUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback);
+  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback, true);
+  webserver.RegisterUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback, true);
 
   Webserver::UrlCallback text_callback = bind<void>(JsonCallback, true, _1, _2);
-  webserver.RegisterUrlCallback(RAW_TEXT_PATH, "json-test.tmpl", text_callback);
+  webserver.RegisterUrlCallback(RAW_TEXT_PATH, "json-test.tmpl", text_callback, true);
   ASSERT_OK(webserver.Start());
 
   stringstream contents;
@@ -187,7 +187,7 @@ TEST(Webserver, EscapingTest) {
 
   const string JSON_TEST_PATH = "/json-test";
   Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
-  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
+  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback, true);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents));
@@ -363,7 +363,7 @@ TEST(Webserver, NoFrameEmbeddingTest) {
   const string FRAME_TEST_PATH = "/frames_test";
   Webserver webserver(FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
-  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback);
+  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback, true);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
@@ -378,7 +378,7 @@ TEST(Webserver, FrameAllowEmbeddingTest) {
       ScopedFlagSetter<string>::Make(&FLAGS_webserver_x_frame_options, "ALLOWALL");
   Webserver webserver(FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
-  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback);
+  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback, true);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,

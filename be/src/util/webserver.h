@@ -90,7 +90,7 @@ class Webserver {
   /// The path of the template file is relative to the webserver's document
   /// root.
   void RegisterUrlCallback(const std::string& path, const std::string& template_filename,
-      const UrlCallback& callback, bool is_on_nav_bar = true);
+      const UrlCallback& callback, bool is_on_nav_bar);
 
   /// Register a 'raw' url callback that produces a bytestream as output. This should only
   /// be used for URLs that want to return binary data; non-HTML callbacks that want to

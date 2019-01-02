@@ -1,0 +1,343 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+
+Example of json received from the impala server
+"resource_pools_plain_json": <..the whole json below in text.>
+"resource_pools": [
+        {
+            "pool_name": "default-pool",
+            "agg_num_running": 1,
+            "agg_num_queued": 4,
+            "agg_mem_reserved": 10382760,
+            "local_mem_admitted": 10382760,
+            "local_num_admitted_running": 1,
+            "local_num_queued": 4,
+            "local_backend_mem_reserved": 10382760,
+            "local_backend_mem_usage": 16384,
+            "pool_max_mem_resources": 10485760,
+            "pool_max_requests": 10,
+            "pool_max_queued": 10,
+            "max_query_mem_limit": 0,
+            "min_query_mem_limit": 0,
+            "clamp_mem_limit_query_option": true,
+            "wait_time_ms_EMA": 0.0,
+            "histogram": [
+                [
+                    0,
+                    0
+                ],
+                .
+                .
+                .
+                [
+                    127,
+                    0
+                ]
+            ],
+            "queued_queries": [
+                {
+                    "query_id": "6f49e509bfa5b347:207d8ef900000000",
+                    "mem_limit": 10382760,
+                    "mem_limit_to_admit": 10382760,
+                    "num_backends": 1
+                },
+                {
+                    "query_id": "854f954e79f79d87:18483b9400000000",
+                    "mem_limit": 10382760,
+                    "mem_limit_to_admit": 10382760,
+                    "num_backends": 1
+                },
+                {
+                    "query_id": "45421dce8bf5664f:6865a45200000000",
+                    "mem_limit": 10382760,
+                    "mem_limit_to_admit": 10382760,
+                    "num_backends": 1
+                },
+                {
+                    "query_id": "e249aecff1bf3372:d5527a2700000000",
+                    "mem_limit": 10382760,
+                    "mem_limit_to_admit": 10382760,
+                    "num_backends": 1
+                }
+            ],
+            "head_queued_reason": "Not enough aggregate memory available in pool default-pool with max mem resources 10.00 MB. Needed 9.90 MB but only 100.59 KB was available.",
+            "running_queries": [
+                {
+                    "query_id": "b94cf355d6df041c:ba3b91400000000",
+                    "mem_limit": 10382760,
+                    "mem_limit_to_admit": 10382760,
+                    "num_backends": 1
+                }
+            ]
+        }
+    ]
+-->
+{{> www/common-header.tmpl }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js" type="text/javascript"></script>
+<script type="text/javascript">
+window.onload = function() {
+  renderGraph();
+  formatMemoryColumns();
+};
+
+// Picks up all the canvas elements associated with each resource pool and renders its
+// peak memory usage histogram.
+function renderGraph() {
+  var plainJson = document.getElementById("resource_pools_plain_json");
+  var json = JSON.parse(plainJson.innerText);
+  var canvases = document.getElementsByTagName("canvas");
+
+  for (var pool_idx = 0; pool_idx < json.length; pool_idx++){
+    var histogram = json[pool_idx]["peak_mem_usage_histogram"]
+    var pool_name = json[pool_idx]['pool_name'];
+    var hist_labels = new Array();
+    var hist_values = new Array();
+    for (var i = 0; i < histogram.length; i++) {
+      var hist_elem = histogram[i];
+      //hist_labels.push((hist_elem[0]-1) + " - " + hist_elem[0] + " GB");
+      hist_labels.push((hist_elem[0]+1) + " GB");
+      hist_values.push(hist_elem[1]);
+    }
+    hist_labels[hist_labels.length-1] += " and above"
+    // Render the bar chart now.
+    var chart_Data = {
+            labels: hist_labels,
+            datasets: [{
+                label: 'Number of Queries',
+                backgroundColor: '#2E6595', // Impala logo's color
+                data: hist_values
+            }],
+      };
+
+    var ctx = canvases[pool_name].getContext('2d');
+      window.myBar = new Chart(ctx, {
+          type: 'bar',
+          data: chart_Data,
+          options: {
+              responsive: true,
+              legend: {
+                  position: 'top',
+              },
+              title: {
+                  display: true,
+                  text: 'Peak Memory per Host'
+              }
+          }
+      });
+  }
+}
+
+// Picks up all the elemets classified as memory and replaces it with pretty printed
+// value.
+function formatMemoryColumns() {
+  var cols = document.getElementsByClassName("memory");
+  for (var idx = 0; idx < cols.length; idx++) {
+    cols[idx].innerText = formatMemory(cols[idx].innerText);
+  }
+}
+
+var memory_key = [
+  {'unit': 'B', 'val': 1},
+  {'unit': 'KB', 'val': 1024},
+  {'unit': 'MB', 'val': 1048576},
+  {'unit': 'GB', 'val': 1073741824}
+]
+
+// Helper method that takes in a value (in bytes) and outputs its pretty printed value.
+function formatMemory(val) {
+  var mem_bytes = parseInt(val);
+  for (var idx = memory_key.length - 1; idx >= 0; idx--) {
+    var result = parseFloat(mem_bytes / memory_key[idx].val);
+    if (result < 1) continue;
+    return result.toFixed(2) + " " + memory_key[idx].unit;
+  }
+  return "0 B";
+}
+
+function reset_all() {
+  if (!confirm('Are you sure you want to reset stats for all resource pools ?')) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/resource_pool_reset", true);
+  xhr.send();
+  window.location.reload(true);
+}
+
+function reset_method(pool_name) {
+  if (!confirm('Are you sure you want to reset stats for ' + pool_name +' ?')) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/resource_pool_reset?pool_name=" + pool_name, true);
+  xhr.send();
+  window.location.reload(true);
+}
+</script>
+
+<h2>Admission Controller
+  {{?get_all_pools}}
+  <button class="btn btn-warning btn-xs" onClick="reset_all();">
+    Reset informational stats for all pools
+  </button>
+  {{/get_all_pools}}
+</h2>
+{{^get_all_pools}}
+<p id="show_all_pools" class="lead">
+  <a href='/admission'> < Show all Resource Pools</a>
+</p>
+{{/get_all_pools}}
+<p class="lead">This page lists all resource pools to which queries have been submitted
+  at least once and their corresponding state and statistics.</p>
+{{#resource_pools}}
+<div class="container-fluid">
+  <h3><a href='/admission?pool_name={{pool_name}}'>{{pool_name}}</a></h3>
+
+  <h4>Pool Config</h4>
+  <table class='table table-hover table-border'>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+    <tr>
+      <td>Max memory (cluster wide)</td>
+      <td class='memory'>{{pool_max_mem_resources}}</td>
+    </tr>
+    <tr>
+      <td>Max concurrent queries</td>
+      <td>{{pool_max_requests}}</td>
+    </tr>
+    <tr>
+      <td>Max queue size</td>
+      <td>{{pool_max_queued}}</td>
+    </tr>
+    <tr>
+      <td><b>Min</b> Query MEM_LIMIT range</td>
+      <td class='memory'>{{min_query_mem_limit}}</td>
+    </tr>
+    <tr>
+      <td><b>Max</b> Query MEM_LIMIT range</td>
+      <td class='memory'>{{max_query_mem_limit}}</td>
+    </tr>
+    <tr>
+      <td>Clamp MEM_LIMIT query option</td>
+      <td>{{clamp_mem_limit_query_option}}</td>
+    </tr>
+  </table>
+
+  <h4>Queued queries in order of being queued (submitted to this coordinator)</h4>
+  <table class='table table-hover table-border'>
+    <tr>
+      <th>Query ID</th>
+      <th>Memory limit</th>
+      <th>Memory limit used for admission</th>
+      <th>Num of backends it will run on</th>
+      <th>Details</th>
+    </tr>
+    {{#queued_queries}}
+    <tr>
+      <td>{{query_id}}</td>
+      <td class='memory'>{{mem_limit}}</td>
+      <td class='memory'>{{mem_limit_to_admit}}</td>
+      <td>{{num_backends}}</td>
+      <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
+    </tr>
+    {{/queued_queries}}
+  </table>
+
+  <h4>Running queries (submitted to this coordinator)</h4>
+  <table class='table table-hover table-border'>
+    <tr>
+      <th>Query ID</th>
+      <th>Memory limit</th>
+      <th>Memory limit used for admission</th>
+      <th>Num of backends it will run on</th>
+      <th>Details</th>
+    </tr>
+    {{#running_queries}}
+    <tr>
+      <td>{{query_id}}</td>
+      <td class='memory'>{{mem_limit}}</td>
+      <td class='memory'>{{mem_limit_to_admit}}</td>
+      <td>{{num_backends}}</td>
+      <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
+    </tr>
+    {{/running_queries}}
+  </table>
+
+  <h4>Pool stats
+    <button class="btn btn-warning btn-xs" onClick="reset_method('{{pool_name}}');">
+      Reset informational stats
+    </button>
+  </h4>
+  <table class='table table-hover table-border'>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+      <th>Limit / Max value</th>
+    </tr>
+    <tr>
+      <td>Total queries <b>admitted</b> by this coordinator</td>
+      <td colspan='2'>{{total_admitted}}</td>
+    </tr>
+    <tr>
+      <td>Total queries <b>rejected</b> by this coordinator</td>
+      <td colspan='2'>{{total_rejected}}</td>
+    </tr>
+    <tr>
+      <td>Total queries <b>timed out</b> on this coordinator</td>
+      <td colspan='2'>{{total_timed_out}}</td>
+    </tr>
+    <tr>
+      <td>Queries currently running</td>
+      <td>{{agg_num_running}}</td>
+      <td>{{pool_max_requests}}</td>
+    </tr>
+    <tr>
+      <td>Queries currently queued</td>
+      <td>{{agg_num_queued}}</td>
+      <td>{{pool_max_queued}}</td>
+    </tr>
+    <tr>
+      <td>Total memory reserved across cluster</td>
+      <td class='memory'>{{agg_mem_reserved}}</td>
+      <td class='memory'>{{pool_max_mem_resources}}</td>
+    </tr>
+    <tr>
+      <td>Memory admitted on this coordinator</td>
+      <td class='memory'>{{local_mem_admitted}}</td>
+      <td class='memory'>{{pool_max_mem_resources}}</td>
+    </tr>
+    <tr>
+      <td>Queued reason of query at the head of the queue</td>
+      <td colspan='2'>{{head_queued_reason}}</td>
+    </tr>
+    <tr>
+      <td>Time in queue (exponential moving average)</td>
+      <td colspan='2'>{{wait_time_ms_ema}} ms</td>
+    </tr>
+    <tr>
+      <td colspan='3'>
+        <canvas id="{{pool_name}}" style="border:1px solid"></canvas>
+      </td>
+    </tr>
+  </table>
+</div>
+{{/resource_pools}}
+
+
+<div id="resource_pools_plain_json" style="display: none;">
+    {{resource_pools_plain_json}}
+</div>
+{{> www/common-footer.tmpl }}
