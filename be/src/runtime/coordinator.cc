@@ -110,10 +110,6 @@ Status Coordinator::Exec() {
   const string& str = Substitute("Query $0", PrintId(query_id()));
   progress_.Init(str, schedule_.num_scan_ranges());
 
-  // runtime filters not yet supported for mt execution
-  bool is_mt_execution = request.query_ctx.client_request.query_options.mt_dop > 0;
-  if (is_mt_execution) filter_mode_ = TRuntimeFilterMode::OFF;
-
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(
       query_ctx(), schedule_.per_backend_mem_limit());
   filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
@@ -286,7 +282,6 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
 }
 
 void Coordinator::InitFilterRoutingTable() {
-  DCHECK(schedule_.request().query_ctx.client_request.query_options.mt_dop == 0);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "InitFilterRoutingTable() called although runtime filters are disabled";
   DCHECK(!filter_routing_table_complete_)

@@ -270,6 +270,9 @@ DEFINE_bool_hidden(enable_parquet_page_index_writing_debug_only, false, "If true
     "We plan to remove this flag once Impala is able to read the page index and has "
     "better test coverage around it.");
 
+DEFINE_bool_hidden(unlock_mt_dop, false,
+    "(Experimental) If true, allow specifying mt_dop for all queries.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

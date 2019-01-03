@@ -231,8 +231,14 @@ public class Planner {
     Preconditions.checkState(ctx_.getQueryOptions().mt_dop > 0);
     List<PlanFragment> distrPlan = createPlan();
     Preconditions.checkNotNull(distrPlan);
-    ParallelPlanner planner = new ParallelPlanner(ctx_);
-    List<PlanFragment> parallelPlans = planner.createPlans(distrPlan.get(0));
+    List<PlanFragment> parallelPlans;
+    // TODO: IMPALA-4224: Parallel plans are not executable
+    if (RuntimeEnv.INSTANCE.isTestEnv()) {
+      ParallelPlanner planner = new ParallelPlanner(ctx_);
+      parallelPlans = planner.createPlans(distrPlan.get(0));
+    } else {
+      parallelPlans = Collections.singletonList(distrPlan.get(0));
+    }
     // Only use one scanner thread per scan-node instance since intra-node
     // parallelism is achieved via multiple fragment instances.
     ctx_.getQueryOptions().setNum_scanner_threads(1);

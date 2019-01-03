@@ -137,7 +137,6 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     // Remove filters that weren't selected during filter routing table construction.
     // TODO: do this more efficiently, we're looping over the entire plan for each
     // instance separately
-    DCHECK_EQ(rpc_params->query_ctx.client_request.query_options.mt_dop, 0);
     int instance_idx = GetInstanceIdx(params.instance_id);
     for (TPlanNode& plan_node: rpc_params->fragment_ctxs.back().fragment.plan.nodes) {
       if (!plan_node.__isset.hash_join_node) continue;

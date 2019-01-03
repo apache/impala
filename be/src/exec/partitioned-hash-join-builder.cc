@@ -95,7 +95,7 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
 
   for (const TRuntimeFilterDesc& filter_desc : filter_descs) {
     DCHECK(state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL ||
-        filter_desc.is_broadcast_join);
+        filter_desc.is_broadcast_join || state->query_options().num_nodes == 1);
     DCHECK(!state->query_options().disable_row_runtime_filtering ||
         filter_desc.applied_on_partition_columns);
     ScalarExpr* filter_expr;
@@ -105,6 +105,7 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
 
     // TODO: Move to Prepare().
     filter_ctxs_.emplace_back();
+    // TODO: IMPALA-4400 - implement local aggregation of runtime filters.
     filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
   }
   return Status::OK();

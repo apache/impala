@@ -67,6 +67,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,22 +156,22 @@ public class SingleNodePlanner {
    * Checks that the given single-node plan is executable:
    * - It may not contain right or full outer joins with no equi-join conjuncts that
    *   are not inside the right child of a SubplanNode.
-   * - MT_DOP > 0 is not supported for plans with base table joins or table sinks.
+   * - MT_DOP > 0 is not supported by default for plans with base table joins or table
+   *   sinks: we only allow MT_DOP > 0 with such plans if --unlock_mt_dop=true is
+   *   specified.
    * Throws a NotImplementedException if plan validation fails.
    */
   public void validatePlan(PlanNode planNode) throws NotImplementedException {
     if (ctx_.getQueryOptions().isSetMt_dop() && ctx_.getQueryOptions().mt_dop > 0
         && !RuntimeEnv.INSTANCE.isTestEnv()
+        && !BackendConfig.INSTANCE.isMtDopUnlocked()
         && (planNode instanceof JoinNode || ctx_.hasTableSink())) {
       throw new NotImplementedException(
           "MT_DOP not supported for plans with base table joins or table sinks.");
     }
 
-    // As long as MT_DOP is unset or 0 any join can run in a single-node plan.
-    if (ctx_.isSingleNodeExec() &&
-        (!ctx_.getQueryOptions().isSetMt_dop() || ctx_.getQueryOptions().mt_dop == 0)) {
-      return;
-    }
+    // Any join can run in a single-node plan.
+    if (ctx_.isSingleNodeExec()) return;
 
     if (planNode instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) planNode;

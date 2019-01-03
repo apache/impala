@@ -188,20 +188,22 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
 
 Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     RuntimeState* state, DataSink* build_sink) {
-  // If this node is not inside a subplan and can get a thread token, initiate the
+  // If this node is not inside a subplan, we are running with mt_dop=0 (i.e. no
+  // fragment-level multithreading) and can get a thread token, initiate the
   // construction of the build-side table in a separate thread, so that the left child
   // can do any initialisation in parallel. Otherwise, do this in the main thread.
   // Inside a subplan we expect Open() to be called a number of times proportional to the
   // input data of the SubplanNode, so we prefer doing processing the build input in the
   // main thread, assuming that thread creation is expensive relative to a single subplan
-  // iteration. TODO-MT: disable async build thread when mt_dop >= 1.
+  // iteration.
   //
   // In this block, we also compute the 'overlap' time for the left and right child. This
   // is the time (i.e. clock reads) when the right child stops overlapping with the left
   // child. For the single threaded case, the left and right child never overlap. For the
   // build side in a different thread, the overlap stops when the left child Open()
   // returns.
-  if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
+  if (!IsInSubplan() && state->query_options().mt_dop == 0
+      && state->resource_pool()->TryAcquireThreadToken()) {
     Status build_side_status;
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
     string thread_name = Substitute("join-build-thread (finst:$0, plan-node-id:$1)",
