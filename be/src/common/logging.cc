@@ -155,6 +155,19 @@ void impala::ShutdownLogging() {
 void impala::LogCommandLineFlags() {
   LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl
             << google::CommandlineFlagsIntoString();
+
+  vector<google::CommandLineFlagInfo> flags;
+  google::GetAllFlags(&flags, true);
+  stringstream ss;
+  for (const auto& flag: flags) {
+    if (flag.hidden) {
+      ss << "--" << flag.name << "=" << flag.current_value << "\n";
+    }
+  }
+  string experimental_flags = ss.str();
+  if (!experimental_flags.empty()) {
+    LOG(WARNING) << "Experimental flags:" << endl << experimental_flags;
+  }
 }
 
 void impala::CheckAndRotateLogFiles(int max_log_files) {

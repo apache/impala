@@ -80,7 +80,7 @@ void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
   }
 }
 
-// Registered to handle "/flags", and produces json containing an array of flag metadata
+// Registered to handle "/varz", and produces json containing an array of flag metadata
 // objects:
 //
 // "title": "Command-line Flags",
@@ -95,7 +95,7 @@ void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
 // .. etc
 void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
   vector<CommandLineFlagInfo> flag_info;
-  GetAllFlags(&flag_info);
+  GetAllFlags(&flag_info, true);
   Value flag_arr(kArrayType);
   for (const CommandLineFlagInfo& flag: flag_info) {
     Value flag_val(kObjectType);
@@ -113,6 +113,8 @@ void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
 
     Value current_value(flag.current_value.c_str(), document->GetAllocator());
     flag_val.AddMember("current", current_value, document->GetAllocator());
+
+    flag_val.AddMember("experimental", flag.hidden, document->GetAllocator());
 
     if (!flag.is_default) {
       flag_val.AddMember("value_changed", 1, document->GetAllocator());
