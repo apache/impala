@@ -34,3 +34,7 @@ ContinuationIndentWidth: 4
 IndentWidth: 2
 IndentWrappedFunctionNames: true
 SortIncludes: true
+---
+Language: Proto
+BasedOnStyle: Google
+ColumnLimit: 90
