@@ -165,6 +165,7 @@ import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.Logger;
 import org.apache.thrift.TException;
@@ -2526,6 +2527,13 @@ public class CatalogOpExecutor {
         oldTbl.getMetaStoreTable().deepCopy();
     msTbl.setDbName(newTableName.getDb());
     msTbl.setTableName(newTableName.getTbl());
+
+    // If oldTbl is a managed Kudu table, rename the underlying Kudu table
+    if (oldTbl instanceof KuduTable && !Table.isExternalTable(msTbl)) {
+      Preconditions.checkState(KuduTable.isKuduTable(msTbl));
+      renameKuduTable((KuduTable) oldTbl, msTbl, newTableName);
+    }
+
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().alter_table(tableName.getDb(), tableName.getTbl(), msTbl);
     } catch (TException e) {
@@ -2551,6 +2559,25 @@ public class CatalogOpExecutor {
     response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
     response.result.setVersion(result.second.getCatalogVersion());
     addSummary(response, "Renaming was successful.");
+  }
+
+  /**
+   * Renames the underlying Kudu table for the given Impala table. If the new Kudu
+   * table name is the same as the old Kudu table name, this method does nothing.
+   */
+  private void renameKuduTable(KuduTable oldTbl,
+      org.apache.hadoop.hive.metastore.api.Table oldMsTbl, TableName newTableName)
+      throws ImpalaRuntimeException {
+    String newKuduTableName = KuduUtil.getDefaultCreateKuduTableName(
+        newTableName.getDb(), newTableName.getTbl());
+
+    // If the name of the Kudu table has not changed, do nothing
+    if (oldTbl.getKuduTableName().equals(newKuduTableName)) return;
+
+    KuduCatalogOpExecutor.renameTable(oldTbl, newKuduTableName);
+
+    // Add the name of the new Kudu table to the HMS table parameters
+    oldMsTbl.getParameters().put(KuduTable.KEY_TABLE_NAME, newKuduTableName);
   }
 
   /**
