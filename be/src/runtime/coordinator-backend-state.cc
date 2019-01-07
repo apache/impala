@@ -23,22 +23,25 @@
 #include "exec/exec-node.h"
 #include "exec/kudu-util.h"
 #include "exec/scan-node.h"
+#include "kudu/rpc/rpc_controller.h"
+#include "kudu/util/monotime.h"
+#include "kudu/util/status.h"
+#include "runtime/backend-client.h"
+#include "runtime/client-cache.h"
+#include "runtime/coordinator-filter-state.h"
+#include "runtime/debug-options.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
-#include "runtime/debug-options.h"
-#include "runtime/client-cache.h"
-#include "runtime/backend-client.h"
-#include "runtime/coordinator-filter-state.h"
-#include "util/error-util-internal.h"
-#include "util/uid-util.h"
-#include "util/network-util.h"
+#include "service/control-service.h"
 #include "util/counting-barrier.h"
-
-#include "gen-cpp/control_service.pb.h"
-#include "gen-cpp/ImpalaInternalService_constants.h"
+#include "util/error-util-internal.h"
+#include "util/network-util.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 
+using kudu::MonoDelta;
+using kudu::rpc::RpcController;
 using namespace impala;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
@@ -58,6 +61,7 @@ void Coordinator::BackendState::Init(
     const vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool) {
   backend_exec_params_ = &exec_params;
   host_ = backend_exec_params_->instance_params[0]->host;
+  krpc_host_ = backend_exec_params_->instance_params[0]->krpc_host;
   num_remaining_instances_ = backend_exec_params_->instance_params.size();
 
   // populate instance_stats_map_ and install instance
@@ -385,6 +389,23 @@ void Coordinator::BackendState::UpdateExecStats(
   }
 }
 
+template <typename F>
+Status Coordinator::BackendState::DoRrpcWithRetry(
+    F&& rpc_call, const char* debug_action, const char* error_msg) {
+  Status rpc_status;
+  for (int i = 0; i < 3; i++) {
+    RpcController rpc_controller;
+    rpc_controller.set_timeout(MonoDelta::FromSeconds(10));
+    // Check for injected failures.
+    rpc_status = DebugAction(query_ctx().client_request.query_options, debug_action);
+    if (!rpc_status.ok()) continue;
+
+    rpc_status = FromKuduStatus(rpc_call(&rpc_controller), error_msg);
+    if (rpc_status.ok()) break;
+  }
+  return rpc_status;
+}
+
 bool Coordinator::BackendState::Cancel() {
   unique_lock<mutex> l(lock_);
 
@@ -401,36 +422,44 @@ bool Coordinator::BackendState::Cancel() {
   // set an error status to make sure we only cancel this once
   if (status_.ok()) status_ = Status::CANCELLED;
 
-  TCancelQueryFInstancesParams params;
-  params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_id());
-  TCancelQueryFInstancesResult dummy;
-  VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id()) <<
-      " backend=" << TNetworkAddressToString(impalad_address());
+  VLOG_QUERY << "Sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id())
+             << " backend=" << TNetworkAddressToString(krpc_host_);
 
+  std::unique_ptr<ControlServiceProxy> proxy;
+  Status get_proxy_status =
+      ControlService::GetProxy(krpc_host_, krpc_host_.hostname, &proxy);
+  if (!get_proxy_status.ok()) {
+    status_.MergeStatus(get_proxy_status);
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id()) << " could not get proxy to "
+               << TNetworkAddressToString(krpc_host_)
+               << " failure: " << get_proxy_status.msg().msg();
+    return true;
+  }
 
-  // The return value 'dummy' is ignored as it's only set if the fragment
-  // instance cannot be found in the backend. The fragment instances of a query
-  // can all be cancelled locally in a backend due to RPC failure to
-  // coordinator. In which case, the query state can be gone already.
-  ImpalaBackendConnection::RpcStatus rpc_status = ImpalaBackendConnection::DoRpcWithRetry(
-      ExecEnv::GetInstance()->impalad_client_cache(), impalad_address(),
-      &ImpalaBackendClient::CancelQueryFInstances, params,
-      [this] () {
-        return DebugAction(query_ctx().client_request.query_options,
-            "COORD_CANCEL_QUERY_FINSTANCES_RPC");
-      }, &dummy);
-  if (!rpc_status.status.ok()) {
-    status_.MergeStatus(rpc_status.status);
-    if (rpc_status.client_error) {
-      VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
-                 << " failed to connect to " << TNetworkAddressToString(impalad_address())
-                 << " :" << rpc_status.status.msg().msg();
-    } else {
-      VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
-                 << " rpc to " << TNetworkAddressToString(impalad_address())
-                 << " failed: " << rpc_status.status.msg().msg();
-    }
+  CancelQueryFInstancesRequestPB request;
+  TUniqueIdToUniqueIdPB(query_id(), request.mutable_query_id());
+  CancelQueryFInstancesResponsePB response;
+
+  auto cancel_rpc = [&](RpcController* rpc_controller) -> kudu::Status {
+    return proxy->CancelQueryFInstances(request, &response, rpc_controller);
+  };
+
+  Status rpc_status = DoRrpcWithRetry(
+      cancel_rpc, "COORD_CANCEL_QUERY_FINSTANCES_RPC", "Cancel() RPC failed");
+
+  if (!rpc_status.ok()) {
+    status_.MergeStatus(rpc_status);
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id()) << " could not do rpc to "
+               << TNetworkAddressToString(krpc_host_)
+               << " failure: " << rpc_status.msg().msg();
+    return true;
+  }
+  Status cancel_status = Status(response.status());
+  if (!cancel_status.ok()) {
+    status_.MergeStatus(cancel_status);
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id())
+               << " got failure after rpc to " << TNetworkAddressToString(krpc_host_)
+               << " failure: " << cancel_status.msg().msg();
     return true;
   }
   return true;

@@ -564,20 +564,6 @@ struct TExecQueryFInstancesResult {
   1: optional Status.TStatus status
 }
 
-// CancelQueryFInstances
-
-struct TCancelQueryFInstancesParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // required in V1
-  2: optional Types.TUniqueId query_id
-}
-
-struct TCancelQueryFInstancesResult {
-  // required in V1
-  1: optional Status.TStatus status
-}
-
 // Parameters for RequestPoolService.resolveRequestPool()
 // TODO: why is this here?
 struct TResolveRequestPoolParams {
@@ -765,12 +751,6 @@ service ImpalaInternalService {
   // backend.
   // Returns as soon as all incoming data streams have been set up.
   TExecQueryFInstancesResult ExecQueryFInstances(1:TExecQueryFInstancesParams params);
-
-  // Called by coord to cancel execution of a single query's fragment instances, which
-  // the coordinator initiated with a prior call to ExecQueryFInstances.
-  // Cancellation is asynchronous.
-  TCancelQueryFInstancesResult CancelQueryFInstances(
-      1:TCancelQueryFInstancesParams params);
 
   // Called by fragment instances that produce local runtime filters to deliver them to
   // the coordinator for aggregation and broadcast.

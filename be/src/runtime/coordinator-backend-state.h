@@ -30,15 +30,14 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "gen-cpp/control_service.proxy.h"
+#include "kudu/rpc/rpc_controller.h"
 #include "runtime/coordinator.h"
 #include "scheduling/query-schedule.h"
 #include "util/error-util-internal.h"
 #include "util/progress-updater.h"
-#include "util/stopwatch.h"
 #include "util/runtime-profile.h"
-#include "gen-cpp/control_service.pb.h"
-#include "gen-cpp/RuntimeProfile_types.h"
-#include "gen-cpp/Types_types.h"
+#include "util/stopwatch.h"
 
 namespace impala {
 
@@ -242,7 +241,10 @@ class Coordinator::BackendState {
   /// indices of fragments executing on this backend, populated in Init()
   std::unordered_set<int> fragments_;
 
+  /// Thrift address of execution backend.
   TNetworkAddress host_;
+  /// Krpc address of execution backend.
+  TNetworkAddress krpc_host_;
 
   /// protects fields below
   /// lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
@@ -292,6 +294,11 @@ class Coordinator::BackendState {
 
   /// Same as ComputeResourceUtilization() but caller must hold lock.
   ResourceUtilization ComputeResourceUtilizationLocked();
+
+  /// Retry the Rpc 'rpc_call' up to 3 times.
+  /// Pass 'debug_action' to DebugAction() to potentially inject errors.
+  template <typename F>
+  Status DoRrpcWithRetry(F&& rpc_call, const char* debug_action, const char* error_msg);
 };
 
 /// Per fragment execution statistics.

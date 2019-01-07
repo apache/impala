@@ -430,8 +430,9 @@ class Scheduler {
   /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
   /// fragment_params and its input fragments via a depth-first traversal.
   /// All fragments are part of plan_exec_info.
-  void ComputeFragmentExecParams(const TPlanExecInfo& plan_exec_info,
-      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+  void ComputeFragmentExecParams(const BackendConfig& executor_config,
+      const TPlanExecInfo& plan_exec_info, FragmentExecParams* fragment_params,
+      QuerySchedule* schedule);
 
   /// Create instances of the fragment corresponding to fragment_params, which contains
   /// a Union node.
@@ -442,7 +443,8 @@ class Scheduler {
   /// a UnionNode with partitioned joins or grouping aggregates as children runs on
   /// at least as many hosts as the input to those children).
   /// TODO: is this really necessary? If not, revise.
-  void CreateUnionInstances(FragmentExecParams* fragment_params, QuerySchedule* schedule);
+  void CreateUnionInstances(const BackendConfig& executor_config,
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
   /// Create instances of the fragment corresponding to fragment_params to run on the
   /// selected replica hosts of the scan ranges of the node with id scan_id.
@@ -451,8 +453,8 @@ class Scheduler {
   /// number of bytes per instances and then in a single pass assigning scan ranges to
   /// each instance to roughly meet that average.
   /// For all other storage mgrs, it load-balances the number of splits per instance.
-  void CreateScanInstances(
-      PlanNodeId scan_id, FragmentExecParams* fragment_params, QuerySchedule* schedule);
+  void CreateScanInstances(const BackendConfig& executor_config, PlanNodeId scan_id,
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.

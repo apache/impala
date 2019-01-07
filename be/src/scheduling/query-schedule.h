@@ -85,7 +85,8 @@ typedef std::map<TNetworkAddress, BackendExecParams> PerBackendExecParams;
 /// TPlanFragmentInstanceCtx
 struct FInstanceExecParams {
   TUniqueId instance_id;
-  TNetworkAddress host; // execution backend
+  TNetworkAddress host; // Thrift address of execution backend.
+  TNetworkAddress krpc_host; // Krpc address of execution backend.
   PerNodeScanRanges per_node_scan_ranges;
 
   /// 0-based ordinal of this particular instance within its fragment (not: query-wide)
@@ -100,8 +101,11 @@ struct FInstanceExecParams {
   const TPlanFragment& fragment() const;
 
   FInstanceExecParams(const TUniqueId& instance_id, const TNetworkAddress& host,
-      int per_fragment_instance_idx, const FragmentExecParams& fragment_exec_params)
-    : instance_id(instance_id), host(host),
+      const TNetworkAddress& krpc_host, int per_fragment_instance_idx,
+      const FragmentExecParams& fragment_exec_params)
+    : instance_id(instance_id),
+      host(host),
+      krpc_host(krpc_host),
       per_fragment_instance_idx(per_fragment_instance_idx),
       sender_id(-1),
       fragment_exec_params(fragment_exec_params) {}

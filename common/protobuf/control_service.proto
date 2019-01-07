@@ -158,9 +158,26 @@ message ReportExecStatusResponsePB {
   optional StatusPB status = 1;
 }
 
+message CancelQueryFInstancesRequestPB {
+  // The query id of the query being cancelled.
+  optional UniqueIdPB query_id = 1;
+}
+
+message CancelQueryFInstancesResponsePB {
+  optional StatusPB status = 1;
+}
+
 service ControlService {
   // Override the default authorization method.
   option (kudu.rpc.default_authz_method) = "Authorize";
 
+  // Update the coordinator with the query status of the backend.
   rpc ReportExecStatus(ReportExecStatusRequestPB) returns (ReportExecStatusResponsePB);
+
+  // Called by coordinator to cancel execution of a single query's fragment instances,
+  // which the coordinator initiated with a prior call to ExecQueryFInstances.
+  // Cancellation is asynchronous (in the sense that this call may return before the
+  // fragment instance has completely stopped executing).
+  rpc CancelQueryFInstances(CancelQueryFInstancesRequestPB)
+      returns (CancelQueryFInstancesResponsePB);
 }

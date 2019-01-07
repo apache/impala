@@ -25,6 +25,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "service/client-request-state.h"
 #include "service/impala-server.h"
 #include "testutil/fault-injection-util.h"
@@ -160,4 +161,20 @@ void ControlService::RespondAndReleaseRpc(const Status& status, ResponsePBType* 
   rpc_context->RespondSuccess();
 }
 
+void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB* request,
+    CancelQueryFInstancesResponsePB* response, ::kudu::rpc::RpcContext* rpc_context) {
+  DCHECK(request->has_query_id());
+  const TUniqueId& query_id = ProtoToQueryId(request->query_id());
+  VLOG_QUERY << "CancelQueryFInstances(): query_id=" << PrintId(query_id);
+  FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
+  QueryState::ScopedRef qs(query_id);
+  if (qs.get() == nullptr) {
+    Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR,
+        Substitute("Unknown query id: $0", PrintId(query_id))));
+    RespondAndReleaseRpc(status, response, rpc_context);
+    return;
+  }
+  qs->Cancel();
+  RespondAndReleaseRpc(Status::OK(), response, rpc_context);
+}
 }

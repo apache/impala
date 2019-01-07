@@ -65,20 +65,6 @@ template <typename T> void SetUnknownIdError(
   status.SetTStatus(status_container);
 }
 
-void ImpalaInternalService::CancelQueryFInstances(
-    TCancelQueryFInstancesResult& return_val,
-    const TCancelQueryFInstancesParams& params) {
-  VLOG_QUERY << "CancelQueryFInstances(): query_id=" << PrintId(params.query_id);
-  FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
-  DCHECK(params.__isset.query_id);
-  QueryState::ScopedRef qs(params.query_id);
-  if (qs.get() == nullptr) {
-    SetUnknownIdError("query", params.query_id, &return_val);
-    return;
-  }
-  qs->Cancel();
-}
-
 void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
     const TUpdateFilterParams& params) {
   FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);

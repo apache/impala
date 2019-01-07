@@ -55,16 +55,6 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     ImpalaInternalServiceClient::recv_ExecQueryFInstances(_return);
   }
 
-  void CancelQueryFInstances(TCancelQueryFInstancesResult& _return,
-      const TCancelQueryFInstancesParams& params, bool* send_done) {
-    DCHECK(!*send_done);
-    FAULT_INJECTION_SEND_RPC_EXCEPTION(16);
-    ImpalaInternalServiceClient::send_CancelQueryFInstances(params);
-    *send_done = true;
-    FAULT_INJECTION_RECV_RPC_EXCEPTION(16);
-    ImpalaInternalServiceClient::recv_CancelQueryFInstances(_return);
-  }
-
   /// Callers of TransmitData() should provide their own counter to measure the data
   /// transmission time.
   void SetTransmitDataCounter(RuntimeProfile::ConcurrentTimerCounter* csw) {
