@@ -366,6 +366,9 @@ class DictDecoder : public DictDecoderBase {
     return sizeof(T) * dict_.size();
   }
 
+  /// Skip 'num_values' values from the input.
+  bool SkipValues(int64_t num_values) WARN_UNUSED_RESULT;
+
  private:
   /// List of decoded values stored in the dict_
   std::vector<T> dict_;
@@ -532,6 +535,23 @@ ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValues(
       }
     }
   }
+  return true;
+}
+
+template <typename T>
+ALWAYS_INLINE inline bool DictDecoder<T>::SkipValues(int64_t num_values) {
+  int64_t num_remaining = num_values;
+  if (num_repeats_ > 0) {
+    int64_t num_to_skip = std::min(num_remaining, num_repeats_);
+    num_repeats_ -= num_to_skip;
+    num_remaining -= num_to_skip;
+  } else if (next_literal_idx_ < num_literal_values_) {
+    int64_t num_to_skip = std::min<int64_t>(num_literal_values_ -
+        next_literal_idx_, num_remaining);
+    next_literal_idx_ += num_to_skip;
+    num_remaining -= num_to_skip;
+  }
+  if (num_remaining > 0) return data_decoder_.SkipValues(num_remaining) == num_remaining;
   return true;
 }
 

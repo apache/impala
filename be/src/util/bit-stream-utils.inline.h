@@ -102,6 +102,18 @@ inline int BatchedBitReader::UnpackBatch(int bit_width, int num_values, T* v) {
   return static_cast<int>(num_read);
 }
 
+inline bool BatchedBitReader::SkipBatch(int bit_width, int num_values_to_skip) {
+  DCHECK(buffer_pos_ != nullptr);
+  DCHECK_GT(bit_width, 0);
+  DCHECK_LE(bit_width, MAX_BITWIDTH);
+  DCHECK_GT(num_values_to_skip, 0);
+
+  int skip_bytes = BitUtil::RoundUpNumBytes(bit_width * num_values_to_skip);
+  if (skip_bytes > buffer_end_ - buffer_pos_) return false;
+  buffer_pos_ += skip_bytes;
+  return true;
+}
+
 template <typename T>
 inline int BatchedBitReader::UnpackAndDecodeBatch(
     int bit_width, T* dict, int64_t dict_len, int num_values, T* v, int64_t stride) {

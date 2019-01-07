@@ -32,9 +32,29 @@
 
 namespace impala {
 
+// Helper function to validate that 'decoder' decodes the expected values.
+// If 'skip_at' and 'skip_count' aren't zero, then the value skipping logic
+// is also exercised.
+template<typename InternalType>
+void ValidateValues(DictDecoder<InternalType>& decoder,
+const vector<InternalType>& values, int skip_at, int skip_count, bool skip_success) {
+  for (int i = 0; i < skip_at; ++i) {
+    InternalType j;
+    ASSERT_TRUE(decoder.GetNextValue(&j));
+    EXPECT_EQ(values[i], j) << i;
+  }
+  EXPECT_EQ(decoder.SkipValues(skip_count), skip_success);
+  for (int i = skip_at + skip_count; i < values.size(); ++i) {
+    InternalType j;
+    ASSERT_TRUE(decoder.GetNextValue(&j));
+    EXPECT_EQ(values[i], j) << i;
+  }
+}
+
 template<typename InternalType, parquet::Type::type PARQUET_TYPE>
 void ValidateDict(const vector<InternalType>& values,
-    const vector<InternalType>& dict_values, int fixed_buffer_byte_size) {
+    const vector<InternalType>& dict_values, int fixed_buffer_byte_size,
+    int skip_at = 0, int skip_count = 0, bool skip_success = true) {
   set<InternalType> values_set(values.begin(), values.end());
 
   int bytes_alloc = 0;
@@ -51,7 +71,7 @@ void ValidateDict(const vector<InternalType>& values,
   uint8_t dict_buffer[encoder.dict_encoded_size()];
   encoder.WriteDict(dict_buffer);
 
-  int data_buffer_len = encoder.EstimatedDataEncodedSize();
+  int data_buffer_len = encoder.EstimatedDataEncodedSize() * 2;
   uint8_t data_buffer[data_buffer_len];
   int data_len = encoder.WriteData(data_buffer, data_buffer_len);
   EXPECT_GT(data_len, 0);
@@ -74,13 +94,7 @@ void ValidateDict(const vector<InternalType>& values,
   }
   // Test access to dictionary via internal stream
   ASSERT_OK(decoder.SetData(data_buffer, data_len));
-  int count = 0;
-  for (InternalType i : values) {
-    InternalType j;
-    ASSERT_TRUE(decoder.GetNextValue(&j));
-    EXPECT_EQ(i, j) << count;
-    ++count;
-  }
+  ValidateValues(decoder, values, skip_at, skip_count, skip_success);
   pool.FreeAll();
 }
 
@@ -320,6 +334,66 @@ TEST(DictTest, DecodeErrors) {
     EXPECT_TRUE(failed) << "Should have detected out-of-range dict-encoded value in test "
         << test_case.first;
   }
+}
+
+TEST(DictTest, TestSkippingValues) {
+  auto ValidateSkipping = [](const vector<int32_t>& values,
+      const vector<int32_t>& dict_values, int skip_at, int skip_count,
+      bool skip_success = true) {
+    const int value_byte_size = ParquetPlainEncoder::EncodedByteSize(
+        ColumnType(TYPE_INT));
+    ValidateDict<int32_t, parquet::Type::INT32>(values, dict_values, value_byte_size,
+        skip_at, skip_count, skip_success);
+  };
+
+  vector<int32_t> literal_values;
+  for (int i = 0; i < 200; ++i) literal_values.push_back(i);
+  ValidateSkipping(literal_values, literal_values, 0, 4);
+  ValidateSkipping(literal_values, literal_values, 0, 130);
+  ValidateSkipping(literal_values, literal_values, 2, 4);
+  ValidateSkipping(literal_values, literal_values, 4, 48);
+  ValidateSkipping(literal_values, literal_values, 7, 130);
+  // Skipping too many values should fail
+  ValidateSkipping(literal_values, literal_values, 4, 300, false);
+
+  vector<int32_t> repeated_values(200, 1000);
+  ValidateSkipping(repeated_values, {1000}, 0, 4);
+  ValidateSkipping(repeated_values, {1000}, 0, 49);
+  ValidateSkipping(repeated_values, {1000}, 0, 145);
+  ValidateSkipping(repeated_values, {1000}, 3, 4);
+  ValidateSkipping(repeated_values, {1000}, 4, 49);
+  ValidateSkipping(repeated_values, {1000}, 4, 150);
+  // Skipping too many values should fail
+  ValidateSkipping(repeated_values, {1000}, 4, 300, false);
+
+  auto Concat = [](const vector<int32_t>& a, const vector<int32_t>& b) {
+    vector<int32_t> ab(a);
+    ab.insert(ab.end(), b.begin(), b.end());
+    return ab;
+  };
+  vector<int32_t> literal_then_repeated = Concat(literal_values, repeated_values);
+  vector<int32_t> literal_then_repeated_dict = Concat(literal_values, {1000});
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 0, 4);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 0, 87);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 0, 200);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 0, 222);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 4, 19);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 4, 200);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 200, 47);
+  ValidateSkipping(literal_then_repeated, literal_then_repeated_dict, 234, 166);
+
+  vector<int32_t> repeated_then_literal = Concat(repeated_values, literal_values);
+  vector<int32_t> repeated_then_literal_dict = Concat({1000}, literal_values);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 0, 4);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 0, 89);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 0, 200);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 0, 232);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 4, 8);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 4, 88);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 4, 288);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 230, 11);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 230, 79);
+  ValidateSkipping(repeated_then_literal, repeated_then_literal_dict, 230, 170);
 }
 
 }

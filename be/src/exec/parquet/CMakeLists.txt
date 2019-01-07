@@ -38,6 +38,7 @@ add_library(Parquet
 
 add_dependencies(Parquet gen-deps)
 
+ADD_BE_LSAN_TEST(parquet-bool-decoder-test)
 ADD_BE_LSAN_TEST(parquet-plain-test)
 ADD_BE_LSAN_TEST(parquet-version-test)
 ADD_BE_LSAN_TEST(hdfs-parquet-scanner-test)

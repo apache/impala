@@ -40,6 +40,10 @@ class ParquetBoolDecoder {
   /// Batched version of DecodeValue() that decodes multiple values at a time.
   bool DecodeValues(int64_t stride, int64_t count, bool* RESTRICT first_value) RESTRICT;
 
+  /// Skip 'num_values' values from the column data.
+  ///TODO: add e2e tests when page filtering is implemented (IMPALA-5843).
+  bool SkipValues(int num_values) RESTRICT;
+
  private:
   /// Implementation of DecodeValues, templated by ENCODING.
   template <parquet::Encoding::type ENCODING>

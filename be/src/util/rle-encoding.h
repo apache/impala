@@ -143,7 +143,17 @@ class RleBatchDecoder {
   /// Returns the number of consumed values or 0 if an error occurred.
   int32_t GetValues(int32_t num_values_to_consume, T* values);
 
+  /// Skip 'num_values' values.
+  /// Returns the number of skipped values or 0 if an error occurred.
+  int32_t SkipValues(int32_t num_values);
+
  private:
+  /// Skip 'num_literals_to_skip' literals.
+  bool SkipLiteralValues(int32_t num_literals_to_skip) WARN_UNUSED_RESULT;
+
+  /// Skip 'num_values' repeated values.
+  void SkipRepeatedValues(int32_t num_values);
+
   BatchedBitReader bit_reader_;
 
   /// Number of bits needed to encode the value. Must be between 0 and 64 after
@@ -190,6 +200,9 @@ class RleBatchDecoder {
   /// Output buffered literals, advancing 'literal_buffer_pos_' and decrementing
   /// 'literal_count_'. Returns the number of literals outputted.
   int32_t OutputBufferedLiterals(int32_t max_to_output, T* values);
+
+  /// Skip buffered literals
+  int32_t SkipBufferedLiterals(int32_t max_to_skip);
 
   /// Output buffered literals, advancing 'literal_buffer_pos_' and decrementing
   /// 'literal_count_'. Returns the number of literals outputted or 0 if a
@@ -619,6 +632,13 @@ inline T RleBatchDecoder<T>::GetRepeatedValue(int32_t num_repeats_to_consume) {
 }
 
 template <typename T>
+inline void RleBatchDecoder<T>::SkipRepeatedValues(int32_t num_values) {
+  DCHECK_GT(num_values, 0);
+  DCHECK_GE(repeat_count_, num_values);
+  repeat_count_ -= num_values;
+}
+
+template <typename T>
 inline int32_t RleBatchDecoder<T>::NextNumLiterals() {
   if (literal_count_ > 0) return literal_count_;
   if (repeat_count_ == 0) NextCounts();
@@ -658,6 +678,34 @@ inline bool RleBatchDecoder<T>::GetLiteralValues(
     if (UNLIKELY(!FillLiteralBuffer())) return false;
     int32_t num_copied = OutputBufferedLiterals(num_remaining, values + num_consumed);
     DCHECK_EQ(num_copied, num_remaining) << "Should have buffered enough literals";
+  }
+  return true;
+}
+
+template <typename T>
+inline bool RleBatchDecoder<T>::SkipLiteralValues(int32_t num_literals_to_skip) {
+  DCHECK_GT(num_literals_to_skip, 0);
+  DCHECK_GE(literal_count_, num_literals_to_skip);
+  DCHECK(!HaveBufferedLiterals());
+
+  int32_t num_remaining = num_literals_to_skip;
+
+  // Need to round to a batch of 32 if the caller is skipping only part of the current
+  // run to avoid ending on a non-byte boundary.
+  int32_t num_to_skip = std::min<int32_t>(literal_count_,
+      BitUtil::RoundDownToPowerOf2(num_remaining, 32));
+  if (num_to_skip > 0) {
+    bit_reader_.SkipBatch(bit_width_, num_to_skip);
+    literal_count_ -= num_to_skip;
+    num_remaining -= num_to_skip;
+  }
+
+  if (num_remaining > 0) {
+    // Earlier we called RoundDownToPowerOf2() to skip literals that fit on byte boundary.
+    // But some literals still need to be skipped. Let's fill the literal buffer
+    // and skip 'num_remaining' values.
+    if (UNLIKELY(!FillLiteralBuffer())) return false;
+    if (SkipBufferedLiterals(num_remaining) != num_remaining) return false;
   }
   return true;
 }
@@ -774,6 +822,16 @@ inline int32_t RleBatchDecoder<T>::OutputBufferedLiterals(
 }
 
 template <typename T>
+inline int32_t RleBatchDecoder<T>::SkipBufferedLiterals(
+    int32_t max_to_skip) {
+  int32_t num_to_skip =
+      std::min<int32_t>(max_to_skip, num_buffered_literals_ - literal_buffer_pos_);
+  literal_buffer_pos_ += num_to_skip;
+  literal_count_ -= num_to_skip;
+  return num_to_skip;
+}
+
+template <typename T>
 template <typename OutType>
 inline int32_t RleBatchDecoder<T>::DecodeBufferedLiterals(int32_t max_to_output,
     OutType* dict, int64_t dict_len, StrideWriter<OutType>* RESTRICT out) {
@@ -820,6 +878,35 @@ inline int32_t RleBatchDecoder<T>::GetValues(int32_t num_values_to_consume, T* v
     num_consumed += num_literals_to_set;
   }
   return num_consumed;
+}
+
+template <typename T>
+inline int32_t RleBatchDecoder<T>::SkipValues(int32_t num_values) {
+  DCHECK_GT(num_values, 0);
+
+  int32_t num_skipped = 0;
+  if (HaveBufferedLiterals()) {
+    num_skipped = SkipBufferedLiterals(num_values);
+  }
+  while (num_skipped < num_values) {
+    // Skip RLE encoded values
+    int32_t num_repeats = NextNumRepeats();
+    if (num_repeats > 0) {
+       int32_t num_repeats_to_consume =
+           std::min(num_repeats, num_values - num_skipped);
+       SkipRepeatedValues(num_repeats_to_consume);
+       num_skipped += num_repeats_to_consume;
+       continue;
+    }
+
+    // Skip literals
+    int32_t num_literals = NextNumLiterals();
+    if (num_literals == 0) break;
+    int32_t num_literals_to_skip = std::min(num_literals, num_values - num_skipped);
+    if (!SkipLiteralValues(num_literals_to_skip)) return 0;
+    num_skipped += num_literals_to_skip;
+  }
+  return num_skipped;
 }
 
 template <typename T>

@@ -133,6 +133,11 @@ class BatchedBitReader {
   template<typename T>
   int UnpackBatch(int bit_width, int num_values, T* v);
 
+  /// Skip 'num_values_to_skip' bit-packed values.
+  /// 'num_values_to_skip * bit_width' is either divisible by 8, or
+  /// 'num_values_to_skip' equals to the count of the remaining bit-packed values.
+  bool SkipBatch(int bit_width, int num_values_to_skip);
+
   /// Unpack bit-packed values in the same way as UnpackBatch() and decode them using the
   /// dictionary 'dict' with 'dict_len' entries. Return -1 if a decoding error is
   /// encountered, i.e. if the bit-packed values are not valid indices in 'dict'.

@@ -21,10 +21,11 @@
 
 #include <boost/utility.hpp>
 #include <math.h>
+#include <random>
 
 #include "testutil/gtest-util.h"
 #include "util/bit-packing.inline.h"
-#include "util/bit-stream-utils.inline.h"
+#include "util/bit-stream-utils.h"
 #include "util/rle-encoding.h"
 
 #include "common/names.h"
@@ -32,119 +33,6 @@
 namespace impala {
 
 const int MAX_WIDTH = BatchedBitReader::MAX_BITWIDTH;
-
-TEST(BitArray, TestBool) {
-  const int len = 8;
-  uint8_t buffer[len];
-
-  BitWriter writer(buffer, len);
-
-  // Write alternating 0's and 1's
-  for (int i = 0; i < 8; ++i) {
-    bool result = writer.PutValue(static_cast<uint64_t>(i % 2), 1);
-    EXPECT_TRUE(result);
-  }
-  writer.Flush();
-  EXPECT_EQ((int)buffer[0], BOOST_BINARY(1 0 1 0 1 0 1 0));
-
-  // Write 00110011
-  for (int i = 0; i < 8; ++i) {
-    bool result;
-    switch (i) {
-      case 0:
-      case 1:
-      case 4:
-      case 5:
-        result = writer.PutValue(0, 1);
-        break;
-      default:
-        result = writer.PutValue(1, 1);
-        break;
-    }
-    EXPECT_TRUE(result);
-  }
-  writer.Flush();
-
-  // Validate the exact bit value
-  EXPECT_EQ((int)buffer[0], BOOST_BINARY(1 0 1 0 1 0 1 0));
-  EXPECT_EQ((int)buffer[1], BOOST_BINARY(1 1 0 0 1 1 0 0));
-
-  // Use the reader and validate
-  BatchedBitReader reader(buffer, len);
-
-  // Ensure it returns the same results after Reset().
-  for (int trial = 0; trial < 2; ++trial) {
-    bool batch_vals[16];
-    EXPECT_EQ(16, reader.UnpackBatch(1, 16, batch_vals));
-    for (int i = 0; i < 8; ++i)  EXPECT_EQ(batch_vals[i], i % 2);
-
-    for (int i = 0; i < 8; ++i) {
-      switch (i) {
-        case 0:
-        case 1:
-        case 4:
-        case 5:
-          EXPECT_EQ(batch_vals[8 + i], false);
-          break;
-        default:
-          EXPECT_EQ(batch_vals[8 + i], true);
-          break;
-      }
-    }
-    reader.Reset(buffer, len);
-  }
-}
-
-// Writes 'num_vals' values with width 'bit_width' and reads them back.
-void TestBitArrayValues(int bit_width, int num_vals) {
-  const int len = BitUtil::Ceil(bit_width * num_vals, 8);
-  const int64_t mod = bit_width == 64 ? 1 : 1LL << bit_width;
-
-  uint8_t buffer[(len > 0) ? len : 1];
-  BitWriter writer(buffer, len);
-  for (int i = 0; i < num_vals; ++i) {
-    bool result = writer.PutValue(i % mod, bit_width);
-    EXPECT_TRUE(result);
-  }
-  writer.Flush();
-  EXPECT_EQ(writer.bytes_written(), len);
-
-  BatchedBitReader reader(buffer, len);
-  BatchedBitReader reader2(reader); // Test copy constructor.
-  // Ensure it returns the same results after Reset().
-  for (int trial = 0; trial < 2; ++trial) {
-    // Unpack all values at once with one batched reader and in small batches with the
-    // other batched reader.
-    vector<int64_t> batch_vals(num_vals);
-    const int BATCH_SIZE = 32;
-    vector<int64_t> batch_vals2(BATCH_SIZE);
-    EXPECT_EQ(num_vals,
-        reader.UnpackBatch(bit_width, num_vals, batch_vals.data()));
-    for (int i = 0; i < num_vals; ++i) {
-      if (i % BATCH_SIZE == 0) {
-        int num_to_unpack = min(BATCH_SIZE, num_vals - i);
-        EXPECT_EQ(num_to_unpack,
-           reader2.UnpackBatch(bit_width, num_to_unpack, batch_vals2.data()));
-      }
-      EXPECT_EQ(i % mod, batch_vals[i]);
-      EXPECT_EQ(i % mod, batch_vals2[i % BATCH_SIZE]);
-    }
-    EXPECT_EQ(reader.bytes_left(), 0);
-    EXPECT_EQ(reader2.bytes_left(), 0);
-    reader.Reset(buffer, len);
-    reader2.Reset(buffer, len);
-  }
-}
-
-TEST(BitArray, TestValues) {
-  for (int width = 0; width <= MAX_WIDTH; ++width) {
-    TestBitArrayValues(width, 1);
-    TestBitArrayValues(width, 2);
-    // Don't write too many values
-    TestBitArrayValues(width, (width < 12) ? (1 << width) : 4096);
-    TestBitArrayValues(width, 1024);
-  }
-}
 
 class RleTest : public ::testing::Test {
  protected:
@@ -188,10 +76,33 @@ class RleTest : public ::testing::Test {
     return true;
   }
 
+  /// Get many values from a batch RLE decoder using its low level functions.
+  template <typename T>
+  static bool GetRleValuesSkip(RleBatchDecoder<T>* decoder, int num_vals, T* vals,
+      int skip_at, int skip_count) {
+    if (!GetRleValues(decoder, skip_at, vals)) return false;
+    if (decoder->SkipValues(skip_count) != skip_count) return false;
+    int consumed = skip_at + skip_count;
+    if (!GetRleValues(decoder, num_vals - consumed, vals + skip_at)) return false;
+    return true;
+  }
+
   /// Get many values from a batch RLE decoder using its GetValues() function.
   template <typename T>
   static bool GetRleValuesBatched(RleBatchDecoder<T>* decoder, int num_vals, T* vals) {
     return num_vals == decoder->GetValues(num_vals, vals);
+  }
+
+  /// Get many values from a batch RLE decoder using its GetValues() function.
+  template <typename T>
+  static bool GetRleValuesBatchedSkip(RleBatchDecoder<T>* decoder, int num_vals, T* vals,
+      int skip_at, int skip_count) {
+    int cnt = 0;
+    if (skip_at > 0) cnt += decoder->GetValues(skip_at, vals);
+    if (decoder->SkipValues(skip_count) != skip_count) return false;
+    cnt += skip_count;
+    if (num_vals - cnt > 0) cnt += decoder->GetValues(num_vals - cnt, vals + skip_at);
+    return cnt == num_vals;
   }
 
   // Validates encoding of values by encoding and decoding them.
@@ -260,6 +171,72 @@ class RleTest : public ::testing::Test {
     return encoded_len;
   }
 
+  int ValidateRleSkip(const vector<int>& values, int bit_width,
+      int min_repeated_run_length, int skip_at, int skip_count, unsigned int seed=0) {
+    stringstream ss;
+    ss << "bit_width=" << bit_width
+       << " min_repeated_run_length_=" << min_repeated_run_length
+       << " skip_at=" << skip_at
+       << " skip_count=" << skip_count
+       << " values.size()=" << values.size()
+       << " seed=" << seed;
+    const string& description = ss.str();
+    const int len = 64 * 1024;
+    uint8_t buffer[len];
+
+    RleEncoder encoder(buffer, len, bit_width, min_repeated_run_length);
+    int encoded_len = 0;
+
+    for (int i = 0; i < values.size(); ++i) {
+      bool result = encoder.Put(values[i]);
+      EXPECT_TRUE(result);
+    }
+    encoded_len = encoder.Flush();
+
+    vector<int> expected_values(values.begin(), values.begin() + skip_at);
+    for (int i = skip_at + skip_count; i < values.size(); ++i) {
+      expected_values.push_back(values[i]);
+    }
+
+    // Verify read.
+    RleBatchDecoder<uint64_t> per_value_decoder(buffer, len, bit_width);
+    RleBatchDecoder<uint64_t> per_run_decoder(buffer, len, bit_width);
+    RleBatchDecoder<uint64_t> batch_decoder(buffer, len, bit_width);
+    // Ensure it returns the same results after Reset().
+    for (int trial = 0; trial < 2; ++trial) {
+      for (int i = 0; i < skip_at; ++i) {
+        uint64_t val;
+        EXPECT_TRUE(per_value_decoder.GetSingleValue(&val)) << description;
+        EXPECT_EQ(expected_values[i], val) << description << " i=" << i << " trial="
+            << trial;
+      }
+      per_value_decoder.SkipValues(skip_count);
+      for (int i = skip_at; i < expected_values.size(); ++i) {
+              uint64_t val;
+              EXPECT_TRUE(per_value_decoder.GetSingleValue(&val)) << description;
+              EXPECT_EQ(expected_values[i], val) << description << " i=" << i << " trial="
+                  << trial;
+      }
+      // Unpack everything at once from the other decoders.
+      vector<uint64_t> decoded_values1(expected_values.size());
+      vector<uint64_t> decoded_values2(expected_values.size());
+      EXPECT_TRUE(
+          GetRleValuesSkip(&per_run_decoder, values.size(),
+              decoded_values1.data(), skip_at, skip_count)) << description;
+      EXPECT_TRUE(
+          GetRleValuesBatchedSkip(&batch_decoder, values.size(),
+              decoded_values2.data(), skip_at, skip_count)) << description;
+      for (int i = 0; i < expected_values.size(); ++i) {
+        EXPECT_EQ(expected_values[i], decoded_values1[i]) << description << " i=" << i;
+        EXPECT_EQ(expected_values[i], decoded_values2[i]) << description << " i=" << i;
+      }
+      per_value_decoder.Reset(buffer, len, bit_width);
+      per_run_decoder.Reset(buffer, len, bit_width);
+      batch_decoder.Reset(buffer, len, bit_width);
+    }
+    return encoded_len;
+  }
+
   // ValidateRle on 'num_vals' values with width 'bit_width'. If 'value' != -1, that value
   // is used, otherwise alternating values are used.
   void TestRleValues(int bit_width, int num_vals, int value = -1) {
@@ -282,22 +259,68 @@ class RleTest : public ::testing::Test {
   }
 
   /// Make a sequence of values.
-  /// literalLength1: the length of an initial literal sequence.
-  /// repeatedLength: the length of a repeated sequence.
-  /// literalLength2: the length of a closing literal sequence.
-  vector<int>& MakeSequence(vector<int>& values, int intitial_literal_length,
-      int repeated_length, int trailing_literal_length) {
+  /// intitial_literal_length: the length of an initial literal sequence.
+  /// repeated_length: the length of a repeated sequence.
+  /// trailing_literal_length: the length of a closing literal sequence.
+  /// bit_width: the bit length of the values being used.
+  vector<int>& MakeSequenceBitWidth(vector<int>& values, int intitial_literal_length,
+      int repeated_length, int trailing_literal_length, int bit_width) {
+    const int64_t mod = 1LL << bit_width;
     values.clear();
     for (int i = 0; i < intitial_literal_length; ++i) {
-      values.push_back(i % 2);
+      values.push_back(i % mod);
     }
     for (int i = 0; i < repeated_length; ++i) {
       values.push_back(1);
     }
     for (int i = 0; i < trailing_literal_length; ++i) {
-      values.push_back(i % 2);
+      values.push_back(i % mod);
     }
     return values;
+  }
+
+  /// Same as above with bit width being 1.
+  vector<int>& MakeSequence(vector<int>& values, int intitial_literal_length,
+      int repeated_length, int trailing_literal_length) {
+    return MakeSequenceBitWidth(values, intitial_literal_length, repeated_length,
+        trailing_literal_length, 1);
+  }
+
+  /// Generates a sequence that contains repeated and literal runs with random lengths.
+  /// Total length of the sequence is limited by 'max_run_length'. The random generation
+  /// is seeded by 'seed' to allow deterministic behavior.
+  vector<int> MakeRandomSequence(unsigned int seed, int total_length, int max_run_length,
+      int bit_width) {
+    std::default_random_engine random_eng(seed);
+    auto NextRunLength = [&]() {
+      std::uniform_int_distribution<int> uni_dist(1, max_run_length);
+      return uni_dist(random_eng);
+    };
+    auto IsNextRunRepeated = [&random_eng]() {
+      std::uniform_int_distribution<int> uni_dist(0, 1);
+      return uni_dist(random_eng) == 0;
+    };
+    auto NextVal = [bit_width](int val) {
+      return (val + 1) % (1 << bit_width);
+    };
+
+    vector<int> ret;
+    int run_length = 0;
+    int val = 0;
+    int is_repeated = false;
+    while (ret.size() < total_length) {
+      if (run_length == 0) {
+        run_length = NextRunLength();
+        is_repeated = IsNextRunRepeated();
+        val = NextVal(val);
+      }
+      ret.push_back(val);
+      if (!is_repeated) {
+        val = NextVal(val);
+      }
+      --run_length;
+    }
+    return ret;
   }
 };
 
@@ -308,6 +331,71 @@ TEST_F(RleTest, TwoLiteralRun) {
     ValidateRle(values, 1, nullptr, -1, min_run_length);
     for (int width = 1; width <= MAX_WIDTH; ++width) {
       ValidateRle(values, width, nullptr, -1, min_run_length);
+    }
+  }
+}
+
+TEST_F(RleTest, ValueSkipping) {
+  vector<int> seq;
+  for (int min_run_length : legal_min_run_lengths_) {
+    for (int bit_width : {1, 3, 7, 8, 20, 32}) {
+      MakeSequenceBitWidth(seq, 100, 100, 100, bit_width);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 7);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 64);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 75);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 100);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 105);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 155);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 200);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 213);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 267);
+      ValidateRleSkip(seq, bit_width, min_run_length, 0, 300);
+      ValidateRleSkip(seq, bit_width, min_run_length, 7, 7);
+      ValidateRleSkip(seq, bit_width, min_run_length, 35, 64);
+      ValidateRleSkip(seq, bit_width, min_run_length, 55, 75);
+      ValidateRleSkip(seq, bit_width, min_run_length, 99, 100);
+      ValidateRleSkip(seq, bit_width, min_run_length, 100, 11);
+      ValidateRleSkip(seq, bit_width, min_run_length, 101, 55);
+      ValidateRleSkip(seq, bit_width, min_run_length, 102, 155);
+      ValidateRleSkip(seq, bit_width, min_run_length, 104, 17);
+      ValidateRleSkip(seq, bit_width, min_run_length, 122, 178);
+      ValidateRleSkip(seq, bit_width, min_run_length, 200, 3);
+      ValidateRleSkip(seq, bit_width, min_run_length, 200, 65);
+      ValidateRleSkip(seq, bit_width, min_run_length, 203, 17);
+      ValidateRleSkip(seq, bit_width, min_run_length, 215, 70);
+      ValidateRleSkip(seq, bit_width, min_run_length, 217, 83);
+    }
+  }
+}
+
+// Tests value-skipping on randomly generated input and
+// random skipping positions and counts.
+TEST_F(RleTest, ValueSkippingFuzzy) {
+  const int bitwidth_iteration = 10;
+  const int probe_iteration = 100;
+  const int total_sequence_length = 2048;
+
+  std::random_device r;
+  unsigned int seed = r();
+  std::default_random_engine random_eng(seed);
+
+  // Generates random number between 'bottom' and 'top' (inclusive intervals).
+  auto GetRandom = [&random_eng](int bottom, int top) {
+    std::uniform_int_distribution<int> uni_dist(bottom, top);
+    return uni_dist(random_eng);
+  };
+
+  for (int min_run_length : legal_min_run_lengths_) {
+    for (int i = 0; i < bitwidth_iteration; ++i) {
+      int bit_width = GetRandom(1, 32);
+      int max_run_length = GetRandom(5, 200);
+      vector<int> seq = MakeRandomSequence(seed, total_sequence_length, max_run_length,
+          bit_width);
+      for (int j = 0; j < probe_iteration; ++j) {
+        int skip_at = GetRandom(0, seq.size() - 1);
+        int skip_count = GetRandom(1, seq.size() - skip_at);
+        ValidateRleSkip(seq, bit_width, min_run_length, skip_at, skip_count, seed);
+      }
     }
   }
 }
