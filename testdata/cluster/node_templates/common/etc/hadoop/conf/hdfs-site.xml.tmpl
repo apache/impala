@@ -4,10 +4,6 @@
 <configuration>
   <property>
     <name>dfs.namenode.http-address</name>
-    <value>${INTERNAL_LISTEN_HOST}:${HDFS_WEBUI_PORT}</value>
-  </property>
-  <property>
-    <name>dfs.namenode.http-address</name>
     <value>${EXTERNAL_LISTEN_HOST}:${HDFS_WEBUI_PORT}</value>
   </property>
 
@@ -33,14 +29,18 @@
     <value>true</value>
   </property>
 
+  <!-- Datanode to listen on all ports to work around issue where it reports
+  its own IP as something other than INTERNAL_LISTEN_HOST.
+  TODO: we can override this with dfs.datanode.dns.interface if we figure out
+  the interface that it should be listening on.-->
   <property>
     <name>dfs.datanode.address</name>
-    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_PORT}</value>
+    <value>${EXTERNAL_LISTEN_HOST}:${DATANODE_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.http.address</name>
-    <value>${INTERNAL_LISTEN_HOST}:${DATANODE_HTTP_PORT}</value>
+    <value>${EXTERNAL_LISTEN_HOST}:${DATANODE_HTTP_PORT}</value>
   </property>
 
   <property>

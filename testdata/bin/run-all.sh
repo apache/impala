@@ -58,7 +58,7 @@ $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
 # - HDFS with 3 DNs
 # - One Yarn ResourceManager
 # - Multiple Yarn NodeManagers, exactly one per HDFS DN
-if [[ ${DEFAULT_FS} == "hdfs://localhost:20500" ]]; then
+if [[ ${DEFAULT_FS} == "hdfs://${INTERNAL_LISTEN_HOST}:20500" ]]; then
   echo " --> Starting HBase"
   $IMPALA_HOME/testdata/bin/run-hbase.sh 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hbase.log

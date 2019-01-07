@@ -35,7 +35,11 @@ from optparse import OptionParser, SUPPRESS_HELP
 from subprocess import call, check_call
 from testdata.common import cgroups
 from tests.common.environ import build_flavor_timeout
-from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
+    DEFAULT_HS2_PORT, DEFAULT_BE_PORT, DEFAULT_KRPC_PORT,
+    DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
+    DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
+    find_user_processes)
 
 logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
     datefmt="%H:%M:%S")
@@ -44,15 +48,6 @@ LOG.setLevel(level=logging.DEBUG)
 
 KUDU_MASTER_HOSTS = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get("IMPALA_MAX_LOG_FILES", 10)
-
-BASE_BEESWAX_PORT = 21000
-BASE_HS2_PORT = 21050
-BASE_BE_PORT = 22000
-BASE_KRPC_PORT = 27000
-BASE_STATE_STORE_SUBSCRIBER_PORT = 23000
-BASE_IMPALAD_WEBSERVER_PORT = 25000
-BASE_STATESTORED_WEBSERVER_PORT = 25010
-BASE_CATALOGD_WEBSERVER_PORT = 25020
 
 # Options
 parser = OptionParser()
@@ -144,26 +139,11 @@ CATALOGD_PATH = os.path.join(IMPALA_HOME,
         build_type=options.build_type))
 MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 
-CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
 KILL_TIMEOUT_IN_SECONDS = 240
 # For build types like ASAN, modify the default Kudu rpc timeout.
 KUDU_RPC_TIMEOUT = build_flavor_timeout(0, slow_build_timeout=60000)
-
-def find_user_processes(binaries):
-  """Returns an iterator over all processes owned by the current user with a matching
-  binary name from the provided list."""
-  for pid in psutil.get_pid_list():
-    try:
-      process = psutil.Process(pid)
-      if process.username == getuser() and process.name in binaries: yield process
-    except KeyError, e:
-      if "uid not found" not in str(e):
-        raise
-    except psutil.NoSuchProcess, e:
-      # Ignore the case when a process no longer exists.
-      pass
 
 def check_process_exists(binary, attempts=1):
   """Checks if a process exists given the binary name. The `attempts` count allows us to
@@ -219,12 +199,13 @@ def kill_matching_processes(binary_names, force=False):
 def choose_impalad_ports(instance_num):
   """Compute the ports for impalad instance num 'instance_num', returning as a map
   from the argument name to the port number."""
-  return {'beeswax_port': BASE_BEESWAX_PORT + instance_num,
-          'hs2_port': BASE_HS2_PORT + instance_num,
-          'be_port': BASE_BE_PORT + instance_num,
-          'krpc_port': BASE_KRPC_PORT + instance_num,
-          'state_store_subscriber_port': BASE_STATE_STORE_SUBSCRIBER_PORT + instance_num,
-          'webserver_port': BASE_IMPALAD_WEBSERVER_PORT + instance_num}
+  return {'beeswax_port': DEFAULT_BEESWAX_PORT + instance_num,
+          'hs2_port': DEFAULT_HS2_PORT + instance_num,
+          'be_port': DEFAULT_BE_PORT + instance_num,
+          'krpc_port': DEFAULT_KRPC_PORT + instance_num,
+          'state_store_subscriber_port':
+              DEFAULT_STATE_STORE_SUBSCRIBER_PORT + instance_num,
+          'webserver_port': DEFAULT_IMPALAD_WEBSERVER_PORT + instance_num}
 
 
 def build_impalad_port_args(instance_num):
@@ -257,8 +238,8 @@ def build_jvm_args(instance_num):
   # these args. Skip generating until that is fixed.
   if options.docker_network is not None:
     return []
-  BASE_JVM_DEBUG_PORT = 30000
-  return ["-jvm_debug_port={0}".format(BASE_JVM_DEBUG_PORT + instance_num),
+  DEFAULT_JVM_DEBUG_PORT = 30000
+  return ["-jvm_debug_port={0}".format(DEFAULT_JVM_DEBUG_PORT + instance_num),
           "-jvm_args={0}".format(options.jvm_args)]
 
 
@@ -385,7 +366,13 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
 
 class MiniClusterOperations(object):
   """Implementations of operations for the non-containerized minicluster
-  implementation."""
+  implementation.
+  TODO: much of this logic could be moved into ImpalaCluster.
+  """
+  def get_cluster(self):
+    """Return an ImpalaCluster instance."""
+    return ImpalaCluster()
+
   def kill_all_daemons(self, force=False):
     kill_matching_processes(["catalogd", "impalad", "statestored"], force)
 
@@ -437,33 +424,6 @@ class MiniClusterOperations(object):
           options.log_dir, "{service_name}-error.log".format(service_name=service_name))
       exec_impala_process(IMPALAD_PATH, impalad_arg_lists[i], stderr_log_file_path)
 
-  def wait_for_cluster(self):
-    """Checks if the cluster is "ready"
-
-    A cluster is deemed "ready" if:
-      - All backends are registered with the statestore.
-      - Each impalad knows about all other impalads.
-      - Each coordinator impalad's catalog cache is ready.
-    This information is retrieved by querying the statestore debug webpage
-    and each individual impalad's metrics webpage.
-    """
-    impala_cluster = ImpalaCluster()
-    # impalad processes may take a while to come up.
-    wait_for_impala_process_count(impala_cluster)
-
-    # TODO: fix this for coordinator-only nodes as well.
-    expected_num_backends = options.cluster_size
-    if options.catalog_init_delays != "":
-      for delay in options.catalog_init_delays.split(","):
-        if int(delay.strip()) != 0: expected_num_backends -= 1
-
-    for impalad in impala_cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(expected_num_backends,
-          timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
-      if impalad._get_arg_value("is_coordinator", default="true") == "true" and \
-         impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) == 0:
-        wait_for_catalog(impalad)
-
 
 class DockerMiniClusterOperations(object):
   """Implementations of operations for the containerized minicluster implementation
@@ -483,6 +443,10 @@ class DockerMiniClusterOperations(object):
     self.network_name = network_name
     # Make sure that the network actually exists.
     check_call(["docker", "network", "inspect", network_name])
+
+  def get_cluster(self):
+    """Return an ImpalaCluster instance."""
+    return ImpalaCluster(docker_network=self.network_name)
 
   def kill_all_daemons(self, force=False):
     self.kill_statestored(force=force)
@@ -507,11 +471,11 @@ class DockerMiniClusterOperations(object):
 
   def start_statestore(self):
     self.__run_container__("statestored", build_statestored_arg_list(),
-        {BASE_STATESTORED_WEBSERVER_PORT: BASE_STATESTORED_WEBSERVER_PORT})
+        {DEFAULT_STATESTORED_WEBSERVER_PORT: DEFAULT_STATESTORED_WEBSERVER_PORT})
 
   def start_catalogd(self):
     self.__run_container__("catalogd", build_catalogd_arg_list(),
-          {BASE_CATALOGD_WEBSERVER_PORT: BASE_CATALOGD_WEBSERVER_PORT})
+          {DEFAULT_CATALOGD_WEBSERVER_PORT: DEFAULT_CATALOGD_WEBSERVER_PORT})
 
   def start_impalads(self, cluster_size, num_coordinators, use_exclusive_coordinators):
     impalad_arg_lists = build_impalad_arg_lists(
@@ -519,16 +483,11 @@ class DockerMiniClusterOperations(object):
     assert cluster_size == len(impalad_arg_lists)
     for i in xrange(cluster_size):
       chosen_ports = choose_impalad_ports(i)
-      port_map = {BASE_BEESWAX_PORT: chosen_ports['beeswax_port'],
-                  BASE_HS2_PORT: chosen_ports['hs2_port'],
-                  BASE_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
+      port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
+                  DEFAULT_HS2_PORT: chosen_ports['hs2_port'],
+                  DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
       self.__run_container__("impalad_coord_exec",
           shlex.split(impalad_arg_lists[i]), port_map, i)
-
-  def wait_for_cluster(self):
-    # TODO: IMPALA-7988: this requires ImpalaCluster to understand containerisation.
-    LOG.info("Impala minicluster started on docker network {0}. Please wait a moment "
-        "before submitting queries.""".format(self.network_name))
 
   def __gen_container_name__(self, daemon, instance=None):
     """Generate the name for the container, which should be unique among containers
@@ -564,10 +523,14 @@ class DockerMiniClusterOperations(object):
     image_tag = daemon
     host_name = self.__gen_host_name__(daemon, instance)
     container_name = self.__gen_container_name__(daemon, instance)
+    # Mount configuration into container so that we don't need to rebuild container
+    # for config changes to take effect.
+    conf_dir = os.path.join(IMPALA_HOME, "fe/target/test-classes")
+    mount_args = ["--mount", "type=bind,src={0},dst=/opt/impala/conf".format(conf_dir)]
     LOG.info("Running container {0}".format(container_name))
     run_cmd = (["docker", "run", "-d"] + env_args + port_args + ["--network",
-      self.network_name, "--name", container_name, "--network-alias", host_name,
-      image_tag] + args)
+      self.network_name, "--name", container_name, "--network-alias", host_name] +
+      mount_args + [image_tag] + args)
     LOG.info("Running command {0}".format(run_cmd))
     check_call(run_cmd)
     port_mapping = check_output(["docker", "port", container_name])
@@ -590,59 +553,6 @@ class DockerMiniClusterOperations(object):
     output = check_output(["docker", "network", "inspect", self.network_name])
     # Only one network should be present in the top level array.
     return json.loads(output)[0]
-
-
-def wait_for_impala_process_count(impala_cluster, retries=10):
-  """Checks that the desired number of impalad/statestored processes are running.
-
-  Refresh until the number running impalad/statestored processes reaches the expected
-  number based on CLUSTER_SIZE, or the retry limit is hit. Failing this, raise a
-  RuntimeError.
-  """
-  for i in range(retries):
-    if len(impala_cluster.impalads) < options.cluster_size or \
-        not impala_cluster.statestored or not impala_cluster.catalogd:
-          sleep(1)
-          impala_cluster.refresh()
-  msg = str()
-  if len(impala_cluster.impalads) < options.cluster_size:
-    impalads_found = len(impala_cluster.impalads)
-    msg += "Expected {expected_num} impalad(s), only {actual_num} found\n".format(
-        expected_num=options.cluster_size,
-        actual_num=impalads_found)
-  if not impala_cluster.statestored:
-    msg += "statestored failed to start.\n"
-  if not impala_cluster.catalogd:
-    msg += "catalogd failed to start.\n"
-  if msg:
-    raise RuntimeError(msg)
-
-
-def wait_for_catalog(impalad):
-  """Waits for a catalog copy to be received by the impalad. When its received,
-     additionally waits for client ports to be opened."""
-  start_time = time()
-  beeswax_port_is_open = False
-  hs2_port_is_open = False
-  num_dbs = 0
-  num_tbls = 0
-  while ((time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS) and
-      not (beeswax_port_is_open and hs2_port_is_open)):
-    try:
-      num_dbs, num_tbls = impalad.service.get_metric_values(
-          ["catalog.num-databases", "catalog.num-tables"])
-      beeswax_port_is_open = impalad.service.beeswax_port_is_open()
-      hs2_port_is_open = impalad.service.hs2_port_is_open()
-    except Exception as e:
-      LOG.exception(("Client services not ready. Waiting for catalog cache: "
-          "({num_dbs} DBs / {num_tbls} tables). Trying again ...").format(
-              num_dbs=num_dbs,
-              num_tbls=num_tbls))
-    sleep(0.5)
-
-  if not hs2_port_is_open or not beeswax_port_is_open:
-    raise RuntimeError("Unable to open client ports within {num_seconds} seconds.".format(
-        num_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS))
 
 
 def validate_options():
@@ -730,8 +640,14 @@ if __name__ == "__main__":
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.
     sleep(3)
 
+    impala_cluster = cluster_ops.get_cluster()
+    expected_catalog_delays = 0
+    if options.catalog_init_delays != "":
+      for delay in options.catalog_init_delays.split(","):
+        if int(delay.strip()) != 0: expected_catalog_delays += 1
     # Check for the cluster to be ready.
-    cluster_ops.wait_for_cluster()
+    impala_cluster.wait_until_ready(options.cluster_size,
+        options.cluster_size - expected_catalog_delays)
   except Exception, e:
     LOG.exception("Error starting cluster")
     sys.exit(1)

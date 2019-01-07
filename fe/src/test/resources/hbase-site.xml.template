@@ -55,6 +55,11 @@
   </property>
 
   <property>
+    <name>hbase.master.hostname</name>
+    <value>${INTERNAL_LISTEN_HOST}</value>
+  </property>
+
+  <property>
     <name>hbase.master.port</name>
     <value>16000</value>
   </property>
@@ -62,6 +67,11 @@
   <property>
     <name>hbase.master.info.port</name>
     <value>16010</value>
+  </property>
+
+  <property>
+    <name>hbase.regionserver.hostname</name>
+    <value>${INTERNAL_LISTEN_HOST}</value>
   </property>
 
   <property>
@@ -77,6 +87,12 @@
   <property>
     <name>hbase.status.multicast.port</name>
     <value>16100</value>
+  </property>
+
+  <property>
+    <name>hbase.zookeeper.quorum</name>
+    <value>${INTERNAL_LISTEN_HOST}</value> <!-- The comma-separated
+    list of hostnames of the ZooKeeper Quorum hosts -->
   </property>
 
   <!-- BEGIN Kerberos settings -->
@@ -108,12 +124,6 @@
   <property>
     <name>hbase.coprocessor.region.classes</name>
     <value>org.apache.hadoop.hbase.security.token.TokenProvider</value>
-  </property>
-
-  <property>
-    <name>hbase.zookeeper.quorum</name>
-    <value>${INTERNAL_LISTEN_HOST}</value> <!-- The comma-separated
-    list of hostnames of the ZooKeeper Quorum hosts -->
   </property>
 
   <property>

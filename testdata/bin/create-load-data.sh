@@ -31,6 +31,7 @@
 set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
+set -x
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 . ${IMPALA_HOME}/testdata/bin/run-step.sh
@@ -38,7 +39,7 @@ setup_report_build_error
 # Environment variables used to direct the data loading process to an external cluster.
 # TODO: We need a better way of managing how these get set. See IMPALA-4346
 : ${HS2_HOST_PORT=localhost:11050}
-: ${HDFS_NN=localhost:20500}
+: ${HDFS_NN=${INTERNAL_LISTEN_HOST}:20500}
 : ${IMPALAD=localhost:21000}
 : ${REMOTE_LOAD=}
 : ${CM_HOST=}

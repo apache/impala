@@ -966,12 +966,6 @@
 </property>
 
 <property>
-  <name>hive.cluster.delegation.token.store.zookeeper.connectString</name>
-  <value>localhost:2181</value>
-  <description>The ZooKeeper token store connect string.</description>
-</property>
-
-<property>
   <name>hive.cluster.delegation.token.store.zookeeper.znode</name>
   <value>/hive/cluster/delegation</value>
   <description>The root path for token store data.</description>

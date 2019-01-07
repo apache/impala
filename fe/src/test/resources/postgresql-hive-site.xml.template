@@ -219,4 +219,11 @@
   <name>hcatalog.message.factory.impl.json</name>
   <value>org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory</value>
 </property>
+
+<!-- Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase. -->
+<property>
+  <name>hive.cluster.delegation.token.store.zookeeper.connectString</name>
+  <value>${INTERNAL_LISTEN_HOST}:2181</value>
+  <description>The ZooKeeper token store connect string.</description>
+</property>
 </configuration>

@@ -275,7 +275,7 @@ export ISILON_NAMENODE="${ISILON_NAMENODE-}"
 # that may need to be accessed from outside, e.g. web UIs.
 export INTERNAL_LISTEN_HOST="${INTERNAL_LISTEN_HOST-localhost}"
 export EXTERNAL_LISTEN_HOST="${EXTERNAL_LISTEN_HOST-0.0.0.0}"
-export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
+export DEFAULT_FS="${DEFAULT_FS-hdfs://${INTERNAL_LISTEN_HOST}:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
