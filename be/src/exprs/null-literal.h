@@ -47,6 +47,8 @@ class NullLiteral: public ScalarExpr {
   /// Constructor for test.
   NullLiteral(PrimitiveType type) : ScalarExpr(type, true) { }
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   friend class ScalarExpr;
   friend class ScalarExprEvaluator;

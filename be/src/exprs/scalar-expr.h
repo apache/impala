@@ -208,7 +208,6 @@ class ScalarExpr : public Expr {
   friend class ExprTest;
   friend class ExprCodegenTest;
   friend class HashTableTest;
-  friend class OldHashTableTest;
 
   /// Cached LLVM IR for the compute function. Set this in GetCodegendComputeFn().
   llvm::Function* ir_compute_fn_ = nullptr;

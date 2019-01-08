@@ -38,6 +38,8 @@ using namespace impala_udf;
 
 namespace impala {
 
+const char* SlotRef::LLVM_CLASS_NAME = "class.impala::SlotRef";
+
 SlotRef::SlotRef(const TExprNode& node)
   : ScalarExpr(node),
     slot_offset_(-1),  // invalid
@@ -155,7 +157,7 @@ string SlotRef::DebugString() const {
 // }
 //
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
-// the types from the TupleDesc.  It will likey make this code simpler to reason about.
+// the types from the TupleDesc.  It will likely make this code simpler to reason about.
 Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (type_.type == TYPE_CHAR) {
     *fn = NULL;
@@ -475,14 +477,4 @@ DecimalVal SlotRef::GetDecimalVal(
   }
 }
 
-CollectionVal SlotRef::GetCollectionVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsCollectionType());
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return CollectionVal::null();
-  CollectionValue* coll_value =
-      reinterpret_cast<CollectionValue*>(t->GetSlot(slot_offset_));
-  return CollectionVal(coll_value->ptr, coll_value->num_tuples);
-}
-
-}
+} // namespace impala

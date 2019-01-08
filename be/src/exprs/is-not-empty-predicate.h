@@ -28,8 +28,9 @@ class TExprNode;
 /// Predicate that checks whether a collection is empty or not.
 /// TODO: Implement this predicate via the UDF interface once the
 /// interface supports CollectionVals.
-class IsNotEmptyPredicate: public Predicate {
+class IsNotEmptyPredicate : public Predicate {
  public:
+  static const char* LLVM_CLASS_NAME;
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) override;
   virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
   virtual std::string DebugString() const override;
@@ -38,10 +39,9 @@ class IsNotEmptyPredicate: public Predicate {
   friend class ScalarExpr;
 
   virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state) override;
-  IsNotEmptyPredicate(const TExprNode& node);
-
+  explicit IsNotEmptyPredicate(const TExprNode& node);
 };
 
-}
+} // namespace impala
 
 #endif

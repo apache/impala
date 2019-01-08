@@ -94,7 +94,6 @@ class LlvmBuilder : public llvm::IRBuilder<> {
   using llvm::IRBuilder<>::IRBuilder;
 };
 
-
 /// LLVM code generator.  This is the top level object to generate jitted code.
 //
 /// LLVM provides a c++ IR builder interface so IR does not need to be written
@@ -103,7 +102,7 @@ class LlvmBuilder : public llvm::IRBuilder<> {
 /// The llvm documentation is not fantastic and a lot of this was figured out
 /// by experimenting.  Thankfully, their API is pretty well designed so it's
 /// possible to get by without great documentation.  The llvm tutorial is very
-/// helpful, http://llvm.org/docs/tutorial/LangImpl1.html.  In this tutorial, they
+/// helpful, https://llvm.org/docs/tutorial/LangImpl01.html.  In this tutorial, they
 /// go over how to JIT an AST for a toy language they create.
 /// It is also helpful to use their online app that lets you compile c/c++ to IR.
 /// http://llvm.org/demo/index.cgi.

@@ -29,6 +29,8 @@ using namespace impala_udf;
 
 namespace impala {
 
+const char* NullLiteral::LLVM_CLASS_NAME = "class.impala::NullLiteral";
+
 BooleanVal NullLiteral::GetBooleanVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
@@ -87,12 +89,6 @@ DecimalVal NullLiteral::GetDecimalVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   return DecimalVal::null();
-}
-
-CollectionVal NullLiteral::GetCollectionVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsCollectionType());
-  return CollectionVal::null();
 }
 
 // Generated IR for a bigint NULL literal:

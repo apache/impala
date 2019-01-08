@@ -27,10 +27,13 @@ class TExprNode;
 /// Returns the tuple id of the single non-NULL tuple in the input row.
 /// Valid input rows must have exactly one non-NULL tuple.
 class ValidTupleIdExpr : public ScalarExpr {
+ public:
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   friend class ScalarExpr;
 
-  ValidTupleIdExpr(const TExprNode& node);
+  explicit ValidTupleIdExpr(const TExprNode& node);
 
   virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state) override;
   virtual Status GetCodegendComputeFn(
@@ -44,7 +47,11 @@ class ValidTupleIdExpr : public ScalarExpr {
   std::vector<TupleId> tuple_ids_;
 
   /// Returns the number of tuples in 'row' that are non-null. Used for debugging.
-  int ComputeNonNullCount(const TupleRow* row) const;
+  static int ComputeNonNullCount(const TupleRow* row, int num_tuples);
+
+  /// Returns true if the tuple of the row at the specified index is non-null.
+  /// Called by Codegen.
+  static bool IsTupleFromRowNonNull(const TupleRow* row, int index);
 };
 
 } // namespace impala

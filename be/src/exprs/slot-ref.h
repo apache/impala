@@ -56,6 +56,7 @@ class SlotRef : public ScalarExpr {
   virtual bool IsSlotRef() const override { return true; }
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const override;
   const SlotId& slot_id() const { return slot_id_; }
+  static const char* LLVM_CLASS_NAME;
 
  protected:
   friend class ScalarExpr;
