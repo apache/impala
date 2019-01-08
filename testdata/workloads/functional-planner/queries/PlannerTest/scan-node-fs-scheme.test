@@ -1,0 +1,80 @@
+select * from functional.testtbl
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.testtbl]
+   HDFS partitions=1/1 files=0 size=0B
+   row-size= cardinality=
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.testtbl]
+   HDFS partitions=1/1 files=0 size=0B
+   row-size= cardinality=
+====
+select * from s3a_tbl
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN S3 [default.s3a_tbl]
+   S3 partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN S3 [default.s3a_tbl]
+   S3 partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+====
+select * from adl_tbl
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN ADLS [default.adl_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN ADLS [default.adl_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+====
+select * from abfs_tbl
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN ADLS [default.abfs_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN ADLS [default.abfs_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+====
+select * from abfss_tbl
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN ADLS [default.abfss_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN ADLS [default.abfss_tbl]
+   ADLS partitions=1/0 files=0 size=0B
+   row-size= cardinality=
+====

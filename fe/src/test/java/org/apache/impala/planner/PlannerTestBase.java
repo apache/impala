@@ -541,6 +541,10 @@ public class PlannerTestBase extends FrontendTestBase {
         resultFilters.add(TestUtils.ROW_SIZE_FILTER);
         resultFilters.add(TestUtils.CARDINALITY_FILTER);
       }
+      if (!testOptions.contains(PlannerTestOption.VALIDATE_SCAN_FS)) {
+        resultFilters.add(TestUtils.SCAN_NODE_SCHEME_FILTER);
+      }
+
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
       if (!planDiff.isEmpty()) {
@@ -819,7 +823,18 @@ public class PlannerTestBase extends FrontendTestBase {
     // HMS table stats and key predicate selectivity. Enable this to test
     // the case when HBase key stats are unavailable (such as due to overly
     // restrictive key predicates).
-    DISABLE_HBASE_KEY_ESTIMATE
+    DISABLE_HBASE_KEY_ESTIMATE,
+    // Validate the filesystem schemes shown in the scan node plan. An example of a scan
+    // node profile that contains fs specific information is:
+    //
+    //   00:SCAN HDFS [functional.testtbl]
+    //     HDFS partitions=1/1 files=0 size=0B
+    //     S3 partitions=1/0 files=0 size=0B
+    //     ADLS partitions=1/0 files=0 size=0B
+    //
+    // By default, this flag is disabled. So tests will ignore the values of 'HDFS',
+    // 'S3', and 'ADLS' in the above explain plan.
+    VALIDATE_SCAN_FS
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {

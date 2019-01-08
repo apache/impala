@@ -53,14 +53,28 @@ ADLS_CLIENT_ID = os.getenv("azure_client_id")
 ADLS_TENANT_ID = os.getenv("azure_tenant_id")
 ADLS_CLIENT_SECRET = os.getenv("azure_client_secret")
 
+# A map of FILESYSTEM values to their corresponding Scan Node types
+fs_to_name = {'s3': 'S3', 'hdfs': 'HDFS', 'local': 'LOCAL', 'adls': 'ADLS',
+              'abfs': 'ADLS'}
+
+
+def get_fs_name(fs):
+ """Given the target filesystem, return the name of the associated storage layer"""
+ return fs_to_name[fs]
+
+
 def prepend_with_fs(fs, path):
   """Prepend 'path' with 'fs' if it's not already the prefix."""
   return path if path.startswith(fs) else "%s%s" % (fs, path)
 
+
 def get_fs_path(path):
   return prepend_with_fs(FILESYSTEM_PREFIX, path)
+
 
 def get_secondary_fs_path(path):
   return prepend_with_fs(SECONDARY_FILESYSTEM, path)
 
+
 WAREHOUSE = get_fs_path('/test-warehouse')
+FILESYSTEM_NAME = get_fs_name(FILESYSTEM)

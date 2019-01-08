@@ -17,11 +17,11 @@
 
 package org.apache.impala.common;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.io.IOUtils;
@@ -45,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Common utility functions for operating on FileSystem objects.
@@ -386,6 +387,46 @@ public class FileSystemUtil {
    */
   public static boolean isDistributedFileSystem(Path path) throws IOException {
     return isDistributedFileSystem(path.getFileSystem(CONF));
+  }
+
+  /**
+   * Represents the type of filesystem being used. Typically associated with a
+   * {@link org.apache.hadoop.fs.FileSystem} instance that is used to read data.
+   *
+   * <p>
+   *   Unlike the {@code is*FileSystem} methods above. A FsType is more
+   *   generic in that it is capable of grouping different filesystems to the
+   *   same type. For example, the FsType {@link FsType#ADLS} maps to
+   *   multiple filesystems: {@link AdlFileSystem},
+   *   {@link AzureBlobFileSystem}, and {@link SecureAzureBlobFileSystem}.
+   * </p>
+   */
+  public enum FsType {
+    ADLS,
+    HDFS,
+    LOCAL,
+    S3;
+
+    private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
+        ImmutableMap.<String, FsType>builder()
+            .put("abfs", ADLS)
+            .put("abfss", ADLS)
+            .put("adl", ADLS)
+            .put("file", LOCAL)
+            .put("hdfs", HDFS)
+            .put("s3a", S3)
+            .build();
+
+    /**
+     * Provides a mapping between filesystem schemes and filesystems types. This can be
+     * useful as there are often multiple filesystem connectors for a give fs, each
+     * with its own scheme (e.g. abfs, abfss, adl are all ADLS connectors).
+     * Returns the {@link FsType} associated with a given filesystem scheme (e.g. local,
+     * hdfs, s3a, etc.)
+     */
+    public static FsType getFsType(String scheme) {
+      return SCHEME_TO_FS_MAPPING.get(scheme);
+    }
   }
 
   public static FileSystem getDefaultFileSystem() throws IOException {

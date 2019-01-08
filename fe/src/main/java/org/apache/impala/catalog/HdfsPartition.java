@@ -704,11 +704,24 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   }
 
   @Override // FeFsPartition
-  public Path getLocationPath() { return new Path(getLocation()); }
+  public Path getLocationPath() {
+    Preconditions.checkNotNull(getLocation(), "HdfsPartition location is null");
+    return new Path(getLocation());
+  }
+
   @Override // FeFsPartition
   public long getId() { return id_; }
+
   @Override // FeFsPartition
   public HdfsTable getTable() { return table_; }
+
+  @Override
+  public FileSystemUtil.FsType getFsType() {
+    Preconditions.checkNotNull(getLocationPath().toUri().getScheme(),
+        "Cannot get scheme from path " + getLocationPath());
+    return FileSystemUtil.FsType.getFsType(getLocationPath().toUri().getScheme());
+  }
+
   public void setNumRows(long numRows) { numRows_ = numRows; }
   @Override // FeFsPartition
   public long getNumRows() { return numRows_; }

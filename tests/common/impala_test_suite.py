@@ -47,7 +47,6 @@ from tests.common.test_dimensions import (
     get_dataset_from_workload,
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
-    apply_error_match_filter,
     try_compile_regex,
     verify_raw_results,
     verify_runtime_profile)
@@ -61,7 +60,8 @@ from tests.util.filesystem_utils import (
     IS_ADLS,
     S3_BUCKET_NAME,
     ADLS_STORE_NAME,
-    FILESYSTEM_PREFIX)
+    FILESYSTEM_PREFIX,
+    FILESYSTEM_NAME)
 
 from tests.util.hdfs_util import (
   HdfsConfig,
@@ -111,6 +111,7 @@ COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
 SET_PATTERN = re.compile(
     COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
 
+
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
   @classmethod
@@ -155,7 +156,6 @@ class ImpalaTestSuite(BaseTestSuite):
     except Exception, e:
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
       LOG.info("HS2 connection setup failed, continuing...: {0}", e)
-
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
@@ -226,7 +226,7 @@ class ImpalaTestSuite(BaseTestSuite):
       hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      hdfs_client =  get_hdfs_client(host, port)
+      hdfs_client = get_hdfs_client(host, port)
     return hdfs_client
 
   @classmethod
@@ -309,6 +309,7 @@ class ImpalaTestSuite(BaseTestSuite):
       # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
       expected_str = expected_str.strip() \
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
+          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
           .replace('$NAMENODE', NAMENODE) \
           .replace('$IMPALA_HOME', IMPALA_HOME)
       if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
@@ -337,7 +338,8 @@ class ImpalaTestSuite(BaseTestSuite):
         test_section[section_name] = test_section[section_name] \
                                      .replace('$NAMENODE', NAMENODE) \
                                      .replace('$IMPALA_HOME', IMPALA_HOME) \
-                                     .replace('$USER', getuser())
+                                     .replace('$USER', getuser()) \
+                                     .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
@@ -413,6 +415,7 @@ class ImpalaTestSuite(BaseTestSuite):
           "SHELL test sections can't contain other sections"
         cmd = test_section['SHELL']\
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)\
+          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)\
           .replace('$IMPALA_HOME', IMPALA_HOME)
         if use_db: cmd = cmd.replace('$DATABASE', use_db)
         LOG.info("Shell command: " + cmd)
@@ -431,13 +434,14 @@ class ImpalaTestSuite(BaseTestSuite):
           .replace('$GROUP_NAME', group_name)
           .replace('$IMPALA_HOME', IMPALA_HOME)
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
+          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)
           .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str())
           .replace('$USER', getuser()))
       if use_db: query = query.replace('$DATABASE', use_db)
 
-      reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$GROUP_NAME",
-                           "$IMPALA_HOME", "$NAMENODE", "$QUERY", "$SECONDARY_FILESYSTEM",
-                           "$USER"]
+      reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$FILESYSTEM_NAME",
+                           "$GROUP_NAME", "$IMPALA_HOME", "$NAMENODE", "$QUERY",
+                           "$SECONDARY_FILESYSTEM", "$USER"]
 
       if test_file_vars:
         for key, value in test_file_vars.iteritems():
@@ -482,6 +486,7 @@ class ImpalaTestSuite(BaseTestSuite):
       if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
         expected_str = " or ".join(test_section['CATCH']).strip() \
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
+          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
           .replace('$NAMENODE', NAMENODE) \
           .replace('$IMPALA_HOME', IMPALA_HOME)
         assert False, "Expected exception: %s" % expected_str

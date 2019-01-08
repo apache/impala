@@ -792,4 +792,18 @@ public class PlannerTest extends PlannerTestBase {
     assertEquals(" row-size= cardinality=10.3K",
         filter.transform(" row-size=10B cardinality=10.3K"));
   }
+
+  @Test
+  public void testScanNodeFsScheme() {
+    addTestTable("CREATE TABLE abfs_tbl (col int) LOCATION "
+        + "'abfs://dummy-fs@dummy-account.dfs.core.windows.net/abfs_tbl'");
+    addTestTable("CREATE TABLE abfss_tbl (col int) LOCATION "
+        + "'abfss://dummy-fs@dummy-account.dfs.core.windows.net/abfs_tbl'");
+    addTestTable("CREATE TABLE adl_tbl (col int) LOCATION "
+        + "'adl://dummy-account.azuredatalakestore.net/adl_tbl'");
+    addTestTable("CREATE TABLE s3a_tbl (col int) LOCATION "
+        + "'s3a://dummy-bucket/s3_tbl'");
+    runPlannerTestFile(
+        "scan-node-fs-scheme", ImmutableSet.of(PlannerTestOption.VALIDATE_SCAN_FS));
+  }
 }

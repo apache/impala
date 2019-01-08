@@ -33,6 +33,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import org.apache.impala.catalog.PartitionStatsUtil;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TPartitionStats;
@@ -84,6 +85,13 @@ public class LocalFsPartition implements FeFsPartition {
   }
 
   @Override
+  public FileSystemUtil.FsType getFsType() {
+    Preconditions.checkNotNull(getLocationPath().toUri().getScheme(),
+        "Cannot get scheme from path " + getLocationPath());
+    return FileSystemUtil.FsType.getFsType(getLocationPath().toUri().getScheme());
+  }
+
+  @Override
   public List<FileDescriptor> getFileDescriptors() {
     return fileDescriptors_;
   }
@@ -115,6 +123,8 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public Path getLocationPath() {
+    Preconditions.checkNotNull(getLocation(),
+            "LocalFsPartition location is null");
     return new Path(getLocation());
   }
 

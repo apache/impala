@@ -756,7 +756,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * Resets any partition metadata, creates the prototype partition and sets the base
    * table directory path as well as the caching info from the HMS table.
    */
-  private void initializePartitionMetadata(
+  public void initializePartitionMetadata(
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws CatalogException {
     Preconditions.checkNotNull(msTbl);
     resetPartitions();
@@ -1283,7 +1283,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * Incrementally updates the file metadata of an unpartitioned HdfsTable.
    *
    * This is optimized for the case where few files have changed. See
-   * {@link #refreshFileMetadata()} above for details.
+   * {@link #refreshFileMetadata(Path, List)} above for details.
    */
   private void updateUnpartitionedTableFileMd() throws CatalogException {
     Preconditions.checkState(getNumClusteringCols() == 0);
@@ -1870,7 +1870,12 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override // FeFsTable
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
-  public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
+
+  public Path getHdfsBaseDirPath() {
+    Preconditions.checkNotNull(hdfsBaseDir_, "HdfsTable base dir is null");
+    return new Path(hdfsBaseDir_);
+  }
+
   @Override // FeFsTable
   public boolean usesAvroSchemaOverride() { return avroSchema_ != null; }
 
@@ -2026,6 +2031,13 @@ public class HdfsTable extends Table implements FeFsTable {
   @Override // FeFsTable
   public TResultSet getTableStats() {
     return getTableStats(this);
+  }
+
+  @Override
+  public FileSystemUtil.FsType getFsType() {
+    Preconditions.checkNotNull(getHdfsBaseDirPath().toUri().getScheme(),
+        "Cannot get scheme from path " + getHdfsBaseDirPath());
+    return FileSystemUtil.FsType.getFsType(getHdfsBaseDirPath().toUri().getScheme());
   }
 
   // TODO(todd): move to FeCatalogUtils. Upon moving to Java 8, could be

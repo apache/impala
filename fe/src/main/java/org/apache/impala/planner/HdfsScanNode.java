@@ -25,9 +25,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -49,6 +52,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsCompression;
@@ -83,6 +87,7 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,10 +176,13 @@ public class HdfsScanNode extends ScanNode {
   private final AggregateInfo aggInfo_;
 
   // Number of partitions, files and bytes scanned. Set in computeScanRangeLocations().
-  // Might not match 'partitions_' due to table sampling.
-  private int numPartitions_ = 0;
-  private long totalFiles_ = 0;
-  private long totalBytes_ = 0;
+  // Might not match 'partitions_' due to table sampling. Grouped by the FsType, so
+  // each key value pair maps how many partitions / files / bytes are stored on each fs.
+  // Stored as a TreeMap so that iteration order is defined by the order of enums in
+  // FsType.
+  private Map<FileSystemUtil.FsType, Long> numPartitionsPerFs_ = new TreeMap<>();
+  private Map<FileSystemUtil.FsType, Long> totalFilesPerFs_ = new TreeMap<>();
+  private Map<FileSystemUtil.FsType, Long> totalBytesPerFs_ = new TreeMap<>();
 
   // File formats scanned. Set in computeScanRangeLocations().
   private Set<HdfsFileFormat> fileFormats_;
@@ -276,8 +284,7 @@ public class HdfsScanNode extends ScanNode {
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
       AggregateInfo aggInfo, List<Expr> partConjuncts) {
-    super(id, desc, "SCAN HDFS");
-    Preconditions.checkState(desc.getTable() instanceof FeFsTable);
+    super(id, desc, createDisplayName(hdfsTblRef.getTable()));
     tbl_ = (FeFsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
@@ -294,6 +301,14 @@ public class HdfsScanNode extends ScanNode {
       // Any errors should already have been caught during analysis.
       throw new IllegalStateException(error.toString());
     }
+  }
+
+  /**
+   * Returns the display name for this scan node. Of the form "SCAN [storage-layer-name]"
+   */
+  private static String createDisplayName(FeTable table) {
+    Preconditions.checkState(table instanceof FeFsTable);
+    return "SCAN " + ((FeFsTable) table).getFsType();
   }
 
   @Override
@@ -746,17 +761,48 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * A collection of metadata associated with a sampled partition. Unlike
+   * {@link FeFsPartition} this class is safe to use in hash-based data structures.
+   */
+  public static final class SampledPartitionMetadata {
+
+    private final long partitionId;
+    private final FileSystemUtil.FsType partitionFsType;
+
+    public SampledPartitionMetadata(
+        long partitionId, FileSystemUtil.FsType partitionFsType) {
+      this.partitionId = partitionId;
+      this.partitionFsType = partitionFsType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SampledPartitionMetadata that = (SampledPartitionMetadata) o;
+      return partitionId == that.partitionId && partitionFsType == that.partitionFsType;
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(partitionId, partitionFsType);
+    }
+
+    private FileSystemUtil.FsType getPartitionFsType() { return partitionFsType; }
+  }
+
+  /**
    * Computes scan ranges (i.e. hdfs splits) plus their storage locations, including
    * volume ids, based on the given maximum number of bytes each scan range should scan.
    * If 'sampleParams_' is not null, generates a sample and computes the scan ranges
    * based on the sample.
    *
-   * Initializes members with information about files and scan ranges, e.g. totalFiles_,
-   * fileFormats_, etc.
+   * Initializes members with information about files and scan ranges, e.g.
+   * totalFilesPerFs_, fileFormats_, etc.
    */
   private void computeScanRangeLocations(Analyzer analyzer)
       throws ImpalaRuntimeException {
-    Map<Long, List<FileDescriptor>> sampledFiles = null;
+    Map<SampledPartitionMetadata, List<FileDescriptor>> sampledFiles = null;
     if (sampleParams_ != null) {
       long percentBytes = sampleParams_.getPercentBytes();
       long randomSeed;
@@ -775,9 +821,17 @@ public class HdfsScanNode extends ScanNode {
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     scanRangeSpecs_ = new TScanRangeSpec();
-    numPartitions_ = (sampledFiles != null) ? sampledFiles.size() : partitions_.size();
-    totalFiles_ = 0;
-    totalBytes_ = 0;
+
+    if (sampledFiles != null) {
+      numPartitionsPerFs_ = sampledFiles.keySet().stream().collect(Collectors.groupingBy(
+          SampledPartitionMetadata::getPartitionFsType, Collectors.counting()));
+    } else {
+      numPartitionsPerFs_.putAll(partitions_.stream().collect(
+          Collectors.groupingBy(FeFsPartition::getFsType, Collectors.counting())));
+    }
+
+    totalFilesPerFs_ = new TreeMap<>();
+    totalBytesPerFs_ = new TreeMap<>();
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
@@ -785,7 +839,8 @@ public class HdfsScanNode extends ScanNode {
       List<FileDescriptor> fileDescs = partition.getFileDescriptors();
       if (sampledFiles != null) {
         // If we are sampling, check whether this partition is included in the sample.
-        fileDescs = sampledFiles.get(Long.valueOf(partition.getId()));
+        fileDescs = sampledFiles.get(
+            new SampledPartitionMetadata(partition.getId(), partition.getFsType()));
         if (fileDescs == null) continue;
       }
       long partitionNumRows = partition.getNumRows();
@@ -816,8 +871,8 @@ public class HdfsScanNode extends ScanNode {
       final long partitionBytes = FileDescriptor.computeTotalFileLength(fileDescs);
       long partitionMaxScanRangeBytes = 0;
       boolean partitionMissingDiskIds = false;
-      totalBytes_ += partitionBytes;
-      totalFiles_ += fileDescs.size();
+      totalBytesPerFs_.merge(partition.getFsType(), partitionBytes, Long::sum);
+      totalFilesPerFs_.merge(partition.getFsType(), (long) fileDescs.size(), Long::sum);
       for (FileDescriptor fileDesc: fileDescs) {
         if (!analyzer.getQueryOptions().isAllow_erasure_coded_files() &&
             fileDesc.getIsEc()) {
@@ -844,14 +899,15 @@ public class HdfsScanNode extends ScanNode {
             partitionNumRows, partitionBytes, partitionMaxScanRangeBytes);
       }
     }
-    if (totalFiles_ == 0) {
+    if (totalFilesPerFs_.isEmpty() || sumValues(totalFilesPerFs_) == 0) {
       maxScanRangeNumRows_ = 0;
     } else {
       // Also estimate max rows per scan range based on table-level stats, in case some
       // or all partition-level stats were missing.
       long tableNumRows = tbl_.getNumRows();
       if (tableNumRows >= 0) {
-        updateMaxScanRangeNumRows(tableNumRows, totalBytes_, largestScanRangeBytes_);
+        updateMaxScanRangeNumRows(
+            tableNumRows, sumValues(totalBytesPerFs_), largestScanRangeBytes_);
       }
     }
   }
@@ -1011,11 +1067,13 @@ public class HdfsScanNode extends ScanNode {
    */
   private void computeCardinalities() {
     // Choose between the extrapolated row count and the one based on stored stats.
-    extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_, totalBytes_);
+    extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_,
+            sumValues(totalBytesPerFs_));
     long statsNumRows = getStatsNumRows();
     if (extrapolatedNumRows_ != -1) {
-      // The extrapolated row count is based on the 'totalBytes_' which already accounts
-      // for table sampling, so no additional adjustment for sampling is necessary.
+      // The extrapolated row count is based on the 'totalBytesPerFs_' which already
+      // accounts for table sampling, so no additional adjustment for sampling is
+      // necessary.
       cardinality_ = extrapolatedNumRows_;
     } else {
       // Set the cardinality based on table or partition stats.
@@ -1029,7 +1087,7 @@ public class HdfsScanNode extends ScanNode {
     }
 
     // Checked after the block above to first collect information for the explain output.
-    if (totalBytes_ == 0) {
+    if (sumValues(totalBytesPerFs_) == 0) {
       // Nothing to scan. Definitely a cardinality of 0.
       inputCardinality_ = 0;
       cardinality_ = 0;
@@ -1259,11 +1317,33 @@ public class HdfsScanNode extends ScanNode {
           .append(String.format("partition predicates: %s\n",
               getExplainString(partitionConjuncts_, detailLevel)));
       }
-      if (tbl_.getNumClusteringCols() == 0) numPartitions_ = 1;
-      output.append(detailPrefix)
-        .append(String.format("partitions=%d/%d files=%d size=%s\n",
-            numPartitions_, table.getPartitions().size(), totalFiles_,
-            PrintUtils.printBytes(totalBytes_)));
+      String partMetaTemplate = "partitions=%d/%d files=%d size=%s\n";
+      if (!numPartitionsPerFs_.isEmpty()) {
+        // The table is partitioned; print a line for each filesystem we are reading
+        // partitions from
+        for (Map.Entry<FileSystemUtil.FsType, Long> partsPerFs :
+            numPartitionsPerFs_.entrySet()) {
+          FileSystemUtil.FsType fsType = partsPerFs.getKey();
+          output.append(detailPrefix);
+          output.append(fsType).append(" ");
+          output.append(String.format(partMetaTemplate, partsPerFs.getValue(),
+              table.getPartitions().size(), totalFilesPerFs_.get(fsType),
+              PrintUtils.printBytes(totalBytesPerFs_.get(fsType))));
+        }
+      } else if (tbl_.getNumClusteringCols() == 0) {
+        // There are no partitions so we use the FsType of the base table
+        output.append(detailPrefix);
+        output.append(table.getFsType()).append(" ");
+        output.append(String.format(partMetaTemplate, 1, table.getPartitions().size(),
+            0, PrintUtils.printBytes(0)));
+      } else {
+        // The table is partitioned, but no partitions are selected; in this case we
+        // exclude the FsType completely
+        output.append(detailPrefix);
+        output.append(String.format(partMetaTemplate, 0, table.getPartitions().size(),
+            0, PrintUtils.printBytes(0)));
+      }
+
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix)
           .append(String.format("predicates: %s\n",
@@ -1301,8 +1381,8 @@ public class HdfsScanNode extends ScanNode {
         output.append(detailPrefix)
           .append(String.format("missing disk ids: "
                 + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
-            numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
-            totalFiles_, numScanRangesNoDiskIds_,
+            numPartitionsNoDiskIds_, sumValues(numPartitionsPerFs_),
+            numFilesNoDiskIds_, sumValues(totalFilesPerFs_), numScanRangesNoDiskIds_,
             scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
       }
       // Groups the min max original conjuncts by tuple descriptor.
@@ -1440,7 +1520,8 @@ public class HdfsScanNode extends ScanNode {
     int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
         perHostScanRanges);
 
-    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRangeSize);
+    long avgScanRangeBytes =
+        (long) Math.ceil(sumValues(totalBytesPerFs_) / (double) scanRangeSize);
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
     long maxIoBufferSize =
@@ -1673,4 +1754,11 @@ public class HdfsScanNode extends ScanNode {
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
 
   public boolean hasMissingDiskIds() { return numScanRangesNoDiskIds_ > 0; }
+
+  /**
+   * Returns of all the values in the given {@link Map}.
+   */
+  private static long sumValues(Map<?, Long> input) {
+    return input.values().stream().mapToLong(Long::longValue).sum();
+  }
 }

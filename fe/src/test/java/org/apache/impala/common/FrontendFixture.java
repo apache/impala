@@ -194,7 +194,7 @@ public class FrontendFixture {
       }
       try {
         HdfsTable hdfsTable = (HdfsTable) dummyTable;
-        hdfsTable.setPrototypePartition(msTbl.getSd());
+        hdfsTable.initializePartitionMetadata(msTbl);
       } catch (CatalogException e) {
         e.printStackTrace();
         fail("Failed to add test table:\n" + createTableSql);

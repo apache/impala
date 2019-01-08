@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonObject;
@@ -93,7 +94,6 @@ public class TestUtils {
     }
   }
 
-
   /**
    * Filter to ignore the value from elements in the format key=value.
    */
@@ -121,6 +121,32 @@ public class TestUtils {
       return input.replaceAll(keyPrefix + valueRegex, keyPrefix);
     }
   }
+
+  /**
+   * Filter to ignore the filesystem schemes in the scan node explain output. See
+   * {@link org.apache.impala.planner.PlannerTestBase.PlannerTestOption#VALIDATE_SCAN_FS}
+   * for more details.
+   */
+  public static final ResultFilter SCAN_NODE_SCHEME_FILTER = new ResultFilter() {
+
+    private final String fsSchemes = "(HDFS|S3|LOCAL|ADLS)";
+    private final Pattern scanNodeFsScheme = Pattern.compile("SCAN " + fsSchemes);
+    // We don't match the size because the FILE_SIZE_FILTER could remove it
+    private final Pattern scanNodeInputMetadata =
+        Pattern.compile(fsSchemes + " partitions=\\d+/\\d+ files=\\d+ size=");
+
+    @Override
+    public boolean matches(String input) {
+      return scanNodeInputMetadata.matcher(input).find()
+          || scanNodeFsScheme.matcher(input).find();
+    }
+
+    @Override
+    public String transform(String input) {
+      return input.replaceAll(fsSchemes, "");
+    }
+  };
+
   // File size could vary from run to run. For example, the parquet file header size
   // or column metadata size could change if the Impala version changes. That doesn't
   // mean anything is wrong with the plan, so we want to filter the file size out.
@@ -166,9 +192,8 @@ public class TestUtils {
    *
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static String compareOutput(
-      ArrayList<String> actual, ArrayList<String> expected, boolean orderMatters,
-      List<ResultFilter> lineFilters) {
+  public static String compareOutput(ArrayList<String> actual, ArrayList<String> expected,
+      boolean orderMatters, List<ResultFilter> lineFilters) {
     if (!orderMatters) {
       Collections.sort(actual);
       Collections.sort(expected);
@@ -177,14 +202,14 @@ public class TestUtils {
     int maxLen = Math.min(actual.size(), expected.size());
     outer:
     for (int i = 0; i < maxLen; ++i) {
-      String expectedStr = expected.get(i).trim();
+      String expectedStr = expected.get(i);
       String actualStr = actual.get(i);
       // Apply all default and caller-supplied filters to the expected and actual output.
       boolean containsPrefix = false;
       for (List<ResultFilter> filters:
           Arrays.<List<ResultFilter>>asList(DEFAULT_FILTERS, lineFilters)) {
         for (ResultFilter filter: filters) {
-          if (filter.matches(expectedStr)) {
+          if (filter.matches(expectedStr) || filter.matches(actualStr)) {
             containsPrefix = true;
             expectedStr = filter.transform(expectedStr);
             actualStr = filter.transform(actualStr);

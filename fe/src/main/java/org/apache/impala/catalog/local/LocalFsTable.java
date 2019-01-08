@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.avro.Schema;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -49,6 +50,7 @@ import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -268,6 +270,16 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public TResultSet getTableStats() {
     return HdfsTable.getTableStats(this);
+  }
+
+  @Override
+  public FileSystemUtil.FsType getFsType() {
+    Preconditions.checkNotNull(getHdfsBaseDir(),
+            "LocalTable base dir is null");
+    Path hdfsBaseDirPath = new Path(getHdfsBaseDir());
+    Preconditions.checkNotNull(hdfsBaseDirPath.toUri().getScheme(),
+        "Cannot get scheme from path " + getHdfsBaseDir());
+    return FileSystemUtil.FsType.getFsType(hdfsBaseDirPath.toUri().getScheme());
   }
 
   @Override

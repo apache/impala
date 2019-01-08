@@ -33,7 +33,9 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -93,6 +95,11 @@ public interface FeFsTable extends FeTable {
    * @return the base HDFS directory where files of this table are stored.
    */
   public String getHdfsBaseDir();
+
+  /**
+   * @return the FsType where files of this table are stored.
+   */
+  public FileSystemUtil.FsType getFsType();
 
   /**
    * @return the total number of bytes stored for this table.
@@ -277,11 +284,9 @@ public interface FeFsTable extends FeTable {
      * The given 'randomSeed' is used for random number generation.
      * The 'percentBytes' parameter must be between 0 and 100.
      */
-    public static Map<Long, List<FileDescriptor>> getFilesSample(
-        FeFsTable table,
-        Collection<? extends FeFsPartition> inputParts,
-        long percentBytes, long minSampleBytes,
-        long randomSeed) {
+    public static Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>>
+        getFilesSample(FeFsTable table, Collection<? extends FeFsPartition> inputParts,
+            long percentBytes, long minSampleBytes, long randomSeed) {
       Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
       Preconditions.checkState(minSampleBytes >= 0);
 
@@ -337,16 +342,15 @@ public interface FeFsTable extends FeTable {
       // selected.
       Random rnd = new Random(randomSeed);
       long selectedBytes = 0;
-      Map<Long, List<FileDescriptor>> result = new HashMap<>();
+      Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>> result =
+          new HashMap<>();
       while (selectedBytes < targetBytes && numFilesRemaining > 0) {
         int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
         FeFsPartition part = parts[selectedIdx];
-        Long partId = Long.valueOf(part.getId());
-        List<FileDescriptor> sampleFileIdxs = result.get(partId);
-        if (sampleFileIdxs == null) {
-          sampleFileIdxs = new ArrayList<>();
-          result.put(partId, sampleFileIdxs);
-        }
+        HdfsScanNode.SampledPartitionMetadata sampledPartitionMetadata =
+            new HdfsScanNode.SampledPartitionMetadata(part.getId(), part.getFsType());
+        List<FileDescriptor> sampleFileIdxs = result.computeIfAbsent(
+            sampledPartitionMetadata, partMetadata -> Lists.newArrayList());
         FileDescriptor fd = part.getFileDescriptors().get(fileIdxs[selectedIdx]);
         sampleFileIdxs.add(fd);
         selectedBytes += fd.getFileLength();
