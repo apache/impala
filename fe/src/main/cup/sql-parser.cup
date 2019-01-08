@@ -480,7 +480,6 @@ nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
 nonterminal Boolean is_primary_key_val;
-nonterminal Boolean replace_existing_cols_val;
 nonterminal HdfsUri location_val;
 nonterminal RowFormat row_format_val, opt_row_format_val;
 nonterminal String field_terminator_val;
@@ -1095,9 +1094,19 @@ alter_db_stmt ::=
 // a partition clause does not make sense for this stmt. If a partition
 // is given, manually throw a parse error.
 alter_tbl_stmt ::=
-  KW_ALTER KW_TABLE table_name:table replace_existing_cols_val:replace KW_COLUMNS
-  LPAREN column_def_list:col_defs RPAREN
-  {: RESULT = new AlterTableAddReplaceColsStmt(table, col_defs, replace); :}
+  KW_ALTER KW_TABLE table_name:table KW_ADD KW_COLUMN if_not_exists_val:if_not_exists
+  column_def:col_def
+  {:
+    List<ColumnDef> list = new ArrayList<>();
+    list.add(col_def);
+    RESULT = new AlterTableAddColsStmt(table, if_not_exists, list);
+  :}
+  | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists KW_COLUMNS
+    LPAREN column_def_list:col_defs RPAREN
+  {: RESULT = new AlterTableAddColsStmt(table, if_not_exists, col_defs); :}
+  | KW_ALTER KW_TABLE table_name:table KW_REPLACE KW_COLUMNS
+    LPAREN column_def_list:col_defs RPAREN
+  {: RESULT = new AlterTableReplaceColsStmt(table, col_defs); :}
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
     partition_def_list:partitions
   {: RESULT = new AlterTableAddPartitionStmt(table, if_not_exists, partitions); :}
@@ -1197,13 +1206,6 @@ table_property_type ::=
 opt_kw_column ::=
   KW_COLUMN
   | /* empty */
-  ;
-
-replace_existing_cols_val ::=
-  KW_REPLACE
-  {: RESULT = true; :}
-  | KW_ADD
-  {: RESULT = false; :}
   ;
 
 create_db_stmt ::=

@@ -92,7 +92,8 @@ struct TAlterDbParams {
 
 // Types of ALTER TABLE commands supported.
 enum TAlterTableType {
-  ADD_REPLACE_COLUMNS,
+  ADD_COLUMNS,
+  REPLACE_COLUMNS,
   ADD_PARTITION,
   ADD_DROP_RANGE_PARTITION,
   ALTER_COLUMN,
@@ -207,13 +208,19 @@ struct TAlterTableOrViewRenameParams {
   1: required CatalogObjects.TTableName new_table_name
 }
 
-// Parameters for ALTER TABLE ADD|REPLACE COLUMNS commands.
-struct TAlterTableAddReplaceColsParams {
+// Parameters for ALTER TABLE ADD COLUMNS commands.
+struct TAlterTableAddColsParams {
   // List of columns to add to the table
   1: required list<CatalogObjects.TColumn> columns
 
-  // If true, replace all existing columns. If false add (append) columns to the table.
-  2: required bool replace_existing_cols
+  // If true, no error is raised when a column already exists.
+  2: required bool if_not_exists
+}
+
+// Parameters for ALTER TABLE REPLACE COLUMNS commands.
+struct TAlterTableReplaceColsParams {
+  // List of columns to replace to the table
+  1: required list<CatalogObjects.TColumn> columns
 }
 
 // Parameters for specifying a single partition in ALTER TABLE ADD PARTITION
@@ -385,7 +392,7 @@ struct TAlterTableParams {
   3: optional TAlterTableOrViewRenameParams rename_params
 
   // Parameters for ALTER TABLE ADD COLUMNS
-  4: optional TAlterTableAddReplaceColsParams add_replace_cols_params
+  4: optional TAlterTableAddColsParams add_cols_params
 
   // Parameters for ALTER TABLE ADD PARTITION
   5: optional TAlterTableAddPartitionParams add_partition_params
@@ -422,6 +429,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE/VIEW SET OWNER
   16: optional TAlterTableOrViewSetOwnerParams set_owner_params
+
+  // Parameters for ALTER TABLE REPLACE COLUMNS
+  17: optional TAlterTableReplaceColsParams replace_cols_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

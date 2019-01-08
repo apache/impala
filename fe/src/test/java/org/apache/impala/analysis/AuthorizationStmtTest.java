@@ -1939,6 +1939,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   @Test
   public void testAlterTable() throws ImpalaException {
     for (AuthzTest test: new AuthzTest[]{
+        authorize("alter table functional.alltypes add column c1 int"),
         authorize("alter table functional.alltypes add columns(c1 int)"),
         authorize("alter table functional.alltypes replace columns(c1 int)"),
         authorize("alter table functional.alltypes change int_col c1 int"),

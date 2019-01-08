@@ -363,7 +363,7 @@ INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL
 ---- QUERY
 alter table tbl_with_defaults add columns (j int null, k int not null default 10000)
 ---- RESULTS
-'Column has been added/replaced.'
+'Column(s) have been added.'
 ====
 ---- QUERY
 select * from tbl_with_defaults

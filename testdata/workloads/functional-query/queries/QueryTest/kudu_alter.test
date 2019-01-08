@@ -219,7 +219,7 @@ alter table tbl_to_alter add range partition 1 < values <= 20;
 alter table tbl_to_alter add columns (new_col1 int not null default 10,
   new_col2 bigint not null default 1000)
 ---- RESULTS
-'Column has been added/replaced.'
+'Column(s) have been added.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -272,7 +272,7 @@ INT,STRING,BIGINT,INT,BIGINT
 # Add nullable columns: with and without a default
 alter table tbl_to_alter add columns (new_col3 string null, new_col4 int null default -1)
 ---- RESULTS
-'Column has been added/replaced.'
+'Column(s) have been added.'
 ====
 ---- QUERY
 # Add a row

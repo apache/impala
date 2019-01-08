@@ -2123,8 +2123,23 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableAddColumn() {
+    for (String keyword: new String[]{"", "IF NOT EXISTS"}) {
+      ParsesOk(String.format("ALTER TABLE Foo ADD COLUMN %s i int", keyword));
+      ParsesOk(String.format("ALTER TABLE TestDb.Foo ADD COLUMN %s i int", keyword));
+
+      ParserError(String.format("ALTER TestDb.Foo ADD COLUMN %s", keyword));
+      ParserError(String.format("ALTER Foo ADD COLUMN %s", keyword));
+      ParserError(String.format("ALTER TABLE TestDb.Foo ADD COLUMN %s (i int)", keyword));
+      ParserError(String.format("ALTER TABLE Foo ADD COLUMN %s (i int)", keyword));
+      ParserError(String.format("ALTER Foo %s ADD COLUMN i int", keyword));
+      ParserError(String.format("ALTER TestDb.Foo %s ADD COLUMN i int", keyword));
+    }
+  }
+
+  @Test
   public void TestAlterTableAddReplaceColumns() {
-    String[] addReplaceKw = {"ADD", "REPLACE"};
+    String[] addReplaceKw = {"ADD", "ADD IF NOT EXISTS", "REPLACE"};
     for (String addReplace: addReplaceKw) {
       ParsesOk(String.format(
           "ALTER TABLE Foo %s COLUMNS (i int, s string)", addReplace));
@@ -2151,9 +2166,6 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format("ALTER TestDb.Foo %s COLUMNS ()", addReplace));
       ParserError(String.format("ALTER Foo %s COLUMNS (i int, s string)", addReplace));
       ParserError(String.format("ALTER TABLE %s COLUMNS (i int, s string)", addReplace));
-      // Don't yet support ALTER TABLE ADD COLUMN syntax
-      ParserError(String.format("ALTER TABLE Foo %s COLUMN i int", addReplace));
-      ParserError(String.format("ALTER TABLE Foo %s COLUMN (i int)", addReplace));
     }
   }
 

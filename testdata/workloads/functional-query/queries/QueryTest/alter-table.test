@@ -22,11 +22,65 @@ alter table t1 add columns (t tinyint, s string comment 'Str Col')
 string
 ====
 ---- QUERY
+# Add columns that already exist with "if not exists" clause.
+alter table t1 add if not exists columns (t tinyint, s string comment 'Str Col')
+---- RESULTS
+'No new column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add columns that do not exist with "if not exists" clause.
+alter table t1 add if not exists columns (t2 tinyint, s2 string comment 'Str Col')
+---- RESULTS
+'New column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+alter table t1 add if not exists columns (t3 tinyint, s2 string comment 'Str Col')
+---- RESULTS
+'New column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a new column that does not exist.
+alter table t1 add column t4 tinyint
+---- RESULTS
+'New column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a new column that does not exist with "if not exists" clause.
+alter table t1 add column if not exists t5 tinyint
+---- RESULTS
+'New column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a new column that already exists with "if not exists" clause.
+alter table t1 add column if not exists t5 tinyint
+---- RESULTS
+'No new column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
 describe t1
 ---- RESULTS
 'i','int',''
 't','tinyint',''
 's','string','Str Col'
+'t2','tinyint',''
+'s2','string','Str Col'
+'t3','tinyint',''
+'t4','tinyint',''
+'t5','tinyint',''
 ---- TYPES
 string,string,string
 ====
@@ -78,6 +132,11 @@ describe t2
 'i','int',''
 't','tinyint',''
 's','string','Str Col'
+'t2','tinyint',''
+'s2','string','Str Col'
+'t3','tinyint',''
+'t4','tinyint',''
+'t5','tinyint',''
 ---- TYPES
 string,string,string
 ====
@@ -92,6 +151,11 @@ describe t2
 ---- RESULTS
 'i','int',''
 's','string','Str Col'
+'t2','tinyint',''
+'s2','string','Str Col'
+'t3','tinyint',''
+'t4','tinyint',''
+'t5','tinyint',''
 ---- TYPES
 string,string,string
 ====

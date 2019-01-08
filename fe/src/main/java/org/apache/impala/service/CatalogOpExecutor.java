@@ -90,14 +90,15 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
+import org.apache.impala.thrift.TAlterTableAddColsParams;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
-import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableOrViewSetOwnerParams;
 import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableSetCachedParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
@@ -420,17 +421,22 @@ public class CatalogOpExecutor {
         return;
       }
       switch (params.getAlter_type()) {
-        case ADD_REPLACE_COLUMNS:
-          TAlterTableAddReplaceColsParams addReplaceColParams =
-              params.getAdd_replace_cols_params();
-          alterTableAddReplaceCols(tbl, addReplaceColParams.getColumns(),
-              addReplaceColParams.isReplace_existing_cols());
+        case ADD_COLUMNS:
+          TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+          boolean added = alterTableAddCols(tbl, addColParams.getColumns(),
+              addColParams.isIf_not_exists());
           reloadTableSchema = true;
-          if (addReplaceColParams.isReplace_existing_cols()) {
-            addSummary(response, "Table columns have been replaced.");
-          } else {
+          if (added) {
             addSummary(response, "New column(s) have been added to the table.");
+          } else {
+            addSummary(response, "No new column(s) have been added to the table.");
           }
+          break;
+        case REPLACE_COLUMNS:
+          TAlterTableReplaceColsParams replaceColParams = params.getReplace_cols_params();
+          alterTableReplaceCols(tbl, replaceColParams.getColumns());
+          reloadTableSchema = true;
+          addSummary(response, "Table columns have been replaced.");
           break;
         case ADD_PARTITION:
           // Create and add HdfsPartition objects to the corresponding HdfsTable and load
@@ -585,7 +591,8 @@ public class CatalogOpExecutor {
    * Kudu in addition to the HMS table.
    */
   private boolean altersKuduTable(TAlterTableType type) {
-    return type == TAlterTableType.ADD_REPLACE_COLUMNS
+    return type == TAlterTableType.ADD_COLUMNS
+        || type == TAlterTableType.REPLACE_COLUMNS
         || type == TAlterTableType.DROP_COLUMN
         || type == TAlterTableType.ALTER_COLUMN
         || type == TAlterTableType.ADD_DROP_RANGE_PARTITION;
@@ -598,29 +605,31 @@ public class CatalogOpExecutor {
       KuduTable tbl, long newCatalogVersion) throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
     switch (params.getAlter_type()) {
-      case ADD_REPLACE_COLUMNS:
-        TAlterTableAddReplaceColsParams addReplaceColParams =
-            params.getAdd_replace_cols_params();
-        KuduCatalogOpExecutor.addColumn((KuduTable) tbl,
-            addReplaceColParams.getColumns());
-        addSummary(response, "Column has been added/replaced.");
+      case ADD_COLUMNS:
+        TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+        KuduCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
+        addSummary(response, "Column(s) have been added.");
+        break;
+      case REPLACE_COLUMNS:
+        TAlterTableReplaceColsParams replaceColParams = params.getReplace_cols_params();
+        KuduCatalogOpExecutor.addColumn(tbl, replaceColParams.getColumns());
+        addSummary(response, "Column(s) have been replaced.");
         break;
       case DROP_COLUMN:
         TAlterTableDropColParams dropColParams = params.getDrop_col_params();
-        KuduCatalogOpExecutor.dropColumn((KuduTable) tbl,
-            dropColParams.getCol_name());
+        KuduCatalogOpExecutor.dropColumn(tbl, dropColParams.getCol_name());
         addSummary(response, "Column has been dropped.");
         break;
       case ALTER_COLUMN:
         TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
-        KuduCatalogOpExecutor.alterColumn((KuduTable) tbl, alterColParams.getCol_name(),
+        KuduCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
             alterColParams.getNew_col_def());
         addSummary(response, "Column has been altered.");
         break;
       case ADD_DROP_RANGE_PARTITION:
         TAlterTableAddDropRangePartitionParams partParams =
             params.getAdd_drop_range_partition_params();
-        KuduCatalogOpExecutor.addDropRangePartition((KuduTable) tbl, partParams);
+        KuduCatalogOpExecutor.addDropRangePartition(tbl, partParams);
         addSummary(response, "Range partition has been " +
             (partParams.type == TRangePartitionOperationType.ADD ?
             "added." : "dropped."));
@@ -2027,28 +2036,49 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Appends one or more columns to the given table, optionally replacing all existing
-   * columns.
+   * Appends one or more columns to the given table. Returns true if there a column was
+   * added; false otherwise.
    */
-  private void alterTableAddReplaceCols(Table tbl, List<TColumn> columns,
-      boolean replaceExistingCols) throws ImpalaException {
+  private boolean alterTableAddCols(Table tbl, List<TColumn> columns, boolean ifNotExists)
+      throws ImpalaException {
+    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
+    List<TColumn> colsToAdd = new ArrayList<>();
+    for (TColumn column: columns) {
+      Column col = tbl.getColumn(column.getColumnName());
+      if (ifNotExists && col != null) continue;
+      if (col != null) {
+        throw new CatalogException(
+            String.format("Column '%s' in table '%s' already exists.",
+            col.getName(), tbl.getName()));
+      }
+      colsToAdd.add(column);
+    }
+    // Only add columns that do not exist.
+    if (!colsToAdd.isEmpty()) {
+      // Append the new column to the existing list of columns.
+      msTbl.getSd().getCols().addAll(buildFieldSchemaList(colsToAdd));
+      applyAlterTable(msTbl, true);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Replaces all existing columns to the given table.
+   */
+  private void alterTableReplaceCols(Table tbl, List<TColumn> columns)
+      throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     List<FieldSchema> newColumns = buildFieldSchemaList(columns);
-    if (replaceExistingCols) {
-      msTbl.getSd().setCols(newColumns);
-      String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
-      if (msTbl.getParameters().containsKey(sortByKey)) {
-        String oldColumns = msTbl.getParameters().get(sortByKey);
-        String alteredColumns = MetaStoreUtil.intersectCsvListWithColumNames(oldColumns,
-            columns);
-        msTbl.getParameters().put(sortByKey, alteredColumns);
-      }
-    } else {
-      // Append the new column to the existing list of columns.
-      for (FieldSchema fs: buildFieldSchemaList(columns)) {
-        msTbl.getSd().addToCols(fs);
-      }
+    msTbl.getSd().setCols(newColumns);
+    String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+    if (msTbl.getParameters().containsKey(sortByKey)) {
+      String oldColumns = msTbl.getParameters().get(sortByKey);
+      String alteredColumns = MetaStoreUtil.intersectCsvListWithColumNames(oldColumns,
+          columns);
+      msTbl.getParameters().put(sortByKey, alteredColumns);
     }
     applyAlterTable(msTbl, true);
   }

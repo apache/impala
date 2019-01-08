@@ -321,39 +321,104 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestAlterTableAddReplaceColumns() throws AnalysisException {
+  public void TestAlterTableAddColumn() {
+    AnalyzesOk("alter table functional.alltypes add column new_col int");
+    AnalyzesOk("alter table functional.alltypes add column NEW_COL int");
+    AnalyzesOk("alter table functional.alltypes add column if not exists int_col int");
+    AnalyzesOk("alter table functional.alltypes add column if not exists INT_COL int");
+
+    // Column name must be unique for add.
+    AnalysisError("alter table functional.alltypes add column int_col int",
+        "Column already exists: int_col");
+    AnalysisError("alter table functional.alltypes add column INT_COL int",
+        "Column already exists: int_col");
+    // Add a column with same name as a partition column.
+    AnalysisError("alter table functional.alltypes add column year int",
+        "Column name conflicts with existing partition column: year");
+    AnalysisError("alter table functional.alltypes add column if not exists year int",
+        "Column name conflicts with existing partition column: year");
+    AnalysisError("alter table functional.alltypes add column YEAR int",
+        "Column name conflicts with existing partition column: year");
+    AnalysisError("alter table functional.alltypes add column if not exists YEAR int",
+        "Column name conflicts with existing partition column: year");
+    // Invalid column name.
+    AnalysisError("alter table functional.alltypes add column `???` int",
+        "Invalid column/field name: ???");
+
+    // Table/Db does not exist.
+    AnalysisError("alter table db_does_not_exist.alltypes add column i int",
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
+    AnalysisError("alter table functional.table_does_not_exist add column i int",
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view add column c1 string",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col add column c1 string",
+        createAnalysisCtx("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource add column c1 string",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "functional.alltypes_datasource");
+
+    // Cannot ALTER TABLE ADD COLUMNS on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes add column i int",
+        "ALTER TABLE ADD COLUMNS not currently supported on HBase tables.");
+
+    // Cannot ALTER ADD COLUMN primary key on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add column " +
+        "new_col int primary key",
+        "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
+        "new_col INT PRIMARY KEY");
+
+    // A non-null column must have a default on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add column new_col int not null",
+        "A new non-null column must have a default value: new_col INT NOT NULL");
+
+    // Cannot ALTER ADD COLUMN complex type on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add column c struct<f1:int>",
+        "Kudu tables do not support complex types: c STRUCT<f1:INT>");
+
+    // A not null is a Kudu only option..
+    AnalysisError("alter table functional.alltypes add column new_col int not null",
+        "The specified column options are only supported in Kudu tables: " +
+        "new_col INT NOT NULL");
+  }
+
+  @Test
+  public void TestAlterTableAddColumns() {
     AnalyzesOk("alter table functional.alltypes add columns (new_col int)");
+    AnalyzesOk("alter table functional.alltypes add columns (NEW_COL int)");
     AnalyzesOk("alter table functional.alltypes add columns (c1 string comment 'hi')");
     AnalyzesOk("alter table functional.alltypes add columns (c struct<f1:int>)");
-    AnalyzesOk(
-        "alter table functional.alltypes replace columns (c1 int comment 'c', c2 int)");
-    AnalyzesOk("alter table functional.alltypes replace columns (c array<string>)");
+    AnalyzesOk("alter table functional.alltypes add if not exists columns (int_col int)");
+    AnalyzesOk("alter table functional.alltypes add if not exists columns (INT_COL int)");
 
-    // Column name must be unique for add
+    // Column name must be unique for add.
     AnalysisError("alter table functional.alltypes add columns (int_col int)",
         "Column already exists: int_col");
-    // Add a column with same name as a partition column
+    // Add a column with same name as a partition column.
     AnalysisError("alter table functional.alltypes add columns (year int)",
+        "Column name conflicts with existing partition column: year");
+    AnalysisError("alter table functional.alltypes add if not exists columns (year int)",
         "Column name conflicts with existing partition column: year");
     // Invalid column name.
     AnalysisError("alter table functional.alltypes add columns (`???` int)",
         "Invalid column/field name: ???");
-    AnalysisError("alter table functional.alltypes replace columns (`???` int)",
-        "Invalid column/field name: ???");
 
-    // Replace should not throw an error if the column already exists
-    AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
-    // It is not possible to replace a partition column
-    AnalysisError("alter table functional.alltypes replace columns (Year int)",
-        "Column name conflicts with existing partition column: year");
-
-    // Duplicate column names
+    // Duplicate column names.
     AnalysisError("alter table functional.alltypes add columns (c1 int, c1 int)",
         "Duplicate column name: c1");
-    AnalysisError("alter table functional.alltypes replace columns (c1 int, C1 int)",
+    AnalysisError("alter table functional.alltypes add columns (c1 int, C1 int)",
         "Duplicate column name: c1");
+    AnalysisError("alter table functional.alltypes add if not exists columns " +
+        "(c1 int, c1 int)", "Duplicate column name: c1");
+    AnalysisError("alter table functional.alltypes add if not exists columns " +
+        "(c1 int, C1 int)", "Duplicate column name: c1");
 
-    // Table/Db does not exist
+    // Table/Db does not exist.
     AnalysisError("alter table db_does_not_exist.alltypes add columns (i int)",
         "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist add columns (i int)",
@@ -374,9 +439,85 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on a table produced by a data source: " +
         "functional.alltypes_datasource");
 
-    // Cannot ALTER TABLE ADD/REPLACE COLUMNS on an HBase table.
+    // Cannot ALTER TABLE ADD COLUMNS on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes add columns (i int)",
-        "ALTER TABLE ADD|REPLACE COLUMNS not currently supported on HBase tables.");
+        "ALTER TABLE ADD COLUMNS not currently supported on HBase tables.");
+
+    // Cannot ALTER ADD COLUMNS primary key on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add columns " +
+        "(new_col int primary key)",
+        "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
+        "new_col INT PRIMARY KEY");
+
+    // A non-null column must have a default on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add columns" +
+        "(new_col int not null)",
+        "A new non-null column must have a default value: new_col INT NOT NULL");
+
+    // Cannot ALTER ADD COLUMN complex type on Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes add columns (c struct<f1:int>)",
+        "Kudu tables do not support complex types: c STRUCT<f1:INT>");
+
+    // A not null is a Kudu only option..
+    AnalysisError("alter table functional.alltypes add columns(new_col int not null)",
+        "The specified column options are only supported in Kudu tables: " +
+        "new_col INT NOT NULL");
+  }
+
+  @Test
+  public void TestAlterTableReplaceColumns() {
+    AnalyzesOk("alter table functional.alltypes replace columns " +
+        "(c1 int comment 'c', c2 int)");
+    AnalyzesOk("alter table functional.alltypes replace columns " +
+        "(C1 int comment 'c', C2 int)");
+    AnalyzesOk("alter table functional.alltypes replace columns (c array<string>)");
+    // Invalid column name.
+    AnalysisError("alter table functional.alltypes replace columns (`???` int)",
+        "Invalid column/field name: ???");
+
+    // Replace should not throw an error if the column already exists.
+    AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
+    AnalyzesOk("alter table functional.alltypes replace columns (INT_COL int)");
+    // It is not possible to replace a partition column.
+    AnalysisError("alter table functional.alltypes replace columns (year int)",
+        "Column name conflicts with existing partition column: year");
+    AnalysisError("alter table functional.alltypes replace columns (Year int)",
+        "Column name conflicts with existing partition column: year");
+
+    // Duplicate column names.
+    AnalysisError("alter table functional.alltypes replace columns (c1 int, c1 int)",
+        "Duplicate column name: c1");
+    AnalysisError("alter table functional.alltypes replace columns (c1 int, C1 int)",
+        "Duplicate column name: c1");
+
+    // Table/Db does not exist
+    AnalysisError("alter table db_does_not_exist.alltypes replace columns (i int)",
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
+    AnalysisError("alter table functional.table_does_not_exist replace columns (i int)",
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
+
+    // Cannot ALTER TABLE a view.
+    AnalysisError("alter table functional.alltypes_view " +
+            "replace columns (c1 string comment 'hi')",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col " +
+            "replace columns (c1 string comment 'hi')",
+        createAnalysisCtx("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource " +
+            "replace columns (c1 string comment 'hi')",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+            "functional.alltypes_datasource");
+
+    // Cannot ALTER TABLE REPLACE COLUMNS on an HBase table.
+    AnalysisError("alter table functional_hbase.alltypes replace columns (i int)",
+        "ALTER TABLE REPLACE COLUMNS not currently supported on HBase tables.");
+
+    // Cannot ALTER TABLE REPLACE COLUMNS on an Kudu table.
+    AnalysisError("alter table functional_kudu.alltypes replace columns (i int)",
+        "ALTER TABLE REPLACE COLUMNS is not supported on Kudu tables.");
   }
 
   @Test
