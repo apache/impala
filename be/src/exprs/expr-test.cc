@@ -86,6 +86,10 @@ using namespace Apache::Hadoop::Hive;
 using namespace impala;
 
 namespace impala {
+// America/Anguilla timezone does not observe DST.
+// Use this timezone in tests where DST changes may cause problems.
+const char* TEST_TZ_WITHOUT_DST = "America/Anguilla";
+
 ImpaladQueryExecutor* executor_;
 scoped_ptr<MetricGroup> statestore_metrics(new MetricGroup("statestore_metrics"));
 Statestore* statestore;
@@ -6266,6 +6270,7 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test Unix epoch conversions again but now converting into local timestamp values.
   {
+    ScopedTimeZoneOverride time_zone("PST8PDT");
     ScopedLocalUnixTimestampConversionOverride use_local;
     // Determine what the local time would have been when it was 1970-01-01 GMT
     ptime local_time_at_epoch = c_local_adjustor<ptime>::utc_to_local(from_time_t(0));
@@ -6559,33 +6564,36 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValidTimestampValue("current_timestamp()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
 
-  // Test that the epoch is reasonable. The default behavior of UNIX_TIMESTAMP()
-  // is incorrect but wasn't changed for compatibility reasons. The function returns
-  // a value as though the current timezone is UTC. Or in other words, 1970-01-01
-  // in the current timezone is the effective epoch. A flag was introduced to enable
-  // the correct behavior. The first test below checks the default/incorrect behavior.
-  time_t unix_start_time =
-      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
-  int64_t unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
-      TYPE_BIGINT));
-  EXPECT_BETWEEN(unix_start_time, unix_timestamp_result, static_cast<int64_t>(
-      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds()));
-
-  // Check again with the flag enabled.
   {
-    ScopedLocalUnixTimestampConversionOverride use_local;
-    tm before = to_tm(posix_time::microsec_clock::local_time());
-    unix_start_time = mktime(&before);
-    unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
+    // Test that the epoch is reasonable. The default behavior of UNIX_TIMESTAMP()
+    // is incorrect but wasn't changed for compatibility reasons. The function returns
+    // a value as though the current timezone is UTC. Or in other words, 1970-01-01
+    // in the current timezone is the effective epoch. A flag was introduced to enable
+    // the correct behavior. The first test below checks the default/incorrect behavior.
+    ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
+    time_t unix_start_time =
+        (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
+    int64_t unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
         TYPE_BIGINT));
-    tm after = to_tm(posix_time::microsec_clock::local_time());
-    EXPECT_BETWEEN(unix_start_time, unix_timestamp_result,
-        static_cast<int64_t>(mktime(&after)));
+    EXPECT_BETWEEN(unix_start_time, unix_timestamp_result, static_cast<int64_t>(
+        (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds()));
+
+    // Check again with the flag enabled.
+    {
+      ScopedLocalUnixTimestampConversionOverride use_local;
+      tm before = to_tm(posix_time::microsec_clock::local_time());
+      unix_start_time = mktime(&before);
+      unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
+          TYPE_BIGINT));
+      tm after = to_tm(posix_time::microsec_clock::local_time());
+      EXPECT_BETWEEN(unix_start_time, unix_timestamp_result,
+          static_cast<int64_t>(mktime(&after)));
+    }
   }
 
   // Test that now() and current_timestamp() are reasonable.
   {
-    ScopedTimeZoneOverride time_zone("PST8PDT");
+    ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
     ScopedLocalUnixTimestampConversionOverride use_local;
     const Timezone& local_tz = time_zone.GetTimezone();
 
@@ -6611,15 +6619,15 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test cast(unix_timestamp() as timestamp).
   {
-    ScopedTimeZoneOverride time_zone("PST8PDT");
+    ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
     ScopedLocalUnixTimestampConversionOverride use_local;
     const Timezone& local_tz = time_zone.GetTimezone();
 
     // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
     // a second to ensure an earlier value.
-    unix_start_time =
+    time_t unix_start_time =
         (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
-    timestamp_result = ConvertValue<TimestampValue>(GetValue(
+    TimestampValue timestamp_result = ConvertValue<TimestampValue>(GetValue(
         "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
     EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1, local_tz),
         timestamp_result,
