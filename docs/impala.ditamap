@@ -65,12 +65,6 @@ under the License.
   </topicref>
   <topicref href="topics/impala_tutorial.xml"/>
   <topicref href="topics/impala_admin.xml">
-    <topicref audience="standalone" href="topics/impala_admission.xml"/>
-<!-- Removing below as it does not have useful content. AR 12/20/2018 -->
-    <!-- <topicref audience="standalone" href="topics/impala_resource_management.xml"/> -->
-
-<!--<topicref href="topics/impala_howto_rm.xml"/>-->
-
     <topicref href="topics/impala_timeouts.xml"/>
     <topicref href="topics/impala_proxy.xml"/>
     <topicref href="topics/impala_disk_space.xml"/>
@@ -298,8 +292,13 @@ under the License.
     <topicref href="topics/impala_perf_skew.xml"/>
     <topicref audience="hidden" href="topics/impala_perf_ddl.xml"/>
   </topicref>
-  <topicref href="topics/impala_scalability.xml"/>
+  <topicref href="topics/impala_scalability.xml">
     <topicref href="topics/impala_dedicated_coordinator.xml"/>
+  </topicref>
+  <topicref href="topics/impala_resource_management.xml">
+    <topicref href="topics/impala_admission.xml"/>
+    <topicref href="topics/impala_admission_config.xml"/>
+  </topicref>
   <topicref href="topics/impala_partitioning.xml"/>
   <topicref href="topics/impala_file_formats.xml">
     <topicref href="topics/impala_txtfile.xml"/>
