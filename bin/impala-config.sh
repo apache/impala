@@ -330,6 +330,7 @@ fi
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # We guard the S3 access check with a variable. This check hits a rate-limited endpoint
   # on AWS and multiple inclusions of S3 can exceed the limit, causing the check to fail.
+  S3_ACCESS_VALIDATED="${S3_ACCESS_VALIDATED-0}"
   if [[ "${S3_ACCESS_VALIDATED}" -ne 1 ]]; then
     if ${IMPALA_HOME}/bin/check-s3-access.sh; then
       export S3_ACCESS_VALIDATED=1
