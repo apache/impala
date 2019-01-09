@@ -447,6 +447,12 @@ struct TQueryCtx {
   //   system's local timezone and falls back to UTC. This logic will be removed in
   //   IMPALA-7359, which will make this member completely obsolete.
   19: required string local_time_zone
+
+  // Disables the code that estimates HBase scan cardinality from key ranges.
+  // When disabled, scan cardinality is estimated from HMS table row count
+  // stats and key column predicate selectivity. Generally only disabled
+  // for testing.
+  20: optional bool disable_hbase_row_est = false;
 }
 
 // Specification of one output destination of a plan fragment

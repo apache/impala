@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -63,7 +62,6 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
@@ -1029,60 +1027,6 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Transform '=', '<[=]' and '>[=]' comparisons for given slot into
-   * ValueRange. Also removes those predicates which were used for the construction
-   * of ValueRange from 'conjuncts_'. Only looks at comparisons w/ string constants
-   * (ie, the bounds of the result can be evaluated with Expr::GetValue(NULL)).
-   * HBase row key filtering works only if the row key is mapped to a string column and
-   * the expression is a string constant expression.
-   * If there are multiple competing comparison predicates that could be used
-   * to construct a ValueRange, only the first one from each category is chosen.
-   */
-  private ValueRange createHBaseValueRange(SlotDescriptor d, List<Expr> conjuncts) {
-    ListIterator<Expr> i = conjuncts.listIterator();
-    ValueRange result = null;
-    while (i.hasNext()) {
-      Expr e = i.next();
-      if (!(e instanceof BinaryPredicate)) continue;
-      BinaryPredicate comp = (BinaryPredicate) e;
-      if ((comp.getOp() == BinaryPredicate.Operator.NE)
-          || (comp.getOp() == BinaryPredicate.Operator.DISTINCT_FROM)
-          || (comp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT)) {
-        continue;
-      }
-      Expr slotBinding = comp.getSlotBinding(d.getId());
-      if (slotBinding == null || !slotBinding.isConstant() ||
-          !slotBinding.getType().equals(Type.STRING)) {
-        continue;
-      }
-
-      if (comp.getOp() == BinaryPredicate.Operator.EQ) {
-        i.remove();
-        return ValueRange.createEqRange(slotBinding);
-      }
-
-      if (result == null) result = new ValueRange();
-
-      // TODO: do we need copies here?
-      if (comp.getOp() == BinaryPredicate.Operator.GT
-          || comp.getOp() == BinaryPredicate.Operator.GE) {
-        if (result.getLowerBound() == null) {
-          result.setLowerBound(slotBinding);
-          result.setLowerBoundInclusive(comp.getOp() == BinaryPredicate.Operator.GE);
-          i.remove();
-        }
-      } else {
-        if (result.getUpperBound() == null) {
-          result.setUpperBound(slotBinding);
-          result.setUpperBoundInclusive(comp.getOp() == BinaryPredicate.Operator.LE);
-          i.remove();
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
    * Returns plan tree for an inline view ref:
    * - predicates from the enclosing scope that can be evaluated directly within
    *   the inline-view plan are pushed down
@@ -1381,6 +1325,9 @@ public class SingleNodePlanner {
     } else if (table instanceof FeHBaseTable) {
       // HBase table
       scanNode = new HBaseScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+      scanNode.addConjuncts(conjuncts);
+      scanNode.init(analyzer);
+      return scanNode;
     } else if (tblRef.getTable() instanceof FeKuduTable) {
       scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts);
       scanNode.init(analyzer);
@@ -1389,29 +1336,6 @@ public class SingleNodePlanner {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());
     }
-    // TODO: move this to HBaseScanNode.init();
-    Preconditions.checkState(scanNode instanceof HBaseScanNode);
-    List<ValueRange> keyRanges = new ArrayList<>();
-    // determine scan predicates for clustering cols
-    for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
-      SlotDescriptor slotDesc = analyzer.getColumnSlot(
-          tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
-      if (slotDesc == null || !slotDesc.getType().isStringType()) {
-        // the hbase row key is mapped to a non-string type
-        // (since it's stored in ascii it will be lexicographically ordered,
-        // and non-string comparisons won't work)
-        keyRanges.add(null);
-      } else {
-        // create ValueRange from conjuncts_ for slot; also removes conjuncts_ that were
-        // used as input for filter
-        keyRanges.add(createHBaseValueRange(slotDesc, conjuncts));
-      }
-    }
-
-    ((HBaseScanNode)scanNode).setKeyRanges(keyRanges);
-    scanNode.addConjuncts(conjuncts);
-    scanNode.init(analyzer);
-    return scanNode;
   }
 
   /**

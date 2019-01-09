@@ -130,6 +130,26 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("hbase");
   }
 
+  /**
+   * Test of HBase in the case of disabling the key scan.
+   * Normally the HBase scan node goes out to HBase to query the
+   * set of keys within the target key range. There are times when this
+   * can fail. In these times we fall back to using HMS row count and
+   * the estimated key predicate cardinality (which will use key column
+   * NDV.) It is hard to test this case in "real life" with an actual
+   * HBase cluster. Instead, we simply disable the key scan via an
+   * option, then rerun all HBase tests with keys.
+   *
+   * TODO: Once node cardinality is available (IMPALA-8021), compare
+   * estimated cardinality with both methods to ensure we get adequate
+   * estimates.
+   */
+  @Test
+  public void testHbaseNoKeyEstimate() {
+    runPlannerTestFile("hbase-no-key-est",
+        ImmutableSet.of(PlannerTestOption.DISABLE_HBASE_KEY_ESTIMATE));
+  }
+
   @Test
   public void testInsert() {
     runPlannerTestFile("insert");

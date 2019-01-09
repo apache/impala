@@ -1,0 +1,299 @@
+# if the row key is mapped as a string col, range predicates are applied to the scan
+select * from functional_hbase.stringids
+where id = '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id = '5'
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=1
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 5:5\0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id = '5'
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=1
+====
+select * from functional_hbase.stringids
+where id > '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '5'
+   start key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 5\0:7
+  HBASE KEYRANGE 7:<unbounded>
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '5'
+   start key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id >= '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '5'
+   start key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 5:7
+  HBASE KEYRANGE 7:<unbounded>
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '5'
+   start key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id < '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id < '5'
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 3:5
+  HBASE KEYRANGE <unbounded>:3
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id < '5'
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id <= '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id <= '5'
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id > '4' and id < '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '4', id < '5'
+   start key: 4\0
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4\0:5
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '4', id < '5'
+   start key: 4\0
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id >= '4' and id < '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id < '5'
+   start key: 4
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4:5
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id < '5'
+   start key: 4
+   stop key: 5
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id > '4' and id <= '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '4', id <= '5'
+   start key: 4\0
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4\0:5\0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id > '4', id <= '5'
+   start key: 4\0
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+select * from functional_hbase.stringids
+where id >= '4' and id <= '5'
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4:5\0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=111
+====
+# mix of predicates, functional_hbase. filters and start/stop keys
+select * from functional_hbase.stringids
+where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5, string_col = '4'
+   row-size=107B cardinality=1
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4:5\0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5, string_col = '4'
+   row-size=107B cardinality=1
+====
+# IMP-1188 - row key predicate is a constant expr.
+select * from functional_hbase.stringids
+where id = concat('', '5')
+and tinyint_col = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id = '5'
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
+   row-size=107B cardinality=1
+====
+# IMP-1188 - row key predicate is a constant expr.
+select * from functional_hbase.stringids
+where string_col = '4' and tinyint_col = 5
+  and id >= concat('', '4') and id <= concat('5', '')
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5, string_col = '4'
+   row-size=107B cardinality=1
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE 4:5\0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   key predicates: id >= '4', id <= '5'
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5, string_col = '4'
+   row-size=107B cardinality=1
+====

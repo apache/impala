@@ -415,6 +415,8 @@ public class PlannerTestBase extends FrontendTestBase {
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
     queryCtx.client_request.query_options = testCase.getOptions();
+    queryCtx.setDisable_hbase_row_est(
+        testOptions.contains(PlannerTestOption.DISABLE_HBASE_KEY_ESTIMATE));
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest = testPlan(testCase, Section.PLAN, queryCtx.deepCopy(),
         testOptions, errorLog, actualOutput);
@@ -812,7 +814,12 @@ public class PlannerTestBase extends FrontendTestBase {
     // to ignore these values (for backward compatibility.) Turn this option
     // on for test that validate cardinality calculations: joins, scan
     // cardinality, etc.
-    VALIDATE_CARDINALITY
+    VALIDATE_CARDINALITY,
+    // If set, disables the normal HBase key estimate scan in favor of using
+    // HMS table stats and key predicate selectivity. Enable this to test
+    // the case when HBase key stats are unavailable (such as due to overly
+    // restrictive key predicates).
+    DISABLE_HBASE_KEY_ESTIMATE
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {
