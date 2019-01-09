@@ -304,6 +304,7 @@ class TestWebPage(ImpalaTestSuite):
       self.client.cancel(query_handle)
     return response_json
 
+  @pytest.mark.xfail(run=True, reason="IMPALA-8059")
   def test_backend_states(self, unique_database):
     """Test that /query_backends returns the list of backend states for DML or
     queries; nothing for DDL statements"""
@@ -334,6 +335,7 @@ class TestWebPage(ImpalaTestSuite):
                                                         self.QUERY_BACKENDS_URL)
     assert 'backend_states' not in response_json
 
+  @pytest.mark.xfail(run=True, reason="IMPALA-8059")
   def test_backend_instances(self, unique_database, query_options=None):
     """Test that /query_finstances returns the list of fragment instances for DML or queries;
     nothing for DDL statements"""
@@ -368,6 +370,7 @@ class TestWebPage(ImpalaTestSuite):
                                                          self.QUERY_BACKENDS_URL)
     assert 'backend_instances' not in response_json
 
+  @pytest.mark.xfail(run=True, reason="IMPALA-8059")
   def test_backend_instances_mt_dop(self, unique_database):
     """Test that accessing /query_finstances does not crash the backend when running with
     mt_dop."""
