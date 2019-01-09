@@ -119,7 +119,7 @@ under the License.
           <dt> Queue Timeout </dt>
           <dd> The amount of time, in milliseconds, that a query waits in the
             admission control queue for this pool before being canceled. The
-            default value is 60,000 milliseconds. <p>It the following cases,
+            default value is 60,000 milliseconds. <p>In the following cases,
                 <uicontrol>Queue Timeout</uicontrol> is not significant, and you
               can specify a high value to avoid canceling queries
                 unexpectedly:<ul id="ul_kzr_rbg_gw">
