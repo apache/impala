@@ -365,6 +365,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # ..intListsColumn_tuple_tuple = 6
   # ..intListsColumn_tuple_tuple = 7
   # ..intListsColumn_tuple_tuple = 8
+  @SkipIfS3.eventually_consistent
   def test_thrift_array_of_arrays(self, vector, unique_database):
     self.__test_array_of_arrays(unique_database, "ThriftArrayOfArrays",
       "bad-thrift.parquet", vector, 1)
@@ -513,6 +514,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # ...f22 = 220
   # ..F11 = 110
   # ..F12 = 120
+  @SkipIfS3.eventually_consistent
   def test_ambiguous_list(self, vector, unique_database):
     """IMPALA-4725: Tests the schema-resolution behavior with different values for the
     PARQUET_ARRAY_RESOLUTION and PARQUET_FALLBACK_SCHEMA_RESOLUTION query options.

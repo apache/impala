@@ -42,16 +42,19 @@ class TestComputeStats(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @SkipIfLocal.hdfs_blocks
+  @SkipIfS3.eventually_consistent
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats', vector, unique_database)
     # Test compute stats on decimal columns separately so we can vary between platforms
     # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
 
+  @SkipIfS3.eventually_consistent
   def test_compute_stats_incremental(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-incremental', vector, unique_database)
 
   @pytest.mark.execute_serially
+  @SkipIfS3.eventually_consistent
   def test_compute_stats_many_partitions(self, vector):
     # To cut down on test execution time, only run the compute stats test against many
     # partitions if performing an exhaustive test run.
@@ -59,6 +62,7 @@ class TestComputeStats(ImpalaTestSuite):
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
 
   @pytest.mark.execute_serially
+  @SkipIfS3.eventually_consistent
   def test_compute_stats_keywords(self, vector):
     """IMPALA-1055: Tests compute stats with a db/table name that are keywords."""
     self.execute_query("drop database if exists `parquet` cascade")
@@ -120,6 +124,7 @@ class TestComputeStats(ImpalaTestSuite):
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
 
+  @SkipIfS3.eventually_consistent
   def test_pull_stats_profile(self, vector, unique_database):
     """Checks that the frontend profile includes metrics when computing
        incremental statistics.

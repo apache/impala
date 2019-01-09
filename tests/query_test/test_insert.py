@@ -23,7 +23,8 @@ from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, \
+    SkipIfNotHdfsMinicluster, SkipIfS3
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -149,6 +150,7 @@ class TestInsertQueries(ImpalaTestSuite):
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=60)
 
   @pytest.mark.execute_serially
+  @SkipIfS3.eventually_consistent
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
