@@ -100,6 +100,7 @@ enum TStmtType {
   DDL, // Data definition, e.g. CREATE TABLE (includes read-only functions e.g. SHOW)
   DML, // Data modification e.g. INSERT
   EXPLAIN,
+  TESTCASE, // For generating a testcase for QueryStmts.
   LOAD, // Statement type for LOAD commands
   SET,
   ADMIN_FN // Admin function, e.g. ": shutdown()".

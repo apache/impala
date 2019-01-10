@@ -96,6 +96,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("comment", SqlParserSymbols.KW_COMMENT);
     keywordMap.put("compression", SqlParserSymbols.KW_COMPRESSION);
     keywordMap.put("compute", SqlParserSymbols.KW_COMPUTE);
+    keywordMap.put("copy", SqlParserSymbols.KW_COPY);
     keywordMap.put("create", SqlParserSymbols.KW_CREATE);
     keywordMap.put("cross", SqlParserSymbols.KW_CROSS);
     keywordMap.put("current", SqlParserSymbols.KW_CURRENT);

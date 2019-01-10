@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
@@ -120,6 +121,12 @@ public abstract class QueryStmt extends StatementBase {
     collectTableRefs(tblRefs, false);
   }
 
+  public List<TableRef> collectTableRefs() {
+    List<TableRef> tableRefs = Lists.newArrayList();
+    collectTableRefs(tableRefs);
+    return tableRefs;
+  }
+
   /**
    * Helper for collectFromClauseTableRefs() and collectTableRefs().
    * If 'fromClauseOnly' is true only collects table references in the FROM clause,
@@ -131,6 +138,12 @@ public abstract class QueryStmt extends StatementBase {
         v.getQueryStmt().collectTableRefs(tblRefs, fromClauseOnly);
       }
     }
+  }
+
+  public List<FeView> collectInlineViews() {
+    Set<FeView> inlineViews = Sets.newHashSet();
+    collectInlineViews(inlineViews);
+    return new ArrayList<>(inlineViews);
   }
 
   /**

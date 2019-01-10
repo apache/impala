@@ -177,20 +177,6 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * @return the QueryStmt present in the whereClause_ if present, null otherwise.
-   */
-  private QueryStmt getWhereSubQueryStmt() {
-    QueryStmt whereQueryStmt = null;
-    if (whereClause_ != null) {
-      Subquery whereSubquery = whereClause_.getSubquery();
-      if (whereSubquery != null) {
-        whereQueryStmt = whereSubquery.getStatement();
-      }
-    }
-    return whereQueryStmt;
-  }
-
-  /**
    * Creates resultExprs and baseTblResultExprs.
    */
   @Override
@@ -1179,9 +1165,18 @@ public class SelectStmt extends QueryStmt {
         inlineViewRef.getViewStmt().collectInlineViews(inlineViews);
       }
     }
-    QueryStmt whereStmt = getWhereSubQueryStmt();
-    if (whereStmt != null) {
-      whereStmt.collectInlineViews(inlineViews);
+    if (whereClause_ != null) {
+      for (Expr conjunct : whereClause_.getConjuncts()) {
+        List<Subquery> whereSubQueries = Lists.newArrayList();
+        conjunct.collect(Predicates.instanceOf(Subquery.class), whereSubQueries);
+        if (whereSubQueries.size() == 0) continue;
+        // Check that multiple subqueries do not exist in the same expression. This
+        // should have been already caught by the analysis passes.
+        Preconditions.checkState(whereSubQueries.size() == 1, "Invariant " +
+            "violated: Multiple subqueries found in a single expression: " +
+            conjunct.toSql());
+        whereSubQueries.get(0).getStatement().collectInlineViews(inlineViews);
+      }
     }
   }
 

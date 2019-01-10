@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.impala.analysis.AggregateInfo;
@@ -1108,6 +1109,11 @@ public class HdfsScanNode extends ScanNode {
    * ultimately determined by the scheduling done by the backend's Scheduler).
    * Assume that scan ranges that can be scheduled locally will be, and that scan
    * ranges that cannot will be round-robined across the cluster.
+   *
+   * When the planner runs in the debug mode (SET PLANNER_TESTCASE_MODE=true), the
+   * estimation does not take into account the local cluster topology and instead
+   * assumes that every scan range location is local to some datanode. This should only
+   * be set when replaying a testcase from some other cluster.
    */
   protected void computeNumNodes(Analyzer analyzer, long cardinality) {
     Preconditions.checkNotNull(scanRangeSpecs_);
@@ -1117,42 +1123,62 @@ public class HdfsScanNode extends ScanNode {
     int numLocalRanges = 0;
     int numRemoteRanges = 0;
     if (scanRangeSpecs_.isSetConcrete_ranges()) {
-      for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
-        boolean anyLocal = false;
-        if (range.isSetLocations()) {
-          for (TScanRangeLocation loc : range.locations) {
-            TNetworkAddress dataNode =
-                analyzer.getHostIndex().getEntry(loc.getHost_idx());
-            if (cluster.contains(dataNode)) {
-              anyLocal = true;
-              // Use the full datanode address (including port) to account for the test
-              // minicluster where there are multiple datanodes and impalads on a single
-              // host.  This assumes that when an impalad is colocated with a datanode,
-              // there are the same number of impalads as datanodes on this host in this
-              // cluster.
-              localHostSet.add(dataNode);
-            }
+      if (analyzer.getQueryOptions().planner_testcase_mode) {
+        // TODO: Have a separate scan node implementation that mocks an HDFS scan
+        // node rather than including the logic here.
+
+        // Track the number of unique host indexes across all scan ranges. Assume for
+        // the sake of simplicity that every scan is served from a local datanode.
+        Set<Integer> dummyHostIndex = Sets.newHashSet();
+        for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
+          for (TScanRangeLocation loc: range.locations) {
+            dummyHostIndex.add(loc.getHost_idx());
+            ++numLocalRanges;
           }
         }
-        // This range has at least one replica with a colocated impalad, so assume it
-        // will be scheduled on one of those nodes.
-        if (anyLocal) {
-          ++numLocalRanges;
-        } else {
-          ++numRemoteRanges;
+        totalNodes = Math.min(
+            scanRangeSpecs_.concrete_ranges.size(), dummyHostIndex.size());
+        LOG.info(String.format("Planner running in DEBUG mode. ScanNode: %s, " +
+            "TotalNodes %d, Local Ranges %d", tbl_.getFullName(), totalNodes,
+            numLocalRanges));
+      } else {
+        for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
+          boolean anyLocal = false;
+          if (range.isSetLocations()) {
+            for (TScanRangeLocation loc : range.locations) {
+              TNetworkAddress dataNode =
+                  analyzer.getHostIndex().getEntry(loc.getHost_idx());
+              if (cluster.contains(dataNode)) {
+                anyLocal = true;
+                // Use the full datanode address (including port) to account for the test
+                // minicluster where there are multiple datanodes and impalads on a single
+                // host.  This assumes that when an impalad is colocated with a datanode,
+                // there are the same number of impalads as datanodes on this host in this
+                // cluster.
+                localHostSet.add(dataNode);
+              }
+            }
+          }
+          // This range has at least one replica with a colocated impalad, so assume it
+          // will be scheduled on one of those nodes.
+          if (anyLocal) {
+            ++numLocalRanges;
+          } else {
+            ++numRemoteRanges;
+          }
+          // Approximate the number of nodes that will execute locally assigned ranges to
+          // be the smaller of the number of locally assigned ranges and the number of
+          // hosts that hold block replica for those ranges.
+          int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
+          // The remote ranges are round-robined across all the impalads.
+          int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
+          // The local and remote assignments may overlap, but we don't know by how much
+          // so conservatively assume no overlap.
+          totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
+          // Exit early if all hosts have a scan range assignment, to avoid extraneous
+          // work in case the number of scan ranges dominates the number of nodes.
+          if (totalNodes == cluster.numExecutors()) break;
         }
-        // Approximate the number of nodes that will execute locally assigned ranges to
-        // be the smaller of the number of locally assigned ranges and the number of
-        // hosts that hold block replica for those ranges.
-        int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
-        // The remote ranges are round-robined across all the impalads.
-        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
-        // The local and remote assignments may overlap, but we don't know by how much so
-        // conservatively assume no overlap.
-        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
-        // Exit early if all hosts have a scan range assignment, to avoid extraneous work
-        // in case the number of scan ranges dominates the number of nodes.
-        if (totalNodes == cluster.numExecutors()) break;
       }
     }
     // Handle the generated range specifications.

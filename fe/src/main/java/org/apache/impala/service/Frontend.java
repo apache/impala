@@ -18,7 +18,6 @@
 package org.apache.impala.service;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +38,7 @@ import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.CommentOnStmt;
+import org.apache.impala.analysis.CopyTestCaseStmt;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
@@ -53,14 +53,11 @@ import org.apache.impala.analysis.GrantRevokePrivStmt;
 import org.apache.impala.analysis.GrantRevokeRoleStmt;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.Parser;
-import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
 import org.apache.impala.analysis.ShowGrantPrincipalStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
-import org.apache.impala.analysis.SqlParser;
-import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -92,7 +89,6 @@ import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -102,7 +98,6 @@ import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
-import org.apache.impala.thrift.TAdminRequest;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
@@ -125,6 +120,7 @@ import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
+import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
@@ -138,7 +134,6 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
-import org.apache.impala.thrift.TShutdownParams;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -606,6 +601,14 @@ public class Frontend {
       req.setAlter_db_params(params);
       ddl.op_type = TCatalogOpType.DDL;
       ddl.setDdl_params(req);
+    } else if (analysis.isTestCaseStmt()){
+      CopyTestCaseStmt stmt = (CopyTestCaseStmt) analysis.getStmt();
+      TCopyTestCaseReq req = new TCopyTestCaseReq(stmt.getHdfsPath());
+      TDdlExecRequest ddlReq = new TDdlExecRequest();
+      ddlReq.setCopy_test_case_params(req);
+      ddlReq.setDdl_type(TDdlType.COPY_TESTCASE);
+      ddl.op_type = TCatalogOpType.DDL;
+      ddl.setDdl_params(ddlReq);
     } else {
       throw new IllegalStateException("Unexpected CatalogOp statement type.");
     }
@@ -1318,7 +1321,21 @@ public class Frontend {
           new TColumn("summary", Type.STRING.toThrift()))));
       result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
       return result;
+    } else if (analysisResult.isTestCaseStmt()) {
+      CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) stmt);
+      if (testCaseStmt.isTestCaseExport()) {
+        result.setStmt_type(TStmtType.TESTCASE);
+        result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+          new TColumn("Test case data output path", Type.STRING.toThrift()))));
+        result.setTestcase_data_path(testCaseStmt.writeTestCaseData());
+      } else {
+        // Mimic it as a DDL.
+        result.setStmt_type(TStmtType.DDL);
+        createCatalogOpRequest(analysisResult, result);
+      }
+      return result;
     }
+
     // If unset, set MT_DOP to 0 to simplify the rest of the code.
     if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 

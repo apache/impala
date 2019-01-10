@@ -310,6 +310,25 @@ public class AnalyzerTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestCopyTestCase() {
+    AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes");
+    AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes union " +
+        "select * from functional.alltypes");
+    // Containing views
+    AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes_view");
+    // Mix of view and table
+    AnalyzesOk("copy testcase to 'hdfs:///tmp' select * from functional.alltypes_view " +
+        "union all select * from functional.alltypes");
+    AnalyzesOk("copy testcase to 'hdfs:///tmp' with v as (select 1) select * from v");
+    // Target directory does not exist
+    AnalysisError("copy testcase to 'hdfs:///foo' select 1", "Path does not exist: " +
+        "hdfs://localhost:20500/foo");
+    // Testcase file does not exist
+    AnalysisError("copy testcase from 'hdfs:///tmp/file-doesnot-exist'", "Path does not" +
+        " exist");
+  }
+
+  @Test
   public void TestBinaryHBaseTable() {
     AnalyzesOk("select * from functional_hbase.alltypessmallbinary");
   }

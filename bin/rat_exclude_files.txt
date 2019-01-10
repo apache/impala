@@ -95,6 +95,7 @@ lib/python/impala_py_lib/gdb/README.md
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a
 # source header would cause the tests to fail."
 testdata/*.csv
+testdata/*.sql
 testdata/*.test
 be/src/testutil/*.pem
 *.json

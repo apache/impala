@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -30,6 +31,14 @@ import org.apache.impala.util.PatternMatcher;
  * Frontend interface for interacting with a database.
  */
 public interface FeDb extends HasName {
+
+  Comparator<FeDb> NAME_COMPARATOR = new Comparator<FeDb>() {
+    @Override
+    public int compare(FeDb db1, FeDb db2) {
+      return db1.getName().compareTo(db2.getName());
+    }
+  };
+
   /**
    * @return the name of the database
    */

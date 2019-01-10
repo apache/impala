@@ -35,6 +35,12 @@ import com.google.common.base.Preconditions;
  * Manages a pool of RetryingMetaStoreClient connections. If the connection pool is empty
  * a new client is created and added to the pool. The idle pool can expand till a maximum
  * size of MAX_HMS_CONNECTION_POOL_SIZE, beyond which the connections are closed.
+ *
+ * This default implementation reads the Hive metastore configuration from the HiveConf
+ * object passed in the c'tor. If you are looking for a temporary HMS instance created
+ * from scratch for unit tests, refer to EmbeddedMetastoreClientPool class. It mocks an
+ * actual HMS by creating a temporary Derby backend database on the fly. It should not
+ * be used for production Catalog server instances.
  */
 public class MetaStoreClientPool {
   // Key for config option read from hive-site.xml

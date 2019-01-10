@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -29,6 +30,14 @@ import org.apache.impala.thrift.TTableStats;
  * Frontend interface for interacting with a table.
  */
 public interface FeTable {
+
+  Comparator<FeTable> NAME_COMPARATOR = new Comparator<FeTable>() {
+    @Override
+    public int compare(FeTable t1, FeTable t2) {
+      return t1.getFullName().compareTo(t2.getFullName());
+    }
+  };
+
   /** @see CatalogObject#isLoaded() */
   boolean isLoaded();
 

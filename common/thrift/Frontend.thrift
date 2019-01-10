@@ -647,6 +647,9 @@ struct TExecRequest {
 
   // Profile information from the planning process.
   14: optional RuntimeProfile.TRuntimeProfileNode profile
+
+  // Set iff stmt_type is TESTCASE
+  15: optional string testcase_data_path
 }
 
 // Parameters to FeSupport.cacheJar().
@@ -904,4 +907,28 @@ struct TGetHadoopGroupsResponse {
 struct TBuildTestDescriptorTableParams {
   // Every entry describes the slot types of one tuple.
   1: required list<list<Types.TColumnType>> slot_types
+}
+
+// Output format for generating a testcase for a given query_stmt. The resulting bytes
+// are compressed before writing to a file.
+// TODO: Add the EXPLAIN string from the source cluster on which the testcase was
+// collected.
+struct TTestCaseData {
+  // Query statemnt for which this test case data is generated.
+  1: required string query_stmt
+
+  // All referenced table and view defs.
+  2: optional list<CatalogObjects.TTable> tables_and_views
+
+  // All databases referenced in the query.
+  3: optional list<CatalogObjects.TDatabase> dbs
+
+  // Output path
+  4: required string testcase_data_path
+
+  // Impala version that was used to generate this testcase.
+  // TODO: How to deal with version incompatibilities? E.g: A testcase collected on
+  // Impala version v1 may or may not be compatible to Impala version v2 if the
+  // underlying thrift layout changes.
+  5: required string impala_version
 }

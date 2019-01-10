@@ -253,17 +253,18 @@ public class CatalogServiceCatalog extends Catalog {
   private final Semaphore partialObjectFetchAccess_ =
       new Semaphore(MAX_PARALLEL_PARTIAL_FETCH_RPC_COUNT, /*fair =*/ true);
 
-  /**
-   * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
-   * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
-   * seconds) CatalogServiceCatalog will wait to establish an initial connection to the
-   * HMS before giving up. Using this setting allows catalogd and HMS to be started
-   * simultaneously.
-   */
+    /**
+     * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
+     * @param loadInBackground If true, table metadata will be loaded in the background.
+     * @param numLoadingThreads Number of threads used to load table metadata.
+     * @param metaStoreClientPool A pool of HMS clients backing this Catalog.
+     * @throws ImpalaException
+     */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
-      String kerberosPrincipal, String localLibraryPath) throws ImpalaException {
-    super(INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec);
+      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal,
+      String localLibraryPath, MetaStoreClientPool metaStoreClientPool)
+      throws ImpalaException {
+    super(metaStoreClientPool);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
@@ -321,6 +322,20 @@ public class CatalogServiceCatalog extends Catalog {
       throw new CatalogException(
           "Fatal error while initializing metastore event processor", e);
     }
+  }
+
+    /**
+     * Initializes the Catalog using the default MetastoreClientPool impl.
+     * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
+     * to establish an initial connection to the HMS before giving up.
+     */
+
+  public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
+      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
+      String kerberosPrincipal, String localLibraryPath) throws ImpalaException {
+    this(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId,
+        kerberosPrincipal, localLibraryPath, new MetaStoreClientPool(
+        INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec));
   }
 
   // Timeout for acquiring a table lock
@@ -1390,6 +1405,19 @@ public class CatalogServiceCatalog extends Catalog {
       versionLock_.writeLock().unlock();
     }
     return db.getTable(tblName);
+  }
+
+  /**
+   * Adds a table 'table' to the database 'db' and returns the table that was added.
+   */
+  public Table addTable(Db db, Table table) {
+    versionLock_.writeLock().lock();
+    try {
+      Preconditions.checkNotNull(db).addTable(Preconditions.checkNotNull(table));
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+    return table;
   }
 
   /**

@@ -17,6 +17,7 @@
 
 package org.apache.impala.common;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -393,6 +394,13 @@ public class FileSystemUtil {
     return fs;
   }
 
+  /**
+   * Returns the FileSystem object for a given path using the cached config.
+   */
+  public static FileSystem getFileSystemForPath(Path p) throws IOException {
+    return p.getFileSystem(CONF);
+  }
+
   public static DistributedFileSystem getDistributedFileSystem() throws IOException {
     FileSystem fs = getDefaultFileSystem();
     Preconditions.checkState(fs instanceof DistributedFileSystem);
@@ -510,5 +518,13 @@ public class FileSystemUtil {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;
     }
+  }
+
+  /**
+   * Returns true if the path 'p' is a directory, false otherwise.
+   */
+  public static boolean isDir(Path p) throws IOException {
+    FileSystem fs = getFileSystemForPath(p);
+    return fs.isDirectory(p);
   }
 }

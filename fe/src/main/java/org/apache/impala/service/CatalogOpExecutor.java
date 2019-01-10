@@ -17,6 +17,8 @@
 
 package org.apache.impala.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -45,6 +49,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
@@ -84,6 +89,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
@@ -122,6 +128,7 @@ import org.apache.impala.thrift.TCreateFunctionParams;
 import org.apache.impala.thrift.TCreateOrAlterViewParams;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDropDataSourceParams;
@@ -135,6 +142,7 @@ import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -153,9 +161,11 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.thrift.TTestCaseData;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
+import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.MetaStoreUtil;
@@ -163,6 +173,7 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.codahale.metrics.Timer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -341,6 +352,9 @@ public class CatalogOpExecutor {
       case ALTER_DATABASE:
         alterDatabase(ddlRequest.getAlter_db_params(), response);
         break;
+      case COPY_TESTCASE:
+        copyTestCaseData(ddlRequest.getCopy_test_case_params(), response);
+        break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type);
     }
@@ -359,6 +373,95 @@ public class CatalogOpExecutor {
     // will handle setting a bad status code.
     response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return response;
+  }
+
+  /**
+   * Loads the testcase metadata from the request into the catalog cache and returns
+   * the query statement this input testcase corresponds to. When loading the table and
+   * database objects, this method overwrites any existing tables or databases with the
+   * same name. However, these overwrites are *not* persistent. The old table/db
+   * states can be recovered by blowing away the cache using INVALIDATE METADATA.
+   */
+  @VisibleForTesting
+  public String copyTestCaseData(
+      TCopyTestCaseReq request, TDdlExecResponse response)
+      throws ImpalaException {
+    Path inputPath = new Path(Preconditions.checkNotNull(request.input_path));
+    // Read the data from the source FS.
+    FileSystem fs;
+    FSDataInputStream in;
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    try {
+      fs = FileSystemUtil.getFileSystemForPath(inputPath);
+      in = fs.open(inputPath);
+      IOUtils.copyBytes(in, out, fs.getConf(), /*close streams*/true);
+    } catch (IOException e) {
+      throw new ImpalaRuntimeException(String.format("Error reading test case data from" +
+          " path: %s", inputPath), e);
+    }
+    byte[] decompressedBytes = CompressionUtil.deflateDecompress(out.toByteArray());
+    TTestCaseData testCaseData = new TTestCaseData();
+    try {
+      JniUtil.deserializeThrift(testCaseData, decompressedBytes);
+    } catch (ImpalaException e) {
+      throw new CatalogException(String.format("Error deserializing the testcase data " +
+          "at path %s. File data may be corrupt or incompatible with the current version "
+          + "of Impala.", inputPath.toString()),e);
+    }
+
+    // Add the databases first, followed by the table and views information.
+    // Overwrites any existing Db/Table objects with name clashes. Since we overwrite
+    // the state in-memory and do not flush it to HMS, the older state can be recovered
+    // by loading everything back from HMS. For ex: INVALIDATE METADATA.
+    int numDbsAdded = 0;
+    for (TDatabase thriftDb: testCaseData.getDbs()) {
+      Db db = Db.fromTDatabase(thriftDb);
+      // Set a new version to force an overwrite if a Db already exists with the same
+      // name.
+      db.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+      Db ret = catalog_.addDb(db.getName(), db.getMetaStoreDb());
+      if (ret != null) {
+        ++numDbsAdded;
+        response.result.addToUpdated_catalog_objects(db.toTCatalogObject());
+      }
+    }
+
+    int numTblsAdded = 0;
+    int numViewsAdded = 0;
+    for(TTable tTable: testCaseData.tables_and_views) {
+      Db db = catalog_.getDb(tTable.db_name);
+      // Db should have been created by now.
+      Preconditions.checkNotNull(db, String.format("Missing db %s", tTable.db_name));
+      Table t = Table.fromThrift(db, tTable);
+      // Set a new version to force an overwrite if a table already exists with the same
+      // name.
+      t.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+      catalog_.addTable(db, t);
+      if (t instanceof View) {
+        ++numViewsAdded;
+      } else {
+        ++numTblsAdded;
+      }
+      // The table lock is needed here since toTCatalogObject() calls Table#toThrift()
+      // which expects the current thread to hold this lock. For more details refer
+      // to IMPALA-4092.
+      t.getLock().lock();
+      try {
+        response.result.addToUpdated_catalog_objects(t.toTCatalogObject());
+      } finally {
+        t.getLock().unlock();
+      }
+    }
+    StringBuilder responseStr = new StringBuilder();
+    responseStr.append(String.format("Testcase generated using Impala version %s. ",
+        testCaseData.getImpala_version()));
+    responseStr.append(String.format(
+        "%d db(s), %d table(s) and %d view(s) imported for query: ", numDbsAdded,
+        numTblsAdded, numViewsAdded));
+    responseStr.append("\n\n").append(testCaseData.getQuery_stmt());
+    LOG.info(String.format("%s. Testcase path: %s", responseStr, inputPath));
+    addSummary(response, responseStr.toString());
+    return testCaseData.getQuery_stmt();
   }
 
   /**

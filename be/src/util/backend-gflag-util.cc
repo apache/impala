@@ -17,6 +17,7 @@
 
 #include "common/global-flags.h"
 
+#include "common/version.h"
 #include "gen-cpp/BackendGflags_types.h"
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
@@ -141,6 +142,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_kudu_mutation_buffer_size(FLAGS_kudu_mutation_buffer_size);
   cfg.__set_kudu_error_buffer_size(FLAGS_kudu_error_buffer_size);
   cfg.__set_hms_event_polling_interval_s(FLAGS_hms_event_polling_interval_s);
+  cfg.__set_impala_build_version(::GetDaemonBuildVersion());
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

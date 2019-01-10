@@ -115,4 +115,6 @@ struct TBackendGflags {
   44: required i32 kudu_error_buffer_size
 
   45: required i32 hms_event_polling_interval_s
+
+  46: required string impala_build_version
 }

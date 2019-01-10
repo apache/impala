@@ -163,6 +163,8 @@ public class AnalysisContext {
       return isUseStmt() || isViewMetadataStmt() || isDdlStmt();
     }
 
+    public boolean isTestCaseStmt() { return stmt_ instanceof CopyTestCaseStmt; }
+
     private boolean isDdlStmt() {
       return isCreateTableLikeStmt() || isCreateTableStmt() ||
           isCreateViewStmt() || isCreateDbStmt() || isDropDbStmt() ||
@@ -195,7 +197,8 @@ public class AnalysisContext {
      */
     public boolean isHierarchicalAuthStmt() {
       return isQueryStmt() || isInsertStmt() || isUpdateStmt() || isDeleteStmt()
-          || isCreateTableAsSelectStmt() || isCreateViewStmt() || isAlterViewStmt();
+          || isCreateTableAsSelectStmt() || isCreateViewStmt() || isAlterViewStmt()
+          || isTestCaseStmt();
     }
 
     /**
@@ -482,9 +485,13 @@ public class AnalysisContext {
 
     // Re-analyze the stmt with a new analyzer.
     analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
+    // We restore the privileges collected in the first pass below. So, no point in
+    // collecting them again.
+    analysisResult_.analyzer_.setEnablePrivChecks(false);
     analysisResult_.stmt_.reset();
     try {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+      analysisResult_.analyzer_.setEnablePrivChecks(true); // restore
     } catch (AnalysisException e) {
       LOG.error(String.format("Error analyzing the rewritten query.\n" +
           "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),

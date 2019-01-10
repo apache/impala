@@ -94,6 +94,19 @@ public class JniUtil {
   }
 
   /**
+   * Serializes input into a byte[] using the default protocol factory.
+   */
+  public static <T extends TBase<?, ?>>
+  byte[] serializeToThrift(T input) throws ImpalaException {
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(input);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
    * Serializes input into a byte[] using a given protocol factory.
    */
   public static <T extends TBase<?, ?>, F extends TProtocolFactory>
@@ -105,6 +118,12 @@ public class JniUtil {
       throw new InternalException(e.getMessage());
     }
   }
+
+  public static <T extends TBase<?, ?>>
+  void deserializeThrift(T result, byte[] thriftData) throws ImpalaException {
+    deserializeThrift(protocolFactory_, result, thriftData);
+  }
+
   /**
    * Deserialize a serialized form of a Thrift data structure to its object form.
    */

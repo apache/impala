@@ -734,6 +734,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
               value));
         }
         query_options->__set_resource_trace_ratio(val);
+      }
+      case TImpalaQueryOptions::PLANNER_TESTCASE_MODE: {
+        query_options->__set_planner_testcase_mode(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       }
       case TImpalaQueryOptions::NUM_REMOTE_EXECUTOR_CANDIDATES: {

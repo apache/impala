@@ -312,7 +312,6 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   74: optional string client_identifier;
 
-  // See comment in ImpalaService.thrift
   75: optional double resource_trace_ratio = 0;
 
   // See comment in ImpalaService.thrift.
@@ -321,6 +320,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   77: optional i64 num_rows_produced_limit = 0;
+
+  // See comment in ImpalaService.thrift
+  78: optional bool planner_testcase_mode = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -52,17 +52,20 @@ public class HdfsUri {
 
   public void analyze(Analyzer analyzer, Privilege privilege)
       throws AnalysisException {
-    analyze(analyzer, privilege, FsAction.NONE, true);
+    analyze(analyzer, privilege, FsAction.NONE, /*registerPrivReq*/ true,
+        /*pathMustExist*/ false);
   }
 
   public void analyze(Analyzer analyzer, Privilege privilege, FsAction perm)
       throws AnalysisException {
-    analyze(analyzer, privilege, perm, true);
+    analyze(analyzer, privilege, perm, /*pathMustExist*/ true,
+        /*pathMustExist*/ false);
   }
 
   public void analyze(Analyzer analyzer, Privilege privilege, boolean registerPrivReq)
       throws AnalysisException {
-    analyze(analyzer, privilege, FsAction.NONE, registerPrivReq);
+    analyze(
+        analyzer, privilege, FsAction.NONE, registerPrivReq, /*pathMustExist*/ false);
   }
 
   /**
@@ -70,9 +73,10 @@ public class HdfsUri {
    * Optionally check location path permission, issue warning if impala user doesn't
    * have sufficient access rights.
    * Optionally register a privilege request. Used by GRANT/REVOKE privilege statements.
+   * If pathMustExist is true and the path does not exist, AnalysisException is thrown.
    */
   public void analyze(Analyzer analyzer, Privilege privilege, FsAction perm,
-      boolean registerPrivReq) throws AnalysisException {
+      boolean registerPrivReq, boolean pathMustExist) throws AnalysisException {
     if (location_.isEmpty()) {
       throw new AnalysisException("URI path cannot be empty.");
     }
@@ -88,15 +92,20 @@ public class HdfsUri {
     Path parentPath = uriPath_.getParent();
     try {
       FileSystem fs = uriPath_.getFileSystem(FileSystemUtil.getConfiguration());
-      boolean pathExists = false;
+      if (pathMustExist && !fs.exists(uriPath_)) {
+        throw new AnalysisException(String.format("Path does not exist: %s", uriPath_));
+      }
+      boolean parentPathExists = false;
       StringBuilder errorMsg = new StringBuilder();
       try {
-        pathExists = fs.exists(parentPath);
-        if (!pathExists) errorMsg.append("Path does not exist.");
+        parentPathExists = fs.exists(parentPath);
+        if (!parentPathExists) {
+          errorMsg.append("Path does not exist.");
+        }
       } catch (Exception e) {
         errorMsg.append(e.getMessage());
       }
-      if (!pathExists) {
+      if (!parentPathExists) {
         analyzer.addWarning(String.format("Path '%s' cannot be reached: %s",
             parentPath, errorMsg.toString()));
       } else if (perm != FsAction.NONE) {

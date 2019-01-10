@@ -65,6 +65,8 @@ public class StmtRewriter {
       queryStmt = ((UpdateStmt) analysisResult.getStmt()).getQueryStmt();
     } else if (analysisResult.isDeleteStmt()) {
       queryStmt = ((DeleteStmt) analysisResult.getStmt()).getQueryStmt();
+    } else if (analysisResult.isTestCaseStmt()) {
+      queryStmt = ((CopyTestCaseStmt) analysisResult.getStmt()).getQueryStmt();
     } else {
       throw new AnalysisException("Unsupported statement: " + stmt.toSql());
     }

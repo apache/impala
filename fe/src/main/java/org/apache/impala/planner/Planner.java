@@ -279,6 +279,12 @@ public class Planner {
           PrintUtils.printBytesRoundedToMb(request.getPer_host_mem_estimate())));
       hasHeader = true;
     }
+    // Warn if the planner is running in DEBUG mode.
+    if (request.query_ctx.client_request.query_options.planner_testcase_mode) {
+      str.append("WARNING: The planner is running in TESTCASE mode. This should only be "
+          + "used by developers for debugging.\nTo disable it, do SET " +
+          "PLANNER_TESTCASE_MODE=false.\n");
+    }
     if (request.query_ctx.disable_codegen_hint) {
       str.append("Codegen disabled by planner\n");
     }

@@ -176,6 +176,11 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
           exec_request_.explain_result.results));
       break;
     }
+    case TStmtType::TESTCASE: {
+      DCHECK(exec_request_.__isset.testcase_data_path);
+      SetResultSet(vector<string>(1, exec_request_.testcase_data_path));
+      break;
+    }
     case TStmtType::DDL: {
       DCHECK(exec_request_.__isset.catalog_op_request);
       RETURN_IF_ERROR(ExecDdlRequest());

@@ -145,6 +145,9 @@ struct TDdlExecRequest {
 
   // Parameters for ALTER DATABASE
   24: optional JniCatalog.TAlterDbParams alter_db_params
+
+  // Parameters for replaying an exported testcase.
+  25: optional JniCatalog.TCopyTestCaseReq copy_test_case_params
 }
 
 // Response from executing a TDdlExecRequest

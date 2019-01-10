@@ -63,8 +63,7 @@ public abstract class Catalog implements AutoCloseable {
   public static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
   public static final String DEFAULT_DB = "default";
 
-  protected final MetaStoreClientPool metaStoreClientPool_ =
-      new MetaStoreClientPool(0, 0);
+  private final MetaStoreClientPool metaStoreClientPool_;
 
   // Cache of authorization policy metadata. Populated from data retried from the
   // Sentry Service, if configured.
@@ -84,29 +83,28 @@ public abstract class Catalog implements AutoCloseable {
   protected final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
       new CatalogObjectCache<HdfsCachePool>(false);
 
-  public Catalog() {
+  /**
+   * Creates a new instance of Catalog backed by a given MetaStoreClientPool.
+   */
+  public Catalog(MetaStoreClientPool metaStoreClientPool) {
     dataSources_ = new CatalogObjectCache<DataSource>();
+    metaStoreClientPool_ = Preconditions.checkNotNull(metaStoreClientPool);
   }
 
   /**
-   * Creates a new instance of Catalog. It also adds 'numClients' clients to
-   * 'metastoreClientPool_'.
-   * 'initialCnxnTimeoutSec' specifies the time (in seconds) Catalog will wait to
-   * establish an initial connection to the HMS. Using this setting allows catalogd and
-   * HMS to be started simultaneously.
+   * Creates a Catalog instance with the default MetaStoreClientPool implementation.
+   * Refer to MetaStoreClientPool class for more details.
    */
-  public Catalog(int numClients, int initialCnxnTimeoutSec) {
-    this();
-    metaStoreClientPool_.initClients(numClients, initialCnxnTimeoutSec);
+  public Catalog() {
+    this(new MetaStoreClientPool(0, 0));
   }
 
   /**
    * Adds a new database to the catalog, replacing any existing database with the same
-   * name. Returns the previous database with this name, or null if there was no
-   * previous database.
+   * name.
    */
-  public Db addDb(Db db) {
-    return dbCache_.get().put(db.getName().toLowerCase(), db);
+  public void addDb(Db db) {
+    dbCache_.get().put(db.getName().toLowerCase(), db);
   }
 
   /**

@@ -53,7 +53,8 @@ enum TDdlType {
   REVOKE_PRIVILEGE,
   TRUNCATE_TABLE,
   COMMENT_ON,
-  ALTER_DATABASE
+  ALTER_DATABASE,
+  COPY_TESTCASE
 }
 
 enum TOwnerType {
@@ -747,4 +748,9 @@ struct TCommentOnParams {
 struct TGetCatalogServerMetricsResponse {
   // Partial fetch RPC queue length.
   1: required i32 catalog_partial_fetch_rpc_queue_len
+}
+
+// Request to copy the generated testcase from a given input path.
+struct TCopyTestCaseReq {
+  1: required string input_path
 }

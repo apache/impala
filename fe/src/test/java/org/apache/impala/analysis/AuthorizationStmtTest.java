@@ -339,6 +339,99 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   @Test
+  public void testCopyTestCasePrivileges() throws ImpalaException {
+    // Used for select *, with, and union
+    Set<String> expectedAuthorizables = Sets.newHashSet(
+        "functional", // For including the DB related metadata in the testcase file.
+        "functional.alltypes",
+        "functional.alltypes.id",
+        "functional.alltypes.bool_col",
+        "functional.alltypes.tinyint_col",
+        "functional.alltypes.smallint_col",
+        "functional.alltypes.int_col",
+        "functional.alltypes.bigint_col",
+        "functional.alltypes.float_col",
+        "functional.alltypes.double_col",
+        "functional.alltypes.date_string_col",
+        "functional.alltypes.string_col",
+        "functional.alltypes.timestamp_col",
+        "functional.alltypes.year",
+        "functional.alltypes.month",
+        "hdfs://localhost:20500/tmp" // For the testcase output URI
+    );
+
+    // Select *
+    verifyPrivilegeReqs("copy testcase to '/tmp' select * from functional" +
+        ".alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("copy testcase to '/tmp' select alltypes.* from " +
+        "functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"), "copy testcase to " +
+        "'/tmp'  select * from alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "copy testcase to '/tmp' select alltypes.* from alltypes",
+        expectedAuthorizables);
+    verifyPrivilegeReqs("copy testcase to '/tmp' select a.* from functional" +
+        ".alltypes a", expectedAuthorizables);
+
+    // With clause.
+    verifyPrivilegeReqs("copy testcase to '/tmp' with t as (select * from " +
+        "functional.alltypes) select * from t", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "copy testcase to '/tmp' with t as (select * from alltypes) select * " +
+            "from t", expectedAuthorizables);
+
+    // Union.
+    verifyPrivilegeReqs("copy testcase to '/tmp' select * from functional" +
+        ".alltypes union all select * from functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"), "copy testcase to '/tmp'"
+            + "select * from alltypes union all select * from" + " alltypes",
+        expectedAuthorizables);
+
+    // Select a specific column.
+    expectedAuthorizables = Sets.newHashSet(
+        "functional",
+        "functional.alltypes",
+        "functional.alltypes.id",
+        "hdfs://localhost:20500/tmp"
+    );
+    verifyPrivilegeReqs("copy testcase to '/tmp' select id from " +
+        "functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("copy testcase to '/tmp' select alltypes.id from " +
+            "functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "copy testcase to '/tmp' select alltypes.id from alltypes",
+        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"), "copy testcase to " +
+            "'/tmp' select id from alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("copy testcase to '/tmp' select alltypes.id from " +
+            "functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("copy testcase to '/tmp' select a.id from functional" +
+        ".alltypes a", expectedAuthorizables);
+
+    // Verify VIEW_METADATA privileges on authorizables.
+    final String copyTestCasePrefix = "copy testcase to '/tmp' ";
+    for (AuthzTest authzTest: new AuthzTest[] {
+        authorize(copyTestCasePrefix + "with t as (select id from functional.alltypes) " +
+            "select * from t"),
+        authorize(copyTestCasePrefix + "select id from functional.alltypes")}) {
+      authzTest
+          // Ideal case, when all the privileges are in place.
+          .ok(onUri(false, "/tmp", TPrivilegeLevel.ALL),
+              onDatabase("functional", viewMetadataPrivileges()),
+              onTable("functional", "alltypes", viewMetadataPrivileges()))
+          // DB does not have the metadata access privileges
+          .error(accessError("functional"),
+              onUri(false, "/tmp", TPrivilegeLevel.ALL),
+              onDatabase("functional", allExcept(viewMetadataPrivileges())),
+              onTable("functional", "alltypes", viewMetadataPrivileges()))
+          // URI does not have ALL privilege.
+          .error(accessError("hdfs://localhost:20500/tmp"),
+              onDatabase("functional", viewMetadataPrivileges()),
+              onTable("functional", "alltypes", viewMetadataPrivileges()));
+    }
+  }
+
+  @Test
   public void testSelect() throws ImpalaException {
     for (AuthzTest authzTest: new AuthzTest[]{
         // Select a specific column on a table.

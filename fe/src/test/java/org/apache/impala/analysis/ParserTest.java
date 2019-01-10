@@ -90,6 +90,28 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestCopyTestCase() {
+    // Only QueryStmts are supported
+    ParsesOk("copy testcase to 'hdfs:///foo' select * from tbl");
+    ParsesOk("copy testcase to 'hdfs:///foo' with v as (select 1) select * from v");
+    ParsesOk("copy testcase to 'hdfs:///foo' select * from t1 union select * from t2");
+    // non QueryStmts aren not supported.
+    ParserError("copy testcase to 'hdfs:///foo' alter table foo add partition (p=1)");
+    ParserError("copy testcase to 'hdfs:///foo' insert into t values (1)");
+    // missing output directory.
+    ParserError("copy testcase to select * from tbl");
+    // missing quotes for the directory path.
+    ParserError("copy testcase to hdfs:///foo select * from tbl");
+
+    ParsesOk("copy testcase from 'hdfs:///foo'");
+    // missing quotes.
+    ParserError("copy testcase from hdfs:///foo");
+    ParserError("copy testcase");
+    // testcase is not a reserved word.
+    ParsesOk("select testcase from foo");
+  }
+
+  @Test
   public void TestNoFromClause() {
     ParsesOk("select 1 + 1, 'two', f(3), a + b");
     ParserError("select 1 + 1 'two' f(3) a + b");
@@ -3262,9 +3284,9 @@ public class ParserTest extends FrontendTestBase {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, COMMENT, COMPUTE, CREATE, DELETE, DESCRIBE, DROP, EXPLAIN, " +
-        "GRANT, INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, " +
-        "TRUNCATE, UPDATE, UPSERT, USE, VALUES, WITH\n");
+        "Expected: ALTER, COMMENT, COMPUTE, COPY, CREATE, DELETE, DESCRIBE, DROP, " +
+            "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, " +
+            "SHOW, TRUNCATE, UPDATE, UPSERT, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",

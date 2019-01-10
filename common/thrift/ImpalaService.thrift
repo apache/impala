@@ -372,6 +372,11 @@ enum TImpalaQueryOptions {
   // canceled if the query is still executing after this limit is hit. A value
   // of 0 means there is no limit on the number of rows produced.
   NUM_ROWS_PRODUCED_LIMIT
+
+  // Set when attempting to load a planner testcase. Typically used by developers for
+  // debugging a testcase. Should not be set in user clusters. If set, a warning
+  // is emitted in the query runtime profile.
+  PLANNER_TESTCASE_MODE
 }
 
 // The summary of a DML statement.
