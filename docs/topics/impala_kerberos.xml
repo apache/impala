@@ -83,10 +83,6 @@ under the License.
           <xref href="http://web.mit.edu/Kerberos/krb5-1.8/" scope="external" format="html"> Kerberos
           documentation</xref>.
         </p>
-        <p rev="1.2">
-          Currently, you cannot use the resource management feature on a cluster that has Kerberos
-          authentication enabled.
-        </p>
       </note>
 
       <p>
