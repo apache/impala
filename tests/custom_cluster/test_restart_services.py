@@ -35,6 +35,7 @@ from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)
 
+
 class TestRestart(CustomClusterTestSuite):
   @classmethod
   def get_workload(cls):
@@ -121,33 +122,40 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
     # Test that a failed shut down from a bogus host or port fails gracefully.
     ex = self.execute_query_expect_failure(self.client,
         ":shutdown('e6c00ca5cd67b567eb96c6ecfb26f05')")
-    assert "Couldn't open transport" in str(ex)
+    assert "Could not find IPv4 address for:" in str(ex)
     ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:100000')")
-    assert "Couldn't open transport" in str(ex)
-    # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully.
-    ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:21050')")
-    assert ("RPC Error: Client for localhost:21050 hit an unexpected exception: " +
-            "Invalid method name: 'RemoteShutdown'") in str(ex)
+    assert "Invalid port:" in str(ex)
+    assert ("This may be because the port specified is wrong.") not in str(ex)
+
+    # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully-ish.
+    thrift_ports = [21051, 22001]  # HS2 port, old backend port.
+    for port in thrift_ports:
+      ex = self.execute_query_expect_failure(self.client,
+          ":shutdown('localhost:{0}')".format(port))
+      assert ("failed with error 'RemoteShutdown() RPC failed") in str(ex)
+      assert ("This may be because the port specified is wrong.") in str(ex)
+
     # Test RPC error handling with debug action.
-    ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:22001')",
+    ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:27001')",
         query_options={'debug_action': 'CRS_SHUTDOWN_RPC:FAIL'})
-    assert 'Debug Action: CRS_SHUTDOWN_RPC:FAIL' in str(ex)
+    assert 'Rpc to 127.0.0.1:27001 failed with error \'Debug Action: ' \
+        'CRS_SHUTDOWN_RPC:FAIL' in str(ex)
 
     # Test remote shutdown.
     LOG.info("Start remote shutdown {0}".format(time.time()))
-    self.execute_query_expect_success(self.client, ":shutdown('localhost:22001')",
+    self.execute_query_expect_success(self.client, ":shutdown('localhost:27001')",
         query_options={})
 
     # Remote shutdown does not require statestore.
     self.cluster.statestored.kill()
     self.cluster.statestored.wait_for_exit()
-    self.execute_query_expect_success(self.client, ":shutdown('localhost:22002')",
+    self.execute_query_expect_success(self.client, ":shutdown('localhost:27002')",
         query_options={})
 
     # Test local shutdown, which should succeed even with injected RPC error.
     LOG.info("Start local shutdown {0}".format(time.time()))
     self.execute_query_expect_success(self.client,
-        ":shutdown('{0}:22000')".format(socket.gethostname()),
+        ":shutdown('{0}:27000')".format(socket.gethostname()),
         query_options={'debug_action': 'CRS_SHUTDOWN_RPC:FAIL'})
 
     # Make sure that the impala daemons exit after the startup grace period plus a 10
@@ -207,7 +215,7 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
     # and only get scan ranges that don't contain the midpoint of any row group, and
     # therefore not actually produce any rows.
     SLOW_QUERY = "select count(*) from tpch.lineitem where sleep(1) = l_orderkey"
-    SHUTDOWN_EXEC2 = ": shutdown('localhost:22001')"
+    SHUTDOWN_EXEC2 = ": shutdown('localhost:27001')"
 
     # Run this query before shutdown and make sure that it executes successfully on
     # all executors through the startup grace period without disruption.
@@ -275,7 +283,7 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
     # Test that we can reduce the deadline after setting it to a high value.
     # Run a query that will fail as a result of the reduced deadline.
     deadline_expiry_handle = self.__exec_and_wait_until_running(SLOW_QUERY)
-    SHUTDOWN_EXEC3 = ": shutdown('localhost:22002', {0})"
+    SHUTDOWN_EXEC3 = ": shutdown('localhost:27002', {0})"
     VERY_HIGH_DEADLINE = 5000
     HIGH_DEADLINE = 1000
     LOW_DEADLINE = 5

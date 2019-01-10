@@ -20,6 +20,7 @@
 #include "common/constant-strings.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
+#include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/coordinator.h"
@@ -94,7 +95,7 @@ bool ControlService::Authorize(const google::protobuf::Message* req,
 }
 
 Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
-    const ClientRequestState& request_state, kudu::rpc::RpcContext* rpc_context,
+    const ClientRequestState& request_state, RpcContext* rpc_context,
     TRuntimeProfileForest* thrift_profiles) {
   // Debug action to simulate deserialization failure.
   RETURN_IF_ERROR(DebugAction(request_state.query_options(),
@@ -110,7 +111,7 @@ Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
 }
 
 void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
-    ReportExecStatusResponsePB* response, kudu::rpc::RpcContext* rpc_context) {
+    ReportExecStatusResponsePB* response, RpcContext* rpc_context) {
   const TUniqueId query_id = ProtoToQueryId(request->query_id());
   shared_ptr<ClientRequestState> request_state =
       ExecEnv::GetInstance()->impala_server()->GetClientRequestState(query_id);
@@ -152,9 +153,9 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
   RespondAndReleaseRpc(resp_status, response, rpc_context);
 }
 
-template<typename ResponsePBType>
-void ControlService::RespondAndReleaseRpc(const Status& status, ResponsePBType* response,
-    kudu::rpc::RpcContext* rpc_context) {
+template <typename ResponsePBType>
+void ControlService::RespondAndReleaseRpc(
+    const Status& status, ResponsePBType* response, RpcContext* rpc_context) {
   status.ToProto(response->mutable_status());
   // Release the memory against the control service's memory tracker.
   mem_tracker_->Release(rpc_context->GetTransferSize());
@@ -162,10 +163,11 @@ void ControlService::RespondAndReleaseRpc(const Status& status, ResponsePBType* 
 }
 
 void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB* request,
-    CancelQueryFInstancesResponsePB* response, ::kudu::rpc::RpcContext* rpc_context) {
+    CancelQueryFInstancesResponsePB* response, RpcContext* rpc_context) {
   DCHECK(request->has_query_id());
   const TUniqueId& query_id = ProtoToQueryId(request->query_id());
   VLOG_QUERY << "CancelQueryFInstances(): query_id=" << PrintId(query_id);
+  // TODO(IMPALA-8143) Use DebugAction for fault injection.
   FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
   QueryState::ScopedRef qs(query_id);
   if (qs.get() == nullptr) {
@@ -176,5 +178,16 @@ void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB*
   }
   qs->Cancel();
   RespondAndReleaseRpc(Status::OK(), response, rpc_context);
+}
+
+void ControlService::RemoteShutdown(const RemoteShutdownParamsPB* req,
+    RemoteShutdownResultPB* response, RpcContext* rpc_context) {
+  // TODO(IMPALA-8143) Use DebugAction for fault injection.
+  FAULT_INJECTION_RPC_DELAY(RPC_REMOTESHUTDOWN);
+  Status status = ExecEnv::GetInstance()->impala_server()->StartShutdown(
+      req->has_deadline_s() ? req->deadline_s() : -1,
+      response->mutable_shutdown_status());
+
+  RespondAndReleaseRpc(status, response, rpc_context);
 }
 }

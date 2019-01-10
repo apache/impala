@@ -733,42 +733,6 @@ struct TPublishFilterParams {
 struct TPublishFilterResult {
 }
 
-// RemoteShutdown
-
-struct TRemoteShutdownParams {
-  // Deadline for the shutdown. After this deadline expires (starting at the time when
-  // this remote shutdown command is received), the Impala daemon exits immediately
-  // regardless of whether queries are still executing.
-  1: optional i64 deadline_s
-}
-
-// The current status of a shutdown operation.
-struct TShutdownStatus {
-  // Milliseconds remaining in startup grace period. 0 if the period has expired.
-  1: required i64 grace_remaining_ms
-
-  // Milliseconds remaining in shutdown deadline. 0 if the deadline has expired.
-  2: required i64 deadline_remaining_ms
-
-  // Number of fragment instances still executing.
-  3: required i64 finstances_executing
-
-  // Number of client requests still registered with the Impala server that is being shut
-  // down.
-  4: required i64 client_requests_registered
-
-  // Number of queries still executing on backend.
-  5: required i64 backend_queries_executing
-}
-
-struct TRemoteShutdownResult {
-  // Success or failure of the operation.
-  1: required Status.TStatus status
-
-  // If status is OK, additional info about the shutdown status
-  2: required TShutdownStatus shutdown_status
-}
-
 service ImpalaInternalService {
   // Called by coord to start asynchronous execution of a query's fragment instances in
   // backend.
@@ -782,7 +746,4 @@ service ImpalaInternalService {
   // Called by the coordinator to deliver global runtime filters to fragments for
   // application at plan nodes.
   TPublishFilterResult PublishFilter(1:TPublishFilterParams params);
-
-  // Called to initiate shutdown of this backend.
-  TRemoteShutdownResult RemoteShutdown(1:TRemoteShutdownParams params);
 }

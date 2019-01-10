@@ -33,9 +33,9 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "scheduling/admission-controller.h"
-#include "service/impala-server.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
+#include "service/impala-server.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/logging-support.h"
@@ -854,7 +854,10 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
     Value backend_obj(kObjectType);
     string address = TNetworkAddressToString(backend.address);
     Value str(address.c_str(), document->GetAllocator());
+    Value krpc_address(
+        TNetworkAddressToString(backend.krpc_address).c_str(), document->GetAllocator());
     backend_obj.AddMember("address", str, document->GetAllocator());
+    backend_obj.AddMember("krpc_address", krpc_address, document->GetAllocator());
     backend_obj.AddMember("is_coordinator", backend.is_coordinator,
         document->GetAllocator());
     backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());

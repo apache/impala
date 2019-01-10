@@ -20,7 +20,15 @@
 
 #include "gen-cpp/control_service.service.h"
 
+#include "kudu/rpc/rpc_context.h"
+#include "kudu/rpc/rpc_controller.h"
+#include "util/debug-util.h"
+
 #include "common/status.h"
+
+using kudu::MonoDelta;
+using kudu::rpc::RpcContext;
+using kudu::rpc::RpcController;
 
 namespace kudu {
 namespace rpc {
@@ -59,10 +67,37 @@ class ControlService : public ControlServiceIf {
   virtual void CancelQueryFInstances(const CancelQueryFInstancesRequestPB* req,
       CancelQueryFInstancesResponsePB* resp, ::kudu::rpc::RpcContext* context) override;
 
+  /// Initiate shutdown.
+  virtual void RemoteShutdown(const RemoteShutdownParamsPB* req,
+      RemoteShutdownResultPB* response, ::kudu::rpc::RpcContext* context) override;
+
   /// Gets a ControlService proxy to a server with 'address' and 'hostname'.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
   static Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
       std::unique_ptr<ControlServiceProxy>* proxy);
+
+  /// Retry the Rpc 'rpc_call' up to 'times_to_try' times.
+  /// Each Rpc has a timeout of 'timeout_s' seconds.
+  /// There is no sleeping between retries.
+  /// Pass 'debug_action' to DebugAction() to potentially inject errors.
+  template <typename F>
+  static Status DoRpcWithRetry(F&& rpc_call, const TQueryCtx& query_ctx,
+      const char* debug_action, const char* error_msg, int times_to_try, int timeout_s) {
+    DCHECK_GT(times_to_try, 0);
+    Status rpc_status;
+    for (int i = 0; i < times_to_try; i++) {
+      RpcController rpc_controller;
+      rpc_controller.set_timeout(MonoDelta::FromSeconds(timeout_s));
+      // Check for injected failures.
+      rpc_status = DebugAction(query_ctx.client_request.query_options, debug_action);
+      if (!rpc_status.ok()) continue;
+
+      rpc_status = FromKuduStatus(rpc_call(&rpc_controller), error_msg);
+      if (rpc_status.ok()) break;
+      // TODO(IMPALA-8143) Add a sleep if RpcMgr::IsServerTooBusy().
+    }
+    return rpc_status;
+  }
 
  private:
   /// Tracks the memory usage of payload in the service queue.

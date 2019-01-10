@@ -2428,38 +2428,39 @@ Status ImpalaServer::CheckNotShuttingDown() const {
       TErrorCode::SERVER_SHUTTING_DOWN, ShutdownStatusToString(GetShutdownStatus())));
 }
 
-TShutdownStatus ImpalaServer::GetShutdownStatus() const {
-  TShutdownStatus result;
+ShutdownStatusPB ImpalaServer::GetShutdownStatus() const {
+  ShutdownStatusPB result;
   int64_t shutdown_time = shutting_down_.Load();
   DCHECK_GT(shutdown_time, 0);
   int64_t shutdown_deadline = shutdown_deadline_.Load();
   DCHECK_GT(shutdown_time, 0);
   int64_t now = MonotonicMillis();
   int64_t elapsed_ms = now - shutdown_time;
-  result.grace_remaining_ms =
-      max<int64_t>(0, FLAGS_shutdown_grace_period_s * 1000 - elapsed_ms);
-  result.deadline_remaining_ms =
-      max<int64_t>(0, shutdown_deadline - now);
-  result.finstances_executing =
-      ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
-  result.client_requests_registered = ImpaladMetrics::NUM_QUERIES_REGISTERED->GetValue();
-  result.backend_queries_executing =
-      ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->GetValue();
+  result.set_grace_remaining_ms(
+      max<int64_t>(0, FLAGS_shutdown_grace_period_s * 1000 - elapsed_ms));
+  result.set_deadline_remaining_ms(max<int64_t>(0, shutdown_deadline - now));
+  result.set_finstances_executing(
+      ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue());
+  result.set_client_requests_registered(
+      ImpaladMetrics::NUM_QUERIES_REGISTERED->GetValue());
+  result.set_backend_queries_executing(
+      ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->GetValue());
   return result;
 }
 
-string ImpalaServer::ShutdownStatusToString(const TShutdownStatus& shutdown_status) {
+string ImpalaServer::ShutdownStatusToString(const ShutdownStatusPB& shutdown_status) {
   return Substitute("startup grace period left: $0, deadline left: $1, "
-      "queries registered on coordinator: $2, queries executing: $3, "
-      "fragment instances: $4",
-      PrettyPrinter::Print(shutdown_status.grace_remaining_ms, TUnit::TIME_MS),
-      PrettyPrinter::Print(shutdown_status.deadline_remaining_ms, TUnit::TIME_MS),
-      shutdown_status.client_requests_registered,
-      shutdown_status.backend_queries_executing, shutdown_status.finstances_executing);
+                    "queries registered on coordinator: $2, queries executing: $3, "
+                    "fragment instances: $4",
+      PrettyPrinter::Print(shutdown_status.grace_remaining_ms(), TUnit::TIME_MS),
+      PrettyPrinter::Print(shutdown_status.deadline_remaining_ms(), TUnit::TIME_MS),
+      shutdown_status.client_requests_registered(),
+      shutdown_status.backend_queries_executing(),
+      shutdown_status.finstances_executing());
 }
 
 Status ImpalaServer::StartShutdown(
-    int64_t relative_deadline_s, TShutdownStatus* shutdown_status) {
+    int64_t relative_deadline_s, ShutdownStatusPB* shutdown_status) {
   DCHECK_GE(relative_deadline_s, -1);
   if (relative_deadline_s == -1) relative_deadline_s = FLAGS_shutdown_deadline_s;
   int64_t now = MonotonicMillis();
@@ -2493,22 +2494,24 @@ Status ImpalaServer::StartShutdown(
   // Show the full grace/limit times to avoid showing confusing intermediate values
   // to the person running the statement.
   if (set_grace) {
-    shutdown_status->grace_remaining_ms = FLAGS_shutdown_grace_period_s * 1000L;
+    shutdown_status->set_grace_remaining_ms(FLAGS_shutdown_grace_period_s * 1000L);
   }
-  if (set_deadline) shutdown_status->deadline_remaining_ms = relative_deadline_s * 1000L;
+  if (set_deadline) {
+    shutdown_status->set_deadline_remaining_ms(relative_deadline_s * 1000L);
+  }
   return Status::OK();
 }
 
 [[noreturn]] void ImpalaServer::ShutdownThread() {
   while (true) {
     SleepForMs(1000);
-    TShutdownStatus shutdown_status = GetShutdownStatus();
+    const ShutdownStatusPB& shutdown_status = GetShutdownStatus();
     LOG(INFO) << "Shutdown status: " << ShutdownStatusToString(shutdown_status);
-    if (shutdown_status.grace_remaining_ms <= 0
-        && shutdown_status.backend_queries_executing == 0
-        && shutdown_status.client_requests_registered == 0) {
+    if (shutdown_status.grace_remaining_ms() <= 0
+        && shutdown_status.backend_queries_executing() == 0
+        && shutdown_status.client_requests_registered() == 0) {
       break;
-    } else if (shutdown_status.deadline_remaining_ms <= 0) {
+    } else if (shutdown_status.deadline_remaining_ms() <= 0) {
       break;
     }
   }

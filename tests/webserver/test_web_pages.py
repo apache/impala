@@ -469,3 +469,21 @@ class TestWebPage(ImpalaTestSuite):
     assert 'backends' in response_json
     # When this test runs, all impalads would have already started.
     assert len(response_json['backends']) == 3
+
+    # Look at results for a single backend - they are not sorted.
+    backend_row = response_json['backends'][0]
+
+    # The 'address' column is the backend port of the impalad.
+    assert len(backend_row['address']) > 0
+    be_ports = ('22000', '22001', '22002')
+    assert backend_row['address'].endswith(be_ports)
+
+    # The 'krpc_address' is the krpc address of the impalad.
+    assert len(backend_row['krpc_address']) > 0
+    krpc_ports = ('27000', '27001', '27002')
+    assert backend_row['krpc_address'].endswith(krpc_ports)
+
+    assert backend_row['is_coordinator']
+    assert backend_row['is_executor']
+    assert not backend_row['is_quiescing']
+    assert len(backend_row['admit_mem_limit']) > 0

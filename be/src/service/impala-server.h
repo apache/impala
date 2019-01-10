@@ -409,7 +409,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// information about the pending shutdown in 'shutdown_status'. 'relative_deadline_s'
   /// is the deadline value in seconds to use, or -1 if we should use the default
   /// deadline. See Shutdown class comment for explanation of the shutdown sequence.
-  Status StartShutdown(int64_t relative_deadline_s, TShutdownStatus* shutdown_status);
+  Status StartShutdown(int64_t relative_deadline_s, ShutdownStatusPB* shutdown_status);
 
   /// Returns true if a shut down is in progress.
   bool IsShuttingDown() const { return shutting_down_.Load() != 0; }
@@ -421,10 +421,10 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Return information about the status of a shutdown. Only valid to call if a shutdown
   /// is in progress (i.e. IsShuttingDown() is true).
-  TShutdownStatus GetShutdownStatus() const;
+  ShutdownStatusPB GetShutdownStatus() const;
 
   /// Convert the shutdown status to a human-readable string.
-  static std::string ShutdownStatusToString(const TShutdownStatus& shutdown_status);
+  static std::string ShutdownStatusToString(const ShutdownStatusPB& shutdown_status);
 
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;

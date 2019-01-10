@@ -417,23 +417,6 @@ void Coordinator::BackendState::UpdateExecStats(
   }
 }
 
-template <typename F>
-Status Coordinator::BackendState::DoRrpcWithRetry(
-    F&& rpc_call, const char* debug_action, const char* error_msg) {
-  Status rpc_status;
-  for (int i = 0; i < 3; i++) {
-    RpcController rpc_controller;
-    rpc_controller.set_timeout(MonoDelta::FromSeconds(10));
-    // Check for injected failures.
-    rpc_status = DebugAction(query_ctx().client_request.query_options, debug_action);
-    if (!rpc_status.ok()) continue;
-
-    rpc_status = FromKuduStatus(rpc_call(&rpc_controller), error_msg);
-    if (rpc_status.ok()) break;
-  }
-  return rpc_status;
-}
-
 bool Coordinator::BackendState::Cancel() {
   unique_lock<mutex> l(lock_);
 
@@ -472,8 +455,8 @@ bool Coordinator::BackendState::Cancel() {
     return proxy->CancelQueryFInstances(request, &response, rpc_controller);
   };
 
-  Status rpc_status = DoRrpcWithRetry(
-      cancel_rpc, "COORD_CANCEL_QUERY_FINSTANCES_RPC", "Cancel() RPC failed");
+  Status rpc_status = ControlService::DoRpcWithRetry(cancel_rpc, query_ctx(),
+      "COORD_CANCEL_QUERY_FINSTANCES_RPC", "Cancel() RPC failed", 3, 10);
 
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);

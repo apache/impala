@@ -21,12 +21,14 @@
 #include <limits>
 #include <gutil/strings/substitute.h>
 
+#include "exec/kudu-util.h"
+#include "kudu/rpc/rpc_controller.h"
 #include "runtime/backend-client.h"
 #include "runtime/coordinator.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/exec-env.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
@@ -40,19 +42,23 @@
 
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
+#include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/control_service.proxy.h"
 
 #include <thrift/Thrift.h>
 
 #include "common/names.h"
+#include "control-service.h"
 
 using boost::algorithm::iequals;
 using boost::algorithm::join;
+using kudu::rpc::RpcController;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace beeswax;
 using namespace strings;
 
-DECLARE_int32(be_port);
+DECLARE_int32(krpc_port);
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
 DECLARE_int64(max_result_cache_size);
@@ -630,39 +636,72 @@ Status ClientRequestState::ExecDdlRequest() {
 
 Status ClientRequestState::ExecShutdownRequest() {
   const TShutdownParams& request = exec_request_.admin_request.shutdown_params;
-  int port = request.__isset.backend && request.backend.port != 0 ? request.backend.port :
-                                                                    FLAGS_be_port;
+  bool backend_port_specified = request.__isset.backend && request.backend.port != 0;
+  int port = backend_port_specified ? request.backend.port : FLAGS_krpc_port;
   // Use the local shutdown code path if the host is unspecified or if it exactly matches
   // the configured host/port. This avoids the possibility of RPC errors preventing
   // shutdown.
   if (!request.__isset.backend
-      || (request.backend.hostname == FLAGS_hostname && port == FLAGS_be_port)) {
-    TShutdownStatus shutdown_status;
+      || (request.backend.hostname == FLAGS_hostname && port == FLAGS_krpc_port)) {
+    ShutdownStatusPB shutdown_status;
     int64_t deadline_s = request.__isset.deadline_s ? request.deadline_s : -1;
     RETURN_IF_ERROR(parent_server_->StartShutdown(deadline_s, &shutdown_status));
     SetResultSet({ImpalaServer::ShutdownStatusToString(shutdown_status)});
     return Status::OK();
   }
-  TNetworkAddress addr = MakeNetworkAddress(request.backend.hostname, port);
 
-  TRemoteShutdownParams params;
-  if (request.__isset.deadline_s) params.__set_deadline_s(request.deadline_s);
-  TRemoteShutdownResult resp;
-  VLOG_QUERY << "Sending Shutdown RPC to " << TNetworkAddressToString(addr);
-  ImpalaBackendConnection::RpcStatus rpc_status = ImpalaBackendConnection::DoRpcWithRetry(
-      ExecEnv::GetInstance()->impalad_client_cache(), addr,
-      &ImpalaBackendClient::RemoteShutdown, params,
-      [this]() { return DebugAction(query_options(), "CRS_SHUTDOWN_RPC"); }, &resp);
-  if (!rpc_status.status.ok()) {
-    VLOG_QUERY << "RemoteShutdown query_id= " << PrintId(query_id())
-               << " failed to send RPC to " << TNetworkAddressToString(addr) << " :"
-               << rpc_status.status.msg().msg();
-    return rpc_status.status;
+  // KRPC relies on resolved IP address, so convert hostname.
+  IpAddr ip_address;
+  Status ip_status = HostnameToIpAddr(request.backend.hostname, &ip_address);
+  if (!ip_status.ok()) {
+    VLOG(1) << "Could not convert hostname " << request.backend.hostname
+            << " to ip address, error: " << ip_status.GetDetail();
+    return ip_status;
+  }
+  TNetworkAddress addr = MakeNetworkAddress(ip_address, port);
+
+  std::unique_ptr<ControlServiceProxy> proxy;
+  Status get_proxy_status = ControlService::GetProxy(addr, addr.hostname, &proxy);
+  if (!get_proxy_status.ok()) {
+    return Status(
+        Substitute("Could not get Proxy to ControlService at $0 with error: $1.",
+            TNetworkAddressToString(addr), get_proxy_status.msg().msg()));
   }
 
-  Status shutdown_status(resp.status);
+  RemoteShutdownParamsPB params;
+  if (request.__isset.deadline_s) params.set_deadline_s(request.deadline_s);
+  RemoteShutdownResultPB resp;
+  VLOG_QUERY << "Sending Shutdown RPC to " << TNetworkAddressToString(addr);
+
+  auto shutdown_rpc = [&](RpcController* rpc_controller) -> kudu::Status {
+    return proxy->RemoteShutdown(params, &resp, rpc_controller);
+  };
+
+  Status rpc_status = ControlService::DoRpcWithRetry(
+      shutdown_rpc, query_ctx_, "CRS_SHUTDOWN_RPC", "RemoteShutdown() RPC failed", 3, 10);
+
+  if (!rpc_status.ok()) {
+    const string& msg = rpc_status.msg().msg();
+    VLOG_QUERY << "RemoteShutdown query_id= " << PrintId(query_id())
+               << " failed to send RPC to " << TNetworkAddressToString(addr) << " :"
+               << msg;
+    string err_string = Substitute(
+        "Rpc to $0 failed with error '$1'", TNetworkAddressToString(addr), msg);
+    // Attempt to detect if the the failure is because of not using a KRPC port.
+    if (backend_port_specified
+        && msg.find("RemoteShutdown() RPC failed: Timed out: connection negotiation to")
+            != string::npos) {
+      // Prior to IMPALA-7985 :shutdown() used the backend port.
+      err_string.append(" This may be because the port specified is wrong. You may have"
+                        " specified the backend (thrift) port which :shutdown() can no"
+                        " longer use. Please make sure the correct KRPC port is being"
+                        " used, or don't specify any port in the :shutdown() command.");
+    }
+    return Status(err_string);
+  }
+  Status shutdown_status(resp.status());
   RETURN_IF_ERROR(shutdown_status);
-  SetResultSet({ImpalaServer::ShutdownStatusToString(resp.shutdown_status)});
+  SetResultSet({ImpalaServer::ShutdownStatusToString(resp.shutdown_status())});
   return Status::OK();
 }
 

@@ -307,11 +307,6 @@ class Coordinator::BackendState {
 
   /// Same as ComputeResourceUtilization() but caller must hold lock.
   ResourceUtilization ComputeResourceUtilizationLocked();
-
-  /// Retry the Rpc 'rpc_call' up to 3 times.
-  /// Pass 'debug_action' to DebugAction() to potentially inject errors.
-  template <typename F>
-  Status DoRrpcWithRetry(F&& rpc_call, const char* debug_action, const char* error_msg);
 };
 
 /// Per fragment execution statistics.
