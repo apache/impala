@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateOrAlterViewParams;
 import org.apache.impala.thrift.TTableName;
@@ -133,6 +134,11 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     // duplicate column names.
     Set<String> distinctColNames = new HashSet<>();
     for (ColumnDef colDesc: finalColDefs_) {
+      if (colDesc.getType() == Type.NULL) {
+        throw new AnalysisException(String.format("Unable to infer the column type " +
+            "for column '%s'. Use cast() to explicitly specify the column type for " +
+            "column '%s'.", colDesc.getColName(), colDesc.getColName()));
+      }
       colDesc.analyze(null);
       if (!distinctColNames.add(colDesc.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDesc.getColName());

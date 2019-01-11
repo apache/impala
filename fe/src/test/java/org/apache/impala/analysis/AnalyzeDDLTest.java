@@ -1216,6 +1216,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "select * from temp_view union distinct " +
         "select tinyint_col, int_col, bigint_col from functional.alltypes",
         "Self-reference not allowed on view: functional.alltypes_view");
+
+    // IMPALA-7679: Inserting a null column type without an explicit type should
+    // throw an error.
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select cast(null as int) as new_col");
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select cast(null as int) as null_col, 1 as one_col");
+    AnalysisError("alter view functional.alltypes_view " +
+        "as select null as new_col", "Unable to infer the column type for " +
+        "column 'new_col'. Use cast() to explicitly specify the column type for " +
+        "column 'new_col'.");
   }
 
   @Test
@@ -1930,6 +1941,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, BIGINT_COL," +
         " DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, MONTH FROM " +
         " functional.alltypes");
+
+    // IMPALA-7679: Inserting a null column type without an explicit type should
+    // throw an error.
+    AnalyzesOk("create table t as select cast(null as int) as new_col");
+    AnalyzesOk("create table t as select cast(null as int) as null_col, 1 as one_col");
+    AnalysisError("create table t as select null as new_col",
+        "Unable to infer the column type for column 'new_col'. Use cast() to " +
+        "explicitly specify the column type for column 'new_col'.");
   }
 
   @Test
@@ -3131,6 +3150,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "from functional.allcomplextypes",
         "Expr 'int_array_col' in select list returns a complex type 'ARRAY<INT>'.\n" +
         "Only scalar types are allowed in the select list.");
+
+    // IMPALA-7679: Inserting a null column type without an explicit type should
+    // throw an error.
+    AnalyzesOk("create view v as select cast(null as int) as new_col");
+    AnalyzesOk("create view v as select cast(null as int) as null_col, 1 as one_col");
+    AnalysisError("create view v as select null as new_col",
+        "Unable to infer the column type for column 'new_col'. Use cast() to " +
+            "explicitly specify the column type for column 'new_col'.");
   }
 
   @Test

@@ -185,6 +185,11 @@ public class CreateTableAsSelectStmt extends StatementBase {
       ColumnDef colDef = new ColumnDef(tmpQueryStmt.getColLabels().get(i), null,
           Collections.<ColumnDef.Option, Object>emptyMap());
       colDef.setType(tmpQueryStmt.getBaseTblResultExprs().get(i).getType());
+      if (colDef.getType() == Type.NULL) {
+        throw new AnalysisException(String.format("Unable to infer the column type " +
+            "for column '%s'. Use cast() to explicitly specify the column type for " +
+            "column '%s'.", colDef.getColName(), colDef.getColName()));
+      }
       createStmt_.getColumnDefs().add(colDef);
     }
     createStmt_.analyze(analyzer);
