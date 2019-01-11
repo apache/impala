@@ -555,23 +555,33 @@ class TestStatestore():
        )
 
   def test_slow_subscriber(self):
-    """Test for IMPALA-6644: This test kills a healthy subscriber and sleeps for a random
-    interval between 1 and 9 seconds, this lets the heartbeats fail without removing the
-    subscriber from the set of active subscribers. It then checks the subscribers page
-    of the statestore to ensure that the 'time_since_heartbeat' field is updated with an
-    acceptable value. Since the statestore heartbeats at 1 second intervals, an acceptable
-    value would be between ((sleep_time-1.0), (sleep_time+1.0))."""
+    """Test for IMPALA-6644: This test kills a healthy subscriber and sleeps for multiple
+    intervals of about 1 second each, this lets the heartbeats to the subscriber fail.
+    It polls the subscribers page of the statestore to ensure that the
+    'secs_since_heartbeat' field is updated with an acceptable value. This test only
+    checks for a strictly increasing value since the actual value of time might depend
+    on the system load. It stops polling the page once the subscriber is removed from
+    the set of active subscribers. It also checks that a valid heartbeat record of the
+    subscriber is found at least once."""
     sub = StatestoreSubscriber()
     sub.start().register().wait_for_heartbeat(1)
     sub.kill()
-    sleep_time = randint(1, 9)
-    time.sleep(sleep_time)
-    subscribers = get_statestore_subscribers()["subscribers"]
-    for s in subscribers:
-      if str(s["id"]) == sub.subscriber_id:
-        secs_since_heartbeat = float(s["secs_since_heartbeat"])
-        assert (secs_since_heartbeat > float(sleep_time - 1.0))
-        assert (secs_since_heartbeat < float(sleep_time + 1.0))
+    # secs_since_heartbeat is initially unknown.
+    secs_since_heartbeat = -1
+    valid_heartbeat_record = False
+    while secs_since_heartbeat != 0:
+      sleep_start_time = time.time()
+      while time.time() - sleep_start_time < 1:
+        time.sleep(0.1)
+      prev_secs_since_heartbeat = secs_since_heartbeat
+      secs_since_heartbeat = 0
+      subscribers = get_statestore_subscribers()["subscribers"]
+      for s in subscribers:
+        if str(s["id"]) == sub.subscriber_id:
+          secs_since_heartbeat = float(s["secs_since_heartbeat"])
+          assert (secs_since_heartbeat > prev_secs_since_heartbeat)
+          valid_heartbeat_record = True
+    assert valid_heartbeat_record
 
   def test_topic_persistence(self):
     """Test that persistent topic entries survive subscriber failure, but transent topic
