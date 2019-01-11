@@ -14,7 +14,7 @@
 #
 # Test case 1.1: Decimal Min-max filters multiple 4 bytes
 #########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d5_0, a.d5_1, a.d5_3, a.d5_5
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -71,7 +71,7 @@ aggregation(SUM, ProbeRows): 102
 #########################################################
 # Test case 1.2: Decimal Min-max filters multiple 4 bytes
 #########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d9_0, a.d9_1, a.d9_5, a.d9_9
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -128,7 +128,7 @@ aggregation(SUM, ProbeRows): 99
 #########################################################
 # Test case 1.3: Decimal Min-max filters multiple 8 bytes
 #########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d14_0, a.d14_1, a.d14_7, a.d14_14
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -185,7 +185,7 @@ aggregation(SUM, ProbeRows): 97
 #########################################################
 # Test case 1.4: Decimal Min-max filters multiple 8 bytes
 #########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d18_0, a.d18_1, a.d18_9, a.d18_18
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -242,7 +242,7 @@ aggregation(SUM, ProbeRows): 99
 ##########################################################
 # Test case 1.5: Decimal Min-max filters multiple 16 bytes
 ##########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d28_0, a.d28_1, a.d28_14, a.d28_28
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -299,7 +299,7 @@ aggregation(SUM, ProbeRows): 97
 ##########################################################
 # Test case 1.6: Decimal Min-max filters multiple 16 bytes
 ##########################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d38_0, a.d38_1, a.d38_19, a.d38_38
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -358,7 +358,7 @@ aggregation(SUM, ProbeRows): 97
 #   d5_0 = d9_0 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d5_0, a.d5_1, a.d5_3, a.d5_5
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -417,7 +417,7 @@ aggregation(SUM, ProbeRows): 102
 #   d9_1 = d14_1 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d9_0, a.d9_1, a.d9_5, a.d9_9
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -476,7 +476,7 @@ aggregation(SUM, ProbeRows): 99
 #   d14_7 = d18_9 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d14_0, a.d14_1, a.d14_7, a.d14_14
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -505,7 +505,7 @@ aggregation(SUM, ProbeRows): 107
 #   d18_18 = d28_28 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d18_0, a.d18_1, a.d18_9, a.d18_18
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -545,7 +545,7 @@ aggregation(SUM, ProbeRows): 102
 #   d28_0 = d38_0 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d28_0, a.d28_1, a.d28_14, a.d28_28
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -604,7 +604,7 @@ aggregation(SUM, ProbeRows): 97
 #   d38_1 = d5_1 uses cast and will not use minmax
 #   filters.  The other 3 will.
 ####################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN a.d38_0, a.d38_1, a.d38_19, a.d38_38
 from decimal_rtf_tbl a
 join [BROADCAST] decimal_rtf_tiny_tbl b
@@ -662,7 +662,7 @@ aggregation(SUM, ProbeRows): 97
 ######################################################################
 # Test case 3.1: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d5_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d5_0 = b.d5_0
@@ -714,7 +714,7 @@ aggregation(SUM, ProbeRows): 149
 ######################################################################
 # Test case 3.2: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d5_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d5_1 = b.d5_1
@@ -766,7 +766,7 @@ aggregation(SUM, ProbeRows): 148
 ######################################################################
 # Test case 3.3: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d5_3
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d5_3 = b.d5_3
@@ -818,7 +818,7 @@ aggregation(SUM, ProbeRows): 143
 #######################################################################
 # Test case 3.4.1: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d5_5
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -870,7 +870,7 @@ aggregation(SUM, ProbeRows): 347
 #######################################################################
 # Test case 3.4.2: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d5_5)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -885,7 +885,7 @@ aggregation(SUM, ProbeRows): 360
 ######################################################################
 # Test case 3.5: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d9_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d9_0 = b.d9_0
@@ -937,7 +937,7 @@ aggregation(SUM, ProbeRows): 149
 ######################################################################
 # Test case 3.6: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d9_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d9_1 = b.d9_1
@@ -989,7 +989,7 @@ aggregation(SUM, ProbeRows): 148
 ######################################################################
 # Test case 3.7: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d9_5
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d9_5 = b.d9_5
@@ -1041,7 +1041,7 @@ aggregation(SUM, ProbeRows): 174
 #######################################################################
 # Test case 3.8.1: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d9_9
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -1093,7 +1093,7 @@ aggregation(SUM, ProbeRows): 379
 #######################################################################
 # Test case 3.8.2: Two DecimalMinMaxFilters with shuffle join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d9_9)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -1108,7 +1108,7 @@ aggregation(SUM, ProbeRows): 612
 ######################################################################
 # Test case 3.9: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d14_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d14_0 = b.d14_0
@@ -1160,7 +1160,7 @@ aggregation(SUM, ProbeRows): 149
 ######################################################################
 # Test case 3.10: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d14_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d14_1 = b.d14_1
@@ -1212,7 +1212,7 @@ aggregation(SUM, ProbeRows): 148
 ######################################################################
 # Test case 3.11: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d14_7
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d14_7 = b.d14_7
@@ -1264,7 +1264,7 @@ aggregation(SUM, ProbeRows): 235
 ########################################################################
 # Test case 3.12.1: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d14_14
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -1316,7 +1316,7 @@ aggregation(SUM, ProbeRows): 479
 ########################################################################
 # Test case 3.12.2: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d14_14)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -1331,7 +1331,7 @@ aggregation(SUM, ProbeRows): 882
 ######################################################################
 # Test case 3.13: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d18_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d18_0 = b.d18_0
@@ -1383,7 +1383,7 @@ aggregation(SUM, ProbeRows): 149
 ######################################################################
 # Test case 3.14: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d18_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d18_1 = b.d18_1
@@ -1435,7 +1435,7 @@ aggregation(SUM, ProbeRows): 148
 ######################################################################
 # Test case 3.15: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d18_9
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d18_9 = b.d18_9
@@ -1487,7 +1487,7 @@ aggregation(SUM, ProbeRows): 296
 ########################################################################
 # Test case 3.16.1: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d18_18
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -1539,7 +1539,7 @@ aggregation(SUM, ProbeRows): 536
 ########################################################################
 # Test case 3.16.2: Two DecimalMinMaxFilters with shuffle join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d18_18)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -1554,7 +1554,7 @@ aggregation(SUM, ProbeRows): 1062
 #######################################################################
 # Test case 3.17: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d28_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d28_0 = b.d28_0
@@ -1606,7 +1606,7 @@ aggregation(SUM, ProbeRows): 149
 #######################################################################
 # Test case 3.18: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d28_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d28_1 = b.d28_1
@@ -1658,7 +1658,7 @@ aggregation(SUM, ProbeRows): 148
 #######################################################################
 # Test case 3.19: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d28_14
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d28_14 = b.d28_14
@@ -1710,7 +1710,7 @@ aggregation(SUM, ProbeRows): 424
 #########################################################################
 # Test case 3.20.1: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d28_28
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -1762,7 +1762,7 @@ aggregation(SUM, ProbeRows): 656
 #########################################################################
 # Test case 3.20.2: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d28_28)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -1777,7 +1777,7 @@ aggregation(SUM, ProbeRows): 1372
 #######################################################################
 # Test case 3.21: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d38_0
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d38_0 = b.d38_0
@@ -1829,7 +1829,7 @@ aggregation(SUM, ProbeRows): 149
 #######################################################################
 # Test case 3.22: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d38_1
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d38_1 = b.d38_1
@@ -1881,7 +1881,7 @@ aggregation(SUM, ProbeRows): 148
 #######################################################################
 # Test case 3.23: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d38_19
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d38_19 = b.d38_19
@@ -1933,7 +1933,7 @@ aggregation(SUM, ProbeRows): 529
 #########################################################################
 # Test case 3.24.1: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join a.d38_38
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -1985,7 +1985,7 @@ aggregation(SUM, ProbeRows): 680
 #########################################################################
 # Test case 3.24.2: Two DecimalMinMaxFilters with shuffle join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(a.d38_38)
 from decimal_rtf_tbl a
   inner join /* +shuffle */ decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -2001,7 +2001,7 @@ aggregation(SUM, ProbeRows): 1464
 ######################################################################
 # Test case 4.1: DecimalMinMaxFilters with right outer join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d5_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d5_0 = b.d5_0
@@ -2014,7 +2014,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 4.2: DecimalMinMaxFilters with right outer join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d5_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d5_1 = b.d5_1
@@ -2027,7 +2027,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 4.3: DecimalMinMaxFilters with right outer join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d5_3)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d5_3 = b.d5_3
@@ -2040,7 +2040,7 @@ aggregation(SUM, ProbeRows): 105
 #######################################################################
 # Test case 4.4.1: DecimalMinMaxFilters with right outer join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d5_5)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -2054,7 +2054,7 @@ aggregation(SUM, ProbeRows): 310
 #######################################################################
 # Test case 4.4.2: DecimalMinMaxFilters with right outer join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d5_5)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -2068,7 +2068,7 @@ aggregation(SUM, ProbeRows): 180
 ######################################################################
 # Test case 4.5: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d9_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d9_0 = b.d9_0
@@ -2081,7 +2081,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 4.6: DecimalMinMaxFilters with right outer join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d9_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d9_1 = b.d9_1
@@ -2094,7 +2094,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 4.7: DecimalMinMaxFilters with right outer join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d9_5)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d9_5 = b.d9_5
@@ -2107,7 +2107,7 @@ aggregation(SUM, ProbeRows): 136
 #######################################################################
 # Test case 4.8.1: DecimalMinMaxFilters with right outer join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d9_9)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -2121,7 +2121,7 @@ aggregation(SUM, ProbeRows): 342
 #######################################################################
 # Test case 4.8.2: DecimalMinMaxFilters with right outer join - 4 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d9_9)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -2135,7 +2135,7 @@ aggregation(SUM, ProbeRows): 306
 ######################################################################
 # Test case 4.9: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d14_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d14_0 = b.d14_0
@@ -2148,7 +2148,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 4.10: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d14_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d14_1 = b.d14_1
@@ -2161,7 +2161,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 4.11: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d14_7)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d14_7 = b.d14_7
@@ -2174,7 +2174,7 @@ aggregation(SUM, ProbeRows): 197
 ########################################################################
 # Test case 4.12.1: DecimalMinMaxFilters with right outer join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d14_14)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -2188,7 +2188,7 @@ aggregation(SUM, ProbeRows): 444
 ########################################################################
 # Test case 4.12.2: DecimalMinMaxFilters with right outer join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d14_14)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -2202,7 +2202,7 @@ aggregation(SUM, ProbeRows): 441
 ######################################################################
 # Test case 4.13: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d18_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d18_0 = b.d18_0
@@ -2215,7 +2215,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 4.14: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d18_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d18_1 = b.d18_1
@@ -2228,7 +2228,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 4.15: DecimalMinMaxFilters with right outer join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d18_9)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d18_9 = b.d18_9
@@ -2241,7 +2241,7 @@ aggregation(SUM, ProbeRows): 258
 ########################################################################
 # Test case 4.16.1: DecimalMinMaxFilters with right outer join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d18_18)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -2255,7 +2255,7 @@ aggregation(SUM, ProbeRows): 501
 ########################################################################
 # Test case 4.16.2: DecimalMinMaxFilters with right outer join - 8 bytes
 ########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d18_18)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -2269,7 +2269,7 @@ aggregation(SUM, ProbeRows): 531
 #######################################################################
 # Test case 4.17: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d28_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d28_0 = b.d28_0
@@ -2282,7 +2282,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 4.18: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d28_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d28_1 = b.d28_1
@@ -2295,7 +2295,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 4.19: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d28_14)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d28_14 = b.d28_14
@@ -2308,7 +2308,7 @@ aggregation(SUM, ProbeRows): 386
 #########################################################################
 # Test case 4.20.1: DecimalMinMaxFilters with right outer join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d28_28)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -2322,7 +2322,7 @@ aggregation(SUM, ProbeRows): 620
 #########################################################################
 # Test case 4.20.2: DecimalMinMaxFilters with right outer join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d28_28)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -2336,7 +2336,7 @@ aggregation(SUM, ProbeRows): 686
 #######################################################################
 # Test case 4.21: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d38_0)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d38_0 = b.d38_0
@@ -2349,7 +2349,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 4.22: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d38_1)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d38_1 = b.d38_1
@@ -2362,7 +2362,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 4.23: DecimalMinMaxFilters with right outer join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d38_19)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d38_19 = b.d38_19
@@ -2375,7 +2375,7 @@ aggregation(SUM, ProbeRows): 491
 #########################################################################
 # Test case 4.24.1: DecimalMinMaxFilters with right outer join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d38_38)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -2389,7 +2389,7 @@ aggregation(SUM, ProbeRows): 643
 #########################################################################
 # Test case 4.24.2: DecimalMinMaxFilters with right outer join - 16 bytes
 #########################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select straight_join count(b.d38_38)
 from decimal_rtf_tbl a
   right outer join decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -2403,7 +2403,7 @@ aggregation(SUM, ProbeRows): 732
 ######################################################################
 # Test case 5.1: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d5_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d5_0 = b.d5_0
@@ -2454,7 +2454,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 5.2: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d5_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d5_1 = b.d5_1
@@ -2505,7 +2505,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 5.3: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d5_3
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d5_3 = b.d5_3
@@ -2556,7 +2556,7 @@ aggregation(SUM, ProbeRows): 105
 ######################################################################
 # Test case 5.4.1: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d5_5
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -2607,7 +2607,7 @@ aggregation(SUM, ProbeRows): 310
 ######################################################################
 # Test case 5.4.2: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d5_5)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -2621,7 +2621,7 @@ aggregation(SUM, ProbeRows): 180
 ######################################################################
 # Test case 5.5: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d9_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d9_0 = b.d9_0
@@ -2672,7 +2672,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 5.6: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d9_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d9_1 = b.d9_1
@@ -2723,7 +2723,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 5.7: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d9_5
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d9_5 = b.d9_5
@@ -2774,7 +2774,7 @@ aggregation(SUM, ProbeRows): 136
 ######################################################################
 # Test case 5.8.1: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d9_9
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -2825,7 +2825,7 @@ aggregation(SUM, ProbeRows): 342
 ######################################################################
 # Test case 5.8.2: DecimalMinMaxFilters with left semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d9_9)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -2839,7 +2839,7 @@ aggregation(SUM, ProbeRows): 306
 ######################################################################
 # Test case 5.9: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d14_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d14_0 = b.d14_0
@@ -2890,7 +2890,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 5.10: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d14_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d14_1 = b.d14_1
@@ -2941,7 +2941,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 5.11: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d14_7
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d14_7 = b.d14_7
@@ -2992,7 +2992,7 @@ aggregation(SUM, ProbeRows): 197
 ######################################################################
 # Test case 5.12.1: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d14_14
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -3043,7 +3043,7 @@ aggregation(SUM, ProbeRows): 442
 ######################################################################
 # Test case 5.12.2: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d14_14)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -3058,7 +3058,7 @@ aggregation(SUM, ProbeRows): 441
 ######################################################################
 # Test case 5.13: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d18_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d18_0 = b.d18_0
@@ -3109,7 +3109,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 5.14: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d18_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d18_1 = b.d18_1
@@ -3160,7 +3160,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 5.15: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d18_9
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d18_9 = b.d18_9
@@ -3211,7 +3211,7 @@ aggregation(SUM, ProbeRows): 258
 ######################################################################
 # Test case 5.16.1: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d18_18
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -3262,7 +3262,7 @@ aggregation(SUM, ProbeRows): 499
 ######################################################################
 # Test case 5.16.2: DecimalMinMaxFilters with left semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d18_18)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -3276,7 +3276,7 @@ aggregation(SUM, ProbeRows): 531
 #######################################################################
 # Test case 5.17: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d28_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d28_0 = b.d28_0
@@ -3327,7 +3327,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 5.18: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d28_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d28_1 = b.d28_1
@@ -3378,7 +3378,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 5.19: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d28_14
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d28_14 = b.d28_14
@@ -3429,7 +3429,7 @@ aggregation(SUM, ProbeRows): 386
 #######################################################################
 # Test case 5.20.1: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d28_28
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -3480,7 +3480,7 @@ aggregation(SUM, ProbeRows): 619
 #######################################################################
 # Test case 5.20.2: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d28_28)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -3495,7 +3495,7 @@ aggregation(SUM, ProbeRows): 686
 #######################################################################
 # Test case 5.21: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d38_0
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d38_0 = b.d38_0
@@ -3546,7 +3546,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 5.22: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d38_1
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d38_1 = b.d38_1
@@ -3597,7 +3597,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 5.23: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d38_19
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d38_19 = b.d38_19
@@ -3648,7 +3648,7 @@ aggregation(SUM, ProbeRows): 491
 #######################################################################
 # Test case 5.24.1: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select a.d38_38
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -3699,7 +3699,7 @@ aggregation(SUM, ProbeRows): 643
 #######################################################################
 # Test case 5.24.2: DecimalMinMaxFilters with left semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select count(a.d38_38)
 from decimal_rtf_tbl a
   left semi join decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38
@@ -3715,7 +3715,7 @@ aggregation(SUM, ProbeRows): 732
 ######################################################################
 # Test case 6.1: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d5_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d5_0 = b.d5_0
@@ -3766,7 +3766,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 6.2: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d5_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d5_1 = b.d5_1
@@ -3817,7 +3817,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 6.3: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d5_3
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d5_3 = b.d5_3
@@ -3868,7 +3868,7 @@ aggregation(SUM, ProbeRows): 105
 ######################################################################
 # Test case 6.4: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d5_5
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d5_5 = b.d5_5
@@ -3919,7 +3919,7 @@ aggregation(SUM, ProbeRows): 490
 ######################################################################
 # Test case 6.5: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d9_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d9_0 = b.d9_0
@@ -3970,7 +3970,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 6.6: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d9_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d9_1 = b.d9_1
@@ -4021,7 +4021,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 6.7: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d9_5
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d9_5 = b.d9_5
@@ -4072,7 +4072,7 @@ aggregation(SUM, ProbeRows): 136
 ######################################################################
 # Test case 6.8: DecimalMinMaxFilters with right semi join - 4 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d9_9
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d9_9 = b.d9_9
@@ -4123,7 +4123,7 @@ aggregation(SUM, ProbeRows): 648
 ######################################################################
 # Test case 6.9: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d14_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d14_0 = b.d14_0
@@ -4174,7 +4174,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 6.10: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d14_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d14_1 = b.d14_1
@@ -4225,7 +4225,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 6.11: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d14_7
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d14_7 = b.d14_7
@@ -4276,7 +4276,7 @@ aggregation(SUM, ProbeRows): 197
 ######################################################################
 # Test case 6.12: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d14_14
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d14_14 = b.d14_14
@@ -4327,7 +4327,7 @@ aggregation(SUM, ProbeRows): 885
 ######################################################################
 # Test case 6.13: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d18_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d18_0 = b.d18_0
@@ -4378,7 +4378,7 @@ aggregation(SUM, ProbeRows): 111
 ######################################################################
 # Test case 6.14: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d18_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d18_1 = b.d18_1
@@ -4429,7 +4429,7 @@ aggregation(SUM, ProbeRows): 110
 ######################################################################
 # Test case 6.15: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d18_9
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d18_9 = b.d18_9
@@ -4480,7 +4480,7 @@ aggregation(SUM, ProbeRows): 258
 ######################################################################
 # Test case 6.16: DecimalMinMaxFilters with right semi join - 8 bytes
 ######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d18_18
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d18_18 = b.d18_18
@@ -4531,7 +4531,7 @@ aggregation(SUM, ProbeRows): 1032
 #######################################################################
 # Test case 6.17: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d28_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d28_0 = b.d28_0
@@ -4582,7 +4582,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 6.18: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d28_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d28_1 = b.d28_1
@@ -4633,7 +4633,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 6.19: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d28_14
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d28_14 = b.d28_14
@@ -4684,7 +4684,7 @@ aggregation(SUM, ProbeRows): 386
 #######################################################################
 # Test case 6.20: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d28_28
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d28_28 = b.d28_28
@@ -4735,7 +4735,7 @@ aggregation(SUM, ProbeRows): 1306
 #######################################################################
 # Test case 6.21: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d38_0
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d38_0 = b.d38_0
@@ -4786,7 +4786,7 @@ aggregation(SUM, ProbeRows): 111
 #######################################################################
 # Test case 6.22: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d38_1
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d38_1 = b.d38_1
@@ -4837,7 +4837,7 @@ aggregation(SUM, ProbeRows): 110
 #######################################################################
 # Test case 6.23: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d38_19
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d38_19 = b.d38_19
@@ -4888,7 +4888,7 @@ aggregation(SUM, ProbeRows): 491
 #######################################################################
 # Test case 6.24: DecimalMinMaxFilters with right semi join - 16 bytes
 #######################################################################
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select b.d38_38
 from decimal_rtf_tbl a
   right semi join decimal_rtf_tiny_tbl b on a.d38_38 = b.d38_38

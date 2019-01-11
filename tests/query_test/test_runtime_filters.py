@@ -110,12 +110,14 @@ class TestMinMaxFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format in ['kudu'])
 
   def test_min_max_filters(self, vector):
-    self.run_test_case('QueryTest/min_max_filters', vector)
+    self.run_test_case('QueryTest/min_max_filters', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
   def test_decimal_min_max_filters(self, vector):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("skip decimal min max filter test with various joins")
-    self.run_test_case('QueryTest/decimal_min_max_filters', vector)
+    self.run_test_case('QueryTest/decimal_min_max_filters', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
   def test_large_strings(self, cursor, unique_database):
     """Tests that truncation of large strings by min-max filters still gives correct
