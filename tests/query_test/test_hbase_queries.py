@@ -19,6 +19,13 @@
 
 import pytest
 
+from tests.common.skip import (
+    SkipIfIsilon,
+    SkipIfS3,
+    SkipIfABFS,
+    SkipIfADLS,
+    SkipIfLocal)
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestHBaseQueries(ImpalaTestSuite):
@@ -56,3 +63,31 @@ class TestHBaseQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_hbase_inserts(self, vector):
     self.run_test_case('QueryTest/hbase-inserts', vector)
+
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfLocal.hive
+  def test_hbase_col_filter(self, vector, unique_database):
+    """IMPALA-7929: test query with table created with hive and mapped to hbase. The key
+    column doesn't have qualifier and the query with predicate on key column name should
+    not fail"""
+    table_name = "{0}.hbase_col_filter_testkeyx".format(unique_database)
+    cr_table = """CREATE TABLE {0} (k STRING, c STRING) STORED BY
+               'org.apache.hadoop.hive.hbase.HBaseStorageHandler' WITH SERDEPROPERTIES
+               ('hbase.columns.mapping'=':key,cf:c', 'serialization.format'='1')
+               TBLPROPERTIES ('hbase.table.name'=\'{1}\',
+               'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler')
+               """.format(table_name, table_name)
+    add_data = """INSERT INTO TABLE {0} VALUES ('row1', 'c1'), ('row2', 'c2'),
+             ('row3', 'c2'), ('row4', 'c4')""".format(table_name)
+    del_table = "DROP TABLE IF EXISTS {0}".format(table_name)
+
+    try:
+      self.run_stmt_in_hive(cr_table)
+      self.run_stmt_in_hive(add_data)
+      self.client.execute("invalidate metadata {0}".format(table_name))
+      self.run_test_case('QueryTest/hbase-col-filter', vector, unique_database)
+    finally:
+      self.run_stmt_in_hive(del_table)

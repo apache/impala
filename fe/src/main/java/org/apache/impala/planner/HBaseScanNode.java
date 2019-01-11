@@ -380,9 +380,14 @@ public class HBaseScanNode extends ScanNode {
 
         StringLiteral literal = (StringLiteral) bindingExpr;
         HBaseColumn col = (HBaseColumn) slot.getColumn();
-        filters_.add(new THBaseFilter(
-            col.getColumnFamily(), col.getColumnQualifier(),
-            (byte) hbaseOp.ordinal(), literal.getUnescapedValue()));
+        // IMPALA-7929: Since the qualifier can be null (e.g. for the key column of an
+        // HBase table), the qualifier field must be optional in order to express the
+        // null value. Constructors in Thrift do not set optional fields, so the qualifier
+        // must be set separately.
+        THBaseFilter thbf = new THBaseFilter(col.getColumnFamily(),
+            (byte) hbaseOp.ordinal(), literal.getUnescapedValue());
+        thbf.setQualifier(col.getColumnQualifier());
+        filters_.add(thbf);
         analyzer.materializeSlots(Lists.newArrayList(e));
       }
     }

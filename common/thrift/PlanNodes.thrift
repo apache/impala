@@ -284,7 +284,8 @@ struct TDataSourceScanNode {
 
 struct THBaseFilter {
   1: required string family
-  2: required string qualifier
+  // The qualifier for HBase Key column can be null, thus the field is optional here.
+  2: optional string qualifier
   // Ordinal number into enum HBase CompareFilter.CompareOp.
   // We don't use TExprOperator because the op is interpreted by an HBase Filter, and
   // not the c++ expr eval.

@@ -1,0 +1,25 @@
+====
+---- QUERY
+select count(*) from hbase_col_filter_testkeyx
+WHERE k != 'row1'
+---- RESULTS
+3
+====
+---- QUERY
+select count(*) from hbase_col_filter_testkeyx
+WHERE k = 'row1'
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from hbase_col_filter_testkeyx
+WHERE c != 'c2'
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from hbase_col_filter_testkeyx
+WHERE c = 'c4'
+---- RESULTS
+1
+====
