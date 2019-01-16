@@ -215,6 +215,9 @@ class Coordinator::BackendState {
     /// Collection of BYTES_READ_COUNTERs of all scan nodes in this fragment instance.
     std::vector<RuntimeProfile::Counter*> bytes_read_counters_;
 
+    /// Collection of TotalBytesSent of all data stream senders in this fragment instance.
+    std::vector<RuntimeProfile::Counter*> bytes_sent_counters_;
+
     /// Descriptor string for the last query status report time in the profile.
     static const char* LAST_REPORT_TIME_DESC;
 

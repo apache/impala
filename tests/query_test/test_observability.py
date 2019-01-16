@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections import defaultdict
 from datetime import datetime
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -381,6 +382,41 @@ class TestObservability(ImpalaTestSuite):
       if query_id not in query_ids:
         query_ids.append(query_id)
     assert len(query_ids) == 3, results.runtime_profile
+
+  def test_global_resource_counters_in_profile(self):
+    """Test that a set of global resource usage counters show up in the profile."""
+    query = "select count(*) from functional.alltypes"
+    profile = self.execute_query(query).runtime_profile
+    expected_counters = ["TotalBytesRead", "TotalBytesSent", "TotalScanBytesSent",
+                         "TotalInnerBytesSent", "ExchangeScanRatio",
+                         "InnerNodeSelectivityRatio"]
+    assert all(counter in profile for counter in expected_counters)
+
+  def test_global_exchange_counters(self):
+    """Test that global exchange counters are set correctly."""
+    query = """select count(*) from tpch_parquet.orders o inner join tpch_parquet.lineitem
+        l on o.o_orderkey = l.l_orderkey group by o.o_clerk limit 10"""
+    profile = self.execute_query(query).runtime_profile
+    assert "ExchangeScanRatio: 3.19" in profile
+
+    keys = ["TotalBytesSent", "TotalScanBytesSent", "TotalInnerBytesSent"]
+    counters = defaultdict(int)
+    for line in profile.splitlines():
+      for key in keys:
+        if key in line:
+          # Match byte count within parentheses
+          m = re.search("\(([0-9]+)\)", line)
+          assert m
+          # Only keep first (query-level) counter
+          if counters[key] == 0:
+            counters[key] = int(m.group(1))
+
+    # All counters have values
+    assert all(counters[key] > 0 for key in keys)
+
+    assert counters["TotalBytesSent"] == (counters["TotalScanBytesSent"] +
+                                          counters["TotalInnerBytesSent"])
+
 
 class TestThriftProfile(ImpalaTestSuite):
   @classmethod

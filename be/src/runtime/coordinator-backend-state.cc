@@ -32,6 +32,7 @@
 #include "runtime/debug-options.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/krpc-data-stream-sender.h"
 #include "service/control-service.h"
 #include "util/counting-barrier.h"
 #include "util/error-util-internal.h"
@@ -242,6 +243,18 @@ Coordinator::BackendState::ComputeResourceUtilizationLocked() {
 
     for (RuntimeProfile::Counter* c : entry.second->bytes_read_counters_) {
       instance_utilization.bytes_read += c->value();
+    }
+
+    int64_t bytes_sent = 0;
+    for (RuntimeProfile::Counter* c : entry.second->bytes_sent_counters_) {
+      bytes_sent += c->value();
+    }
+
+    // Determine whether this instance had a scan node in its plan.
+    if (instance_utilization.bytes_read > 0) {
+      instance_utilization.scan_bytes_sent = bytes_sent;
+    } else {
+      instance_utilization.exchange_bytes_sent = bytes_sent;
     }
 
     RuntimeProfile::Counter* peak_mem =
@@ -508,13 +521,15 @@ void Coordinator::BackendState::InstanceStats::InitCounters() {
   vector<RuntimeProfile*> children;
   profile_->GetAllChildren(&children);
   for (RuntimeProfile* p : children) {
-    // This profile is not for an exec node.
-    if (!p->metadata().__isset.plan_node_id) continue;
     RuntimeProfile::Counter* c = p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
     if (c != nullptr) scan_ranges_complete_counters_.push_back(c);
 
     RuntimeProfile::Counter* bytes_read = p->GetCounter(ScanNode::BYTES_READ_COUNTER);
     if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
+
+    RuntimeProfile::Counter* bytes_sent =
+        p->GetCounter(KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER);
+    if (bytes_sent != nullptr) bytes_sent_counters_.push_back(bytes_sent);
   }
 }
 

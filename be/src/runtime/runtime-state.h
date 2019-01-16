@@ -243,6 +243,18 @@ class RuntimeState {
    return total_thread_statistics_;
   }
 
+  void AddBytesReadCounter(RuntimeProfile::Counter* counter) {
+    bytes_read_counters_.push_back(counter);
+  }
+
+  void AddBytesSentCounter(RuntimeProfile::Counter* counter) {
+    bytes_sent_counters_.push_back(counter);
+  }
+
+  /// Computes the ratio between the bytes sent and the bytes read by this runtime state's
+  /// fragment instance. For fragment instances that don't scan data, this returns 0.
+  double ComputeExchangeScanRatio() const;
+
   /// Sets query_status_ with err_msg if no error has been set yet.
   void SetQueryStatus(const std::string& err_msg) {
     boost::lock_guard<SpinLock> l(query_status_lock_);
@@ -349,6 +361,12 @@ class RuntimeState {
 
   /// Total CPU utilization for all threads in this plan fragment.
   RuntimeProfile::ThreadCounters* total_thread_statistics_;
+
+  /// BytesRead counters in this instance's tree, not owned.
+  std::vector<RuntimeProfile::Counter*> bytes_read_counters_;
+
+  /// Counters for bytes sent over the network in this instance's tree, not owned.
+  std::vector<RuntimeProfile::Counter*> bytes_sent_counters_;
 
   /// Memory usage of this fragment instance, a child of 'query_mem_tracker_'.
   boost::scoped_ptr<MemTracker> instance_mem_tracker_;

@@ -131,6 +131,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
 void ScanNode::AddBytesReadCounters() {
   bytes_read_counter_ =
       ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TUnit::BYTES);
+  runtime_state()->AddBytesReadCounter(bytes_read_counter_);
   bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
       BYTES_READ_COUNTER, bytes_read_counter_);
   total_throughput_counter_ = runtime_profile()->AddRateCounter(

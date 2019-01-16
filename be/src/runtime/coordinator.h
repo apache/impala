@@ -179,6 +179,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     /// Total bytes read across all scan nodes.
     int64_t bytes_read = 0;
 
+    /// Total bytes sent by instances that did not contain a scan node.
+    int64_t exchange_bytes_sent = 0;
+
+    /// Total bytes sent by instances that contained a scan node.
+    int64_t scan_bytes_sent = 0;
+
     /// Total user cpu consumed.
     int64_t cpu_user_ns = 0;
 
@@ -190,6 +196,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
       peak_per_host_mem_consumption =
           std::max(peak_per_host_mem_consumption, other.peak_per_host_mem_consumption);
       bytes_read += other.bytes_read;
+      exchange_bytes_sent += other.exchange_bytes_sent;
+      scan_bytes_sent += other.scan_bytes_sent;
       cpu_user_ns += other.cpu_user_ns;
       cpu_sys_ns += other.cpu_sys_ns;
     }

@@ -96,6 +96,9 @@ class KrpcDataStreamSender : public DataSink {
   /// illegal after calling Close().
   virtual void Close(RuntimeState* state) override;
 
+  /// Counters shared with other parts of the code
+  static const char* TOTAL_BYTES_SENT_COUNTER;
+
  protected:
   friend class DataStreamTest;
 

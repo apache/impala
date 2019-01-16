@@ -229,6 +229,15 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   return Status::OK();
 }
 
+double RuntimeState::ComputeExchangeScanRatio() const {
+  int64_t bytes_read = 0;
+  for (const auto& c : bytes_read_counters_) bytes_read += c->value();
+  if (bytes_read == 0) return 0;
+  int64_t bytes_sent = 0;
+  for (const auto& c : bytes_sent_counters_) bytes_sent += c->value();
+  return (double)bytes_sent / bytes_read;
+}
+
 void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     int64_t failed_allocation_size, const ErrorMsg* msg) {
   // Constructing the MemLimitExceeded and logging it is not cheap, so

@@ -774,8 +774,45 @@ void Coordinator::ComputeQuerySummary() {
                     << ") ";
   }
 
+  // The total number of bytes read by this query.
   COUNTER_SET(ADD_COUNTER(query_profile_, "TotalBytesRead", TUnit::BYTES),
       total_utilization.bytes_read);
+  // The total number of bytes sent by this query in exchange nodes. Does not include
+  // remote reads, data written to disk, or data sent to the client.
+  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalBytesSent", TUnit::BYTES),
+      total_utilization.scan_bytes_sent + total_utilization.exchange_bytes_sent);
+  // The total number of bytes sent by fragment instances that had a scan node in their
+  // plan.
+  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalScanBytesSent", TUnit::BYTES),
+      total_utilization.scan_bytes_sent);
+  // The total number of bytes sent by fragment instances that did not have a scan node in
+  // their plan, i.e. that received their input data from other instances through exchange
+  // node.
+  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalInnerBytesSent", TUnit::BYTES),
+      total_utilization.exchange_bytes_sent);
+
+  double xchg_scan_ratio = 0;
+  if (total_utilization.bytes_read > 0) {
+    xchg_scan_ratio =
+        (double)total_utilization.scan_bytes_sent / total_utilization.bytes_read;
+  }
+  // The ratio between TotalScanBytesSent and TotalBytesRead, i.e. the selectivity over
+  // all fragment instances that had a scan node in their plan.
+  COUNTER_SET(ADD_COUNTER(query_profile_, "ExchangeScanRatio", TUnit::DOUBLE_VALUE),
+      xchg_scan_ratio);
+
+  double inner_node_ratio = 0;
+  if (total_utilization.scan_bytes_sent > 0) {
+    inner_node_ratio =
+        (double)total_utilization.exchange_bytes_sent / total_utilization.scan_bytes_sent;
+  }
+  // The ratio between bytes sent by instances with a scan node in their plan and
+  // instances without a scan node in their plan. This indicates how well the inner nodes
+  // of the execution plan reduced the data volume.
+  COUNTER_SET(
+      ADD_COUNTER(query_profile_, "InnerNodeSelectivityRatio", TUnit::DOUBLE_VALUE),
+      inner_node_ratio);
+
   COUNTER_SET(ADD_COUNTER(query_profile_, "TotalCpuTime", TUnit::TIME_NS),
       total_utilization.cpu_user_ns + total_utilization.cpu_sys_ns);
 

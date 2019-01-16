@@ -233,6 +233,13 @@ Status FragmentInstanceState::Prepare() {
   per_host_mem_usage_ =
       ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TUnit::BYTES);
 
+  profile()->AddDerivedCounter("ExchangeScanRatio", TUnit::DOUBLE_VALUE, [this](){
+      int64_t counter_val = 0;
+      *reinterpret_cast<double*>(&counter_val) =
+          runtime_state_->ComputeExchangeScanRatio();
+      return counter_val;
+      });
+
   row_batch_.reset(
       new RowBatch(exec_tree_->row_desc(), runtime_state_->batch_size(),
         runtime_state_->instance_mem_tracker()));

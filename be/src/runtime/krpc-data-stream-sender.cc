@@ -67,6 +67,7 @@ namespace impala {
 const char* KrpcDataStreamSender::HASH_ROW_SYMBOL =
     "KrpcDataStreamSender7HashRowEPNS_8TupleRowE";
 const char* KrpcDataStreamSender::LLVM_CLASS_NAME = "class.impala::KrpcDataStreamSender";
+const char* KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER = "TotalBytesSent";
 
 // A datastream sender may send row batches to multiple destinations. There is one
 // channel for each destination.
@@ -645,6 +646,7 @@ Status KrpcDataStreamSender::Prepare(
   rpc_retry_counter_ = ADD_COUNTER(profile(), "RpcRetry", TUnit::UNIT);
   rpc_failure_counter_ = ADD_COUNTER(profile(), "RpcFailure", TUnit::UNIT);
   bytes_sent_counter_ = ADD_COUNTER(profile(), "TotalBytesSent", TUnit::BYTES);
+  state->AddBytesSentCounter(bytes_sent_counter_);
   bytes_sent_time_series_counter_ =
       ADD_TIME_SERIES_COUNTER(profile(), "BytesSent", bytes_sent_counter_);
   network_throughput_counter_ =

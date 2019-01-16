@@ -129,7 +129,6 @@ class PrettyPrinter {
         break;
       }
 
-      /// TODO: Remove DOUBLE_VALUE. IMPALA-1649
       case TUnit::DOUBLE_VALUE: {
         double output = *reinterpret_cast<double*>(&value);
         ss << std::setprecision(PRECISION) << output << " ";
