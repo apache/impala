@@ -66,7 +66,8 @@ explain select count(*) from corrupted where org = 1;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted]'
-'   partitions=1/2 files=1 size=24B row-size=0B cardinality=0'
+'   partitions=1/2 files=1 size=24B'
+'   row-size=0B cardinality=0'
 ---- TYPES
 STRING
 ====
@@ -92,7 +93,8 @@ explain select count(*) from corrupted;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted]'
-'   partitions=2/2 files=2 size=48B row-size=0B cardinality=6'
+'   partitions=2/2 files=2 size=48B'
+'   row-size=0B cardinality=6'
 ---- TYPES
 STRING
 ====
@@ -117,7 +119,8 @@ explain select count(*) from corrupted;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted]'
-'   partitions=2/2 files=2 size=48B row-size=0B cardinality=6'
+'   partitions=2/2 files=2 size=48B'
+'   row-size=0B cardinality=6'
 ---- TYPES
 STRING
 ====
@@ -139,7 +142,8 @@ explain select count(*) from corrupted where org = 2;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted]'
-'   partitions=1/2 files=1 size=24B row-size=0B cardinality=6'
+'   partitions=1/2 files=1 size=24B'
+'   row-size=0B cardinality=6'
 ---- TYPES
 STRING
 ====
@@ -165,7 +169,8 @@ explain select count(*) from corrupted_no_part;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted_no_part]'
-'   partitions=1/1 files=1 size=6B row-size=0B cardinality=3'
+'   partitions=1/1 files=1 size=6B'
+'   row-size=0B cardinality=3'
 ---- TYPES
 STRING
 ====
@@ -197,7 +202,8 @@ explain select count(*) from corrupted_no_part;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted_no_part]'
-'   partitions=1/1 files=1 size=6B row-size=0B cardinality=0'
+'   partitions=1/1 files=1 size=6B'
+'   row-size=0B cardinality=0'
 ---- TYPES
 STRING
 ====
@@ -219,7 +225,8 @@ explain select count(*) from corrupted_no_part;
 '|  output: count(*)'
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted_no_part]'
-'   partitions=1/1 files=1 size=6B row-size=0B cardinality=unavailable'
+'   partitions=1/1 files=1 size=6B'
+'   row-size=0B cardinality=unavailable'
 ---- TYPES
 STRING
 ====
