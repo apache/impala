@@ -69,6 +69,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -642,25 +643,16 @@ public class SingleNodePlanner {
     computeParentAndSubplanRefs(
         selectStmt.getTableRefs(), analyzer.isStraightJoin(), parentRefs, subplanRefs);
     MultiAggregateInfo multiAggInfo = selectStmt.getMultiAggInfo();
-    // Only optimize scan/agg plan if there is a single aggregation class.
-    AggregateInfo scanAggInfo = null;
-    if (multiAggInfo != null && multiAggInfo.getMaterializedAggClasses().size() == 1) {
-      scanAggInfo = multiAggInfo.getMaterializedAggClass(0);
-    }
-    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, scanAggInfo, analyzer);
+    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, multiAggInfo, analyzer);
     // Add aggregation, if any.
     if (multiAggInfo != null) {
       // Apply substitution for optimized scan/agg plan,
-      if (scanAggInfo != null) {
-        if (root instanceof HdfsScanNode) {
-          scanAggInfo.substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
-          scanAggInfo.getMergeAggInfo().substitute(
-              ((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
-        } else if (root instanceof KuduScanNode) {
-          scanAggInfo.substitute(((KuduScanNode) root).getOptimizedAggSmap(), analyzer);
-          scanAggInfo.getMergeAggInfo().substitute(
-              ((KuduScanNode) root).getOptimizedAggSmap(), analyzer);
-        }
+      if (multiAggInfo.getMaterializedAggClasses().size() == 1 &&
+          (root instanceof HdfsScanNode || root instanceof KuduScanNode)) {
+        AggregateInfo scanAggInfo = multiAggInfo.getMaterializedAggClass(0);
+        scanAggInfo.substitute(((ScanNode) root).getOptimizedAggSmap(), analyzer);
+        scanAggInfo.getMergeAggInfo().substitute(
+            ((ScanNode) root).getOptimizedAggSmap(), analyzer);
       }
       root = createAggregationPlan(selectStmt, analyzer, root);
     }
@@ -816,7 +808,7 @@ public class SingleNodePlanner {
    * Returns a plan tree for evaluating the given parentRefs and subplanRefs.
    */
   private PlanNode createTableRefsPlan(List<TableRef> parentRefs,
-      List<SubplanRef> subplanRefs, AggregateInfo aggInfo, Analyzer analyzer)
+      List<SubplanRef> subplanRefs, MultiAggregateInfo aggInfo, Analyzer analyzer)
       throws ImpalaException {
     // create plans for our table refs; use a list here instead of a map to
     // maintain a deterministic order of traversing the TableRefs during join
@@ -1342,7 +1334,7 @@ public class SingleNodePlanner {
    * The given 'aggInfo' is used for detecting and applying optimizations that span both
    * the scan and aggregation.
    */
-  private PlanNode createHdfsScanPlan(TableRef hdfsTblRef, AggregateInfo aggInfo,
+  private PlanNode createHdfsScanPlan(TableRef hdfsTblRef, MultiAggregateInfo aggInfo,
       List<Expr> conjuncts, Analyzer analyzer) throws ImpalaException {
     TupleDescriptor tupleDesc = hdfsTblRef.getDesc();
 
@@ -1375,19 +1367,19 @@ public class SingleNodePlanner {
       }
     }
 
-    // For queries which contain partition columns only, we may use the metadata instead
-    // of table scans. This is only feasible if all materialized aggregate expressions
-    // have distinct semantics. Please see createHdfsScanPlan() for details.
-    boolean fastPartitionKeyScans =
-        analyzer.getQueryCtx().client_request.query_options.optimize_partition_key_scans &&
-        aggInfo != null && aggInfo.hasAllDistinctAgg();
+    // For queries which contain partition columns only and where all materialized
+    // aggregate expressions have distinct semantics, we only need to return one
+    // row per partition. Please see createHdfsScanPlan() for details.
+    boolean allAggsDistinct = aggInfo != null && aggInfo.hasAllDistinctAgg();
+    boolean isPartitionKeyScan = allAggsDistinct && tupleDesc.hasClusteringColsOnly();
 
     // If the optimization for partition key scans with metadata is enabled,
     // try evaluating with metadata first. If not, fall back to scanning.
-    if (fastPartitionKeyScans && tupleDesc.hasClusteringColsOnly()) {
+    TQueryOptions queryOpts = analyzer.getQueryCtx().client_request.query_options;
+    if (isPartitionKeyScan && queryOpts.optimize_partition_key_scans) {
       Set<List<Expr>> uniqueExprs = new HashSet<>();
 
-      for (FeFsPartition partition: partitions) {
+      for (FeFsPartition partition : partitions) {
         // Ignore empty partitions to match the behavior of the scan based approach.
         if (partition.getSize() == 0) continue;
         List<Expr> exprs = new ArrayList<>();
@@ -1415,7 +1407,7 @@ public class SingleNodePlanner {
     } else {
       HdfsScanNode scanNode =
           new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions,
-              hdfsTblRef, aggInfo, pair.second);
+              hdfsTblRef, aggInfo, pair.second, isPartitionKeyScan);
       scanNode.init(analyzer);
       return scanNode;
     }
@@ -1446,7 +1438,7 @@ public class SingleNodePlanner {
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.
    */
-  private PlanNode createScanNode(TableRef tblRef, AggregateInfo aggInfo,
+  private PlanNode createScanNode(TableRef tblRef, MultiAggregateInfo aggInfo,
       Analyzer analyzer) throws ImpalaException {
     ScanNode scanNode = null;
 
@@ -1660,7 +1652,7 @@ public class SingleNodePlanner {
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.
    */
-  private PlanNode createTableRefNode(TableRef tblRef, AggregateInfo aggInfo,
+  private PlanNode createTableRefNode(TableRef tblRef, MultiAggregateInfo aggInfo,
       Analyzer analyzer) throws ImpalaException {
     PlanNode result = null;
     if (tblRef instanceof BaseTableRef) {

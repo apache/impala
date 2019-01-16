@@ -28,21 +28,21 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  05:SCAN KUDU [functional_kudu.alltypes]
-|     row-size=8B cardinality=unavailable
+|     row-size=8B cardinality=7.30K
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  output: sum_init_zero(functional_kudu.alltypes.stats: num_rows)
 |  |  row-size=8B cardinality=1
 |  |
 |  03:SCAN KUDU [functional_kudu.alltypes]
-|     row-size=8B cardinality=unavailable
+|     row-size=8B cardinality=7.30K
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_kudu.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 01:SCAN KUDU [functional_kudu.alltypes]
-   row-size=8B cardinality=unavailable
+   row-size=8B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -75,7 +75,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  05:SCAN KUDU [functional_kudu.alltypes]
-|     row-size=8B cardinality=unavailable
+|     row-size=8B cardinality=7.30K
 |
 |--12:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  03:SCAN KUDU [functional_kudu.alltypes]
-|     row-size=8B cardinality=unavailable
+|     row-size=8B cardinality=7.30K
 |
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -101,7 +101,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 01:SCAN KUDU [functional_kudu.alltypes]
-   row-size=8B cardinality=unavailable
+   row-size=8B cardinality=7.30K
 ====
 # Verify that the kudu count(*) optimization is applied even if there is more than
 # one item in the select list.
@@ -114,7 +114,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=8B cardinality=unavailable
+   row-size=8B cardinality=7.30K
 ====
 # The optimization is disabled because tinyint_col is not a partition col.
 select tinyint_col, count(*) from functional_kudu.alltypes group by tinyint_col, year
@@ -124,10 +124,10 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: tinyint_col, `year`
-|  row-size=13B cardinality=unavailable
+|  row-size=13B cardinality=20
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=5B cardinality=unavailable
+   row-size=5B cardinality=7.30K
 ====
 # The optimization is disabled because there are two aggregate functions.
 select avg(year), count(*) from functional_kudu.alltypes
@@ -139,7 +139,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=4B cardinality=unavailable
+   row-size=4B cardinality=7.30K
 ====
 # Optimization is not applied because the inner count(*) is not materialized. The outer
 # count(*) does not reference a base table.
@@ -155,7 +155,7 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=0B cardinality=unavailable
+   row-size=0B cardinality=7.30K
 ====
 # The optimization is applied if count(*) is in the having clause.
 select 1 from functional_kudu.alltypes having count(*) > 1
@@ -165,10 +165,10 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_kudu.alltypes.stats: num_rows)
 |  having: count(*) > 1
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=8B cardinality=unavailable
+   row-size=8B cardinality=7.30K
 ====
 # The count(*) optimization is applied in the inline view.
 select count(*), count(a) from (select count(1) as a from functional_kudu.alltypes) t
@@ -184,7 +184,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=8B cardinality=unavailable
+   row-size=8B cardinality=7.30K
 ====
 # The count(*) optimization is not applied if there is more than 1 table ref.
 select count(*) from functional_kudu.alltypes a, functional_kudu.alltypes b
@@ -196,13 +196,13 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
-|  row-size=0B cardinality=unavailable
+|  row-size=0B cardinality=53.29M
 |
 |--01:SCAN KUDU [functional_kudu.alltypes b]
-|     row-size=0B cardinality=unavailable
+|     row-size=0B cardinality=7.30K
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
-   row-size=0B cardinality=unavailable
+   row-size=0B cardinality=7.30K
 ====
 # Optimization is not applied to count(null).
 select count(1 + null + 3) from functional_kudu.alltypes
@@ -220,14 +220,14 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  03:SCAN KUDU [functional_kudu.alltypes]
-|     row-size=0B cardinality=unavailable
+|     row-size=0B cardinality=7.30K
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(NULL + 3)
 |  row-size=8B cardinality=1
 |
 01:SCAN KUDU [functional_kudu.alltypes]
-   row-size=0B cardinality=unavailable
+   row-size=0B cardinality=7.30K
 ====
 # Optimization is not applied when selecting from an empty table.
 select count(*) from functional_kudu.emptytable
@@ -236,10 +236,10 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_kudu.emptytable.stats: num_rows)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.emptytable]
-   row-size=0B cardinality=0
+   row-size=8B cardinality=0
 ====
 # Optimization is not applied across query blocks, even though it would be correct here.
 select count(*) from (select int_col from functional_kudu.alltypes) t
@@ -251,7 +251,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=0B cardinality=unavailable
+   row-size=0B cardinality=7.30K
 ====
 # Optimization is not applied when there is a distinct agg.
 select count(*), count(distinct 1) from functional_kudu.alltypes
@@ -268,5 +268,5 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=1
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   row-size=0B cardinality=unavailable
+   row-size=0B cardinality=7.30K
 ====

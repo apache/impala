@@ -432,7 +432,6 @@ void RowBatch::FreeBuffers() {
 void RowBatch::Reset() {
   num_rows_ = 0;
   capacity_ = tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
-  // TODO: Change this to Clear() and investigate the repercussions.
   tuple_data_pool_.FreeAll();
   FreeBuffers();
   attached_buffer_bytes_ = 0;

@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
@@ -40,6 +39,7 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNotEmptyPredicate;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -85,6 +85,7 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,6 +170,11 @@ public class HdfsScanNode extends ScanNode {
   private static double ESTIMATED_COMPRESSION_FACTOR_LEGACY = 3.58;
   private static double ESTIMATED_COMPRESSION_FACTOR_COLUMNAR = 4.97;
 
+  // Adjustment factor for inputCardinality_ calculation used when doing a partition
+  // key scan to reflect that opening a file to read a single row imposes significant
+  // overhead per row.
+  private static long PARTITION_KEY_SCAN_INPUT_CARDINALITY_ADJUSTMENT_FACTOR = 100;
+
   private static Set<HdfsFileFormat> VALID_LEGACY_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
       .add(HdfsFileFormat.RC_FILE)
@@ -231,6 +237,10 @@ public class HdfsScanNode extends ScanNode {
   // True if this scan node should use the MT implementation in the backend.
   // Set in computeNodeResourceProfile().
   private boolean useMtScanNode_;
+
+  // True if this is a scan that only returns partition keys and is only required to
+  // return at least one of each of the distinct values of the partition keys.
+  private final boolean isPartitionKeyScan_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
@@ -304,7 +314,7 @@ public class HdfsScanNode extends ScanNode {
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
-      AggregateInfo aggInfo, List<Expr> partConjuncts) {
+      MultiAggregateInfo aggInfo, List<Expr> partConjuncts, boolean isPartitionKeyScan) {
     super(id, desc, createDisplayName(hdfsTblRef.getTable()));
     tbl_ = (FeFsTable)desc.getTable();
     conjuncts_ = conjuncts;
@@ -322,6 +332,7 @@ public class HdfsScanNode extends ScanNode {
       // Any errors should already have been caught during analysis.
       throw new IllegalStateException(error.toString());
     }
+    isPartitionKeyScan_ = isPartitionKeyScan;
   }
 
   /**
@@ -852,7 +863,8 @@ public class HdfsScanNode extends ScanNode {
       }
       boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
       if (!fsHasBlocks) {
-        // Limit the scan range length if generating scan ranges.
+        // Limit the scan range length if generating scan ranges (and we're not
+        // short-circuiting the scan for a partition key scan).
         long defaultBlockSize = isParquetBased(partition.getFileFormat()) ?
             analyzer.getQueryOptions().parquet_object_store_split_size :
             partitionFs.getDefaultBlockSize(partition.getLocationPath());
@@ -947,7 +959,7 @@ public class HdfsScanNode extends ScanNode {
         partition.getLocation().hashCode());
     scanRangeSpecs_.addToSplit_specs(splitSpec);
     long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
-    if (splittable) {
+    if (splittable && !isPartitionKeyScan_) {
       generatedScanRangeCount_ +=
           Math.ceil((double) fileDesc.getFileLength() / (double) maxBlockSize);
     } else {
@@ -1020,6 +1032,8 @@ public class HdfsScanNode extends ScanNode {
         remainingLength -= currentLength;
         currentOffset += currentLength;
       }
+      // Only generate one scan range for partition key scans.
+      if (isPartitionKeyScan_) break;
     }
     if (fileDescMissingDiskIds) {
       ++numFilesNoDiskIds_;
@@ -1113,6 +1127,22 @@ public class HdfsScanNode extends ScanNode {
       cardinality_ = applyConjunctsSelectivity(cardinality_);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+
+    // Backend only returns one row per partition
+    if (isPartitionKeyScan_) {
+      // The short-circuiting means we generate at most one row per scan range.
+      long numRanges = getNumScanRanges();
+      cardinality_ = cardinality_ < 0 ? numRanges : Math.min(cardinality_, numRanges);
+      // inputCardinality_ is used as a rough cost measure to determine whether to run on
+      // a single node. Adjust it upwards to reflect that producing the one row per scan
+      // range requires more work than a typical rows, so that we won't process large
+      // numbers of scan ranges on the coordinator.
+      long numRangesAdjusted = MathUtil.saturatingMultiply(
+          numRanges, PARTITION_KEY_SCAN_INPUT_CARDINALITY_ADJUSTMENT_FACTOR);
+      inputCardinality_ = inputCardinality_ < 0 ?
+          numRangesAdjusted :
+          Math.min(inputCardinality_, numRangesAdjusted);
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }
@@ -1396,6 +1426,7 @@ public class HdfsScanNode extends ScanNode {
       dictMap.put(entry.getKey().getId().asInt(), entry.getValue());
     }
     msg.hdfs_scan_node.setDictionary_filter_conjuncts(dictMap);
+    msg.hdfs_scan_node.setIs_partition_key_scan(isPartitionKeyScan_);
   }
 
   @Override
@@ -1460,6 +1491,9 @@ public class HdfsScanNode extends ScanNode {
       if (!runtimeFilters_.isEmpty()) {
         output.append(detailPrefix + "runtime filters: ");
         output.append(getRuntimeFilterExplainString(false, detailLevel));
+      }
+      if (isPartitionKeyScan_) {
+        output.append(detailPrefix + "partition key scan\n");
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -1842,8 +1876,6 @@ public class HdfsScanNode extends ScanNode {
         MAX_IO_BUFFERS_PER_THREAD * BackendConfig.INSTANCE.getReadSize();
   }
 
-  public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
-
   @Override
   public boolean isTableMissingTableStats() {
     if (extrapolatedNumRows_ >= 0) return false;
@@ -1864,5 +1896,15 @@ public class HdfsScanNode extends ScanNode {
    */
   private static long sumValues(Map<?, Long> input) {
     return input.values().stream().mapToLong(Long::longValue).sum();
+  }
+
+  /**
+   * Return the number of scan ranges. computeScanRangeLocations() must be called
+   * before calling this.
+   */
+  public long getNumScanRanges() {
+    Preconditions.checkNotNull(scanRangeSpecs_);
+    return scanRangeSpecs_.getConcrete_rangesSize()
+        + scanRangeSpecs_.getSplit_specsSize();
   }
 }

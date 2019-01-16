@@ -20,13 +20,13 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.FunctionParams;
+import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -49,7 +49,6 @@ import com.google.common.base.Preconditions;
  * Representation of the common elements of all scan nodes.
  */
 abstract public class ScanNode extends PlanNode {
-
   // Factor capturing the worst-case deviation from a uniform distribution of scan ranges
   // among nodes. The factor of 1.2 means that a particular node may have 20% more
   // scan ranges than would have been estimated assuming a uniform distribution.
@@ -67,11 +66,11 @@ abstract public class ScanNode extends PlanNode {
   // The AggregationInfo from the query block of this scan node. Used for determining if
   // the count(*) optimization can be applied.
   // Count(*) aggregation optimization flow:
-  // The caller passes in an AggregateInfo to the constructor that this scan node uses to
-  // determine whether to apply the optimization or not. The produced smap must then be
-  // applied to the AggregateInfo in this query block. We do not apply the smap in this
-  // class directly to avoid side effects and make it easier to reason about.
-  protected AggregateInfo aggInfo_ = null;
+  // The caller passes in a MultiAggregateInfo to the constructor that this scan node
+  // uses to determine whether to apply the optimization or not. The produced smap must
+  // then be applied to the MultiAggregateInfo in this query block. We do not apply the
+  // smap in this class directly to avoid side effects and make it easier to reason about.
+  protected MultiAggregateInfo aggInfo_ = null;
   protected static final String STATS_NUM_ROWS = "stats: num_rows";
 
   // Should be applied to the AggregateInfo from the same query block. We cannot use the
@@ -148,9 +147,12 @@ abstract public class ScanNode extends PlanNode {
    */
   protected boolean canApplyCountStarOptimization(Analyzer analyzer) {
     if (analyzer.getNumTableRefs() != 1)  return false;
-    if (aggInfo_ == null || !aggInfo_.hasCountStarOnly()) return false;
+    if (aggInfo_ == null || aggInfo_.getMaterializedAggClasses().size() != 1
+        || !aggInfo_.getMaterializedAggClass(0).hasCountStarOnly()) {
+      return false;
+    }
     if (!conjuncts_.isEmpty()) return false;
-    return desc_.getMaterializedSlots().isEmpty() || desc_.hasClusteringColsOnly();
+    return !desc_.hasMaterializedSlots() || desc_.hasClusteringColsOnly();
   }
 
   /**
@@ -338,4 +340,6 @@ abstract public class ScanNode extends PlanNode {
    * engine.
    */
   public boolean hasStorageLayerConjuncts() { return false; }
+
+  public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 }

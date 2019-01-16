@@ -300,6 +300,14 @@ class RowBatch {
     flush_mode_ = FlushMode::FLUSH_RESOURCES;
   }
 
+  /// Set the capacity of the row batch to 'limit' so that only that many rows can be
+  /// appended to it. The capacity will be restored to its original value when Reset()
+  /// is called.
+  void limit_capacity(int limit) {
+    DCHECK_LE(num_rows_, limit);
+    capacity_ = limit;
+  }
+
   FlushMode flush_mode() const { return flush_mode_; }
 
   /// Called to indicate that some resources backing this batch were not attached and

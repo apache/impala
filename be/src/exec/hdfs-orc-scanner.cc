@@ -503,7 +503,13 @@ Status HdfsOrcScanner::ProcessSplit() {
   do {
     unique_ptr<RowBatch> batch = make_unique<RowBatch>(scan_node_->row_desc(),
         state_->batch_size(), scan_node_->mem_tracker());
+    if (scan_node_->is_partition_key_scan()) batch->limit_capacity(1);
     Status status = GetNextInternal(batch.get());
+
+    // If we are doing a partition key scan, we are done scanning the file after
+    // returning at least one row.
+    if (scan_node_->is_partition_key_scan() && batch->num_rows() > 0) eos_ = true;
+
     // Always add batch to the queue because it may contain data referenced by previously
     // appended batches.
     scan_node->AddMaterializedRowBatch(move(batch));

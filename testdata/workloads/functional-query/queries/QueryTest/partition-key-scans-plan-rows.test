@@ -1,0 +1,14 @@
+====
+---- QUERY
+# Basic partition key scan.
+select distinct year
+from alltypes
+---- RESULTS
+2009
+2010
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file flows through the plan.
+aggregation(SUM, RowsReturned): 48
+====

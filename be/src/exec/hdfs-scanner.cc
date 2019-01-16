@@ -139,12 +139,15 @@ Status HdfsScanner::ProcessSplit() {
     }
     unique_ptr<RowBatch> batch = std::make_unique<RowBatch>(scan_node_->row_desc(),
         state_->batch_size(), scan_node_->mem_tracker());
+    if (scan_node_->is_partition_key_scan()) batch->limit_capacity(1);
     Status status = GetNextInternal(batch.get());
     if (batch->num_rows() > 0) returned_rows = true;
     // Always add batch to the queue if any rows were returned because it may contain
     // data referenced by previously appended batches.
     if (returned_rows) scan_node->AddMaterializedRowBatch(move(batch));
     RETURN_IF_ERROR(status);
+    // Only need to return one row per partition for partition key scans.
+    if (returned_rows && scan_node_->is_partition_key_scan()) eos_ = true;
   } while (!eos_ && !scan_node_->ReachedLimitShared());
   return Status::OK();
 }
