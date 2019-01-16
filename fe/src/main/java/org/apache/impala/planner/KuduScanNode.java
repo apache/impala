@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
-import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
@@ -33,6 +32,7 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
@@ -119,14 +119,12 @@ public class KuduScanNode extends ScanNode {
   boolean isPointLookupQuery_ = false;
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      AggregateInfo aggInfo) {
+      MultiAggregateInfo aggInfo) {
     super(id, desc, "SCAN KUDU");
     kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
   }
-
-  public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {

@@ -613,6 +613,29 @@ public class CardinalityTest extends PlannerTestBase {
         path, HdfsScanNode.class);
   }
 
+  /**
+   * Test that cardinality estimates for partition key scans reflect the
+   * number of scan ranges, not the number of rows in the files.
+   */
+  @Test
+  public void testHdfsScanNodePartitionKeyScan() {
+    // Non-distinct, partition key scan optimisation is disabled.
+    verifyCardinality("SELECT year FROM functional.alltypes", 7300, true,
+        ImmutableSet.of(), Arrays.asList(0), HdfsScanNode.class);
+
+    // Distinct, partition key scan optimisation is enabled.
+    verifyCardinality("SELECT distinct year FROM functional.alltypes", 24, true,
+        ImmutableSet.of(), Arrays.asList(0, 0, 0, 0), HdfsScanNode.class);
+
+    // Distinct, partition key scan optimisation is enabled but no stats. We should still
+    // estimate based on the number of files.
+    verifyCardinality("SELECT distinct year FROM functional_parquet.alltypes", 24,
+        true, ImmutableSet.of(), Arrays.asList(0, 0, 0, 0), HdfsScanNode.class);
+    verifyCardinality("SELECT distinct year FROM functional_parquet.alltypes", 24,
+        true, ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        Arrays.asList(0, 0, 0, 0), HdfsScanNode.class);
+  }
+
   @Test
   public void testSelectNode() {
     // Create the path to the SelectNode of interest

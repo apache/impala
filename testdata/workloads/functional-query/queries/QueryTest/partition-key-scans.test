@@ -1,0 +1,147 @@
+====
+---- QUERY
+# Basic partition key scan.
+select distinct year
+from alltypes
+---- RESULTS
+2009
+2010
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Test with more complex multiple distinct aggregation.
+select count(distinct year), count(distinct month)
+from alltypes
+---- RESULTS
+2,12
+---- TYPES
+BIGINT,BIGINT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Distinct aggregation with multiple columns.
+select distinct year, month
+from alltypes
+---- RESULTS
+2009,1
+2009,2
+2009,3
+2009,4
+2009,5
+2009,6
+2009,7
+2009,8
+2009,9
+2009,10
+2009,11
+2009,12
+2010,1
+2010,2
+2010,3
+2010,4
+2010,5
+2010,6
+2010,7
+2010,8
+2010,9
+2010,10
+2010,11
+2010,12
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Partition key scan combined with analytic function.
+select year, row_number() over (order by year)
+from alltypes group by year;
+---- RESULTS
+2009,1
+2010,2
+---- TYPES
+INT,BIGINT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Partition scan combined with sort.
+select distinct year, month
+from alltypes
+order by year, month
+---- RESULTS
+2009,1
+2009,2
+2009,3
+2009,4
+2009,5
+2009,6
+2009,7
+2009,8
+2009,9
+2009,10
+2009,11
+2009,12
+2010,1
+2010,2
+2010,3
+2010,4
+2010,5
+2010,6
+2010,7
+2010,8
+2010,9
+2010,10
+2010,11
+2010,12
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Partition key scan combined with predicate on partition columns
+select distinct year, month
+from alltypes
+where year - 2000 = month;
+---- RESULTS
+2009,9
+2010,10
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 2
+====
+---- QUERY
+# Partition key scan combined with having predicate.
+select year, min(month)
+from alltypes
+group by year
+having min(month) = 1
+---- RESULTS
+2009,1
+2010,1
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+# Confirm that only one row per file is read.
+aggregation(SUM, RowsRead): 24
+====
+---- QUERY
+# Empty table should not return any rows
+select distinct 'test'
+from emptytable
+---- RESULTS
+---- TYPES
+STRING
+====

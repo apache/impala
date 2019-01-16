@@ -262,6 +262,7 @@ class HdfsScanNodeBase : public ScanNode {
     return parquet_count_star_slot_offset_ != -1;
   }
   int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
+  bool is_partition_key_scan() const { return is_partition_key_scan_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
     ConjunctEvaluatorsMap;
@@ -480,6 +481,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// applyParquetCountStartOptimization() in HdfsScanNode.java.
   const int parquet_count_star_slot_offset_;
 
+  // True if this is a partition key scan that needs only to return at least one row from
+  // each scan range. If true, the scan node and scanner implementations should attempt
+  // to do the minimum possible work to materialise one row.
+  const bool is_partition_key_scan_;
+
   /// RequestContext object to use with the disk-io-mgr for reads.
   std::unique_ptr<io::RequestContext> reader_context_;
 
@@ -498,7 +504,8 @@ class HdfsScanNodeBase : public ScanNode {
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   const AvroSchemaElement& avro_schema_;
 
-  /// Partitions scanned by this scan node.
+  /// Partitions scanned by this scan node. Initialized in Prepare() and not modified
+  /// afterwards.
   std::unordered_set<int64_t> partition_ids_;
 
   /// This is a pair for partition ID and filename

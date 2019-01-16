@@ -123,6 +123,12 @@ public class TupleDescriptor {
   public TupleId getId() { return id_; }
   public List<SlotDescriptor> getSlots() { return slots_; }
 
+  public boolean hasMaterializedSlots() {
+    for (SlotDescriptor slot: slots_) {
+      if (slot.isMaterialized()) return true;
+    }
+    return false;
+  }
   public List<SlotDescriptor> getMaterializedSlots() {
     List<SlotDescriptor> result = new ArrayList<>();
     for (SlotDescriptor slot: slots_) {
@@ -361,7 +367,11 @@ public class TupleDescriptor {
    */
   public boolean hasClusteringColsOnly() {
     FeTable table = getTable();
-    if (!(table instanceof FeFsTable) || table.getNumClusteringCols() == 0) return false;
+    if (!(table instanceof FeFsTable)) return false;
+    // If we have no materialized slots, we are referencing no columns, so it's
+    // trivially true that that we're referencing only partition columns.
+    if (!hasMaterializedSlots()) return true;
+    if (table.getNumClusteringCols() == 0) return false;
 
     FeFsTable hdfsTable = (FeFsTable)table;
     for (SlotDescriptor slotDesc: getSlots()) {

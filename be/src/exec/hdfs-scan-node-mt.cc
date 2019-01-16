@@ -93,6 +93,9 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     }
   }
 
+  // We only need one row per partition. Limit the capacity to prevent the scanner
+  // materialising extra rows.
+  if (is_partition_key_scan_) row_batch->limit_capacity(1);
   Status status = scanner_->GetNext(row_batch);
   if (!status.ok()) {
     scanner_->Close(row_batch);
@@ -105,6 +108,13 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     scan_range_ = NULL;
     scanner_->Close(row_batch);
     scanner_.reset();
+    *eos = true;
+  } else if (row_batch->num_rows() > 0 && is_partition_key_scan_) {
+    // Only return one from each scan range.
+    scanner_->Close(row_batch);
+    scanner_.reset();
+    scan_range_ = nullptr;
+    return Status::OK();
   }
   COUNTER_SET(rows_returned_counter_, rows_returned());
 

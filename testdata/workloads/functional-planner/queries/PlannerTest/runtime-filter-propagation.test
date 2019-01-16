@@ -742,7 +742,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypesagg t1]
    HDFS partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> t1.year, RF002 -> t1.month
-   row-size=8B cardinality=11.00K
+   partition key scan
+   row-size=8B cardinality=11
 ====
 # Four-way join query between an inline view with an aggregation and three base tables
 select straight_join 1 from

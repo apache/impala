@@ -9,7 +9,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=24B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -27,7 +27,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=24B cardinality=0
 ====
 # distinct w/ explicit select list
@@ -41,7 +41,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -59,7 +59,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ====
 # count(distinct)
@@ -77,7 +77,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ====
 # count(distinct) w/ grouping
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
 |  row-size=13B cardinality=11.00K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=13B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
 |  row-size=13B cardinality=11.00K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=13B cardinality=11.00K
 ====
 # count(distinct) and sum(distinct) w/ grouping
@@ -173,7 +173,7 @@ PLAN-ROOT SINK
 |  row-size=5B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=5B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -203,7 +203,7 @@ PLAN-ROOT SINK
 |  row-size=5B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=5B cardinality=11.00K
 ====
 # sum(distinct) w/o grouping
@@ -221,7 +221,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=957
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=4B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -247,7 +247,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=957
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=4B cardinality=11.00K
 ====
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
@@ -269,7 +269,7 @@ PLAN-ROOT SINK
 |  row-size=19B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=22B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -301,7 +301,7 @@ PLAN-ROOT SINK
 |  row-size=19B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=22B cardinality=11.00K
 ====
 # aggregate fns with and without distinct
@@ -322,7 +322,7 @@ PLAN-ROOT SINK
 |  row-size=31B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -354,7 +354,7 @@ PLAN-ROOT SINK
 |  row-size=31B cardinality=8.61K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ====
 # test join on inline views containing distinct aggregates to make sure
@@ -379,7 +379,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=8B cardinality=8
 |
 02:AGGREGATE [FINALIZE]
@@ -391,7 +391,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=4B cardinality=8
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -423,7 +423,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=8B cardinality=8
 |
 10:AGGREGATE [FINALIZE]
@@ -447,7 +447,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=4B cardinality=8
 ====
 # Test placement of having predicate into 2nd phase merge agg for
@@ -472,7 +472,7 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=9B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -501,7 +501,7 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=9B cardinality=7.30K
 ====
 # test slot materialization on a distinct agg inside an inline view
@@ -522,8 +522,9 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
-   row-size=0B cardinality=7.30K
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
+   row-size=0B cardinality=24
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -549,8 +550,9 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
-   row-size=0B cardinality=7.30K
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
+   row-size=0B cardinality=24
 ====
 # test slot materialization on a distinct agg inside an inline view
 # triggered by a predicate in an outer query block (IMPALA-861)
@@ -571,7 +573,7 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -600,7 +602,7 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # IMPALA-2266: Test non-grouping distinct aggregation inside an inline view.
@@ -629,7 +631,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # IMPALA-2266: Test grouping distinct aggregation inside an inline view.
@@ -662,7 +664,7 @@ PLAN-ROOT SINK
 |  row-size=5B cardinality=20
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=5B cardinality=7.30K
 ====
 # IMPALA-4042: count(distinct NULL) fails on a view
@@ -691,7 +693,7 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Query block with a single distinct and multiple non-distinct aggs simplifies to a
@@ -715,7 +717,7 @@ PLAN-ROOT SINK
 |  row-size=26B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=15B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -744,6 +746,6 @@ PLAN-ROOT SINK
 |  row-size=26B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=15B cardinality=7.30K
 ====

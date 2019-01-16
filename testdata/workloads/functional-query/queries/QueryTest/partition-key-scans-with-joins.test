@@ -1,0 +1,14 @@
+====
+---- QUERY
+# Partition key scan combined with join.
+select straight_join count(distinct year), count(distinct month), combined
+from alltypes
+  join (
+    select count(*) as combined
+    from (select distinct year, month from alltypes) v) v
+group by combined
+---- RESULTS
+2,12,24
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====

@@ -284,6 +284,9 @@ struct THdfsScanNode {
   // The byte offset of the slot for Parquet metadata if Parquet count star optimization
   // is enabled.
   10: optional i32 parquet_count_star_slot_offset
+
+  // If true, the backend only needs to return one row per partition.
+  11: optional bool is_partition_key_scan
 }
 
 struct TDataSourceScanNode {

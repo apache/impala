@@ -612,6 +612,18 @@ public class MultiAggregateInfo {
   }
 
   /**
+   * Return true if all materialized aggregate expressions have distinct semantics.
+   */
+  public boolean hasAllDistinctAgg() {
+    for (AggregateInfo ai : materializedAggInfos_) {
+      if (!ai.hasAllDistinctAgg()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Returns all unassigned, bound, and equivalence conjuncts that should be evaluated
    * against the aggregation output. The conjuncts are bound by the result tuple id, as
    * returned by getResultTupleId().

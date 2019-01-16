@@ -22,9 +22,9 @@ import re
 from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfCatalogV2
+from tests.common.skip import SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    create_uncompressed_text_dimension, extend_exec_option_dimension,
+    create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
     create_client_protocol_dimension, hs2_parquet_constraint)
 from tests.common.test_vector import ImpalaTestVector
 
@@ -242,6 +242,35 @@ class TestHdfsQueries(ImpalaTestSuite):
 
   def test_file_partitions(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
+
+
+class TestPartitionKeyScans(ImpalaTestSuite):
+  """Tests for queries that exercise partition key scan optimisation. These
+  should be run against all HDFS table types with and without mt_dop to
+  exercise both scanner code paths. We run with mt_dop=0 and 1 only so
+  that the same number of rows flow through the plan."""
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestPartitionKeyScans, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format not in ('kudu', 'hbase'))
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension_from_dict({
+      'mt_dop': [0, 1], 'exec_single_node_rows_threshold': [0]}))
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def test_partition_key_scans(self, vector):
+    self.run_test_case('QueryTest/partition-key-scans', vector)
+
+  @SkipIfNotHdfsMinicluster.scheduling
+  def test_partition_key_scans_plan_rows(self, vector):
+    """Tests that assume the query is scheduled across three nodes."""
+    self.run_test_case('QueryTest/partition-key-scans-plan-rows', vector)
+
+  def test_partition_key_scans_with_joins(self, vector):
+    self.run_test_case('QueryTest/partition-key-scans-with-joins', vector)
 
 class TestTopNReclaimQuery(ImpalaTestSuite):
   """Test class to validate that TopN periodically reclaims tuple pool memory

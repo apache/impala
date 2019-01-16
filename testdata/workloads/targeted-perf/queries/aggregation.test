@@ -2705,3 +2705,20 @@ AGG1,AGG2,AGG3
 ----TYPES
 BIGINT,BIGINT,BIGINT
 ====
+---- QUERY: PERF_AGG-Q10
+-- Query with only distinct constants, should be optimized using partition key
+-- scan optimization.
+SELECT
+  count(distinct 'test') agg1,
+  count(distinct 1234) agg2,
+  'grouping value' g
+FROM
+  lineitem
+GROUP BY 2
+---- LABELS
+AGG1,AGG2,G
+---- RESULTS
+1,1,'grouping value'
+----TYPES
+BIGINT,BIGINT,STRING
+====

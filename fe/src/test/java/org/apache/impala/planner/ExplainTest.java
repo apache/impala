@@ -107,7 +107,8 @@ public class ExplainTest extends FrontendTestBase {
 
     HdfsScanNode hdfsScanNode =
         new HdfsScanNode(PlanNodeId.createGenerator().getNextId(), tupleDescriptor,
-            new ArrayList<>(), partitions, mockTableRef, null, new ArrayList<>());
+            new ArrayList<>(), partitions, mockTableRef, null, new ArrayList<>(),
+            false);
 
     Analyzer mockAnalyer = createMockAnalyzer();
 

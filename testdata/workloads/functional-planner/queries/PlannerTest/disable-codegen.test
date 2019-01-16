@@ -18,7 +18,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Rows per node is > 3000: codegen should be enabled.
@@ -40,7 +40,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=0B cardinality=11.00K
 ====
 # No stats on functional_parquet: codegen should be disabled.
@@ -64,14 +64,14 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=189.28KB
-   row-size=8B cardinality=unavailable
+   HDFS partitions=24/24 files=24 size=202.42KB
+   row-size=8B cardinality=12.88K
 ====
 # > 3000 rows returned to coordinator: codegen should be enabled
 select * from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=88.00KB Threads=3
-Per-Host Resource Estimates: Memory=128MB
+Per-Host Resource Estimates: Memory=129MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 
@@ -80,8 +80,8 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=189.28KB
-   row-size=80B cardinality=unavailable
+   HDFS partitions=24/24 files=24 size=202.42KB
+   row-size=80B cardinality=12.88K
 ====
 # Optimisation is enabled for join producing < 3000 rows
 select count(*)
@@ -112,11 +112,11 @@ PLAN-ROOT SINK
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=4B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
    row-size=4B cardinality=7.30K
 ====
@@ -144,11 +144,11 @@ PLAN-ROOT SINK
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=0B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Optimisation is enabled for union producing < 3000 rows
@@ -178,11 +178,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=7.31K
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=0B cardinality=8
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Optimisation is disabled by union producing > 3000 rows
@@ -211,11 +211,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=14.60K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=0B cardinality=7.30K
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Scan with limit on large table: the number of rows scanned is bounded,
@@ -237,7 +237,7 @@ PLAN-ROOT SINK
 |  limit: 1000
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 files=1 size=718.94MB
+   HDFS partitions=1/1 files=1 size=718.94MB
    limit: 1000
    row-size=8B cardinality=1.00K
 ====
@@ -259,7 +259,7 @@ PLAN-ROOT SINK
 |  limit: 1000
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 files=1 size=718.94MB
+   HDFS partitions=1/1 files=1 size=718.94MB
    predicates: l_orderkey > 100
    limit: 1000
    row-size=16B cardinality=1.00K
@@ -296,4 +296,32 @@ PLAN-ROOT SINK
 00:SCAN KUDU [tpch_kudu.partsupp]
    kudu predicates: ps_partkey = 2
    row-size=172B cardinality=4
+====
+# Test that codegen is disabled for a query over a small number of large files when the
+# partition key scan optimisation kicks in. This is desirable because most of the rows
+# in the file will not be processed.
+select distinct 'const' from tpch_parquet.lineitem;
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.06MB Threads=4
+Per-Host Resource Estimates: Memory=21MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  group by: 'const'
+|  row-size=12B cardinality=1
+|
+02:EXCHANGE [HASH('const')]
+|
+01:AGGREGATE [STREAMING]
+|  group by: 'const'
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   partition key scan
+   row-size=0B cardinality=3
 ====

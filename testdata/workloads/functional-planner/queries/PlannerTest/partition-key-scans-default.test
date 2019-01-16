@@ -7,18 +7,26 @@ PLAN-ROOT SINK
 |  output: min(`month`), max(`year`), ndv(`day`)
 |  row-size=16B cardinality=1
 |
-00:UNION
-   constant-operands=11
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   partition key scan
    row-size=12B cardinality=11
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-01:AGGREGATE [FINALIZE]
+03:AGGREGATE [FINALIZE]
+|  output: min:merge(`month`), max:merge(`year`), ndv:merge(`day`)
+|  row-size=16B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
 |  output: min(`month`), max(`year`), ndv(`day`)
 |  row-size=16B cardinality=1
 |
-00:UNION
-   constant-operands=11
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   partition key scan
    row-size=12B cardinality=11
 ====
 # Test with explicit distinct keyword.
@@ -35,23 +43,38 @@ PLAN-ROOT SINK
 |  group by: `year`
 |  row-size=12B cardinality=1
 |
-00:UNION
-   constant-operands=11
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   partition key scan
    row-size=8B cardinality=11
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(`year`), ndv:merge(`day`)
+|  row-size=16B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
 |  output: count(`year`), ndv:merge(`day`)
 |  row-size=16B cardinality=1
 |
-01:AGGREGATE
+04:AGGREGATE
+|  output: ndv:merge(`day`)
+|  group by: `year`
+|  row-size=12B cardinality=1
+|
+03:EXCHANGE [HASH(`year`)]
+|
+01:AGGREGATE [STREAMING]
 |  output: ndv(`day`)
 |  group by: `year`
 |  row-size=12B cardinality=1
 |
-00:UNION
-   constant-operands=11
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   partition key scan
    row-size=8B cardinality=11
 ====
 # Test static partition pruning.
@@ -63,8 +86,10 @@ PLAN-ROOT SINK
 |  output: min(`month`), max(`day`)
 |  row-size=8B cardinality=1
 |
-00:UNION
-   constant-operands=1
+00:SCAN HDFS [functional.alltypesagg]
+   partition predicates: `year` = 2010, `day` = 1
+   HDFS partitions=1/11 files=1 size=73.39KB
+   partition key scan
    row-size=8B cardinality=1
 ====
 # Test with cases where all partitions are pruned.
@@ -78,7 +103,10 @@ PLAN-ROOT SINK
 |  output: min(`year`), max(`month`)
 |  row-size=8B cardinality=1
 |
-00:UNION
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2000
+   partitions=0/24 files=0 size=0B
+   partition key scan
    row-size=8B cardinality=0
 ====
 # Test with group by and having clauses.
@@ -92,8 +120,9 @@ PLAN-ROOT SINK
 |  having: max(`day`) = 10
 |  row-size=16B cardinality=1
 |
-00:UNION
-   constant-operands=11
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   partition key scan
    row-size=12B cardinality=11
 ====
 # Test with group-by clauses (no aggregate expressions) only.
@@ -105,9 +134,10 @@ PLAN-ROOT SINK
 |  group by: `month`
 |  row-size=4B cardinality=12
 |
-00:UNION
-   constant-operands=12
-   row-size=4B cardinality=12
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
+   row-size=4B cardinality=24
 ====
 # Test with distinct select list.
 select distinct month from functional.alltypes where month % 2 = 0
@@ -116,11 +146,13 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  group by: `month`
-|  row-size=4B cardinality=6
+|  row-size=4B cardinality=12
 |
-00:UNION
-   constant-operands=6
-   row-size=4B cardinality=6
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` % 2 = 0
+   HDFS partitions=12/24 files=12 size=237.43KB
+   partition key scan
+   row-size=4B cardinality=12
 ====
 # Test with joins on the partition keys.
 select min(a.month)
@@ -135,34 +167,50 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.`year` = b.`year`
-|  row-size=12B cardinality=24
+|  runtime filters: RF000 <- b.`year`
+|  row-size=12B cardinality=264
 |
-|--01:UNION
-|     constant-operands=1
-|     row-size=4B cardinality=1
+|--01:SCAN HDFS [functional.alltypesagg b]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     partition key scan
+|     row-size=4B cardinality=11
 |
-00:UNION
-   constant-operands=24
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.`year`
+   partition key scan
    row-size=8B cardinality=24
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-03:AGGREGATE [FINALIZE]
+07:AGGREGATE [FINALIZE]
+|  output: min:merge(a.`month`)
+|  row-size=4B cardinality=1
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
 |  output: min(a.`month`)
 |  row-size=4B cardinality=1
 |
-02:HASH JOIN [INNER JOIN, BROADCAST]
+02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.`year` = b.`year`
-|  row-size=12B cardinality=24
+|  runtime filters: RF000 <- b.`year`
+|  row-size=12B cardinality=264
 |
-|--04:EXCHANGE [UNPARTITIONED]
+|--05:EXCHANGE [HASH(b.`year`)]
 |  |
-|  01:UNION
-|     constant-operands=1
-|     row-size=4B cardinality=1
+|  01:SCAN HDFS [functional.alltypesagg b]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     partition key scan
+|     row-size=4B cardinality=11
 |
-00:UNION
-   constant-operands=24
+04:EXCHANGE [HASH(a.`year`)]
+|
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.`year`
+   partition key scan
    row-size=8B cardinality=24
 ====
 # Test query which contains both distinct and non-distinct aggregate
@@ -183,9 +231,10 @@ PLAN-ROOT SINK
 |  |  group by: `year`
 |  |  row-size=4B cardinality=2
 |  |
-|  00:UNION
-|     constant-operands=2
-|     row-size=4B cardinality=2
+|  00:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     partition key scan
+|     row-size=4B cardinality=24
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(`month`)
@@ -214,9 +263,10 @@ PLAN-ROOT SINK
 |     HDFS partitions=1/1 files=0 size=0B
 |     row-size=16B cardinality=0
 |
-00:UNION
-   constant-operands=2
-   row-size=4B cardinality=2
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
+   row-size=4B cardinality=24
 ====
 # Test that non-partitioning slots which aren't materialized won't block the
 # optimization from being applied.
@@ -231,14 +281,16 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
-|  row-size=16B cardinality=24
+|  row-size=16B cardinality=264
 |
-|--01:UNION
-|     constant-operands=1
-|     row-size=8B cardinality=1
+|--01:SCAN HDFS [functional.alltypesagg b]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     partition key scan
+|     row-size=8B cardinality=11
 |
-00:UNION
-   constant-operands=24
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
    row-size=8B cardinality=24
 ====
 # IMPALA-2948. Unmaterialized slots won't block the optimization (the hash join version).
@@ -259,9 +311,10 @@ PLAN-ROOT SINK
 |  |  output: min(t2.`year`)
 |  |  row-size=4B cardinality=1
 |  |
-|  01:UNION
-|     constant-operands=1
-|     row-size=4B cardinality=1
+|  01:SCAN HDFS [functional.alltypestiny t2]
+|     HDFS partitions=4/4 files=4 size=460B
+|     partition key scan
+|     row-size=4B cardinality=4
 |
 00:SCAN HDFS [functional.alltypestiny t1]
    HDFS partitions=4/4 files=4 size=460B
@@ -286,17 +339,19 @@ PLAN-ROOT SINK
 |  |  group by: `year`
 |  |  row-size=4B cardinality=2
 |  |
-|  03:UNION
-|     constant-operands=2
-|     row-size=4B cardinality=2
+|  03:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     partition key scan
+|     row-size=4B cardinality=24
 |
 02:AGGREGATE [FINALIZE]
 |  group by: `month`
 |  row-size=4B cardinality=12
 |
-01:UNION
-   constant-operands=12
-   row-size=4B cardinality=12
+01:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   partition key scan
+   row-size=4B cardinality=24
 ====
 # If slots other than partition keys are accessed, make sure scan nodes are generated.
 select date_string_col, min(month) from functional.alltypes group by date_string_col
@@ -339,7 +394,7 @@ PLAN-ROOT SINK
    row-size=8B cardinality=7.30K
 ====
 # Test that unpartitioned queries with distinct semantics and only constant
-# columns turn into partition key scans.
+# columns turn into metadata-only queries.
 select distinct 'test', 1234 from tpch.lineitem;
 ---- PLAN
 PLAN-ROOT SINK
@@ -348,11 +403,12 @@ PLAN-ROOT SINK
 |  group by: 'test', 1234
 |  row-size=14B cardinality=1
 |
-00:UNION
-   constant-operands=1
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   partition key scan
    row-size=0B cardinality=1
 ====
-# Test that unpartitioned tables with no files return 0 value.
+# Test that unpartitioned tables with no files return 0 values.
 select distinct 'test', 1234 from functional.emptytable
 ---- PLAN
 PLAN-ROOT SINK
@@ -361,7 +417,9 @@ PLAN-ROOT SINK
 |  group by: 'test', 1234
 |  row-size=14B cardinality=0
 |
-00:UNION
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 files=0 size=0B
+   partition key scan
    row-size=0B cardinality=0
 ====
 # Test that queries with multiple aggregate classes are optimised.
@@ -392,7 +450,8 @@ PLAN-ROOT SINK
 |    group by: 1234, 1234
 |  row-size=18B cardinality=2
 |
-00:UNION
-   constant-operands=1
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   partition key scan
    row-size=0B cardinality=1
 ====

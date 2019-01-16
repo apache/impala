@@ -453,7 +453,19 @@ public class PlannerTest extends PlannerTestBase {
   public void testPartitionKeyScans() {
     TQueryOptions options = new TQueryOptions();
     options.setOptimize_partition_key_scans(true);
-    runPlannerTestFile("partition-key-scans", options);
+    runPlannerTestFile("partition-key-scans", options, ImmutableSet.of(
+            PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Test partition key scans with the option disabled - backend support is
+   * used to only return one row per file.
+   */
+  @Test
+  public void testPartitionKeyScansDefault() {
+    TQueryOptions options = new TQueryOptions();
+    runPlannerTestFile("partition-key-scans-default", options, ImmutableSet.of(
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test

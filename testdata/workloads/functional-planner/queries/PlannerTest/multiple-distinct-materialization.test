@@ -675,7 +675,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
-   row-size=0B cardinality=7.30K
+   partition key scan
+   row-size=0B cardinality=24
 ====
 # Mixed distinct and non-distinct aggs. No materialized aggregations. With group by.
 select v.gby1 from
