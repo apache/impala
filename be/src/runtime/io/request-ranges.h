@@ -245,6 +245,10 @@ class ScanRange : public RequestRange {
   /// the read did not come from a local disk. 'buffer_opts' specifies buffer management
   /// options - see the DiskIoMgr class comment and the BufferOpts comments for details.
   /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
+  ///
+  /// TODO: IMPALA-4249: clarify if a ScanRange can be reused after Reset(). Currently
+  /// it is not generally safe to do so, but some unit tests reuse ranges after
+  /// successfully reading to eos.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
       bool expected_local, const BufferOpts& buffer_opts, void* meta_data = nullptr);
 

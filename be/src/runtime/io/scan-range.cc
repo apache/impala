@@ -239,8 +239,8 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     // Propagate 'read_status' to the scan range. This will also wake up any waiting
     // threads.
     CancelInternal(read_status, true);
-    // No more reads for this scan range - we can close it.
-    file_reader_->Close();
+    // At this point we cannot touch the state of this range because the client
+    // may notice cancellation, then reuse the scan range.
     return ReadOutcome::CANCELLED;
   }
 
@@ -253,14 +253,13 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   // After calling EnqueueReadyBuffer(), it is no longer valid to touch 'buffer_desc'.
   // Store the state we need before calling EnqueueReadyBuffer().
   bool eosr = buffer_desc->eosr();
+  // No more reads for this scan range - we can close it.
+  if (eosr) file_reader_->Close();
   // Read successful - enqueue the buffer and return the appropriate outcome.
   if (!EnqueueReadyBuffer(move(buffer_desc))) return ReadOutcome::CANCELLED;
-  if (eosr) {
-    // No more reads for this scan range - we can close it.
-    file_reader_->Close();
-    return ReadOutcome::SUCCESS_EOSR;
-  }
-  return ReadOutcome::SUCCESS_NO_EOSR;
+  // At this point, if eosr=true, then we cannot touch the state of this scan range
+  // because the client may notice eos, then reuse the scan range.
+  return eosr ? ReadOutcome::SUCCESS_EOSR : ReadOutcome::SUCCESS_NO_EOSR;
 }
 
 Status ScanRange::ReadSubRanges(BufferDescriptor* buffer_desc, bool* eof) {
@@ -375,6 +374,9 @@ void ScanRange::CancelInternal(const Status& status, bool read_error) {
 
   // For cached buffers, we can't close the range until the cached buffer is returned.
   // Close() is called from ScanRange::CleanUpBufferLocked().
+  // TODO: IMPALA-4249 - this Close() call makes it unsafe to reuse a cancelled scan
+  // range, because there is no synchronisation between this Close() call and the
+  // client adding the ScanRange back into the IoMgr.
   if (external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER) file_reader_->Close();
 }
 
