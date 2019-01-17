@@ -25,6 +25,6 @@ EXPOSE 21050
 # Debug webserver
 EXPOSE 25000
 
-CMD ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
+ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
      "-abort_on_config_error=false", "-state_store_host=statestored",\
-     "-catalog_service_host=catalogd"]
+     "-catalog_service_host=catalogd" "-is_executor=false"]

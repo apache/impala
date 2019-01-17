@@ -30,7 +30,8 @@ add_custom_command(
   OUTPUT ${IMPALA_BASE_BUILD_CONTEXT_TIMESTAMP}
   COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
   COMMAND touch ${IMPALA_BASE_BUILD_CONTEXT_TIMESTAMP}
-  DEPENDS daemons fe test-configuration ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
+  DEPENDS daemons fe ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
+  DEPENDS ${CMAKE_SOURCE_DIR}/fe/src/test/resources/.test_config_timestamp
   COMMENT "Creating impala base build context."
   VERBATIM
 )
@@ -54,20 +55,48 @@ add_custom_target(impala_base_image
   DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP}
 )
 
-# Command and target for the Impalad image.
-set(IMPALAD_IMAGE_TIMESTAMP
-  ${CMAKE_SOURCE_DIR}/docker/.impalad_image_timestamp
+# Command and target for the various Impalad images.
+set(COORD_EXEC_IMAGE_TIMESTAMP
+  ${CMAKE_SOURCE_DIR}/docker/.coord_exec_image_timestamp
 )
 add_custom_command(
-  OUTPUT ${IMPALAD_IMAGE_TIMESTAMP}
-  COMMAND cd ${CMAKE_SOURCE_DIR}/docker/impalad && docker build -t impalad .
-  COMMAND touch ${IMPALAD_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/impalad/Dockerfile
-  COMMENT "Building Impalad docker image."
+  OUTPUT ${COORD_EXEC_IMAGE_TIMESTAMP}
+  COMMAND cd ${CMAKE_SOURCE_DIR}/docker/coord_exec && docker build -t impalad_coord_exec .
+  COMMAND touch ${COORD_EXEC_IMAGE_TIMESTAMP}
+  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/coord_exec/Dockerfile
+  COMMENT "Building Impalad Coord Exec docker image."
   VERBATIM
 )
-add_custom_target(impalad_image
-  DEPENDS ${IMPALAD_IMAGE_TIMESTAMP}
+add_custom_target(coord_exec_image
+  DEPENDS ${COORD_EXEC_IMAGE_TIMESTAMP}
+)
+set(COORDINATOR_IMAGE_TIMESTAMP
+  ${CMAKE_SOURCE_DIR}/docker/.coordinator_image_timestamp
+)
+add_custom_command(
+  OUTPUT ${COORDINATOR_IMAGE_TIMESTAMP}
+  COMMAND cd ${CMAKE_SOURCE_DIR}/docker/coordinator && docker build -t impalad_coordinator .
+  COMMAND touch ${COORDINATOR_IMAGE_TIMESTAMP}
+  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/coordinator/Dockerfile
+  COMMENT "Building Impalad Coordinator docker image."
+  VERBATIM
+)
+add_custom_target(coordinator_image
+  DEPENDS ${COORDINATOR_IMAGE_TIMESTAMP}
+)
+set(EXECUTOR_IMAGE_TIMESTAMP
+  ${CMAKE_SOURCE_DIR}/docker/.executor_image_timestamp
+)
+add_custom_command(
+  OUTPUT ${EXECUTOR_IMAGE_TIMESTAMP}
+  COMMAND cd ${CMAKE_SOURCE_DIR}/docker/executor && docker build -t impalad_executor .
+  COMMAND touch ${EXECUTOR_IMAGE_TIMESTAMP}
+  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/executor/Dockerfile
+  COMMENT "Building Impalad Executor docker image."
+  VERBATIM
+)
+add_custom_target(executor_image
+  DEPENDS ${EXECUTOR_IMAGE_TIMESTAMP}
 )
 
 # Command and target for the Statestored image.
@@ -102,5 +131,6 @@ add_custom_target(catalogd_image
   DEPENDS ${CATALOGD_IMAGE_TIMESTAMP}
 )
 add_custom_target(docker_images
-  DEPENDS impalad_image statestored_image catalogd_image
+  DEPENDS coord_exec_image coordinator_image executor_image
+  DEPENDS statestored_image catalogd_image
 )

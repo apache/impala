@@ -19,7 +19,8 @@ FROM impala_base
 
 # Externally-facing ports
 # Debug webserver
-EXPOSE 25020
+EXPOSE 25000
 
-ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/catalogd",\
-     "-abort_on_config_error=false", "-state_store_host=statestored"]
+ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
+     "-abort_on_config_error=false", "-state_store_host=statestored",\
+     "-catalog_service_host=catalogd" "-is_coordinator=false"]
