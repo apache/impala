@@ -137,6 +137,65 @@ void SetDecimalConvertedAndLogicalType(
   col_schema->__set_logicalType(logical_type);
 }
 
+/// For int64 timestamps, sets logical_type in 'col_schema' to TIMESTAMP and fills its
+/// parameters.
+/// converted_type is not set because Impala always writes timestamps without UTC
+/// normalization, and older readers that do not use logical types would incorrectly
+/// interpret TIMESTAMP_MILLIS/MICROS as UTC normalized.
+/// Leaves logical type empty for int96 timestamps.
+void SetTimestampLogicalType(const TQueryOptions& query_options,
+    parquet::SchemaElement* col_schema) {
+  if(query_options.parquet_timestamp_type == TParquetTimestampType::INT96_NANOS) return;
+
+  parquet::TimeUnit time_unit;
+  switch (query_options.parquet_timestamp_type) {
+    case TParquetTimestampType::INT64_MILLIS:
+      time_unit.__set_MILLIS(parquet::MilliSeconds());
+      break;
+    case TParquetTimestampType::INT64_MICROS:
+      time_unit.__set_MICROS(parquet::MicroSeconds());
+      break;
+    case TParquetTimestampType::INT64_NANOS:
+      time_unit.__set_NANOS(parquet::NanoSeconds());
+      break;
+    default:
+      DCHECK(false);
+  }
+
+  parquet::TimestampType timestamp_type;
+  timestamp_type.__set_unit(time_unit);
+  timestamp_type.__set_isAdjustedToUTC(false);
+
+  parquet::LogicalType logical_type;
+  logical_type.__set_TIMESTAMP(timestamp_type);
+  col_schema->__set_logicalType(logical_type);
+}
+
+/// Mapping of impala's internal types to parquet storage types. This is indexed by
+/// PrimitiveType enum
+const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
+  parquet::Type::BOOLEAN,     // Invalid
+  parquet::Type::BOOLEAN,     // NULL type
+  parquet::Type::BOOLEAN,
+  parquet::Type::INT32,
+  parquet::Type::INT32,
+  parquet::Type::INT32,
+  parquet::Type::INT64,
+  parquet::Type::FLOAT,
+  parquet::Type::DOUBLE,
+  parquet::Type::INT96,       // Timestamp
+  parquet::Type::BYTE_ARRAY,  // String
+  parquet::Type::BYTE_ARRAY,  // Date, NYI
+  parquet::Type::BYTE_ARRAY,  // DateTime, NYI
+  parquet::Type::BYTE_ARRAY,  // Binary NYI
+  parquet::Type::FIXED_LEN_BYTE_ARRAY, // Decimal
+  parquet::Type::BYTE_ARRAY,  // VARCHAR(N)
+  parquet::Type::BYTE_ARRAY,  // CHAR(N)
+};
+
+const int INTERNAL_TO_PARQUET_TYPES_SIZE =
+  sizeof(INTERNAL_TO_PARQUET_TYPES) / sizeof(INTERNAL_TO_PARQUET_TYPES[0]);
+
 } // anonymous namespace
 
 // Needs to be in sync with the order of enum values declared in TParquetArrayResolution.
@@ -316,9 +375,20 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
   return Status::OK();
 }
 
+parquet::Type::type ParquetMetadataUtils::ConvertInternalToParquetType(
+    PrimitiveType type, const TQueryOptions& query_options) {
+  DCHECK_GE(type, 0);
+  DCHECK_LT(type, INTERNAL_TO_PARQUET_TYPES_SIZE);
+  if (type == TYPE_TIMESTAMP &&
+      query_options.parquet_timestamp_type != TParquetTimestampType::INT96_NANOS) {
+    return parquet::Type::INT64;
+  }
+  return INTERNAL_TO_PARQUET_TYPES[type];
+}
+
 void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
     const TQueryOptions& query_options, parquet::SchemaElement* col_schema) {
-  col_schema->__set_type(ConvertInternalToParquetType(col_type.type));
+  col_schema->__set_type(ConvertInternalToParquetType(col_type.type, query_options));
   col_schema->__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
 
   switch (col_type.type) {
@@ -353,11 +423,12 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
       SetIntLogicalType(64, col_schema);
       break;
     case TYPE_TIMESTAMP:
+      SetTimestampLogicalType(query_options, col_schema);
+      break;
     case TYPE_BOOLEAN:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
       // boolean/float/double/INT96 encoded timestamp have no logical or converted types.
-      // INT64 encoded timestamp will have logical and converted types (IMPALA-5051).
       break;
     default:
       DCHECK(false);

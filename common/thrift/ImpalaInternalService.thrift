@@ -67,6 +67,14 @@ enum TKuduReadMode {
   READ_AT_SNAPSHOT = 2
 }
 
+// Physical type and unit used when writing timestamps in Parquet.
+enum TParquetTimestampType {
+  INT96_NANOS,
+  INT64_MILLIS,
+  INT64_MICROS,
+  INT64_NANOS
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -327,6 +335,10 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift.
   79: optional CatalogObjects.THdfsFileFormat default_file_format =
       CatalogObjects.THdfsFileFormat.TEXT;
+
+  // See comment in ImpalaService.thrift.
+  80: optional TParquetTimestampType parquet_timestamp_type =
+      TParquetTimestampType.INT96_NANOS;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

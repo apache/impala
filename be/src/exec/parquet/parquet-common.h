@@ -35,10 +35,6 @@ namespace impala {
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
 
-/// Return the Parquet type corresponding to Impala's internal type. The caller must
-/// validate that the type is valid, otherwise this will DCHECK.
-parquet::Type::type ConvertInternalToParquetType(PrimitiveType type);
-
 /// Return the Impala compression type for the given Parquet codec. The caller must
 /// validate that the codec is a supported one, otherwise this will DCHECK.
 THdfsCompression::type ConvertParquetToImpalaCodec(parquet::CompressionCodec::type codec);

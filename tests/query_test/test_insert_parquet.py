@@ -353,9 +353,9 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
             % dst_tbl)
     assert result_src.data == result_dst.data
 
-  def _ctas_and_get_metadata(self, vector, unique_database, tmp_dir, source_table):
+  def _ctas_and_get_metadata(self, vector, unique_database, tmp_dir, source_table,
+                             table_name="test_hdfs_parquet_table_writer"):
     """CTAS 'source_table' into a Parquet table and returns its Parquet metadata."""
-    table_name = "test_hdfs_parquet_table_writer"
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
     hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
                                                                  table_name))
@@ -461,6 +461,36 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self._check_decimal_logical_type(schemas, "c2", 15, 5)
     self._check_decimal_logical_type(schemas, "c3", 1, 1)
 
+  def _check_int64_timestamp_logical_type(self, schemas, column_name, unit):
+    """Checks that the schema with name 'column_name' has logical and converted type that
+       describe a timestamp with the given unit."""
+    schema = self._get_schema(schemas, column_name)
+    assert schema.logicalType is not None
+    self._check_only_one_member_var_is_set(schema.logicalType, "TIMESTAMP")
+    assert schema.logicalType.TIMESTAMP.unit is not None
+    self._check_only_one_member_var_is_set(
+        schema.logicalType.TIMESTAMP.unit, unit.upper())
+    # Non UTC-normalized timestamps have no converted_type to avoid confusing older
+    # readers that would interpret these as UTC-normalized.
+    assert schema.converted_type is None
+    assert not schema.logicalType.TIMESTAMP.isAdjustedToUTC
+
+  def _ctas_and_check_int64_timestamps(self, vector, unique_database, tmpdir, unit):
+    """CTAS a table using 'unit' int64 timestamps and checks columns metadata."""
+    source = "functional.alltypestiny"
+    timestamp_type = 'int64_' + unit
+    vector.get_value('exec_option')['parquet_timestamp_type'] = timestamp_type
+    file_metadata = self._ctas_and_get_metadata(vector, unique_database, tmpdir.strpath,
+                                                source, table_name=timestamp_type)
+    schemas = file_metadata.schema
+    self._check_int64_timestamp_logical_type(schemas, "timestamp_col", unit)
+
+  def test_int64_timestamp_logical_type(self, vector, unique_database, tmpdir):
+    """Tests that correct metadata is written for int64 timestamps."""
+    self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "millis")
+    self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "micros")
+    self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "nanos")
+
 
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
@@ -559,13 +589,13 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
       assert stats == expected
 
   def _ctas_table_and_verify_stats(self, vector, unique_database, tmp_dir, source_table,
-                                   expected_values):
+                                   expected_values,
+                                   table_name="test_hdfs_parquet_table_writer"):
     """Copies 'source_table' into a parquet table and makes sure that the row group
     statistics in the resulting parquet file match those in 'expected_values'. 'tmp_dir'
     needs to be supplied by the caller and will be used to store temporary files. The
     caller is responsible for cleaning up 'tmp_dir'.
     """
-    table_name = "test_hdfs_parquet_table_writer"
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
     hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
                                                                  table_name))
@@ -781,11 +811,59 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
       "functional_parquet.zipcode_incomes", expected_min_max_values)
 
+  def test_write_int64_timestamp_statistics(self, vector, unique_database, tmpdir):
+    """Test that writing a parquet file populates the rowgroup statistics correctly for
+    int64 milli/micro/nano timestamps."""
+    table_name = "int96_nanos"
+    qualified_table_name = "{0}.{1}".format(unique_database, table_name)
+
+    create_table_stmt = "create table {0} (ts timestamp);".format(qualified_table_name)
+    self.execute_query(create_table_stmt)
+
+    insert_stmt = """insert into {0} values
+        ("1969-12-31 23:59:59.999999999"),
+        ("1970-01-01 00:00:00.001001001")""".format(qualified_table_name)
+    self.execute_query(insert_stmt)
+
+    vector.get_value('exec_option')['parquet_timestamp_type'] = "int64_millis"
+    expected_min_max_values = [
+      ColumnStats('ts', -1, 1, 0)
+    ]
+    self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
+                                      qualified_table_name,
+                                      expected_min_max_values,
+                                      table_name="int64_millis")
+
+    vector.get_value('exec_option')['parquet_timestamp_type'] = "int64_micros"
+    expected_min_max_values = [
+      ColumnStats('ts', -1, 1001, 0)
+    ]
+    self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
+                                      qualified_table_name,
+                                      expected_min_max_values,
+                                      table_name="int64_micros")
+
+    # Insert values that fall outside the valid range for int64_nanos. These should
+    # be inserted as NULLs and not affect min/max stats.
+    insert_stmt = """insert into {0} values
+        ("1677-09-21 00:12:43.145224191"),
+        ("2262-04-11 23:47:16.854775808")""".format(qualified_table_name)
+    self.execute_query(insert_stmt)
+
+    vector.get_value('exec_option')['parquet_timestamp_type'] = "int64_nanos"
+    expected_min_max_values = [
+      ColumnStats('ts', -1, 1001001, 2)
+    ]
+    self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
+                                      qualified_table_name,
+                                      expected_min_max_values,
+                                      table_name="int64_nanos")
+
   def test_too_many_columns(self, vector, unique_database):
     """Test that writing a Parquet table with too many columns results in an error."""
     num_cols = 12000
     query = "create table %s.wide stored as parquet as select \n" % unique_database
     query += ", ".join(map(str, xrange(num_cols)))
     query += ";\n"
-    result = self.execute_query_expect_failure(self.client, query);
+    result = self.execute_query_expect_failure(self.client, query)
     assert "Minimum required block size must be less than 2GB" in str(result)

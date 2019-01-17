@@ -26,6 +26,7 @@
 #include <chrono>
 
 #include "exprs/timezone_db.h"
+#include "kudu/util/int128.h"
 #include "gutil/walltime.h"
 
 namespace impala {
@@ -33,7 +34,7 @@ namespace impala {
 template <int32_t TICKS_PER_SEC>
 inline TimestampValue TimestampValue::UtcFromUnixTimeTicks(int64_t unix_time_ticks) {
   static const boost::gregorian::date EPOCH(1970,1,1);
-  int64_t days = SplitTime<(uint64_t)TICKS_PER_SEC*24*60*60>(&unix_time_ticks);
+  int64_t days = SplitTime<(uint64_t)TICKS_PER_SEC*SECONDS_PER_DAY>(&unix_time_ticks);
 
   return TimestampValue(EPOCH + boost::gregorian::date_duration(days),
       boost::posix_time::nanoseconds(unix_time_ticks*(NANOS_PER_SEC/TICKS_PER_SEC)));
@@ -81,6 +82,11 @@ inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_
   return result;
 }
 
+inline int64_t TimestampValue::DaysSinceUnixEpoch() const {
+  DCHECK(HasDate());
+  static const boost::gregorian::date epoch(1970,1,1);
+  return (date_ - epoch).days();
+}
 
 /// Interpret 'this' as a timestamp in UTC and convert to unix time.
 /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise
@@ -89,8 +95,7 @@ inline bool TimestampValue::UtcToUnixTime(time_t* unix_time) const {
   DCHECK(unix_time != nullptr);
   if (UNLIKELY(!HasDateAndTime())) return false;
 
-  static const boost::gregorian::date epoch(1970,1,1);
-  *unix_time = (date_ - epoch).days() * 24 * 60 * 60 + time_.total_seconds();
+  *unix_time = DaysSinceUnixEpoch() * SECONDS_PER_DAY + time_.total_seconds();
   return true;
 }
 
@@ -116,6 +121,44 @@ inline bool TimestampValue::UtcToUnixTimeMicros(int64_t* unix_time_micros) const
   // truncated.
   DCHECK_LE(*unix_time_micros, MAX_UNIXTIME_MICROS + 1);
   *unix_time_micros = std::min(MAX_UNIXTIME_MICROS, *unix_time_micros);
+  return true;
+}
+
+inline bool TimestampValue::FloorUtcToUnixTimeMicros(int64_t* unix_time_micros) const {
+  DCHECK(unix_time_micros != nullptr);
+  if (UNLIKELY(!HasDateAndTime())) return false;
+
+  *unix_time_micros = DaysSinceUnixEpoch() * SECONDS_PER_DAY * MICROS_PER_SEC
+      + time_.total_microseconds();
+  return true;
+}
+
+inline bool TimestampValue::FloorUtcToUnixTimeMillis(int64_t* unix_time_millis) const {
+  DCHECK(unix_time_millis != nullptr);
+  if (UNLIKELY(!HasDateAndTime())) return false;
+
+  *unix_time_millis = DaysSinceUnixEpoch() * SECONDS_PER_DAY * MILLIS_PER_SEC
+      + time_.total_milliseconds();
+  return true;
+}
+
+inline bool TimestampValue::UtcToUnixTimeLimitedRangeNanos(
+    int64_t* unix_time_nanos) const {
+  DCHECK(unix_time_nanos != nullptr);
+  time_t unixtime_seconds;
+  if (UNLIKELY(!UtcToUnixTime(&unixtime_seconds))) return false;
+
+  DCHECK(HasTime());
+  // TODO: consider optimizing this (IMPALA-8268)
+  kudu::int128_t nanos128 =
+      static_cast<kudu::int128_t>(unixtime_seconds) * NANOS_PER_SEC
+      + time_.fractional_seconds();
+
+  if (nanos128 <  std::numeric_limits<int64_t>::min()
+      || nanos128 >  std::numeric_limits<int64_t>::max()) {
+    return false;
+  }
+  *unix_time_nanos = static_cast<int64_t>(nanos128);
   return true;
 }
 

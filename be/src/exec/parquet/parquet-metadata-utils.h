@@ -57,6 +57,11 @@ class ParquetMetadataUtils {
       const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
       RuntimeState* state);
 
+  /// Returns the Parquet type corresponding to Impala's internal type. The caller must
+  /// validate that the input type is valid, otherwise this will DCHECK.
+  static parquet::Type::type ConvertInternalToParquetType(PrimitiveType type,
+      const TQueryOptions& query_options);
+
   /// Sets type related fields in a SchemaElement based on the column's internal type
   /// and query options.
   static void FillSchemaElement(const ColumnType& col_type,

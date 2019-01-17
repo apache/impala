@@ -271,6 +271,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Implemented in the subclass.
   virtual bool ProcessValue(void* value, int64_t* bytes_needed) WARN_UNUSED_RESULT = 0;
 
+
+  // Subclasses can override this function to convert values after the expression was
+  // evaluated. Used by int64 timestamp writers to change the TimestampValue returned by
+  // the expression to an int64.
+  virtual void* ConvertValue(void* value) { return value; }
+
   // Encodes out all data for the current page and updates the metadata.
   virtual Status FinalizeCurrentPage() WARN_UNUSED_RESULT;
 
@@ -471,9 +477,6 @@ class HdfsParquetTableWriter::ColumnWriter :
   // The number of values added since we last checked the dictionary.
   int num_values_since_dict_size_check_;
 
-  // Size of each encoded value in plain encoding. -1 if the type is variable-length.
-  int64_t plain_encoded_value_size_;
-
   // Temporary string value to hold CHAR(N)
   StringValue temp_;
 
@@ -487,6 +490,9 @@ class HdfsParquetTableWriter::ColumnWriter :
   inline T* CastValue(void* value) {
     return reinterpret_cast<T*>(value);
   }
+ protected:
+  // Size of each encoded value in plain encoding. -1 if the type is variable-length.
+  int64_t plain_encoded_value_size_;
 };
 
 template<>
@@ -554,9 +560,81 @@ class HdfsParquetTableWriter::BoolColumnWriter :
 
 }
 
+
+/// Base class for int64 timestamp writers. 'eval' is expected to return a pointer to a
+/// TimestampValue. The result of TimestampValue->int64 conversion is stored in 'result_'.
+class HdfsParquetTableWriter::Int64TimestampColumnWriterBase :
+    public HdfsParquetTableWriter::ColumnWriter<int64_t> {
+public:
+  Int64TimestampColumnWriterBase(HdfsParquetTableWriter* parent,
+      ScalarExprEvaluator* eval, const THdfsCompression::type& codec)
+    : HdfsParquetTableWriter::ColumnWriter<int64_t>(parent, eval, codec) {
+    int64_t dummy;
+    plain_encoded_value_size_ = ParquetPlainEncoder::ByteSize(dummy);
+  }
+
+protected:
+  virtual void* ConvertValue(void* value) override {
+    const TimestampValue* ts = reinterpret_cast<TimestampValue*>(value);
+    return ConvertTimestamp(*ts, &result_) ? &result_ : nullptr;
+  }
+
+  /// Overrides of this function are expected to set 'result' if the conversion is
+  /// successful and return true. If the timestamp is invalid or cannot
+  /// be represented as int64 then false should be returned.
+  virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) = 0;
+
+private:
+  int64_t result_;
+};
+
+
+/// Converts TimestampValues to INT64_MILLIS.
+class HdfsParquetTableWriter::Int64MilliTimestampColumnWriter :
+    public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
+public:
+  Int64MilliTimestampColumnWriter(HdfsParquetTableWriter* parent,
+      ScalarExprEvaluator* eval, const THdfsCompression::type& codec)
+    : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec) {}
+
+protected:
+  virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
+    return ts.FloorUtcToUnixTimeMillis(result);
+  }
+};
+
+/// Converts TimestampValues to INT64_MICROS.
+class HdfsParquetTableWriter::Int64MicroTimestampColumnWriter :
+    public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
+public:
+  Int64MicroTimestampColumnWriter(HdfsParquetTableWriter* parent,
+      ScalarExprEvaluator* eval, const THdfsCompression::type& codec)
+    : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec) {}
+
+protected:
+  virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
+    return ts.FloorUtcToUnixTimeMicros(result);
+  }
+};
+
+/// Converts TimestampValues to INT64_NANOS. Conversion is expected to fail for
+/// timestamps outside [1677-09-21 00:12:43.145224192 .. 2262-04-11 23:47:16.854775807].
+class HdfsParquetTableWriter::Int64NanoTimestampColumnWriter :
+    public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
+public:
+  Int64NanoTimestampColumnWriter(HdfsParquetTableWriter* parent,
+      ScalarExprEvaluator* eval, const THdfsCompression::type& codec)
+    : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec) {}
+
+protected:
+  virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
+    return ts.UtcToUnixTimeLimitedRangeNanos(result);
+  }
+};
+
 inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row) {
   ++num_values_;
-  void* value = expr_eval_->GetValue(row);
+  void* value = ConvertValue(expr_eval_->GetValue(row));
   if (current_page_ == nullptr) NewPage();
 
   // Ensure that we have enough space for the definition level, but don't write it yet in
@@ -925,8 +1003,26 @@ Status HdfsParquetTableWriter::Init() {
         writer = new ColumnWriter<double>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_TIMESTAMP:
-        writer = new ColumnWriter<TimestampValue>(
-            this, output_expr_evals_[i], codec);
+        switch (state_->query_options().parquet_timestamp_type) {
+          case TParquetTimestampType::INT96_NANOS:
+            writer =
+                new ColumnWriter<TimestampValue>(this, output_expr_evals_[i], codec);
+            break;
+          case TParquetTimestampType::INT64_MILLIS:
+            writer =
+                new Int64MilliTimestampColumnWriter(this, output_expr_evals_[i], codec);
+            break;
+          case TParquetTimestampType::INT64_MICROS:
+            writer =
+                new Int64MicroTimestampColumnWriter(this, output_expr_evals_[i], codec);
+            break;
+          case TParquetTimestampType::INT64_NANOS:
+            writer =
+                new Int64NanoTimestampColumnWriter(this, output_expr_evals_[i], codec);
+            break;
+          default:
+            DCHECK(false);
+        }
         break;
       case TYPE_VARCHAR:
       case TYPE_STRING:
@@ -990,7 +1086,8 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::ColumnMetaData metadata;
-    metadata.type = ConvertInternalToParquetType(columns_[i]->type().type);
+    metadata.type = ParquetMetadataUtils::ConvertInternalToParquetType(
+        columns_[i]->type().type, state_->query_options());
     metadata.path_in_schema.push_back(
         table_desc_->col_descs()[i + num_clustering_cols].name());
     metadata.codec = columns_[i]->GetParquetCodec();

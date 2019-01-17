@@ -176,8 +176,10 @@ def get_parquet_metadata_from_hdfs_folder(hdfs_path, tmp_dir):
   subdirectories. The hdfs folder is copied into 'tmp_dir' before processing.
   """
   check_call(['hdfs', 'dfs', '-get', hdfs_path, tmp_dir])
+  # Only walk the new directory to make the same tmp_dir usable for multiple tables.
+  table_dir = os.path.join(tmp_dir, os.path.basename(os.path.normpath(hdfs_path)))
   result = []
-  for root, subdirs, files in os.walk(tmp_dir):
+  for root, subdirs, files in os.walk(table_dir):
     for f in files:
       if not f.endswith('parq'):
         continue

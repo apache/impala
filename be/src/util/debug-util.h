@@ -69,6 +69,7 @@ std::string PrintThriftEnum(const TRuntimeFilterMode::type& value);
 std::string PrintThriftEnum(const TSessionType::type& value);
 std::string PrintThriftEnum(const TStmtType::type& value);
 std::string PrintThriftEnum(const TUnit::type& value);
+std::string PrintThriftEnum(const TParquetTimestampType::type& value);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);

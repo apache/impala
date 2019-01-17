@@ -725,6 +725,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_default_file_format(enum_type);
         break;
       }
+      case TImpalaQueryOptions::PARQUET_TIMESTAMP_TYPE: {
+        TParquetTimestampType::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Parquet timestamp type",
+            _TParquetTimestampType_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_parquet_timestamp_type(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

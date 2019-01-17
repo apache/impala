@@ -380,6 +380,11 @@ enum TImpalaQueryOptions {
 
   // Specifies the default table file format.
   DEFAULT_FILE_FORMAT = 78
+
+  // The physical type and unit used when writing timestamps in Parquet.
+  // Valid values: INT96_NANOS, INT64_MILLIS, INT64_MICROS, INT64_NANOS
+  // Default: INT96_NANOS
+  PARQUET_TIMESTAMP_TYPE = 79
 }
 
 // The summary of a DML statement.

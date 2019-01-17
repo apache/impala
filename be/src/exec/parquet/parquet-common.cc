@@ -19,31 +19,6 @@
 
 namespace impala {
 
-/// Mapping of impala's internal types to parquet storage types. This is indexed by
-/// PrimitiveType enum
-const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
-  parquet::Type::BOOLEAN,     // Invalid
-  parquet::Type::BOOLEAN,     // NULL type
-  parquet::Type::BOOLEAN,
-  parquet::Type::INT32,
-  parquet::Type::INT32,
-  parquet::Type::INT32,
-  parquet::Type::INT64,
-  parquet::Type::FLOAT,
-  parquet::Type::DOUBLE,
-  parquet::Type::INT96,       // Timestamp
-  parquet::Type::BYTE_ARRAY,  // String
-  parquet::Type::BYTE_ARRAY,  // Date, NYI
-  parquet::Type::BYTE_ARRAY,  // DateTime, NYI
-  parquet::Type::BYTE_ARRAY,  // Binary NYI
-  parquet::Type::FIXED_LEN_BYTE_ARRAY, // Decimal
-  parquet::Type::BYTE_ARRAY,  // VARCHAR(N)
-  parquet::Type::BYTE_ARRAY,  // CHAR(N)
-};
-
-const int INTERNAL_TO_PARQUET_TYPES_SIZE =
-  sizeof(INTERNAL_TO_PARQUET_TYPES) / sizeof(INTERNAL_TO_PARQUET_TYPES[0]);
-
 /// Mapping of Parquet codec enums to Impala enums
 const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::NONE,
@@ -68,12 +43,6 @@ const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
 
 const int IMPALA_TO_PARQUET_CODEC_SIZE =
     sizeof(IMPALA_TO_PARQUET_CODEC) / sizeof(IMPALA_TO_PARQUET_CODEC[0]);
-
-parquet::Type::type ConvertInternalToParquetType(PrimitiveType type) {
-  DCHECK_GE(type, 0);
-  DCHECK_LT(type, INTERNAL_TO_PARQUET_TYPES_SIZE);
-  return INTERNAL_TO_PARQUET_TYPES[type];
-}
 
 THdfsCompression::type ConvertParquetToImpalaCodec(
     parquet::CompressionCodec::type codec) {

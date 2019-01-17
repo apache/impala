@@ -120,6 +120,14 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   template<typename T> friend class ColumnWriter;
   class BoolColumnWriter;
   friend class BoolColumnWriter;
+  class Int64TimestampColumnWriterBase;
+  friend class Int64TimestampColumnWriterBase;
+  class Int64MicroTimestampColumnWriter;
+  friend class Int64MicroTimestampColumnWriter;
+  class Int64MilliTimestampColumnWriter;
+  friend class Int64MilliTimestampColumnWriter;
+  class Int64NanoTimestampColumnWriter;
+  friend class Int64NanoTimestampColumnWriter;
 
   /// Minimum allowable block size in bytes. This is a function of the number of columns
   /// in the target file.

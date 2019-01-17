@@ -193,7 +193,7 @@ class TimestampValue {
 
   /// Verifies that the time is not negative and is less than a whole day.
   static inline bool IsValidTime(const boost::posix_time::time_duration& time) {
-    static const int64_t NANOS_PER_DAY = 1'000'000'000LL*60*60*24;
+    static const int64_t NANOS_PER_DAY = 1'000'000'000LL * SECONDS_PER_DAY;
     return !time.is_negative()
         && time.total_nanoseconds() < NANOS_PER_DAY;
   }
@@ -217,7 +217,29 @@ class TimestampValue {
   /// Nanoseconds are rounded to the nearest microsecond supported by Impala.
   /// Returns false if the conversion failed ('unix_time_micros' will be undefined),
   /// otherwise true.
+  /// TODO: Rounding towards nearest microsecond should be replaced with rounding
+  ///       towards minus infinity. For more details, see IMPALA-8180
   bool UtcToUnixTimeMicros(int64_t* unix_time_micros) const;
+
+  /// Interpret 'this' as a timestamp in UTC and convert to unix time in microseconds.
+  /// Nanoseconds are rounded towards minus infinity.
+  /// Returns false if the conversion failed ('unix_time_micros' will be undefined),
+  /// otherwise true.
+  bool FloorUtcToUnixTimeMicros(int64_t* unix_time_micros) const;
+
+  /// Interpret 'this' as a timestamp in UTC and convert to unix time in milliseconds.
+  /// Nanoseconds are rounded towards minus infinity.
+  /// Returns false if the conversion failed ('unix_time_millis' will be undefined),
+  /// otherwise true.
+  bool FloorUtcToUnixTimeMillis(int64_t* unix_time_millis) const;
+
+  /// Interpret 'this' as a timestamp in UTC and convert to unix time in nanoseconds.
+  /// The full [1400 .. 10000) range cannot be represented with an int64, so the
+  /// conversion will fail outside the supported range:
+  ///  [1677-09-21 00:12:43.145224192 .. 2262-04-11 23:47:16.854775807]
+  /// Returns false if the conversion failed ('unix_time_millis' will be undefined),
+  /// otherwise true.
+  bool UtcToUnixTimeLimitedRangeNanos(int64_t* unix_time_nanos) const;
 
   /// Converts to Unix time (seconds since the Unix epoch) representation. The time zone
   /// interpretation of the TimestampValue instance is determined by
@@ -316,6 +338,9 @@ class TimestampValue {
   /// Used when converting a time with fractional seconds which are stored as in integer
   /// to a Unix time stored as a double.
   static const double ONE_BILLIONTH;
+
+  static const uint64_t SECONDS_PER_DAY = 24 * 60 * 60;
+
   /// Boost ptime leaves a gap in the structure, so we swap the order to make it
   /// 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
   /// See IMP-87 for more information on why using ptime with the 4 byte gap is
@@ -349,6 +374,9 @@ class TimestampValue {
   /// Converts 'unix_time_ticks'/TICKS_PER_SEC seconds to TimestampValue.
   template <int32_t TICKS_PER_SEC>
   static TimestampValue UtcFromUnixTimeTicks(int64_t unix_time_ticks);
+
+  // Returns the number of days since 1970-01-01. Expects date_ to be valid.
+  int64_t DaysSinceUnixEpoch() const;
 };
 
 /// This function must be called 'hash_value' to be picked up by boost.
