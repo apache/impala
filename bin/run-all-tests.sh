@@ -234,7 +234,8 @@ do
   # ${IMPALA_HOME}/tests/run-process-failure-tests.sh
 
   # Finally, kill the spawned timeout process and its child sleep process.
-  pkill -P $TIMEOUT_PID
+  # There may not be a sleep process, so ignore failure.
+  pkill -P $TIMEOUT_PID || true
   kill $TIMEOUT_PID
 
   if [[ $TEST_RET_CODE == 1 ]]; then

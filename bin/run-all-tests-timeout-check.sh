@@ -33,7 +33,7 @@ fi
 
 echo
 echo
-echo "**** Timout Timer Started for $SLEEP_TIMEOUT_S s! ****"
+echo "**** Timout Timer Started (pid $$, ppid $PPID) for $SLEEP_TIMEOUT_S s! ****"
 echo
 echo
 
@@ -41,7 +41,10 @@ echo
 # Note: $SECONDS is a bash built-in that counts seconds since bash started.
 while ((SLEEP_TIMEOUT_S - SECONDS > 0)); do
   sleep 1
-  ps $PPID &> /dev/null || exit
+  if ! ps $PPID &> /dev/null; then
+    echo "Timeout Timer Exited because $PPID is gone."
+    exit
+  fi
 done
 
 echo
