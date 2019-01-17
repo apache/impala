@@ -291,7 +291,7 @@ echo ">>> Checking out Impala"
 # If there is no Impala git repo, get one now
 if ! [[ -d "$IMPALA_HOME" ]]
 then
-  time -p git clone https://git-wip-us.apache.org/repos/asf/impala.git "$IMPALA_HOME"
+  time -p git clone https://gitbox.apache.org/repos/asf/impala.git "$IMPALA_HOME"
 fi
 cd "$IMPALA_HOME"
 SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
