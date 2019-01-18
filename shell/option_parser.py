@@ -32,13 +32,16 @@ import sys
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser
 
+
 class ConfigFileFormatError(Exception):
   """Raised when the config file cannot be read by ConfigParser."""
   pass
 
+
 class InvalidOptionValueError(Exception):
   """Raised when an option contains an invalid value."""
   pass
+
 
 def parse_bool_option(value):
   """Returns True for '1' and 'True', and False for '0' and 'False'.
@@ -49,21 +52,24 @@ def parse_bool_option(value):
   elif value.lower() in ["false", "0"]:
     return False
   else:
-    raise InvalidOptionValueError("Unexpected value in configuration file. '" + value \
+    raise InvalidOptionValueError("Unexpected value in configuration file. '" + value
       + "' is not a valid value for a boolean option.")
 
-def parse_shell_options(options, defaults):
+
+def parse_shell_options(options, defaults, option_list):
   """Filters unknown options and converts some values from string to their corresponding
-     python types (booleans and None).
+     python types (booleans and None).  'option_list' contains the list of valid options,
+     and 'defaults' is used to deduce the type of some options (only bool at the moment).
 
      Returns a dictionary with option names as keys and option values as values.
   """
   result = {}
+  option_dests = set(opt.dest for opt in option_list)
   for option, value in options:
-    if option not in defaults:
-      print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
-        "Ignoring unrecognized config option: '%s'\n" % option
-    elif isinstance(defaults[option], bool):
+    if option not in option_dests:
+        print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
+          "Ignoring unrecognized config option: '%s'\n" % option
+    elif isinstance(defaults.get(option), bool):
       result[option] = parse_bool_option(value)
     elif value.lower() == "none":
       result[option] = None
@@ -71,7 +77,8 @@ def parse_shell_options(options, defaults):
       result[option] = value
   return result
 
-def get_config_from_file(config_filename):
+
+def get_config_from_file(config_filename, option_list):
   """Reads contents of configuration file
 
   Two config sections are supported:
@@ -90,7 +97,6 @@ def get_config_from_file(config_filename):
   Returns a pair of dictionaries (shell_options, query_options), with option names
   as keys and option values as values.
   """
-
   config = ConfigParser.ConfigParser()
   try:
     config.read(config_filename)
@@ -100,7 +106,8 @@ def get_config_from_file(config_filename):
 
   shell_options = {}
   if config.has_section("impala"):
-    shell_options = parse_shell_options(config.items("impala"), impala_shell_defaults)
+    shell_options = parse_shell_options(config.items("impala"), impala_shell_defaults,
+                                        option_list)
     if "config_file" in shell_options:
       print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
       shell_options["config_file"] = config_filename
@@ -113,6 +120,7 @@ def get_config_from_file(config_filename):
       [ (k.upper(), v) for k, v in config.items("impala.query_options") ])
 
   return shell_options, query_options
+
 
 def get_option_parser(defaults):
   """Creates OptionParser and adds shell options (flags)
@@ -207,7 +215,7 @@ def get_option_parser(defaults):
                     "may be used with an insecure connection to Impala. " +
                     "WARNING: Authentication credentials will therefore be sent " +
                     "unencrypted, and may be vulnerable to attack.")
-  parser.add_option("--ldap_password_cmd",
+  parser.add_option("--ldap_password_cmd", dest="ldap_password_cmd",
                     help="Shell command to run to retrieve the LDAP password")
   parser.add_option("--var", dest="keyval", action="append",
                     help="Defines a variable to be used within the Impala session."

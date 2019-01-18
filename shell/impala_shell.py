@@ -1629,7 +1629,8 @@ if __name__ == "__main__":
   # default shell options loaded in from impala_shell_config_defaults.py
   # options defaults overwritten by those in config file
   try:
-    loaded_shell_options, query_options = get_config_from_file(config_to_load)
+    loaded_shell_options, query_options = get_config_from_file(config_to_load,
+                                                               parser.option_list)
     impala_shell_defaults.update(loaded_shell_options)
   except Exception, e:
     print_to_stderr(e)

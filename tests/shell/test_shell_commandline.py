@@ -471,6 +471,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # Positive tests
     args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
     result = run_impala_shell_cmd(args)
+    assert 'WARNING:' not in result.stderr
     assert 'Query: select 1' in result.stderr
 
     # override option in config file through command line
