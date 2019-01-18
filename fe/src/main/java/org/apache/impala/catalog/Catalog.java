@@ -57,7 +57,7 @@ import com.google.common.base.Preconditions;
  * database that the user cannot modify.
  * Builtins are populated on startup in initBuiltins().
  */
-public abstract class Catalog {
+public abstract class Catalog implements AutoCloseable {
   // Initial catalog version and ID.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
@@ -322,8 +322,8 @@ public abstract class Catalog {
    * Release the Hive Meta Store Client resources. Can be called multiple times
    * (additional calls will be no-ops).
    */
+  @Override
   public void close() { metaStoreClientPool_.close(); }
-
 
   /**
    * Returns a managed meta store client from the client connection pool.

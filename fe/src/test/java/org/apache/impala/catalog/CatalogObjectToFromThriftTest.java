@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Map;
 
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.SqlCastException;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;

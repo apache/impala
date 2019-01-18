@@ -370,15 +370,16 @@ public class AuditingTest extends FrontendTestBase {
     // an AuthorizationError
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
         "server1", "/does/not/exist", "");
-    ImpaladCatalog catalog = new ImpaladTestCatalog(config);
-    Frontend fe = new Frontend(config, catalog);
-    AnalysisContext analysisCtx = createAnalysisCtx(config);
-    // We should get an audit event even when an authorization failure occurs.
-    try {
-      parseAndAnalyze("create table foo_does_not_exist(i int)", analysisCtx, fe);
-      Assert.fail("Expected AuthorizationException");
-    } catch (AuthorizationException e) {
-      Assert.assertEquals(1, analysisCtx.getAnalyzer().getAccessEvents().size());
+    try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
+      Frontend fe = new Frontend(config, catalog);
+      AnalysisContext analysisCtx = createAnalysisCtx(config);
+      // We should get an audit event even when an authorization failure occurs.
+      try {
+        parseAndAnalyze("create table foo_does_not_exist(i int)", analysisCtx, fe);
+        Assert.fail("Expected AuthorizationException");
+      } catch (AuthorizationException e) {
+        Assert.assertEquals(1, analysisCtx.getAnalyzer().getAccessEvents().size());
+      }
     }
   }
 

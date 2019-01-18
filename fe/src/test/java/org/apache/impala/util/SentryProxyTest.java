@@ -274,41 +274,41 @@ public class SentryProxyTest {
     String mixedCaseRoleName = lowerCaseRoleName.substring(0, 1).toUpperCase() +
         lowerCaseRoleName.substring(1);
 
-    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-        authzConfig_.getSentryConfig());
+    try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
+        authzConfig_.getSentryConfig())) {
+      addSentryRolePrivileges(sentryService_, lowerCaseRoleName, "functional");
+      CatalogState noReset = refreshSentryAuthorization(catalog, sentryService_, false);
 
-    addSentryRolePrivileges(sentryService_, lowerCaseRoleName, "functional");
-    CatalogState noReset = refreshSentryAuthorization(catalog, sentryService_, false);
+      // Impala stores the role name in case insensitive way.
+      for (String roleName : new String[]{
+          lowerCaseRoleName, upperCaseRoleName, mixedCaseRoleName}) {
+        Role role = catalog.getAuthPolicy().getRole(roleName);
+        assertEquals(lowerCaseRoleName, role.getName());
+        assertEquals(1, role.getPrivileges().size());
+        assertNotNull(role.getPrivilege(
+            "server=server1->db=functional->grantoption=false"));
+      }
 
-    // Impala stores the role name in case insensitive way.
-    for (String roleName: new String[]{
-        lowerCaseRoleName, upperCaseRoleName, mixedCaseRoleName}) {
-      Role role = catalog.getAuthPolicy().getRole(roleName);
-      assertEquals(lowerCaseRoleName, role.getName());
-      assertEquals(1, role.getPrivileges().size());
-      assertNotNull(role.getPrivilege(
-          "server=server1->db=functional->grantoption=false"));
+      try {
+        sentryService_.createRole(USER, upperCaseRoleName, false);
+        fail("Exception should be thrown when creating a duplicate role name.");
+      } catch (Exception e) {
+        assertTrue(e.getMessage().startsWith("Error creating role"));
+      }
+
+      // No new role should be added.
+      for (String roleName : new String[]{
+          lowerCaseRoleName, upperCaseRoleName, mixedCaseRoleName}) {
+        Role role = catalog.getAuthPolicy().getRole(roleName);
+        assertEquals(lowerCaseRoleName, role.getName());
+        assertEquals(1, role.getPrivileges().size());
+        assertNotNull(role.getPrivilege(
+            "server=server1->db=functional->grantoption=false"));
+      }
+
+      CatalogState reset = refreshSentryAuthorization(catalog, sentryService_, true);
+      checkCatalogState(noReset, reset);
     }
-
-    try {
-      sentryService_.createRole(USER, upperCaseRoleName, false);
-      fail("Exception should be thrown when creating a duplicate role name.");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().startsWith("Error creating role"));
-    }
-
-    // No new role should be added.
-    for (String roleName: new String[]{
-        lowerCaseRoleName, upperCaseRoleName, mixedCaseRoleName}) {
-      Role role = catalog.getAuthPolicy().getRole(roleName);
-      assertEquals(lowerCaseRoleName, role.getName());
-      assertEquals(1, role.getPrivileges().size());
-      assertNotNull(role.getPrivilege(
-          "server=server1->db=functional->grantoption=false"));
-    }
-
-    CatalogState reset = refreshSentryAuthorization(catalog, sentryService_, true);
-    checkCatalogState(noReset, reset);
   }
 
   @Test
@@ -319,34 +319,34 @@ public class SentryProxyTest {
     String mixedCaseUserName = lowerCaseUserName.substring(0, 1).toUpperCase() +
         lowerCaseUserName.substring(1);
 
-    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-        authzConfig_.getSentryConfig());
+    try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
+        authzConfig_.getSentryConfig())) {
+      SentryPolicyServiceStub sentryService = createSentryPolicyServiceStub(
+          authzConfig_.getSentryConfig());
+      // We grant different privileges to different users to ensure each user is
+      // granted with a distinct privilege.
+      addSentryUserPrivileges(sentryService, lowerCaseUserName, "functional");
+      addSentryUserPrivileges(sentryService, upperCaseUserName, "functional_kudu");
+      addSentryUserPrivileges(sentryService, mixedCaseUserName, "functional_parquet");
 
-    SentryPolicyServiceStub sentryService = createSentryPolicyServiceStub(
-        authzConfig_.getSentryConfig());
-    // We grant different privileges to different users to ensure each user is
-    // granted with a distinct privilege.
-    addSentryUserPrivileges(sentryService, lowerCaseUserName, "functional");
-    addSentryUserPrivileges(sentryService, upperCaseUserName, "functional_kudu");
-    addSentryUserPrivileges(sentryService, mixedCaseUserName, "functional_parquet");
+      CatalogState noReset = refreshSentryAuthorization(catalog, sentryService, false);
 
-    CatalogState noReset = refreshSentryAuthorization(catalog, sentryService, false);
+      // Impala stores the user name in case sensitive way.
+      for (Pair<String, String> userPrivilege : new Pair[]{
+          new Pair(lowerCaseUserName, "server=server1->db=functional->grantoption=false"),
+          new Pair(upperCaseUserName, "server=server1->db=functional_kudu" +
+              "->grantoption=false"),
+          new Pair(mixedCaseUserName, "server=server1->db=functional_parquet" +
+              "->grantoption=false")}) {
+        User user = catalog.getAuthPolicy().getUser(userPrivilege.first);
+        assertEquals(userPrivilege.first, user.getName());
+        assertEquals(1, user.getPrivileges().size());
+        assertNotNull(user.getPrivilege(userPrivilege.second));
+      }
 
-    // Impala stores the user name in case sensitive way.
-    for (Pair<String, String> userPrivilege: new Pair[]{
-        new Pair(lowerCaseUserName, "server=server1->db=functional->grantoption=false"),
-        new Pair(upperCaseUserName, "server=server1->db=functional_kudu" +
-            "->grantoption=false"),
-        new Pair(mixedCaseUserName, "server=server1->db=functional_parquet" +
-            "->grantoption=false")}) {
-      User user = catalog.getAuthPolicy().getUser(userPrivilege.first);
-      assertEquals(userPrivilege.first, user.getName());
-      assertEquals(1, user.getPrivileges().size());
-      assertNotNull(user.getPrivilege(userPrivilege.second));
+      CatalogState reset = refreshSentryAuthorization(catalog, sentryService, true);
+      checkCatalogState(noReset, reset);
     }
-
-    CatalogState reset = refreshSentryAuthorization(catalog, sentryService, true);
-    checkCatalogState(noReset, reset);
   }
 
   private static void addCatalogPrincipalPrivileges(TPrincipalType type,
@@ -601,13 +601,14 @@ public class SentryProxyTest {
 
   private void withAllPrincipalTypes(Consumer<SentryProxyTestContext> consumer) {
     for (TPrincipalType type: TPrincipalType.values()) {
-      CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-          authzConfig_.getSentryConfig());
-      SentryPolicyService sentryService = sentryService_;
-      if (type == TPrincipalType.USER) {
-        sentryService = createSentryPolicyServiceStub(authzConfig_.getSentryConfig());
+      try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
+          authzConfig_.getSentryConfig())) {
+        SentryPolicyService sentryService = sentryService_;
+        if (type == TPrincipalType.USER) {
+          sentryService = createSentryPolicyServiceStub(authzConfig_.getSentryConfig());
+        }
+        consumer.accept(new SentryProxyTestContext(type, catalog, sentryService));
       }
-      consumer.accept(new SentryProxyTestContext(type, catalog, sentryService));
     }
   }
 }

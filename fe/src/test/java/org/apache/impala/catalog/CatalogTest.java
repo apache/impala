@@ -64,6 +64,7 @@ import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TTableName;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -79,6 +80,9 @@ public class CatalogTest {
   public void init() {
     catalog_ = CatalogServiceTestCatalog.create();
   }
+
+  @After
+  public void cleanUp() { catalog_.close(); }
 
   public static void checkTableCols(FeDb db, String tblName, int numClusteringCols,
       String[] colNames, Type[] colTypes) throws TableLoadingException {

@@ -49,6 +49,7 @@ import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.junit.AfterClass;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -57,6 +58,9 @@ import com.google.common.collect.ImmutableList;
 public class PartialCatalogInfoTest {
   private static CatalogServiceCatalog catalog_ =
       CatalogServiceTestCatalog.create();
+
+  @AfterClass
+  public static void cleanUp() { catalog_.close(); }
 
   /**
    * A Callable wrapper around getPartialCatalogObject() call.

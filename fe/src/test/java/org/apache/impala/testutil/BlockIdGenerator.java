@@ -61,38 +61,39 @@ public class BlockIdGenerator {
       writer = new FileWriter(output);
 
       // Load all tables in the catalog
-      Catalog catalog = CatalogServiceTestCatalog.create();
-      for (FeDb database: catalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
-        for (String tableName: database.getAllTableNames()) {
-          FeTable table = database.getTable(tableName);
-          // Only do this for hdfs tables
-          if (table == null || !(table instanceof HdfsTable)) {
-            continue;
-          }
-          HdfsTable hdfsTable = (HdfsTable)table;
+      try (Catalog catalog = CatalogServiceTestCatalog.create()) {
+        for (FeDb database : catalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
+          for (String tableName : database.getAllTableNames()) {
+            FeTable table = database.getTable(tableName);
+            // Only do this for hdfs tables
+            if (table == null || !(table instanceof HdfsTable)) {
+              continue;
+            }
+            HdfsTable hdfsTable = (HdfsTable) table;
 
-          // Write the output as <tablename>: <blockid1> <blockid2> <etc>
-          writer.write(tableName + ":");
-          Collection<? extends FeFsPartition> parts =
-              FeCatalogUtils.loadAllPartitions(hdfsTable);
-          for (FeFsPartition partition: parts) {
-            List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
-            for (FileDescriptor fd : fileDescriptors) {
-              Path p = new Path(partition.getLocation(), fd.getFileName());
+            // Write the output as <tablename>: <blockid1> <blockid2> <etc>
+            writer.write(tableName + ":");
+            Collection<? extends FeFsPartition> parts =
+                FeCatalogUtils.loadAllPartitions(hdfsTable);
+            for (FeFsPartition partition : parts) {
+              List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
+              for (FileDescriptor fd : fileDescriptors) {
+                Path p = new Path(partition.getLocation(), fd.getFileName());
 
-              // Use a deprecated API to get block ids
-              DistributedFileSystem dfs =
-                  (DistributedFileSystem)p.getFileSystem(hdfsConfig);
-              LocatedBlocks locations = dfs.getClient().getNamenode().getBlockLocations(
-                  p.toUri().getPath(), 0, fd.getFileLength());
+                // Use a deprecated API to get block ids
+                DistributedFileSystem dfs =
+                    (DistributedFileSystem) p.getFileSystem(hdfsConfig);
+                LocatedBlocks locations = dfs.getClient().getNamenode().getBlockLocations(
+                    p.toUri().getPath(), 0, fd.getFileLength());
 
-              for (LocatedBlock lb : locations.getLocatedBlocks()) {
-                long id = lb.getBlock().getBlockId();
-                writer.write(" " + id);
+                for (LocatedBlock lb : locations.getLocatedBlocks()) {
+                  long id = lb.getBlock().getBlockId();
+                  writer.write(" " + id);
+                }
               }
             }
+            writer.write("\n");
           }
-          writer.write("\n");
         }
       }
     } finally {

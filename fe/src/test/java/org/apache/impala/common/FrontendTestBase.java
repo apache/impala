@@ -97,6 +97,7 @@ public class FrontendTestBase {
   @AfterClass
   public static void cleanUp() throws Exception {
     RuntimeEnv.INSTANCE.reset();
+    catalog_.close();
   }
 
   // Adds a Udf: default.name(args) to the catalog.

@@ -38,21 +38,23 @@ public class StmtMetadataLoaderTest {
       int expectedNumLoadRequests, int expectedNumCatalogUpdates,
       String[] expectedDbs, String[] expectedTables)
       throws ImpalaException {
-    ImpaladTestCatalog catalog = new ImpaladTestCatalog();
-    Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
-    StatementBase stmt = Parser.parse(stmtStr);
-    // Catalog is fresh and no tables are cached.
-    validateUncached(stmt, fe, expectedNumLoadRequests, expectedNumCatalogUpdates,
-        expectedDbs, expectedTables);
-    // All relevant tables should be cached now.
-    validateCached(stmt, fe, expectedDbs, expectedTables);
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
+      Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
+      StatementBase stmt = Parser.parse(stmtStr);
+      // Catalog is fresh and no tables are cached.
+      validateUncached(stmt, fe, expectedNumLoadRequests, expectedNumCatalogUpdates,
+          expectedDbs, expectedTables);
+      // All relevant tables should be cached now.
+      validateCached(stmt, fe, expectedDbs, expectedTables);
+    }
   }
 
   private void testNoLoad(String stmtStr) throws ImpalaException {
-    ImpaladTestCatalog catalog = new ImpaladTestCatalog();
-    Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
-    StatementBase stmt = Parser.parse(stmtStr);
-    validateCached(stmt, fe, new String[]{}, new String[]{});
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
+      Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
+      StatementBase stmt = Parser.parse(stmtStr);
+      validateCached(stmt, fe, new String[]{}, new String[]{});
+    }
   }
 
   private void validateDbs(StmtTableCache stmtTableCache, String[] expectedDbs) {

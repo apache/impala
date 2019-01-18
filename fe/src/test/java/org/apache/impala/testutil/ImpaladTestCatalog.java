@@ -147,4 +147,10 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   }
 
   public void removeUser(String userName) { srcCatalog_.removeUser(userName); }
+
+  @Override
+  public void close() {
+    super.close();
+    srcCatalog_.close();
+  }
 }

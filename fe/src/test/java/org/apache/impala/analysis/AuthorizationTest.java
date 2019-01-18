@@ -842,58 +842,59 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
         AUTHZ_POLICY_FILE, "",
         LocalGroupResourceAuthorizationProvider.class.getName());
-    ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig);
+    try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+      // This test relies on the auth_to_local rule -
+      // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
+      // which converts any principal of type authtest/<hostname>@REALM.COM to user
+      // auth_to_local_user. We have a sentry privilege in place that grants 'SELECT'
+      // privilege on tpcds.* to user auth_to_local_user. To test the integration, we try
+      // running the query with authtest/hostname@REALM.COM user which is converted to
+      // user 'auth_to_local_user' and the authz should pass.
+      User.setRulesForTesting(
+          new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
+      User user = new User("authtest/hostname@REALM.COM");
+      AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
+      Frontend fe = new Frontend(authzConfig, catalog);
 
-    // This test relies on the auth_to_local rule -
-    // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
-    // which converts any principal of type authtest/<hostname>@REALM.COM to user
-    // auth_to_local_user. We have a sentry privilege in place that grants 'SELECT'
-    // privilege on tpcds.* to user auth_to_local_user. To test the integration, we try
-    // running the query with authtest/hostname@REALM.COM user which is converted to user
-    // 'auth_to_local_user' and the authz should pass.
-    User.setRulesForTesting(
-        new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
-    User user = new User("authtest/hostname@REALM.COM");
-    AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
-    Frontend fe = new Frontend(authzConfig, catalog);
+      // Can select from table that user has privileges on.
+      AuthzOk(fe, ctx, "select * from tpcds.customer");
+      // Does not have privileges to execute a query
+      AuthzError(fe, ctx, "select * from functional.alltypes",
+          "User '%s' does not have privileges to execute 'SELECT' on: " +
+          "functional.alltypes");
 
-    // Can select from table that user has privileges on.
-    AuthzOk(fe, ctx, "select * from tpcds.customer");
-    // Does not have privileges to execute a query
-    AuthzError(fe, ctx, "select * from functional.alltypes",
-        "User '%s' does not have privileges to execute 'SELECT' on: functional.alltypes");
+      // Unit tests for User#getShortName()
+      // Different auth_to_local rules to apply on the username.
+      List<String> rules = Lists.newArrayList(
+          // Expects user@REALM and returns 'usera' (appends a in the end)
+          "RULE:[1:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g",
+          // Same as above but expects user/host@REALM
+          "RULE:[2:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g");
 
-    // Unit tests for User#getShortName()
-    // Different auth_to_local rules to apply on the username.
-    List<String> rules = Lists.newArrayList(
-        // Expects user@REALM and returns 'usera' (appends a in the end)
-        "RULE:[1:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g",
-        // Same as above but expects user/host@REALM
-        "RULE:[2:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g");
+      // Map from the user to the expected getShortName() output after applying
+      // the corresponding rule from 'rules' list.
+      List<Map.Entry<User, String>> users = Lists.newArrayList(
+          Maps.immutableEntry(new User(USER.getName() + "@REALM.COM"), USER.getName()
+              + "a"),
+          Maps.immutableEntry(new User(USER.getName() + "/abc.host.com@REALM.COM"),
+              USER.getName() + "a"));
 
-    // Map from the user to the expected getShortName() output after applying
-    // the corresponding rule from 'rules' list.
-    List<Map.Entry<User, String>> users = Lists.newArrayList(
-        Maps.immutableEntry(new User(USER.getName() + "@REALM.COM"), USER.getName()
-            + "a"),
-        Maps.immutableEntry(new User(USER.getName() + "/abc.host.com@REALM.COM"),
-            USER.getName() + "a"));
+      for (int idx = 0; idx < users.size(); ++idx) {
+        Map.Entry<User, String> userObj = users.get(idx);
+        assertEquals(userObj.getKey().getShortNameForTesting(rules.get(idx)),
+            userObj.getValue());
+      }
 
-    for (int idx = 0; idx < users.size(); ++idx) {
-      Map.Entry<User, String> userObj = users.get(idx);
-      assertEquals(userObj.getKey().getShortNameForTesting(rules.get(idx)),
-          userObj.getValue());
+      // Test malformed rules. RuleParser throws an IllegalArgumentException.
+      String malformedRule = "{((()";
+      try {
+        user.getShortNameForTesting(malformedRule);
+      } catch (IllegalArgumentException e) {
+        Assert.assertTrue(e.getMessage().contains("Invalid rule"));
+        return;
+      }
+      Assert.fail("No exception caught while using getShortName() on a malformed rule");
     }
-
-    // Test malformed rules. RuleParser throws an IllegalArgumentException.
-    String malformedRule = "{((()";
-    try {
-      user.getShortNameForTesting(malformedRule);
-    } catch (IllegalArgumentException e) {
-      Assert.assertTrue(e.getMessage().contains("Invalid rule"));
-      return;
-    }
-    Assert.fail("No exception caught while using getShortName() on a malformed rule");
   }
 
   @Test
@@ -1027,30 +1028,32 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
         AUTHZ_POLICY_FILE, "",
         LocalGroupResourceAuthorizationProvider.class.getName());
-    ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig);
+    try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+      // Create an analysis context + FE with the test user
+      // (as defined in the policy file)
+      User user = new User("test_user");
+      AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
+      Frontend fe = new Frontend(authzConfig, catalog);
 
-    // Create an analysis context + FE with the test user (as defined in the policy file)
-    User user = new User("test_user");
-    AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
-    Frontend fe = new Frontend(authzConfig, catalog);
+      // Can select from table that user has privileges on.
+      AuthzOk(fe, ctx, "select * from functional.alltypesagg");
+      // Does not have privileges to execute a query
+      AuthzError(fe, ctx, "select * from functional.alltypes",
+          "User '%s' does not have privileges to execute 'SELECT' on: " +
+          "functional.alltypes");
 
-    // Can select from table that user has privileges on.
-    AuthzOk(fe, ctx, "select * from functional.alltypesagg");
-    // Does not have privileges to execute a query
-    AuthzError(fe, ctx, "select * from functional.alltypes",
-        "User '%s' does not have privileges to execute 'SELECT' on: functional.alltypes");
+      // Verify with the admin user
+      user = new User("admin_user");
+      ctx = createAnalysisCtx(authzConfig, user.getName());
+      fe = new Frontend(authzConfig, catalog);
 
-    // Verify with the admin user
-    user = new User("admin_user");
-    ctx = createAnalysisCtx(authzConfig, user.getName());
-    fe = new Frontend(authzConfig, catalog);
-
-    // Admin user should have privileges to do anything
-    AuthzOk(fe, ctx, "select * from functional.alltypesagg");
-    AuthzOk(fe, ctx, "select * from functional.alltypes");
-    AuthzOk(fe, ctx, "invalidate metadata");
-    AuthzOk(fe, ctx, "create external table tpch.kudu_tbl stored as kudu " +
-        "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
+      // Admin user should have privileges to do anything
+      AuthzOk(fe, ctx, "select * from functional.alltypesagg");
+      AuthzOk(fe, ctx, "select * from functional.alltypes");
+      AuthzOk(fe, ctx, "invalidate metadata");
+      AuthzOk(fe, ctx, "create external table tpch.kudu_tbl stored as kudu " +
+          "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
+    }
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)

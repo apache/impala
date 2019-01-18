@@ -22,6 +22,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TTableName;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,7 +32,10 @@ import static java.lang.Thread.sleep;
 
 
 public class CatalogdTableInvalidatorTest {
-  private CatalogServiceCatalog catalog_ = CatalogServiceTestCatalog.create();
+  private static CatalogServiceCatalog catalog_ = CatalogServiceTestCatalog.create();
+
+  @AfterClass
+  public static void tearDown() { catalog_.close(); }
 
   private long waitForTrigger(long previousTriggerCount) throws InterruptedException {
     long triggerCount;
