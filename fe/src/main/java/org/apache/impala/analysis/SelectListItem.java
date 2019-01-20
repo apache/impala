@@ -17,14 +17,14 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 import java.util.List;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
-
-class SelectListItem {
+public class SelectListItem {
   private Expr expr_;
   private String alias_;
 

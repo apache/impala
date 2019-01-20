@@ -26,8 +26,10 @@ import java.util.List;
 
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.AnalysisSessionFixture;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.QueryFixture;
 import org.apache.impala.common.SqlCastException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
@@ -51,13 +53,31 @@ import com.google.common.collect.Lists;
  * Tests ExprRewriteRules.
  */
 public class ExprRewriteRulesTest extends FrontendTestBase {
+  /**
+   * Wraps an ExprRewriteRule to count how many times it's been applied.
+   */
+  public static class CountingRewriteRuleWrapper implements ExprRewriteRule {
+    int rewrites_;
+    final ExprRewriteRule wrapped_;
+
+    CountingRewriteRuleWrapper(ExprRewriteRule wrapped) {
+      this.wrapped_ = wrapped;
+    }
+
+    @Override
+    public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+      Expr ret = wrapped_.apply(expr, analyzer);
+      if (expr != ret) { rewrites_++; }
+      return ret;
+    }
+  }
 
   /**
    * Specialized form of the Select fixture which analyzes a query without
    * rewrites. Use this to invoke the rewrite engine within the test itself.
    * Note: no analysis context is created in this case.
    */
-  public static class SelectRewriteFixture extends AnalysisSessionFixture.SelectFixture {
+  public static class SelectRewriteFixture extends QueryFixture.SelectFixture {
     private Analyzer analyzer_;
 
     public SelectRewriteFixture(AnalysisSessionFixture analysisFixture) {
@@ -136,7 +156,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     }
   }
 
-  public static AnalysisSessionFixture session = new AnalysisSessionFixture(frontend_);
+  public static AnalysisSessionFixture session = new AnalysisSessionFixture();
 
   @BeforeClass
   public static void setup() {

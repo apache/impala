@@ -24,17 +24,41 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.util.EventSequence;
 import org.junit.Test;
 
-public class AnalyzeAuthStmtsTest extends AnalyzerTest {
+public class AnalyzeAuthStmtsTest extends FrontendTestBase {
+
+  // TODO: Change this to a @BeforeClass method. Then, clean up these
+  // items in @AfterClass, else we've made a global change that may affect
+  // other tests in random ways.
   public AnalyzeAuthStmtsTest() {
     catalog_.getAuthPolicy().addPrincipal(
         new Role("myRole", new HashSet<>()));
     catalog_.getAuthPolicy().addPrincipal(
         new User("myUser", new HashSet<>()));
+  }
+
+  // TODO: Switch to use a fixture with custom settings rather than the
+  // current patchwork of base and derived class methods.
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   */
+  @Override
+  public ParseNode AnalyzesOk(String stmt) {
+    return AnalyzesOk(stmt, createAnalysisCtx(Catalog.DEFAULT_DB), null);
+  }
+
+  /**
+   * Asserts if stmt passes analysis or the error string doesn't match and it
+   * is non-null.
+   */
+  @Override
+  public void AnalysisError(String stmt, String expectedErrorString) {
+    AnalysisError(stmt, createAnalysisCtx(Catalog.DEFAULT_DB), expectedErrorString);
   }
 
   @Override

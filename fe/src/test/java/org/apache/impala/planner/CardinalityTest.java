@@ -93,6 +93,56 @@ public class CardinalityTest extends PlannerTestBase {
         "SELECT COUNT(*) FROM functional.alltypes GROUP BY bool_col", 2);
   }
 
+  /**
+   * Test tables with all-null columns. Test need for IMPALA-7310, NDV of an
+   * all-null column should be 1.
+   */
+  @Test
+  public void testNulls() {
+    verifyCardinality("SELECT null_int FROM functional.nullrows", 26);
+    // a has unique values, so NDV = 26, card = 26/26 = 1
+    verifyCardinality("SELECT null_int FROM functional.nullrows WHERE id = 'x'", 1);
+    // f repeats for 5 rows, so NDV=7, 26/7 =~ 4
+    verifyCardinality("SELECT null_int FROM functional.nullrows WHERE group_str = 'x'",
+        4);
+    // Revised use of nulls per IMPALA-7310
+    // null_str is all nulls, NDV = 1, selectivity = 1/1, cardinality = 26
+    // BUG: At present selectivity is assumed to be 0.1
+    //verifyCardinality(
+    //      "SELECT null_int FROM functional.nullrows WHERE null_str = 'x'", 26);
+    verifyCardinality("SELECT null_int FROM functional.nullrows WHERE null_str = 'x'",
+        3);
+  }
+
+  @Test
+  public void testGroupBy() {
+    String baseStmt = "SELECT COUNT(*) " +
+                      "FROM functional.nullrows " +
+                      "GROUP BY ";
+    // NDV(a) = 26
+    verifyCardinality(baseStmt + "id", 26);
+    // f has NDV=3
+    verifyCardinality(baseStmt + "group_str", 6);
+    // b has NDV=1 (plus 1 for nulls)
+    // Bug: Nulls not counted in NDV
+    //verifyCardinality(baseStmt + "blank", 2);
+    verifyCardinality(baseStmt + "blank", 1);
+    // c is all nulls
+    // Bug: Nulls not counted in NDV
+    //verifyCardinality(baseStmt + "null_str", 1);
+    verifyCardinality(baseStmt + "null_str", 0);
+    // NDV(a) * ndv(c) = 26 * 1 = 26
+    // Bug: Nulls not counted in NDV
+    //verifyCardinality(baseStmt + "id, null_str", 26);
+    verifyCardinality(baseStmt + "id, null_str", 0);
+    // NDV(a) * ndv(f) = 26 * 3 = 78, capped at row count = 26
+    verifyCardinality(baseStmt + "id, group_str", 26);
+  }
+
+  /**
+   * Compute join cardinality using a table without stats. We estimate row count.
+   * Combine with an all-nulls column.
+   */
   @Test
   public void testNullColumnJoinCardinality() throws ImpalaException {
     // IMPALA-7565: Make sure there is no division by zero during cardinality calculation
@@ -100,6 +150,43 @@ public class CardinalityTest extends PlannerTestBase {
     String query = "select * from functional.nulltable t1 "
         + "inner join [shuffle] functional.nulltable t2 on t1.d = t2.d";
     checkCardinality(query, 1, 1);
+  }
+
+  /**
+   * Compute join cardinality using a table with stats.
+   * Focus on an all-nulls column.
+   */
+  @Test
+  public void testJoinWithStats() {
+    // NDV multiplied out on group by
+    verifyCardinality(
+        "SELECT null_int FROM functional.alltypes, functional.nullrows", 7300 * 26);
+    // With that as the basis, add a GROUP BY
+    String baseStmt = "SELECT COUNT(*) " +
+                      "FROM functional.alltypes, functional.nullrows " +
+                      "GROUP BY ";
+    // Unique values, one group per row
+    verifyCardinality(baseStmt + "alltypes.id", 7300);
+    // NDV(id) = 26
+    verifyCardinality(baseStmt + "nullrows.id", 26);
+    // blank has NDV=1, but adjust for nulls
+    // Bug: Nulls not counted in NDV
+    //verifyCardinality(baseStmt + "blank", 2);
+    verifyCardinality(baseStmt + "blank", 1);
+    // group_str has NDV=6
+    verifyCardinality(baseStmt + "group_str", 6);
+    // null_str is all nulls
+    // Bug: Nulls not counted in NDV
+    //verifyCardinality(baseStmt + "null_str", 1);
+    verifyCardinality(baseStmt + "null_str", 0);
+    // NDV(id) = 26 * ndv(null_str) = 1
+    // Bug: Nulls not counted in NDV
+    // Here and for similar bugs: see IMPALA-7310 and IMPALA-8094
+    //verifyCardinality(baseStmt + "id, null_str", 26);
+    verifyCardinality(baseStmt + "nullrows.id, null_str", 0);
+    // NDV(id) = 26 * ndv(group_str) = 156
+    // Planner does not know that id determines group_str
+    verifyCardinality(baseStmt + "nullrows.id, group_str", 156);
   }
 
   /**

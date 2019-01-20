@@ -203,6 +203,7 @@ table_name:tinytable, constraint:only, table_format:kudu/none/none
 table_name:tinyinttable, constraint:only, table_format:kudu/none/none
 table_name:zipcode_incomes, constraint:only, table_format:kudu/none/none
 table_name:nulltable, constraint:only, table_format:kudu/none/none
+table_name:nullrows, constraint:only, table_format:kudu/none/none
 table_name:nullescapedtable, constraint:only, table_format:kudu/none/none
 table_name:decimal_tbl, constraint:only, table_format:kudu/none/none
 table_name:decimal_rtf_tbl, constraint:only, table_format:kudu/none/none

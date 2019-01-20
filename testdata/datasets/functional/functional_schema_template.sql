@@ -1350,6 +1350,30 @@ create table {db_name}{db_suffix}.{table_name} (
 partition by hash(a) partitions 3 stored as kudu;
 ====
 ---- DATASET
+-- Table with varying ratios of nulls. Used to test NDV with nulls
+-- Also useful to test null counts as the count varies from 0 to
+-- some to all rows.
+functional
+---- BASE_TABLE_NAME
+nullrows
+---- COLUMNS
+id string
+blank string
+null_str string
+null_int int
+null_double double
+group_str string
+some_nulls string
+bool_nulls boolean
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nullrows;
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullRows/data.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 nullescapedtable

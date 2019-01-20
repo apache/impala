@@ -33,7 +33,7 @@ COMPUTE_STATS_SCRIPT="${IMPALA_HOME}/tests/util/compute_table_stats.py --impalad
 # Run compute stats over as many of the tables used in the Planner tests as possible.
 ${COMPUTE_STATS_SCRIPT} --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
-    alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey,nulltable"
+    alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey,nulltable,nullrows"
 
 # We cannot load HBase on s3 and isilon yet.
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
