@@ -197,6 +197,14 @@ function build_impdev() {
   git fetch /git_common_dir --no-tags "$GIT_HEAD_REV"
   git checkout -b test-with-docker FETCH_HEAD
 
+  # Checkout impala-lzo too
+  mkdir /home/impdev/Impala-lzo
+  pushd /home/impdev/Impala-lzo
+  git init
+  git fetch $IMPALA_LZO_REPO --no-tags "$IMPALA_LZO_REF"
+  git checkout -b test-with-docker FETCH_HEAD
+  popd
+
   # Link in logs. Logs are on the host since that's the most important thing to
   # look at after the tests are run.
   ln -sf /logs logs
