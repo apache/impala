@@ -28,6 +28,7 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.StorageStatistics;
@@ -842,7 +842,7 @@ public class CatalogTest {
     // Test to check if catalog can handle loading corrupt udfs
     Map<String, String> dbParams = new HashMap<>();
     String badFnKey = "impala_registered_function_badFn";
-    String badFnVal = Base64.encodeBase64String("badFn".getBytes());
+    String badFnVal = Base64.getEncoder().encodeToString("badFn".getBytes());
     String dbName = "corrupt_udf_test";
     dbParams.put(badFnKey, badFnVal);
     Db db = catalog_.getDb(dbName);

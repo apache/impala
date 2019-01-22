@@ -18,10 +18,10 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
@@ -109,7 +109,7 @@ public class PartitionStatsUtil {
       }
       encodedStats.append(chunk);
     }
-    byte[] decodedBytes = Base64.decodeBase64(encodedStats.toString());
+    byte[] decodedBytes = Base64.getDecoder().decode(encodedStats.toString());
     TPartitionStats stats = new TPartitionStats();
     JniUtil.deserializeThrift(new TCompactProtocol.Factory(), stats, decodedBytes);
     hasIncrStats.setRef(stats.isSetIntermediate_col_stats());
@@ -177,7 +177,7 @@ public class PartitionStatsUtil {
           "Error decompressing partition stats for " + partition.getPartitionName());
       return;
     }
-    String base64 = new String(Base64.encodeBase64(decompressed));
+    String base64 = new String(Base64.getEncoder().encode(decompressed));
     List<String> chunks =
       chunkStringForHms(base64, MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH);
     params.put(INCREMENTAL_STATS_NUM_CHUNKS, Integer.toString(chunks.size()));

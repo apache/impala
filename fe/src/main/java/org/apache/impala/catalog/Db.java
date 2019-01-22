@@ -18,12 +18,12 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaException;
@@ -246,7 +246,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
       TSerializer serializer =
           new TSerializer(new TCompactProtocol.Factory());
       byte[] serializedFn = serializer.serialize(fn.toThrift());
-      String base64Fn = Base64.encodeBase64String(serializedFn);
+      String base64Fn = Base64.getEncoder().encodeToString(serializedFn);
       String fnKey = FUNCTION_INDEX_PREFIX + fn.signatureString();
       if (base64Fn.length() > HIVE_METASTORE_DB_PARAM_LIMIT_BYTES) {
         throw new ImpalaRuntimeException(

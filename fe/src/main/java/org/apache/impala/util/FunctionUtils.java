@@ -21,12 +21,12 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FunctionType;
 import org.apache.hadoop.hive.metastore.api.ResourceType;
@@ -154,7 +154,7 @@ public abstract class FunctionUtils {
       try {
         TFunction fn = new TFunction();
         JniUtil.deserializeThrift(protocolFactory, fn,
-            Base64.decodeBase64(entry.getValue()));
+            Base64.getDecoder().decode(entry.getValue()));
         results.add(Function.fromThrift(fn));
       } catch (ImpalaException e) {
         LOG.error("Encountered an error during function load: key=" +
