@@ -52,6 +52,7 @@
 #include "service/frontend.h"
 #include "service/impala-server.h"
 #include "statestore/statestore-subscriber.h"
+#include "util/cgroup-util.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
@@ -228,41 +229,8 @@ Status ExecEnv::Init() {
   }
   RETURN_IF_ERROR(async_rpc_pool_->Init());
 
-  // Initialize global memory limit.
-  // Depending on the system configuration, we will have to calculate the process
-  // memory limit either based on the available physical memory, or if overcommitting
-  // is turned off, we use the memory commit limit from /proc/meminfo (see
-  // IMPALA-1690).
-  int64_t bytes_limit = 0;
-  bool is_percent;
-  int64_t system_mem;
-  if (MemInfo::vm_overcommit() == 2 &&
-      MemInfo::commit_limit() < MemInfo::physical_mem()) {
-    system_mem = MemInfo::commit_limit();
-    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
-    // There might be the case of misconfiguration, when on a system swap is disabled
-    // and overcommitting is turned off the actual usable memory is less than the
-    // available physical memory.
-    LOG(WARNING) << "This system shows a discrepancy between the available "
-                 << "memory and the memory commit limit allowed by the "
-                 << "operating system. ( Mem: " << MemInfo::physical_mem()
-                 << "<=> CommitLimit: "
-                 << MemInfo::commit_limit() << "). "
-                 << "Impala will adhere to the smaller value by setting the "
-                 << "process memory limit to " << bytes_limit << " "
-                 << "Please verify the system configuration. Specifically, "
-                 << "/proc/sys/vm/overcommit_memory and "
-                 << "/proc/sys/vm/overcommit_ratio.";
-  } else {
-    system_mem = MemInfo::physical_mem();
-    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
-  }
-  // ParseMemSpec() returns -1 for invalid input and 0 to mean unlimited. From Impala
-  // 2.11 onwards we do not support unlimited process memory limits.
-  if (bytes_limit <= 0) {
-    return Status(Substitute("The process memory limit (--mem_limit) must be a positive "
-          "bytes value or percentage: $0", FLAGS_mem_limit));
-  }
+  int64_t bytes_limit;
+  RETURN_IF_ERROR(ChooseProcessMemLimit(&bytes_limit));
 
   // Need to register JVM metrics first so that we can use them to compute the buffer pool
   // limit.
@@ -281,6 +249,7 @@ Status ExecEnv::Init() {
     post_jvm_bytes_limit -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
   }
 
+  bool is_percent;
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
       &is_percent, post_jvm_bytes_limit);
   if (buffer_pool_limit <= 0) {
@@ -288,12 +257,15 @@ Status ExecEnv::Init() {
           "positive bytes value or percentage: $0", FLAGS_buffer_pool_limit));
   }
   buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
+  LOG(INFO) << "Buffer pool limit: "
+            << PrettyPrinter::Print(buffer_pool_limit, TUnit::BYTES);
 
   int64_t clean_pages_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_clean_pages_limit,
       &is_percent, buffer_pool_limit);
   if (clean_pages_limit <= 0) {
-    return Status(Substitute("Invalid --buffer_pool_clean_pages_limit value, must be a percentage or "
-          "positive bytes value or percentage: $0", FLAGS_buffer_pool_clean_pages_limit));
+    return Status(Substitute("Invalid --buffer_pool_clean_pages_limit value, must be a "
+        "percentage or positive bytes value or percentage: $0",
+        FLAGS_buffer_pool_clean_pages_limit));
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
 
@@ -350,17 +322,6 @@ Status ExecEnv::Init() {
 #endif
   mem_tracker_->RegisterMetrics(metrics_.get(), "mem-tracker.process");
 
-  if (bytes_limit > MemInfo::physical_mem()) {
-    LOG(WARNING) << "Memory limit "
-                 << PrettyPrinter::Print(bytes_limit, TUnit::BYTES)
-                 << " exceeds physical memory of "
-                 << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
-  }
-  LOG(INFO) << "Using global memory limit: "
-            << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
-  LOG(INFO) << "Buffer pool limit: "
-            << PrettyPrinter::Print(buffer_pool_limit, TUnit::BYTES);
-
   RETURN_IF_ERROR(disk_io_mgr_->Init());
 
   // Start services in order to ensure that dependencies between them are met
@@ -388,6 +349,72 @@ Status ExecEnv::Init() {
     default_fs_ = "hdfs://";
   }
 
+  return Status::OK();
+}
+
+Status ExecEnv::ChooseProcessMemLimit(int64_t* bytes_limit) {
+  // Depending on the system configuration, we detect the total amount of memory
+  // available to the system - either the available physical memory, or if overcommitting
+  // is turned off, we use the memory commit limit from /proc/meminfo (see IMPALA-1690).
+  // The 'memory' CGroup can also impose a lower limit on memory consumption,
+  // so we take the minimum of the system memory and the CGroup memory limit.
+  int64_t avail_mem = MemInfo::physical_mem();
+  bool use_commit_limit =
+      MemInfo::vm_overcommit() == 2 && MemInfo::commit_limit() < MemInfo::physical_mem();
+  if (use_commit_limit) {
+    avail_mem = MemInfo::commit_limit();
+    // There might be the case of misconfiguration, when on a system swap is disabled
+    // and overcommitting is turned off the actual usable memory is less than the
+    // available physical memory.
+    LOG(WARNING) << "This system shows a discrepancy between the available "
+                 << "memory and the memory commit limit allowed by the "
+                 << "operating system. ( Mem: " << MemInfo::physical_mem()
+                 << "<=> CommitLimit: " << MemInfo::commit_limit() << "). "
+                 << "Impala will adhere to the smaller value when setting the process "
+                 << "memory limit. Please verify the system configuration. Specifically, "
+                 << "/proc/sys/vm/overcommit_memory and "
+                 << "/proc/sys/vm/overcommit_ratio.";
+  }
+  LOG(INFO) << "System memory available: " << PrettyPrinter::PrintBytes(avail_mem)
+            << " (from " << (use_commit_limit ? "commit limit" : "physical mem") << ")";
+  int64_t cgroup_mem_limit;
+  Status cgroup_mem_status = CGroupUtil::FindCGroupMemLimit(&cgroup_mem_limit);
+  if (cgroup_mem_status.ok()) {
+    if (cgroup_mem_limit < avail_mem) {
+      avail_mem = cgroup_mem_limit;
+      LOG(INFO) << "CGroup memory limit for this process reduces physical memory "
+                << "available to: " << PrettyPrinter::PrintBytes(avail_mem);
+    }
+  } else {
+    LOG(WARNING) << "Could not detect CGroup memory limit, assuming unlimited: $0"
+                 << cgroup_mem_status.GetDetail();
+  }
+  bool is_percent;
+  *bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, avail_mem);
+  // ParseMemSpec() returns -1 for invalid input and 0 to mean unlimited. From Impala
+  // 2.11 onwards we do not support unlimited process memory limits.
+  if (*bytes_limit <= 0) {
+    return Status(Substitute("The process memory limit (--mem_limit) must be a positive "
+                             "bytes value or percentage: $0", FLAGS_mem_limit));
+  }
+  if (is_percent) {
+    LOG(INFO) << "Using process memory limit: " << PrettyPrinter::PrintBytes(*bytes_limit)
+              << " (--mem_limit=" << FLAGS_mem_limit << " of "
+              << PrettyPrinter::PrintBytes(avail_mem) << ")";
+  } else {
+    LOG(INFO) << "Using process memory limit: " << PrettyPrinter::PrintBytes(*bytes_limit)
+              << " (--mem_limit=" << FLAGS_mem_limit << ")";
+  }
+  if (*bytes_limit > MemInfo::physical_mem()) {
+    LOG(WARNING) << "Process memory limit " << PrettyPrinter::PrintBytes(*bytes_limit)
+                 << " exceeds physical memory of "
+                 << PrettyPrinter::PrintBytes(MemInfo::physical_mem());
+  }
+  if (cgroup_mem_status.ok() && *bytes_limit > cgroup_mem_limit) {
+    LOG(WARNING) << "Process Memory limit " << PrettyPrinter::PrintBytes(*bytes_limit)
+                 << " exceeds CGroup memory limit of "
+                 << PrettyPrinter::PrintBytes(cgroup_mem_limit);
+  }
   return Status::OK();
 }
 

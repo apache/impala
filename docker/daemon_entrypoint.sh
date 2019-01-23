@@ -39,7 +39,10 @@ do
   CLASSPATH+=:$jar
 done
 echo "CLASSPATH: $CLASSPATH"
-echo "LD_LIBRARY_PATH: $LD_LIBRARY_PAT"
+echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+
+# Default to 2GB heap. Allow overriding by externally-set JAVA_TOOL_OPTIONS.
+export JAVA_TOOL_OPTIONS="-Xmx2g $JAVA_TOOL_OPTIONS"
 
 "$@"
 EXIT_CODE=$?

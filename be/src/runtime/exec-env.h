@@ -248,6 +248,12 @@ class ExecEnv {
   /// address lists be identical in order to share a KuduClient.
   KuduClientMap kudu_client_map_;
 
+  /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
+  /// the memory available to the daemon process. Returns an error if the memory limit is
+  /// invalid or another error is encountered that should prevent starting up the daemon.
+  /// Logs the memory limit chosen and any relevant diagnostics related to that choice.
+  Status ChooseProcessMemLimit(int64_t* bytes_limit);
+
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
   void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);
 

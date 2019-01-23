@@ -288,21 +288,14 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
   # blob that has to be tokenized later. However, that may require more substantial
   # refactoring.
 
-  # Set mem_limit of each impalad to the smaller of 12GB or
-  # 1/cluster_size (typically 1/3) of 70% of system memory.
-  #
-  # The default memory limit for an impalad is 80% of the total system memory. On a
-  # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
-  # is very annoying, the mem limit will be reduced. This can be overridden using the
-  # --impalad_args flag. virtual_memory().total returns the total physical memory.
-  # The exact ratio to use is somewhat arbitrary. Peak memory usage during
-  # tests depends on the concurrency of parallel tests as well as their ordering.
-  # On the other hand, to avoid using too much memory, we limit the
-  # memory choice here to max out at 12GB. This should be sufficient for tests.
-  #
-  # Beware that ASAN builds use more memory than regular builds.
-  mem_limit = int(0.7 * psutil.virtual_memory().total / cluster_size)
-  mem_limit = min(12 * 1024 * 1024 * 1024, mem_limit)
+  mem_limit_arg = ""
+  if options.docker_network is None:
+    mem_limit_arg = "-mem_limit={0}".format(compute_impalad_mem_limit(cluster_size))
+  else:
+    # For containerised impalads, set a memory limit via docker instead of directly,
+    # to emulate what would happen in a production container. JVM heap is included,
+    # so we should be able to use 100% of the detected mem_limit.
+    mem_limit_arg = "-mem_limit=100%"
 
   delay_list = []
   if options.catalog_init_delays != "":
@@ -321,15 +314,13 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if remap_ports:
       impala_port_args = build_impalad_port_args(i)
     # impalad args from the --impalad_args flag. Also replacing '#ID' with the instance.
-    # TODO: IMPALA-7940: mem_limit should be set on docker container and detected by
-    # the impala daemon process instead of set manually here.
     param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
-    args = ("--mem_limit={mem_limit} "
+    args = ("{mem_limit_arg} "
         "{impala_logging_args} "
         "{jvm_args} "
         "{impala_port_args} "
         "{param_args}").format(
-            mem_limit=mem_limit,  # Goes first so --impalad_args will override it.
+            mem_limit_arg=mem_limit_arg,  # Goes first so --impalad_args will override it.
             impala_logging_args=" ".join(build_logging_args(service_name)),
             jvm_args=" ".join(build_jvm_args(i)),
             impala_port_args=impala_port_args,
@@ -363,6 +354,23 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     impalad_args.append(args)
   return impalad_args
 
+
+def compute_impalad_mem_limit(cluster_size):
+  # Set mem_limit of each impalad to the smaller of 12GB or
+  # 1/cluster_size (typically 1/3) of 70% of system memory.
+  #
+  # The default memory limit for an impalad is 80% of the total system memory. On a
+  # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
+  # is very annoying, the mem limit will be reduced. This can be overridden using the
+  # --impalad_args flag. virtual_memory().total returns the total physical memory.
+  # The exact ratio to use is somewhat arbitrary. Peak memory usage during
+  # tests depends on the concurrency of parallel tests as well as their ordering.
+  # On the other hand, to avoid using too much memory, we limit the
+  # memory choice here to max out at 12GB. This should be sufficient for tests.
+  #
+  # Beware that ASAN builds use more memory than regular builds.
+  mem_limit = int(0.7 * psutil.virtual_memory().total / cluster_size)
+  return min(12 * 1024 * 1024 * 1024, mem_limit)
 
 class MiniClusterOperations(object):
   """Implementations of operations for the non-containerized minicluster
@@ -481,13 +489,14 @@ class DockerMiniClusterOperations(object):
     impalad_arg_lists = build_impalad_arg_lists(
         cluster_size, num_coordinators, use_exclusive_coordinators, remap_ports=False)
     assert cluster_size == len(impalad_arg_lists)
+    mem_limit = compute_impalad_mem_limit(cluster_size)
     for i in xrange(cluster_size):
       chosen_ports = choose_impalad_ports(i)
       port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
                   DEFAULT_HS2_PORT: chosen_ports['hs2_port'],
                   DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
       self.__run_container__("impalad_coord_exec",
-          shlex.split(impalad_arg_lists[i]), port_map, i)
+          shlex.split(impalad_arg_lists[i]), port_map, i, mem_limit=mem_limit)
 
   def __gen_container_name__(self, daemon, instance=None):
     """Generate the name for the container, which should be unique among containers
@@ -502,14 +511,15 @@ class DockerMiniClusterOperations(object):
       return daemon
     return "{0}-{1}".format(daemon, instance)
 
-  def __run_container__(self, daemon, args, port_map, instance=None):
+  def __run_container__(self, daemon, args, port_map, instance=None, mem_limit=None):
     """Launch a container with the daemon - impalad, catalogd, or statestored. If there
     are multiple impalads in the cluster, a unique instance number must be specified.
     'args' are command-line arguments to be appended to the end of the daemon command
     line. 'port_map' determines a mapping from container ports to ports on localhost. If
     --docker_auto_ports was set on the command line, 'port_map' is ignored and Docker
     will automatically choose the mapping. If there is an existing running or stopped
-    container with the same name, it will be destroyed."""
+    container with the same name, it will be destroyed. If provided, mem_limit is
+    passed to "docker run" as a string to set the memory limit for the container."""
     self.__destroy_container__(daemon, instance)
     if options.docker_auto_ports:
       port_args = ["-P"]
@@ -527,10 +537,13 @@ class DockerMiniClusterOperations(object):
     # for config changes to take effect.
     conf_dir = os.path.join(IMPALA_HOME, "fe/target/test-classes")
     mount_args = ["--mount", "type=bind,src={0},dst=/opt/impala/conf".format(conf_dir)]
+    mem_limit_args = []
+    if mem_limit is not None:
+      mem_limit_args = ["--memory", str(mem_limit)]
     LOG.info("Running container {0}".format(container_name))
     run_cmd = (["docker", "run", "-d"] + env_args + port_args + ["--network",
       self.network_name, "--name", container_name, "--network-alias", host_name] +
-      mount_args + [image_tag] + args)
+      mount_args + mem_limit_args + [image_tag] + args)
     LOG.info("Running command {0}".format(run_cmd))
     check_call(run_cmd)
     port_mapping = check_output(["docker", "port", container_name])
