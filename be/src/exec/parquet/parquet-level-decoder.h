@@ -59,6 +59,10 @@ class ParquetLevelDecoder {
   /// as batched methods.
   inline int16_t ReadLevel();
 
+  /// Returns the next level or INVALID_LEVEL if there was an error. It doesn't move
+  /// to the next level.
+  inline int16_t PeekLevel();
+
   /// If the next value is part of a repeated run and is not cached, return the length
   /// of the repeated run. A max level of 0 is treated as an arbitrarily long run of
   /// zeroes, so this returns numeric_limits<int32_t>::max(). Otherwise return 0.
@@ -84,6 +88,11 @@ class ParquetLevelDecoder {
     DCHECK_LT(cached_level_idx_, num_cached_levels_);
     return cached_levels_[cached_level_idx_++];
   }
+  // Retrieving the next cached level without consuming it.
+  uint8_t CachePeekNext() {
+    DCHECK_LT(cached_level_idx_, num_cached_levels_);
+    return cached_levels_[cached_level_idx_];
+  }
   void CacheSkipLevels(int num_levels) {
     DCHECK_LE(cached_level_idx_ + num_levels, num_cached_levels_);
     cached_level_idx_ += num_levels;
@@ -96,6 +105,10 @@ class ParquetLevelDecoder {
   /// Initializes members associated with the level cache. Allocates memory for
   /// the cache from pool, if necessary.
   Status InitCache(MemPool* pool, int cache_size);
+
+  // Invokes FillCache() when the cache is empty. Returns true if there are values
+  // in the cache already, or filling the cache was successful, returns false otherwise.
+  inline bool PrepareForRead();
 
   /// Decodes and writes a batch of levels into the cache. Returns true and sets
   /// the number of values written to the cache via *num_cached_levels if no errors
@@ -133,17 +146,27 @@ class ParquetLevelDecoder {
   TErrorCode::type decoding_error_code_;
 };
 
-inline int16_t ParquetLevelDecoder::ReadLevel() {
+inline bool ParquetLevelDecoder::PrepareForRead() {
   if (UNLIKELY(!CacheHasNext())) {
     if (UNLIKELY(!FillCache(cache_size_, &num_cached_levels_))) {
-      return ParquetLevel::INVALID_LEVEL;
+      return false;
     }
     DCHECK_GE(num_cached_levels_, 0);
     if (UNLIKELY(num_cached_levels_ == 0)) {
-      return ParquetLevel::INVALID_LEVEL;
+      return false;
     }
   }
+  return true;
+}
+
+inline int16_t ParquetLevelDecoder::ReadLevel() {
+  if (UNLIKELY(!PrepareForRead())) return ParquetLevel::INVALID_LEVEL;
   return CacheGetNext();
+}
+
+inline int16_t ParquetLevelDecoder::PeekLevel() {
+  if (UNLIKELY(!PrepareForRead())) return ParquetLevel::INVALID_LEVEL;
+  return CachePeekNext();
 }
 
 inline int32_t ParquetLevelDecoder::NextRepeatedRunLength() {

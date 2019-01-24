@@ -22,6 +22,7 @@
 
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-level-decoder.h"
+#include "runtime/io/request-ranges.h"
 #include "util/bit-stream-utils.h"
 #include "util/codec.h"
 
@@ -340,7 +341,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   // Less frequently used members that are not accessed in inner loop should go below
   // here so they do not occupy precious cache line space.
 
-  /// The number of values seen so far. Updated per data page.
+  /// The number of values seen so far. Updated per data page. It is only used for
+  /// validation. It is not used when we filter rows based on the page index.
   int64_t num_values_read_ = 0;
 
   /// Metadata for the column for the current row group.
@@ -366,6 +368,50 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
   /// Header for current data page.
   parquet::PageHeader current_page_header_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members used for page filtering
+  /// They are not set when we don't filter out pages at all.
+
+  /// The parquet OffsetIndex of this column chunk. It stores information about the page
+  /// locations and row indexes.
+  parquet::OffsetIndex offset_index_;
+
+  /// Collection of page indexes that we are going to read. When we use page filtering,
+  /// we issue a scan-range with sub-ranges that belong to the candidate data pages, i.e.
+  /// we will not even see the bytes of the filtered out pages.
+  /// It is set in HdfsParquetScanner::CalculateCandidatePagesForColumns().
+  std::vector<int> candidate_data_pages_;
+
+  /// Stores an index to 'candidate_data_pages_'. It is the currently read data page when
+  /// we have candidate pages.
+  int candidate_page_idx_ = -1;
+
+  /// Stores an index to 'parent_->candidate_ranges_'. When we have candidate pages, we
+  /// are processing values in this range. When we leave this range, then we need to skip
+  /// rows and increment this field.
+  int current_row_range_ = 0;
+
+  /// Index of the current top-level row. It is updated together with the rep/def levels.
+  /// When updated, and its value is N, it means that we already processed the Nth row
+  /// completely.
+  int64_t current_row_ = -1;
+
+  /// This flag is needed for the proper tracking of the last processed row.
+  /// The batched and non-batched interfaces behave differently. E.g. when using the
+  /// batched interface you don't need to invoke NextLevels() in advance, while you need
+  /// to do that for the non-batched interface. In fact, the batched interface doesn't
+  /// call NextLevels() at all. It directly reads the levels then the corresponding value
+  /// in a loop. On the other hand, the non-batched interface (ReadValue()) expects that
+  /// the levels for the next value are already read via NextLevels(). And after reading
+  /// the value it calls NextLevels() to read the levels of the next value. Hence, the
+  /// levels are always read ahead in this case.
+  /// Returns true, if we read ahead def and rep levels. In this case 'current_row_'
+  /// points to the row we'll process next, not to the row we already processed.
+  bool levels_readahead_ = false;
+
+  /// END: Members used for page filtering
+  /////////////////////////////////////////
 
   /// Reads the next page header into next_page_header/next_header_size.
   /// If the stream reaches the end before reading a complete page header,
@@ -421,6 +467,91 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     return page_encoding != parquet::Encoding::PLAIN_DICTIONARY
         && slot_desc_ != nullptr && slot_desc_->type().IsVarLenStringType();
   }
+
+  /// Resets structures related to page filtering.
+  void ResetPageFiltering();
+
+  /// Must be invoked when starting a new page. Updates the structures related to page
+  /// filtering and skips the first rows if needed.
+  Status StartPageFiltering();
+
+  /// Returns the index of the row that was processed most recently.
+  int64_t LastProcessedRow() const {
+    if (def_level_ == ParquetLevel::ROW_GROUP_END) return current_row_;
+    return levels_readahead_ ? current_row_ - 1 : current_row_;
+  }
+
+  /// Creates sub-ranges if page filtering is active.
+  void CreateSubRanges(std::vector<io::ScanRange::SubRange>* sub_ranges);
+
+  /// Calculates how many encoded values we need to skip in the page data, then
+  /// invokes SkipEncodedValuesInPage(). The number of the encoded values depends on the
+  /// nesting of the data, and also on the number of null values.
+  /// E.g. if 'num_rows' is 10, and every row contains an array of 10 integers, then
+  /// we need to skip 100 encoded values in the page data.
+  /// And, if 'num_rows' is 10, and every second value is NULL, then we only need to skip
+  /// 5 values in the page data since NULL values are not stored there.
+  /// The number of primitive values can be calculated from the def and rep levels.
+  /// Returns true on success, false otherwise.
+  bool SkipTopLevelRows(int64_t num_rows);
+
+  /// Skip values in the page data. Returns true on success, false otherwise.
+  virtual bool SkipEncodedValuesInPage(int64_t num_values) = 0;
+
+  /// Only valid to call this function when we filter out pages based on the Page index.
+  /// Returns the RowGroup-level index of the starting row in the candidate page.
+  int64_t FirstRowIdxInCurrentPage() const {
+    DCHECK(!candidate_data_pages_.empty());
+    return offset_index_.page_locations[
+        candidate_data_pages_[candidate_page_idx_]].first_row_index;
+  }
+
+  /// The number of top-level rows until the end of the current candidate range.
+  /// For simple columns it returns 0 if we have processed the last row in the current
+  /// range. For nested columns, it returns 0 when we are processing values from the last
+  /// row in the current row range.
+  int RowsRemainingInCandidateRange() const {
+    DCHECK(!candidate_data_pages_.empty());
+    return parent_->candidate_ranges_[current_row_range_].last - current_row_;
+  }
+
+  /// Returns true if we are filtering pages.
+  bool DoesPageFiltering() const {
+    return !candidate_data_pages_.empty();
+  }
+
+  bool IsLastCandidateRange() const {
+    return current_row_range_ == parent_->candidate_ranges_.size() - 1;
+  }
+
+  template <bool IN_COLLECTION>
+  bool ConsumedCurrentCandidateRange() {
+    return RowsRemainingInCandidateRange() == 0 &&
+        (!IN_COLLECTION || max_rep_level() == 0 || num_buffered_values_ == 0 ||
+            rep_levels_.PeekLevel() == 0);
+  }
+
+  /// This function fills the position slots up to 'max_values' or up to values belonging
+  /// to the current candidate range or up to cached repetition levels. It returns the
+  /// count of values until its limit. It can also be used without a position slot, in
+  /// that case it returns the number of values until the first limit it reaches.
+  /// It consumes cached repetition levels.
+  int FillPositionsInCandidateRange(int rows_remaining, int max_values,
+      uint8_t* RESTRICT tuple_mem, int tuple_size);
+
+  /// Advance to the next candidate range that contains 'current_row_'.
+  /// Cannot advance past the last candidate range.
+  void AdvanceCandidateRange();
+
+  /// Returns true if the current candidate row range has some rows in the current page.
+  bool PageHasRemainingCandidateRows() const;
+
+  /// Skip top level rows in current page until current candidate range is reached.
+  bool SkipRowsInPage();
+
+  /// Invoke this when there aren't any more interesting rows in the current page based
+  /// on the page index. It starts reading the next page.
+  bool JumpToNextPage();
 
   /// Slow-path status construction code for def/rep decoding errors. 'level_name' is
   /// either "rep" or "def", 'decoded_level' is the value returned from

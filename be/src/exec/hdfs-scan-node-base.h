@@ -259,7 +259,19 @@ class HdfsScanNodeBase : public ScanNode {
   /// Same as above, but it takes a pointer to a ScanRangeMetadata object which contains
   /// the partition_id, original_splits, and other information about the scan range.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
-      int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
+      int64_t offset, ScanRangeMetadata* metadata, int disk_id,
+      bool expected_local, bool is_erasure_coded, const io::BufferOpts& buffer_opts);
+
+  /// Same as the first overload, but it takes sub-ranges as well.
+  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+      int64_t offset, std::vector<io::ScanRange::SubRange>&& sub_ranges,
+      int64_t partition_id, int disk_id, bool expected_local, bool is_erasure_coded,
+      const io::BufferOpts& buffer_opts, const io::ScanRange* original_split = NULL);
+
+  /// Same as above, but it takes both sub-ranges and metadata.
+  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+      int64_t offset, std::vector<io::ScanRange::SubRange>&& sub_ranges,
+      ScanRangeMetadata* metadata, int disk_id, bool expected_local,
       bool is_erasure_coded, const io::BufferOpts& buffer_opts);
 
   /// Old API for compatibility with text scanners (e.g. LZO text scanner).

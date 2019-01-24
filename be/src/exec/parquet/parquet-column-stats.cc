@@ -25,6 +25,20 @@
 
 namespace impala {
 
+bool ColumnStatsReader::GetRequiredStatsField(const string& fn_name,
+    StatsField* stats_field) {
+  if (fn_name == "lt" || fn_name == "le") {
+    *stats_field = StatsField::MIN;
+    return true;
+  } else if (fn_name == "gt" || fn_name == "ge") {
+    *stats_field = StatsField::MAX;
+    return true;
+  }
+  DCHECK(false) << "Unsupported function name for statistics evaluation: "
+                << fn_name;
+  return false;
+}
+
 bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const {
   if (!(col_chunk_.__isset.meta_data && col_chunk_.meta_data.__isset.statistics)) {
     return false;
@@ -58,14 +72,19 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
   }
   if (stat_value == nullptr) return false;
 
+  return ReadFromString(stats_field, *stat_value, slot);
+}
+
+bool ColumnStatsReader::ReadFromString(StatsField stats_field,
+    const string& encoded_value, void* slot) const {
   switch (col_type_.type) {
     case TYPE_BOOLEAN:
-      return ColumnStats<bool>::DecodePlainValue(*stat_value, slot,
+      return ColumnStats<bool>::DecodePlainValue(encoded_value, slot,
           parquet::Type::BOOLEAN);
     case TYPE_TINYINT: {
       // parquet::Statistics encodes INT_8 values using 4 bytes.
       int32_t col_stats;
-      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats,
+      bool ret = ColumnStats<int32_t>::DecodePlainValue(encoded_value, &col_stats,
           parquet::Type::INT32);
       if (!ret || col_stats < std::numeric_limits<int8_t>::min() ||
           col_stats > std::numeric_limits<int8_t>::max()) {
@@ -77,7 +96,7 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
     case TYPE_SMALLINT: {
       // parquet::Statistics encodes INT_16 values using 4 bytes.
       int32_t col_stats;
-      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats,
+      bool ret = ColumnStats<int32_t>::DecodePlainValue(encoded_value, &col_stats,
           parquet::Type::INT32);
       if (!ret || col_stats < std::numeric_limits<int16_t>::min() ||
           col_stats > std::numeric_limits<int16_t>::max()) {
@@ -87,23 +106,24 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
       return true;
     }
     case TYPE_INT:
-      return ColumnStats<int32_t>::DecodePlainValue(*stat_value, slot, element_.type);
+      return ColumnStats<int32_t>::DecodePlainValue(encoded_value, slot, element_.type);
     case TYPE_BIGINT:
-      return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot, element_.type);
+      return ColumnStats<int64_t>::DecodePlainValue(encoded_value, slot, element_.type);
     case TYPE_FLOAT:
       // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
-      return ColumnStats<float>::DecodePlainValue(*stat_value, slot, element_.type)
-          && !std::isnan(*reinterpret_cast<float*>(slot));
+      return ColumnStats<float>::DecodePlainValue(encoded_value, slot, element_.type) &&
+          !std::isnan(*reinterpret_cast<float*>(slot));
     case TYPE_DOUBLE:
       // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
-      return ColumnStats<double>::DecodePlainValue(*stat_value, slot, element_.type)
-          && !std::isnan(*reinterpret_cast<double*>(slot));
+      return ColumnStats<double>::DecodePlainValue(encoded_value, slot, element_.type) &&
+          !std::isnan(*reinterpret_cast<double*>(slot));
     case TYPE_TIMESTAMP:
-      return DecodeTimestamp(*stat_value, stats_field,
+      return DecodeTimestamp(encoded_value, stats_field,
           static_cast<TimestampValue*>(slot));
     case TYPE_STRING:
     case TYPE_VARCHAR:
-      return ColumnStats<StringValue>::DecodePlainValue(*stat_value, slot, element_.type);
+      return ColumnStats<StringValue>::DecodePlainValue(encoded_value, slot,
+          element_.type);
     case TYPE_CHAR:
       /// We don't read statistics for CHAR columns, since CHAR support is broken in
       /// Impala (IMPALA-1652).
@@ -111,18 +131,18 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
     case TYPE_DECIMAL:
       switch (col_type_.GetByteSize()) {
         case 4:
-          return ColumnStats<Decimal4Value>::DecodePlainValue(*stat_value, slot,
+          return ColumnStats<Decimal4Value>::DecodePlainValue(encoded_value, slot,
               element_.type);
         case 8:
-          return ColumnStats<Decimal8Value>::DecodePlainValue(*stat_value, slot,
+          return ColumnStats<Decimal8Value>::DecodePlainValue(encoded_value, slot,
               element_.type);
         case 16:
-          return ColumnStats<Decimal16Value>::DecodePlainValue(*stat_value, slot,
+          return ColumnStats<Decimal16Value>::DecodePlainValue(encoded_value, slot,
               element_.type);
         }
       DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
     case TYPE_DATE:
-      return ColumnStats<DateValue>::DecodePlainValue(*stat_value, slot, element_.type);
+      return ColumnStats<DateValue>::DecodePlainValue(encoded_value, slot, element_.type);
     default:
       DCHECK(false) << col_type_.DebugString();
   }

@@ -408,8 +408,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::DISABLE_ROW_RUNTIME_FILTERING:
-        query_options->__set_disable_row_runtime_filtering(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_disable_row_runtime_filtering(IsTrue(value));
         break;
       case TImpalaQueryOptions::MAX_NUM_RUNTIME_FILTERS: {
         StringParser::ParseResult status;
@@ -723,6 +722,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(GetThriftEnum(value, "default file format",
             _THdfsFileFormat_VALUES_TO_NAMES, &enum_type));
         query_options->__set_default_file_format(enum_type);
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_READ_PAGE_INDEX: {
+        query_options->__set_parquet_read_page_index(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PARQUET_TIMESTAMP_TYPE: {

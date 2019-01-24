@@ -1,0 +1,219 @@
+# These tests check that the page selection and value-skipping logic works well when using
+# the page index of the Parquet file. 'decimals_1_10' contains tiny, misaligned pages and
+# some NULL values. Column 'd_10' has one value per page, while column 'd_1' has five
+# values per page. Thus, with putting predicates on column 'd_10' we can craft different
+# test cases for value skipping in 'd_1'.
+====
+---- QUERY
+# 'd_10 = 1' selects the first row from each page. Therefore in the pages of 'd_1' we
+# read the first value, then skip all the rest.
+select * from decimals_1_10 where d_10 = 1
+---- RESULTS
+1,1
+NULL,1
+1,1
+1,1
+1,1
+1,1
+NULL,1
+1,1
+1,1
+NULL,1
+1,1
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 50
+====
+---- QUERY
+# Selecting the second rows of the pages of 'd_1', skipping values before and after.
+select * from decimals_1_10 where d_10 = 2
+---- RESULTS
+2,2
+2,2
+NULL,2
+2,2
+2,2
+2,2
+NULL,2
+NULL,2
+2,2
+2,2
+2,2
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 50
+====
+---- QUERY
+# Selecting the third rows of the pages of 'd_1', skipping values before and after.
+select * from decimals_1_10 where d_10 = 3
+---- RESULTS
+3,3
+3,3
+3,3
+NULL,3
+3,3
+3,3
+3,3
+3,3
+3,3
+NULL,3
+3,3
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 50
+====
+---- QUERY
+# Selecting the fourth rows of the pages of 'd_1', skipping values before and after.
+select * from decimals_1_10 where d_10 = 4
+---- RESULTS
+4,4
+4,4
+4,4
+4,4
+NULL,4
+4,4
+4,4
+NULL,4
+NULL,4
+NULL,4
+4,4
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 50
+====
+---- QUERY
+# 'd_10 = 5' selects the last row from each page. Therefore in the pages of 'd_1' we
+# skip the first four values, then read the last.
+select * from decimals_1_10 where d_10 = 5
+---- RESULTS
+5,5
+5,5
+5,5
+5,5
+5,5
+NULL,5
+5,5
+5,5
+NULL,5
+5,5
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 52
+====
+---- QUERY
+# Selecting the first couple of rows from the pages of 'd_1'. Skips last rows.
+select * from decimals_1_10 where d_10 < 3
+---- RESULTS
+1,1
+2,2
+NULL,1
+2,2
+1,1
+NULL,2
+1,1
+2,2
+1,1
+2,2
+1,1
+2,2
+NULL,1
+NULL,2
+1,1
+NULL,2
+1,1
+2,2
+NULL,1
+2,2
+1,1
+2,2
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 39
+====
+---- QUERY
+# Selecting the last couple of rows from the pages of 'd_1'. Skips first rows.
+select * from decimals_1_10 where d_10 > 2
+---- RESULTS
+3,3
+4,4
+5,5
+3,3
+4,4
+5,5
+3,3
+4,4
+5,5
+NULL,3
+4,4
+5,5
+3,3
+NULL,4
+5,5
+3,3
+4,4
+NULL,5
+3,3
+4,4
+5,5
+3,3
+NULL,4
+5,5
+3,3
+NULL,4
+NULL,5
+NULL,3
+NULL,4
+5,5
+7,7
+8,8
+9,9
+8,8
+7,7
+3,3
+4,4
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 23
+====
+---- QUERY
+# Skipping middle row in a page.
+select * from decimals_1_10 where d_10 > 5 and d_10 < 9
+---- RESULTS
+7,7
+8,8
+8,8
+7,7
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 67
+====
+---- QUERY
+# Only reading middle rows in a page.
+select * from decimals_1_10 where d_10 > 7
+---- RESULTS
+8,8
+9,9
+8,8
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 68
+====
+---- QUERY
+# Row group level minimum is 1, maximum is 9. But there is a gap between the pages,
+# therefore with page-level statistics we can filter out the whole row group.
+select * from decimals_1_10 where d_10 = 6
+---- RESULTS
+---- TYPES
+DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====

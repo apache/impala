@@ -314,25 +314,25 @@ string Literal::DebugString() const {
   out << "Literal(value=";
   switch (type_.type) {
     case TYPE_BOOLEAN:
-      out << value_.bool_val;
+      out << std::to_string(value_.bool_val);
       break;
     case TYPE_TINYINT:
-      out << value_.tinyint_val;
+      out << std::to_string(value_.tinyint_val);
       break;
     case TYPE_SMALLINT:
-      out << value_.smallint_val;
+      out << std::to_string(value_.smallint_val);
       break;
     case TYPE_INT:
-      out << value_.int_val;
+      out << std::to_string(value_.int_val);
       break;
     case TYPE_BIGINT:
-      out << value_.bigint_val;
+      out << std::to_string(value_.bigint_val);
       break;
     case TYPE_FLOAT:
-      out << value_.float_val;
+      out << std::to_string(value_.float_val);
       break;
     case TYPE_DOUBLE:
-      out << value_.double_val;
+      out << std::to_string(value_.double_val);
       break;
     case TYPE_STRING:
       out << value_.string_val;
@@ -353,7 +353,7 @@ string Literal::DebugString() const {
       }
       break;
     case TYPE_TIMESTAMP:
-      out << value_.timestamp_val;
+      out << value_.timestamp_val.ToString();
       break;
     case TYPE_DATE:
       out << value_.date_val;

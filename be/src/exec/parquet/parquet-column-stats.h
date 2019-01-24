@@ -270,10 +270,22 @@ public:
   /// was successful, false otherwise.
   bool ReadFromThrift(StatsField stats_field, void* slot) const;
 
+  /// Read plain encoded value from a string 'encoded_value' into 'slot'.
+  bool ReadFromString(StatsField stats_field, const std::string& encoded_value,
+      void* slot) const;
+
   // Gets the null_count statistics from the column chunk's metadata and returns
   // it via an output parameter.
   // Returns true if the null_count stats were read successfully, false otherwise.
   bool ReadNullCountStat(int64_t* null_count) const;
+
+  /// Returns the required stats field for the given function. 'fn_name' can be 'le',
+  /// 'lt', 'ge', and 'gt' (i.e. binary operators <=, <, >=, >). If we want to check that
+  /// whether a column contains a value less than a constant, we need the minimum value of
+  /// the column to answer that question. And, to answer the opposite question we need the
+  /// maximum value. The required stats field (min/max) will be stored in 'stats_field'.
+  /// The function returns true on success, false otherwise.
+  static bool GetRequiredStatsField(const std::string& fn_name, StatsField* stats_field);
 
 private:
   /// Returns true if we support reading statistics stored in the fields 'min_value' and

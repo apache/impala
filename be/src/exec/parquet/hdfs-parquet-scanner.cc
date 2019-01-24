@@ -27,7 +27,6 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/parquet/parquet-collection-column-reader.h"
 #include "exec/parquet/parquet-column-readers.h"
-#include "exec/parquet/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
@@ -37,6 +36,7 @@
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "util/dict-encoding.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
@@ -103,7 +103,8 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     parquet_compressed_page_size_counter_(nullptr),
     parquet_uncompressed_page_size_counter_(nullptr),
     coll_items_read_counter_(0),
-    codegend_process_scratch_batch_fn_(nullptr) {
+    codegend_process_scratch_batch_fn_(nullptr),
+    page_index_(this) {
   assemble_rows_timer_.Stop();
 }
 
@@ -117,6 +118,13 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
           TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
+  num_row_groups_with_page_index_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroupsWithPageIndex",
+          TUnit::UNIT);
+  num_stats_filtered_pages_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumStatsFilteredPages", TUnit::UNIT);
+  num_pages_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumPages", TUnit::UNIT);
   num_scanners_with_no_reads_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
   num_dict_filtered_row_groups_counter_ =
@@ -127,6 +135,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       scan_node_->runtime_profile(), "ParquetCompressedPageSize", TUnit::BYTES);
   parquet_uncompressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
       scan_node_->runtime_profile(), "ParquetUncompressedPageSize", TUnit::BYTES);
+  process_page_index_stats_ =
+      ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "PageIndexProcessingTime");
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -501,18 +511,16 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     DCHECK_LT(col_idx, row_group.columns.size());
 
     const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
-    const parquet::ColumnOrder* col_order = nullptr;
-    if (col_idx < col_orders.size()) col_order = &col_orders[col_idx];
+    const parquet::ColumnOrder* col_order = col_idx < col_orders.size() ?
+        &col_orders[col_idx] : nullptr;
 
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
     const ColumnType& col_type = slot_desc->type();
 
     DCHECK(node->element != nullptr);
 
-    ColumnStatsReader stat_reader(col_chunk, col_type, col_order,  *node->element);
-    if (col_type.IsTimestampType()) {
-      stat_reader.SetTimestampDecoder(CreateTimestampDecoder(*node->element));
-    }
+    ColumnStatsReader stat_reader = CreateColumnStatsReader(col_chunk, col_type,
+        col_order, *node->element);
 
     int64_t null_count = 0;
     bool null_count_result = stat_reader.ReadNullCountStat(&null_count);
@@ -523,16 +531,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
 
     const string& fn_name = eval->root().function_name();
     ColumnStatsReader::StatsField stats_field;
-    if (fn_name == "lt" || fn_name == "le") {
-      // We need to get min stats.
-      stats_field = ColumnStatsReader::StatsField::MIN;
-    } else if (fn_name == "gt" || fn_name == "ge") {
-      // We need to get max stats.
-      stats_field = ColumnStatsReader::StatsField::MAX;
-    } else {
-      DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
-      continue;
-    }
+    if (!ColumnStatsReader::GetRequiredStatsField(fn_name, &stats_field)) continue;
 
     void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
     bool stats_read = stat_reader.ReadFromThrift(stats_field, slot);
@@ -609,6 +608,10 @@ Status HdfsParquetScanner::NextRowGroup() {
     }
 
     COUNTER_ADD(num_row_groups_counter_, 1);
+    if (!row_group.columns.empty() &&
+        row_group.columns.front().__isset.offset_index_offset) {
+      COUNTER_ADD(num_row_groups_with_page_index_counter_, 1);
+    }
 
     // Evaluate row group statistics.
     bool skip_row_group_on_stats;
@@ -617,6 +620,26 @@ Status HdfsParquetScanner::NextRowGroup() {
     if (skip_row_group_on_stats) {
       COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
       continue;
+    }
+
+    // Evaluate page index.
+    if (!min_max_conjunct_evals_.empty() &&
+        state_->query_options().parquet_read_page_index) {
+      bool filter_pages;
+      Status page_index_status = ProcessPageIndex(&filter_pages);
+      if (!page_index_status.ok()) {
+        RETURN_IF_ERROR(state_->LogOrReturnError(page_index_status.msg()));
+      }
+      if (filter_pages && candidate_ranges_.empty()) {
+        // Page level statistics filtered the whole row group. It can happen when there
+        // is a gap in the data between the pages and the user's predicate hit that gap.
+        // E.g. column chunk 'A' has two pages with statistics {min: 0, max: 5},
+        // {min: 10, max: 20}, and query is 'select * from T where A = 8'.
+        // It can also happen when there are predicates against different columns, and
+        // the passing row ranges of the predicates don't have a common subset.
+        COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
+        continue;
+      }
     }
 
     InitCollectionColumns();
@@ -661,6 +684,141 @@ Status HdfsParquetScanner::NextRowGroup() {
     break;
   }
   DCHECK(parse_status_.ok());
+  return Status::OK();
+}
+
+bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader,
+    const parquet::ColumnIndex& column_index, int page_idx,
+    ColumnStatsReader::StatsField stats_field, bool* is_null_page, void* slot) {
+  *is_null_page = column_index.null_pages[page_idx];
+  if (*is_null_page) return false;
+  switch (stats_field) {
+    case ColumnStatsReader::StatsField::MIN:
+      return stats_reader.ReadFromString(
+          stats_field, column_index.min_values[page_idx], slot);
+    case ColumnStatsReader::StatsField::MAX:
+      return stats_reader.ReadFromString(
+          stats_field, column_index.max_values[page_idx], slot);
+    default:
+      DCHECK(false);
+  }
+  return false;
+}
+
+Status HdfsParquetScanner::ProcessPageIndex(bool* filter_pages) {
+  MonotonicStopWatch single_process_page_index_timer;
+  single_process_page_index_timer.Start();
+  candidate_ranges_.clear();
+  *filter_pages = false;
+  for (auto& scalar_reader : scalar_readers_) scalar_reader->ResetPageFiltering();
+  RETURN_IF_ERROR(page_index_.ReadAll(row_group_idx_));
+  if (page_index_.IsEmpty()) return Status::OK();
+  // We can release the raw page index buffer when we exit this function.
+  const auto scope_exit = MakeScopeExitTrigger([this](){page_index_.Release();});
+  RETURN_IF_ERROR(EvaluatePageIndex(filter_pages));
+  RETURN_IF_ERROR(ComputeCandidatePagesForColumns(filter_pages));
+  single_process_page_index_timer.Stop();
+  process_page_index_stats_->UpdateCounter(single_process_page_index_timer.ElapsedTime());
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  vector<RowRange> skip_ranges;
+
+  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
+    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
+    SlotDescriptor* slot_desc = scan_node_->min_max_tuple_desc()->slots()[i];
+
+    // Resolve column path to determine col idx.
+    SchemaNode* node = nullptr;
+    bool pos_field, missing_field;
+    RETURN_IF_ERROR(schema_resolver_->ResolvePath(slot_desc->col_path(), &node,
+        &pos_field, &missing_field));
+    if (pos_field || missing_field) continue;
+
+    int col_idx = node->col_idx;
+    DCHECK_LT(col_idx, row_group.columns.size());
+    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    if (col_chunk.column_index_length == 0) continue;
+
+    parquet::ColumnIndex column_index;
+    RETURN_IF_ERROR(page_index_.DeserializeColumnIndex(col_chunk, &column_index));
+
+    const ColumnType& col_type = slot_desc->type();
+    const vector<parquet::ColumnOrder>& col_orders = file_metadata_.column_orders;
+    const parquet::ColumnOrder* col_order = col_idx < col_orders.size() ?
+        &col_orders[col_idx] : nullptr;
+    ColumnStatsReader stats_reader = CreateColumnStatsReader(col_chunk, col_type,
+        col_order, *node->element);
+
+    min_max_tuple_->Init(scan_node_->min_max_tuple_desc()->byte_size());
+    void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
+
+    const int num_of_pages = column_index.null_pages.size();
+    const string& fn_name = eval->root().function_name();
+    ColumnStatsReader::StatsField stats_field;
+    if (!ColumnStatsReader::GetRequiredStatsField(fn_name, &stats_field)) continue;
+
+    for (int page_idx = 0; page_idx < num_of_pages; ++page_idx) {
+      bool value_read, is_null_page;
+      value_read = ReadStatFromIndex(stats_reader, column_index, page_idx, stats_field,
+          &is_null_page, slot);
+      if (!is_null_page && !value_read) continue;
+      TupleRow row;
+      row.SetTuple(0, min_max_tuple_);
+      if (is_null_page || !ExecNode::EvalPredicate(eval, &row)) {
+        BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
+        RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk,
+            &scalar_reader->offset_index_));
+        RowRange row_range;
+        GetRowRangeForPage(row_group, scalar_reader->offset_index_, page_idx, &row_range);
+        skip_ranges.push_back(row_range);
+      }
+    }
+  }
+  if (skip_ranges.empty()) return Status::OK();
+
+  for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
+    const parquet::ColumnChunk& col_chunk = row_group.columns[scalar_reader->col_idx()];
+    if (col_chunk.offset_index_length > 0) {
+      parquet::OffsetIndex& offset_index = scalar_reader->offset_index_;
+      if (!offset_index.page_locations.empty()) continue;
+      RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk, &offset_index));
+    } else {
+      // We can only filter pages based on the page index if we have the offset index
+      // for all columns.
+      return Status(Substitute("Found column index, but no offset index for '$0' in "
+          "file '$1'", scalar_reader->schema_element().name, filename()));
+    }
+  }
+  if (!ComputeCandidateRanges(row_group.num_rows, &skip_ranges, &candidate_ranges_)) {
+    return Status(Substitute("Invalid offset index in Parquet file $0.", filename()));
+  }
+  *filter_pages = true;
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ComputeCandidatePagesForColumns(bool* filter_pages) {
+  if (candidate_ranges_.empty()) return Status::OK();
+
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
+    const auto& page_locations = scalar_reader->offset_index_.page_locations;
+    if (!ComputeCandidatePages(page_locations, candidate_ranges_, row_group.num_rows,
+        &scalar_reader->candidate_data_pages_)) {
+      *filter_pages = false;
+      return Status(Substitute("Invalid offset index in Parquet file $0.", filename()));
+    }
+  }
+  for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
+    const auto& page_locations = scalar_reader->offset_index_.page_locations;
+    int total_page_count = page_locations.size();
+    int candidate_pages_count = scalar_reader->candidate_data_pages_.size();
+    COUNTER_ADD(num_stats_filtered_pages_counter_,
+        total_page_count - candidate_pages_count);
+    COUNTER_ADD(num_pages_counter_, total_page_count);
+  }
   return Status::OK();
 }
 
@@ -973,6 +1131,7 @@ Status HdfsParquetScanner::AssembleRows(
       }
       last_num_tuples = scratch_batch_->num_tuples;
     }
+    RETURN_IF_ERROR(CheckPageFiltering());
     num_rows_read += scratch_batch_->num_tuples;
     int num_row_to_commit = TransferScratchTuples(row_batch);
     RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
@@ -983,6 +1142,20 @@ Status HdfsParquetScanner::AssembleRows(
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::CheckPageFiltering() {
+  if (candidate_ranges_.empty() || scalar_readers_.empty()) return Status::OK();
+
+  int64_t current_row = scalar_readers_[0]->LastProcessedRow();
+  for (int i = 1; i < scalar_readers_.size(); ++i) {
+    if (current_row != scalar_readers_[i]->LastProcessedRow()) {
+      DCHECK(false);
+      return Status(Substitute(
+          "Top level rows aren't in sync during page filtering in file $0.", filename()));
+    }
+  }
   return Status::OK();
 }
 
@@ -1383,6 +1556,9 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
           static_cast<CollectionColumnReader*>(col_reader);
       RETURN_IF_ERROR(CreateColumnReaders(
           *item_tuple_desc, schema_resolver, collection_reader->children()));
+    } else {
+      scalar_reader_map_[node->col_idx] = static_cast<BaseScalarColumnReader*>(
+          col_reader);
     }
   }
 
@@ -1642,13 +1818,27 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
       << parse_status_.GetDetail();
 
   if (column_readers[0]->max_rep_level() == 0) {
-    // These column readers materialize table-level values (vs. collection values). Test
-    // if the expected number of rows from the file metadata matches the actual number of
-    // rows read from the file.
-    int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
-    if (rows_read != expected_rows_in_group) {
-      return Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR, filename(), row_group_idx,
-          expected_rows_in_group, rows_read);
+    if (candidate_ranges_.empty()) {
+      // These column readers materialize table-level values (vs. collection values).
+      // Test if the expected number of rows from the file metadata matches the actual
+      // number of rows read from the file.
+      int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
+      if (rows_read != expected_rows_in_group) {
+        return Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR, filename(),
+            row_group_idx, expected_rows_in_group, rows_read);
+      }
+    } else {
+      // In this case we filter out row ranges. Validate that the number of rows read
+      // matches the number of rows determined by the candidate row ranges.
+      int64_t expected_rows_in_group = 0;
+      for (auto& range : candidate_ranges_) {
+        expected_rows_in_group += range.last - range.first + 1;
+      }
+      if (rows_read != expected_rows_in_group) {
+        return Status(Substitute("Based on the page index of group $0($1) there are $2 ",
+            "rows need to be scanned, but $3 rows were read.", filename(), row_group_idx,
+            expected_rows_in_group, rows_read));
+      }
     }
   }
 
@@ -1671,12 +1861,23 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
     // fail if this not the case though, since num_values_read_ is only updated at the end
     // of a data page).
     if (num_values_read == -1) num_values_read = reader->num_values_read_;
-    DCHECK_EQ(reader->num_values_read_, num_values_read);
+    if (candidate_ranges_.empty()) DCHECK_EQ(reader->num_values_read_, num_values_read);
     // ReadDataPage() uses metadata_->num_values to determine when the column's done
-    DCHECK(reader->num_values_read_ == reader->metadata_->num_values ||
-        !state_->abort_on_error());
+    DCHECK(!candidate_ranges_.empty() ||
+        (reader->num_values_read_ == reader->metadata_->num_values ||
+        !state_->abort_on_error()));
   }
   return Status::OK();
+}
+
+ColumnStatsReader HdfsParquetScanner::CreateColumnStatsReader(
+    const parquet::ColumnChunk& col_chunk, const ColumnType& col_type,
+    const parquet::ColumnOrder* col_order, const parquet::SchemaElement& element) {
+  ColumnStatsReader stats_reader(col_chunk, col_type, col_order, element);
+  if (col_type.IsTimestampType()) {
+    stats_reader.SetTimestampDecoder(CreateTimestampDecoder(element));
+  }
+  return stats_reader;
 }
 
 ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
@@ -1697,4 +1898,5 @@ void HdfsParquetScanner::UpdateUncompressedPageSizeCounter(
     int64_t uncompressed_page_size) {
   parquet_uncompressed_page_size_counter_->UpdateCounter(uncompressed_page_size);
 }
+
 }

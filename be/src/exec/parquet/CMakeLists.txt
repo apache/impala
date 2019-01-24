@@ -34,11 +34,14 @@ add_library(Parquet
   parquet-level-decoder.cc
   parquet-metadata-utils.cc
   parquet-common.cc
+  parquet-page-index.cc
 )
 
 add_dependencies(Parquet gen-deps)
 
 ADD_BE_LSAN_TEST(parquet-bool-decoder-test)
+ADD_BE_LSAN_TEST(parquet-common-test)
+ADD_BE_LSAN_TEST(parquet-page-index-test)
 ADD_BE_LSAN_TEST(parquet-plain-test)
 ADD_BE_LSAN_TEST(parquet-version-test)
 ADD_BE_LSAN_TEST(hdfs-parquet-scanner-test)

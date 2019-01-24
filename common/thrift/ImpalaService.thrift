@@ -385,6 +385,11 @@ enum TImpalaQueryOptions {
   // Valid values: INT96_NANOS, INT64_MILLIS, INT64_MICROS, INT64_NANOS
   // Default: INT96_NANOS
   PARQUET_TIMESTAMP_TYPE = 79
+
+  // Enable using the Parquet page index during scans. The page index contains min/max
+  // statistics at page-level granularity. It can be used to skip pages and rows during
+  // scanning.
+  PARQUET_READ_PAGE_INDEX = 80
 }
 
 // The summary of a DML statement.

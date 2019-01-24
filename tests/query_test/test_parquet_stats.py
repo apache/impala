@@ -73,3 +73,27 @@ class TestParquetStats(ImpalaTestSuite):
     NaNs, therefore we need to ignore them"""
     create_table_from_parquet(self.client, unique_database, 'min_max_is_nan')
     self.run_test_case('QueryTest/parquet-invalid-minmax-stats', vector, unique_database)
+
+  def test_page_index(self, vector, unique_database):
+    """Test that using the Parquet page index works well. The various test files
+    contain queries that exercise the page selection and value-skipping logic against
+    columns with different types and encodings."""
+    create_table_from_parquet(self.client, unique_database, 'decimals_1_10')
+    create_table_from_parquet(self.client, unique_database, 'nested_decimals')
+    create_table_from_parquet(self.client, unique_database, 'double_nested_decimals')
+    create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages')
+    create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages_plain')
+
+    for batch_size in [0, 1]:
+      vector.get_value('exec_option')['batch_size'] = batch_size
+      self.run_test_case('QueryTest/parquet-page-index', vector, unique_database)
+      self.run_test_case('QueryTest/nested-types-parquet-page-index', vector,
+                         unique_database)
+      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages', vector,
+                         unique_database)
+      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages-plain', vector,
+                         unique_database)
+
+    for batch_size in [0, 32]:
+      vector.get_value('exec_option')['batch_size'] = batch_size
+      self.run_test_case('QueryTest/parquet-page-index-large', vector, unique_database)

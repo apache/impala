@@ -339,6 +339,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift.
   80: optional TParquetTimestampType parquet_timestamp_type =
       TParquetTimestampType.INT96_NANOS;
+
+  // See comment in ImpalaService.thrift.
+  81: optional bool parquet_read_page_index = true;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

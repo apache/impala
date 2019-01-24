@@ -1,0 +1,704 @@
+# These tests check that the page selection and value value-skipping logic works well
+# for nested types. 'nested_decimals' contains an array column of decimals.
+# 'double_nested_decimals' contains an array of arrays of decimals column They are
+# created in a way to have tiny, misaligned pages.
+# The result set checks that the reading and skipping of values went well. And via
+# on the runtime profile check we can verify that we used the page index properly.
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 1
+---- RESULTS
+1,0,1
+1,1,1
+1,2,1
+1,0,1
+1,0,NULL
+1,1,NULL
+1,2,NULL
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 2
+---- RESULTS
+2,0,2
+2,1,2
+2,2,2
+2,0,2
+2,1,2
+2,0,2
+2,1,NULL
+2,2,NULL
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 3
+---- RESULTS
+3,0,3
+3,1,3
+3,2,3
+3,0,3
+3,1,3
+3,2,3
+3,0,3
+3,1,NULL
+3,2,3
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 4
+---- RESULTS
+4,0,4
+4,1,4
+4,2,4
+4,0,4
+4,1,4
+4,2,4
+4,3,4
+4,0,NULL
+4,1,4
+4,2,4
+4,3,NULL
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 5
+---- RESULTS
+5,0,5
+5,1,5
+5,2,5
+5,0,5
+5,1,5
+5,2,5
+5,3,5
+5,4,5
+5,0,NULL
+5,1,5
+5,2,NULL
+5,3,NULL
+5,4,5
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 6
+---- RESULTS
+6,0,6
+6,1,NULL
+6,2,6
+6,0,NULL
+6,1,NULL
+6,2,NULL
+6,3,6
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 21
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 7
+---- RESULTS
+7,0,7
+7,1,7
+7,2,7
+7,3,NULL
+7,0,7
+7,1,7
+7,2,7
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 21
+====
+---- QUERY
+# Test value-skipping logic by selecting a single top-level row from each page.
+# Skipping other rows.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 = 8
+---- RESULTS
+8,0,NULL
+8,1,NULL
+8,2,8
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 22
+====
+---- QUERY
+# Selecting the first rows from the pages.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 < 3
+---- RESULTS
+1,0,1
+1,1,1
+1,2,1
+2,0,2
+2,1,2
+2,2,2
+1,0,1
+2,0,2
+2,1,2
+1,0,NULL
+1,1,NULL
+1,2,NULL
+2,0,2
+2,1,NULL
+2,2,NULL
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 15
+====
+---- QUERY
+# Selecting the last rows from the pages.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 > 2 and d_38 < 6
+---- RESULTS
+3,0,3
+3,1,3
+3,2,3
+4,0,4
+4,1,4
+4,2,4
+5,0,5
+5,1,5
+5,2,5
+3,0,3
+3,1,3
+3,2,3
+4,0,4
+4,1,4
+4,2,4
+4,3,4
+5,0,5
+5,1,5
+5,2,5
+5,3,5
+5,4,5
+3,0,3
+3,1,NULL
+3,2,3
+4,0,NULL
+4,1,4
+4,2,4
+4,3,NULL
+5,0,NULL
+5,1,5
+5,2,NULL
+5,3,NULL
+5,4,5
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 12
+====
+---- QUERY
+# This query selects the first and last rows from a page, so it tests the case
+# when we read, skip, and read values.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 > 5 and d_38 < 8
+---- RESULTS
+6,0,6
+6,1,NULL
+6,2,6
+7,0,7
+7,1,7
+7,2,7
+7,3,NULL
+7,0,7
+7,1,7
+7,2,7
+6,0,NULL
+6,1,NULL
+6,2,NULL
+6,3,6
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 19
+====
+---- QUERY
+# Selecting middle rows from a page.
+select d_38, pos, item from nested_decimals n, n.arr where d_38 > 6
+---- RESULTS
+7,0,7
+7,1,7
+7,2,7
+7,3,NULL
+8,0,NULL
+8,1,NULL
+8,2,8
+7,0,7
+7,1,7
+7,2,7
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 20
+====
+---- QUERY
+# Filtering based on nested value.
+select d_38, pos, item from nested_decimals n, n.arr where item = 1
+---- RESULTS
+1,0,1
+1,1,1
+1,2,1
+1,0,1
+---- TYPES
+DECIMAL, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 12
+====
+---- QUERY
+# Only selecting the nested item and its position. The Parquet scanner reads
+# the values in batches in this case.
+select pos, item from nested_decimals.arr where item < 3
+---- RESULTS
+0,1
+1,1
+2,1
+0,2
+1,2
+2,2
+0,1
+0,2
+1,2
+0,2
+---- TYPES
+BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 1
+====
+---- QUERY
+# Only selecting the nested item and its position. The Parquet scanner reads
+# the values in batches in this case.
+select pos, item from nested_decimals.arr where item < 8 and item > 5
+---- RESULTS
+0,6
+2,6
+0,7
+1,7
+2,7
+0,7
+1,7
+2,7
+3,6
+---- TYPES
+BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 3
+====
+---- QUERY
+# Only selecting the nested item and its position. The Parquet scanner reads
+# the values in batches in this case.
+select pos, item from nested_decimals.arr where item = 8
+---- RESULTS
+2,8
+---- TYPES
+BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 3
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 1
+---- RESULTS
+1,0,0,1
+1,0,1,1
+1,0,0,1
+1,1,0,1
+1,2,0,1
+1,0,0,1
+1,0,0,1
+1,1,0,1
+1,2,0,1
+1,0,0,1
+1,1,0,1
+1,1,1,1
+1,0,0,NULL
+1,1,0,NULL
+1,2,0,1
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 30
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 2
+---- RESULTS
+2,0,0,2
+2,0,1,2
+2,0,0,2
+2,1,0,2
+2,0,0,2
+2,1,0,2
+2,0,0,2
+2,1,0,2
+2,0,0,2
+2,0,0,NULL
+2,1,0,NULL
+2,2,0,NULL
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 30
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 3
+---- RESULTS
+3,0,0,3
+3,0,1,3
+3,0,2,3
+3,0,0,3
+3,1,0,3
+3,2,0,3
+3,0,0,3
+3,1,0,3
+3,2,0,3
+3,0,0,3
+3,0,0,3
+3,0,1,3
+3,1,0,3
+3,0,0,NULL
+3,1,0,3
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 30
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 4
+---- RESULTS
+4,0,0,4
+4,0,1,4
+4,0,2,4
+4,0,0,4
+4,1,0,4
+4,0,0,4
+4,1,0,4
+4,0,0,4
+4,1,0,4
+4,0,0,4
+4,1,0,4
+4,1,1,4
+4,2,0,4
+4,2,0,NULL
+4,2,1,NULL
+4,2,2,NULL
+4,2,3,NULL
+4,2,4,NULL
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 30
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 5
+---- RESULTS
+5,0,0,5
+5,0,1,5
+5,0,2,5
+5,0,0,5
+5,1,0,5
+5,0,0,5
+5,0,0,5
+5,1,0,5
+5,2,0,5
+5,0,0,5
+5,1,0,5
+5,2,0,5
+5,0,0,NULL
+5,0,1,5
+5,0,2,NULL
+5,0,3,NULL
+5,0,4,NULL
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 30
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 6
+---- RESULTS
+6,0,0,6
+6,0,1,NULL
+6,1,0,6
+6,0,0,NULL
+6,0,1,NULL
+6,0,2,6
+6,1,0,NULL
+6,1,1,6
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 39
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 7
+---- RESULTS
+7,0,0,7
+7,0,1,7
+7,0,0,7
+7,0,1,NULL
+7,1,0,7
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 39
+====
+---- QUERY
+# Selecting one top-level row from a table that has a double-nested column.
+# Skipping all other rows.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 = 8
+---- RESULTS
+8,0,0,NULL
+8,0,1,NULL
+8,0,2,8
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 40
+====
+---- QUERY
+# Selecting frist couple of rows from the pages.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 < 3
+---- RESULTS
+1,0,0,1
+1,0,1,1
+2,0,0,2
+2,0,1,2
+1,0,0,1
+1,1,0,1
+1,2,0,1
+2,0,0,2
+2,1,0,2
+1,0,0,1
+2,0,0,2
+2,1,0,2
+1,0,0,1
+1,1,0,1
+1,2,0,1
+2,0,0,2
+2,1,0,2
+1,0,0,1
+1,1,0,1
+1,1,1,1
+2,0,0,2
+1,0,0,NULL
+1,1,0,NULL
+1,2,0,1
+2,0,0,NULL
+2,1,0,NULL
+2,2,0,NULL
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 24
+====
+---- QUERY
+# Selecting last couple of rows from the pages.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 > 2 and d_38 < 6
+---- RESULTS
+3,0,0,3
+3,0,1,3
+3,0,2,3
+4,0,0,4
+4,0,1,4
+4,0,2,4
+5,0,0,5
+5,0,1,5
+5,0,2,5
+3,0,0,3
+3,1,0,3
+3,2,0,3
+4,0,0,4
+4,1,0,4
+5,0,0,5
+5,1,0,5
+3,0,0,3
+3,1,0,3
+3,2,0,3
+4,0,0,4
+4,1,0,4
+5,0,0,5
+3,0,0,3
+4,0,0,4
+4,1,0,4
+5,0,0,5
+5,1,0,5
+5,2,0,5
+3,0,0,3
+3,0,1,3
+3,1,0,3
+4,0,0,4
+4,1,0,4
+4,1,1,4
+4,2,0,4
+5,0,0,5
+5,1,0,5
+5,2,0,5
+3,0,0,NULL
+3,1,0,3
+4,2,0,NULL
+4,2,1,NULL
+4,2,2,NULL
+4,2,3,NULL
+4,2,4,NULL
+5,0,0,NULL
+5,0,1,5
+5,0,2,NULL
+5,0,3,NULL
+5,0,4,NULL
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 18
+====
+---- QUERY
+# This query selects the first and last rows from a page, so it tests the case
+# when we read, then skip, then we read again from a page.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 > 5 and d_38 < 8
+---- RESULTS
+6,0,0,6
+6,0,1,NULL
+6,1,0,6
+7,0,0,7
+7,0,1,7
+7,0,0,7
+7,0,1,NULL
+7,1,0,7
+6,0,0,NULL
+6,0,1,NULL
+6,0,2,6
+6,1,0,NULL
+6,1,1,6
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 37
+====
+---- QUERY
+# Selecting middle rows from a page. So the scanner needs to skip, then read,
+# then skip again.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where d_38 > 6
+---- RESULTS
+7,0,0,7
+7,0,1,7
+8,0,0,NULL
+8,0,1,NULL
+8,0,2,8
+7,0,0,7
+7,0,1,NULL
+7,1,0,7
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 38
+====
+---- QUERY
+# Selecting rows based on the innermost item. Tests whether the page index works for
+# nested columns.
+select d_38, a1.pos, a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where a2.item = 1
+---- RESULTS
+1,0,0,1
+1,0,1,1
+1,0,0,1
+1,1,0,1
+1,2,0,1
+1,0,0,1
+1,0,0,1
+1,1,0,1
+1,2,0,1
+1,0,0,1
+1,1,0,1
+1,1,1,1
+1,2,0,1
+---- TYPES
+DECIMAL, BIGINT, BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 6
+====
+---- QUERY
+# Only selecting the innermost item and its position column. The Parquet scanner reads
+# the values in batches in this case.
+select a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where a2.item = 2
+---- RESULTS
+0,2
+1,2
+0,2
+0,2
+0,2
+0,2
+0,2
+0,2
+0,2
+---- TYPES
+BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 1
+====
+---- QUERY
+# Only selecting the innermost item and its position column. The Parquet scanner reads
+# the values in batches in this case.
+select a2.pos, a2.item from double_nested_decimals d, d.arr a1, a1.item a2
+where a2.item > 5 and a2.item < 7
+---- RESULTS
+0,6
+0,6
+2,6
+1,6
+---- TYPES
+BIGINT, DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 6
+====

@@ -1,0 +1,357 @@
+# Test page selection and value skipping logic on a large table such as 'lineitem'.
+# Queries have predicates on different columns, might have multiple predicates
+# joined by AND. This way we can test how page filtering combines these predicates
+# to filter out even more rows.
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_orderkey < 50
+---- RESULTS
+1,155190,7706,1,17.00,21168.23,0.04,0.02,'N','O','1996-03-13','1996-02-12','1996-03-22','DELIVER IN PERSON','TRUCK','egular courts above the'
+1,67310,7311,2,36.00,45983.16,0.09,0.06,'N','O','1996-04-12','1996-02-28','1996-04-20','TAKE BACK RETURN','MAIL','ly final dependencies: slyly bold '
+1,63700,3701,3,8.00,13309.60,0.10,0.02,'N','O','1996-01-29','1996-03-05','1996-01-31','TAKE BACK RETURN','REG AIR','riously. regular, express dep'
+1,2132,4633,4,28.00,28955.64,0.09,0.06,'N','O','1996-04-21','1996-03-30','1996-05-16','NONE','AIR','lites. fluffily even de'
+1,24027,1534,5,24.00,22824.48,0.10,0.04,'N','O','1996-03-30','1996-03-14','1996-04-01','NONE','FOB',' pending foxes. slyly re'
+1,15635,638,6,32.00,49620.16,0.07,0.02,'N','O','1996-01-30','1996-02-07','1996-02-03','DELIVER IN PERSON','MAIL','arefully slyly ex'
+2,106170,1191,1,38.00,44694.46,0.00,0.05,'N','O','1997-01-28','1997-01-14','1997-02-02','TAKE BACK RETURN','RAIL','ven requests. deposits breach a'
+3,4297,1798,1,45.00,54058.05,0.06,0.00,'R','F','1994-02-02','1994-01-04','1994-02-23','NONE','AIR','ongside of the furiously brave acco'
+3,19036,6540,2,49.00,46796.47,0.10,0.00,'R','F','1993-11-09','1993-12-20','1993-11-24','TAKE BACK RETURN','RAIL',' unusual accounts. eve'
+3,128449,3474,3,27.00,39890.88,0.06,0.07,'A','F','1994-01-16','1993-11-22','1994-01-23','DELIVER IN PERSON','SHIP','nal foxes wake. '
+3,29380,1883,4,2.00,2618.76,0.01,0.06,'A','F','1993-12-04','1994-01-07','1994-01-01','NONE','TRUCK','y. fluffily pending d'
+3,183095,650,5,28.00,32986.52,0.04,0.00,'R','F','1993-12-14','1994-01-10','1994-01-01','TAKE BACK RETURN','FOB','ages nag slyly pending'
+3,62143,9662,6,26.00,28733.64,0.10,0.02,'A','F','1993-10-29','1993-12-18','1993-11-04','TAKE BACK RETURN','RAIL','ges sleep after the caref'
+4,88035,5560,1,30.00,30690.90,0.03,0.08,'N','O','1996-01-10','1995-12-14','1996-01-18','DELIVER IN PERSON','REG AIR','- quickly regular packages sleep. idly'
+5,108570,8571,1,15.00,23678.55,0.02,0.04,'R','F','1994-10-31','1994-08-31','1994-11-20','NONE','AIR','ts wake furiously '
+5,123927,3928,2,26.00,50723.92,0.07,0.08,'R','F','1994-10-16','1994-09-25','1994-10-19','NONE','FOB','sts use slyly quickly special instruc'
+5,37531,35,3,50.00,73426.50,0.08,0.03,'A','F','1994-08-08','1994-10-13','1994-08-26','DELIVER IN PERSON','AIR','eodolites. fluffily unusual'
+6,139636,2150,1,37.00,61998.31,0.08,0.03,'A','F','1992-04-27','1992-05-15','1992-05-02','TAKE BACK RETURN','TRUCK','p furiously special foxes'
+7,182052,9607,1,12.00,13608.60,0.07,0.03,'N','O','1996-05-07','1996-03-13','1996-06-03','TAKE BACK RETURN','FOB','ss pinto beans wake against th'
+7,145243,7758,2,9.00,11594.16,0.08,0.08,'N','O','1996-02-01','1996-03-02','1996-02-19','TAKE BACK RETURN','SHIP','es. instructions'
+7,94780,9799,3,46.00,81639.88,0.10,0.07,'N','O','1996-01-15','1996-03-27','1996-02-03','COLLECT COD','MAIL',' unusual reques'
+7,163073,3074,4,28.00,31809.96,0.03,0.04,'N','O','1996-03-21','1996-04-08','1996-04-20','NONE','FOB','. slyly special requests haggl'
+7,151894,9440,5,38.00,73943.82,0.08,0.01,'N','O','1996-02-11','1996-02-24','1996-02-18','DELIVER IN PERSON','TRUCK','ns haggle carefully ironic deposits. bl'
+7,79251,1759,6,35.00,43058.75,0.06,0.03,'N','O','1996-01-16','1996-02-23','1996-01-22','TAKE BACK RETURN','FOB','jole. excuses wake carefully alongside of '
+7,157238,2269,7,5.00,6476.15,0.04,0.02,'N','O','1996-02-10','1996-03-26','1996-02-13','NONE','FOB','ithely regula'
+32,82704,7721,1,28.00,47227.60,0.05,0.08,'N','O','1995-10-23','1995-08-27','1995-10-26','TAKE BACK RETURN','TRUCK','sleep quickly. req'
+32,197921,441,2,32.00,64605.44,0.02,0.00,'N','O','1995-08-14','1995-10-07','1995-08-27','COLLECT COD','AIR','lithely regular deposits. fluffily '
+32,44161,6666,3,2.00,2210.32,0.09,0.02,'N','O','1995-08-07','1995-10-07','1995-08-23','DELIVER IN PERSON','AIR',' express accounts wake according to the'
+32,2743,7744,4,4.00,6582.96,0.09,0.03,'N','O','1995-08-04','1995-10-01','1995-09-03','NONE','REG AIR','e slyly final pac'
+32,85811,8320,5,44.00,79059.64,0.05,0.06,'N','O','1995-08-28','1995-08-20','1995-09-14','DELIVER IN PERSON','AIR','symptotes nag according to the ironic depo'
+32,11615,4117,6,6.00,9159.66,0.04,0.03,'N','O','1995-07-21','1995-09-23','1995-07-25','COLLECT COD','RAIL',' gifts cajole carefully.'
+33,61336,8855,1,31.00,40217.23,0.09,0.04,'A','F','1993-10-29','1993-12-19','1993-11-08','COLLECT COD','TRUCK','ng to the furiously ironic package'
+33,60519,5532,2,32.00,47344.32,0.02,0.05,'A','F','1993-12-09','1994-01-04','1993-12-28','COLLECT COD','MAIL','gular theodolites'
+33,137469,9983,3,5.00,7532.30,0.05,0.03,'A','F','1993-12-09','1993-12-25','1993-12-23','TAKE BACK RETURN','AIR','. stealthily bold exc'
+33,33918,3919,4,41.00,75928.31,0.09,0.00,'R','F','1993-11-09','1994-01-24','1993-11-11','TAKE BACK RETURN','MAIL','unusual packages doubt caref'
+34,88362,871,1,13.00,17554.68,0.00,0.07,'N','O','1998-10-23','1998-09-14','1998-11-06','NONE','REG AIR','nic accounts. deposits are alon'
+34,89414,1923,2,22.00,30875.02,0.08,0.06,'N','O','1998-10-09','1998-10-16','1998-10-12','NONE','FOB','thely slyly p'
+34,169544,4577,3,6.00,9681.24,0.02,0.06,'N','O','1998-10-30','1998-09-20','1998-11-05','NONE','FOB','ar foxes sleep '
+35,450,2951,1,24.00,32410.80,0.02,0.00,'N','O','1996-02-21','1996-01-03','1996-03-18','TAKE BACK RETURN','FOB',', regular tithe'
+35,161940,4457,2,34.00,68065.96,0.06,0.08,'N','O','1996-01-22','1996-01-06','1996-01-27','DELIVER IN PERSON','RAIL','s are carefully against the f'
+35,120896,8433,3,7.00,13418.23,0.06,0.04,'N','O','1996-01-19','1995-12-22','1996-01-29','NONE','MAIL',' the carefully regular '
+35,85175,7684,4,25.00,29004.25,0.06,0.05,'N','O','1995-11-26','1995-12-25','1995-12-21','DELIVER IN PERSON','SHIP',' quickly unti'
+35,119917,4940,5,34.00,65854.94,0.08,0.06,'N','O','1995-11-08','1996-01-15','1995-11-26','COLLECT COD','MAIL','. silent, unusual deposits boost'
+35,30762,3266,6,28.00,47397.28,0.03,0.02,'N','O','1996-02-01','1995-12-24','1996-02-28','COLLECT COD','RAIL','ly alongside of '
+36,119767,9768,1,42.00,75043.92,0.09,0.00,'N','O','1996-02-03','1996-01-21','1996-02-23','COLLECT COD','SHIP',' careful courts. special '
+37,22630,5133,1,40.00,62105.20,0.09,0.03,'A','F','1992-07-21','1992-08-01','1992-08-15','NONE','REG AIR','luffily regular requests. slyly final acco'
+37,126782,1807,2,39.00,70542.42,0.05,0.02,'A','F','1992-07-02','1992-08-18','1992-07-28','TAKE BACK RETURN','RAIL','the final requests. ca'
+37,12903,5405,3,43.00,78083.70,0.05,0.08,'A','F','1992-07-10','1992-07-06','1992-08-02','DELIVER IN PERSON','TRUCK','iously ste'
+38,175839,874,1,44.00,84252.52,0.04,0.02,'N','O','1996-09-29','1996-11-17','1996-09-30','COLLECT COD','MAIL','s. blithely unusual theodolites am'
+39,2320,9821,1,44.00,53782.08,0.09,0.06,'N','O','1996-11-14','1996-12-15','1996-12-12','COLLECT COD','RAIL','eodolites. careful'
+39,186582,4137,2,26.00,43383.08,0.08,0.04,'N','O','1996-11-04','1996-10-20','1996-11-20','NONE','FOB','ckages across the slyly silent'
+39,67831,5350,3,46.00,82746.18,0.06,0.08,'N','O','1996-09-26','1996-12-19','1996-10-26','DELIVER IN PERSON','AIR','he carefully e'
+39,20590,3093,4,32.00,48338.88,0.07,0.05,'N','O','1996-10-02','1996-12-19','1996-10-14','COLLECT COD','MAIL','heodolites sleep silently pending foxes. ac'
+39,54519,9530,5,43.00,63360.93,0.01,0.01,'N','O','1996-10-17','1996-11-14','1996-10-26','COLLECT COD','MAIL','yly regular i'
+39,94368,6878,6,40.00,54494.40,0.06,0.05,'N','O','1996-12-08','1996-10-22','1997-01-01','COLLECT COD','AIR','quickly ironic fox'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_orderkey > 5999950
+---- RESULTS
+5999968,143161,8190,1,13.00,15654.08,0.04,0.06,'A','F','1993-01-03','1993-03-13','1993-01-05','DELIVER IN PERSON','RAIL','ickly bold foxes. blithely f'
+5999968,94639,4640,2,41.00,66978.83,0.08,0.07,'A','F','1993-01-15','1993-03-04','1993-02-08','NONE','TRUCK','yly express ideas. r'
+5999968,183011,3012,3,48.00,52512.48,0.01,0.00,'A','F','1993-04-16','1993-02-10','1993-04-29','COLLECT COD','MAIL','tions after the blithely express instru'
+5999968,58218,5734,4,48.00,56458.08,0.02,0.07,'A','F','1993-04-08','1993-03-24','1993-04-10','NONE','TRUCK','nd the carefully bold pinto beans. flu'
+5999968,55929,5930,5,38.00,71626.96,0.10,0.00,'A','F','1993-01-14','1993-02-12','1993-01-31','DELIVER IN PERSON','REG AIR','ions. slyl'
+5999968,182919,474,6,41.00,82078.31,0.03,0.02,'A','F','1993-03-24','1993-02-16','1993-04-01','DELIVER IN PERSON','FOB','ctions are furiously unusual hockey playe'
+5999968,103669,3670,7,10.00,16726.60,0.08,0.03,'A','F','1993-03-12','1993-02-19','1993-04-09','TAKE BACK RETURN','REG AIR','slyly final instructio'
+5999969,157685,7686,1,15.00,26140.20,0.00,0.02,'N','O','1996-09-11','1996-07-22','1996-10-07','NONE','SHIP','ep slyly brave in'
+5999970,51044,8560,1,22.00,21890.88,0.00,0.08,'N','O','1995-11-25','1996-02-09','1995-12-04','DELIVER IN PERSON','RAIL','theodolites. express, ironic fox'
+5999970,82081,2082,2,49.00,52090.92,0.04,0.08,'N','O','1995-12-23','1996-02-16','1996-01-04','TAKE BACK RETURN','SHIP','at quickly furiously expres'
+5999970,123008,545,3,32.00,32992.00,0.05,0.07,'N','O','1995-12-11','1996-01-06','1995-12-27','NONE','FOB','iously along '
+5999970,184826,4827,4,6.00,11464.92,0.09,0.01,'N','O','1996-02-08','1996-02-09','1996-02-15','COLLECT COD','FOB','slyly regular requests sleep '
+5999970,167769,2802,5,38.00,69796.88,0.03,0.04,'N','O','1996-02-28','1996-01-12','1996-03-06','DELIVER IN PERSON','FOB','ve the clos'
+5999971,30247,2751,1,40.00,47089.60,0.09,0.01,'N','O','1996-10-02','1996-08-23','1996-10-09','COLLECT COD','REG AIR','lly according '
+5999971,144823,4824,2,38.00,70977.16,0.08,0.03,'N','O','1996-11-13','1996-09-04','1996-11-20','DELIVER IN PERSON','FOB','e blithely after the carefully pending '
+5999971,33994,9001,3,49.00,94471.51,0.03,0.02,'N','O','1996-08-30','1996-08-27','1996-09-16','NONE','MAIL',' promise for the blithely r'
+5999971,132903,2904,4,19.00,36782.10,0.09,0.01,'N','O','1996-11-02','1996-09-02','1996-11-25','TAKE BACK RETURN','RAIL','ckly above the boldly '
+5999971,97922,7923,5,28.00,53757.76,0.10,0.06,'N','O','1996-09-20','1996-08-29','1996-10-05','TAKE BACK RETURN','REG AIR','place of the slyly quick pla'
+5999971,161882,6915,6,15.00,29158.20,0.03,0.00,'N','O','1996-10-19','1996-08-24','1996-10-28','DELIVER IN PERSON','RAIL','luffy theodolites nag boldly bli'
+5999972,102942,473,1,33.00,64183.02,0.06,0.05,'N','O','1996-05-26','1996-06-28','1996-05-29','NONE','MAIL','s maintain carefully among the'
+5999972,133109,8136,2,44.00,50252.40,0.08,0.00,'N','O','1996-05-24','1996-07-22','1996-05-27','COLLECT COD','RAIL',' the furiously express pearls. furi'
+5999972,152761,2762,3,3.00,5441.28,0.04,0.01,'N','O','1996-08-31','1996-06-02','1996-09-22','DELIVER IN PERSON','MAIL','sual accounts al'
+5999973,176345,1380,1,50.00,71067.00,0.04,0.01,'N','O','1997-07-27','1997-09-07','1997-08-10','TAKE BACK RETURN','FOB','gular excuses. '
+5999974,25360,5361,1,24.00,30848.64,0.02,0.03,'R','F','1993-08-15','1993-10-07','1993-09-01','COLLECT COD','MAIL','express dependencies. express, pendi'
+5999974,10463,5466,2,46.00,63179.16,0.08,0.06,'R','F','1993-09-16','1993-09-21','1993-10-02','COLLECT COD','RAIL','dolites wake'
+5999975,7272,2273,1,32.00,37736.64,0.07,0.01,'R','F','1993-10-07','1993-09-30','1993-10-21','COLLECT COD','REG AIR','tructions. excu'
+5999975,6452,1453,2,7.00,9509.15,0.04,0.00,'A','F','1993-11-02','1993-09-23','1993-11-19','DELIVER IN PERSON','SHIP','lar pinto beans aft'
+5999975,37131,2138,3,18.00,19226.34,0.04,0.01,'A','F','1993-11-17','1993-08-28','1993-12-08','DELIVER IN PERSON','FOB',', quick deposits. ironic, unusual deposi'
+6000000,32255,2256,1,5.00,5936.25,0.04,0.03,'N','O','1996-11-02','1996-11-19','1996-12-01','TAKE BACK RETURN','MAIL','carefully '
+6000000,96127,6128,2,28.00,31447.36,0.01,0.02,'N','O','1996-09-22','1996-10-01','1996-10-21','NONE','AIR','ooze furiously about the pe'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_orderkey > 3999950 and l_orderkey < 4000000
+---- RESULTS
+3999968,135583,5584,1,43.00,69598.94,0.02,0.07,'A','F','1993-10-03','1993-10-15','1993-10-22','TAKE BACK RETURN','MAIL','losely final dolphins alongside o'
+3999968,126704,9217,2,11.00,19037.70,0.04,0.07,'R','F','1993-11-27','1993-11-27','1993-12-16','NONE','RAIL','n ideas; enticing, expres'
+3999968,106138,6139,3,26.00,29747.38,0.02,0.01,'A','F','1993-09-29','1993-11-06','1993-10-17','COLLECT COD','SHIP','ng excuses are carefully'
+3999968,47967,2976,4,42.00,80428.32,0.03,0.05,'A','F','1993-09-27','1993-10-11','1993-10-08','COLLECT COD','RAIL','es use carefully with the silent '
+3999969,48082,3091,1,33.00,33992.64,0.06,0.02,'R','F','1993-10-13','1993-09-07','1993-11-12','NONE','SHIP','ronic accounts'
+3999970,50866,8382,1,36.00,65406.96,0.04,0.03,'N','O','1995-08-25','1995-09-16','1995-09-10','TAKE BACK RETURN','MAIL',' hockey players. fluffily even accounts'
+3999970,95116,135,2,12.00,13333.32,0.01,0.00,'N','O','1995-10-23','1995-11-07','1995-11-09','NONE','FOB','to the furiously regular deposits. s'
+3999971,64290,1809,1,8.00,10034.32,0.09,0.02,'R','F','1993-08-29','1993-07-17','1993-09-02','DELIVER IN PERSON','MAIL','lithely ironic reques'
+3999971,110171,172,2,29.00,34253.93,0.04,0.02,'R','F','1993-07-30','1993-08-08','1993-08-17','TAKE BACK RETURN','AIR','xpress requests. unusual accounts cajol'
+3999971,43521,8530,3,14.00,20503.28,0.06,0.06,'A','F','1993-07-11','1993-08-09','1993-07-24','NONE','RAIL','arefully pending theodolites. carefu'
+3999971,50396,2902,4,36.00,48470.04,0.00,0.01,'R','F','1993-06-02','1993-07-20','1993-06-21','DELIVER IN PERSON','RAIL','ironic, ironic deposits. ir'
+3999971,196039,6040,5,26.00,29510.78,0.07,0.02,'R','F','1993-08-08','1993-08-23','1993-08-09','COLLECT COD','SHIP','lithely blithely regular foxes. carefully'
+3999971,25817,5818,6,18.00,31370.58,0.02,0.06,'R','F','1993-06-15','1993-08-28','1993-07-12','COLLECT COD','AIR','dependencies wake c'
+3999972,118670,1182,1,7.00,11820.69,0.03,0.02,'N','O','1998-07-19','1998-06-28','1998-08-14','NONE','REG AIR','bove the furiously regular ideas haggle '
+3999972,86248,8757,2,9.00,11108.16,0.06,0.02,'N','O','1998-08-17','1998-06-09','1998-08-19','DELIVER IN PERSON','RAIL','ly final deposits wake fluffily ac'
+3999972,155174,5175,3,38.00,46708.46,0.08,0.01,'N','O','1998-05-13','1998-06-20','1998-06-04','COLLECT COD','RAIL','ans wake furiously. bl'
+3999973,184250,9287,1,30.00,40027.50,0.10,0.03,'R','F','1992-06-10','1992-07-05','1992-06-26','TAKE BACK RETURN','TRUCK',' sentiments sleep quickly after the blithel'
+3999973,75652,667,2,41.00,66733.65,0.02,0.08,'A','F','1992-07-25','1992-08-11','1992-08-21','TAKE BACK RETURN','RAIL','ithely ironic instructions. bold '
+3999973,81373,6390,3,36.00,48757.32,0.00,0.01,'R','F','1992-06-08','1992-06-28','1992-07-02','TAKE BACK RETURN','FOB','thely around the'
+3999973,33236,5740,4,13.00,15199.99,0.02,0.03,'R','F','1992-06-07','1992-07-03','1992-06-21','TAKE BACK RETURN','TRUCK','nal accounts. express requests snoo'
+3999973,192614,5134,5,36.00,61437.96,0.10,0.04,'R','F','1992-05-24','1992-07-08','1992-06-06','TAKE BACK RETURN','FOB','ly express platelets haggle'
+3999974,37722,2729,1,29.00,48131.88,0.01,0.05,'A','F','1994-12-18','1994-10-01','1994-12-23','DELIVER IN PERSON','FOB','pending packages u'
+3999974,191924,1925,2,14.00,28222.88,0.02,0.06,'R','F','1994-10-27','1994-10-18','1994-11-20','TAKE BACK RETURN','MAIL','the ironic '
+3999974,55547,558,3,33.00,49583.82,0.01,0.06,'R','F','1994-09-02','1994-10-09','1994-09-13','COLLECT COD','AIR','ar dependencies wake alongsid'
+3999974,165089,122,4,30.00,34622.40,0.02,0.07,'A','F','1994-11-04','1994-11-06','1994-11-25','TAKE BACK RETURN','SHIP','ding excuses. regular reque'
+3999975,11692,6695,1,42.00,67354.98,0.06,0.08,'N','O','1996-06-29','1996-07-23','1996-07-12','COLLECT COD','SHIP','carefully ironic deposits sl'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_partkey < 25 and l_partkey > 23
+---- RESULTS
+1096387,24,7525,3,15.00,13860.30,0.00,0.04,'A','F','1995-02-06','1995-02-19','1995-02-28','NONE','RAIL','r the furiously ironic packages; spec'
+1128579,24,2525,2,23.00,21252.46,0.00,0.02,'R','F','1994-07-03','1994-06-01','1994-07-08','TAKE BACK RETURN','TRUCK','lly ironic packages detect'
+1150310,24,25,4,29.00,26796.58,0.01,0.07,'N','O','1996-05-03','1996-04-16','1996-05-20','COLLECT COD','MAIL','eans sublate quickly'
+3245350,24,2525,3,38.00,35112.76,0.04,0.04,'N','O','1998-05-03','1998-03-17','1998-05-23','NONE','REG AIR','e furiously unusual ac'
+3301445,24,7525,5,7.00,6468.14,0.09,0.06,'N','O','1996-06-03','1996-07-02','1996-06-18','NONE','SHIP','detect carefully ironic, ironic d'
+3331584,24,5025,4,33.00,30492.66,0.06,0.07,'N','O','1997-10-03','1997-08-23','1997-10-31','TAKE BACK RETURN','RAIL','gular pinto beans cajole! quickl'
+2372164,24,2525,1,43.00,39732.86,0.04,0.06,'N','O','1997-12-09','1997-11-27','1998-01-07','NONE','RAIL','ake ruthlessly a'
+4450017,24,2525,1,11.00,10164.22,0.03,0.00,'N','O','1996-04-16','1996-06-12','1996-05-08','COLLECT COD','SHIP','ly even requests wake blithely'
+3490022,24,7525,6,32.00,29568.64,0.03,0.08,'N','O','1996-07-24','1996-07-19','1996-07-27','COLLECT COD','MAIL','ounts. final, special theodolites'
+2474144,24,25,2,40.00,36960.80,0.00,0.08,'A','F','1994-06-26','1994-07-05','1994-07-06','NONE','FOB','ages use blithel'
+5718278,24,2525,6,6.00,5544.12,0.07,0.05,'N','O','1996-08-12','1996-08-23','1996-08-28','TAKE BACK RETURN','REG AIR','o beans sleep. slyly express packages a'
+5745697,24,7525,2,30.00,27720.60,0.02,0.05,'N','O','1998-06-09','1998-05-23','1998-06-17','TAKE BACK RETURN','SHIP','r the regular, final excuses. fluffily bol'
+4663810,24,5025,2,19.00,17556.38,0.08,0.08,'N','O','1996-05-07','1996-02-23','1996-06-01','DELIVER IN PERSON','REG AIR','al pinto beans sublate permanently '
+1502112,24,25,1,22.00,20328.44,0.10,0.07,'R','F','1992-10-29','1992-11-11','1992-11-03','DELIVER IN PERSON','FOB','ideas affix slyly. enticing pinto beans ca'
+324771,24,25,3,21.00,19404.42,0.09,0.00,'N','O','1997-03-07','1997-04-06','1997-03-20','NONE','SHIP','uriously acro'
+3580387,24,25,1,8.00,7392.16,0.09,0.03,'A','F','1993-08-16','1993-09-16','1993-08-22','COLLECT COD','MAIL','into beans eat. furious'
+442278,24,5025,2,12.00,11088.24,0.08,0.05,'N','O','1998-05-28','1998-05-15','1998-06-18','TAKE BACK RETURN','SHIP','requests sleep blithely f'
+5949380,24,25,1,4.00,3696.08,0.01,0.02,'N','O','1998-07-30','1998-06-21','1998-07-31','TAKE BACK RETURN','SHIP','ding instruct'
+2796742,24,7525,1,35.00,32340.70,0.01,0.03,'R','F','1994-04-12','1994-06-07','1994-05-10','COLLECT COD','REG AIR','en, final instructions. '
+2842339,24,7525,5,47.00,43428.94,0.00,0.08,'N','O','1997-10-22','1997-08-25','1997-11-15','NONE','AIR','ickly express excuses. fluf'
+4908453,24,7525,5,10.00,9240.20,0.10,0.06,'A','F','1994-04-04','1994-05-03','1994-04-11','NONE','REG AIR','xpress theodolit'
+3845317,24,5025,7,14.00,12936.28,0.03,0.06,'N','O','1995-11-27','1995-12-01','1995-12-20','NONE','SHIP','tly bold packages sleep against the '
+3870983,24,7525,1,50.00,46201.00,0.08,0.01,'R','F','1993-12-31','1994-01-28','1994-01-07','NONE','REG AIR','nts sublate. quic'
+5040484,24,2525,1,8.00,7392.16,0.04,0.07,'R','F','1995-01-07','1994-12-10','1995-01-26','DELIVER IN PERSON','AIR','iously. regu'
+1853765,24,7525,2,4.00,3696.08,0.00,0.03,'N','O','1996-05-22','1996-05-11','1996-05-30','COLLECT COD','RAIL','totes affix slyly. unusua'
+3135236,24,2525,1,30.00,27720.60,0.04,0.05,'A','F','1992-07-18','1992-08-18','1992-08-16','COLLECT COD','AIR','Tiresias haggle packages. d'
+3954851,24,7525,1,29.00,26796.58,0.10,0.00,'N','O','1997-03-28','1997-05-25','1997-04-26','NONE','FOB',' bold accounts according to the'
+776295,24,25,2,46.00,42504.92,0.08,0.05,'A','F','1994-05-29','1994-06-19','1994-06-04','COLLECT COD','FOB','carefully alongside of t'
+4023489,24,25,1,38.00,35112.76,0.07,0.07,'N','O','1997-07-16','1997-06-06','1997-08-10','TAKE BACK RETURN','AIR','elets. furiously '
+5161861,24,5025,3,45.00,41580.90,0.04,0.08,'N','O','1996-06-04','1996-08-04','1996-06-29','TAKE BACK RETURN','RAIL','sual ideas integrate after the fluffily '
+1996481,24,5025,5,23.00,21252.46,0.04,0.02,'A','F','1995-05-21','1995-04-05','1995-06-07','COLLECT COD','TRUCK','ual requests ar'
+5239172,24,2525,7,37.00,34188.74,0.06,0.03,'N','O','1998-02-22','1998-03-23','1998-03-24','TAKE BACK RETURN','SHIP','encies. furiously regular reques'
+857093,24,2525,2,17.00,15708.34,0.04,0.03,'A','F','1993-01-08','1993-02-04','1993-01-31','NONE','RAIL','ely bold theodolites. special packages '
+908449,24,7525,1,43.00,39732.86,0.09,0.08,'R','F','1993-12-10','1993-11-24','1994-01-06','NONE','MAIL','es affix carefully'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_extendedprice > 104000 and l_extendedprice < 104100
+---- RESULTS
+4326275,195986,8506,3,50.00,104099.00,0.06,0.05,'R','F','1994-06-12','1994-07-15','1994-06-24','NONE','FOB','thely final ideas. foxes'
+4366983,185996,3551,6,50.00,104099.50,0.01,0.05,'R','F','1993-01-16','1993-02-26','1993-01-25','COLLECT COD','RAIL','ructions. evenly bold theodolit'
+4392259,198983,8984,4,50.00,104099.00,0.03,0.01,'N','O','1998-08-13','1998-08-14','1998-09-12','TAKE BACK RETURN','FOB','ependencies wake carefully alongside of '
+1191105,185995,5996,6,50.00,104049.50,0.04,0.02,'R','F','1994-10-12','1994-11-07','1994-10-24','DELIVER IN PERSON','TRUCK','iously packages. unusual, e'
+2482885,190991,3511,2,50.00,104099.50,0.04,0.04,'N','O','1998-02-02','1997-12-15','1998-02-19','NONE','TRUCK','ainst the slyly final '
+338118,192989,2990,2,50.00,104099.00,0.10,0.08,'N','O','1996-01-28','1995-12-21','1996-02-14','NONE','REG AIR','ajole fluffily qui'
+1567104,193987,3988,4,50.00,104049.00,0.03,0.02,'R','F','1992-03-28','1992-04-17','1992-04-11','NONE','MAIL',' regular pains. furiously daring Tiresia'
+1587110,187993,3030,4,50.00,104049.50,0.08,0.05,'N','O','1996-01-27','1996-01-27','1996-02-09','NONE','TRUCK','p blithely silent dugouts. '
+3890689,184997,2552,3,50.00,104099.50,0.07,0.02,'N','O','1997-04-17','1997-03-29','1997-04-28','TAKE BACK RETURN','AIR',' carefully bold deposits nag qu'
+3912326,194986,7506,2,50.00,104049.00,0.01,0.01,'N','F','1995-06-16','1995-05-03','1995-06-25','DELIVER IN PERSON','SHIP','furiously '
+699526,198982,6540,4,50.00,104049.00,0.01,0.05,'N','O','1998-07-26','1998-07-04','1998-08-06','NONE','AIR',' excuses nag blithely against th'
+1756229,197983,7984,3,50.00,104049.00,0.08,0.02,'N','O','1998-06-10','1998-05-03','1998-07-10','DELIVER IN PERSON','AIR','tes alongside of'
+5926503,192989,547,6,50.00,104099.00,0.05,0.00,'N','O','1995-08-24','1995-09-09','1995-08-29','NONE','FOB','jole enticingly careful'
+5014279,194987,2545,3,50.00,104099.00,0.04,0.03,'A','F','1994-02-24','1994-04-17','1994-03-09','TAKE BACK RETURN','TRUCK','its. even, p'
+3997415,187993,3030,1,50.00,104049.50,0.09,0.05,'N','O','1997-03-23','1997-03-09','1997-04-01','NONE','AIR','nal ideas ac'
+910432,182998,8035,3,50.00,104049.50,0.05,0.05,'N','F','1995-06-07','1995-06-16','1995-07-03','NONE','AIR','ross the carefully pending foxes. blithely '
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_comment > 'zzle' and l_quantity < 5
+---- RESULTS
+15046,37324,9828,2,3.00,3783.96,0.03,0.07,'N','O','1997-12-27','1997-11-15','1998-01-19','NONE','MAIL','zzle furiously iron'
+3313831,33790,8797,1,2.00,3447.58,0.02,0.03,'N','O','1997-08-18','1997-10-08','1997-09-03','DELIVER IN PERSON','SHIP','zzle fluffily regular din'
+3345767,116221,3755,1,4.00,4948.88,0.02,0.08,'A','F','1992-07-11','1992-06-19','1992-08-01','DELIVER IN PERSON','REG AIR','zzle furiously pending requests. slyly fina'
+4396290,149387,4416,6,4.00,5745.52,0.04,0.07,'A','F','1993-01-19','1992-12-08','1993-01-26','DELIVER IN PERSON','REG AIR','zzle slyly slyly final excuses. expres'
+4434754,179382,9383,5,3.00,4384.14,0.05,0.07,'A','F','1995-03-02','1995-02-22','1995-03-21','COLLECT COD','MAIL','zzle quickly above the e'
+3384549,33300,8307,6,2.00,2466.60,0.01,0.04,'N','O','1996-12-12','1996-10-08','1996-12-15','TAKE BACK RETURN','TRUCK','zzle enticingly ruthless accounts. pending,'
+3418016,43648,1161,5,4.00,6366.56,0.09,0.04,'N','O','1996-10-08','1996-09-08','1996-11-07','TAKE BACK RETURN','TRUCK','zzle against the theodo'
+222145,56727,4243,1,2.00,3367.44,0.00,0.06,'A','F','1994-09-06','1994-10-10','1994-09-23','TAKE BACK RETURN','MAIL','zzle slyly even ideas. unus'
+3480997,155559,590,2,4.00,6458.20,0.02,0.00,'A','F','1992-05-25','1992-06-26','1992-06-10','DELIVER IN PERSON','RAIL','zzle quickly even requests. ironic ins'
+3492800,143471,8500,5,4.00,6057.88,0.10,0.08,'N','O','1995-06-23','1995-05-30','1995-07-12','NONE','FOB','zzle carefully at t'
+4473636,4016,4017,2,3.00,2760.03,0.00,0.03,'A','F','1994-06-18','1994-07-29','1994-07-01','COLLECT COD','RAIL','zzle blithely. silently bold exc'
+357157,95395,7905,5,4.00,5561.56,0.08,0.07,'N','O','1998-08-13','1998-10-14','1998-08-19','DELIVER IN PERSON','AIR','zzle evenly re'
+3625573,188624,3661,1,1.00,1712.62,0.03,0.02,'A','F','1994-03-29','1994-01-07','1994-04-07','DELIVER IN PERSON','MAIL','zzle after the regular foxes; final'
+2356514,153502,6018,2,3.00,4666.50,0.07,0.05,'N','O','1998-07-13','1998-07-26','1998-07-27','NONE','TRUCK','zzle quickly. requests caj'
+2407269,98969,8970,1,4.00,7871.84,0.00,0.05,'A','F','1993-03-11','1993-01-24','1993-04-06','DELIVER IN PERSON','AIR','zzle. regular, special theodolites wake. bl'
+5611046,158172,3203,6,3.00,3690.51,0.03,0.02,'A','F','1992-07-09','1992-05-10','1992-08-01','TAKE BACK RETURN','TRUCK','zzle after the slyly express req'
+5637252,98651,3670,3,2.00,3299.30,0.01,0.07,'A','F','1992-09-25','1992-07-19','1992-10-02','DELIVER IN PERSON','REG AIR','zzle quickly slyly ironic'
+3649697,170341,2859,5,4.00,5645.36,0.01,0.02,'A','F','1992-05-24','1992-05-17','1992-06-03','COLLECT COD','AIR','zzle. foxes cajole quickly according'
+453126,89720,4737,2,4.00,6838.88,0.04,0.00,'R','F','1995-04-11','1995-05-26','1995-05-11','DELIVER IN PERSON','REG AIR','zzle according to the blithely ev'
+3732899,122611,148,2,2.00,3267.22,0.10,0.01,'R','F','1994-07-07','1994-08-25','1994-07-17','DELIVER IN PERSON','MAIL','zzle slyly bol'
+4863458,77848,7849,2,1.00,1825.84,0.10,0.02,'N','O','1996-12-03','1996-11-11','1996-12-07','DELIVER IN PERSON','RAIL','zzle blithely. ruthlessly b'
+4887207,108221,8222,2,1.00,1229.22,0.09,0.00,'R','F','1995-02-27','1995-04-08','1995-03-06','COLLECT COD','MAIL','zzle silent pinto bea'
+4898439,149853,4882,5,4.00,7611.40,0.07,0.08,'N','O','1998-04-30','1998-05-20','1998-05-08','COLLECT COD','FOB','zzle slyly after the carefully'
+1764517,192822,380,4,2.00,3829.64,0.09,0.06,'A','F','1994-09-03','1994-07-26','1994-10-03','NONE','FOB','zzle about the ideas. special packages'
+4038850,191403,6442,3,3.00,4483.20,0.09,0.01,'A','F','1993-05-30','1993-05-09','1993-06-18','TAKE BACK RETURN','MAIL','zzle slyly about the'
+5791713,8767,1268,4,3.00,5027.28,0.01,0.00,'N','O','1997-06-25','1997-07-30','1997-07-05','TAKE BACK RETURN','RAIL','zzle furiously above the ironic, re'
+2689120,87143,2160,3,1.00,1130.14,0.05,0.06,'A','F','1994-12-10','1994-10-25','1994-12-19','COLLECT COD','AIR','zzle above the even foxe'
+5908418,155066,2612,2,1.00,1121.06,0.01,0.05,'N','O','1997-03-20','1997-02-04','1997-04-09','COLLECT COD','TRUCK','zzle express ideas. slyly i'
+876549,96206,6207,6,2.00,2404.40,0.01,0.05,'R','F','1994-01-15','1994-02-14','1994-01-16','NONE','REG AIR','zzle slyly blithely express epitaphs. req'
+898788,62837,2838,2,2.00,3599.66,0.08,0.01,'N','O','1998-07-26','1998-05-29','1998-08-11','NONE','REG AIR','zzle blithely regular foxes. sp'
+903459,182031,4550,1,3.00,3339.09,0.02,0.04,'R','F','1995-04-18','1995-05-20','1995-05-08','NONE','REG AIR','zzle blithely bravely unusual instr'
+928898,106264,8775,6,1.00,1270.26,0.10,0.00,'R','F','1994-10-18','1994-10-03','1994-11-12','DELIVER IN PERSON','RAIL','zzle fluffily furiou'
+4193893,83860,8877,2,2.00,3687.72,0.06,0.06,'R','F','1993-09-30','1993-11-06','1993-10-11','COLLECT COD','FOB','zzle carefully'
+5937603,197827,7828,3,2.00,3849.64,0.03,0.00,'A','F','1994-07-01','1994-07-30','1994-07-31','TAKE BACK RETURN','RAIL','zzle quickly regular foxes. silent pains '
+2776164,19867,2369,1,4.00,7147.44,0.03,0.03,'A','F','1993-01-16','1992-12-01','1993-01-21','DELIVER IN PERSON','FOB','zzle after the accounts. blithely bold'
+2860996,15745,5746,1,3.00,4982.22,0.02,0.07,'N','O','1996-05-02','1996-03-29','1996-05-16','TAKE BACK RETURN','RAIL','zzle blithely regular reque'
+4211265,54718,4719,7,4.00,6690.84,0.06,0.05,'R','F','1993-08-16','1993-09-16','1993-09-05','NONE','MAIL','zzle carefully alongside of the pendin'
+1013090,96470,6471,1,2.00,2932.94,0.08,0.04,'N','O','1997-08-14','1997-09-08','1997-08-25','TAKE BACK RETURN','FOB','zzle slyly alongside '
+1936391,87326,2343,2,2.00,2626.64,0.04,0.04,'A','F','1993-09-12','1993-08-20','1993-09-14','NONE','AIR','zzle carefully against the '
+5179426,158940,1456,5,2.00,3997.88,0.10,0.05,'A','F','1992-12-23','1992-11-12','1992-12-29','COLLECT COD','MAIL','zzle blithely requests. regular, regular'
+5190949,30001,5008,4,4.00,3724.00,0.07,0.04,'R','F','1992-06-20','1992-06-07','1992-06-28','TAKE BACK RETURN','AIR','zzle along the even, pending '
+2014983,32060,9570,1,2.00,1984.12,0.04,0.04,'N','O','1998-07-16','1998-09-02','1998-08-06','NONE','REG AIR','zzle instructions. carefully regular '
+5330853,22283,7288,1,4.00,4821.12,0.09,0.00,'R','F','1992-08-03','1992-08-21','1992-08-13','DELIVER IN PERSON','RAIL','zzle fluffily a'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_extendedprice < 910
+---- RESULTS
+5400866,7001,9502,1,1.00,908.00,0.10,0.03,'N','O','1998-01-24','1998-03-26','1998-02-01','COLLECT COD','TRUCK',' accounts. slyly special platelets nag fl'
+2243878,3004,8005,5,1.00,907.00,0.01,0.06,'N','O','1998-06-11','1998-05-14','1998-06-14','DELIVER IN PERSON','REG AIR',' slyly bold packages wake quickly regu'
+3322496,3003,5504,6,1.00,906.00,0.07,0.00,'R','F','1994-09-25','1994-08-11','1994-09-27','TAKE BACK RETURN','TRUCK','ss, regular accounts wake furiously on the '
+201607,4003,4004,6,1.00,907.00,0.02,0.02,'R','F','1993-02-11','1993-02-12','1993-03-10','COLLECT COD','AIR','y unusual packages. blithely regular dino'
+4549287,2006,4507,1,1.00,908.00,0.06,0.02,'N','O','1995-08-22','1995-10-17','1995-09-18','TAKE BACK RETURN','RAIL','e slyly fi'
+5696710,7001,9502,3,1.00,908.00,0.02,0.07,'N','O','1995-09-17','1995-09-29','1995-10-16','COLLECT COD','TRUCK','ove the slyly'
+2506752,4000,6501,4,1.00,904.00,0.10,0.02,'A','F','1992-10-06','1992-11-12','1992-10-19','DELIVER IN PERSON','REG AIR','play. ironic asymptotes '
+309573,4000,9001,2,1.00,904.00,0.09,0.04,'R','F','1993-11-05','1993-08-12','1993-11-28','TAKE BACK RETURN','MAIL','furiously pending req'
+407206,3002,8003,1,1.00,905.00,0.08,0.08,'N','O','1996-07-01','1996-05-24','1996-07-04','TAKE BACK RETURN','REG AIR','arefully even requests '
+1409604,2005,2006,3,1.00,907.00,0.10,0.05,'R','F','1992-09-13','1992-09-08','1992-09-22','COLLECT COD','FOB','ously ironic attain'
+4685351,2002,4503,2,1.00,904.00,0.10,0.03,'N','O','1996-08-30','1996-06-18','1996-09-05','COLLECT COD','AIR','ironic platelet'
+5911524,7,2508,3,1.00,907.00,0.00,0.06,'A','F','1995-01-23','1994-12-14','1995-02-18','TAKE BACK RETURN','AIR',' even asymptotes. ironic de'
+3672610,5001,7502,4,1.00,906.00,0.07,0.07,'R','F','1992-09-23','1992-10-13','1992-10-07','TAKE BACK RETURN','AIR','cajole according to the careful'
+505280,8,7509,4,1.00,908.00,0.06,0.05,'N','O','1996-01-07','1996-01-16','1996-02-06','NONE','MAIL',' regular pi'
+529024,2002,2003,4,1.00,904.00,0.09,0.02,'N','O','1998-03-29','1998-04-26','1998-04-25','COLLECT COD','AIR','press grouc'
+2888709,6,5007,3,1.00,906.00,0.10,0.06,'N','O','1996-10-21','1996-08-12','1996-11-18','TAKE BACK RETURN','RAIL','arefully even theodolites. deposits use'
+2891650,2003,4504,1,1.00,905.00,0.04,0.04,'N','O','1997-07-16','1997-09-21','1997-08-11','COLLECT COD','MAIL','e unusual foxes detect stealthy'
+1607271,8001,3002,1,1.00,909.00,0.03,0.05,'A','F','1992-02-06','1992-03-04','1992-02-10','TAKE BACK RETURN','AIR','y unusual pinto beans boost pending pint'
+599361,1,5002,7,1.00,901.00,0.05,0.01,'N','O','1998-04-28','1998-05-23','1998-05-26','DELIVER IN PERSON','AIR','lithely bold packages sleep fluffily. f'
+3889155,5001,2,4,1.00,906.00,0.05,0.07,'R','F','1992-03-09','1992-05-27','1992-03-22','COLLECT COD','FOB','thely across the final requests. quic'
+2993222,6001,6002,5,1.00,907.00,0.07,0.07,'N','O','1998-05-10','1998-03-19','1998-05-11','DELIVER IN PERSON','RAIL','ckly! slyly'
+3013575,4,5,5,1.00,904.00,0.08,0.06,'N','O','1998-05-10','1998-06-07','1998-05-24','COLLECT COD','RAIL','ress foxes. carefully special dependencies'
+1669568,2002,7003,1,1.00,904.00,0.07,0.00,'N','O','1995-08-27','1995-09-18','1995-09-17','DELIVER IN PERSON','MAIL','ously final requests breach slyly sile'
+1769571,9000,1501,3,1.00,909.00,0.05,0.02,'R','F','1992-08-08','1992-06-20','1992-08-10','DELIVER IN PERSON','AIR','ideas cajole slyly bold pain'
+1796167,1006,3507,6,1.00,907.00,0.07,0.08,'A','F','1994-09-09','1994-10-16','1994-09-23','DELIVER IN PERSON','FOB','es are fluffil'
+1803334,1004,1005,7,1.00,905.00,0.10,0.08,'A','F','1994-05-31','1994-04-19','1994-06-12','NONE','TRUCK','tithes. eve'
+5071588,3000,501,2,1.00,903.00,0.05,0.08,'N','O','1997-07-02','1997-08-26','1997-07-16','COLLECT COD','TRUCK',' blithely after the blithely regu'
+5109957,5002,5003,2,1.00,907.00,0.04,0.07,'N','O','1998-04-18','1998-04-01','1998-05-03','TAKE BACK RETURN','MAIL','equests haggle '
+856807,2005,7006,4,1.00,907.00,0.03,0.02,'N','O','1997-12-03','1997-12-26','1997-12-07','COLLECT COD','REG AIR','ironic, reg'
+943879,3002,8003,2,1.00,905.00,0.06,0.04,'N','O','1995-09-21','1995-09-05','1995-10-06','NONE','MAIL','d the dolphins. furiously final deposits '
+5143585,4,7505,4,1.00,904.00,0.07,0.02,'A','F','1992-02-05','1992-02-24','1992-02-25','TAKE BACK RETURN','FOB','y special accounts. ironic'
+5229153,3005,5506,6,1.00,908.00,0.08,0.00,'A','F','1993-11-05','1993-11-06','1993-11-09','DELIVER IN PERSON','AIR','nts. even instructions are ironi'
+5286247,5003,5004,3,1.00,908.00,0.04,0.02,'N','O','1995-10-18','1995-11-19','1995-10-25','NONE','TRUCK','y even frays. final requests wak'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem
+where l_shipdate < '1994' and l_shipdate > '1993-11-31' and
+      l_extendedprice < 988 and l_extendedprice > 986 and l_partkey < 88
+---- RESULTS
+5347525,86,5087,3,1.00,986.08,0.08,0.07,'R','F','1993-12-14','1994-02-07','1994-01-01','TAKE BACK RETURN','TRUCK','nments haggle carefully quickly spe'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_receiptdate = '1998-12-30'
+---- RESULTS
+2357827,110874,8408,2,12.00,22618.44,0.08,0.05,'N','O','1998-12-01','1998-10-22','1998-12-30','COLLECT COD','RAIL','. fluffily quiet theodolites above the exp'
+3797283,3820,6321,1,43.00,74124.26,0.07,0.08,'N','O','1998-11-30','1998-10-07','1998-12-30','NONE','FOB','ake carefully. quick'
+2949666,73956,6464,2,25.00,48248.75,0.03,0.08,'N','O','1998-12-01','1998-10-30','1998-12-30','NONE','MAIL','. blithely ironic'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem where l_commitdate = '1992-01-31'
+---- RESULTS
+4396228,184608,7127,1,24.00,40622.40,0.10,0.05,'A','F','1992-04-08','1992-01-31','1992-04-19','COLLECT COD','MAIL','st the slyly final platelets. regular de'
+1203046,182171,4690,3,36.00,45114.12,0.01,0.02,'R','F','1992-04-08','1992-01-31','1992-05-02','DELIVER IN PERSON','REG AIR','ead of the final p'
+287971,100055,56,1,34.00,35871.70,0.08,0.08,'A','F','1992-04-24','1992-01-31','1992-05-14','NONE','RAIL',' furiously ironic, final dependencies. sl'
+2153317,126942,1967,2,21.00,41347.74,0.01,0.01,'R','F','1992-04-17','1992-01-31','1992-05-05','TAKE BACK RETURN','AIR','ly pending packages. quickly unusual pa'
+5364544,188754,3791,2,37.00,68181.75,0.07,0.02,'A','F','1992-03-11','1992-01-31','1992-03-12','TAKE BACK RETURN','REG AIR','de of the ironic depe'
+5497253,73137,659,3,35.00,38854.55,0.06,0.08,'A','F','1992-02-20','1992-01-31','1992-03-04','TAKE BACK RETURN','RAIL',' final foxes are fluff'
+1249954,105591,612,4,40.00,63863.60,0.01,0.06,'R','F','1992-02-19','1992-01-31','1992-03-09','DELIVER IN PERSON','SHIP','ts boost furiously. ironic instr'
+1304070,45028,7533,1,7.00,6811.14,0.02,0.02,'R','F','1992-04-25','1992-01-31','1992-04-28','DELIVER IN PERSON','AIR','ual ideas. slyly final instr'
+3557312,41542,9055,3,44.00,65275.76,0.06,0.00,'A','F','1992-02-29','1992-01-31','1992-03-09','COLLECT COD','TRUCK','osits. fluffily express account'
+343335,156215,1246,6,3.00,3813.63,0.02,0.02,'R','F','1992-03-16','1992-01-31','1992-03-26','COLLECT COD','RAIL','kages wake slyly expre'
+433446,135091,7605,4,6.00,6756.54,0.06,0.01,'A','F','1992-02-08','1992-01-31','1992-02-16','NONE','SHIP','e ironic deposits wake f'
+2335747,99615,9616,6,13.00,20989.93,0.10,0.01,'A','F','1992-04-07','1992-01-31','1992-04-23','DELIVER IN PERSON','AIR','al ideas must have to boost furiously thin'
+470693,45925,3438,4,42.00,78578.64,0.03,0.06,'R','F','1992-03-19','1992-01-31','1992-04-02','DELIVER IN PERSON','AIR','s wake slyly final waters. '
+3741124,89320,9321,3,31.00,40588.92,0.01,0.04,'R','F','1992-03-26','1992-01-31','1992-04-15','DELIVER IN PERSON','RAIL','. unusual, silent sentiments cajole qui'
+571586,76488,1503,2,21.00,30754.08,0.08,0.00,'R','F','1992-02-28','1992-01-31','1992-03-26','COLLECT COD','TRUCK','ongside of the '
+5670564,56165,6166,4,49.00,54936.84,0.04,0.05,'R','F','1992-03-15','1992-01-31','1992-03-30','TAKE BACK RETURN','MAIL','efully pending deposits. furiously '
+2559431,191885,4405,5,36.00,71167.68,0.04,0.05,'A','F','1992-04-19','1992-01-31','1992-05-14','DELIVER IN PERSON','AIR','requests sleep carefully'
+2559431,7343,2344,6,33.00,41261.22,0.02,0.04,'R','F','1992-01-05','1992-01-31','1992-01-31','DELIVER IN PERSON','FOB','s nag quick'
+1545379,24148,1655,1,3.00,3216.42,0.03,0.00,'A','F','1992-03-08','1992-01-31','1992-03-15','TAKE BACK RETURN','REG AIR',' wake across the requests. carefully pend'
+1545379,52219,4725,2,8.00,9369.68,0.00,0.01,'A','F','1992-04-28','1992-01-31','1992-04-30','COLLECT COD','SHIP','riously final foxes. blithely final '
+1586021,9636,9637,1,9.00,13910.67,0.02,0.00,'A','F','1992-02-10','1992-01-31','1992-02-12','TAKE BACK RETURN','TRUCK','pearls cajole ac'
+4812032,161931,4448,5,22.00,43844.46,0.05,0.00,'R','F','1992-04-18','1992-01-31','1992-05-08','NONE','FOB','ctions cajole about '
+575495,94198,9217,4,14.00,16690.66,0.00,0.04,'R','F','1992-04-09','1992-01-31','1992-04-13','COLLECT COD','RAIL','tructions. unus'
+3804260,94311,9330,3,44.00,57433.64,0.09,0.05,'R','F','1992-03-29','1992-01-31','1992-04-03','DELIVER IN PERSON','AIR',' forges. slyly final instructions hagg'
+2653089,50040,2546,3,46.00,45541.84,0.01,0.07,'A','F','1992-01-06','1992-01-31','1992-02-05','TAKE BACK RETURN','MAIL',' asymptotes.'
+5854464,74338,6846,5,31.00,40682.23,0.05,0.04,'R','F','1992-01-13','1992-01-31','1992-02-03','DELIVER IN PERSON','TRUCK','theodolites sl'
+4859008,24294,9299,5,2.00,2436.58,0.02,0.08,'R','F','1992-03-20','1992-01-31','1992-04-05','DELIVER IN PERSON','TRUCK','d deposits cajole slyly accounts. ex'
+717701,153080,626,1,4.00,4532.32,0.09,0.03,'R','F','1992-01-13','1992-01-31','1992-01-24','TAKE BACK RETURN','AIR','ithely special theodolite'
+3958784,44413,6918,2,31.00,42079.71,0.06,0.04,'A','F','1992-01-13','1992-01-31','1992-02-12','TAKE BACK RETURN','REG AIR','sly above the blit'
+4010469,55374,5375,6,22.00,29246.14,0.06,0.05,'R','F','1992-03-31','1992-01-31','1992-04-30','DELIVER IN PERSON','AIR','oys. carefully final pinto beans are s'
+3001924,110252,7786,3,28.00,35343.00,0.06,0.04,'A','F','1992-03-05','1992-01-31','1992-03-23','DELIVER IN PERSON','SHIP','e quickly even depos'
+3142627,191818,1819,1,48.00,91670.88,0.00,0.03,'R','F','1992-01-15','1992-01-31','1992-02-13','COLLECT COD','FOB','final pinto beans. furiously unusu'
+874625,166022,1055,3,11.00,11968.22,0.03,0.04,'A','F','1992-04-24','1992-01-31','1992-04-26','COLLECT COD','TRUCK',' players along the carefully bold package'
+4227367,66843,9350,3,48.00,86872.32,0.06,0.02,'R','F','1992-02-02','1992-01-31','1992-02-13','TAKE BACK RETURN','RAIL','aggle blithely according to the regular '
+1049856,83433,8450,4,45.00,63739.35,0.04,0.02,'R','F','1992-04-26','1992-01-31','1992-05-25','COLLECT COD','FOB','uriously regular deposits cajole quick'
+4262469,73143,665,2,43.00,47994.02,0.10,0.04,'R','F','1992-01-25','1992-01-31','1992-02-10','TAKE BACK RETURN','AIR','nic pinto beans. requests across the fluf'
+2069187,112268,2269,2,39.00,49930.14,0.01,0.03,'R','F','1992-02-08','1992-01-31','1992-02-12','DELIVER IN PERSON','MAIL','blithely? blithely pending ideas use. pen'
+2138215,151143,3659,1,48.00,57318.72,0.02,0.01,'A','F','1992-04-04','1992-01-31','1992-05-02','NONE','FOB','kly according to the thin i'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from tpch_parquet.lineitem
+where l_commitdate = '1992-01-31' and l_orderkey > 5000000
+---- RESULTS
+5364544,188754,3791,2,37.00,68181.75,0.07,0.02,'A','F','1992-03-11','1992-01-31','1992-03-12','TAKE BACK RETURN','REG AIR','de of the ironic depe'
+5497253,73137,659,3,35.00,38854.55,0.06,0.08,'A','F','1992-02-20','1992-01-31','1992-03-04','TAKE BACK RETURN','RAIL',' final foxes are fluff'
+5670564,56165,6166,4,49.00,54936.84,0.04,0.05,'R','F','1992-03-15','1992-01-31','1992-03-30','TAKE BACK RETURN','MAIL','efully pending deposits. furiously '
+5854464,74338,6846,5,31.00,40682.23,0.05,0.04,'R','F','1992-01-13','1992-01-31','1992-02-03','DELIVER IN PERSON','TRUCK','theodolites sl'
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====

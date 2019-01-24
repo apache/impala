@@ -55,7 +55,9 @@ class ScopedBuffer {
     bytes_ = 0;
   }
 
-  inline uint8_t* buffer() const { return buffer_; }
+  uint8_t* buffer() const { return buffer_; }
+
+  int64_t Size() const { return bytes_; }
 
  private:
   MemTracker* mem_tracker_;

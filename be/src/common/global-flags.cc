@@ -264,7 +264,7 @@ DEFINE_double_hidden(invalidate_tables_fraction_on_memory_pressure, 0.1,
     "The fraction of tables to invalidate when CatalogdTableInvalidator considers the "
     "old GC generation to be almost full.");
 
-DEFINE_bool_hidden(enable_parquet_page_index_writing_debug_only, false, "If true, Impala "
+DEFINE_bool_hidden(enable_parquet_page_index_writing_debug_only, true, "If true, Impala "
     "will write the Parquet page index. It is not advised to use it in a production "
     "environment, only for testing and development. This flag is meant to be temporary. "
     "We plan to remove this flag once Impala is able to read the page index and has "

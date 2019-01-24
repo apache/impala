@@ -36,6 +36,20 @@ namespace impala {
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
 
+/// Struct that specifies an inclusive range of rows.
+struct RowRange {
+  int64_t first;
+  int64_t last;
+};
+
+inline bool operator==(const RowRange& lhs, const RowRange& rhs) {
+  return lhs.first == rhs.first && lhs.last == rhs.last;
+}
+
+inline bool operator<(const RowRange& lhs, const RowRange& rhs) {
+  return std::tie(lhs.first, lhs.last) < std::tie(rhs.first, rhs.last);
+}
+
 /// Return the Impala compression type for the given Parquet codec. The caller must
 /// validate that the codec is a supported one, otherwise this will DCHECK.
 THdfsCompression::type ConvertParquetToImpalaCodec(parquet::CompressionCodec::type codec);
@@ -44,6 +58,29 @@ THdfsCompression::type ConvertParquetToImpalaCodec(parquet::CompressionCodec::ty
 /// validate that the codec is a supported one, otherwise this will DCHECK.
 parquet::CompressionCodec::type ConvertImpalaToParquetCodec(
     THdfsCompression::type codec);
+
+/// Returns the row range for the given page idx using information from the row group and
+/// offset index.
+void GetRowRangeForPage(const parquet::RowGroup& row_group,
+    const parquet::OffsetIndex& offset_index, int page_idx, RowRange* row_range);
+
+/// Given a column chunk containing rows in the range [0, 'num_rows'), 'skip_ranges'
+/// contains the row ranges we are not interested in. 'skip_ranges' can be redundant and
+/// can potentially contain ranges that intersect with each other. As a side-effect, this
+/// function sorts 'skip_ranges'.
+/// 'candidate_ranges' will contain the set of row ranges that we want to scan.
+/// Returns false if the input data is invalid.
+bool ComputeCandidateRanges(const int64_t num_rows, std::vector<RowRange>* skip_ranges,
+    std::vector<RowRange>* candidate_ranges);
+
+/// This function computes the pages that intersect with 'candidate_ranges'. I.e. it
+/// determines the pages that we actually need to read from a given column chunk.
+/// 'candidate_pages' will hold the indexes of such pages.
+/// Returns true on success, false otherwise.
+bool ComputeCandidatePages(
+    const std::vector<parquet::PageLocation>& page_locations,
+    const std::vector<RowRange>& candidate_ranges,
+    const int64_t num_rows, std::vector<int>* candidate_pages);
 
 /// The plain encoding does not maintain any state so all these functions
 /// are static helpers.
@@ -227,6 +264,28 @@ class ParquetPlainEncoder {
     return byte_size;
   }
 
+  /// Returns the byte size of the encoded data when PLAIN encoding is used.
+  /// Returns -1 if the encoded data passes the end of the buffer.
+  template <parquet::Type::type PARQUET_TYPE>
+  static int64_t EncodedLen(const uint8_t* buffer, const uint8_t* buffer_end,
+      int fixed_len_size, int32_t num_values) {
+    using parquet::Type;
+    int byte_size = 0;
+    switch (PARQUET_TYPE) {
+      case Type::INT32: byte_size = 4; break;
+      case Type::INT64: byte_size = 8; break;
+      case Type::INT96: byte_size = 12; break;
+      case Type::FLOAT: byte_size = 4; break;
+      case Type::DOUBLE: byte_size = 8; break;
+      case Type::FIXED_LEN_BYTE_ARRAY: byte_size = fixed_len_size; break;
+      default:
+        DCHECK(false);
+        return -1;
+    }
+    int64_t encoded_len = byte_size * num_values;
+    return encoded_len > buffer_end - buffer ? -1 : encoded_len;
+  }
+
   /// Batched version of Decode() that tries to decode 'num_values' values from the memory
   /// range [buffer, buffer_end) and writes them to 'v' with a stride of 'stride' bytes.
   /// Returns the number of bytes read from 'buffer' or -1 if there was an error
@@ -296,6 +355,26 @@ inline int ParquetPlainEncoder::ByteSize(const StringValue& v) {
 template <>
 inline int ParquetPlainEncoder::ByteSize(const TimestampValue& v) {
   return 12;
+}
+
+/// Returns the byte size of the encoded data when PLAIN encoding is used.
+/// Returns -1 if the encoded data passes the end of the buffer.
+template <>
+inline int64_t ParquetPlainEncoder::EncodedLen<parquet::Type::BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    int32_t num_values) {
+  const uint8_t* orig_buffer = buffer;
+  int64_t values_remaining = num_values;
+  while (values_remaining > 0) {
+    if (UNLIKELY(buffer_end - buffer < sizeof(int32_t))) return -1;
+    int32_t str_len;
+    memcpy(&str_len, buffer, sizeof(int32_t));
+    str_len += sizeof(int32_t);
+    if (UNLIKELY(str_len < sizeof(int32_t) || buffer_end - buffer < str_len)) return -1;
+    buffer += str_len;
+    --values_remaining;
+  }
+  return buffer - orig_buffer;
 }
 
 template <typename From, typename To>

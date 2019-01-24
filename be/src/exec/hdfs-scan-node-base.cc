@@ -585,13 +585,31 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
     const ScanRange* original_split) {
   ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
         new ScanRangeMetadata(partition_id, original_split));
-  return AllocateScanRange(fs, file, len, offset, metadata, disk_id, expected_local,
+  return AllocateScanRange(fs, file, len, offset, {}, metadata, disk_id, expected_local,
       is_erasure_coded, buffer_opts);
 }
 
 ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
-    bool is_erasure_coded, const BufferOpts& buffer_opts) {
+    int64_t len, int64_t offset, ScanRangeMetadata* metadata, int disk_id,
+    bool expected_local, bool is_erasure_coded, const BufferOpts& buffer_opts) {
+  return AllocateScanRange(fs, file, len, offset, {}, metadata, disk_id, expected_local,
+      is_erasure_coded, buffer_opts);
+}
+
+ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
+    int64_t partition_id, int disk_id, bool expected_local, bool is_erasure_coded,
+    const BufferOpts& buffer_opts, const ScanRange* original_split) {
+  ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
+      new ScanRangeMetadata(partition_id, original_split));
+  return AllocateScanRange(fs, file, len, offset, move(sub_ranges), metadata,
+      disk_id, expected_local, is_erasure_coded, buffer_opts);
+}
+
+ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
+    ScanRangeMetadata* metadata, int disk_id, bool expected_local, bool is_erasure_coded,
+    const BufferOpts& buffer_opts) {
   DCHECK_GE(disk_id, -1);
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
@@ -606,7 +624,7 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
 
   ScanRange* range = runtime_state_->obj_pool()->Add(new ScanRange);
   range->Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded,
-      buffer_opts, metadata);
+      buffer_opts, move(sub_ranges), metadata);
   return range;
 }
 
