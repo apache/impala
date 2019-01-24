@@ -161,13 +161,13 @@ void ScanNode::Close(RuntimeState* state) {
 }
 
 bool ScanNode::WaitForRuntimeFilters() {
-  int32 wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
+  int32_t wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
   if (runtime_state_->query_options().runtime_filter_wait_time_ms > 0) {
     wait_time_ms = runtime_state_->query_options().runtime_filter_wait_time_ms;
   }
   vector<string> arrived_filter_ids;
   vector<string> missing_filter_ids;
-  int32_t start = MonotonicMillis();
+  int64_t start = MonotonicMillis();
   for (auto& ctx: filter_ctxs_) {
     string filter_id = Substitute("$0", ctx.filter->id());
     if (ctx.filter->WaitForArrival(wait_time_ms)) {
@@ -176,7 +176,7 @@ bool ScanNode::WaitForRuntimeFilters() {
       missing_filter_ids.push_back(filter_id);
     }
   }
-  int32_t end = MonotonicMillis();
+  int64_t end = MonotonicMillis();
   const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
 
   if (arrived_filter_ids.size() == filter_ctxs_.size()) {
