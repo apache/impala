@@ -66,8 +66,8 @@ class TestBreakpadBase(CustomClusterTestSuite):
   def start_cluster_with_args(self, **kwargs):
     cluster_options = []
     for daemon_arg in DAEMON_ARGS:
-      daemon_options = " ".join("-%s=%s" % i for i in kwargs.iteritems())
-      cluster_options.append("""--%s='%s'""" % (daemon_arg, daemon_options))
+      daemon_options = " ".join("-{0}={1}".format(k, v) for k, v in kwargs.iteritems())
+      cluster_options.append("--{0}={1}".format(daemon_arg, daemon_options))
     self._start_impala_cluster(cluster_options)
 
   def start_cluster(self):

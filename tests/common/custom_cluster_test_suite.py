@@ -131,7 +131,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     cluster_args = list()
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS]:
       if arg in method.func_dict:
-        cluster_args.append("--%s=\"%s\" " % (arg, method.func_dict[arg]))
+        cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:
       cluster_args.append(method.func_dict[START_ARGS])
 

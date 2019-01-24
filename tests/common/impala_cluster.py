@@ -20,6 +20,7 @@
 import json
 import logging
 import os
+import pipes
 import psutil
 import socket
 import sys
@@ -44,8 +45,7 @@ LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
-CATALOGD_PATH = os.path.join(IMPALA_HOME, 'bin/start-catalogd.sh')
-IMPALAD_PATH = os.path.join(IMPALA_HOME, 'bin/start-impalad.sh -build_type=latest')
+START_DAEMON_PATH = os.path.join(IMPALA_HOME, 'bin/start-daemon.sh')
 
 DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
@@ -56,6 +56,9 @@ DEFAULT_STATE_STORE_SUBSCRIBER_PORT = 23000
 DEFAULT_IMPALAD_WEBSERVER_PORT = 25000
 DEFAULT_STATESTORED_WEBSERVER_PORT = 25010
 DEFAULT_CATALOGD_WEBSERVER_PORT = 25020
+
+DEFAULT_IMPALAD_JVM_DEBUG_PORT = 30000
+DEFAULT_CATALOGD_JVM_DEBUG_PORT = 30030
 
 # Timeout to use when waiting for a cluster to start up. Set quite high to avoid test
 # flakiness.
@@ -308,18 +311,6 @@ class Process(object):
     LOG.info("No PID found for process cmdline: %s. Process is dead?" % self.cmd)
     return None
 
-  def start(self):
-    if self.container_id is None:
-      LOG.info("Starting process: {0}".format(' '.join(self.cmd)))
-      # Use os.system() to start 'cmd' in the background via a shell so its parent will be
-      # init after the shell exits. Otherwise, the parent of 'cmd' will be py.test and we
-      # cannot cleanly kill it until py.test exits. In theory, Popen(shell=True) should
-      # achieve the same thing but it doesn't work on some platforms for some reasons.
-      os.system(' '.join(self.cmd) + ' &')
-    else:
-      LOG.info("Starting container: {0}".format(self.container_id))
-      check_call(["docker", "container", "start", self.container_id])
-
   def kill(self, signal=SIGKILL):
     """
     Kills the given processes.
@@ -334,6 +325,16 @@ class Process(object):
       LOG.info("Stopping container: {0}".format(self.container_id))
       check_call(["docker", "container", "stop", self.container_id])
 
+  def start(self):
+    """Start the process with the same arguments after it was stopped."""
+    if self.container_id is None:
+      binary = os.path.basename(self.cmd[0])
+      restart_args = self.cmd[1:]
+      LOG.info("Starting {0} with arguments".format(binary, restart_args))
+      run_daemon(binary, restart_args)
+    else:
+      LOG.info("Starting container: {0}".format(self.container_id))
+      check_call(["docker", "container", "start", self.container_id])
 
   def restart(self):
     """Kills and restarts the process"""
@@ -409,9 +410,9 @@ class ImpaladProcess(BaseImpalaProcess):
 
   def start(self, wait_until_ready=True):
     """Starts the impalad and waits until the service is ready to accept connections."""
-    restart_cmd = [IMPALAD_PATH] + self.cmd[1:] + ['&']
-    LOG.info("Starting Impalad process: %s" % ' '.join(restart_cmd))
-    os.system(' '.join(restart_cmd))
+    restart_args = self.cmd[1:]
+    LOG.info("Starting Impalad process with args: {0}".format(restart_args))
+    run_daemon("impalad", restart_args)
     if wait_until_ready:
       self.service.wait_for_metric_value('impala-server.ready',
                                          expected_value=1, timeout=30)
@@ -466,9 +467,9 @@ class CatalogdProcess(BaseImpalaProcess):
 
   def start(self, wait_until_ready=True):
     """Starts catalogd and waits until the service is ready to accept connections."""
-    restart_cmd = [CATALOGD_PATH] + self.cmd[1:] + ["&"]
-    LOG.info("Starting Catalogd process: %s" % ' '.join(restart_cmd))
-    os.system(' '.join(restart_cmd))
+    restart_args = self.cmd[1:]
+    LOG.info("Starting Catalogd process: {0}".format(restart_args))
+    run_daemon("catalogd", restart_args)
     if wait_until_ready:
       self.service.wait_for_metric_value('statestore-subscriber.connected',
                                          expected_value=1, timeout=30)
@@ -487,3 +488,28 @@ def find_user_processes(binaries):
     except psutil.NoSuchProcess, e:
       # Ignore the case when a process no longer exists.
       pass
+
+
+def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_file=None):
+  """Starts up an impalad with the specified command line arguments. args must be a list
+  of strings. An optional build_type parameter can be passed to determine the build type
+  to use for the impalad instance.  Any values in the env_vars override environment
+  variables inherited from this process. If output_file is specified, stdout and stderr
+  are redirected to that file.
+  """
+  bin_path = os.path.join(IMPALA_HOME, "be", "build", build_type, "service",
+                          daemon_binary)
+  redirect = ""
+  if output_file is not None:
+    redirect = "1>{0} 2>&1".format(output_file)
+  cmd = [START_DAEMON_PATH, bin_path] + args
+  # Use os.system() to start 'cmd' in the background via a shell so its parent will be
+  # init after the shell exits. Otherwise, the parent of 'cmd' will be py.test and we
+  # cannot cleanly kill it until py.test exits. In theory, Popen(shell=True) should
+  # achieve the same thing but it doesn't work on some platforms for some reasons.
+  sys_cmd = ("{set_cmds} {cmd} {redirect} &".format(
+      set_cmds=''.join(["export {0}={1};".format(k, pipes.quote(v))
+                         for k, v in env_vars.iteritems()]),
+      cmd=' '.join([pipes.quote(tok) for tok in cmd]),
+      redirect=redirect))
+  os.system(sys_cmd)

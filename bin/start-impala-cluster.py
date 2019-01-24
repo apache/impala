@@ -39,7 +39,8 @@ from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_HS2_PORT, DEFAULT_BE_PORT, DEFAULT_KRPC_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
-    find_user_processes)
+    DEFAULT_CATALOGD_JVM_DEBUG_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
+    find_user_processes, run_daemon)
 
 logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
     datefmt="%H:%M:%S")
@@ -91,8 +92,6 @@ parser.add_option("--log_dir", dest="log_dir",
                   help="Directory to store output logs to.")
 parser.add_option("--max_log_files", default=DEFAULT_IMPALA_MAX_LOG_FILES,
                   help="Max number of log files before rotation occurs.")
-parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
-                  help="Prints all output to stderr/stdout.")
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 parser.add_option("--jvm_args", dest="jvm_args", default="",
@@ -128,16 +127,6 @@ options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 KNOWN_BUILD_TYPES = ["debug", "release", "latest"]
-IMPALAD_PATH = os.path.join(IMPALA_HOME,
-    "bin/start-impalad.sh -build_type={build_type}".format(
-        build_type=options.build_type))
-STATE_STORE_PATH = os.path.join(IMPALA_HOME,
-    "bin/start-statestored.sh -build_type={build_type}".format(
-        build_type=options.build_type))
-CATALOGD_PATH = os.path.join(IMPALA_HOME,
-    "bin/start-catalogd.sh -build_type={build_type}".format(
-        build_type=options.build_type))
-MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
@@ -157,20 +146,24 @@ def check_process_exists(binary, attempts=1):
     sleep(1)
   return False
 
-def exec_impala_process(cmd, args, stderr_log_file_path):
-  redirect_output = str()
-  if options.verbose:
-    args += " -logtostderr=1"
-  else:
-    redirect_output = "1>{stderr_log_file_path}".format(
-        stderr_log_file_path=stderr_log_file_path)
-  # TODO: it would be better to use Popen and pass in tokenised arguments rather than
-  # relying on shell tokenisation.
-  cmd = "{cmd} {args} {redirect_output} 2>&1 &".format(
-      cmd=cmd,
-      args=args,
-      redirect_output=redirect_output)
-  os.system(cmd)
+
+def run_daemon_with_options(daemon_binary, args, output_file, jvm_debug_port=None):
+  """Wrapper around run_daemon() with options determined from command-line options."""
+  env_vars = {"JAVA_TOOL_OPTIONS": build_java_tool_options(jvm_debug_port)}
+  run_daemon(daemon_binary, args, build_type=options.build_type, env_vars=env_vars,
+      output_file=output_file)
+
+
+def build_java_tool_options(jvm_debug_port=None):
+  """Construct the value of the JAVA_TOOL_OPTIONS environment variable to pass to
+  daemons."""
+  java_tool_options = ""
+  if jvm_debug_port is not None:
+    java_tool_options = ("-agentlib:jdwp=transport=dt_socket,address={debug_port}," +
+        "server=y,suspend=n ").format(debug_port=jvm_debug_port) + java_tool_options
+  if options.jvm_args is not None:
+    java_tool_options += " " + options.jvm_args
+  return java_tool_options
 
 def kill_matching_processes(binary_names, force=False):
   """Kills all processes with the given binary name, waiting for them to exit"""
@@ -231,18 +224,6 @@ def build_logging_args(service_name):
   return result
 
 
-def build_jvm_args(instance_num):
-  """Return a list of command line arguments to pass to start-*.sh to configure the JVM.
-  """
-  # TODO: IMPALA-7999 - Docker build doesn't use the start-*.sh scripts that process
-  # these args. Skip generating until that is fixed.
-  if options.docker_network is not None:
-    return []
-  DEFAULT_JVM_DEBUG_PORT = 30000
-  return ["-jvm_debug_port={0}".format(DEFAULT_JVM_DEBUG_PORT + instance_num),
-          "-jvm_args={0}".format(options.jvm_args)]
-
-
 def impalad_service_name(i):
   """Return the name to use for the ith impala daemon in the cluster."""
   if i == 0:
@@ -264,7 +245,7 @@ def combine_arg_list_opts(opt_args):
 
 def build_statestored_arg_list():
   """Build a list of command line arguments to pass to the statestored."""
-  return (build_logging_args("statestored") +
+  return (build_logging_args("statestored") + build_kerberos_args("statestored") +
       combine_arg_list_opts(options.state_store_args))
 
 
@@ -272,21 +253,19 @@ def build_catalogd_arg_list():
   """Build a list of command line arguments to pass to the catalogd."""
   return (build_logging_args("catalogd") +
       ["-kudu_master_hosts", options.kudu_master_hosts] +
-      combine_arg_list_opts(options.catalogd_args) +
-      build_jvm_args(options.cluster_size))
+      build_kerberos_args("catalogd") +
+      combine_arg_list_opts(options.catalogd_args))
 
 
 def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordinators,
     remap_ports):
   """Build the argument lists for impala daemons in the cluster. Returns a list of
   argument lists, one for each impala daemon in the cluster. Each argument list is
-  simply a string that will be tokenized based on shell rules. 'num_coordinators' and
-  'use_exclusive_coordinators' allow setting up the cluster with dedicated coordinators.
-  If 'remap_ports' is true, the impalad ports are changed from their default values to
-  avoid port conflicts."""
-  # TODO: it would be better to produce a list of arguments rather than a big string
-  # blob that has to be tokenized later. However, that may require more substantial
-  # refactoring.
+  a list of strings. 'num_coordinators' and 'use_exclusive_coordinators' allow setting
+  up the cluster with dedicated coordinators.  If 'remap_ports' is true, the impalad
+  ports are changed from their default values to avoid port conflicts."""
+  # TODO: currently we build a big string blob then split it. It would be better to
+  # build up the lists directly.
 
   mem_limit_arg = ""
   if options.docker_network is None:
@@ -317,13 +296,13 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
     args = ("{mem_limit_arg} "
         "{impala_logging_args} "
-        "{jvm_args} "
         "{impala_port_args} "
+        "{impala_kerberos_args} "
         "{param_args}").format(
             mem_limit_arg=mem_limit_arg,  # Goes first so --impalad_args will override it.
             impala_logging_args=" ".join(build_logging_args(service_name)),
-            jvm_args=" ".join(build_jvm_args(i)),
             impala_port_args=impala_port_args,
+            impala_kerberos_args=" ".join(build_kerberos_args("impalad")),
             param_args=param_args)
     if options.kudu_master_hosts:
       # Must be prepended, otherwise the java options interfere.
@@ -351,8 +330,27 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if i < len(per_impalad_args):
       args = "{args} {per_impalad_args}".format(
           args=args, per_impalad_args=per_impalad_args[i])
-    impalad_args.append(args)
+    impalad_args.append(shlex.split(args))
   return impalad_args
+
+
+def build_kerberos_args(daemon):
+  """If the cluster is kerberized, returns arguments to pass to daemon process.
+  daemon should either be "impalad", "catalogd" or "statestored"."""
+  # Note: this code has probably bit-rotted but is preserved in case someone needs to
+  # revive the kerberized minicluster.
+  assert daemon in ("impalad", "catalogd", "statestored")
+  if call([os.path.join(IMPALA_HOME, "testdata/cluster/admin"), "is_kerberized"]) != 0:
+    return []
+  args = ["-keytab_file={0}".format(os.getenv("KRB5_KTNAME")),
+          "-krb5_conf={0}".format(os.getenv("KRB5_CONFIG"))]
+  if daemon == "impalad":
+    args += ["-principal={0}".format(os.getenv("MINIKDC_PRINC_IMPALA")),
+             "-be_principal={0}".format(os.getenv("MINIKDC_PRINC_IMPALA_BE"))]
+  else:
+    args.append("-principal={0}".format(os.getenv("MINIKDC_PRINC_IMPALA_BE")))
+  if os.getenv("MINIKDC_DEBUG", "") == "true":
+    args.append("-krb5_debug_file=/tmp/{0}.krb5_debug".format(daemon))
 
 
 def compute_impalad_mem_limit(cluster_size):
@@ -396,9 +394,8 @@ class MiniClusterOperations(object):
   def start_statestore(self):
     LOG.info("Starting State Store logging to {log_dir}/statestored.INFO".format(
         log_dir=options.log_dir))
-    stderr_log_file_path = os.path.join(options.log_dir, "statestore-error.log")
-    args = " ".join(build_statestored_arg_list())
-    exec_impala_process(STATE_STORE_PATH, args, stderr_log_file_path)
+    output_file = os.path.join(options.log_dir, "statestore-out.log")
+    run_daemon_with_options("statestored", build_statestored_arg_list(), output_file)
     if not check_process_exists("statestored", 10):
       raise RuntimeError("Unable to start statestored. Check log or file permissions"
                          " for more details.")
@@ -406,9 +403,9 @@ class MiniClusterOperations(object):
   def start_catalogd(self):
     LOG.info("Starting Catalog Service logging to {log_dir}/catalogd.INFO".format(
         log_dir=options.log_dir))
-    stderr_log_file_path = os.path.join(options.log_dir, "catalogd-error.log")
-    args = " ".join(build_catalogd_arg_list())
-    exec_impala_process(CATALOGD_PATH, args, stderr_log_file_path)
+    output_file = os.path.join(options.log_dir, "catalogd-out.log")
+    run_daemon_with_options("catalogd", build_catalogd_arg_list(), output_file,
+        jvm_debug_port=DEFAULT_CATALOGD_JVM_DEBUG_PORT)
     if not check_process_exists("catalogd", 10):
       raise RuntimeError("Unable to start catalogd. Check log or file permissions"
                          " for more details.")
@@ -428,9 +425,10 @@ class MiniClusterOperations(object):
       service_name = impalad_service_name(i)
       LOG.info("Starting Impala Daemon logging to {log_dir}/{service_name}.INFO".format(
           log_dir=options.log_dir, service_name=service_name))
-      stderr_log_file_path = os.path.join(
-          options.log_dir, "{service_name}-error.log".format(service_name=service_name))
-      exec_impala_process(IMPALAD_PATH, impalad_arg_lists[i], stderr_log_file_path)
+      output_file = os.path.join(
+          options.log_dir, "{service_name}-out.log".format(service_name=service_name))
+      run_daemon_with_options("impalad", impalad_arg_lists[i],
+          jvm_debug_port=DEFAULT_IMPALAD_JVM_DEBUG_PORT + i, output_file=output_file)
 
 
 class DockerMiniClusterOperations(object):
@@ -495,8 +493,8 @@ class DockerMiniClusterOperations(object):
       port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
                   DEFAULT_HS2_PORT: chosen_ports['hs2_port'],
                   DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
-      self.__run_container__("impalad_coord_exec",
-          shlex.split(impalad_arg_lists[i]), port_map, i, mem_limit=mem_limit)
+      self.__run_container__("impalad_coord_exec", impalad_arg_lists[i], port_map, i,
+          mem_limit=mem_limit)
 
   def __gen_container_name__(self, daemon, instance=None):
     """Generate the name for the container, which should be unique among containers
@@ -528,7 +526,10 @@ class DockerMiniClusterOperations(object):
                    for src, dst in port_map.iteritems()]
     # Impersonate the current user for operations against the minicluster. This is
     # necessary because the user name inside the container is "root".
-    env_args = ["-e", "HADOOP_USER_NAME={0}".format(getpass.getuser())]
+    # TODO: pass in the actual options
+    env_args = ["-e", "HADOOP_USER_NAME={0}".format(getpass.getuser()),
+                "-e", "JAVA_TOOL_OPTIONS={0}".format(
+                    build_java_tool_options(DEFAULT_IMPALAD_JVM_DEBUG_PORT))]
     # The container build processes tags the generated image with the daemon name.
     image_tag = daemon
     host_name = self.__gen_host_name__(daemon, instance)

@@ -92,10 +92,10 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       file.write(redaction_rules)
 
     self._start_impala_cluster(
-        ["""--impalad_args='-audit_event_log_dir=%s
-                            -profile_log_dir=%s
-                            -redaction_rules_file=%s
-                            -vmodule=%s'"""
+        ["""--impalad_args=-audit_event_log_dir=%s
+                           -profile_log_dir=%s
+                           -redaction_rules_file=%s
+                           -vmodule=%s"""
             % (self.audit_dir, self.profile_dir, self.rules_file, vmodule)],
         impala_log_dir=self.log_dir,
         log_level=log_level)
@@ -121,7 +121,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     except Exception:
       if self.cluster.impalads:
         raise Exception("No impalads should have started")
-    with open(os.path.join(self.log_dir, 'impalad-error.log')) as file:
+    with open(os.path.join(self.log_dir, 'impalad-out.log')) as file:
       result = grep_file(file, expected_error_message)
     assert result, 'The expected error message was not found'
 
