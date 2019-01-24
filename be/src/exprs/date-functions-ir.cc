@@ -24,7 +24,6 @@
 #include "exprs/anyval-util.h"
 #include "exprs/timestamp-functions.h"
 #include "exprs/udf-builtins.h"
-#include "runtime/datetime-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "udf/udf.h"
@@ -33,9 +32,6 @@
 #include "common/names.h"
 
 namespace impala {
-
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::ParseFormatTokens;
 
 IntVal DateFunctions::Year(FunctionContext* context, const DateVal& d_val) {
   if (d_val.is_null) return IntVal::null();

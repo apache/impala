@@ -88,9 +88,11 @@ class TimestampValue {
 
   /// Constructors that parse from a date/time string. See TimestampParser for details
   /// about the date-time format.
-  static TimestampValue Parse(const std::string& str);
-  static TimestampValue Parse(const char* str, int len);
-  static TimestampValue Parse(const char* str, int len,
+  static TimestampValue ParseSimpleDateFormat(const std::string& str);
+  static TimestampValue ParseSimpleDateFormat(const char* str, int len);
+  static TimestampValue ParseSimpleDateFormat(const char* str, int len,
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx);
+  static TimestampValue ParseIsoSqlFormat(const char* str, int len,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx);
 
   /// 'days' represents the number of days since 1970-01-01.
@@ -206,15 +208,9 @@ class TimestampValue {
         && time.total_nanoseconds() < NANOS_PER_DAY;
   }
 
-  /// Formats the timestamp using the given date/time context and places the result in the
-  /// string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
-  /// string terminator will be appended to the string.
+  /// Formats the timestamp using the given date/time context and returns the result.
   /// dt_ctx -- the date/time context containing the format to use
-  /// len -- the length of the buffer
-  /// buff -- the buffer that will hold the result
-  /// Returns the number of characters copied in to the buffer (minus the terminator)
-  int Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx, int len,
-      char* buff) const;
+  std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx) const;
 
   /// Interpret 'this' as a timestamp in UTC and convert to unix time.
   /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise

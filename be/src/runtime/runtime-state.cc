@@ -69,9 +69,10 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
   : query_state_(query_state),
     fragment_ctx_(&fragment_ctx),
     instance_ctx_(&instance_ctx),
-    now_(new TimestampValue(TimestampValue::Parse(query_state->query_ctx().now_string))),
-    utc_timestamp_(new TimestampValue(
-        TimestampValue::Parse(query_state->query_ctx().utc_timestamp_string))),
+    now_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
+        query_state->query_ctx().now_string))),
+    utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
+        query_state->query_ctx().utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
     profile_(RuntimeProfile::Create(
         obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
@@ -92,8 +93,9 @@ RuntimeState::RuntimeState(
     fragment_ctx_(nullptr),
     instance_ctx_(nullptr),
     local_query_state_(query_state_),
-    now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
-    utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
+    now_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(qctx.now_string))),
+    utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
+        qctx.utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")),
     instance_buffer_reservation_(nullptr) {

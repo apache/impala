@@ -3236,4 +3236,67 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertNotNull(foundFn);
     Assert.assertEquals(Type.TIMESTAMP, foundFn.getArgs()[0]);
   }
+
+  @Test
+  public void TestCastFormatClauseFromString() throws AnalysisException {
+    AnalysisError("select cast('05-01-2017' AS DATETIME FORMAT 'MM-dd-yyyy')",
+        "Unsupported data type: DATETIME");
+    AnalysisError("select cast('05-01-2017' AS INT FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from STRING to INT");
+    AnalysisError("select cast('05-01-2017' AS STRING FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from STRING to STRING");
+    AnalysisError("select cast('05-01-2017' AS BOOLEAN FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from STRING to BOOLEAN");
+    AnalysisError("select cast('05-01-2017' AS DOUBLE FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from STRING to DOUBLE");
+    AnalysisError("select cast('05-01-2017' AS TIMESTAMP FORMAT '')",
+        "FORMAT clause can't be empty");
+    AnalyzesOk("select cast('05-01-2017' AS TIMESTAMP FORMAT 'MM-dd-yyyy')");
+    AnalyzesOk("select cast('05-01-2017' AS DATE FORMAT 'MM-dd-yyyy')");
+  }
+
+  @Test
+  public void TestCastFormatClauseFromDatetime() throws AnalysisException {
+    RunCastFormatTestOnType("TIMESTAMP");
+    RunCastFormatTestOnType("DATE");
+  }
+
+  private void RunCastFormatTestOnType(String type) {
+    String to_timestamp_cast = "cast('05-01-2017' as " + type + ")";
+    AnalysisError(
+        "select cast(" + to_timestamp_cast + " as DATETIME FORMAT 'MM-dd-yyyy')",
+        "Unsupported data type: DATETIME");
+    if (!type.equals("TIMESTAMP")) {
+      AnalysisError(
+          "select cast(" + to_timestamp_cast + " as TIMESTAMP FORMAT 'MM-dd-yyyy')",
+          "FORMAT clause is not applicable from " + type + " to TIMESTAMP");
+    }
+    if (!type.equals("DATE")) {
+      AnalysisError("select cast(" + to_timestamp_cast + " as DATE FORMAT 'MM-dd-yyyy')",
+          "FORMAT clause is not applicable from " + type + " to DATE");
+    }
+    AnalysisError("select cast(" + to_timestamp_cast + " AS INT FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from " + type +" to INT");
+    AnalysisError("select cast(" + to_timestamp_cast + " AS BOOLEAN FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from " + type + " to BOOLEAN");
+    AnalysisError("select cast(" + to_timestamp_cast + " AS DOUBLE FORMAT 'MM-dd-yyyy')",
+        "FORMAT clause is not applicable from " + type + " to DOUBLE");
+    AnalysisError("select cast(" + to_timestamp_cast + " AS STRING FORMAT '')",
+        "FORMAT clause can't be empty");
+    AnalyzesOk("select cast(" + to_timestamp_cast + " AS STRING FORMAT 'MM-dd-yyyy')");
+    AnalyzesOk("select cast(" + to_timestamp_cast + " AS VARCHAR FORMAT 'MM-dd-yyyy')");
+    AnalyzesOk("select cast(" + to_timestamp_cast + " AS CHAR(10) FORMAT 'MM-dd-yyyy')");
+  }
+
+  @Test
+  public void TestToStringOnCastFormatClause() throws AnalysisException {
+    String cast_str = "CAST('05-01-2017' AS TIMESTAMP FORMAT \"MM-dd-yyyy\")";
+    SelectStmt select = (SelectStmt) AnalyzesOk("select " + cast_str);
+    Assert.assertEquals(cast_str, select.getResultExprs().get(0).toSqlImpl());
+
+    cast_str = "CAST('05-01-2017' AS DATE FORMAT \"MM-dd-yyyy\")";
+    select = (SelectStmt) AnalyzesOk("select " + cast_str);
+    Assert.assertEquals(cast_str, select.getResultExprs().get(0).toSqlImpl());
+  }
+
 }

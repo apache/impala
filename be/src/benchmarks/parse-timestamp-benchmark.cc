@@ -21,6 +21,8 @@
 #include <vector>
 #include <sstream>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include "runtime/datetime-iso-sql-format-tokenizer.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
@@ -39,28 +41,29 @@ using boost::posix_time::to_iso_extended_string;
 using boost::posix_time::to_simple_string;
 using namespace impala;
 
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::InitParseCtx;
-using datetime_parse_util::ParseFormatTokens;
+using namespace datetime_parse_util;
 
-// Benchmark for parsing timestamps.
-// Machine Info: Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz
-// ParseDate:            Function     Rate (iters/ms)          Comparison
-// ----------------------------------------------------------------------
-//                BoostStringDate               1.277                  1X
-//                      BoostDate               1.229              0.962X
-//                         Impala               16.83              13.17X
+// ParseDate:                 Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                     BoostStringDate              0.654    0.682    0.717         1X         1X         1X
+//                           BoostDate              0.642    0.667    0.691     0.981X     0.978X     0.964X
+//                              Impala               6.58     6.79     7.11      10.1X      9.96X      9.91X
 //
-// ParseTimestamp:       Function     Rate (iters/ms)          Comparison
-// ----------------------------------------------------------------------
-//                      BoostTime              0.9074                  1X
-//                         Impala               15.01              16.54X
+// ParseTimestamp:            Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                           BoostTime               0.48    0.491     0.51         1X         1X         1X
+//                              Impala               6.03     6.38     6.54      12.6X        13X      12.8X
 //
-// ParseTimestampWithFormat:Function  Rate (iters/ms)          Comparison
-// ----------------------------------------------------------------------
-//                  BoostDateTime              0.4488                  1X
-//                ImpalaTimeStamp               37.41              83.35X
-//              ImpalaTZTimeStamp               37.39               83.3X
+// ParseTimestampWithFormat:  Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                       BoostDateTime               0.24     0.25     0.26         1X         1X         1X
+//     ImpalaSimpleDateFormatTimeStamp                 16     16.7     17.2      66.8X      66.8X      66.3X
+//   ImpalaSimpleDateFormatTZTimeStamp               16.1     16.7     17.1      67.2X      66.7X      65.8X
+//         ImpalaIsoSqlFormatTimeStamp               8.12     8.42     8.71      33.8X      33.7X      33.5X
+//       ImpalaIsoSqlFormatTZTimeStamp               8.12     8.56     8.85      33.8X      34.2X        34X
 
 struct TestData {
   vector<StringValue> data;
@@ -68,8 +71,10 @@ struct TestData {
   vector<TimestampValue> result;
 };
 
-DateTimeFormatContext dt_ctx;
-DateTimeFormatContext dt_ctx_tz;
+DateTimeFormatContext dt_ctx_simple_date_format;
+DateTimeFormatContext dt_ctx_tz_simple_date_format;
+DateTimeFormatContext dt_ctx_iso_sql_format;
+DateTimeFormatContext dt_ctx_tz_iso_sql_format;
 
 void AddTestData(TestData* data, const string& input) {
   data->memory.push_back(input);
@@ -127,12 +132,13 @@ void AddTestDataTZDateTimes(TestData* data, int n, const string& startstr) {
   }
 }
 
-void TestImpalaDate(int batch_size, void* d) {
+void TestImpalaSimpleDateFormat(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len);
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
+          data->data[j].len);
     }
   }
 }
@@ -169,24 +175,46 @@ void TestBoostTime(int batch_size, void* d) {
   }
 }
 
-void TestImpalaTimestamp(int batch_size, void* d) {
+void TestImpalaSimpleDateFormatTimestamp(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len,
-          dt_ctx);
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
+          data->data[j].len, dt_ctx_simple_date_format);
     }
   }
 }
 
-void TestImpalaTZTimestamp(int batch_size, void* d) {
+void TestImpalaIsoSqlFormatTimestamp(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len,
-          dt_ctx_tz);
+      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].ptr,
+          data->data[j].len, dt_ctx_iso_sql_format);
+    }
+  }
+}
+
+void TestImpalaIsoSqlFormatTZTimestamp(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  for (int i = 0; i < batch_size; ++i) {
+    int n = data->data.size();
+    for (int j = 0; j < n; ++j) {
+      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].ptr,
+          data->data[j].len, dt_ctx_tz_iso_sql_format);
+    }
+  }
+}
+
+void TestImpalaSimpleDateFormatTZTimestamp(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  for (int i = 0; i < batch_size; ++i) {
+    int n = data->data.size();
+    for (int j = 0; j < n; ++j) {
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
+          data->data[j].len, dt_ctx_tz_simple_date_format);
     }
   }
 }
@@ -206,14 +234,15 @@ int main(int argc, char **argv) {
   CpuInfo::Init();
   cout << Benchmark::GetMachineInfo() << endl;
 
-  InitParseCtx();
+  SimpleDateFormatTokenizer::InitCtx();
+  SimpleDateFormatParser::InitCtx();
 
   TestData dates, times, datetimes, tzdatetimes;
 
-  AddTestDataDates(&dates, 1000, "1953-04-22");
-  AddTestDataTimes(&times, 1000, "01:02:03.45678");
-  AddTestDataDateTimes(&datetimes, 1000, "1953-04-22 01:02:03");
-  AddTestDataTZDateTimes(&tzdatetimes, 1000, "1990-04-22 01:10:03");
+  AddTestDataDates(&dates, 700, "1953-04-22");
+  AddTestDataTimes(&times, 700, "01:02:03.45678");
+  AddTestDataDateTimes(&datetimes, 700, "1953-04-22 01:02:03");
+  AddTestDataTZDateTimes(&tzdatetimes, 700, "1990-04-22 01:10:03");
 
   dates.result.resize(dates.data.size());
   times.result.resize(times.data.size());
@@ -223,24 +252,37 @@ int main(int argc, char **argv) {
   Benchmark date_suite("ParseDate");
   date_suite.AddBenchmark("BoostStringDate", TestBoostStringDate, &dates);
   date_suite.AddBenchmark("BoostDate", TestBoostDate, &dates);
-  date_suite.AddBenchmark("Impala", TestImpalaDate, &dates);
+  date_suite.AddBenchmark("Impala", TestImpalaSimpleDateFormat, &dates);
 
   Benchmark timestamp_suite("ParseTimestamp");
   timestamp_suite.AddBenchmark("BoostTime", TestBoostTime, &times);
-  timestamp_suite.AddBenchmark("Impala", TestImpalaDate, &times);
+  timestamp_suite.AddBenchmark("Impala", TestImpalaSimpleDateFormat, &times);
 
-  dt_ctx.Reset("yyyy-MM-dd HH:mm:ss", 19);
-  ParseFormatTokens(&dt_ctx);
-  dt_ctx_tz.Reset("yyyy-MM-dd HH:mm:ss+hh:mm", 25);
-  ParseFormatTokens(&dt_ctx_tz);
+  dt_ctx_simple_date_format.Reset("yyyy-MM-dd HH:mm:ss", 19);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_simple_date_format);
+  dt_ctx_tz_simple_date_format.Reset("yyyy-MM-dd HH:mm:ss+hh:mm", 25);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_tz_simple_date_format);
+
+  dt_ctx_iso_sql_format.Reset("YYYY-MM-DD HH24:MI:SS", 21);
+  datetime_parse_util::IsoSqlFormatTokenizer tokenizer(&dt_ctx_iso_sql_format,
+      datetime_parse_util::PARSE, true);
+  tokenizer.Tokenize();
+
+  dt_ctx_tz_iso_sql_format.Reset("YYYY-MM-DD HH24:MI:SSTZH:TZM", 28);
+  tokenizer.Reset(&dt_ctx_tz_iso_sql_format, datetime_parse_util::PARSE, true);
+  tokenizer.Tokenize();
 
   Benchmark timestamp_with_format_suite("ParseTimestampWithFormat");
   timestamp_with_format_suite.AddBenchmark("BoostDateTime",
       TestBoostDateTime, &datetimes);
-  timestamp_with_format_suite.AddBenchmark("ImpalaTimeStamp",
-      TestImpalaTimestamp, &datetimes);
-  timestamp_with_format_suite.AddBenchmark("ImpalaTZTimeStamp",
-      TestImpalaTZTimestamp, &tzdatetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaSimpleDateFormatTimeStamp",
+      TestImpalaSimpleDateFormatTimestamp, &datetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaSimpleDateFormatTZTimeStamp",
+      TestImpalaSimpleDateFormatTZTimestamp, &tzdatetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaIsoSqlFormatTimeStamp",
+      TestImpalaIsoSqlFormatTimestamp, &datetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaIsoSqlFormatTZTimeStamp",
+        TestImpalaIsoSqlFormatTZTimestamp, &tzdatetimes);
 
   cout << date_suite.Measure();
   cout << endl;

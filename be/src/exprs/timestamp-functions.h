@@ -239,10 +239,6 @@ class TimestampFunctions {
   /// TODO: eventually return format converted from Java to Boost.
   static StringValue* CheckFormat(StringValue* format);
 
-  /// Issue a warning for a bad format string.
-  static void ReportBadFormat(FunctionContext* context,
-      const StringVal& format, bool is_error);
-
  private:
   /// Static result values for DayName() function.
   static const std::string DAY_ARRAY[7];

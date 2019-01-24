@@ -85,13 +85,13 @@ std::vector<std::string> RandomStrVec(Generator& gen, const int length,
 template <typename Generator = std::mt19937>
 std::vector<TimestampValue> RandomTimestampVec(Generator& gen, const int length) {
   const TimestampValue min_date =
-      TimestampValue::Parse("1400-01-01 00:00:00");
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00");
   int64_t min_millis;
   bool min_success = min_date.FloorUtcToUnixTimeMillis(&min_millis);
   DCHECK(min_success);
 
   const TimestampValue max_date =
-      TimestampValue::Parse("9999-12-31 23:59:59");
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59");
   int64_t max_millis;
   bool max_success = max_date.FloorUtcToUnixTimeMillis(&max_millis);
   DCHECK(max_success);

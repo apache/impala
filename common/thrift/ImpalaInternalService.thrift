@@ -394,6 +394,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   94: optional i64 fetch_rows_timeout_ms = 10000;
+
+  // For testing purposes
+  95: optional string now_string = "";
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -20,8 +20,8 @@
 
 #include "cctz/civil_time.h"
 #include "common/status.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/date-value.h"
-#include "runtime/datetime-parse-util.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
@@ -33,8 +33,7 @@ using boost::posix_time::time_duration;
 
 namespace impala {
 
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::ParseFormatTokens;
+using namespace datetime_parse_util;
 
 inline void ValidateDate(const DateValue& dv, int exp_year, int exp_month, int exp_day,
     const string& desc) {
@@ -48,7 +47,7 @@ inline void ValidateDate(const DateValue& dv, int exp_year, int exp_month, int e
 inline DateValue ParseValidateDate(const char* s, bool accept_time_toks, int exp_year,
     int exp_month, int exp_day) {
   DCHECK(s != nullptr);
-  DateValue v = DateValue::Parse(s, strlen(s), accept_time_toks);
+  DateValue v = DateValue::ParseSimpleDateFormat(s, strlen(s), accept_time_toks);
   ValidateDate(v, exp_year, exp_month, exp_day, s);
   return v;
 }
@@ -98,20 +97,20 @@ TEST(DateTest, ParseDefault) {
   // Bad formats: invalid date component.
   for (const char* s: {"1990-10", "1991-10-32", "1990-10-", "10:11:12 1991-10-10",
       "02011-01-01", "999-01-01", "2012-01-200", "2011-001-01"}) {
-    EXPECT_FALSE(DateValue::Parse(s, strlen(s), false).IsValid()) << s;
+    EXPECT_FALSE(DateValue::ParseSimpleDateFormat(s, strlen(s), false).IsValid()) << s;
   }
   // Bad formats: valid date and time components but time component is rejected.
   for (const char* s: {"2012-01-20 10:11:12", "2012-1-2 10:11:12"}) {
-    EXPECT_FALSE(DateValue::Parse(s, strlen(s), false).IsValid()) << s;
+    EXPECT_FALSE(DateValue::ParseSimpleDateFormat(s, strlen(s), false).IsValid()) << s;
   }
   // Bad formats: valid date component, invalid time component.
   for (const char* s: {"2012-01-20 10:11:", "2012-1-2 10::12", "2012-01-20 :11:12",
       "2012-01-20 24:11:12", "2012-01-20 23:60:12"}) {
-    EXPECT_FALSE(DateValue::Parse(s, strlen(s), true).IsValid()) << s;
+    EXPECT_FALSE(DateValue::ParseSimpleDateFormat(s, strlen(s), true).IsValid()) << s;
   }
   // Bad formats: missing date component, valid time component.
   for (const char* s: {"10:11:12", "1:11:12", "10:1:12", "10:1:2.999"}) {
-    EXPECT_FALSE(DateValue::Parse(s, strlen(s), true).IsValid()) << s;
+    EXPECT_FALSE(DateValue::ParseSimpleDateFormat(s, strlen(s), true).IsValid()) << s;
   }
 }
 
@@ -155,17 +154,14 @@ void TestDateTokens(const vector<DateToken>& toks, int year, int month, int day,
 
   string fmt_val = "Format: " + fmt + ", Val: " + val;
   DateTimeFormatContext dt_ctx(fmt.c_str());
-  ASSERT_TRUE(ParseFormatTokens(&dt_ctx, false)) << fmt_val;
-  DateValue dv = DateValue::Parse(val.c_str(), val.length(), dt_ctx);
+  ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false)) << fmt_val;
+  DateValue dv = DateValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
   ValidateDate(dv, year, month, day, fmt_val);
 
-  vector<char> buff(dt_ctx.fmt_out_len + 1);
-  int actual_len = dv.Format(dt_ctx, buff.size(), buff.data());
-  EXPECT_GT(actual_len, 0) << fmt_val;
-  EXPECT_LE(actual_len, dt_ctx.fmt_len) << fmt_val;
-
-  string buff_str(buff.data());
-  EXPECT_EQ(buff_str, val) << fmt_val <<  " " << buff_str;
+  string buff = dv.Format(dt_ctx);
+  EXPECT_TRUE(!buff.empty()) << fmt_val;
+  EXPECT_LE(buff.length(), dt_ctx.fmt_len) << fmt_val;
+  EXPECT_EQ(buff, val) << fmt_val <<  " " << buff;
 }
 
 // This function will generate all permutations of tokens to test that the parsing and
@@ -266,14 +262,14 @@ struct DateTC {
 
   void Run(int id, const TimestampValue& now) const {
     DateTimeFormatContext dt_ctx(fmt);
-    dt_ctx.SetCenturyBreak(now);
+    dt_ctx.SetCenturyBreakAndCurrentTime(now);
 
     stringstream desc;
     desc << "DateTC [" << id << "]: " << " fmt:" << fmt << " str:" << str
       << " expected date:" << expected_year << "/" << expected_month << "/"
       << expected_day;
 
-    bool parse_result = ParseFormatTokens(&dt_ctx, false);
+    bool parse_result = SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false);
     if (fmt_should_fail) {
       EXPECT_FALSE(parse_result) << desc.str();
       return;
@@ -281,7 +277,7 @@ struct DateTC {
       ASSERT_TRUE(parse_result) << desc.str();
     }
 
-    DateValue cust_dv = DateValue::Parse(str, strlen(str), dt_ctx);
+    DateValue cust_dv = DateValue::ParseSimpleDateFormat(str, strlen(str), dt_ctx);
     if (str_should_fail) {
       EXPECT_FALSE(cust_dv.IsValid()) << desc.str();
       return;
@@ -293,11 +289,10 @@ struct DateTC {
     // Check formatted date
     if (!should_format) return;
 
-    vector<char> buff(dt_ctx.fmt_out_len + 1);
-    int actual_len = cust_dv.Format(dt_ctx, buff.size(), buff.data());
-    EXPECT_GT(actual_len, 0) << desc.str();
-    EXPECT_LE(actual_len, dt_ctx.fmt_len) << desc.str();
-    EXPECT_EQ(string(str, strlen(str)), string(buff.data(), actual_len)) << desc.str();
+    string buff = cust_dv.Format(dt_ctx);
+    EXPECT_TRUE(!buff.empty()) << desc.str();
+    EXPECT_LE(buff.length(), dt_ctx.fmt_len) << desc.str();
+    EXPECT_EQ(string(str, strlen(str)), buff) << desc.str();
   }
 };
 
@@ -496,23 +491,22 @@ struct DateFormatTC {
 
   void Run(int id, const TimestampValue& now) const {
     DateTimeFormatContext dt_ctx(fmt);
-    dt_ctx.SetCenturyBreak(now);
+    dt_ctx.SetCenturyBreakAndCurrentTime(now);
 
     stringstream desc;
     desc << "DateFormatTC [" << id << "]: " << "days_since_epoch:" << days_since_epoch
          << " fmt:" << fmt << " str:" << str;
 
-    ASSERT_TRUE(ParseFormatTokens(&dt_ctx, false)) << desc.str();
+    ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false)) << desc.str();
 
     const DateValue cust_dv(days_since_epoch);
     EXPECT_TRUE(cust_dv.IsValid()) << desc.str();
     EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len) << desc.str();
 
-    vector<char> buff(dt_ctx.fmt_out_len + 1);
-    int actual_len = cust_dv.Format(dt_ctx, buff.size(), buff.data());
-    EXPECT_GT(actual_len, 0) << desc.str();
-    EXPECT_LE(actual_len, dt_ctx.fmt_out_len) << desc.str();
-    EXPECT_EQ(string(buff.data(), actual_len), string(str, strlen(str))) << desc.str();
+    string buff = cust_dv.Format(dt_ctx);
+    EXPECT_TRUE(!buff.empty()) << desc.str();
+    EXPECT_LE(buff.length(), dt_ctx.fmt_out_len) << desc.str();
+    EXPECT_EQ(buff, string(str, strlen(str))) << desc.str();
   }
 
 };

@@ -21,6 +21,8 @@
 
 #include "cctz/civil_time.h"
 #include "exprs/timestamp-functions.h"
+#include "runtime/datetime-iso-sql-format-parser.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
@@ -33,27 +35,10 @@ using boost::posix_time::time_duration;
 
 namespace impala {
 
-using datetime_parse_util::DEFAULT_DATE_CTX;
-using datetime_parse_util::DEFAULT_DATE_FMT_LEN;
+using namespace datetime_parse_util;
 
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::DateTimeFormatToken;
-using datetime_parse_util::DateTimeParseResult;
-
-using datetime_parse_util::IsParseCtxInitialized;
-using datetime_parse_util::ParseDateTime;
-using datetime_parse_util::ParseFormatTokensByStr;
-using datetime_parse_util::ParseDefaultFormatTokensByStr;
-
-using datetime_parse_util::YEAR;
-using datetime_parse_util::MONTH_IN_YEAR;
-using datetime_parse_util::MONTH_IN_YEAR_SLT;
-using datetime_parse_util::DAY_IN_MONTH;
-using datetime_parse_util::SEPARATOR;
-
-bool DateParser::Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
-    DateValue* date) {
-  DCHECK(IsParseCtxInitialized());
+bool DateParser::ParseSimpleDateFormat(const char* str, int len,
+    const DateTimeFormatContext& dt_ctx, DateValue* date) {
   DCHECK(dt_ctx.toks.size() > 0);
   // 'dt_ctx' must have date tokens. Time tokens are accepted but ignored.
   DCHECK(dt_ctx.has_date_toks);
@@ -61,7 +46,7 @@ bool DateParser::Parse(const char* str, int len, const DateTimeFormatContext& dt
 
   DateTimeParseResult dt_result;
   if (UNLIKELY(str == nullptr || len <= 0
-      || !ParseDateTime(str, len, dt_ctx, &dt_result))) {
+      || !SimpleDateFormatParser::ParseDateTime(str, len, dt_ctx, &dt_result))) {
     *date = DateValue();
     return false;
   }
@@ -101,13 +86,10 @@ int DateParser::RealignYear(const DateTimeParseResult& dt_result,
   return year;
 }
 
-bool DateParser::Parse(const char* str, int len, bool accept_time_toks, DateValue* date) {
-  DCHECK(IsParseCtxInitialized());
+bool DateParser::ParseSimpleDateFormat(const char* str, int len, bool accept_time_toks,
+    DateValue* date) {
   DCHECK(date != nullptr);
-  if (UNLIKELY(str == nullptr)) {
-    *date = DateValue();
-    return false;
-  }
+  if (UNLIKELY(str == nullptr)) return IndicateDateParseFailure(date);
 
   int trimmed_len = len;
   // Remove leading white space.
@@ -117,48 +99,59 @@ bool DateParser::Parse(const char* str, int len, bool accept_time_toks, DateValu
   }
   // Strip the trailing blanks.
   while (trimmed_len > 0 && isspace(str[trimmed_len - 1])) --trimmed_len;
+  if (UNLIKELY(trimmed_len <= 0)) return IndicateDateParseFailure(date);
 
-  if (UNLIKELY(trimmed_len <= 0)) {
-    *date = DateValue();
-    return false;
-  }
-
-  // Determine the default formatting context that's required for parsing.
-  const DateTimeFormatContext* dt_ctx = ParseDefaultFormatTokensByStr(str, trimmed_len,
-      accept_time_toks, false);
-
-  if (dt_ctx != nullptr) return Parse(str, trimmed_len, *dt_ctx, date);
+  const DateTimeFormatContext* dt_ctx =
+      SimpleDateFormatTokenizer::GetDefaultFormatContext(str, trimmed_len,
+          accept_time_toks, false);
+  if (dt_ctx != nullptr) return ParseSimpleDateFormat(str, trimmed_len, *dt_ctx, date);
 
   // Generating context lazily as a fall back if default formats fail.
   // ParseFormatTokenByStr() does not require a template format string.
   DateTimeFormatContext lazy_ctx(str, trimmed_len);
-  if (!ParseFormatTokensByStr(&lazy_ctx, accept_time_toks, false)) {
-    *date = DateValue();
-    return false;
+  if (!SimpleDateFormatTokenizer::TokenizeByStr(&lazy_ctx, accept_time_toks, false)) {
+    return IndicateDateParseFailure(date);
   }
-  return Parse(str, trimmed_len, lazy_ctx, date);
+  return ParseSimpleDateFormat(str, trimmed_len, lazy_ctx, date);
 }
 
-int DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& date,
-    int len, char* buff) {
-  DCHECK(IsParseCtxInitialized());
+bool DateParser::ParseIsoSqlFormat(const char* str, int len,
+      const DateTimeFormatContext& dt_ctx, DateValue* date) {
+  DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(date != nullptr);
+  DCHECK(dt_ctx.has_date_toks);
+
+  if (UNLIKELY(str == nullptr || len <= 0)) return IndicateDateParseFailure(date);
+
+  DateTimeParseResult dt_result;
+  bool result = IsoSqlFormatParser::ParseDateTime(str, len, dt_ctx, &dt_result);
+  if (!result) return IndicateDateParseFailure(date);
+
+  *date = DateValue(dt_result.year, dt_result.month, dt_result.day);
+  return date->IsValid();
+}
+
+string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& date) {
   DCHECK(dt_ctx.toks.size() > 0);
   DCHECK(dt_ctx.has_date_toks && !dt_ctx.has_time_toks);
-  DCHECK(len > dt_ctx.fmt_out_len);
-  DCHECK(buff != nullptr);
 
   int year, month, day;
-  if (!date.ToYearMonthDay(&year, &month, &day)) return -1;
+  if (!date.ToYearMonthDay(&year, &month, &day)) return "";
 
-  char* str = buff;
+  string result;
+  result.reserve(dt_ctx.fmt_out_len);
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
     const char* str_val = nullptr;
     int str_val_len = 0;
     switch (tok.type) {
-      case YEAR: {
+      case YEAR:
+      case ROUND_YEAR: {
         num_val = year;
-        if (tok.len <= 3) num_val %= 100;
+        if (tok.len < 4) {
+          int adjust_factor = std::pow(10, tok.len);
+          num_val %= adjust_factor;
+        }
         break;
       }
       case MONTH_IN_YEAR: num_val = month; break;
@@ -168,6 +161,10 @@ int DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& dat
         break;
       }
       case DAY_IN_MONTH: num_val = day; break;
+      case DAY_IN_YEAR: {
+        num_val = GetDayInYear(year, month, day);
+        break;
+      }
       case SEPARATOR: {
         str_val = tok.val;
         str_val_len = tok.len;
@@ -176,15 +173,20 @@ int DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& dat
       default: DCHECK(false) << "Unknown date format token";
     }
     if (num_val > -1) {
-      str += sprintf(str, "%0*d", tok.len, num_val);
+      string tmp_str = std::to_string(num_val);
+      if (tmp_str.length() < tok.len) tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      result.append(tmp_str);
     } else {
-      memcpy(str, str_val, str_val_len);
-      str += str_val_len;
+      DCHECK(str_val != nullptr && str_val_len > 0);
+      result.append(str_val, str_val_len);
     }
   }
-  /// Terminate the string
-  *str = '\0';
-  return str - buff;
+  return result;
+}
+
+bool DateParser::IndicateDateParseFailure(DateValue* date) {
+  *date = DateValue();
+  return false;
 }
 
 }

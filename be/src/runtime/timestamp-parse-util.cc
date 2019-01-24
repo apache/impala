@@ -17,11 +17,16 @@
 
 #include "runtime/timestamp-parse-util.h"
 
+#include "common/names.h"
+#include "runtime/datetime-iso-sql-format-parser.h"
+#include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
+#include "udf/udf-internal.h"
 #include "util/string-parser.h"
 
-#include "common/names.h"
+#include "cctype"
 
 using boost::gregorian::date;
 using boost::gregorian::date_duration;
@@ -35,17 +40,18 @@ namespace impala {
 
 using namespace datetime_parse_util;
 
-// Helper for TimestampParse::Parse to produce return value and set output parameters
-// when parsing fails. 'd' and 't' must be non-NULL.
+// Helper for parse functions to produce return value and set output parameters when
+// parsing fails. 'd' and 't' must be non-NULL.
 static bool IndicateTimestampParseFailure(date* d, time_duration* t) {
+  DCHECK(d != nullptr);
+  DCHECK(t != nullptr);
   *d = date();
   *t = time_duration(not_a_date_time);
   return false;
 }
 
-bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
-    boost::posix_time::time_duration* t) {
-  DCHECK(IsParseCtxInitialized());
+bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
+    boost::gregorian::date* d, boost::posix_time::time_duration* t) {
   DCHECK(d != nullptr);
   DCHECK(t != nullptr);
   if (UNLIKELY(str == nullptr)) return IndicateTimestampParseFailure(d, t);
@@ -61,9 +67,10 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
   // Strip if there is a 'Z' suffix
   if (trimmed_len > 0 && str[trimmed_len - 1] == 'Z') {
     --trimmed_len;
-  } else if (trimmed_len > DEFAULT_TIME_FMT_LEN && (str[4] == '-' || str[2] == ':')) {
+  } else if (trimmed_len > SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN &&
+      (str[4] == '-' || str[2] == ':')) {
     // Strip timezone offset if it seems like a valid timestamp string.
-    int curr_pos = DEFAULT_TIME_FMT_LEN;
+    int curr_pos = SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN;
     // Timezone offset will be at least two bytes long, no need to check last
     // two bytes.
     while (curr_pos < trimmed_len - 2) {
@@ -77,18 +84,24 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
   if (UNLIKELY(trimmed_len <= 0)) return IndicateTimestampParseFailure(d, t);
 
   // Determine the length of relevant input, if we're using one of the default formats.
-  int default_fmt_len = min(trimmed_len, DEFAULT_DATE_TIME_FMT_LEN);
+  int default_fmt_len = min(trimmed_len,
+      SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN);
   // Determine the default formatting context that's required for parsing.
-  const DateTimeFormatContext* dt_ctx = ParseDefaultFormatTokensByStr(str,
-      default_fmt_len, true, true);
+  const DateTimeFormatContext* dt_ctx =
+      SimpleDateFormatTokenizer::GetDefaultFormatContext(str, default_fmt_len, true,
+          true);
 
-  if (dt_ctx != nullptr) return Parse(str, default_fmt_len, *dt_ctx, d, t);
+  if (dt_ctx != nullptr) {
+    return ParseSimpleDateFormat(str, default_fmt_len, *dt_ctx, d, t);
+  }
   // Generating context lazily as a fall back if default formats fail.
   // ParseFormatTokenByStr() does not require a template format string.
   DateTimeFormatContext lazy_ctx(str, trimmed_len);
-  if (!ParseFormatTokensByStr(&lazy_ctx)) return IndicateTimestampParseFailure(d, t);
+  if (!SimpleDateFormatTokenizer::TokenizeByStr(&lazy_ctx)) {
+    return IndicateTimestampParseFailure(d, t);
+  }
   dt_ctx = &lazy_ctx;
-  return Parse(str, trimmed_len, *dt_ctx, d, t);
+  return ParseSimpleDateFormat(str, trimmed_len, *dt_ctx, d, t);
 }
 
 date TimestampParser::RealignYear(const DateTimeParseResult& dt_result,
@@ -117,28 +130,26 @@ date TimestampParser::RealignYear(const DateTimeParseResult& dt_result,
   }
 }
 
-bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
-    date* d, time_duration* t) {
-  DCHECK(IsParseCtxInitialized());
-  DCHECK(dt_ctx.toks.size() > 0);
-  DCHECK(d != NULL);
-  DCHECK(t != NULL);
-  DateTimeParseResult dt_result;
-  int day_offset = 0;
-  if (UNLIKELY(str == NULL || len <= 0 || !ParseDateTime(str, len, dt_ctx, &dt_result))) {
-    return IndicateTimestampParseFailure(d, t);
+int TimestampParser::AdjustWithTimezone(time_duration* t,
+    const time_duration& tz_offset) {
+  *t -= tz_offset;
+  if (t->is_negative()) {
+    *t += hours(24);
+    return -1;
+  } else if (t->hours() >= 24) {
+    *t -= hours(24);
+    return 1;
   }
+  return 0;
+}
+
+bool TimestampParser::PopulateParseResult(const DateTimeFormatContext& dt_ctx,
+    const DateTimeParseResult& dt_result, date* d, time_duration* t) {
+  int day_offset = 0;
   if (dt_ctx.has_time_toks) {
     *t = time_duration(dt_result.hour, dt_result.minute,
         dt_result.second, dt_result.fraction);
-    *t -= dt_result.tz_offset;
-    if (t->is_negative()) {
-      *t += hours(24);
-      day_offset = -1;
-    } else if (t->hours() >= 24) {
-      *t -= hours(24);
-      day_offset = 1;
-    }
+    day_offset = AdjustWithTimezone(t, dt_result.tz_offset);
   } else {
     *t = time_duration(0, 0, 0, 0);
   }
@@ -161,8 +172,8 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
       }
     } catch (boost::exception&) {
       VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
-               << dt_result.day;
-      return IndicateTimestampParseFailure(d, t);
+          << dt_result.day;
+      return false;
     }
   } else {
     *d = date();
@@ -170,24 +181,59 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
   return true;
 }
 
-int TimestampParser::Format(const DateTimeFormatContext& dt_ctx,
-    const boost::gregorian::date& d, const boost::posix_time::time_duration& t,
-    int len, char* buff) {
-  DCHECK(IsParseCtxInitialized());
+bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
+    const DateTimeFormatContext& dt_ctx, date* d, time_duration* t) {
   DCHECK(dt_ctx.toks.size() > 0);
-  DCHECK(len > dt_ctx.fmt_out_len);
-  DCHECK(buff != NULL);
-  if (dt_ctx.has_date_toks && d.is_special()) return -1;
-  if (dt_ctx.has_time_toks && t.is_special()) return -1;
-  char* str = buff;
+  DCHECK(d != nullptr);
+  DCHECK(t != nullptr);
+  DateTimeParseResult dt_result;
+  if (UNLIKELY(str == nullptr || len <= 0 ||
+      !SimpleDateFormatParser::ParseDateTime(str, len, dt_ctx, &dt_result))) {
+    return IndicateTimestampParseFailure(d, t);
+  }
+  if (!PopulateParseResult(dt_ctx, dt_result, d, t)) {
+    return IndicateTimestampParseFailure(d, t);
+  }
+  return true;
+}
+
+bool TimestampParser::ParseIsoSqlFormat(const char* str, int len,
+    const DateTimeFormatContext& dt_ctx, date* d, time_duration* t) {
+  DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(d != nullptr);
+  DCHECK(t != nullptr);
+  if (UNLIKELY(str == nullptr || len <= 0)) return IndicateTimestampParseFailure(d, t);
+
+  DateTimeParseResult dt_result;
+  if (!IsoSqlFormatParser::ParseDateTime(str, len, dt_ctx, &dt_result)) {
+    return IndicateTimestampParseFailure(d, t);
+  }
+
+  if (!PopulateParseResult(dt_ctx, dt_result, d, t)) {
+    return IndicateTimestampParseFailure(d, t);
+  }
+  return true;
+}
+
+string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& d,
+      const time_duration& t) {
+  DCHECK(dt_ctx.toks.size() > 0);
+  if (dt_ctx.has_date_toks && d.is_special()) return "";
+  if (dt_ctx.has_time_toks && t.is_special()) return "";
+  string result;
+  result.reserve(dt_ctx.fmt_out_len);
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
     const char* str_val = NULL;
     int str_val_len = 0;
     switch (tok.type) {
-      case YEAR: {
+      case YEAR:
+      case ROUND_YEAR: {
         num_val = d.year();
-        if (tok.len <= 3) num_val %= 100;
+        if (tok.len < 4) {
+          int adjust_factor = std::pow(10, tok.len);
+          num_val %= adjust_factor;
+        }
         break;
       }
       case MONTH_IN_YEAR: num_val = d.month().as_number(); break;
@@ -197,15 +243,40 @@ int TimestampParser::Format(const DateTimeFormatContext& dt_ctx,
         break;
       }
       case DAY_IN_MONTH: num_val = d.day(); break;
+      case DAY_IN_YEAR: {
+        num_val = GetDayInYear(d.year(), d.month(), d.day());
+        break;
+      }
       case HOUR_IN_DAY: num_val = t.hours(); break;
+      case HOUR_IN_HALF_DAY: {
+        num_val = t.hours();
+        if (num_val == 0) num_val = 12;
+        if (num_val > 12) num_val -= 12;
+        break;
+      }
+      case MERIDIEM_INDICATOR: {
+        const MERIDIEM_INDICATOR_TEXT* indicator_txt = (tok.len == 2) ? &AM : &AM_LONG;
+        if (t.hours() >= 12) {
+          indicator_txt = (tok.len == 2) ? &PM : &PM_LONG;
+        }
+        str_val_len = tok.len;
+        str_val = (isupper(*tok.val)) ? indicator_txt->first : indicator_txt->second;
+        break;
+      }
       case MINUTE_IN_HOUR: num_val = t.minutes(); break;
       case SECOND_IN_MINUTE: num_val = t.seconds(); break;
+      case SECOND_IN_DAY: {
+          num_val = t.hours() * 3600 + t.minutes() * 60 + t.seconds();
+          break;
+      }
       case FRACTION: {
         num_val = t.fractional_seconds();
         if (num_val > 0) for (int j = tok.len; j < 9; ++j) num_val /= 10;
         break;
       }
-      case SEPARATOR: {
+      case SEPARATOR:
+      case ISO8601_TIME_INDICATOR:
+      case ISO8601_ZULU_INDICATOR: {
         str_val = tok.val;
         str_val_len = tok.len;
         break;
@@ -216,15 +287,15 @@ int TimestampParser::Format(const DateTimeFormatContext& dt_ctx,
       default: DCHECK(false) << "Unknown date/time format token";
     }
     if (num_val > -1) {
-      str += sprintf(str, "%0*d", tok.len, num_val);
+      string tmp_str = std::to_string(num_val);
+      if (tmp_str.length() < tok.len) tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      result.append(tmp_str);
     } else {
-      memcpy(str, str_val, str_val_len);
-      str += str_val_len;
+      DCHECK(str_val != nullptr && str_val_len > 0);
+      result.append(str_val, str_val_len);
     }
   }
-  /// Terminate the string
-  *str = '\0';
-  return str - buff;
+  return result;
 }
 
 }

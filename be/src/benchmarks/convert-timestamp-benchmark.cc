@@ -36,7 +36,7 @@
 #include "cctz/civil_time.h"
 #include "exprs/timezone_db.h"
 #include "exprs/timestamp-functions.h"
-#include "runtime/datetime-parse-util.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "util/benchmark.h"
@@ -52,10 +52,7 @@ using std::uniform_int_distribution;
 using std::thread;
 
 using namespace impala;
-
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::InitParseCtx;
-using datetime_parse_util::ParseFormatTokens;
+using namespace datetime_parse_util;
 
 // Benchmark tests for timestamp time-zone conversions
 /*
@@ -169,7 +166,7 @@ fast path speedup: 10.2951
 vector<TimestampValue> AddTestDataDateTimes(int n, const string& startstr) {
   DateTimeFormatContext dt_ctx;
   dt_ctx.Reset("yyyy-MMM-dd HH:mm:ss");
-  ParseFormatTokens(&dt_ctx);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx);
 
   random_device rd;
   mt19937 gen(rd());
@@ -184,7 +181,7 @@ vector<TimestampValue> AddTestDataDateTimes(int n, const string& startstr) {
     start += boost::gregorian::date_duration(dis_days(gen));
     start += boost::posix_time::nanoseconds(dis_nanosec(gen));
     string ts = to_simple_string(start);
-    data.push_back(TimestampValue::Parse(ts.c_str(), ts.size(), dt_ctx));
+    data.push_back(TimestampValue::ParseSimpleDateFormat(ts.c_str(), ts.size(), dt_ctx));
   }
 
   return data;
@@ -709,7 +706,8 @@ int main(int argc, char* argv[]) {
   PTR_CCTZ_LOCAL_TZ = TimezoneDatabase::FindTimezone(local_tz_name);
   DCHECK(PTR_CCTZ_LOCAL_TZ != nullptr);
 
-  InitParseCtx();
+  SimpleDateFormatTokenizer::InitCtx();
+  SimpleDateFormatParser::InitCtx();
 
   const vector<TimestampValue> tsvalue_data =
       AddTestDataDateTimes(1000, "1953-04-22 01:02:03");

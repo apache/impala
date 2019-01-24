@@ -21,7 +21,7 @@
 #include "exprs/anyval-util.h"
 #include "exprs/timezone_db.h"
 #include "gutil/strings/substitute.h"
-#include "runtime/datetime-parse-util.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
@@ -32,8 +32,7 @@
 
 namespace impala {
 
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::ParseFormatTokens;
+using namespace datetime_parse_util;
 
 const string TimestampFunctions::DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu",
     "Fri", "Sat"};
@@ -130,14 +129,14 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
     StringVal fmt_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     const StringValue& fmt_ref = StringValue::FromStringVal(fmt_val);
     if (fmt_val.is_null || fmt_ref.len == 0) {
-      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
+      ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt_val, true);
       return;
     }
     dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
-    bool parse_result = ParseFormatTokens(dt_ctx);
+    bool parse_result = SimpleDateFormatTokenizer::Tokenize(dt_ctx);
     if (!parse_result) {
       delete dt_ctx;
-      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
+      ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt_val, true);
       return;
     }
   } else {
@@ -146,7 +145,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
     // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
     dt_ctx = new DateTimeFormatContext();
   }
-  dt_ctx->SetCenturyBreak(*context->impl()->state()->now());
+  dt_ctx->SetCenturyBreakAndCurrentTime(*context->impl()->state()->now());
   context->SetFunctionState(scope, dt_ctx);
 }
 

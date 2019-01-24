@@ -210,6 +210,7 @@ class ScalarExpr : public Expr {
   friend class AggFnEvaluator;
   friend class AndPredicate;
   friend class CaseExpr;
+  friend class CastFormatExpr;
   friend class CoalesceExpr;
   friend class ConditionalFunctions;
   friend class CompoundPredicate;

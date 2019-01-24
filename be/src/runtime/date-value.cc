@@ -27,6 +27,8 @@
 namespace impala {
 
 using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::GetMonthAndDayFromDaysSinceJan1;
+using datetime_parse_util::IsLeapYear;
 
 const int EPOCH_YEAR = 1970;
 const int MIN_YEAR = 0;
@@ -42,14 +44,6 @@ const int32_t DateValue::MAX_DAYS_SINCE_EPOCH =
 const DateValue DateValue::MIN_DATE(MIN_DAYS_SINCE_EPOCH);
 const DateValue DateValue::MAX_DATE(MAX_DAYS_SINCE_EPOCH);
 
-// Describes ranges for months in a non-leap year expressed as number of days since
-// January 1.
-const vector<int> MONTH_RANGES = {
-    0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 };
-// Describes ranges for months in a leap year expressed as number of days since January 1.
-const vector<int> LEAP_YEAR_MONTH_RANGES = {
-    0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 };
-
 DateValue::DateValue(int64_t year, int64_t month, int64_t day)
     : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
   DCHECK(!IsValid());
@@ -64,25 +58,33 @@ DateValue::DateValue(int64_t year, int64_t month, int64_t day)
   }
 }
 
-DateValue DateValue::Parse(const char* str, int len, bool accept_time_toks) {
+DateValue DateValue::ParseSimpleDateFormat(const char* str, int len,
+    bool accept_time_toks) {
   DateValue dv;
-  discard_result(DateParser::Parse(str, len, accept_time_toks, &dv));
+  discard_result(DateParser::ParseSimpleDateFormat(str, len, accept_time_toks, &dv));
   return dv;
 }
 
-DateValue DateValue::Parse(const string& str, bool accept_time_toks) {
-  return Parse(str.c_str(), str.size(), accept_time_toks);
+DateValue DateValue::ParseSimpleDateFormat(const string& str, bool accept_time_toks) {
+  return ParseSimpleDateFormat(str.c_str(), str.size(), accept_time_toks);
 }
 
-DateValue DateValue::Parse(const char* str, int len,
+DateValue DateValue::ParseSimpleDateFormat(const char* str, int len,
     const DateTimeFormatContext& dt_ctx) {
   DateValue dv;
-  discard_result(DateParser::Parse(str, len, dt_ctx, &dv));
+  discard_result(DateParser::ParseSimpleDateFormat(str, len, dt_ctx, &dv));
   return dv;
 }
 
-int DateValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) const {
-  return DateParser::Format(dt_ctx, *this, len, buff);
+DateValue DateValue::ParseIsoSqlFormat(const char* str, int len,
+      const DateTimeFormatContext& dt_ctx) {
+  DateValue dv;
+  discard_result(DateParser::ParseIsoSqlFormat(str, len, dt_ctx, &dv));
+  return dv;
+}
+
+string DateValue::Format(const DateTimeFormatContext& dt_ctx) const {
+  return DateParser::Format(dt_ctx, *this);
 }
 
 namespace {
@@ -96,10 +98,6 @@ inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
       + ((year - EPOCH_YEAR / 4 * 4 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
       - ((year - EPOCH_YEAR / 100 * 100 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
       + ((year - EPOCH_YEAR / 400 * 400 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1);
-}
-
-inline bool IsLeapYear(int year) {
-  return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
 }
 
 }
@@ -193,19 +191,7 @@ bool DateValue::ToYearMonthDay(int* year, int* month, int* day) const {
   // Day of year. 0 is used for January 1.
   int days_since_jan1 = days_since_epoch_ - jan1_dse;
 
-  // Calculate month using month ranges and the average month length.
-  const vector<int>& month_ranges = IsLeapYear(*year) ? LEAP_YEAR_MONTH_RANGES
-                                                      : MONTH_RANGES;
-  int m = static_cast<int>(days_since_jan1 / 30.5);
-  DCHECK(month_ranges[m] <= days_since_jan1);
-
-  *month = (month_ranges[m + 1] <= days_since_jan1) ? m + 2 : m + 1;
-  DCHECK(*month >= 1 && *month <= 12);
-
-  // Calculate day.
-  *day = days_since_jan1 - month_ranges[*month - 1] + 1;
-  DCHECK(*day >= 1 && *day <= 31);
-  return true;
+  return GetMonthAndDayFromDaysSinceJan1(*year, days_since_jan1, month, day);
 }
 
 int DateValue::WeekDay() const {

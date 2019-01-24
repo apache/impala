@@ -387,47 +387,47 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   void TestLastDayFunction() {
     // Test common months (with and without time component).
     TestTimestampValue("last_day('2003-01-02 04:24:04.1579')",
-      TimestampValue::Parse("2003-01-31 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2003-01-31 00:00:00", 19));
     TestTimestampValue("last_day('2003-02-02')",
-      TimestampValue::Parse("2003-02-28 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-02-28 00:00:00"));
     TestTimestampValue("last_day('2003-03-02 03:21:12.0058')",
-      TimestampValue::Parse("2003-03-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-03-31 00:00:00"));
     TestTimestampValue("last_day('2003-04-02')",
-      TimestampValue::Parse("2003-04-30 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-04-30 00:00:00"));
     TestTimestampValue("last_day('2003-05-02')",
-      TimestampValue::Parse("2003-05-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-05-31 00:00:00"));
     TestTimestampValue("last_day('2003-06-02')",
-      TimestampValue::Parse("2003-06-30 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-06-30 00:00:00"));
     TestTimestampValue("last_day('2003-07-02 00:01:01.125')",
-      TimestampValue::Parse("2003-07-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-07-31 00:00:00"));
     TestTimestampValue("last_day('2003-08-02')",
-      TimestampValue::Parse("2003-08-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-08-31 00:00:00"));
     TestTimestampValue("last_day('2003-09-02')",
-      TimestampValue::Parse("2003-09-30 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-09-30 00:00:00"));
     TestTimestampValue("last_day('2003-10-02')",
-      TimestampValue::Parse("2003-10-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-10-31 00:00:00"));
     TestTimestampValue("last_day('2003-11-02 12:30:16')",
-      TimestampValue::Parse("2003-11-30 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-11-30 00:00:00"));
     TestTimestampValue("last_day('2003-12-02')",
-      TimestampValue::Parse("2003-12-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2003-12-31 00:00:00"));
 
     // Test leap years and special cases.
     TestTimestampValue("last_day('2004-02-13')",
-      TimestampValue::Parse("2004-02-29 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2004-02-29 00:00:00"));
     TestTimestampValue("last_day('2008-02-13')",
-      TimestampValue::Parse("2008-02-29 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2008-02-29 00:00:00"));
     TestTimestampValue("last_day('2000-02-13')",
-      TimestampValue::Parse("2000-02-29 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2000-02-29 00:00:00"));
     TestTimestampValue("last_day('1900-02-13')",
-      TimestampValue::Parse("1900-02-28 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1900-02-28 00:00:00"));
     TestTimestampValue("last_day('2100-02-13')",
-      TimestampValue::Parse("2100-02-28 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2100-02-28 00:00:00"));
 
     // Test corner cases.
     TestTimestampValue("last_day('1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-31 00:00:00"));
     TestTimestampValue("last_day('9999-12-31 23:59:59')",
-      TimestampValue::Parse("9999-12-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 00:00:00"));
 
     // Test invalid input.
     TestIsNull("last_day('12202010')", TYPE_TIMESTAMP);
@@ -440,67 +440,68 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   void TestNextDayFunction() {
     // Sequential test cases
     TestTimestampValue("next_day('2016-05-01','Sunday')",
-      TimestampValue::Parse("2016-05-08 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-08 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Monday')",
-      TimestampValue::Parse("2016-05-02 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-02 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Tuesday')",
-      TimestampValue::Parse("2016-05-03 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-03 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Wednesday')",
-      TimestampValue::Parse("2016-05-04 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-04 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Thursday')",
-      TimestampValue::Parse("2016-05-05 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-05 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Friday')",
-      TimestampValue::Parse("2016-05-06 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-06 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Saturday')",
-      TimestampValue::Parse("2016-05-07 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2016-05-07 00:00:00", 19));
 
     // Random test cases
     TestTimestampValue("next_day('1910-01-18','SunDay')",
-      TimestampValue::Parse("1910-01-23 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1910-01-23 00:00:00", 19));
     TestTimestampValue("next_day('1916-06-05', 'SUN')",
-      TimestampValue::Parse("1916-06-11 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1916-06-11 00:00:00", 19));
     TestTimestampValue("next_day('1932-11-08','monday')",
-      TimestampValue::Parse("1932-11-14 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1932-11-14 00:00:00", 19));
     TestTimestampValue("next_day('1933-09-11','Mon')",
-      TimestampValue::Parse("1933-09-18 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1933-09-18 00:00:00", 19));
     TestTimestampValue("next_day('1934-03-21','TUeSday')",
-      TimestampValue::Parse("1934-03-27 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1934-03-27 00:00:00", 19));
     TestTimestampValue("next_day('1954-02-25','tuE')",
-      TimestampValue::Parse("1954-03-02 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1954-03-02 00:00:00", 19));
     TestTimestampValue("next_day('1965-04-18','WeDneSdaY')",
-      TimestampValue::Parse("1965-04-21 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1965-04-21 00:00:00", 19));
     TestTimestampValue("next_day('1966-08-29','wed')",
-      TimestampValue::Parse("1966-08-31 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1966-08-31 00:00:00", 19));
     TestTimestampValue("next_day('1968-07-23','tHurSday')",
-      TimestampValue::Parse("1968-07-25 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1968-07-25 00:00:00", 19));
     TestTimestampValue("next_day('1969-05-28','thu')",
-      TimestampValue::Parse("1969-05-29 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1969-05-29 00:00:00", 19));
     TestTimestampValue("next_day('1989-10-12','fRIDay')",
-      TimestampValue::Parse("1989-10-13 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1989-10-13 00:00:00", 19));
     TestTimestampValue("next_day('1973-10-02','frI')",
-      TimestampValue::Parse("1973-10-05 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1973-10-05 00:00:00", 19));
     TestTimestampValue("next_day('2000-02-29','saTUrDaY')",
-      TimestampValue::Parse("2000-03-04 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2000-03-04 00:00:00", 19));
     TestTimestampValue("next_day('2013-04-12','sat')",
-      TimestampValue::Parse("2013-04-13 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2013-04-13 00:00:00", 19));
     TestTimestampValue("next_day('2013-12-25','Saturday')",
-      TimestampValue::Parse("2013-12-28 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2013-12-28 00:00:00", 19));
 
     // Explicit timestamp conversion tests
     TestTimestampValue("next_day(to_timestamp('12-27-2008', 'MM-dd-yyyy'), 'moN')",
-      TimestampValue::Parse("2008-12-29 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2008-12-29 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('2007-20-10 11:22', 'yyyy-dd-MM HH:mm'),\
-      'TUeSdaY')", TimestampValue::Parse("2007-10-23 11:22:00", 19));
+      'TUeSdaY')", TimestampValue::ParseSimpleDateFormat("2007-10-23 11:22:00", 19));
     TestTimestampValue("next_day(to_timestamp('18-11-2070 09:12', 'dd-MM-yyyy HH:mm'),\
-      'WeDneSdaY')", TimestampValue::Parse("2070-11-19 09:12:00", 19));
+      'WeDneSdaY')", TimestampValue::ParseSimpleDateFormat("2070-11-19 09:12:00", 19));
     TestTimestampValue("next_day(to_timestamp('12-1900-05', 'dd-yyyy-MM'), 'tHurSday')",
-      TimestampValue::Parse("1900-05-17 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1900-05-17 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('08-1987-21', 'MM-yyyy-dd'), 'FRIDAY')",
-      TimestampValue::Parse("1987-08-28 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1987-08-28 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('02-04-2001', 'dd-MM-yyyy'), 'SAT')",
-      TimestampValue::Parse("2001-04-07 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("2001-04-07 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('1970-01-31 00:00:00',\
-      'yyyy-MM-dd HH:mm:ss'), 'SunDay')", TimestampValue::Parse("1970-02-01 00:00:00", 19));
+      'yyyy-MM-dd HH:mm:ss'), 'SunDay')",
+      TimestampValue::ParseSimpleDateFormat("1970-02-01 00:00:00", 19));
 
     // Invalid input: unacceptable date parameter
     TestIsNull("next_day('12202010','Saturday')", TYPE_TIMESTAMP);
@@ -1189,7 +1190,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(const string& val) {
-  return TimestampValue::Parse(val);
+  return TimestampValue::ParseSimpleDateFormat(val);
 }
 
 template<>
@@ -1277,12 +1278,12 @@ double ExprTest::ConvertValue<double>(const string& value) {
 
 template <>
 TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
-  return TimestampValue::Parse(value.data(), value.size());
+  return TimestampValue::ParseSimpleDateFormat(value.data(), value.size());
 }
 
 template <>
 DateValue ExprTest::ConvertValue<DateValue>(const string& value) {
-  return DateValue::Parse(value.data(), value.size());
+  return DateValue::ParseSimpleDateFormat(value.data(), value.size());
 }
 
 // We can't put this into TestValue() because GTest can't resolve
@@ -1316,7 +1317,8 @@ template<>
 bool ExprTest::ParseString(const string& str, TimestampValue* val) {
   boost::gregorian::date date;
   boost::posix_time::time_duration time;
-  bool success = TimestampParser::Parse(str.data(), str.length(), &date, &time);
+  bool success = TimestampParser::ParseSimpleDateFormat(str.data(), str.length(), &date,
+      &time);
   val->set_date(date);
   val->set_time(time);
   return success;
@@ -1324,7 +1326,7 @@ bool ExprTest::ParseString(const string& str, TimestampValue* val) {
 
 template<>
 bool ExprTest::ParseString(const string& str, DateValue* val) {
-  return DateParser::Parse(str.c_str(), str.length(), false, val);
+  return DateParser::ParseSimpleDateFormat(str.c_str(), str.length(), false, val);
 }
 
 Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
@@ -3216,26 +3218,30 @@ TEST_P(ExprTest, CastExprs) {
 
   // Test casting of lazy date and/or time format string to timestamp
   TestTimestampValue(
-      "cast('2001-1-2' as timestamp)", TimestampValue::Parse("2001-01-02 00:00:00"));
+      "cast('2001-1-2' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-02 00:00:00"));
   TestTimestampValue(
-      "cast('2001-01-3' as timestamp)", TimestampValue::Parse("2001-01-03 00:00:00"));
+      "cast('2001-01-3' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-03 00:00:00"));
   TestTimestampValue(
-      "cast('2001-1-21' as timestamp)", TimestampValue::Parse("2001-01-21 00:00:00"));
+      "cast('2001-1-21' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 00:00:00"));
   TestTimestampValue("cast('2001-1-21 12:5:30' as timestamp)",
-      TimestampValue::Parse("2001-01-21 12:05:30"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 12:05:30"));
   TestTimestampValue("cast('2001-1-21 13:5:05' as timestamp)",
-      TimestampValue::Parse("2001-01-21 13:05:05"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 13:05:05"));
   TestTimestampValue("cast('2001-1-21 1:2:3' as timestamp)",
-      TimestampValue::Parse("2001-01-21 01:02:03"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 01:02:03"));
   TestTimestampValue("cast('2001-1-21 1:5:31.12345' as timestamp)",
-      TimestampValue::Parse("2001-01-21 01:05:31.123450000"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 01:05:31.123450000"));
   TestTimestampValue("cast('2001-1-21 1:5:31.12345678910111213' as timestamp)",
-      TimestampValue::Parse("2001-01-21 01:05:31.123456789"));
-  TestTimestampValue(
-      "cast('1:05:1.12' as timestamp)", TimestampValue::Parse("01:05:01.120000000"));
-  TestTimestampValue("cast('1:05:1' as timestamp)", TimestampValue::Parse("01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-21 01:05:31.123456789"));
+  TestTimestampValue("cast('1:05:1.12' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("01:05:01.120000000"));
+  TestTimestampValue("cast('1:05:1' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("01:05:01"));
   TestTimestampValue("cast('        2001-01-9 1:05:1        ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestIsNull("cast('2001-6' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('01-1-21' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-21 12:5:3 AM' as timestamp)", TYPE_TIMESTAMP);
@@ -3292,29 +3298,29 @@ TEST_P(ExprTest, CastExprs) {
 
   // IMPALA-6630: Test whitespace trimming mechanism when cast from string to timestamp
   TestTimestampValue("cast(' \t\r\n 2001-01-09 01:05:01.123456789 \t\r\n' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
-  TestTimestampValue("cast(' \t\r\n 2001-01-09T01:05:01.123456789 \t\r\n' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01.123456789"));
+  TestTimestampValue("cast(' \t\r\n 2001-01-09T01:05:02.123456789 \t\r\n' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:02.123456789"));
   TestTimestampValue("cast('  \t\r\n      2001-01-09 01:05:01   \t\r\n  ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n      2001-01-09T01:05:01   \t\r\n  ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n      2001-01-09   \t\r\n     ' as timestamp)",
-      TimestampValue::Parse("2001-01-09"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09"));
   TestTimestampValue("cast('  \t\r\n      01:05:01   \t\r\n     ' as timestamp)",
-      TimestampValue::Parse("01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("01:05:01"));
   TestTimestampValue("cast(' \t\r\n 01:05:01.123456789   \t\r\n     ' as timestamp)",
-      TimestampValue::Parse("01:05:01.123456789"));
+      TimestampValue::ParseSimpleDateFormat("01:05:01.123456789"));
   TestTimestampValue("cast('  \t\r\n      2001-1-9 1:5:1    \t\r\n    ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n  2001-1-9 1:5:1.12345678  \t\r\n ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456780"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01.123456780"));
   TestTimestampValue("cast('  \t\r\n      1:5:1    \t\r\n    ' as timestamp)",
-      TimestampValue::Parse("01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("01:05:01"));
   TestTimestampValue("cast('  \t\r\n      1:5:1.12345678    \t\r\n    ' as timestamp)",
-      TimestampValue::Parse("01:05:01.123456780"));
+      TimestampValue::ParseSimpleDateFormat("01:05:01.123456780"));
   TestTimestampValue("cast('  \t\r\n      2001-1-9    \t\r\n    ' as timestamp)",
-      TimestampValue::Parse("2001-01-09"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09"));
 
   // IMPALA-6995: whitespace-only strings should return NULL.
   TestIsNull("cast(' ' as timestamp)", TYPE_TIMESTAMP);
@@ -3325,23 +3331,23 @@ TEST_P(ExprTest, CastExprs) {
   // Test valid multi-space and 'T' separators between date and time
   // components
   TestTimestampValue("cast('2001-01-09   01:05:01' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
-  TestTimestampValue("cast('2001-01-09T01:05:01' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
-  TestTimestampValue("cast('2001-01-09   01:05:01.123456789101112' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
-  TestTimestampValue("cast('2001-01-09T01:05:01.123456789101112' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
+  TestTimestampValue("cast('2001-01-09T01:05:10' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:10"));
+  TestTimestampValue("cast('2001-01-09   01:05:02.321456789101112' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:02.321456789"));
+  TestTimestampValue("cast('2001-01-09T01:05:03.123456789101112' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:03.123456789"));
   TestTimestampValue("cast('  \t\r\n 2001-01-09   01:05:01   \t\r\n ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n 2001-01-09T01:05:01   \t\r\n ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue(
-      "cast('  \t\r\n 2001-01-09   01:05:01.12345678910   \t\r\n ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+      "cast('  \t\r\n 2001-01-09   01:05:04.12345678910   \t\r\n ' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:04.123456789"));
   TestTimestampValue(
-      "cast('  \t\r\n 2001-01-09T01:05:01.12345678910   \t\r\n ' as timestamp)",
-      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+      "cast('  \t\r\n 2001-02-09T01:05:01.12345678910   \t\r\n ' as timestamp)",
+      TimestampValue::ParseSimpleDateFormat("2001-02-09 01:05:01.123456789"));
 
   // Test invalid variations of the 'T' separator
   TestIsNull("cast('2001-01-09TTTTT01:05:01' as timestamp)", TYPE_TIMESTAMP);
@@ -3357,34 +3363,34 @@ TEST_P(ExprTest, CastExprs) {
 
   // IMPALA-3163: Test precise conversion from Decimal to Timestamp.
   TestTimestampValue("cast(cast(1457473016.1230 as decimal(17,4)) as timestamp)",
-      TimestampValue::Parse("2016-03-08 21:36:56.123000000", 29));
+      TimestampValue::ParseSimpleDateFormat("2016-03-08 21:36:56.123000000", 29));
   // 32 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(9,2)) as timestamp)",
-      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1970-01-01 00:02:03.450000000", 29));
   TestTimestampValue("cast(cast(-123.45 as decimal(9,2)) as timestamp)",
-      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1969-12-31 23:57:56.550000000", 29));
   // 64 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(18,2)) as timestamp)",
-      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1970-01-01 00:02:03.450000000", 29));
   TestTimestampValue("cast(cast(-123.45 as decimal(18,2)) as timestamp)",
-      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1969-12-31 23:57:56.550000000", 29));
   TestTimestampValue("cast(cast(-0.1 as decimal(18,10)) as timestamp)",
-      TimestampValue::Parse("1969-12-31 23:59:59.900000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1969-12-31 23:59:59.900000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(18, 2)) as timestamp)",
-      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59.990000000", 29));
   TestIsNull("cast(cast(260000000000.00 as decimal(18, 2)) as timestamp)",
       TYPE_TIMESTAMP);
   // 128 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(38,2)) as timestamp)",
-      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1970-01-01 00:02:03.450000000", 29));
   TestTimestampValue("cast(cast(-123.45 as decimal(38,2)) as timestamp)",
-      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1969-12-31 23:57:56.550000000", 29));
   TestTimestampValue("cast(cast(-0.1 as decimal(38,20)) as timestamp)",
-      TimestampValue::Parse("1969-12-31 23:59:59.900000000", 29));
+      TimestampValue::ParseSimpleDateFormat("1969-12-31 23:59:59.900000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 2)) as timestamp)",
-      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59.990000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 26)) as timestamp)",
-      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59.990000000", 29));
   TestIsNull("cast(cast(260000000000.00 as decimal(38, 2)) as timestamp)",
       TYPE_TIMESTAMP);
   // numeric_limits<int64_t>::max()
@@ -3417,18 +3423,18 @@ TEST_P(ExprTest, CastExprs) {
   TestValue("cast(cast('2000-01-01 09:10:11.000000' as timestamp) as int)", TYPE_INT,
       946717811);
   TestTimestampValue("cast(946717811 as timestamp)",
-      TimestampValue::Parse("2000-01-01 09:10:11", 19));
+      TimestampValue::ParseSimpleDateFormat("2000-01-01 09:10:11", 19));
 
   // Timestamp <--> Int conversions boundary cases
   TestValue("cast(cast('1400-01-01 00:00:00' as timestamp) as bigint)",
       TYPE_BIGINT, -17987443200);
   TestTimestampValue("cast(-17987443200 as timestamp)",
-      TimestampValue::Parse("1400-01-01 00:00:00", 19));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00", 19));
   TestIsNull("cast(-17987443201 as timestamp)", TYPE_TIMESTAMP);
   TestValue("cast(cast('9999-12-31 23:59:59' as timestamp) as bigint)",
       TYPE_BIGINT, 253402300799);
   TestTimestampValue("cast(253402300799 as timestamp)",
-      TimestampValue::Parse("9999-12-31 23:59:59", 19));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59", 19));
   TestIsNull("cast(253402300800 as timestamp)", TYPE_TIMESTAMP);
 
   // Timestamp <--> Float
@@ -3438,12 +3444,12 @@ TEST_P(ExprTest, CastExprs) {
   TestValue("cast(cast('2000-01-01 09:10:11.720000' as timestamp) as double)",
       TYPE_DOUBLE, 946717811.72);
   TestTimestampValue("cast(cast(946717811.033 as double) as timestamp)",
-      TimestampValue::Parse("2000-01-01 09:10:11.032999992", 29));
+      TimestampValue::ParseSimpleDateFormat("2000-01-01 09:10:11.032999992", 29));
   TestValue("cast(cast('1400-01-01' as timestamp) as double)", TYPE_DOUBLE,
       -17987443200);
   TestIsNull("cast(cast(-17987443201.03 as double) as timestamp)", TYPE_TIMESTAMP);
   TestTimestampValue("cast(253402300799 as timestamp)",
-      TimestampValue::Parse("9999-12-31 23:59:59", 19));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59", 19));
   TestIsNull("cast(253433923200 as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast(cast(null as bigint) as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast(cast(null as timestamp) as bigint)", TYPE_BIGINT);
@@ -3569,17 +3575,17 @@ TEST_P(ExprTest, CastDateExprs) {
       DateValue(9999, 12, 31));
 
   TestTimestampValue("cast(cast('2000-09-27' as date) as timestamp)",
-      TimestampValue::Parse("2000-09-27", 10));
+      TimestampValue::ParseSimpleDateFormat("2000-09-27", 10));
   TestTimestampValue("cast(date '2000-09-27' as timestamp)",
-      TimestampValue::Parse("2000-09-27", 10));
+      TimestampValue::ParseSimpleDateFormat("2000-09-27", 10));
   TestTimestampValue("cast(cast('9999-12-31' as date) as timestamp)",
-      TimestampValue::Parse("9999-12-31", 10));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31", 10));
   TestTimestampValue("cast(date '9999-12-31' as timestamp)",
-      TimestampValue::Parse("9999-12-31", 10));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31", 10));
   TestTimestampValue("cast(cast('1400-01-01' as date) as timestamp)",
-      TimestampValue::Parse("1400-01-01", 10));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01", 10));
   TestTimestampValue("cast(DATE '1400-01-01' as timestamp)",
-      TimestampValue::Parse("1400-01-01", 10));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01", 10));
   TestError("cast(cast('1399-12-31' as date) as timestamp)");
   TestError("cast(date '1399-12-31' as timestamp)");
 
@@ -9782,113 +9788,113 @@ TEST_P(ExprTest, UuidTest) {
 
 TEST_P(ExprTest, DateTruncTest) {
   TestTimestampValue("date_trunc('MILLENNIUM', '2016-05-08 10:30:00')",
-      TimestampValue::Parse("2001-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MILLENNIUM', '3000-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("2001-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MILLENNIUM', '3001-01-01 00:00:00')",
-      TimestampValue::Parse("3001-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("3001-01-01 00:00:00"));
   TestTimestampValue("date_trunc('CENTURY', '2016-05-08 10:30:00')",
-      TimestampValue::Parse("2001-01-01 00:00:00  "));
+      TimestampValue::ParseSimpleDateFormat("2001-01-01 00:00:00  "));
   TestTimestampValue("date_trunc('CENTURY', '2116-05-08 10:30:00')",
-      TimestampValue::Parse("2101-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2101-01-01 00:00:00"));
   TestTimestampValue("date_trunc('DECADE', '2116-05-08 10:30:00')",
-      TimestampValue::Parse("2110-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2110-01-01 00:00:00"));
   TestTimestampValue("date_trunc('YEAR', '2016-05-08 10:30:00')",
-      TimestampValue::Parse("2016-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2016-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MONTH', '2016-05-08 00:00:00')",
-      TimestampValue::Parse("2016-05-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2016-05-01 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2116-05-08 10:30:00')",
-      TimestampValue::Parse("2116-05-04 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2116-05-04 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2017-01-01 10:37:03.455722111')",
-      TimestampValue::Parse("2016-12-26 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2016-12-26 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2017-01-02 10:37:03.455722111')",
-      TimestampValue::Parse("2017-01-02 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2017-01-02 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2017-01-07 10:37:03.455722111')",
-      TimestampValue::Parse("2017-01-02 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2017-01-02 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2017-01-08 10:37:03.455722111')",
-      TimestampValue::Parse("2017-01-02 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2017-01-02 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '2017-01-09 10:37:03.455722111')",
-      TimestampValue::Parse("2017-01-09 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2017-01-09 00:00:00"));
   TestTimestampValue("date_trunc('DAY', '1416-05-08 10:37:03.455722111')",
-      TimestampValue::Parse("1416-05-08 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 00:00:00"));
 
   TestTimestampValue("date_trunc('HOUR', '1416-05-08 10:30:03.455722111')",
-      TimestampValue::Parse("1416-05-08 10:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 10:00:00"));
   TestTimestampValue("date_trunc('HOUR', '1416-05-08 23:30:03.455722111')",
-      TimestampValue::Parse("1416-05-08 23:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 23:00:00"));
   TestTimestampValue("date_trunc('MINUTE', '1416-05-08 10:37:03.455722111')",
-      TimestampValue::Parse("1416-05-08 10:37:00"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 10:37:00"));
   TestTimestampValue("date_trunc('SECOND', '1416-05-08 10:37:03.455722111')",
-      TimestampValue::Parse("1416-05-08 10:37:03"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 10:37:03"));
   TestTimestampValue("date_trunc('MILLISECONDS', '1416-05-08 10:37:03.455722111')",
-      TimestampValue::Parse("1416-05-08 10:37:03.455000000"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 10:37:03.455000000"));
   TestTimestampValue("date_trunc('MICROSECONDS', '1416-05-08 10:37:03.455722111')",
-      TimestampValue::Parse("1416-05-08 10:37:03.455722000"));
+      TimestampValue::ParseSimpleDateFormat("1416-05-08 10:37:03.455722000"));
 
   // Test corner cases.
   TestTimestampValue("date_trunc('MILLENNIUM', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9001-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9001-01-01 00:00:00"));
   TestTimestampValue("date_trunc('CENTURY', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9901-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9901-01-01 00:00:00"));
   TestTimestampValue("date_trunc('DECADE', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9990-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9990-01-01 00:00:00"));
   TestTimestampValue("date_trunc('YEAR', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MONTH', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-01 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-27 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-27 00:00:00"));
   TestTimestampValue("date_trunc('DAY', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 00:00:00"));
   TestTimestampValue("date_trunc('HOUR', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 23:00:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:00:00"));
   TestTimestampValue("date_trunc('MINUTE', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 23:59:00"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:00"));
   TestTimestampValue("date_trunc('SECOND', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 23:59:59"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59"));
   TestTimestampValue("date_trunc('MILLISECONDS', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 23:59:59.999"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59.999"));
   TestTimestampValue("date_trunc('MICROSECONDS', '9999-12-31 23:59:59.999999999')",
-      TimestampValue::Parse("9999-12-31 23:59:59.999999"));
+      TimestampValue::ParseSimpleDateFormat("9999-12-31 23:59:59.999999"));
 
   TestTimestampValue("date_trunc('DECADE', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('YEAR', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MONTH', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('DAY', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('HOUR', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MINUTE', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('SECOND', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MILLISECONDS', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
   TestTimestampValue("date_trunc('MICROSECONDS', '1400-01-01 00:00:00')",
-      TimestampValue::Parse("1400-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-01 00:00:00"));
 
   // Test lower limit for century
   TestIsNull("date_trunc('CENTURY', '1400-01-01 00:00:00')", TYPE_TIMESTAMP);
   TestIsNull("date_trunc('CENTURY', '1400-12-31 23:59:59.999999999')", TYPE_TIMESTAMP);
   TestTimestampValue("date_trunc('CENTURY', '1401-01-01 00:00:00')",
-      TimestampValue::Parse("1401-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1401-01-01 00:00:00"));
 
   // Test lower limit for millennium
   TestIsNull("date_trunc('MILLENNIUM', '1400-01-01 00:00:00')", TYPE_TIMESTAMP);
   TestIsNull("date_trunc('MILLENNIUM', '2000-12-31 23:59:59.999999999')", TYPE_TIMESTAMP);
   TestTimestampValue("date_trunc('MILLENNIUM', '2001-01-01 00:00:00')",
-      TimestampValue::Parse("2001-01-01 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("2001-01-01 00:00:00"));
 
   // Test lower limit for week
   TestIsNull("date_trunc('WEEK', '1400-01-01 00:00:00')", TYPE_TIMESTAMP);
   TestIsNull("date_trunc('WEEK', '1400-01-05 23:59:59.999999999')", TYPE_TIMESTAMP);
   TestTimestampValue("date_trunc('WEEK', '1400-01-06 00:00:00')",
-      TimestampValue::Parse("1400-01-06 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-06 00:00:00"));
   TestTimestampValue("date_trunc('WEEK', '1400-01-07 23:59:59.999999999')",
-      TimestampValue::Parse("1400-01-06 00:00:00"));
+      TimestampValue::ParseSimpleDateFormat("1400-01-06 00:00:00"));
 
   // Test invalid input.
   TestIsNull("date_trunc('HOUR', '12202010')", TYPE_TIMESTAMP);

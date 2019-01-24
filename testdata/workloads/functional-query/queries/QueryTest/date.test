@@ -591,3 +591,291 @@ select cast(cast('23:59:59' as timestamp) as date);
 ---- CATCH
 UDF ERROR: Timestamp to Date conversion failed. Timestamp has no date component.
 ====
+---- QUERY
+# Basic test for FORMAT clause in CAST().
+select cast("2014-11-01" as date format "YYYY-MM-DD");
+---- RESULTS
+2014-11-01
+---- TYPES
+DATE
+====
+---- QUERY
+# Shuffle the pattern elements in the input.
+select cast("02-11-2014" as date format "dd-mm-yyyy");
+---- RESULTS
+2014-11-02
+---- TYPES
+DATE
+====
+---- QUERY
+# Don't accept time tokens for date when format is provided.
+select cast("2014-11-03 10" as date format "YYYY-MM-DD HH12");
+---- CATCH
+PARSE ERROR: Time tokens provided with date type.
+====
+---- QUERY
+# Input doesn't match the format.
+select cast("2014-11-04" as date format "MM-DD-YYYY");
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Interchangeability of separators.
+select cast("2014/11/05" as date format "YYYY-MM-DD");
+---- RESULTS
+2014-11-05
+---- TYPES
+DATE
+====
+---- QUERY
+select cast("2014/- ,11'/:-05" as date format "YYYY-MM-DD");
+---- RESULTS
+2014-11-05
+---- TYPES
+DATE
+====
+---- QUERY
+# Day of year tests.
+select cast("2014 001" as date format "YYYY DDD");
+---- RESULTS
+2014-01-01
+---- TYPES
+DATE
+====
+---- QUERY
+select cast("365 2014" as date format "DDD-YYYY");
+---- RESULTS
+2014-12-31
+---- TYPES
+DATE
+====
+---- QUERY
+select cast("366 2014" as date format "DDD-YYYY");
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Leap year with day of year token.
+select cast("2000-366" as date format "YYYY DDD");
+---- RESULTS
+2000-12-31
+---- TYPES
+DATE
+====
+---- QUERY
+select cast("2000 367" as date format "YYYY DDD");
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+----QUERY
+# Leap year with day of year token before 1400.
+select cast('0004 100' as date format "YYYY DDD");
+---- RESULTS
+0004-04-09
+---- TYPES
+DATE
+====
+---- QUERY
+# Test how missing year digits are filled from current year.
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("095-01-31" as date FORMAT "YYYY-MM-DD");
+---- RESULTS
+2095-01-31
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("95-01-30" as date FORMAT "YYYY-MM-DD");
+---- RESULTS
+2095-01-30
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("5-01-29" as date FORMAT "YYYY-MM-DD");
+---- RESULTS
+2015-01-29
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("95-01-28" as date FORMAT "YYY-MM-DD");
+---- RESULTS
+2095-01-28
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("5-01-27" as date FORMAT "YYY-MM-DD");
+---- RESULTS
+2015-01-27
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("5-01-26" as date FORMAT "YY-MM-DD");
+---- RESULTS
+2015-01-26
+---- TYPES
+DATE
+====
+---- QUERY
+# RRRR with 4-digit year falls back to YYYY
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("2017-01-25" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2017-01-25
+---- TYPES
+DATE
+====
+---- QUERY
+# RRRR with 3-digit year fills digits from current year
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("017-01-24" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2017-01-24
+---- TYPES
+DATE
+====
+---- QUERY
+# RRRR with 1-digit year fills digits from current year
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("7-01-23" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2017-01-23
+---- TYPES
+DATE
+====
+---- QUERY
+# RR with 1-digit year fills digits from current year
+SET NOW_STRING="2019-01-01 11:11:11";
+select cast("7-01-22" as date FORMAT "RR-MM-DD");
+---- RESULTS
+2017-01-22
+---- TYPES
+DATE
+====
+---- QUERY
+# Round year when last 2 digits of current year is less than 50
+SET NOW_STRING="2049-01-01 11:11:11";
+select cast("49-01-21" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2049-01-21
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2049-01-01 11:11:11";
+select cast("50-01-20" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+1950-01-20
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2000-01-01 11:11:11";
+select cast("49-01-19" as date FORMAT "RR-MM-DD");
+---- RESULTS
+2049-01-19
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2000-01-01 11:11:11";
+select cast("50-01-18" as date FORMAT "RR-MM-DD");
+---- RESULTS
+1950-01-18
+---- TYPES
+DATE
+====
+---- QUERY
+# Round year when last 2 digits of current year is greater than 49
+SET NOW_STRING="2050-01-01 11:11:11";
+select cast("49-01-17" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2149-01-17
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2050-01-01 11:11:11";
+select cast("50-01-16" as date FORMAT "RRRR-MM-DD");
+---- RESULTS
+2050-01-16
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2099-01-01 11:11:11";
+select cast("49-01-15" as date FORMAT "RR-MM-DD");
+---- RESULTS
+2149-01-15
+---- TYPES
+DATE
+====
+---- QUERY
+SET NOW_STRING="2099-01-01 11:11:11";
+select cast("50-01-14" as date FORMAT "RR-MM-DD");
+---- RESULTS
+2050-01-14
+---- TYPES
+DATE
+====
+---- QUERY
+# In a date to string cast round year act like regular 'YYYY' or 'YY' tokens.
+# select date_col from date_tbl where id_col = 4;
+# 2017-11-28
+select cast(date_col as string format "RRRR RR") from date_tbl where id_col = 4;
+---- RESULTS
+'2017 17'
+---- TYPES
+STRING
+====
+---- QUERY
+# Date to string conversion using all but round year tokens.
+select cast(date_col as string format "YYYY YYY YY Y MM DD DDD") from date_tbl
+where id_col = 4;
+---- RESULTS
+'2017 017 17 7 11 28 332'
+---- TYPES
+STRING
+====
+---- QUERY
+# Time tokens not allowed with date type.
+select cast(date_col as string format "YYYY-MM-DD HH12") from date_tbl
+where id_col = 4;
+---- CATCH
+PARSE ERROR: Time tokens provided with date type.
+====
+---- QUERY
+# Boundary tests with FORMAT clause
+select cast("0000-01-01" as date FORMAT "YYYY-MM-DD");
+---- RESULTS
+0000-01-01
+====
+---- QUERY
+select cast("9999-12-31" as date FORMAT "YYYY-MM-DD");
+---- RESULTS
+9999-12-31
+====
+---- QUERY
+# Cast NULL string to date
+select cast(cast(NULL as string) as date format "YYYY-MM-DD");
+---- RESULTS
+NULL
+---- TYPES
+DATE
+====
+---- QUERY
+# Cast NULL date to string
+select cast(cast(NULL as date) as string format "YYYY-MM-DD");
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====

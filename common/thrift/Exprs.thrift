@@ -141,6 +141,11 @@ struct TKuduPartitionExpr {
   2: required list<i32> referenced_columns
 }
 
+struct TCastExpr {
+  // Holds the format clause of a cast expression.
+  1: required string cast_format
+}
+
 // This is essentially a union over the subclasses of Expr.
 struct TExprNode {
   1: required TExprNodeType node_type
@@ -171,6 +176,7 @@ struct TExprNode {
   19: optional TAggregateExpr agg_expr
   20: optional TTimestampLiteral timestamp_literal
   21: optional TKuduPartitionExpr kudu_partition_expr
+  22: optional TCastExpr cast_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

@@ -20,7 +20,8 @@
 
 #include <boost/date_time/gregorian/gregorian.hpp>
 
-#include "runtime/datetime-parse-util.h"
+#include "gutil/macros.h"
+#include "runtime/datetime-parser-common.h"
 
 namespace boost {
   namespace posix_time {
@@ -44,33 +45,37 @@ class TimestampParser {
   /// d -- the date value where the results of the parsing will be placed
   /// t -- the time value where the results of the parsing will be placed
   /// Returns true if the date/time was successfully parsed.
-  static bool Parse(const char* str, int len, boost::gregorian::date* d,
-      boost::posix_time::time_duration* t);
+  static bool ParseSimpleDateFormat(const char* str, int len, boost::gregorian::date* d,
+      boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
 
-  /// Parse a date/time string. The data must adhere to the format, otherwise it will be
-  /// rejected i.e. no missing tokens. In the case of just a date, the time will be set
-  /// to 00:00:00. In the case of just a time, the date will be set to invalid.
+  /// Parse a date/time string. The data must adhere to SimpleDateFormat, otherwise it
+  /// will be rejected i.e. no missing tokens. In the case of just a date, the time will
+  /// be set to 00:00:00. In the case of just a time, the date will be set to invalid.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
   /// dt_ctx -- date/time format context (must contain valid tokens)
   /// d -- the date value where the results of the parsing will be placed
   /// t -- the time value where the results of the parsing will be placed
   /// Returns true if the date/time was successfully parsed.
-  static bool Parse(const char* str, int len,
+  static bool ParseSimpleDateFormat(const char* str, int len,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx, boost::gregorian::date* d,
-      boost::posix_time::time_duration* t);
+      boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
 
-  /// Format the date/time values using the given format context. Note that a string
-  /// terminator will be appended to the string.
+  /// Parse 'str' into date and time objects following ISO:SQL:2016 datetime pattern
+  /// format. This function is used when a user specifies a datetime format string for
+  /// the cast. 'dt_ctx' holds the format tokens produced by the tokenizer.
+  /// Returns true if the parsing succeeded. Otherwise it sets 'd' and 't' to
+  /// invalid values and returns false.
+  static bool ParseIsoSqlFormat(const char* str, int len,
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx, boost::gregorian::date* d,
+      boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
+
+  /// Format the date/time values using the given format context.
   /// dt_ctx -- date/time format context
   /// d -- the date value
   /// t -- the time value
-  /// len -- the output buffer length (should be at least dt_ctx.fmt_exp_len + 1)
-  /// buff -- the output string buffer (must be large enough to hold value)
-  /// Return the number of characters copied in to the buffer (excluding terminator).
-  static int Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
-      const boost::gregorian::date& d, const boost::posix_time::time_duration& t, int len,
-      char* buff);
+  static std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
+      const boost::gregorian::date& d, const boost::posix_time::time_duration& t);
 
  private:
   /// Helper function finding the correct century for 1 or 2 digit year according to
@@ -83,6 +88,20 @@ class TimestampParser {
       const datetime_parse_util::DateTimeParseResult& dt_result,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx, int day_offset,
       const boost::posix_time::time_duration& t);
+
+  /// Populates 'd' and 't' based on the outcome of parsing the input string into
+  /// 'dt_result'. 'dt_ctx' is used for checking if date, time and timezone tokens were
+  /// provided.
+  static bool PopulateParseResult(
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx,
+      const datetime_parse_util::DateTimeParseResult& dt_result,
+      boost::gregorian::date* d, boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
+
+  /// Adjusts the time in 't' with 'tz_offset' and handles overflow cases. After adjusting
+  /// with 'tz_offset' returns -1 if 't' is negative, +1 if 't' is greater than or equals
+  /// to 24 or zero otherwise.
+  static int AdjustWithTimezone(boost::posix_time::time_duration* t,
+      const boost::posix_time::time_duration& tz_offset);
 };
 
 }

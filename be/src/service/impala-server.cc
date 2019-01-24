@@ -988,7 +988,12 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
     local_tz = &utc_tz;
   }
   query_ctx->__set_utc_timestamp_string(ToStringFromUnixMicros(now_us, utc_tz));
-  query_ctx->__set_now_string(ToStringFromUnixMicros(now_us, *local_tz));
+  if (query_ctx->client_request.query_options.now_string.empty()) {
+    query_ctx->__set_now_string(ToStringFromUnixMicros(now_us, *local_tz));
+  } else {
+    // For testing purposes
+    query_ctx->__set_now_string(query_ctx->client_request.query_options.now_string);
+  }
   query_ctx->__set_start_unix_millis(now_us / MICROS_PER_MILLI);
   query_ctx->__set_coord_address(backend_addr);
   query_ctx->__set_coord_krpc_address(krpc_addr);

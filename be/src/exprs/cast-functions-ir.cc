@@ -27,6 +27,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
+#include "exprs/cast-format-expr.h"
 #include "exprs/decimal-functions.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
@@ -39,6 +40,7 @@
 
 using namespace impala;
 using namespace impala_udf;
+using namespace datetime_parse_util;
 
 // The maximum number of characters need to represent a floating-point number (float or
 // double) as a string. 24 = 17 (maximum significant digits) + 1 (decimal point) + 1 ('E')
@@ -166,18 +168,40 @@ StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TinyIntVal&
 }
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVal& val) {
+  DCHECK(ctx != nullptr);
   if (val.is_null) return StringVal::null();
   TimestampValue tv = TimestampValue::FromTimestampVal(val);
-  StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tv));
+  const DateTimeFormatContext* format_ctx =
+      reinterpret_cast<const DateTimeFormatContext*>(
+          ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  StringVal sv;
+  if (format_ctx == nullptr) {
+    sv = AnyValUtil::FromString(ctx, tv.ToString());
+  } else {
+    string formatted_timestamp = tv.Format(*format_ctx);
+    if (formatted_timestamp.empty()) return StringVal::null();
+    sv = AnyValUtil::FromString(ctx, formatted_timestamp);
+  }
   AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const DateVal& val) {
+  DCHECK(ctx != nullptr);
   if (val.is_null) return StringVal::null();
   DateValue dv = DateValue::FromDateVal(val);
   if (UNLIKELY(!dv.IsValid())) return StringVal::null();
-  StringVal sv = AnyValUtil::FromString(ctx, dv.ToString());
+  const DateTimeFormatContext* format_ctx =
+      reinterpret_cast<const DateTimeFormatContext*>(
+          ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  StringVal sv;
+  if (format_ctx == nullptr) {
+    sv = AnyValUtil::FromString(ctx, dv.ToString());
+  } else {
+    string formatted_date = dv.Format(*format_ctx);
+    if (formatted_date.empty()) return StringVal::null();
+    sv = AnyValUtil::FromString(ctx, formatted_date);
+  }
   AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }
@@ -281,9 +305,19 @@ CAST_TO_TIMESTAMP(BigIntVal);
 
 TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx,
     const StringVal& val) {
+  DCHECK(ctx != nullptr);
   if (val.is_null) return TimestampVal::null();
-  TimestampValue tv = TimestampValue::Parse(reinterpret_cast<char*>(val.ptr), val.len);
-  // Return null if 'val' did not parse
+  const DateTimeFormatContext* format_ctx =
+      reinterpret_cast<const DateTimeFormatContext*>(
+          ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  TimestampValue tv;
+  if (format_ctx != nullptr) {
+    tv = TimestampValue::ParseIsoSqlFormat(reinterpret_cast<const char*>(val.ptr),
+        val.len, *format_ctx);
+  } else {
+    tv = TimestampValue::ParseSimpleDateFormat(reinterpret_cast<const char*>(val.ptr),
+        val.len);
+  }
   TimestampVal result;
   tv.ToTimestampVal(&result);
   return result;
@@ -308,13 +342,22 @@ TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, const DateV
 }
 
 DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const StringVal& val) {
+  DCHECK(ctx != nullptr);
   if (val.is_null) return DateVal::null();
-  const char* stringVal = reinterpret_cast<const char*>(val.ptr);
-  DateValue dv = DateValue::Parse(stringVal, val.len, true);
+  const char* string_val = reinterpret_cast<const char*>(val.ptr);
+  const DateTimeFormatContext* format_ctx =
+      reinterpret_cast<const DateTimeFormatContext*>(
+          ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  DateValue dv;
+  if (format_ctx != nullptr) {
+    dv = DateValue::ParseIsoSqlFormat(string_val, val.len, *format_ctx);
+  } else {
+    dv = DateValue::ParseSimpleDateFormat(string_val, val.len, true);
+  }
   if (UNLIKELY(!dv.IsValid())) {
-    string invalidVal = string(stringVal, val.len);
+    string invalid_val = string(string_val, val.len);
     ctx->SetError(Substitute("String to Date parse failed. Invalid string val: \"$0\"",
-        invalidVal).c_str());
+        invalid_val).c_str());
     return DateVal::null();
   }
   return dv.ToDateVal();

@@ -30,6 +30,7 @@ add_library(Exprs
   anyval-util.cc
   bit-byte-functions-ir.cc
   case-expr.cc
+  cast-format-expr.cc
   cast-functions-ir.cc
   compound-predicates.cc
   compound-predicates-ir.cc

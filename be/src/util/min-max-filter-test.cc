@@ -329,16 +329,16 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
   // Now insert some stuff.
-  TimestampValue t1 = TimestampValue::Parse("2000-01-01 00:00:00");
+  TimestampValue t1 = TimestampValue::ParseSimpleDateFormat("2000-01-01 00:00:00");
   filter->Insert(&t1);
   CheckTimestampVals(filter, t1, t1);
-  TimestampValue t2 = TimestampValue::Parse("1990-01-01 12:30:00");
+  TimestampValue t2 = TimestampValue::ParseSimpleDateFormat("1990-01-01 12:30:00");
   filter->Insert(&t2);
   CheckTimestampVals(filter, t2, t1);
-  TimestampValue t3 = TimestampValue::Parse("2001-04-30 05:00:00");
+  TimestampValue t3 = TimestampValue::ParseSimpleDateFormat("2001-04-30 05:00:00");
   filter->Insert(&t3);
   CheckTimestampVals(filter, t2, t3);
-  TimestampValue t4 = TimestampValue::Parse("2001-04-30 01:00:00");
+  TimestampValue t4 = TimestampValue::ParseSimpleDateFormat("2001-04-30 01:00:00");
   filter->Insert(&t4);
   CheckTimestampVals(filter, t2, t3);
 

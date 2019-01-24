@@ -200,6 +200,7 @@ class ScalarExprEvaluator {
  protected:
   /// Users of fn_context();
   friend class CaseExpr;
+  friend class CastFormatExpr;
   friend class HiveUdfCall;
   friend class ScalarFnCall;
 

@@ -53,26 +53,34 @@ using datetime_parse_util::DateTimeFormatContext;
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
 const double TimestampValue::ONE_BILLIONTH = 0.000000001;
 
-TimestampValue TimestampValue::Parse(const char* str, int len) {
+TimestampValue TimestampValue::ParseSimpleDateFormat(const char* str, int len) {
   TimestampValue tv;
-  TimestampParser::Parse(str, len, &tv.date_, &tv.time_);
+  discard_result(TimestampParser::ParseSimpleDateFormat(str, len, &tv.date_, &tv.time_));
   return tv;
 }
 
-TimestampValue TimestampValue::Parse(const string& str) {
-  return Parse(str.c_str(), str.size());
+TimestampValue TimestampValue::ParseSimpleDateFormat(const string& str) {
+  return ParseSimpleDateFormat(str.c_str(), str.size());
 }
 
-TimestampValue TimestampValue::Parse(const char* str, int len,
+TimestampValue TimestampValue::ParseSimpleDateFormat(const char* str, int len,
     const DateTimeFormatContext& dt_ctx) {
   TimestampValue tv;
-  TimestampParser::Parse(str, len, dt_ctx, &tv.date_, &tv.time_);
+  discard_result(TimestampParser::ParseSimpleDateFormat(str, len, dt_ctx, &tv.date_,
+      &tv.time_));
   return tv;
 }
 
-int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff)
-    const {
-  return TimestampParser::Format(dt_ctx, date_, time_, len, buff);
+TimestampValue TimestampValue::ParseIsoSqlFormat(const char* str, int len,
+    const datetime_parse_util::DateTimeFormatContext& dt_ctx) {
+  TimestampValue tv;
+  discard_result(TimestampParser::ParseIsoSqlFormat(str, len, dt_ctx, &tv.date_,
+      &tv.time_));
+  return tv;
+}
+
+string TimestampValue::Format(const DateTimeFormatContext& dt_ctx) const {
+  return TimestampParser::Format(dt_ctx, date_, time_);
 }
 
 namespace {

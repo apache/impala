@@ -25,6 +25,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/case-expr.h"
+#include "exprs/cast-format-expr.h"
 #include "exprs/compound-predicates.h"
 #include "exprs/conditional-functions.h"
 #include "exprs/hive-udf-call.h"
@@ -184,6 +185,9 @@ Status ScalarExpr::CreateNode(
         *expr = pool->Add(new CoalesceExpr(texpr_node));
       } else if (texpr_node.fn.binary_type == TFunctionBinaryType::JAVA) {
         *expr = pool->Add(new HiveUdfCall(texpr_node));
+      } else if (texpr_node.__isset.cast_expr &&
+          !texpr_node.cast_expr.cast_format.empty()) {
+        *expr = pool->Add(new CastFormatExpr(texpr_node));
       } else {
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }

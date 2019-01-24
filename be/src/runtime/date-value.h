@@ -156,18 +156,16 @@ class DateValue {
 
   /// Constructors that parse from a date string. See DateParser for details about the
   /// date format.
-  static DateValue Parse(const char* str, int len, bool accept_time_toks);
-  static DateValue Parse(const std::string& str, bool accept_time_toks);
-  static DateValue Parse(const char* str, int len,
+  static DateValue ParseSimpleDateFormat(const char* str, int len, bool accept_time_toks);
+  static DateValue ParseSimpleDateFormat(const std::string& str, bool accept_time_toks);
+  static DateValue ParseSimpleDateFormat(const char* str, int len,
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx);
+  static DateValue ParseIsoSqlFormat(const char* str, int len,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx);
 
-  /// Format the date using the given 'dt_ctx' format context. The result is placed in
-  /// 'buff' buffer which has the size of 'len'. The size of the buffer should be at least
-  /// dt_ctx.fmt_out_len + 1. A string terminator will be appended to the string.
-  /// Return the number of characters copied in to the buffer (excluding terminator).
-  /// If *this is invalid, nothing is placed in 'buff' and -1 is returned.
-  int Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx, int len,
-      char* buff) const;
+  /// Format the date using the given 'dt_ctx' format context. If *this is invalid
+  /// returns an empty string.
+  std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx) const;
 
   bool operator==(const DateValue& other) const {
     return days_since_epoch_ == other.days_since_epoch_;

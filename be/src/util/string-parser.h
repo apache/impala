@@ -103,14 +103,16 @@ class StringParser {
       ParseResult* result) {
     boost::gregorian::date d;
     boost::posix_time::time_duration t;
-    *result = TimestampParser::Parse(s, len, &d, &t) ? PARSE_SUCCESS : PARSE_FAILURE;
+    *result = TimestampParser::ParseSimpleDateFormat(s, len, &d, &t) ? PARSE_SUCCESS :
+        PARSE_FAILURE;
     return {d, t};
   }
 
   /// Parse a DateValue from s.
   static inline DateValue StringToDate(const char* s, int len, ParseResult* result) {
     DateValue d;
-    *result = DateParser::Parse(s, len, false, &d) ? PARSE_SUCCESS : PARSE_FAILURE;
+    *result = DateParser::ParseSimpleDateFormat(s, len, false, &d) ? PARSE_SUCCESS :
+        PARSE_FAILURE;
     return d;
   }
 

@@ -24,7 +24,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
-#include "runtime/datetime-parse-util.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -56,8 +56,7 @@ typedef boost::posix_time::seconds Seconds;
 
 namespace impala {
 
-using datetime_parse_util::DateTimeFormatContext;
-using datetime_parse_util::ParseFormatTokens;
+using namespace datetime_parse_util;
 
 StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
     const TimestampValue& tv, const StringVal& fmt) {
@@ -65,17 +64,15 @@ StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-    if (!ParseFormatTokens(dt_ctx)){
-      TimestampFunctions::ReportBadFormat(context, fmt, false);
+    if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx)){
+      ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
       return StringVal::null();
     }
   }
 
-  int buff_len = dt_ctx->fmt_out_len + 1;
-  StringVal result(context, buff_len);
-  if (UNLIKELY(result.is_null)) return StringVal::null();
-  result.len = tv.Format(*dt_ctx, buff_len, reinterpret_cast<char*>(result.ptr));
-  if (result.len <= 0) return StringVal::null();
+  string formatted_timestamp = tv.Format(*dt_ctx);
+  if (formatted_timestamp.empty()) return StringVal::null();
+  StringVal result = AnyValUtil::FromString(context, formatted_timestamp);
   return result;
 }
 
@@ -92,7 +89,7 @@ template <class TIME>
 StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp,
     const StringVal& fmt) {
   if (fmt.is_null || fmt.len == 0) {
-    TimestampFunctions::ReportBadFormat(context, fmt, false);
+    ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
     return StringVal::null();
   }
   if (intp.is_null) return StringVal::null();
@@ -160,7 +157,7 @@ TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
 TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
     const StringVal& date, const StringVal& fmt) {
   if (fmt.is_null || fmt.len == 0) {
-    TimestampFunctions::ReportBadFormat(context, fmt, false);
+    ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
     return TimestampVal::null();
   }
   if (date.is_null || date.len == 0) return TimestampVal::null();
@@ -168,12 +165,12 @@ TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
      dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-     if (!ParseFormatTokens(dt_ctx)) {
-       ReportBadFormat(context, fmt, false);
+     if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx)) {
+       ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
        return TimestampVal::null();
      }
   }
-  const TimestampValue& tv = TimestampValue::Parse(
+  const TimestampValue& tv = TimestampValue::ParseSimpleDateFormat(
       reinterpret_cast<const char*>(date.ptr), date.len, *dt_ctx);
   TimestampVal tv_val;
   tv.ToTimestampVal(&tv_val);
@@ -191,27 +188,11 @@ StringVal TimestampFunctions::FromTimestamp(FunctionContext* context,
 BigIntVal TimestampFunctions::UnixFromString(FunctionContext* context,
     const StringVal& sv) {
   if (sv.is_null) return BigIntVal::null();
-  const TimestampValue& tv = TimestampValue::Parse(
+  const TimestampValue& tv = TimestampValue::ParseSimpleDateFormat(
       reinterpret_cast<const char *>(sv.ptr), sv.len);
   time_t result;
   return (tv.ToUnixTime(context->impl()->state()->local_time_zone(), &result)) ?
       BigIntVal(result) : BigIntVal::null();
-}
-
-void TimestampFunctions::ReportBadFormat(FunctionContext* context,
-    const StringVal& format, bool is_error) {
-  stringstream ss;
-  const StringValue& fmt = StringValue::FromStringVal(format);
-  if (format.is_null || format.len == 0) {
-    ss << "Bad date/time conversion format: format string is NULL or has 0 length";
-  } else {
-    ss << "Bad date/time conversion format: " << fmt.DebugString();
-  }
-  if (is_error) {
-    context->SetError(ss.str().c_str());
-  } else {
-    context->AddWarning(ss.str().c_str());
-  }
 }
 
 IntVal TimestampFunctions::Year(FunctionContext* context, const TimestampVal& ts_val) {
@@ -343,10 +324,6 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
   result.ptr[7] = '-';
   result.ptr[4] = '-';
   return result;
-}
-
-inline bool IsLeapYear(int year) {
-  return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
 
 inline unsigned short GetLastDayOfMonth(int month, int year) {

@@ -32,7 +32,7 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
-#include "runtime/datetime-parse-util.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/decimal-value.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -309,7 +309,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   AtomicOps_x86CPUFeaturesInit();
 #endif
   impala::InitThreading();
-  impala::datetime_parse_util::InitParseCtx();
+  impala::datetime_parse_util::SimpleDateFormatTokenizer::InitCtx();
+  impala::datetime_parse_util::SimpleDateFormatParser::InitCtx();
   impala::SeedOpenSSLRNG();
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 

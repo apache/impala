@@ -1455,8 +1455,14 @@ public class ParserTest extends FrontendTestBase {
   public void TestCastExprs() {
     ParsesOk("select cast(a + 5.0 as string) from t");
     ParsesOk("select cast(NULL as string) from t");
+    ParsesOk("select cast('05-01-2017' as timestamp format 'MM-dd-yyyy')");
+    ParsesOk("select cast('2017.01.02' as date format 'YYYY-MM-DD')");
     ParserError("select cast(a + 5.0 as badtype) from t");
     ParserError("select cast(a + 5.0, string) from t");
+    ParserError("select cast('05-01-2017' as timestamp format 12345)");
+    ParserError("select cast('05-01-2017' as timestamp format )");
+    ParserError("select cast('05-01-2017' as timestamp format NULL)");
+    ParserError("select cast('05-01-2017' as date format NULL)");
   }
 
   @Test

@@ -1,0 +1,109 @@
+# Input value for the tests:
+# select timestamp_col from alltypes where id=30;
+# 2009-01-04 00:30:01.350000000
+====
+---- QUERY
+# timestamp to string conversion
+select
+    cast(timestamp_col as string format 'HH24 HH24 HH12:MI:SS MM-DD-YYYY DDD SSSSS P.M.')
+    from alltypes
+    where id=30
+---- RESULTS
+'00 00 12:30:01 01-04-2009 004 01801 A.M.'
+---- TYPES
+string
+====
+---- QUERY
+# timestamp to varchar conversion
+select
+    cast(timestamp_col as varchar format 'HH24 HH24 HH12:MI:SS MM-DD-YYYY DDD SSSSS PM')
+    from alltypes
+    where id=30
+---- RESULTS
+'00 00 12:30:01 01-04-2009 004 01801 AM'
+---- TYPES
+string
+====
+---- QUERY
+# timestamp to char conversion
+select
+    cast(timestamp_col as char(38) format 'HH24 HH24 HH12:MI:SS MM-DD-YYYY DDD SSSSS PM')
+    from alltypes
+    where id=30
+---- RESULTS
+'00 00 12:30:01 01-04-2009 004 01801 AM'
+---- TYPES
+char
+====
+---- QUERY
+# For the string types to timestamp conversions I use the timestamp_col from alltypes
+# convert it to the desired string format and then convert back to timestamp.
+# string to timestamp conversion
+select cast(cast(timestamp_col as string format 'DD-MM-YYYY HH12:MI:SS') as timestamp
+    format 'DD-MM-YYYY HH:MI:SS') from alltypes where id=30
+---- RESULTS
+2009-01-04 00:30:01
+---- TYPES
+timestamp
+====
+---- QUERY
+# varchar to timestamp conversion
+select cast(cast(timestamp_col as varchar format 'HH:MI:SS YYYY-MM-DD') as timestamp
+    format 'HH:MI:SS YYYY-MM-DD') from alltypes where id=30
+---- RESULTS
+2009-01-04 00:30:01
+---- TYPES
+timestamp
+====
+---- QUERY
+# char to timestamp conversion
+select cast(cast(timestamp_col as char(19) format 'yyyy/dd/mm hh:mi:ss') as timestamp
+    format 'yyyy/dd/mm hh:mi:ss') from alltypes where id=30
+---- RESULTS
+2009-01-04 00:30:01
+---- TYPES
+timestamp
+====
+---- QUERY
+# Multiple casts are in the expr tree with different format.
+# Input: '01/04/09' => 2009-04-01 > 2009-01-04
+select (cast(date_string_col as timestamp format 'DD/MM/YYYY') >
+        cast(date_string_col as timestamp format 'MM/DD/YYYY'))
+    from alltypes where id=30
+---- RESULTS
+True
+---- TYPES
+boolean
+====
+---- QUERY
+# Multiple nested casts are in the expr tree with different format.
+# Input: '01/04/09'
+select cast(cast(date_string_col as timestamp format 'mm/dd/yyyy')
+           as string format 'hh24:mi yyyy-mm-dd') from alltypes where id=30;
+---- RESULTS
+'00:00 2009-01-04'
+---- TYPES
+string
+====
+---- QUERY
+# Year boundary tests
+select cast("1399-12-31" as timestamp FORMAT "YYYY-MM-DD");
+---- RESULTS
+NULL
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast("1400-01-01" as timestamp FORMAT "YYYY-MM-DD");
+---- RESULTS
+1400-01-01 00:00:00
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast("9999-12-31" as timestamp FORMAT "YYYY-MM-DD");
+---- RESULTS
+9999-12-31 00:00:00
+---- TYPES
+timestamp
+====
