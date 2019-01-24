@@ -273,6 +273,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .array = 34
   # .array = 35
   # .array = 36
+  @SkipIfS3.eventually_consistent
   def test_avro_primitive_in_list(self, vector, unique_database):
     self.__test_primitive_in_list(unique_database, "AvroPrimitiveInList",
       "AvroPrimitiveInList.parquet", vector)

@@ -21,6 +21,7 @@ import pytest
 
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
@@ -116,6 +117,7 @@ class TestAggregation(ImpalaTestSuite):
       return False
     return True
 
+  @SkipIfS3.eventually_consistent
   def test_aggregation(self, vector):
     exec_option = vector.get_value('exec_option')
     disable_codegen = exec_option['disable_codegen']
