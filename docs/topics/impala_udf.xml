@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="1.2" id="udfs">
 
-  <title>Impala User-Defined Functions (UDFs)</title>
+  <title>User-Defined Functions (UDFs)</title>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
