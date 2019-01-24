@@ -50,3 +50,21 @@ select sleep(10000)
 ---- CATCH
 row_regex:.*expired due to execution time limit of 2s000ms.*
 ====
+---- QUERY
+# Query should fail due to exceeding rows produced limit.
+set NUM_ROWS_PRODUCED_LIMIT = 10000;
+select * from tpch.lineitem;
+---- CATCH
+row_regex:.*terminated due to rows produced limit of 10000.*
+====
+---- QUERY
+# The query should succeed when it doesn't exceed the rows produced limit.
+set NUM_ROWS_PRODUCED_LIMIT = 3;
+select * from functional.tinytable;
+---- TYPES
+STRING,STRING
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====

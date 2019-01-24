@@ -393,6 +393,10 @@ error_codes = (
   ("CPU_LIMIT_EXCEEDED", 129, "Query $0 terminated due to CPU limit of $1"),
 
   ("SCAN_BYTES_LIMIT_EXCEEDED", 130, "Query $0 terminated due to scan bytes limit of $1"),
+
+  ("ROWS_PRODUCED_LIMIT_EXCEEDED", 131,
+   "Query $0 terminated due to rows produced limit of $1. "
+   "Unset or increase NUM_ROWS_PRODUCED_LIMIT query option to produce more rows."),
 )
 
 import sys

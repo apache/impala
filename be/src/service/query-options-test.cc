@@ -251,7 +251,8 @@ TEST(QueryOptions, SetBigIntOptions) {
   TQueryOptions options;
   // List of pairs of Key and its valid range
   pair<OptionDef<int64_t>, Range<int64_t>> case_set[] {
-      {MAKE_OPTIONDEF(cpu_limit_s),  {0, I64_MAX}},
+      {MAKE_OPTIONDEF(cpu_limit_s), {0, I64_MAX}},
+      {MAKE_OPTIONDEF(num_rows_produced_limit), {0, I64_MAX}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int64_t>& option_def = test_case.first;

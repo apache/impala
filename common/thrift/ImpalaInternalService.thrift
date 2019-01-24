@@ -318,6 +318,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift.
   // The default value is set to 3 as this is the default value of HDFS replicas.
   76: optional i32 num_remote_executor_candidates = 3;
+
+  // See comment in ImpalaService.thrift.
+  77: optional i64 num_rows_produced_limit = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

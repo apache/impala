@@ -118,6 +118,12 @@ class PlanRootSink : public DataSink {
 
   /// Set by GetNext() to indicate to Send() how many rows it should write to results_.
   int num_rows_requested_ = 0;
+
+  /// Updated by Send() to indicate the total number of rows produced by query execution.
+  int64_t num_rows_produced_ = 0;
+
+  /// Limit on the number of rows produced by this query, initialized by the constructor.
+  const int64_t num_rows_produced_limit_;
 };
 }
 

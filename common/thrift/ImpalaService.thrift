@@ -367,6 +367,11 @@ enum TImpalaQueryOptions {
   // cache). If set to 0, the number of executor candidates is unlimited, and remote
   // ranges will be scheduled across all executors.
   NUM_REMOTE_EXECUTOR_CANDIDATES,
+
+  // A limit on the number of rows produced by the query. The query will be
+  // canceled if the query is still executing after this limit is hit. A value
+  // of 0 means there is no limit on the number of rows produced.
+  NUM_ROWS_PRODUCED_LIMIT
 }
 
 // The summary of a DML statement.

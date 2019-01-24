@@ -750,6 +750,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
             num_remote_executor_candidates);
         break;
       }
+      case TImpalaQueryOptions::NUM_ROWS_PRODUCED_LIMIT: {
+        StringParser::ParseResult result;
+        const int64_t num_rows_produced_limit =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || num_rows_produced_limit < 0) {
+          return Status(Substitute("Invalid rows returned limit: '$0'. "
+                                   "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_num_rows_produced_limit(num_rows_produced_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
