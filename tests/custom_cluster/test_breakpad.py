@@ -308,7 +308,10 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     # enough files to trigger rotation.
     for i in xrange(max_minidumps + 1):
       self.kill_cluster(SIGUSR1)
-      # Breakpad forks to write its minidump files, wait for all the clones to terminate.
+      # Breakpad forks to write its minidump files, sleep briefly to allow the forked
+      # processes to start.
+      time.sleep(1)
+      # Wait for all the clones to terminate.
       assert self.wait_for_num_processes('impalad', cluster_size) == cluster_size
       assert self.wait_for_num_processes('catalogd', 1) == 1
       assert self.wait_for_num_processes('statestored', 1) == 1
