@@ -21,6 +21,7 @@
 import pytest
 import threading
 from time import sleep
+from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -159,9 +160,6 @@ class TestCancellation(ImpalaTestSuite):
         except ImpalaBeeswaxException as e:
           threading.current_thread().fetch_results_error = e
 
-        threading.current_thread().query_profile = \
-          self.impalad_test_service.get_thrift_profile(handle.get_handle().id)
-
       thread = threading.Thread(target=fetch_results)
       thread.start()
 
@@ -182,17 +180,6 @@ class TestCancellation(ImpalaTestSuite):
 
       # Before accessing fetch_results_error we need to join the fetch thread
       thread.join()
-
-      # IMPALA-2063 Cancellation tests may generate profile text that is otherwise hard
-      # to reproduce for testing mis-formatting.
-      profile = thread.query_profile
-      if profile:
-        for (k, v) in profile.nodes[1].info_strings.iteritems():
-          assert v == v.rstrip(), \
-            "Mis-formatted profile text: %s %s" % (k, v)
-          # "Plan" text may be strangely formatted.
-          assert k == 'Plan' or '\n\n' not in v, \
-            "Mis-formatted profile text: %s %s" % (k, v)
 
       if thread.fetch_results_error is None:
         # If the fetch rpc didn't result in CANCELLED (and auto-close the query) then
@@ -222,6 +209,33 @@ class TestCancellation(ImpalaTestSuite):
     # query has a limit or aggregation
     if not debug_action and ('count' in query or 'limit' in query):
       self.execute_query(query, vector.get_value('exec_option'))
+
+  def test_misformatted_profile_text(self):
+    """Tests that canceled queries have no whitespace formatting errors in their profiles
+    (IMPALA-2063)."""
+    query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
+    client = self.hs2_client
+    # Start query
+    handle = client.execute_async(query)
+    # Wait up to 5 seconds for the query to start
+    assert any(client.get_state(handle) == 'RUNNING_STATE' or sleep(1)
+               for _ in range(5)), 'Query failed to start'
+
+    client.cancel(handle)
+    # Wait up to 5 seconds for the query to get cancelled
+    # TODO(IMPALA-1262): This should be CANCELED_STATE
+    # TODO(IMPALA-8411): Remove and assert that the query is cancelled immediately
+    assert any(client.get_state(handle) == 'ERROR_STATE' or sleep(1)
+               for _ in range(5)), 'Query failed to cancel'
+    # Get profile and check for formatting errors
+    profile = client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
+    for (k, v) in profile.nodes[1].info_strings.iteritems():
+      # Ensure that whitespace gets removed from values.
+      assert v == v.rstrip(), \
+        "Profile value contains surrounding whitespace: %s %s" % (k, v)
+      # Plan text may be strangely formatted.
+      assert k == 'Plan' or '\n\n' not in v, \
+        "Profile contains repeating newlines: %s %s" % (k, v)
 
   def teardown_method(self, method):
     # For some reason it takes a little while for the query to get completely torn down

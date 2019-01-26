@@ -25,6 +25,7 @@ import re
 
 import impala.dbapi as impyla
 import tests.common
+from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 
 
@@ -98,6 +99,11 @@ class ImpalaConnection(object):
   @abc.abstractmethod
   def get_state(self, operation_handle):
     """Returns the state of a query"""
+    pass
+
+  @abc.abstractmethod
+  def state_is_finished(self, operation_handle):
+    """Returns whether the state of a query is finished"""
     pass
 
   @abc.abstractmethod
@@ -186,6 +192,10 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- getting state for operation: %s" % operation_handle)
     return self.__beeswax_client.get_state(operation_handle.get_handle())
 
+  def state_is_finished(self, operation_handle):
+    LOG.info("-- checking finished state for operation: {0}".format(operation_handle))
+    return self.get_state(operation_handle) == self.QUERY_STATES["FINISHED"]
+
   def get_exec_summary(self, operation_handle):
     LOG.info("-- getting exec summary operation: %s" % operation_handle)
     return self.__beeswax_client.get_exec_summary(operation_handle.get_handle())
@@ -270,10 +280,10 @@ class ImpylaHS2Connection(ImpalaConnection):
     LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
     operation_handle.get_handle().close_operation()
 
-  def execute(self, sql_stmt, user=None):
+  def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING):
     handle = self.execute_async(sql_stmt, user)
     try:
-      return self.__fetch_results(handle)
+      return self.__fetch_results(handle, profile_format=profile_format)
     finally:
       self.close_query(handle)
 
@@ -282,7 +292,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     if user is not None:
       raise NotImplementedError("Not yet implemented for HS2 - authentication")
     try:
-      self.__cursor.execute(sql_stmt, configuration=self.__query_options)
+      self.__cursor.execute_async(sql_stmt, configuration=self.__query_options)
       return OperationHandle(self.__cursor, sql_stmt)
     except Exception:
       self.__cursor.close_operation()
@@ -290,20 +300,30 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def cancel(self, operation_handle):
     LOG.info("-- canceling operation: {0}".format(operation_handle))
-    return self.__beeswax_client.cancel_query(operation_handle.get_handle())
+    cursor = operation_handle.get_handle()
+    return cursor.cancel_operation(reset_state=False)
 
   def get_state(self, operation_handle):
     LOG.info("-- getting state for operation: {0}".format(operation_handle))
-    raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
+    cursor = operation_handle.get_handle()
+    return cursor.status()
+
+  def state_is_finished(self, operation_handle):
+    LOG.info("-- checking finished state for operation: {0}".format(operation_handle))
+    cursor = operation_handle.get_handle()
+    # cursor.status contains a string representation of one of
+    # TCLIService.TOperationState.
+    return cursor.status() == "FINISHED_STATE"
 
   def get_exec_summary(self, operation_handle):
     LOG.info("-- getting exec summary operation: {0}".format(operation_handle))
     raise NotImplementedError(
         "Not yet implemented for HS2 - summary returned is thrift, not string.")
 
-  def get_runtime_profile(self, operation_handle):
+  def get_runtime_profile(self, operation_handle, profile_format):
     LOG.info("-- getting runtime profile operation: {0}".format(operation_handle))
-    return self.__cursor.get_profile()
+    cursor = operation_handle.get_handle()
+    return cursor.get_profile(profile_format=profile_format)
 
   def wait_for_finished_timeout(self, operation_handle, timeout):
     LOG.info("-- waiting for query to reach FINISHED state: {0}".format(operation_handle))
@@ -330,7 +350,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     LOG.info("-- fetching results from: {0}".format(handle))
     return self.__fetch_results(handle, max_rows)
 
-  def __fetch_results(self, handle, max_rows=-1):
+  def __fetch_results(self, handle, max_rows=-1,
+                      profile_format=TRuntimeProfileFormat.STRING):
     """Implementation of result fetching from handle."""
     cursor = handle.get_handle()
     assert cursor is not None
@@ -347,7 +368,7 @@ class ImpylaHS2Connection(ImpalaConnection):
       else:
         result_tuples = cursor.fetchmany(max_rows)
     log = self.get_log(handle)
-    profile = self.get_runtime_profile(handle)
+    profile = self.get_runtime_profile(handle, profile_format=profile_format)
     return ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
                               column_labels=column_labels, column_types=column_types,
                               query=handle.sql_stmt(), log=log, profile=profile)

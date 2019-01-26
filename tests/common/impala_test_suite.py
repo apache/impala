@@ -651,10 +651,14 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def execute_query_using_client(self, client, query, vector):
     self.change_database(client, vector.get_value('table_format'))
+    query_options = vector.get_value('exec_option')
+    if query_options is not None: client.set_configuration(query_options)
     return client.execute(query)
 
   def execute_query_async_using_client(self, client, query, vector):
     self.change_database(client, vector.get_value('table_format'))
+    query_options = vector.get_value('exec_option')
+    if query_options is not None: client.set_configuration(query_options)
     return client.execute_async(query)
 
   def close_query_using_client(self, client, query):

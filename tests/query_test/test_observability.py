@@ -23,11 +23,10 @@ from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
                                SkipIfLocal, SkipIfNotHdfsMinicluster)
 from tests.util.filesystem_utils import IS_EC
 from time import sleep, time
+from RuntimeProfile.ttypes import TRuntimeProfileFormat
 import logging
 import pytest
 import re
-
-MAX_THRIFT_PROFILE_WAIT_TIME_S = 300
 
 class TestObservability(ImpalaTestSuite):
   @classmethod
@@ -72,13 +71,11 @@ class TestObservability(ImpalaTestSuite):
     profiles of fragment instances."""
     query = """select count(distinct a.int_col) from functional.alltypes a
         inner join functional.alltypessmall b on (a.id = b.id + cast(sleep(15) as INT))"""
-    handle = self.client.execute_async(query)
-    query_id = handle.get_handle().id
+    handle = self.hs2_client.execute_async(query)
 
     num_validated = 0
-    tree = self.impalad_test_service.get_thrift_profile(query_id,
-        MAX_THRIFT_PROFILE_WAIT_TIME_S)
-    while self.client.get_state(handle) != self.client.QUERY_STATES['FINISHED']:
+    tree = self.hs2_client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
+    while not self.hs2_client.state_is_finished(handle):
       assert tree, num_validated
       for node in tree.nodes:
         if node.name.startswith('Instance '):
@@ -88,9 +85,11 @@ class TestObservability(ImpalaTestSuite):
           # Try converting the string to make sure it's in the expected format
           assert datetime.strptime(report_time_str, '%Y-%m-%d %H:%M:%S')
           num_validated += 1
-      tree = self.impalad_test_service.get_thrift_profile(query_id)
+      tree = self.hs2_client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
+      # Let's not hit the backend too hard
+      sleep(0.1)
     assert num_validated > 0
-    self.client.close_query(handle)
+    self.hs2_client.close_query(handle)
 
   @SkipIfS3.hbase
   @SkipIfLocal.hbase
@@ -478,23 +477,15 @@ class TestObservability(ImpalaTestSuite):
           counters.append(counter)
     return counters
 
-  def _get_thrift_profile(self, query_id, timeout=MAX_THRIFT_PROFILE_WAIT_TIME_S):
-    """Downloads a thrift profile and asserts that a profile was retrieved within the
-       specified timeout. If you see unexpected timeouts, try running the calling test
-       serially."""
-    thrift_profile = self.impalad_test_service.get_thrift_profile(query_id,
-                                                                  timeout=timeout)
-    assert thrift_profile, "Debug thrift profile for query {0} not available in {1} \
-        seconds".format(query_id, timeout)
-    return thrift_profile
-
   @pytest.mark.execute_serially
   def test_thrift_profile_contains_host_resource_metrics(self):
     """Tests that the thrift profile contains time series counters for CPU and network
        resource usage."""
     query_opts = {'resource_trace_ratio': 1.0}
-    result = self.execute_query("select sleep(2000)", query_opts)
-    thrift_profile = self._get_thrift_profile(result.query_id)
+    self.hs2_client.set_configuration(query_opts)
+    result = self.hs2_client.execute("select sleep(2000)",
+                                     profile_format=TRuntimeProfileFormat.THRIFT)
+    thrift_profile = result.profile
 
     expected_keys = ["HostCpuUserPercentage", "HostNetworkRx", "HostDiskReadThroughput"]
     for key in expected_keys:
@@ -510,9 +501,9 @@ class TestObservability(ImpalaTestSuite):
     nanosecond precision. Nanosecond precision is expected by management API clients
     that consume Impala debug webpages."""
     query = "select sleep(5)"
-    result = self.execute_query(query)
+    result = self.hs2_client.execute(query, profile_format=TRuntimeProfileFormat.THRIFT)
+    tree = result.profile
 
-    tree = self._get_thrift_profile(result.query_id)
     # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
     # See be/src/service/client-request-state.[h|cc].
     start_time = tree.nodes[1].info_strings["Start Time"]
@@ -533,30 +524,30 @@ class TestObservability(ImpalaTestSuite):
     without coordinators, the End Time is set only when UnregisterQuery() is called."""
     # Test the end time of a query with a coordinator.
     query = "select 1"
-    handle = self.execute_query_async(query)
-    result = self.client.fetch(query, handle)
+    handle = self.hs2_client.execute_async(query)
+    result = self.hs2_client.fetch(query, handle)
     # Ensure that the query returns a non-empty result set.
     assert result is not None
     # Once the results have been fetched, the query End Time must be set.
-    query_id = handle.get_handle().id
-    tree = self._get_thrift_profile(query_id)
+    tree = self.hs2_client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
     end_time = tree.nodes[1].info_strings["End Time"]
-    assert end_time is not None
-    self.client.close_query(handle)
+    assert end_time
+    self.hs2_client.close_query(handle)
+
     # Test the end time of a query without a coordinator.
     query = "describe functional.alltypes"
-    handle = self.execute_query_async(query)
-    result = self.client.fetch(query, handle)
+    handle = self.hs2_client.execute_async(query)
+    result = self.hs2_client.fetch(query, handle)
     # Ensure that the query returns a non-empty result set.
-    assert result is not None
+    assert result
     # The query End Time must not be set until the query is unregisterted
-    query_id = handle.get_handle().id
-    tree = self._get_thrift_profile(query_id)
+    tree = self.hs2_client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)
     end_time = tree.nodes[1].info_strings["End Time"]
     assert len(end_time) == 0, end_time
-    self.client.close_query(handle)
-    # The query End Time must be set after the query is unregistered
-    tree = self._get_thrift_profile(query_id)
+    # Save the last operation to be able to retrieve the profile after closing the query
+    last_op = handle.get_handle()._last_operation
+    self.hs2_client.close_query(handle)
+    tree = last_op.get_profile(TRuntimeProfileFormat.THRIFT)
     end_time = tree.nodes[1].info_strings["End Time"]
     assert end_time is not None
 
