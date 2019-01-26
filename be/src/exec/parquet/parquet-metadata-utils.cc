@@ -31,6 +31,7 @@
 #include "exec/parquet/parquet-common.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -212,11 +213,12 @@ Status ParquetMetadataUtils::ValidateRowGroupColumn(
   }
 
   // Check the compression is supported.
-  if (col_chunk_metadata.codec != parquet::CompressionCodec::UNCOMPRESSED &&
-      col_chunk_metadata.codec != parquet::CompressionCodec::SNAPPY &&
-      col_chunk_metadata.codec != parquet::CompressionCodec::GZIP) {
+  const auto codec = Ubsan::EnumToInt(&col_chunk_metadata.codec);
+  if (codec != parquet::CompressionCodec::UNCOMPRESSED &&
+      codec != parquet::CompressionCodec::SNAPPY &&
+      codec != parquet::CompressionCodec::GZIP) {
     return Status(Substitute("File '$0' uses an unsupported compression: $1 for column "
-        "'$2'.", filename, col_chunk_metadata.codec, schema_element.name));
+        "'$2'.", filename, codec, schema_element.name));
   }
 
   if (col_chunk_metadata.type != schema_element.type) {
@@ -498,9 +500,10 @@ Status ParquetSchemaResolver::CreateSchemaTree(
   // updating ira_def_level
   node->def_level_of_immediate_repeated_ancestor = ira_def_level;
 
-  if (node->element->repetition_type == parquet::FieldRepetitionType::OPTIONAL) {
+  const auto repetition_type = Ubsan::EnumToInt(&node->element->repetition_type);
+  if (repetition_type == parquet::FieldRepetitionType::OPTIONAL) {
     ++max_def_level;
-  } else if (node->element->repetition_type == parquet::FieldRepetitionType::REPEATED &&
+  } else if (repetition_type == parquet::FieldRepetitionType::REPEATED &&
              !is_root_schema /*PARQUET-843*/) {
     ++max_rep_level;
     // Repeated fields add a definition level. This is used to distinguish between an

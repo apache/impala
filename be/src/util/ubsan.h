@@ -22,6 +22,7 @@
 // undefined behavior.
 
 #include <cstring>
+#include <type_traits>
 
 #include "common/logging.h"
 
@@ -47,6 +48,50 @@ class Ubsan {
       return 0;
     }
     return std::memcmp(s1, s2, n);
+  }
+  // Convert a potential enum value (that may be out of range) into its underlying integer
+  // implementation. This is required because, according to the standard, enum values that
+  // are out of range induce undefined behavior. For instance,
+  //
+  //     enum A {B = 0, C = 5};
+  //     int d = 6;
+  //     A e;
+  //     memcpy(&e, &d, sizeof(e));
+  //     if (e == B)
+  //     ; // undefined behavior: load of value 6, which is not a valid value for type 'A'
+  //     if (EnumToInt(&e) == B)
+  //     ; // OK: the type of EnumToInt(&e) is int, and B is converted to int for the
+  //       // comparison
+  //
+  // EnumToInt() is a worse alternative to not treating a pointer to arbitrary memory as a
+  // pointer to an enum. To put it another way, the first block below is a better way to
+  // handle possibly-out-of-range enum values:
+  //
+  // extern char * v;
+  // enum A { B = 0, C = 45 };
+  // A x;
+  // if (good_way) {
+  //   std::underlying_type_t<T> i;
+  //   std::memcpy(&i, v, sizeof(i));
+  //   if (B <= i && i <= C) x = i;
+  // } else {
+  //   A * y = reinterpret_cast<A *>(v);
+  //   int i = EnumToInt(y);
+  //   if (B <= i && i <= C) x = *y;
+  // }
+  //
+  // The second block is worse because y is masquerading as a legitimate pointer to an A
+  // and could get dereferenced illegally as the code evolves. Unfortunately,
+  // deserialization methods don't always make the better way an option - sometimes the
+  // possibly invalid pointer to A (like y) is created externally.
+  template<typename T>
+  static auto EnumToInt(const T * e) {
+    std::underlying_type_t<T> i;
+    static_assert(sizeof(i) == sizeof(*e), "enum underlying type is the wrong size");
+    // We have to memcpy, rather than directly assigning i = *e, because dereferencing e
+    // creates undefined behavior.
+    memcpy(&i, e, sizeof(i));
+    return i;
   }
 };
 
