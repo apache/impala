@@ -67,6 +67,7 @@ from tempfile import mkdtemp
 
 import json
 import os
+import pipes
 import sh
 import shutil
 import subprocess
@@ -78,16 +79,24 @@ from tests.common.test_dimensions import TableFormatInfo
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 
 
+def configured_call(cmd):
+  """Call a command in a shell with config-impala.sh."""
+  if type(cmd) is list:
+    cmd = " ".join([pipes.quote(arg) for arg in cmd])
+  cmd = "source {0}/bin/impala-config.sh && {1}".format(IMPALA_HOME, cmd)
+  return subprocess.check_call(["bash", "-c", cmd])
+
+
 def load_data(db_to_load, table_formats, scale):
   """Loads a database with a particular scale factor."""
-  subprocess.check_call(["{0}/bin/load-data.py".format(IMPALA_HOME),
-                         "--workloads", db_to_load, "--scale_factor", str(scale),
-                         "--table_formats", "text/none," + table_formats])
+  configured_call(["{0}/bin/load-data.py".format(IMPALA_HOME),
+                   "--workloads", db_to_load, "--scale_factor", str(scale),
+                   "--table_formats", "text/none," + table_formats])
   for table_format in table_formats.split(","):
     suffix = TableFormatInfo.create_from_string(None, table_format).db_suffix()
     db_name = db_to_load + scale + suffix
-    subprocess.check_call(["{0}/tests/util/compute_table_stats.py".format(IMPALA_HOME),
-                           "--stop_on_error", "--db_names", db_name])
+    configured_call(["{0}/tests/util/compute_table_stats.py".format(IMPALA_HOME),
+                     "--stop_on_error", "--db_names", db_name])
 
 def get_git_hash_for_name(name):
   return sh.git("rev-parse", name).strip()
@@ -99,17 +108,17 @@ def build(git_hash, options):
   buildall = ["{0}/buildall.sh".format(IMPALA_HOME), "-notests", "-release", "-noclean"]
   if options.ninja:
     buildall += ["-ninja"]
-  subprocess.check_call(buildall)
+  configured_call(buildall)
 
 
 def start_minicluster():
-  subprocess.check_call(["{0}/bin/create-test-configuration.sh".format(IMPALA_HOME)])
-  subprocess.check_call(["{0}/testdata/bin/run-all.sh".format(IMPALA_HOME)])
+  configured_call(["{0}/bin/create-test-configuration.sh".format(IMPALA_HOME)])
+  configured_call(["{0}/testdata/bin/run-all.sh".format(IMPALA_HOME)])
 
 
 def start_impala(num_impalads):
-  subprocess.check_call(["{0}/bin/start-impala-cluster.py".format(IMPALA_HOME), "-s",
-                         str(num_impalads), "-c", str(num_impalads)])
+  configured_call(["{0}/bin/start-impala-cluster.py".format(IMPALA_HOME), "-s",
+                   str(num_impalads), "-c", str(num_impalads)])
 
 
 def run_workload(base_dir, workloads, options):
@@ -134,7 +143,7 @@ def run_workload(base_dir, workloads, options):
   if options.query_names:
     run_workload += ["--query_names={0}".format(options.query_names)]
 
-  subprocess.check_call(run_workload)
+  configured_call(run_workload)
 
 
 def report_benchmark_results(file_a, file_b, description):
