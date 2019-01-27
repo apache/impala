@@ -72,6 +72,8 @@ REDHAT=
 REDHAT6=
 REDHAT7=
 UBUNTU=
+UBUNTU16=
+UBUNTU18=
 IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
@@ -87,18 +89,28 @@ if [[ -f /etc/redhat-release ]]; then
   # TODO: restrict redhat versions
 else
   source /etc/lsb-release
-  if ! [[ $DISTRIB_ID = Ubuntu ]]
+  if [[ $DISTRIB_ID = Ubuntu ]]
   then
+    UBUNTU=true
+    echo "Identified Ubuntu system."
+    # Kerberos setup would pop up dialog boxes without this
+    export DEBIAN_FRONTEND=noninteractive
+    if [[ $DISTRIB_RELEASE = 16.04 ]]
+    then
+      UBUNTU16=true
+      echo "Identified Ubuntu 16.04 system."
+    elif [[ $DISTRIB_RELEASE = 18.04 ]]
+    then
+      UBUNTU18=true
+      echo "Identified Ubuntu 18.04 system."
+    else
+      echo "This script only supports 16.04 or 18.04 of Ubuntu" >&2
+      exit 1
+    fi
+  else
     echo "This script only supports Ubuntu or RedHat" >&2
     exit 1
   fi
-  if ! [[ $DISTRIB_RELEASE = 16.04 ]]
-  then
-    echo "This script only supports 16.04 of Ubuntu" >&2
-    exit 1
-  fi
-  UBUNTU=true
-  export DEBIAN_FRONTEND=noninteractive
 fi
 if grep docker /proc/1/cgroup; then
   IN_DOCKER=true
@@ -108,6 +120,20 @@ fi
 # Helper function to execute following command only on Ubuntu
 function ubuntu {
   if [[ "$UBUNTU" == true ]]; then
+    "$@"
+  fi
+}
+
+# Helper function to execute following command only on Ubuntu 16.04
+function ubuntu16 {
+  if [[ "$UBUNTU16" == true ]]; then
+    "$@"
+  fi
+}
+
+# Helper function to execute following command only on Ubuntu 18.04
+function ubuntu18 {
+  if [[ "$UBUNTU18" == true ]]; then
     "$@"
   fi
 }
@@ -165,7 +191,7 @@ ubuntu apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
         krb5-admin-server krb5-kdc krb5-user libsasl2-dev libsasl2-modules \
         libsasl2-modules-gssapi-mit libssl-dev make maven ninja-build ntp \
         ntpdate python-dev python-setuptools postgresql ssh wget vim-common psmisc \
-        lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git
+        lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
 
 if [[ "$UBUNTU" == true ]]; then
   # Don't use openjdk-8-jdk 8u181-b13-1ubuntu0.16.04.1 which is known to break the
@@ -188,6 +214,10 @@ if [[ "$UBUNTU" == true ]]; then
     rm -rf $DEB_DIR
   fi
 fi
+
+# Ubuntu 18.04 installs OpenJDK 11 and configures it as the default Java version.
+# Impala is currently tested with OpenJDK 8, so configure that version as the default.
+ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
 
 
 redhat sudo yum install -y curl gcc gcc-c++ git krb5-devel krb5-server krb5-workstation \
@@ -252,7 +282,7 @@ redhat6 sudo service ntpd start || grep docker /proc/1/cgroup
 notindocker redhat7 sudo service ntpd start
 
 # IMPALA-3932, IMPALA-3926
-if [[ $UBUNTU = true && $DISTRIB_RELEASE = 16.04 ]]
+if [[ $UBUNTU = true && ( $DISTRIB_RELEASE = 16.04 || $DISTRIB_RELEASE = 18.04 ) ]]
 then
   SET_LD_LIBRARY_PATH='export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}'
   echo -e "\n$SET_LD_LIBRARY_PATH" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
