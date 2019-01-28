@@ -107,12 +107,19 @@ function(THRIFT_GEN_DS VAR)
     get_filename_component(ABS_THRIFT_FILE ${THRIFT_FILE} ABSOLUTE)
     get_filename_component(THRIFT_FILE_WE ${THRIFT_FILE} NAME_WE)
 
-    # This isn't the exact output file that's created, just a unique file
-    set(OUTPUT_FILE "${EXT_DS_OUTPUT_DIR}/${THRIFT_FILE_WE}.java")
+    # Create a dummy marker file to track if Thrift compilation of the current file has
+    # been run or not. This file is created only if Thrift compilation succeeds. Deletion
+    # of the file will re-trigger Thrift compilation for the current file.
+    set(OUTPUT_FILE_MESSAGE "CMake state file for Thrift compilation of"
+                            "${ABS_THRIFT_FILE}, deletion of this file will cause"
+                            "${THRIFT_FILE} to be recompiled during the next build")
+    set(OUTPUT_DIR "${EXT_DS_OUTPUT_DIR}/../target/tmp/generated-sources/")
+    set(OUTPUT_FILE "${OUTPUT_DIR}/${THRIFT_FILE_WE}.txt")
     list(APPEND ${VAR} ${OUTPUT_FILE})
     add_custom_command(
       OUTPUT ${OUTPUT_FILE}
-      COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE}
+      COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${THRIFT_FILE} &&
+              mkdir -p ${OUTPUT_DIR} && echo ${OUTPUT_FILE_MESSAGE} > ${OUTPUT_FILE}
       DEPENDS ${ABS_THRIFT_FILE}
       COMMENT "Running thrift compiler for ext-data-source on ${THRIFT_FILE}"
       VERBATIM
@@ -141,7 +148,14 @@ function(THRIFT11_GEN VAR)
     get_filename_component(THRIFT_FILE_WE ${THRIFT_FILE} NAME_WE)
 
     # This isn't the exact output file that's created, just a unique file
-    set(OUTPUT_FILE "${THRIFT11_PYTHON_OUTPUT_DIR}/${THRIFT_FILE_WE}.py")
+    set(OUTPUT_FILE "${THRIFT11_PYTHON_OUTPUT_DIR}/gen-py/${THRIFT_FILE_WE}/__init__.py")
+
+    # We have to special case beeswax.thrift because its Python namespace is beeswaxd
+    # instead of beeswax
+    if (${THRIFT_FILE_WE} STREQUAL "beeswax")
+      set(OUTPUT_FILE "${THRIFT11_PYTHON_OUTPUT_DIR}/gen-py/beeswaxd/__init__.py")
+    endif(${THRIFT_FILE_WE} STREQUAL "beeswax")
+
     list(APPEND ${VAR} ${OUTPUT_FILE})
     add_custom_command(
       OUTPUT ${OUTPUT_FILE}
