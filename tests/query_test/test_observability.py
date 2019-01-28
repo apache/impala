@@ -19,7 +19,8 @@ from collections import defaultdict
 from datetime import datetime
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
+                               SkipIfLocal, SkipIfNotHdfsMinicluster)
 from tests.util.filesystem_utils import IS_EC
 from time import sleep, time
 import logging
@@ -392,6 +393,7 @@ class TestObservability(ImpalaTestSuite):
                          "InnerNodeSelectivityRatio"]
     assert all(counter in profile for counter in expected_counters)
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_global_exchange_counters(self):
     """Test that global exchange counters are set correctly."""
     query = """select count(*) from tpch_parquet.orders o inner join tpch_parquet.lineitem
