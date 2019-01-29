@@ -767,14 +767,14 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
 
   {
     // Print all time series counters as following:
-    // <Name> (<period>): <val1>, <val2>, <etc>
+    //    - <Name> (<period>): <val1>, <val2>, <etc>
     SpinLock* lock;
     int num, period;
     lock_guard<SpinLock> l(counter_map_lock_);
     for (const TimeSeriesCounterMap::value_type& v: time_series_counter_map_) {
       const int64_t* samples = v.second->samples_.GetSamples(&num, &period, &lock);
       if (num > 0) {
-        stream << prefix << "  " << v.first << "("
+        stream << prefix << "   - " << v.first << "("
                << PrettyPrinter::Print(period * 1000000L, TUnit::TIME_NS)
                << "): ";
         for (int i = 0; i < num; ++i) {

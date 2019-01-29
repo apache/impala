@@ -399,6 +399,11 @@ class TestObservability(ImpalaTestSuite):
     query = """select count(*) from tpch_parquet.orders o inner join tpch_parquet.lineitem
         l on o.o_orderkey = l.l_orderkey group by o.o_clerk limit 10"""
     profile = self.execute_query(query).runtime_profile
+
+    # TimeSeriesCounter should be prefixed with a hyphen.
+    assert "  MemoryUsage" not in profile
+    assert "- MemoryUsage" in profile
+
     assert "ExchangeScanRatio: 3.19" in profile
 
     keys = ["TotalBytesSent", "TotalScanBytesSent", "TotalInnerBytesSent"]
