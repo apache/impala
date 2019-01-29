@@ -1401,3 +1401,10 @@ group by P, Q order by P, Q
 ---- TYPES
 bigint, float, float
 ====
+---- QUERY
+# IMPALA-8140: Test that group by with limit does not crash on Asan
+select count(*) from tpch_parquet.orders o group by o.o_clerk limit 10
+# We don't validate the results since the order is not deterministic.
+---- TYPES
+bigint
+====
