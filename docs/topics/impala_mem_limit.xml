@@ -45,8 +45,16 @@ under the License.
     <p rev="">
       There are two levels of memory limit for Impala.
       The <codeph>-mem_limit</codeph> startup option sets an overall limit for the <cmdname>impalad</cmdname> process
-      (which handles multiple queries concurrently).
-      That limit is typically expressed in terms of a percentage of the RAM available on the host, such as <codeph>-mem_limit=70%</codeph>.
+      (which handles multiple queries concurrently). That process memory limit can be expressed either as a percentage
+      of RAM available to the process such as <codeph>-mem_limit=70%</codeph> or as a fixed
+      amount of memory, such as <codeph>100gb</codeph>. The memory available to the process is based on the host's
+      physical memory and, since Impala 3.2, memory limits from Linux Control Groups. E.g. if an
+      <cmdname>impalad</cmdname> process is running in a Docker container on a host with 100GB of memory, the memory
+      available is 100GB or the Docker container's memory limit, whichever is less.
+    </p>
+
+
+    <p rev="">
       The <codeph>MEM_LIMIT</codeph> query option, which you set through <cmdname>impala-shell</cmdname>
       or the <codeph>SET</codeph> statement in a JDBC or ODBC application, applies to each individual query.
       The <codeph>MEM_LIMIT</codeph> query option is usually expressed as a fixed size such as <codeph>10gb</codeph>,
