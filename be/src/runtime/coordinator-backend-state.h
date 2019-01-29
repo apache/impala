@@ -129,6 +129,7 @@ class Coordinator::BackendState {
   void MergeErrorLog(ErrorLogMap* merged);
 
   const TNetworkAddress& impalad_address() const { return host_; }
+  const TNetworkAddress& krpc_impalad_address() const { return krpc_host_; }
   int state_idx() const { return state_idx_; }
 
   /// Valid after Init().
@@ -136,6 +137,11 @@ class Coordinator::BackendState {
 
   /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
+
+  int64_t last_report_time_ms() {
+    boost::lock_guard<boost::mutex> l(lock_);
+    return last_report_time_ms_;
+  }
 
   /// Print host/port info for the first backend that's still in progress as a
   /// debugging aid for backend deadlocks.
@@ -148,6 +154,9 @@ class Coordinator::BackendState {
   /// Serializes the InstanceStats of all instances of this backend state to JSON by
   /// adding members to 'value', including the remote host name.
   void InstanceStatsToJson(rapidjson::Value* value, rapidjson::Document* doc);
+
+  /// Returns a timestamp using monotonic time for tracking arrival of status reports.
+  static int64_t GenerateReportTimestamp() { return MonotonicMillis(); }
 
  private:
   /// Execution stats for a single fragment instance.
@@ -290,7 +299,8 @@ class Coordinator::BackendState {
   /// successful.
   bool rpc_sent_ = false;
 
-  /// Set in ApplyExecStatusReport(). Uses MonotonicMillis().
+  /// Initialized in Init(), then set in each call to ApplyExecStatusReport().
+  /// Uses GenerateReportTimeout().
   int64_t last_report_time_ms_ = 0;
 
   const TQueryCtx& query_ctx() const { return coord_.query_ctx(); }

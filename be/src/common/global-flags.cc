@@ -332,6 +332,7 @@ REMOVED_FLAG(rpc_cnxn_retry_interval_ms);
 REMOVED_FLAG(skip_lzo_version_check);
 REMOVED_FLAG(staging_cgroup);
 REMOVED_FLAG(status_report_interval);
+REMOVED_FLAG(status_report_max_retries);
 REMOVED_FLAG(suppress_unknown_disk_id_warnings);
 REMOVED_FLAG(use_krpc);
 REMOVED_FLAG(use_kudu_kinit);

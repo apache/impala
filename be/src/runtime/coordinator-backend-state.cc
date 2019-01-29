@@ -37,6 +37,7 @@
 #include "util/counting-barrier.h"
 #include "util/error-util-internal.h"
 #include "util/network-util.h"
+#include "util/scope-exit-trigger.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -168,7 +169,11 @@ void Coordinator::BackendState::Exec(
     const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table,
     CountingBarrier* exec_complete_barrier) {
-  NotifyBarrierOnExit notifier(exec_complete_barrier);
+  const auto trigger = MakeScopeExitTrigger([&]() {
+    // Ensure that 'last_report_time_ms_' is set prior to the barrier being notified.
+    last_report_time_ms_ = GenerateReportTimestamp();
+    exec_complete_barrier->Notify();
+  });
   TExecQueryFInstancesParams rpc_params;
   rpc_params.__set_query_ctx(query_ctx());
   SetRpcParams(debug_options, filter_routing_table, &rpc_params);
@@ -304,7 +309,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   // the update loop below.
   lock_guard<SpinLock> l1(exec_summary->lock);
   unique_lock<mutex> lock(lock_);
-  last_report_time_ms_ = MonotonicMillis();
+  last_report_time_ms_ = GenerateReportTimestamp();
 
   // If this backend completed previously, don't apply the update.
   if (IsDoneLocked(lock)) return false;

@@ -485,6 +485,12 @@ struct TQueryCtx {
   // Flag to enable tracing of resource usage consumption for all fragment instances of a
   // query. Set in ImpalaServer::PrepareQueryContext().
   21: required bool trace_resource_usage = false
+
+  // Taken from the flags of the same name. The coordinator uses these to decide how long
+  // to wait for a report before cancelling a backend, so we want to ensure that the
+  // coordinator and executors for a given query always agree this value.
+  22: optional i32 status_report_interval_ms
+  23: optional i32 status_report_max_retry_s
 }
 
 // Specification of one output destination of a plan fragment

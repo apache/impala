@@ -45,7 +45,6 @@
 #include "scheduling/query-schedule.h"
 #include "service/client-request-state.h"
 #include "util/bloom-filter.h"
-#include "util/counting-barrier.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
@@ -76,7 +75,8 @@ Coordinator::Coordinator(ClientRequestState* parent, const QuerySchedule& schedu
     schedule_(schedule),
     filter_mode_(schedule.query_options().runtime_filter_mode),
     obj_pool_(new ObjectPool()),
-    query_events_(events) {}
+    query_events_(events),
+    exec_rpcs_complete_barrier_(schedule_.per_backend_exec_params().size()) {}
 
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
@@ -348,7 +348,6 @@ void Coordinator::InitFilterRoutingTable() {
 
 void Coordinator::StartBackendExec() {
   int num_backends = backend_states_.size();
-  exec_rpcs_complete_barrier_.reset(new CountingBarrier(num_backends));
   backend_exec_complete_barrier_.reset(new CountingBarrier(num_backends));
 
   DebugOptions debug_options(schedule_.query_options());
@@ -361,11 +360,11 @@ void Coordinator::StartBackendExec() {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
         [backend_state, this, &debug_options]() {
           DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
-          backend_state->Exec(debug_options, filter_routing_table_,
-              exec_rpcs_complete_barrier_.get());
+          backend_state->Exec(
+              debug_options, filter_routing_table_, &exec_rpcs_complete_barrier_);
         });
   }
-  exec_rpcs_complete_barrier_->Wait();
+  exec_rpcs_complete_barrier_.Wait();
 
   VLOG_QUERY << "started execution on " << num_backends << " backends for query_id="
              << PrintId(query_id());
@@ -547,8 +546,7 @@ void Coordinator::HandleExecStateTransition(
   // Can't transition until the exec RPCs are no longer in progress. Otherwise, a
   // cancel RPC could be missed, and resources freed before a backend has had a chance
   // to take a resource reference.
-  DCHECK(exec_rpcs_complete_barrier_ != nullptr &&
-      exec_rpcs_complete_barrier_->pending() <= 0) << "exec rpcs not completed";
+  DCHECK_LE(exec_rpcs_complete_barrier_.pending(), 0) << "exec rpcs not completed";
 
   query_events_->MarkEvent(exec_state_to_event.at(new_state));
   // This thread won the race to transitioning into a terminal state - terminate
@@ -663,8 +661,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 void Coordinator::Cancel() {
   // Illegal to call Cancel() before Exec() returns, so there's no danger of the cancel
   // RPC passing the exec RPC.
-  DCHECK(exec_rpcs_complete_barrier_ != nullptr &&
-      exec_rpcs_complete_barrier_->pending() <= 0) << "Exec() must be called first";
+  DCHECK_LE(exec_rpcs_complete_barrier_.pending(), 0) << "Exec() must be called first";
   discard_result(SetNonErrorTerminalState(ExecState::CANCELLED));
   // CancelBackends() is called for all transitions into a terminal state except
   // for RETURNED_RESULTS. We need to call it now because after Cancel() is called
@@ -725,7 +722,7 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     if (!status.ok()) {
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
-      exec_rpcs_complete_barrier_->Wait();
+      exec_rpcs_complete_barrier_.Wait();
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
       // a terminal state.
@@ -739,6 +736,30 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
   return IsExecuting() ? Status::OK() : Status::CANCELLED;
+}
+
+int64_t Coordinator::GetMaxBackendStateLagMs(TNetworkAddress* address) {
+  if (exec_rpcs_complete_barrier_.pending() > 0) {
+    // Exec() hadn't completed for all the backends, so we can't rely on
+    // 'last_report_time_ms_' being set yet.
+    return 0;
+  }
+  DCHECK_GT(backend_states_.size(), 0);
+  int64_t current_time = BackendState::GenerateReportTimestamp();
+  int64_t min_last_report_time_ms = current_time;
+  BackendState* min_state = nullptr;
+  for (BackendState* backend_state : backend_states_) {
+    if (backend_state->IsDone()) continue;
+    int64_t last_report_time_ms = backend_state->last_report_time_ms();
+    DCHECK_GT(last_report_time_ms, 0);
+    if (last_report_time_ms < min_last_report_time_ms) {
+      min_last_report_time_ms = last_report_time_ms;
+      min_state = backend_state;
+    }
+  }
+  if (min_state == nullptr) return 0;
+  *address = min_state->krpc_impalad_address();
+  return current_time - min_last_report_time_ms;
 }
 
 // TODO: add histogram/percentile
@@ -891,10 +912,10 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   shared_lock<shared_mutex> lock(filter_lock_);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
-  DCHECK(exec_rpcs_complete_barrier_.get() != nullptr)
+  DCHECK(backend_exec_complete_barrier_.get() != nullptr)
       << "Filters received before fragments started!";
 
-  exec_rpcs_complete_barrier_->Wait();
+  exec_rpcs_complete_barrier_.Wait();
   DCHECK(filter_routing_table_complete_)
       << "Filter received before routing table complete";
 

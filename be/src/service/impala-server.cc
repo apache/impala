@@ -212,6 +212,17 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
     "QUERY_TIMEOUT_S overrides this setting, but, if set, --idle_query_timeout represents"
     " the maximum allowable timeout.");
 
+DEFINE_int32(status_report_interval_ms, 5000, "(Advanced) Interval between profile "
+    "reports in milliseconds. If set to <= 0, periodic reporting is disabled and only "
+    "the final report is sent.");
+DEFINE_int32(status_report_max_retry_s, 600, "(Advanced) Max amount of time in seconds "
+    "for a backend to attempt to send a status report before cancelling. This must be > "
+    "--status_report_interval_ms. Effective only if --status_report_interval_ms > 0.");
+DEFINE_int32(status_report_cancellation_padding, 20, "(Advanced) The coordinator will "
+    "wait --status_report_max_retry_s * (1 + --status_report_cancellation_padding / 100) "
+    "without receiving a status report before deciding that a backend is unresponsive "
+    "and the query should be cancelled. This must be > 0.");
+
 DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and coordinate "
     "queries from clients. If false, it will refuse client connections.");
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
@@ -393,6 +404,28 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   ABORT_IF_ERROR(Thread::Create("impala-server", "query-expirer",
       bind<void>(&ImpalaServer::ExpireQueries, this), &query_expiration_thread_));
+
+  // Only enable the unresponsive backend thread if periodic status reporting is enabled.
+  if (FLAGS_status_report_interval_ms > 0) {
+    if (FLAGS_status_report_max_retry_s * 1000 <= FLAGS_status_report_interval_ms) {
+      const string& err = "Since --status_report_max_retry_s <= "
+          "--status_report_interval_ms, most queries will likely be cancelled.";
+      LOG(ERROR) << err;
+      if (FLAGS_abort_on_config_error) {
+        CLEAN_EXIT_WITH_ERROR(Substitute("Aborting Impala Server startup: $0", err));
+      }
+    }
+    if (FLAGS_status_report_cancellation_padding <= 0) {
+      const string& err = "--status_report_cancellationn_padding should be > 0.";
+      LOG(ERROR) << err;
+      if (FLAGS_abort_on_config_error) {
+        CLEAN_EXIT_WITH_ERROR(Substitute("Aborting Impala Server startup: $0", err));
+      }
+    }
+    ABORT_IF_ERROR(Thread::Create("impala-server", "unresponsive-backend-thread",
+        bind<void>(&ImpalaServer::UnresponsiveBackendThread, this),
+        &unresponsive_backend_thread_));
+  }
 
   is_coordinator_ = FLAGS_is_coordinator;
   is_executor_ = FLAGS_is_executor;
@@ -1021,6 +1054,8 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   query_ctx->__set_coord_address(backend_addr);
   query_ctx->__set_coord_krpc_address(krpc_addr);
   query_ctx->__set_local_time_zone(local_tz_name);
+  query_ctx->__set_status_report_interval_ms(FLAGS_status_report_interval_ms);
+  query_ctx->__set_status_report_max_retry_s(FLAGS_status_report_max_retry_s);
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a
@@ -2212,6 +2247,41 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     // comfortable with a maximum error of 1s as a trade-off for not frequently waking
     // this thread.
     SleepForMs(EXPIRATION_CHECK_INTERVAL_MS);
+  }
+}
+
+[[noreturn]] void ImpalaServer::UnresponsiveBackendThread() {
+  int64_t max_lag_ms = FLAGS_status_report_max_retry_s * 1000
+      * (1 + FLAGS_status_report_cancellation_padding / 100.0);
+  DCHECK_GT(max_lag_ms, 0);
+  VLOG(1) << "Queries will be cancelled if a backend has not reported its status in "
+          << "more than " << max_lag_ms << "ms.";
+  while (true) {
+    vector<CancellationWork> to_cancel;
+    client_request_state_map_.DoFuncForAllEntries(
+        [&](const std::shared_ptr<ClientRequestState>& request_state) {
+          Coordinator* coord = request_state->GetCoordinator();
+          if (coord != nullptr) {
+            TNetworkAddress address;
+            int64_t lag_time_ms = coord->GetMaxBackendStateLagMs(&address);
+            if (lag_time_ms > max_lag_ms) {
+              to_cancel.push_back(
+                  CancellationWork::TerminatedByServer(request_state->query_id(),
+                      Status(TErrorCode::UNRESPONSIVE_BACKEND,
+                          PrintId(request_state->query_id()),
+                          TNetworkAddressToString(address), lag_time_ms, max_lag_ms),
+                      false /* unregister */));
+            }
+          }
+        });
+
+    // We call Offer() outside of DoFuncForAllEntries() to ensure that if the
+    // cancellation_thread_pool_ queue is full, we're not blocked while holding one of the
+    // 'client_request_state_map_' shard locks.
+    for (auto cancellation_work : to_cancel) {
+      cancellation_thread_pool_->Offer(cancellation_work);
+    }
+    SleepForMs(max_lag_ms * 0.1);
   }
 }
 

@@ -94,10 +94,6 @@ class ThriftSerializer;
 ///
 /// TODO:
 /// - set up kudu clients in Init(), remove related locking
-/// - IMPALA-2990: when ReportExecStatus() encounters an error, query execution at this
-///   node gets aborted, but it's possible for the coordinator not to find out about that;
-///   fix the coordinator to periodically ping the backends (should the coordinator
-///   simply poll for the status reports?)
 class QueryState {
  public:
   /// Use this class to obtain a QueryState for the duration of a function/block,
@@ -389,6 +385,11 @@ class QueryState {
 
   /// The number of failed intermediate reports since the last successfully sent report.
   int64_t num_failed_reports_ = 0;
+
+  /// If a status report fails, set to the current time using MonotonicMillis(). Reset to
+  /// 0 on a successful report. Used to track how long we've been trying unsuccessfully to
+  /// send a status report so that we can cancel after a configurable timeout.
+  int64_t failed_report_time_ms_ = 0;
 
   /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
   /// to the query mem tracker. The query is associated with the resource pool set in

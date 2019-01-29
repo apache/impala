@@ -30,13 +30,13 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/dml-exec-state.h"
+#include "util/counting-barrier.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
 namespace impala {
 
-class CountingBarrier;
 class ClientRequestState;
 class FragmentInstanceState;
 class MemTracker;
@@ -134,6 +134,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Thrift runtime profiles of all fragment instances from the backend.
   Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
       const TRuntimeProfileForest& thrift_profiles) WARN_UNUSED_RESULT;
+
+  /// Returns the time in ms since the latest report was received for the backend which
+  /// has gone the longest without a report being received, and sets 'address' to the host
+  /// for that backend. May return 0, for example if the backends are not initialized yet
+  /// or if all of them have already completed, in which case 'address' will not be set.
+  int64_t GetMaxBackendStateLagMs(TNetworkAddress* address);
 
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
@@ -327,9 +333,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// sequentially, without synchronization.
   std::vector<FragmentStats*> fragment_stats_;
 
-  /// Barrier that is released when all calls to BackendState::Exec() have
-  /// returned. Initialized in StartBackendExec().
-  boost::scoped_ptr<CountingBarrier> exec_rpcs_complete_barrier_;
+  /// Barrier that is released when all calls to BackendState::Exec() have returned.
+  CountingBarrier exec_rpcs_complete_barrier_;
 
   /// Barrier that is released when all backends have indicated execution completion,
   /// or when all backends are cancelled due to an execution error or client requested

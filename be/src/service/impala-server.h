@@ -898,6 +898,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// FLAGS_idle_query_timeout seconds.
   [[noreturn]] void ExpireQueries();
 
+  /// Periodically iterates over all queries and cancels any where a backend hasn't sent a
+  /// status report in greater than GetMaxReportRetryMs().
+  [[noreturn]] void UnresponsiveBackendThread();
+
   /// Called from ExpireQueries() to check query resource limits for 'crs'. If the query
   /// exceeded a resource limit, returns a non-OK status with information about what
   /// limit was exceeded. Returns OK if the query will continue running and expiration
@@ -977,6 +981,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// session_timeout_thread_ relies on the following conditional variable to wake up
   /// when there are sessions that have a timeout.
   ConditionVariable session_timeout_cv_;
+
+  /// Thread that runs UnresponsiveBackendThread().
+  std::unique_ptr<Thread> unresponsive_backend_thread_;
 
   /// maps from query id to exec state; ClientRequestState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion

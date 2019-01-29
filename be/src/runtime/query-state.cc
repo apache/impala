@@ -56,11 +56,6 @@ using kudu::rpc::RpcSidecar;
 
 static const int DEFAULT_REPORT_WAIT_TIME_MS = 5000;
 
-DEFINE_int32(status_report_interval_ms, DEFAULT_REPORT_WAIT_TIME_MS,
-    "Interval between profile reports in milliseconds. If set to <= 0, periodic "
-    "reporting is disabled.");
-DEFINE_int32(status_report_max_retries, 3,
-    "Max number of times to retry sending the status report before cancelling");
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
@@ -384,8 +379,8 @@ bool QueryState::ReportExecStatus() {
   // Note that the sidecar is created with faststring so the ownership of the Thrift
   // profile buffer is transferred to RPC layer and it is freed after the RPC payload
   // is sent. If serialization of the profile to RPC sidecar fails, we will proceed
-  // without the profile so that the coordinator can still get the status instead of
-  // hitting IMPALA-2990.
+  // without the profile so that the coordinator can still get the status and won't
+  // conclude that the backend has hung and cancel the query.
   if (profile_buf != nullptr) {
     unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
     sidecar_buf->assign_copy(profile_buf, profile_len);
@@ -401,19 +396,25 @@ bool QueryState::ReportExecStatus() {
     }
   }
 
+  // TODO: --backend_client_rpc_timeout_ms was originally intended as a socket timeout for
+  // Thrift. We should rethink how we set backend rpc timeouts for krpc.
   rpc_controller.set_timeout(
       MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
   ReportExecStatusResponsePB resp;
   rpc_status = FromKuduStatus(proxy_->ReportExecStatus(report, &resp, &rpc_controller),
       "ReportExecStatus() RPC failed");
   result_status = Status(resp.status());
+  int64_t retry_time_ms = 0;
   if (rpc_status.ok()) {
     num_failed_reports_ = 0;
+    failed_report_time_ms_ = 0;
   } else {
     ++num_failed_reports_;
+    if (failed_report_time_ms_ == 0) failed_report_time_ms_ = MonotonicMillis();
+    retry_time_ms = MonotonicMillis() - failed_report_time_ms_;
     LOG(WARNING) << Substitute("Failed to send ReportExecStatus() RPC for query $0. "
-                               "Consecutive failed reports = $1",
-        PrintId(query_id()), num_failed_reports_);
+        "Consecutive failed reports = $1. Time spent retrying = $2ms.",
+        PrintId(query_id()), num_failed_reports_, retry_time_ms);
   }
 
   // Notify the fragment instances of the report's status.
@@ -428,20 +429,16 @@ bool QueryState::ReportExecStatus() {
     }
   }
 
-  if (((!rpc_status.ok() && num_failed_reports_ >= FLAGS_status_report_max_retries)
+  if (((!rpc_status.ok() && retry_time_ms >= query_ctx().status_report_max_retry_s * 1000)
           || !result_status.ok())
       && instances_started) {
     // TODO: should we try to keep rpc_status for the final report? (but the final
     // report, following this Cancel(), may not succeed anyway.)
     // TODO: not keeping an error status here means that all instances might
     // abort with CANCELLED status, despite there being an error
-    // TODO: Fix IMPALA-2990. Cancelling fragment instances without sending the
-    // ReporExecStatus RPC may cause query to hang as the coordinator may not be aware
-    // of the cancellation. Remove the log statements once IMPALA-2990 is fixed.
     if (!rpc_status.ok()) {
       LOG(ERROR) << "Cancelling fragment instances due to failure to reach the "
-                 << "coordinator. (" << rpc_status.GetDetail()
-                 << "). Query " << PrintId(query_id()) << " may hang. See IMPALA-2990.";
+                 << "coordinator. (" << rpc_status.GetDetail() << ").";
     } else if (!result_status.ok()) {
       // If the ReportExecStatus RPC succeeded in reaching the coordinator and we get
       // back a non-OK status, it means that the coordinator expects us to cancel the
@@ -457,8 +454,10 @@ bool QueryState::ReportExecStatus() {
 }
 
 int64_t QueryState::GetReportWaitTimeMs() const {
-  return (FLAGS_status_report_interval_ms > 0 ? FLAGS_status_report_interval_ms :
-      DEFAULT_REPORT_WAIT_TIME_MS) * (num_failed_reports_ + 1);
+  int64_t report_interval = query_ctx().status_report_interval_ms > 0 ?
+      query_ctx().status_report_interval_ms :
+      DEFAULT_REPORT_WAIT_TIME_MS;
+  return report_interval * (num_failed_reports_ + 1);
 }
 
 void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
@@ -603,7 +602,7 @@ void QueryState::MonitorFInstances() {
   // reporting back to the coordinator.
   DCHECK(backend_exec_state_ == BackendExecState::EXECUTING)
       << BackendExecStateToString(backend_exec_state_);
-  if (FLAGS_status_report_interval_ms > 0) {
+  if (query_ctx().status_report_interval_ms > 0) {
     while (!WaitForFinishOrTimeout(GetReportWaitTimeMs())) {
       ReportExecStatus();
     }

@@ -28,6 +28,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
      resource should be all released."""
   TEST_QUERY = "select count(c2.string_col) from \
      functional.alltypestiny join functional.alltypessmall c2"
+  # Designed to take approx. 30s.
+  SLOW_TEST_QUERY = TEST_QUERY + " where c2.int_col = sleep(1000)"
 
   @classmethod
   def get_workload(self):
@@ -39,12 +41,15 @@ class TestRPCTimeout(CustomClusterTestSuite):
       pytest.skip('runs only in exhaustive')
     super(TestRPCTimeout, cls).setup_class()
 
-  def execute_query_verify_metrics(self, query, query_options=None, repeat=1):
+  def execute_query_verify_metrics(self, query, query_options=None, repeat=1,
+      expected_exception=None):
     for i in range(repeat):
       try:
         self.execute_query(query, query_options)
-      except ImpalaBeeswaxException:
-        pass
+        assert expected_exception is None
+      except ImpalaBeeswaxException as e:
+        if expected_exception is not None:
+          assert expected_exception in str(e)
     verifiers = [MetricVerifier(i.service)
                  for i in ImpalaCluster.get_e2e_test_cluster().impalads]
 
@@ -160,7 +165,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=100"
-      " --status_report_interval_ms=1000 --status_report_max_retries=100000")
+      " --status_report_interval_ms=1000 --status_report_max_retry_s=1000")
   def test_reportexecstatus_retries(self, unique_database):
     tbl = "%s.kudu_test" % unique_database
     self.execute_query("create table %s (a int primary key) stored as kudu" % tbl)
@@ -174,3 +179,13 @@ class TestRPCTimeout(CustomClusterTestSuite):
     # Ensure that the error log was tracked correctly - all but the first row inserted
     # should result in a 'key already present' insert error.
     assert "(1 of 99999 similar)" in result.log, str(result)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=100000 "
+      "--status_report_max_retry_s=1 --abort_on_config_error=false")
+  def test_unresponsive_backend(self, unique_database):
+    """Test the UnresponsiveBackendThread by setting a status report retry time that is
+    much lower than the status report interval, ensuring that the coordinator will
+    conclude that the backend is unresponsive."""
+    self.execute_query_verify_metrics(self.SLOW_TEST_QUERY,
+        expected_exception="cancelled due to unresponsive backend")

@@ -399,7 +399,11 @@ error_codes = (
    "Unset or increase NUM_ROWS_PRODUCED_LIMIT query option to produce more rows."),
 
   ("EXPR_REWRITE_RESULT_LIMIT_EXCEEDED", 132,
-   "Expression rewrite rejected due to result size ($0) exceeding the limit ($1).")
+   "Expression rewrite rejected due to result size ($0) exceeding the limit ($1)."),
+
+  ("UNRESPONSIVE_BACKEND", 133,
+   "Query $0 cancelled due to unresponsive backend: $1 has not sent a report in $2ms "
+   "(max allowed lag is $3ms)")
 )
 
 import sys
