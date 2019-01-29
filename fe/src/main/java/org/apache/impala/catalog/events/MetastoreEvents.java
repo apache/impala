@@ -17,12 +17,18 @@
 
 package org.apache.impala.catalog.events;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.messaging.AddPartitionMessage;
+import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
+import org.apache.hadoop.hive.metastore.messaging.CreateTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONAlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONCreateDatabaseMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropTableMessage;
@@ -34,14 +40,18 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TTableName;
-import org.apache.log4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 
 /**
- * Util class which provides Metastore event objects for various event types. Also
+ * Main class which provides Metastore event objects for various event types. Also
  * provides a MetastoreEventFactory to get or create the event instances for a given event
  * type
  */
-public class MetastoreEventUtils {
+public class MetastoreEvents {
+
+  // flag to be set in the table/database parameters to disable event based metadata sync
+  public static final String DISABLE_EVENT_HMS_SYNC_KEY = "impala.disableHmsSync";
 
   public enum MetastoreEventType {
     CREATE_TABLE("CREATE_TABLE"),
@@ -87,7 +97,9 @@ public class MetastoreEventUtils {
    * Factory class to create various MetastoreEvents.
    */
   public static class MetastoreEventFactory {
-    private static final Logger LOG = Logger.getLogger(MetastoreEventFactory.class);
+
+    private static final Logger LOG =
+        LoggerFactory.getLogger(MetastoreEventFactory.class);
 
     // catalog service instance to be used for creating eventHandlers
     private final CatalogServiceCatalog catalog_;
@@ -121,13 +133,13 @@ public class MetastoreEventUtils {
           return new IgnoredEvent(catalog_, event);
         case ADD_PARTITION:
           // add partition events triggers invalidate table currently
-          return new TableInvalidatingEvent(catalog_, event);
+          return new AddPartitionEvent(catalog_, event);
         case DROP_PARTITION:
           // drop partition events triggers invalidate table currently
-          return new TableInvalidatingEvent(catalog_, event);
+          return new DropPartitionEvent(catalog_, event);
         case ALTER_PARTITION:
           // alter partition events triggers invalidate table currently
-          return new TableInvalidatingEvent(catalog_, event);
+          return new AlterPartitionEvent(catalog_, event);
         default:
           // ignore all the unknown events by creating a IgnoredEvent
           return new IgnoredEvent(catalog_, event);
@@ -154,6 +166,8 @@ public class MetastoreEventUtils {
     List<MetastoreEvent> getFilteredEvents(List<NotificationEvent> events)
         throws MetastoreNotificationException {
       Preconditions.checkNotNull(events);
+      if (events.isEmpty()) return Collections.emptyList();
+
       List<MetastoreEvent> metastoreEvents = new ArrayList<>(events.size());
       for (NotificationEvent event : events) {
         metastoreEvents.add(get(event));
@@ -188,6 +202,12 @@ public class MetastoreEventUtils {
    */
   public static abstract class MetastoreEvent {
 
+    // String.format compatible string to prepend event id and type
+    private static final String STR_FORMAT_EVENT_ID_TYPE = "EventId: %d EventType: %s ";
+
+    // logger format compatible string to prepend to a log formatted message
+    private static final String LOG_FORMAT_EVENT_ID_TYPE = "EventId: {} EventType: {} ";
+
     // CatalogServiceCatalog instance on which the event needs to be acted upon
     protected final CatalogServiceCatalog catalog_;
 
@@ -195,7 +215,7 @@ public class MetastoreEventUtils {
     protected final NotificationEvent event_;
 
     // Logger available for all the sub-classes
-    protected final Logger LOG = Logger.getLogger(this.getClass());
+    protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
     // dbName from the event
     protected final String dbName_;
@@ -213,11 +233,19 @@ public class MetastoreEventUtils {
       this.event_ = event;
       this.eventId_ = event_.getEventId();
       this.eventType_ = MetastoreEventType.from(event.getEventType());
-      LOG.debug(String
-          .format("Creating event %d of type %s on table %s", event.getEventId(),
-              event.getEventType(), event.getTableName()));
       dbName_ = Preconditions.checkNotNull(event.getDbName());
       metastoreNotificationEvent_ = event;
+    }
+
+    /**
+     * Process this event if it is enabled based on the flags on this object
+     * @throws CatalogException If  Catalog operations fail
+     * @throws MetastoreNotificationException If NotificationEvent parsing fails
+     */
+    public void processIfEnabled()
+        throws CatalogException, MetastoreNotificationException {
+      if (isEventProcessingDisabled()) return;
+      process();
     }
 
     /**
@@ -227,11 +255,12 @@ public class MetastoreEventUtils {
      * @throws MetastoreNotificationException in case of event parsing errors out
      * @throws CatalogException in case catalog operations could not be performed
      */
-    abstract void process() throws MetastoreNotificationException, CatalogException;
+    protected abstract void process() throws MetastoreNotificationException,
+        CatalogException;
 
     /**
      * Helper method to get debug string with helpful event information prepended to the
-     * message
+     * message. This can be used to generate helpful exception messages
      *
      * @param msgFormatString String value to be used in String.format() for the given
      *     message
@@ -240,17 +269,55 @@ public class MetastoreEventUtils {
      */
     protected String debugString(String msgFormatString, Object... args) {
       String formatString =
-          new StringBuilder("EventId: %d EventType: %s ").append(msgFormatString)
+          new StringBuilder(STR_FORMAT_EVENT_ID_TYPE).append(msgFormatString)
               .toString();
+      Object[] formatArgs = getLogFormatArgs(args);
+      return String.format(formatString, formatArgs);
+    }
+
+    /**
+     * Helper method to generate the format args after prepending the event id and type
+     */
+    private Object[] getLogFormatArgs(Object[] args) {
       Object[] formatArgs = new Object[args.length + 2];
       formatArgs[0] = eventId_;
       formatArgs[1] = eventType_;
-      int i=2;
+      int i = 2;
       for (Object arg : args) {
         formatArgs[i] = arg;
         i++;
       }
-      return String.format(formatString, formatArgs);
+      return formatArgs;
+    }
+
+    /**
+     * Logs at info level the given log formatted string and its args. The log
+     * formatted string should have {} pair at the appropriate location in the string
+     * for each arg value provided. This method prepends the event id and event type
+     * before logging the message. No-op if the log level is not at INFO
+
+     * @param logFormattedStr
+     * @param args
+     */
+    protected void infoLog(String logFormattedStr, Object... args) {
+      if (!LOG.isInfoEnabled()) return;
+      String formatString =
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr)
+              .toString();
+      Object[] formatArgs = getLogFormatArgs(args);
+      LOG.info(formatString, formatArgs);
+    }
+
+    /**
+     * Similar to infoLog excepts logs at debug level
+     */
+    protected void debugLog(String logFormattedStr, Object... args) {
+      if (!LOG.isDebugEnabled()) return;
+      String formatString =
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr)
+              .toString();
+      Object[] formatArgs = getLogFormatArgs(args);
+      LOG.debug(formatString, formatArgs);
     }
 
     /**
@@ -264,6 +331,12 @@ public class MetastoreEventUtils {
     protected boolean isRemovedAfter(List<MetastoreEvent> events) {
       return false;
     }
+
+    /**
+     * Returns true if event based sync is disabled for this table/database associated
+     * with this event
+     */
+    protected abstract boolean isEventProcessingDisabled();
   }
 
   /**
@@ -274,10 +347,16 @@ public class MetastoreEventUtils {
     // tblName from the event
     protected final String tblName_;
 
+    // tbl object from the Notification event, corresponds to the before tableObj in
+    // case of alter events
+    protected org.apache.hadoop.hive.metastore.api.Table msTbl_;
+
     private MetastoreTableEvent(CatalogServiceCatalog catalogServiceCatalog,
         NotificationEvent event) {
       super(catalogServiceCatalog, event);
       tblName_ = Preconditions.checkNotNull(event.getTableName());
+      debugLog("Creating event {} of type {} on table {}", eventId_, eventType_,
+          getFullyQualifiedTblName());
     }
 
 
@@ -297,6 +376,53 @@ public class MetastoreEventUtils {
     protected boolean invalidateCatalogTable() {
       return catalog_.invalidateTableIfExists(dbName_, tblName_) != null;
     }
+
+    /**
+     * Checks if the table level property is set in the parameters of the table from
+     * the event. If it is available, it takes precedence over database level flag for
+     * this table. If the table level property is not set, returns the value from the
+     * database level property.f
+     *
+     * @return Boolean value of the table property with the key
+     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. Else, returns the database property
+     * which is associated with this table. Returns false if neither of the properties
+     * are set.
+     */
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      Preconditions.checkNotNull(msTbl_);
+      Boolean tblProperty = getHmsSyncProperty(msTbl_);
+      if (tblProperty != null) {
+        debugLog("Found table level flag {} is set to {}",
+            DISABLE_EVENT_HMS_SYNC_KEY, tblProperty.toString());
+        return tblProperty;
+      }
+      // if the tbl property is not set check at db level
+      String dbFlagVal = catalog_.getDbProperty(dbName_, DISABLE_EVENT_HMS_SYNC_KEY);
+      if (dbFlagVal != null) {
+        // no need to spew unnecessary logs. Most tables/databases are expected to not
+        // have this flag set when event based HMS polling is enabled
+        debugLog("Table level flag is not set. Db level flag {} at Db level is {}",
+                DISABLE_EVENT_HMS_SYNC_KEY, dbFlagVal);
+      }
+      // flag value of null also returns false
+      return Boolean.valueOf(dbFlagVal);
+    }
+
+    /**
+     * Gets the value of the parameter with the key
+     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> from the given table
+     *
+     * @return the Boolean value of the property with the key
+     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> if it is available else returns null
+     */
+    public static Boolean getHmsSyncProperty(
+        org.apache.hadoop.hive.metastore.api.Table tbl) {
+      if (!tbl.isSetParameters()) return null;
+      String val = tbl.getParameters().get(DISABLE_EVENT_HMS_SYNC_KEY);
+      if (val == null || val.isEmpty()) return null;
+      return Boolean.valueOf(val);
+    }
   }
 
   /**
@@ -307,20 +433,45 @@ public class MetastoreEventUtils {
     MetastoreDatabaseEvent(CatalogServiceCatalog catalogServiceCatalog,
         NotificationEvent event) {
       super(catalogServiceCatalog, event);
+      debugLog("Creating event {} of type {} on database {}", eventId_,
+              eventType_, dbName_);
+    }
+
+    /**
+     * Even though there is a database level property
+     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> it is only used for tables within that
+     * database. As such this property does not control if the database level DDLs are
+     * skipped or not.
+     * @return false
+     */
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      return false;
     }
   }
 
   /**
    * MetastoreEvent for CREATE_TABLE event type
    */
-  private static class CreateTableEvent extends MetastoreTableEvent {
-
+  public static class CreateTableEvent extends MetastoreTableEvent {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private CreateTableEvent(CatalogServiceCatalog catalog, NotificationEvent event) {
+    private CreateTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
+        throws MetastoreNotificationException {
       super(catalog, event);
       Preconditions.checkArgument(MetastoreEventType.CREATE_TABLE.equals(eventType_));
+      Preconditions
+          .checkNotNull(event.getMessage(), debugString("Event message is null"));
+      CreateTableMessage createTableMessage =
+          MetastoreEventsProcessor.getMessageFactory().getDeserializer()
+              .getCreateTableMessage(event.getMessage());
+      try {
+        msTbl_ = createTableMessage.getTableObj();
+      } catch (Exception e) {
+        throw new MetastoreNotificationException(
+            debugString("Unable to deserialize the event message"), e);
+      }
     }
 
     /**
@@ -336,9 +487,12 @@ public class MetastoreEventUtils {
       // table being dropped and recreated with the same name or in case this event is
       // a self-event (see description of self-event in the class documentation of
       // MetastoreEventsProcessor)
-      boolean tableAdded;
       try {
-        tableAdded = catalog_.addTableIfNotExists(dbName_, tblName_);
+        if (!catalog_.addTableIfNotExists(dbName_, tblName_)) {
+          debugLog("Not adding the table {} since it already exists in catalog",
+                  tblName_);
+          return;
+        }
       } catch (CatalogException e) {
         // if a exception is thrown, it could be due to the fact that the db did not
         // exist in the catalog cache. This could only happen if the previous
@@ -349,13 +503,7 @@ public class MetastoreEventUtils {
                 + "processing CREATE_DATABASE event for the database %s",
             getFullyQualifiedTblName(), dbName_), e);
       }
-      if (!tableAdded) {
-        LOG.debug(
-            debugString("Not adding the table %s since it already exists in catalog",
-                tblName_));
-        return;
-      }
-      LOG.info(debugString("Added a table %s", getFullyQualifiedTblName()));
+      debugLog("Added a table {}", getFullyQualifiedTblName());
     }
 
     @Override
@@ -366,8 +514,8 @@ public class MetastoreEventUtils {
           DropTableEvent dropTableEvent = (DropTableEvent) event;
           if (dbName_.equalsIgnoreCase(dropTableEvent.dbName_) && tblName_
               .equalsIgnoreCase(dropTableEvent.tblName_)) {
-            LOG.info(debugString("Found table %s is removed later in event %d type %s",
-                tblName_, dropTableEvent.eventId_, dropTableEvent.eventType_));
+            infoLog("Found table {} is removed later in event {} type {}",
+                tblName_, dropTableEvent.eventId_, dropTableEvent.eventType_);
             return true;
           }
         } else if (event.eventType_.equals(MetastoreEventType.ALTER_TABLE)) {
@@ -380,11 +528,11 @@ public class MetastoreEventUtils {
           // the create table event, the alter rename event just becomes a addIfNotExists
           // event which is valid for both a self-event and external event cases
           AlterTableEvent alterTableEvent = (AlterTableEvent) event;
-          if (alterTableEvent.isRename_ && dbName_
-              .equalsIgnoreCase(alterTableEvent.tableBefore_.getDbName()) && tblName_
-              .equalsIgnoreCase(alterTableEvent.tableBefore_.getTableName())) {
-            LOG.info(debugString("Found table %s is renamed later in event %d type %s",
-                tblName_, alterTableEvent.eventId_, alterTableEvent.eventType_));
+          if (alterTableEvent.isRename_ &&
+              dbName_.equalsIgnoreCase(alterTableEvent.msTbl_.getDbName()) &&
+              tblName_.equalsIgnoreCase(alterTableEvent.msTbl_.getTableName())) {
+            infoLog("Found table {} is renamed later in event {} type {}",
+                tblName_, alterTableEvent.eventId_, alterTableEvent.eventType_);
             return true;
           }
         }
@@ -396,19 +544,24 @@ public class MetastoreEventUtils {
   /**
    * MetastoreEvent for ALTER_TABLE event type
    */
-  private static class AlterTableEvent extends MetastoreTableEvent {
+  public static class AlterTableEvent extends MetastoreTableEvent {
 
-    // the table object before alter operation, as parsed from the NotificationEvent
-    private final org.apache.hadoop.hive.metastore.api.Table tableBefore_;
     // the table object after alter operation, as parsed from the NotificationEvent
-    private final org.apache.hadoop.hive.metastore.api.Table tableAfter_;
+    protected org.apache.hadoop.hive.metastore.api.Table tableAfter_;
     // true if this alter event was due to a rename operation
     private final boolean isRename_;
+    // value of event sync flag for this table before the alter operation
+    private final Boolean eventSyncBeforeFlag_;
+    // value of the event sync flag if available at this table after the alter operation
+    private final Boolean eventSyncAfterFlag_;
+    // value of the db flag at the time of event creation
+    private final boolean dbFlagVal;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private AlterTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
+    @VisibleForTesting
+    AlterTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
         throws MetastoreNotificationException {
       super(catalog, event);
       Preconditions.checkArgument(MetastoreEventType.ALTER_TABLE.equals(eventType_));
@@ -416,7 +569,7 @@ public class MetastoreEventUtils {
           (JSONAlterTableMessage) MetastoreEventsProcessor.getMessageFactory()
               .getDeserializer().getAlterTableMessage(event.getMessage());
       try {
-        tableBefore_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
+        msTbl_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
         tableAfter_ = Preconditions.checkNotNull(alterTableMessage.getTableObjAfter());
       } catch (Exception e) {
         throw new MetastoreNotificationException(
@@ -424,8 +577,13 @@ public class MetastoreEventUtils {
       }
       // this is a rename event if either dbName or tblName of before and after object
       // changed
-      isRename_ = !tableBefore_.getDbName().equalsIgnoreCase(tableAfter_.getDbName())
-          || !tableBefore_.getTableName().equalsIgnoreCase(tableAfter_.getTableName());
+      isRename_ = !msTbl_.getDbName().equalsIgnoreCase(tableAfter_.getDbName())
+          || !msTbl_.getTableName().equalsIgnoreCase(tableAfter_.getTableName());
+      eventSyncBeforeFlag_ =
+          getHmsSyncProperty(msTbl_);
+      eventSyncAfterFlag_ = getHmsSyncProperty(tableAfter_);
+      dbFlagVal =
+          Boolean.valueOf(catalog_.getDbProperty(dbName_, DISABLE_EVENT_HMS_SYNC_KEY));
     }
 
     /**
@@ -435,66 +593,108 @@ public class MetastoreEventUtils {
      * in-place
      */
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void process() throws MetastoreNotificationException, CatalogException {
       // in case of table level alters from external systems it is better to do a full
       // invalidate  eg. this could be due to as simple as adding a new parameter or a
       // full blown adding  or changing column type
       // detect the special where a table is renamed
-      try {
-        if (!isRename_) {
-          // table is not renamed, need to invalidate
-          if (!invalidateCatalogTable()) {
-            LOG.debug(debugString("Table %s does not need to be "
-                    + "invalidated since it does not exist anymore",
-                getFullyQualifiedTblName()));
-          } else {
-            LOG.info(debugString("Table %s is invalidated", getFullyQualifiedTblName()));
+      if (!isRename_) {
+        // table is not renamed, need to invalidate
+        if (!invalidateCatalogTable()) {
+          if (wasEventSyncTurnedOn()) {
+            // we received this alter table event on a non-existing table. We also
+            // detect that event sync was turned on in this event. This may mean that
+            // the table creation was skipped earlier because event sync was turned off
+            // we don't really know how many of events we have skipped till now because
+            // the sync was disabled all this while before we receive such a event. We
+            // error on the side of caution by stopping the event processing and
+            // letting the user to issue a invalidate metadata to reset the state
+            throw new MetastoreNotificationNeedsInvalidateException(debugString(
+                "Detected that event sync was turned on for the table %s "
+                    + "and the table does not exist. Event processing cannot be "
+                    + "continued further. Issue a invalidate metadata command to reset "
+                    + "the event processing state", getFullyQualifiedTblName()));
           }
-          return;
+          debugLog("Table {} does not need to be "
+                  + "invalidated since it does not exist anymore",
+              getFullyQualifiedTblName());
+        } else {
+          infoLog("Table {} is invalidated", getFullyQualifiedTblName());
         }
-        // table was renamed, remove the old table
-        LOG.info(debugString("Found that %s table was renamed. Renaming it by "
-                + "remove and adding a new table", new TableName(tableBefore_.getDbName(),
-            tableBefore_.getTableName())));
-        TTableName oldTTableName =
-            new TTableName(tableBefore_.getDbName(), tableBefore_.getTableName());
-        TTableName newTTableName =
-            new TTableName(tableAfter_.getDbName(), tableAfter_.getTableName());
-
-        // atomically rename the old table to new table
-        Pair<Boolean, Boolean> result =
-            catalog_.renameOrAddTableIfNotExists(oldTTableName, newTTableName);
-
-        // old table was not found. This could be because catalogD is stale and didn't
-        // have any entry for the oldTable
-        if (!result.first) {
-          LOG.debug(debugString("Did not remove old table to rename table %s to %s since "
-                  + "it does not exist anymore", qualify(oldTTableName),
-              qualify(newTTableName)));
-        }
-        // the new table from the event was not added since it was already present
-        if (!result.second) {
-          LOG.debug(
-              debugString("Did not add new table name while renaming table %s to %s",
-                  qualify(oldTTableName), qualify(newTTableName)));
-        }
-      } catch (Exception e) {
-        throw new MetastoreNotificationException(e);
+        return;
       }
+      // table was renamed, remove the old table
+      infoLog("Found that {} table was renamed. Renaming it by "
+              + "remove and adding a new table",
+          new TableName(msTbl_.getDbName(), msTbl_.getTableName()));
+      TTableName oldTTableName =
+          new TTableName(msTbl_.getDbName(), msTbl_.getTableName());
+      TTableName newTTableName =
+          new TTableName(tableAfter_.getDbName(), tableAfter_.getTableName());
+
+      // atomically rename the old table to new table
+      Pair<Boolean, Boolean> result = null;
+      result = catalog_.renameOrAddTableIfNotExists(oldTTableName, newTTableName);
+
+      // old table was not found. This could be because catalogD is stale and didn't
+      // have any entry for the oldTable
+      if (!result.first) {
+        debugLog("Did not remove old table to rename table {} to {} since "
+                + "it does not exist anymore", qualify(oldTTableName),
+            qualify(newTTableName));
+      }
+      // the new table from the event was not added since it was already present
+      if (!result.second) {
+        debugLog("Did not add new table name while renaming table {} to {}",
+            qualify(oldTTableName), qualify(newTTableName));
+      }
+    }
+
+    /**
+     * Detects a event sync flag was turned on in this event
+     */
+    private boolean wasEventSyncTurnedOn() {
+      // the eventsync flag was not changed
+      if (Objects.equals(eventSyncBeforeFlag_, eventSyncAfterFlag_)) return false;
+      // eventSync after flag is null or if it is explicitly set to false
+      if ((eventSyncAfterFlag_ == null && !dbFlagVal) || !eventSyncAfterFlag_) {
+        return true;
+      }
+      return false;
     }
 
     private String qualify(TTableName tTableName) {
       return new TableName(tTableName.db_name, tTableName.table_name).toString();
+    }
+
+    /**
+     * In case of alter table events, it is possible that the alter event is generated
+     * because user changed the value of the parameter
+     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. If the parameter is unchanged, it doesn't
+     * matter if you use the before or after table object here since the eventual
+     * action is going be invalidate or rename. If however, the parameter is changed,
+     * couple of things could happen. The flag changes from unset/false to true or it
+     * changes from true to false/unset. In the first case, we want to process the
+     * event (and ignore subsequent events on this table). In the second case, we
+     * should process the event (as well as all the subsequent events on the table). So
+     * we always process this event when the value of the flag is changed.
+     *
+     * @return true, if this event needs to be skipped. false if this event needs to be
+     * processed.
+     */
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      // if the event sync flag was changed then we always process this event
+      if (!Objects.equals(eventSyncBeforeFlag_, eventSyncAfterFlag_)) return false;
+      // flag is unchanged, use the default impl from base class
+      return super.isEventProcessingDisabled();
     }
   }
 
   /**
    * MetastoreEvent for the DROP_TABLE event type
    */
-  private static class DropTableEvent extends MetastoreTableEvent {
-
-    // the metastore table object as parsed from the drop table event
-    private final org.apache.hadoop.hive.metastore.api.Table droppedTable_;
+  public static class DropTableEvent extends MetastoreTableEvent {
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -507,7 +707,7 @@ public class MetastoreEventUtils {
           (JSONDropTableMessage) MetastoreEventsProcessor.getMessageFactory()
               .getDeserializer().getDropTableMessage(event.getMessage());
       try {
-        droppedTable_ = Preconditions.checkNotNull(dropTableMessage.getTableObj());
+        msTbl_ = Preconditions.checkNotNull(dropTableMessage.getTableObj());
       } catch (Exception e) {
         throw new MetastoreNotificationException(debugString(
             "Could not parse event message. "
@@ -528,16 +728,15 @@ public class MetastoreEventUtils {
       Reference<Boolean> tblWasFound = new Reference<>();
       Reference<Boolean> tblMatched = new Reference<>();
       Table removedTable =
-          catalog_.removeTableIfExists(droppedTable_, tblWasFound, tblMatched);
+          catalog_.removeTableIfExists(msTbl_, tblWasFound, tblMatched);
       if (removedTable != null) {
-        LOG.info(debugString("Removed table %s ", getFullyQualifiedTblName()));
+        infoLog("Removed table {} ", getFullyQualifiedTblName());
       } else if (!tblMatched.getRef()) {
         LOG.warn(debugString("Table %s was not removed from "
             + "catalog since the creation time of the table did not match", tblName_));
       } else if (!tblWasFound.getRef()) {
-        LOG.debug(
-            debugString("Table %s was not removed since it did not exist in catalog.",
-                tblName_));
+        debugLog("Table {} was not removed since it did not exist in catalog.",
+                tblName_);
       }
     }
   }
@@ -545,7 +744,7 @@ public class MetastoreEventUtils {
   /**
    * MetastoreEvent for CREATE_DATABASE event type
    */
-  private static class CreateDatabaseEvent extends MetastoreDatabaseEvent {
+  public static class CreateDatabaseEvent extends MetastoreDatabaseEvent {
 
     // metastore database object as parsed from NotificationEvent message
     private final Database createdDatabase_;
@@ -587,9 +786,9 @@ public class MetastoreEventUtils {
       // already existing database in catalog is a later version with the same name and
       // this event can be ignored
       if (catalog_.addDbIfNotExists(dbName_, createdDatabase_)) {
-        LOG.info(debugString("Successfully added database %s", dbName_));
+        infoLog("Successfully added database {}", dbName_);
       } else {
-        LOG.info(debugString("Database %s already exists", dbName_));
+        infoLog("Database {} already exists", dbName_);
       }
     }
 
@@ -600,9 +799,9 @@ public class MetastoreEventUtils {
         if (event.eventType_.equals(MetastoreEventType.DROP_DATABASE)) {
           DropDatabaseEvent dropDatabaseEvent = (DropDatabaseEvent) event;
           if (dbName_.equalsIgnoreCase(dropDatabaseEvent.dbName_)) {
-            LOG.info(debugString(
-                "Found database %s is removed later in event %d of " + "type %s ",
-                dbName_, dropDatabaseEvent.eventId_, dropDatabaseEvent.eventType_));
+            infoLog(
+                "Found database {} is removed later in event {} of type {} ",
+                dbName_, dropDatabaseEvent.eventId_, dropDatabaseEvent.eventType_);
             return true;
           }
         }
@@ -614,7 +813,7 @@ public class MetastoreEventUtils {
   /**
    * MetastoreEvent for the DROP_DATABASE event
    */
-  private static class DropDatabaseEvent extends MetastoreDatabaseEvent {
+  public static class DropDatabaseEvent extends MetastoreDatabaseEvent {
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -641,7 +840,7 @@ public class MetastoreEventUtils {
       Db removedDb = catalog_.removeDb(dbName_);
       // if database did not exist in the cache there was nothing to do
       if (removedDb != null) {
-        LOG.info(debugString("Successfully removed database %s", dbName_));
+        infoLog("Successfully removed database {}", dbName_);
       }
     }
   }
@@ -649,7 +848,7 @@ public class MetastoreEventUtils {
   /**
    * MetastoreEvent for which issues invalidate on a table from the event
    */
-  private static class TableInvalidatingEvent extends MetastoreTableEvent {
+  public static abstract class TableInvalidatingEvent extends MetastoreTableEvent {
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -669,18 +868,84 @@ public class MetastoreEventUtils {
     @Override
     public void process() {
       if (invalidateCatalogTable()) {
-        LOG.info(debugString("Table %s is invalidated", getFullyQualifiedTblName()));
+        infoLog("Table {} is invalidated", getFullyQualifiedTblName());
       } else {
-        LOG.debug(debugString("Table %s does not need to be invalidated since "
-            + "it does not exist anymore", getFullyQualifiedTblName()));
+        debugLog("Table {} does not need to be invalidated since "
+            + "it does not exist anymore", getFullyQualifiedTblName());
       }
+    }
+  }
+
+  public static class AddPartitionEvent extends TableInvalidatingEvent {
+
+    /**
+     * Prevent instantiation from outside should use MetastoreEventFactory instead
+     */
+    private AddPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event)
+        throws MetastoreNotificationException {
+      super(catalog, event);
+      Preconditions.checkState(eventType_.equals(MetastoreEventType.ADD_PARTITION));
+      if (event.getMessage() == null) {
+        throw new IllegalStateException(debugString("Event message is null"));
+      }
+      AddPartitionMessage addPartitionMessage =
+          MetastoreEventsProcessor.getMessageFactory().getDeserializer()
+              .getAddPartitionMessage(event.getMessage());
+      try {
+        msTbl_ = addPartitionMessage.getTableObj();
+      } catch (Exception ex) {
+        throw new MetastoreNotificationException(ex);
+      }
+    }
+  }
+
+  public static class AlterPartitionEvent extends TableInvalidatingEvent {
+
+    /**
+     * Prevent instantiation from outside should use MetastoreEventFactory instead
+     */
+    private AlterPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event)
+        throws MetastoreNotificationException {
+      super(catalog, event);
+      Preconditions.checkState(eventType_.equals(MetastoreEventType.ALTER_PARTITION));
+      Preconditions.checkNotNull(event.getMessage());
+      AlterPartitionMessage alterPartitionMessage =
+          MetastoreEventsProcessor.getMessageFactory().getDeserializer()
+              .getAlterPartitionMessage(event.getMessage());
+      try {
+        msTbl_ = alterPartitionMessage.getTableObj();
+      } catch (Exception ex) {
+        throw new MetastoreNotificationException(ex);
+      }
+    }
+  }
+
+  public static class DropPartitionEvent extends TableInvalidatingEvent {
+
+    private final boolean isEventProcessingDisabled_;
+    /**
+     * Prevent instantiation from outside should use MetastoreEventFactory instead
+     */
+    private DropPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event) {
+      super(catalog, event);
+      Preconditions.checkState(eventType_.equals(MetastoreEventType.DROP_PARTITION));
+      Preconditions.checkNotNull(event.getMessage());
+      //TODO we should use DropPartitionMessage to get the table object here but
+      // current DropPartitionMessage does not provide the table object
+      isEventProcessingDisabled_ = Boolean.valueOf(
+          catalog_.getTableProperty(dbName_, tblName_, DISABLE_EVENT_HMS_SYNC_KEY));
+    }
+
+    @Override
+    public boolean isEventProcessingDisabled() {
+      return isEventProcessingDisabled_;
     }
   }
 
   /**
    * An event type which is ignored. Useful for unsupported metastore event types
    */
-  private static class IgnoredEvent extends MetastoreEvent {
+  public static class IgnoredEvent extends MetastoreEvent {
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -691,7 +956,12 @@ public class MetastoreEventUtils {
 
     @Override
     public void process() {
-      LOG.debug(debugString("Ignored"));
+      debugLog("Ignored");
+    }
+
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      return false;
     }
   }
 }

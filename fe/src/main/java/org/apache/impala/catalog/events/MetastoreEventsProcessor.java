@@ -30,12 +30,11 @@ import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.messaging.json.ExtendedJSONMessageFactory;
-import org.apache.hadoop.yarn.webapp.hamlet.HamletSpec.META;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.events.MetastoreEventUtils.MetastoreEvent;
-import org.apache.impala.catalog.events.MetastoreEventUtils.MetastoreEventFactory;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -150,7 +149,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public enum EventProcessorStatus {
     STOPPED, // event processor is instantiated but not yet scheduled
     ACTIVE, // event processor is scheduled at a given frequency
-    ERROR // event processor is in error state and event processing has stopped
+    ERROR, // event processor is in error state and event processing has stopped
+    NEEDS_INVALIDATE // event processor could not resolve certain events and needs a
+    // manual invalidate command to reset the state (See AlterEvent for a example)
   }
 
   // current status of this event processor
@@ -197,7 +198,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     startScheduler();
     eventProcessorStatus_ = EventProcessorStatus.ACTIVE;
     LOG.info(String.format("Successfully started metastore event processing."
-        + "Polling interval: %d seconds.", pollingFrequencyInSec_));
+        + " Polling interval: %d seconds.", pollingFrequencyInSec_));
   }
 
   /**
@@ -314,8 +315,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     NotificationEvent lastProcessedEvent = null;
     try {
       EventProcessorStatus currentStatus = eventProcessorStatus_;
-      if (currentStatus == EventProcessorStatus.STOPPED
-          || currentStatus == EventProcessorStatus.ERROR) {
+      if (currentStatus != EventProcessorStatus.ACTIVE) {
         LOG.warn(String.format(
             "Event processing is skipped since status is %s. Last synced event id is %d",
             currentStatus, lastSyncedEventId_));
@@ -323,15 +323,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       }
 
       List<NotificationEvent> events = getNextMetastoreEvents();
-      lastProcessedEvent = processEvents(events);
-    } catch (MetastoreNotificationFetchException ex) {
+      processEvents(events);
+    } catch (MetastoreNotificationFetchException fetchEx) {
       updateStatus(EventProcessorStatus.ERROR);
-      LOG.error("Unable to fetch the next batch of metastore events", ex);
-    } catch (MetastoreNotificationException | CatalogException ex) {
+      LOG.error("Unable to fetch the next batch of metastore events", fetchEx);
+    } catch(MetastoreNotificationNeedsInvalidateException ex) {
+      updateStatus(EventProcessorStatus.NEEDS_INVALIDATE);
+      LOG.error("Event processing needs a invalidate command to resolve the state", ex);
+    } catch(MetastoreNotificationException ex) {
       updateStatus(EventProcessorStatus.ERROR);
-      LOG.error(String.format(
-          "Unable to process notification event %d due to %s. Event processing will be "
-              + "stopped", lastProcessedEvent.getEventId(), ex.getMessage()));
+      LOG.error("Unexpected exception received while processing event", ex);
       dumpEventInfoToLog(lastProcessedEvent);
     }
   }
@@ -343,25 +344,31 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * @return the last Notification event which was processed.
    */
   @VisibleForTesting
-  protected NotificationEvent processEvents(List<NotificationEvent> events)
-      throws MetastoreNotificationException, CatalogException {
+  protected void processEvents(List<NotificationEvent> events)
+      throws MetastoreNotificationException {
     List<MetastoreEvent> filteredEvents =
         metastoreEventFactory_.getFilteredEvents(events);
     NotificationEvent lastProcessedEvent = null;
-    for (MetastoreEvent event : filteredEvents) {
-      // synchronizing each event processing reduces the scope of the lock so the a
-      // potential reset() during event processing is not blocked for longer than
-      // necessary
-      synchronized (this) {
-        if (eventProcessorStatus_ != EventProcessorStatus.ACTIVE) {
-          break;
+    try {
+      for (MetastoreEvent event : filteredEvents) {
+        // synchronizing each event processing reduces the scope of the lock so the a
+        // potential reset() during event processing is not blocked for longer than
+        // necessary
+        synchronized (this) {
+          if (eventProcessorStatus_ != EventProcessorStatus.ACTIVE) {
+            break;
+          }
+          lastProcessedEvent = event.metastoreNotificationEvent_;
+          event.processIfEnabled();
+          lastSyncedEventId_ = event.eventId_;
         }
-        lastProcessedEvent = event.metastoreNotificationEvent_;
-        event.process();
-        lastSyncedEventId_ = event.eventId_;
       }
+    } catch (CatalogException e) {
+      throw new MetastoreNotificationException(String.format(
+          "Unable to process event %d of type %s. "
+              + "Event processing will be stopped.", lastProcessedEvent.getEventId(),
+          lastProcessedEvent.getEventType()), e);
     }
-    return lastProcessedEvent;
   }
 
   /**

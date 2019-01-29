@@ -821,6 +821,51 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Given a database name and a property key returns the value of the key from the
+   * parameters map of the HMS db object
+   * @param dbName name of the database
+   * @param propertyKey property key
+   * @return value of key from the db parameter. returns null if Db is not found or key
+   * does not exist in the parameters
+   */
+  public String getDbProperty(String dbName, String propertyKey) {
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(propertyKey);
+    versionLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) return null;
+      if (!db.getMetaStoreDb().isSetParameters()) return null;
+      return db.getMetaStoreDb().getParameters().get(propertyKey);
+    } finally {
+      versionLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Given a dbname, table name and a key returns the value of the key from the cached
+   * Table object's parameters
+   * @return Value of the parameter which maps to property key, null if the table
+   * doesn't exist, if it is a incomplete table or if the parameter is not found
+   */
+  public String getTableProperty(String dbName, String tblName, String propertyKey) {
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tblName);
+    Preconditions.checkNotNull(propertyKey);
+    versionLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) return null;
+      Table tbl = db.getTable(tblName);
+      if (tbl == null || tbl instanceof IncompleteTable) return null;
+      if (!tbl.getMetaStoreTable().isSetParameters()) return null;
+      return tbl.getMetaStoreTable().getParameters().get(propertyKey);
+    } finally {
+      versionLock_.readLock().unlock();
+    }
+  }
+
+  /**
    * Adds a table in the topic update if its version is in the range
    * ('ctx.fromVersion', 'ctx.toVersion']. If the table's version is larger than
    * 'ctx.toVersion' and the table has skipped a topic update
