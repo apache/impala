@@ -299,8 +299,8 @@ under the License.
       <title>System-wide auth-to-local mapping not applied correctly to Kudu
         service account</title>
       <conbody>
-        <p>Due to system "auth_to_local" mapping, the principal may be mapped to
-          some local name.</p>
+        <p>Due to system the <codeph>auth_to_local</codeph> mapping, the
+          principal may be mapped to some local name.</p>
         <p>When running with Kerberos enabled, you may hit the following error
           message where <varname>&lt;random-string></varname> is some random
           string which doesn't match the primary in the Kerberos principal.</p>
@@ -311,8 +311,7 @@ under the License.
           system-wide <codeph>auth_to_local</codeph> mappings configured in
             <codeph>/etc/krb5.conf</codeph>.</p>
         <p><b>Bug:</b> KUDU-2198</p>
-        <p><b>Affected Versions:</b> Kudu 1.6</p>
-        <p><b>Fixed Version:</b> Kudu 1.6</p>
+        <p><b>Affected Versions:</b> Impala 2.12, Impala 3.0 / Kudu 1.6</p>
       </conbody>
     </concept>
 </concept>
