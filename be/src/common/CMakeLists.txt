@@ -36,12 +36,16 @@ add_library(Common
   ${VERSION_CC_GEN_OUTPUT}
 )
 
+# Command to generate the build version file if not present. We don't automatically
+# regenerate the file if present, which speeds up incremental builds but can lead
+# to the version being stale.
 add_custom_command(
   OUTPUT ${VERSION_CC_GEN_OUTPUT}
   COMMAND $ENV{IMPALA_HOME}/bin/gen_build_version.py
   COMMENT "Generating the version.cc file"
   VERBATIM
 )
+
 add_dependencies(Common gen-deps)
 
 add_library(GlobalFlags

@@ -103,6 +103,9 @@ do
   esac
 done
 
+echo "IMPALA-8147: make_impala.sh, make_debug.sh, make_release.sh and make_asan.sh "
+echo "are deprecated. Please migrate your scripts to use buildall.sh or make directly"
+
 if [ $BUILD_TESTS -eq 1 ]; then
   MAKE_TARGETS+=" be-test be-benchmarks"
 fi

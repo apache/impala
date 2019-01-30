@@ -56,10 +56,6 @@ you can either
 ```
 make -j$(distcc -j)
 ```
-or
-```
-bin/make_impala.sh
-```
 
 ### Switching back to local compilation
 If you want to compile a very small change, a local build might be faster.
@@ -71,8 +67,7 @@ to switch back
 switch_compiler distcc
 ```
 ### Second time
-If you open a new terminal and attempt to build with "make" or "bin/make_impala.sh",
-that will fail. To fix:
+If you open a new terminal and attempt to build with "make" that will fail. To fix:
 ```
 source "$IMPALA_HOME"/bin/impala-config.sh   # Skip if already done
 source "$IMPALA_HOME"/bin/distcc/distcc_env.sh
