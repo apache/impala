@@ -206,6 +206,9 @@ public class TupleDescriptor {
         .toString();
   }
 
+  @Override
+  public String toString() { return debugString(); }
+
   /**
    * Checks that this tuple is materialized and has a mem layout. Throws if this tuple
    * is not executable, i.e., if one of those conditions is not met.

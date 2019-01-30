@@ -100,7 +100,7 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
       skip_unknown_sections=False)
 
 def parse_table_constraints(constraints_file):
-  """Reads a table contraints file, if one exists"""
+  """Reads a table constraints file, if one exists"""
   schema_include = defaultdict(list)
   schema_exclude = defaultdict(list)
   schema_only = defaultdict(list)

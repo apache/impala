@@ -2265,7 +2265,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk(inPredStr.toString() + ")");
     inPredStr.append(", " + 1234);
     AnalysisError(inPredStr.toString() + ")",
-        String.format("Exceeded the maximum number of child expressions (%s).\n" +
+        String.format("Exceeded the maximum number of child expressions (%d).\n" +
         "Expression has %s children",  Expr.EXPR_CHILDREN_LIMIT,
         Expr.EXPR_CHILDREN_LIMIT + 1));
 
@@ -2277,7 +2277,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk(caseExprStr.toString() + " end");
     caseExprStr.append(" when true then 1");
     AnalysisError(caseExprStr.toString() + " end",
-        String.format("Exceeded the maximum number of child expressions (%s).\n" +
+        String.format("Exceeded the maximum number of child expressions (%d).\n" +
         "Expression has %s children", Expr.EXPR_CHILDREN_LIMIT,
         Expr.EXPR_CHILDREN_LIMIT + 2));
   }
@@ -2353,7 +2353,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(expr, expectedType, expectedType);
   }
 
-  // Verify that mod and % returns the same type when it's DECIMAL V2 mdoe.
+  // Verify that mod and % returns the same type when it's DECIMAL V2 mode.
   // See IMPALA-6202.
   @Test
   public void TestModReturnType() {

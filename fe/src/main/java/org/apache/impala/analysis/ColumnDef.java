@@ -257,8 +257,8 @@ public class ColumnDef {
         throw new AnalysisException(String.format("Only constant values are allowed " +
             "for default values: %s", defaultValue_.toSql()));
       }
-      if (defaultValLiteral.getType().isNull() && ((isNullable_ != null && !isNullable_)
-          || isPrimaryKey_)) {
+      if (Expr.IS_NULL_VALUE.apply(defaultValLiteral) &&
+          ((isNullable_ != null && !isNullable_) || isPrimaryKey_)) {
         throw new AnalysisException(String.format("Default value of NULL not allowed " +
             "on non-nullable column: '%s'", getColName()));
       }

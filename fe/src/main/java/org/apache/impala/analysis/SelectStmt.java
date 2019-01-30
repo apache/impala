@@ -344,7 +344,7 @@ public class SelectStmt extends QueryStmt {
     private void analyzeWhereClause() throws AnalysisException {
       if (whereClause_ == null) return;
       whereClause_.analyze(analyzer_);
-      if (whereClause_.contains(Expr.isAggregatePredicate())) {
+      if (whereClause_.contains(Expr.IS_AGGREGATE)) {
         throw new AnalysisException(
             "aggregate function not allowed in WHERE clause");
       }
@@ -586,12 +586,12 @@ public class SelectStmt extends QueryStmt {
 
     private boolean checkForAggregates() throws AnalysisException {
       if (groupingExprs_ == null && !selectList_.isDistinct()
-          && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
+          && !TreeNode.contains(resultExprs_, Expr.IS_AGGREGATE)
           && (havingPred_ == null
-              || !havingPred_.contains(Expr.isAggregatePredicate()))
+              || !havingPred_.contains(Expr.IS_AGGREGATE))
           && (sortInfo_ == null
               || !TreeNode.contains(sortInfo_.getSortExprs(),
-                                    Expr.isAggregatePredicate()))) {
+                                    Expr.IS_AGGREGATE))) {
         // We're not computing aggregates but we still need to register the HAVING
         // clause which could, e.g., contain a constant expression evaluating to false.
         if (havingPred_ != null) analyzer_.registerConjuncts(havingPred_, true);
@@ -609,9 +609,9 @@ public class SelectStmt extends QueryStmt {
 
       if (selectList_.isDistinct()
           && (groupingExprs_ != null
-              || TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
+              || TreeNode.contains(resultExprs_, Expr.IS_AGGREGATE)
               || (havingPred_ != null
-                  && havingPred_.contains(Expr.isAggregatePredicate())))) {
+                  && havingPred_.contains(Expr.IS_AGGREGATE)))) {
         throw new AnalysisException(
           "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
       }
@@ -620,7 +620,7 @@ public class SelectStmt extends QueryStmt {
       // '*', and if you need to name all star-expanded cols in the group by clause you
       // might as well do it in the select list).
       if (groupingExprs_ != null ||
-          TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())) {
+          TreeNode.contains(resultExprs_, Expr.IS_AGGREGATE)) {
         for (SelectListItem item : selectList_.getItems()) {
           if (item.isStar()) {
             throw new AnalysisException(
@@ -652,7 +652,7 @@ public class SelectStmt extends QueryStmt {
 
       for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
         groupingExprsCopy_.get(i).analyze(analyzer_);
-        if (groupingExprsCopy_.get(i).contains(Expr.isAggregatePredicate())) {
+        if (groupingExprsCopy_.get(i).contains(Expr.IS_AGGREGATE)) {
           // reference the original expr in the error msg
           throw new AnalysisException(
               "GROUP BY expression must not contain aggregate functions: "
@@ -671,13 +671,13 @@ public class SelectStmt extends QueryStmt {
       // Collect the aggregate expressions from the SELECT, HAVING and ORDER BY clauses
       // of this statement.
       aggExprs_ = new ArrayList<>();
-      TreeNode.collect(resultExprs_, Expr.isAggregatePredicate(), aggExprs_);
+      TreeNode.collect(resultExprs_, Expr.IS_AGGREGATE, aggExprs_);
       if (havingPred_ != null) {
-        havingPred_.collect(Expr.isAggregatePredicate(), aggExprs_);
+        havingPred_.collect(Expr.IS_AGGREGATE, aggExprs_);
       }
       if (sortInfo_ != null) {
         // TODO: Avoid evaluating aggs in ignored order-bys
-        TreeNode.collect(sortInfo_.getSortExprs(), Expr.isAggregatePredicate(),
+        TreeNode.collect(sortInfo_.getSortExprs(), Expr.IS_AGGREGATE,
             aggExprs_);
       }
     }
@@ -727,7 +727,7 @@ public class SelectStmt extends QueryStmt {
       List<Expr> substitutedAggs =
           Expr.substituteList(aggExprs_, countAllMap_, analyzer_, false);
       aggExprs_.clear();
-      TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs_);
+      TreeNode.collect(substitutedAggs, Expr.IS_AGGREGATE, aggExprs_);
 
       List<Expr> groupingExprs = groupingExprsCopy_;
       if (selectList_.isDistinct()) {

@@ -56,49 +56,51 @@ import com.google.common.collect.Lists;
 
 /**
  * Root of the expr node hierarchy.
- *
  */
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
-  private final static Logger LOG = LoggerFactory.getLogger(Expr.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Expr.class);
 
   // Limits on the number of expr children and the depth of an expr tree. These maximum
   // values guard against crashes due to stack overflows (IMPALA-432) and were
   // experimentally determined to be safe.
-  public final static int EXPR_CHILDREN_LIMIT = 10000;
+  public static final int EXPR_CHILDREN_LIMIT = 10000;
   // The expr depth limit is mostly due to our recursive implementation of clone().
-  public final static int EXPR_DEPTH_LIMIT = 1000;
+  public static final int EXPR_DEPTH_LIMIT = 1000;
 
   // Name of the function that needs to be implemented by every Expr that
   // supports negation.
-  private final static String NEGATE_FN = "negate";
+  private static final String NEGATE_FN = "negate";
 
   // To be used where we cannot come up with a better estimate (selectivity_ is -1).
-  public static double DEFAULT_SELECTIVITY = 0.1;
+  public static final double DEFAULT_SELECTIVITY = 0.1;
 
   // The relative costs of different Exprs. These numbers are not intended as a precise
   // reflection of running times, but as simple heuristics for ordering Exprs from cheap
   // to expensive.
   // TODO(tmwarshall): Get these costs in a more principled way, eg. with a benchmark.
-  public final static float ARITHMETIC_OP_COST = 1;
-  public final static float BINARY_PREDICATE_COST = 1;
-  public final static float VAR_LEN_BINARY_PREDICATE_COST = 5;
-  public final static float CAST_COST = 1;
-  public final static float COMPOUND_PREDICATE_COST = 1;
-  public final static float FUNCTION_CALL_COST = 10;
-  public final static float IS_NOT_EMPTY_COST = 1;
-  public final static float IS_NULL_COST = 1;
-  public final static float LIKE_COST = 10;
-  public final static float LITERAL_COST = 1;
-  public final static float SLOT_REF_COST = 1;
-  public final static float TIMESTAMP_ARITHMETIC_COST = 5;
-  public final static float UNKNOWN_COST = -1;
+  public static final float ARITHMETIC_OP_COST = 1;
+  public static final float BINARY_PREDICATE_COST = 1;
+  public static final float VAR_LEN_BINARY_PREDICATE_COST = 5;
+  public static final float CAST_COST = 1;
+  public static final float COMPOUND_PREDICATE_COST = 1;
+  public static final float FUNCTION_CALL_COST = 10;
+  public static final float IS_NOT_EMPTY_COST = 1;
+  public static final float IS_NULL_COST = 1;
+  public static final float LIKE_COST = 10;
+  public static final float LITERAL_COST = 1;
+  public static final float SLOT_REF_COST = 1;
+  public static final float TIMESTAMP_ARITHMETIC_COST = 5;
+  public static final float UNKNOWN_COST = -1;
+
+  // Arbitrary max exprs considered for constant propagation due to O(n^2) complexity.
+  private static final int CONST_PROPAGATION_EXPR_LIMIT = 200;
 
   // To be used when estimating the cost of Exprs of type string where we don't otherwise
   // have an estimate of how long the strings produced by that Expr are.
-  public final static int DEFAULT_AVG_STRING_LENGTH = 5;
+  public static final int DEFAULT_AVG_STRING_LENGTH = 5;
 
   // returns true if an Expr is a non-analytic aggregate.
-  private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
+  public static final com.google.common.base.Predicate<Expr> IS_AGGREGATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -108,7 +110,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       };
 
   // Returns true if an Expr is a NOT CompoundPredicate.
-  public final static com.google.common.base.Predicate<Expr> IS_NOT_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_NOT_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -118,7 +120,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       };
 
   // Returns true if an Expr is an OR CompoundPredicate.
-  public final static com.google.common.base.Predicate<Expr> IS_OR_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_OR_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -128,7 +130,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       };
 
   // Returns true if an Expr is a scalar subquery
-  public final static com.google.common.base.Predicate<Expr> IS_SCALAR_SUBQUERY =
+  public static final com.google.common.base.Predicate<Expr> IS_SCALAR_SUBQUERY =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -138,7 +140,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   // Returns true if an Expr is an aggregate function that returns non-null on
   // an empty set (e.g. count).
-  public final static com.google.common.base.Predicate<Expr>
+  public static final com.google.common.base.Predicate<Expr>
       NON_NULL_EMPTY_AGG = new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -148,7 +150,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       };
 
   // Returns true if an Expr is a builtin aggregate function.
-  public final static com.google.common.base.Predicate<Expr> IS_BUILTIN_AGG_FN =
+  public static final com.google.common.base.Predicate<Expr> IS_BUILTIN_AGG_FN =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -158,16 +160,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       };
 
   // Returns true if an Expr is a user-defined aggregate function.
-  public final static com.google.common.base.Predicate<Expr> IS_UDA_FN =
+  public static final com.google.common.base.Predicate<Expr> IS_UDA_FN =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
-          return isAggregatePredicate_.apply(arg) &&
+          return IS_AGGREGATE.apply(arg) &&
               !((FunctionCallExpr)arg).getFnName().isBuiltin();
         }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_TRUE_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_TRUE_LITERAL =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -175,7 +177,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_FALSE_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_FALSE_LITERAL =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -183,13 +185,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_EQ_BINARY_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_EQ_BINARY_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) { return BinaryPredicate.getEqSlots(arg) != null; }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_NOT_EQ_BINARY_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_NOT_EQ_BINARY_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -199,14 +201,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_BINARY_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_BINARY_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) { return arg instanceof BinaryPredicate; }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_EXPR_EQ_LITERAL_PREDICATE =
-      new com.google.common.base.Predicate<Expr>() {
+  public static final com.google.common.base.Predicate<Expr>
+    IS_EXPR_EQ_LITERAL_PREDICATE = new com.google.common.base.Predicate<Expr>() {
     @Override
     public boolean apply(Expr arg) {
       return arg instanceof BinaryPredicate
@@ -215,7 +217,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   };
 
-  public final static com.google.common.base.Predicate<Expr>
+  public static final com.google.common.base.Predicate<Expr>
       IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
@@ -225,7 +227,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
-  public final static com.google.common.base.Predicate<Expr> IS_UDF_PREDICATE =
+  public static final com.google.common.base.Predicate<Expr> IS_UDF_PREDICATE =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
@@ -237,7 +239,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * @return true if the expression is a literal.
    */
-  public final static com.google.common.base.Predicate<Expr> IS_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_LITERAL =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -248,7 +250,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * @return true if the expression is a null literal.
    */
-  public final static com.google.common.base.Predicate<Expr> IS_NULL_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_NULL_LITERAL =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -259,7 +261,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * @return true if the expression is a literal value other than NULL.
    */
-  public final static com.google.common.base.Predicate<Expr> IS_NON_NULL_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_NON_NULL_LITERAL =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -271,7 +273,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @return true if the expression is a null literal, or a
    * cast of a null (as created by the ConstantFoldingRule.)
    */
-  public final static com.google.common.base.Predicate<Expr> IS_NULL_VALUE =
+  public static final com.google.common.base.Predicate<Expr> IS_NULL_VALUE =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -285,7 +287,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @return true if the expression is a  literal, or a
    * cast of a null (as created by the ConstantFoldingRule.)
    */
-  public final static com.google.common.base.Predicate<Expr> IS_LITERAL_VALUE =
+  public static final com.google.common.base.Predicate<Expr> IS_LITERAL_VALUE =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -293,7 +295,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       }
     };
 
-  public final static com.google.common.base.Predicate<Expr> IS_INT_LITERAL =
+  public static final com.google.common.base.Predicate<Expr> IS_INT_LITERAL =
     new com.google.common.base.Predicate<Expr>() {
       @Override
       public boolean apply(Expr arg) {
@@ -346,7 +348,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   private boolean isAnalyzed_ = false;
 
   protected Expr() {
-    super();
     type_ = Type.INVALID;
     selectivity_ = -1.0;
     evalCost_ = -1.0f;
@@ -662,8 +663,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         this instanceof BinaryPredicate);
     // This heuristic conversion is not part of DECIMAL_V2.
     if (analyzer.getQueryOptions().isDecimal_v2()) return;
-    if (children_.size() == 1) return; // Do not attempt to convert for unary ops
-    Preconditions.checkState(children_.size() == 2);
+    if (getChildCount() == 1) return; // Do not attempt to convert for unary ops
+    Preconditions.checkState(getChildCount() == 2);
     Type t0 = getChild(0).getType();
     Type t1 = getChild(1).getType();
     boolean c0IsConstantDecimal = getChild(0).isConstant() && t0.isDecimal();
@@ -784,12 +785,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return result;
   }
 
-  public static com.google.common.base.Predicate<Expr> isAggregatePredicate() {
-    return isAggregatePredicate_;
-  }
-
   public boolean isAggregate() {
-    return isAggregatePredicate_.apply(this);
+    return IS_AGGREGATE.apply(this);
   }
 
   public List<String> childrenToSql(ToSqlOptions options) {
@@ -1115,9 +1112,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
-  // Arbitrary max exprs considered for constant propagation due to O(n^2) complexity.
-  private final static int CONST_PROPAGATION_EXPR_LIMIT = 200;
-
   /**
    * Propagates constant expressions of the form <slot ref> = <constant> to
    * other uses of slot ref in the given conjuncts; returns a BitSet with
@@ -1402,24 +1396,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Returns child expr if this expr is an implicit cast, otherwise returns 'this'.
    */
-  public Expr ignoreImplicitCast() {
-    if (isImplicitCast()) return getChild(0).ignoreImplicitCast();
-    return this;
-  }
+  public Expr ignoreImplicitCast() { return this; }
 
   /**
    * Returns true if 'this' is an implicit cast expr.
    */
-  public boolean isImplicitCast() {
-    return this instanceof CastExpr && ((CastExpr) this).isImplicit();
-  }
+  public boolean isImplicitCast() { return false; }
 
   @Override
   public String toString() {
     return Objects.toStringHelper(this.getClass())
         .add("id", id_)
         .add("type", type_)
-        .add("toSql", toSql())
+        .add("toSql", toSql(ToSqlOptions.SHOW_IMPLICIT_CASTS))
         .add("sel", selectivity_)
         .add("evalCost", evalCost_)
         .add("#distinct", numDistinctValues_)

@@ -43,12 +43,12 @@ public class PartitionKeyValue {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (value_ == null) return;
     if (isStatic() && !value_.isConstant()) {
       throw new AnalysisException(
           String.format("Non-constant expressions are not supported " +
               "as static partition-key values in '%s'.", toString()));
     }
-    if (value_ == null) return;
     value_.analyze(analyzer);
     literalValue_ = LiteralExpr.create(value_, analyzer.getQueryCtx());
   }

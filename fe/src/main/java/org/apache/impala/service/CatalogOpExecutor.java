@@ -238,22 +238,22 @@ import com.google.common.collect.Sets;
  * metastore out of this class.
  */
 public class CatalogOpExecutor {
+  private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
   // Format string for exceptions returned by Hive Metastore RPCs.
   private final static String HMS_RPC_ERROR_FORMAT_STR =
       "Error making '%s' RPC to Hive Metastore: ";
-
-  private final CatalogServiceCatalog catalog_;
-
-  // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
-  // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
-  private final Object metastoreDdlLock_ = new Object();
-  private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
 
   // The maximum number of partitions to update in one Hive Metastore RPC.
   // Used when persisting the results of COMPUTE STATS statements.
   // It is also used as an upper limit for the number of partitions allowed in one ADD
   // PARTITION statement.
   public final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
+
+  private final CatalogServiceCatalog catalog_;
+
+  // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
+  // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
+  private final Object metastoreDdlLock_ = new Object();
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
@@ -766,13 +766,13 @@ public class CatalogOpExecutor {
       int numColumns =
           params.isSetColumn_stats() ? params.column_stats.size() : 0;
       LOG.info(String.format(
-          "Updating stats for table %s: table-stats=%s partitions=%s column-stats=%s",
+          "Updating stats for table %s: table-stats=%s partitions=%d column-stats=%d",
           tableName, params.isSetTable_stats(), numPartitions, numColumns));
     }
 
     // Update column stats.
     ColumnStatistics colStats = null;
-    numUpdatedColumns.setRef(Long.valueOf(0));
+    numUpdatedColumns.setRef(0L);
     if (params.isSetColumn_stats()) {
       colStats = createHiveColStats(params, table);
       if (colStats.getStatsObjSize() > 0) {
@@ -783,7 +783,7 @@ public class CatalogOpExecutor {
               "updateTableColumnStatistics"), e);
         }
       }
-      numUpdatedColumns.setRef(Long.valueOf(colStats.getStatsObjSize()));
+      numUpdatedColumns.setRef((long) colStats.getStatsObjSize());
     }
 
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
@@ -810,11 +810,11 @@ public class CatalogOpExecutor {
 
     applyAlterTable(msTbl, false);
 
-    numUpdatedPartitions.setRef(Long.valueOf(0));
+    numUpdatedPartitions.setRef(0L);
     if (modifiedParts != null) {
-      numUpdatedPartitions.setRef(Long.valueOf(modifiedParts.size()));
+      numUpdatedPartitions.setRef((long) modifiedParts.size());
     } else if (params.isSetTable_stats()) {
-      numUpdatedPartitions.setRef(Long.valueOf(1));
+      numUpdatedPartitions.setRef(1L);
     }
   }
 
@@ -862,7 +862,7 @@ public class CatalogOpExecutor {
       // existing state of the metadata. See IMPALA-2201.
       long numRows = partitionStats.stats.num_rows;
       if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
+        LOG.trace(String.format("Updating stats for partition %s: numRows=%d",
             partition.getValuesAsString(), numRows));
       }
       PartitionStatsUtil.partStatsToPartition(partitionStats, partition);
@@ -917,8 +917,8 @@ public class CatalogOpExecutor {
               ndvCap, entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
       if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
-            "maxSize=%s avgSize=%s", colName, entry.getValue().getNum_distinct_values(),
+        LOG.trace(String.format("Updating column stats for %s: numDVs=%d numNulls=%d " +
+            "maxSize=%d avgSize=%.2f", colName, entry.getValue().getNum_distinct_values(),
             entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
             entry.getValue().getAvg_size()));
       }
@@ -3749,7 +3749,7 @@ public class CatalogOpExecutor {
       throws ImpalaRuntimeException, CatalogException {
     Db db = catalog_.getDb(dbName);
     if (db == null) {
-      throw new CatalogException("Database: " + db.getName() + " does not exist.");
+      throw new CatalogException("Database: " + dbName + " does not exist.");
     }
     synchronized (metastoreDdlLock_) {
       Database msDb = db.getMetaStoreDb();
@@ -3782,7 +3782,7 @@ public class CatalogOpExecutor {
       TDdlExecResponse response) throws CatalogException, ImpalaRuntimeException {
     Db db = catalog_.getDb(dbName);
     if (db == null) {
-      throw new CatalogException("Database: " + db.getName() + " does not exist.");
+      throw new CatalogException("Database: " + dbName + " does not exist.");
     }
     Preconditions.checkNotNull(params.owner_name);
     Preconditions.checkNotNull(params.owner_type);

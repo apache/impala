@@ -232,7 +232,6 @@ public class FunctionCallExpr extends Expr {
         .toString();
   }
 
-  public FunctionParams getParams() { return params_; }
   public boolean isScalarFunction() {
     Preconditions.checkNotNull(fn_);
     return fn_ instanceof ScalarFunction ;
@@ -271,16 +270,14 @@ public class FunctionCallExpr extends Expr {
     return ((AggregateFunction)fn_).ignoresDistinct();
   }
 
+  public FunctionParams getParams() { return params_; }
   public FunctionName getFnName() { return fnName_; }
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
   public void setIsInternalFnCall(boolean v) { isInternalFnCall_ = v; }
 
   static boolean isNondeterministicBuiltinFnName(String fnName) {
-    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
-        || fnName.equalsIgnoreCase("uuid")) {
-      return true;
-    }
-    return false;
+    return fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random") ||
+           fnName.equalsIgnoreCase("uuid");
   }
 
   /**
@@ -559,7 +556,7 @@ public class FunctionCallExpr extends Expr {
 
     if (isAggregateFunction()) {
       // subexprs must not contain aggregates
-      if (TreeNode.contains(children_, Expr.isAggregatePredicate())) {
+      if (TreeNode.contains(children_, Expr.IS_AGGREGATE)) {
         throw new AnalysisException(
             "aggregate function must not contain aggregate parameters: " + this.toSql());
       }

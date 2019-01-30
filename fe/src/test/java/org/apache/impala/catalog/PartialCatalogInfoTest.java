@@ -106,7 +106,7 @@ public class PartialCatalogInfoTest {
       tasksToWaitFor.add(threadPoolExecutor.submit(new
           CallableGetPartialCatalogObjectRequest(request)));
     }
-    for (Future task: tasksToWaitFor) task.get();
+    for (Future<?> task: tasksToWaitFor) task.get();
   }
 
   @Test
@@ -243,7 +243,7 @@ public class PartialCatalogInfoTest {
     // Uses a callable<Void> instead of Runnable because junit does not catch exceptions
     // from threads other than the main thread. Callable here makes sure the exception
     // is propagated to the main thread.
-    final Callable<Void> assertReqCount = new Callable() {
+    final Callable<Void> assertReqCount = new Callable<Void>() {
       @Override
       public Void call() throws Exception {
         while (!requestsFinished.get()) {
@@ -254,7 +254,7 @@ public class PartialCatalogInfoTest {
         return null;
       }
     };
-    Future assertThreadTask;
+    Future<Void> assertThreadTask;
     try {
       // Assert the request count in a tight loop.
       assertThreadTask = Executors.newSingleThreadExecutor().submit(assertReqCount);

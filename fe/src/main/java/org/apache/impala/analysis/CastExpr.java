@@ -29,6 +29,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -307,6 +308,11 @@ public class CastExpr extends Expr {
     } else {
       return this;
     }
+  }
+
+  @Override
+  public boolean isImplicitCast() {
+    return isImplicit();
   }
 
   @Override

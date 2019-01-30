@@ -97,8 +97,8 @@ public class HdfsPartitionPruner {
   }
 
   /**
-   * Return a list of partitions left after applying the conjuncts. Please note
-   * that conjuncts used for filtering will be removed from the list 'conjuncts' and
+   * Return a list of partitions left after applying the conjuncts.
+   * Conjuncts used for filtering will be removed from the list 'conjuncts' and
    * returned as the second item in the returned Pair. These expressions can be
    * shown in the EXPLAIN output.
    *
@@ -189,7 +189,11 @@ public class HdfsPartitionPruner {
     if (expr instanceof BinaryPredicate) {
       // Evaluate any constant expression in the BE
       try {
-        analyzer.getConstantFolder().rewrite(expr, analyzer);
+        // TODO: Analyzer should already have done constant folding
+        // and rewrite -- unless this is a copy of an expression taken
+        // before analysis, which would introduce its own issues.
+        expr = analyzer.getConstantFolder().rewrite(expr, analyzer);
+        Preconditions.checkState(expr instanceof BinaryPredicate);
       } catch (AnalysisException e) {
         LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
         return false;
@@ -238,6 +242,8 @@ public class HdfsPartitionPruner {
   private Set<Long> evalBinaryPredicate(Expr expr) {
     Preconditions.checkNotNull(expr);
     Preconditions.checkState(expr instanceof BinaryPredicate);
+    // TODO: Note that rewrite rules should have ensured that the slot
+    // is on the left.
     boolean isSlotOnLeft = true;
     if (Expr.IS_LITERAL.apply(expr.getChild(0))) isSlotOnLeft = false;
 

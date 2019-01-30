@@ -110,6 +110,7 @@ public class HdfsPartitionTest {
     assertTrue(Integer.signum(comparePartitionKeyValues(o1, o2)) ==
         -Integer.signum(comparePartitionKeyValues(o2, o1)));
   }
+
   private void verifyTransitive(List<LiteralExpr> o1, List<LiteralExpr> o2,
                                 List<LiteralExpr> o3) {
     // ((compare(x, y)>0) && (compare(y, z)>0)) implies compare(x, z)>0
@@ -118,10 +119,12 @@ public class HdfsPartitionTest {
       assertTrue(comparePartitionKeyValues(o1, o3) > 0);
     }
   }
+
   private void verifyReflexive(List<LiteralExpr> o1) {
     // (compare(x, x)==0) is always true
     assertTrue(comparePartitionKeyValues(o1, o1) == 0);
   }
+
   private void verifyAntiSymmetric(List<LiteralExpr> o1, List<LiteralExpr> o2,
                                    List<LiteralExpr> o3) {
     // compare(x, y)==0 implies that sgn(compare(x, z))==sgn(compare(y, z)) for all z.

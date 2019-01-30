@@ -393,7 +393,7 @@ public abstract class QueryStmt extends StatementBase {
       return resultExprs_.get((int) pos - 1).clone();
     }
 
-    // Ordinary expression..
+    // Ordinary expression.
     return expr;
   }
 

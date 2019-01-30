@@ -28,7 +28,7 @@ public class InvalidValueException extends AnalysisException {
     super(msg);
   }
 
-  public InvalidValueException(String msg, NumberFormatException e) {
+  public InvalidValueException(String msg, Exception e) {
     super(msg, e);
   }
 

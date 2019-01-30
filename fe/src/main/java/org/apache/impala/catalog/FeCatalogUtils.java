@@ -222,12 +222,12 @@ public abstract class FeCatalogUtils {
       List<String> hmsPartitionValues) throws CatalogException {
     Preconditions.checkArgument(
         hmsPartitionValues.size() == table.getNumClusteringCols(),
-        "Cannot parse partition values %s for table %s: " +
-        "expected %s values but got %s",
+        "Cannot parse partition values '%s' for table %s: " +
+        "expected %d values but got %d",
         hmsPartitionValues, table.getFullName(),
         table.getNumClusteringCols(), hmsPartitionValues.size());
     List<LiteralExpr> keyValues = new ArrayList<>();
-    for (String partitionKey: hmsPartitionValues) {
+    for (String partitionKey : hmsPartitionValues) {
       Type type = table.getColumns().get(keyValues.size()).getType();
       // Deal with Hive's special NULL partition key.
       if (partitionKey.equals(table.getNullPartitionKeyValue())) {
@@ -236,7 +236,9 @@ public abstract class FeCatalogUtils {
         try {
           keyValues.add(LiteralExpr.create(partitionKey, type));
         } catch (Exception ex) {
-          LOG.warn("Failed to create literal expression of type: " + type, ex);
+          LOG.warn(String.format(
+              "Failed to create literal expression: type: %s, value: '%s'",
+              type.toSql(), partitionKey), ex);
           throw new CatalogException("Invalid partition key value of type: " + type,
               ex);
         }

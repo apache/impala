@@ -169,7 +169,7 @@ public class RangePartition extends StmtNode {
       throw new AnalysisException(String.format("Only constant values are allowed " +
           "for range-partition bounds: %s", value.toSql()));
     }
-    if (literal.getType().isNull()) {
+    if (Expr.IS_NULL_VALUE.apply(literal)) {
       throw new AnalysisException(String.format("Range partition values cannot be " +
           "NULL. Range partition: '%s'", toSql()));
     }

@@ -25,6 +25,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TSlotRef;
@@ -102,14 +103,14 @@ public class SlotRef extends Expr {
     desc_ = analyzer.registerSlotRef(resolvedPath);
     type_ = desc_.getType();
     if (!type_.isSupported()) {
-      throw new AnalysisException("Unsupported type '"
+      throw new UnsupportedFeatureException("Unsupported type '"
           + type_.toSql() + "' in '" + toSql() + "'.");
     }
     if (type_.isInvalid()) {
       // In this case, the metastore contained a string we can't parse at all
       // e.g. map. We could report a better error if we stored the original
       // HMS string.
-      throw new AnalysisException("Unsupported type in '" + toSql() + "'.");
+      throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
 
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
@@ -234,10 +235,24 @@ public class SlotRef extends Expr {
 
   @Override
   public String toString() {
-    if (desc_ != null) {
-      return "tid=" + desc_.getParent().getId() + " sid=" + desc_.getId();
+    StringBuilder buf = new StringBuilder();
+    if (rawPath_ != null) {
+      buf.append(String.join(".", rawPath_));
+    } else if (label_ != null) {
+      buf.append(label_);
     }
-    return "no desc set";
+    boolean closeParen = buf.length() > 0;
+    if (closeParen) buf.append(" (");
+    if (desc_ != null) {
+      buf.append("tid=")
+        .append(desc_.getParent().getId())
+        .append(" sid=")
+        .append(desc_.getId());
+    } else {
+      buf.append("no desc set");
+    }
+    if (closeParen) buf.append(")");
+    return buf.toString();
   }
 
   @Override

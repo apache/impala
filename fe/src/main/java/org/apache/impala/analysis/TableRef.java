@@ -534,7 +534,7 @@ public class TableRef extends StmtNode {
       onClause_.analyze(analyzer);
       analyzer.setVisibleSemiJoinedTuple(null);
       onClause_.checkReturnsBool("ON clause", true);
-        if (onClause_.contains(Expr.isAggregatePredicate())) {
+        if (onClause_.contains(Expr.IS_AGGREGATE)) {
           throw new AnalysisException(
               "aggregate function not allowed in ON clause: " + toSql());
       }

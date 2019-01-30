@@ -864,7 +864,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     int numWithoutSel = 0;
     List<T> remaining = Lists.newArrayListWithCapacity(conjuncts.size());
     for (T e : conjuncts) {
-      Preconditions.checkState(e.hasCost(), e.toSql());
+      if (!e.hasCost()) {
+        // Avoid toSql() calls for each call
+        Preconditions.checkState(false, e.toSql());
+      }
       totalCost += e.getCost();
       remaining.add(e);
       if (!e.hasSelectivity()) {

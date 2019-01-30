@@ -39,7 +39,7 @@ from tests.util.filesystem_utils import (
 
 class SkipIfS3:
 
-  # These ones are skipped due to product limitations.
+  # These are skipped due to product limitations.
   caching = pytest.mark.skipif(IS_S3, reason="SET CACHED not implemented for S3")
   hive = pytest.mark.skipif(IS_S3, reason="Hive doesn't work with S3")
   hdfs_block_size = pytest.mark.skipif(IS_S3, reason="S3 uses it's own block size")
@@ -50,7 +50,7 @@ class SkipIfS3:
   empty_directory = pytest.mark.skipif(IS_S3,
       reason="Empty directories are not supported on S3")
 
-  # These ones need test infra work to re-enable.
+  # These need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
   datasrc = pytest.mark.skipif(IS_S3, reason="data sources not copied to S3")
   hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
@@ -62,7 +62,7 @@ class SkipIfS3:
 
 class SkipIfABFS:
 
-  # These ones are skipped due to product limitations.
+  # These are skipped due to product limitations.
   caching = pytest.mark.skipif(IS_ABFS, reason="SET CACHED not implemented for ABFS")
   hive = pytest.mark.skipif(IS_ABFS, reason="Hive doesn't work with ABFS")
   hdfs_block_size = pytest.mark.skipif(IS_ABFS, reason="ABFS uses it's own block size")
@@ -73,7 +73,7 @@ class SkipIfABFS:
   trash = pytest.mark.skipif(IS_ABFS,
       reason="Drop/purge not working as expected on ABFS, IMPALA-7726")
 
-  # These ones need test infra work to re-enable.
+  # These need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_ABFS, reason="udas/udfs not copied to ABFS")
   datasrc = pytest.mark.skipif(IS_ABFS, reason="data sources not copied to ABFS")
   hbase = pytest.mark.skipif(IS_ABFS, reason="HBase not started with ABFS")
@@ -82,7 +82,7 @@ class SkipIfABFS:
 
 class SkipIfADLS:
 
-  # These ones are skipped due to product limitations.
+  # These are skipped due to product limitations.
   caching = pytest.mark.skipif(IS_ADLS, reason="SET CACHED not implemented for ADLS")
   hive = pytest.mark.skipif(IS_ADLS, reason="Hive doesn't work with ADLS")
   hdfs_block_size = pytest.mark.skipif(IS_ADLS, reason="ADLS uses it's own block size")
@@ -91,7 +91,7 @@ class SkipIfADLS:
   hdfs_encryption = pytest.mark.skipif(IS_ADLS,
       reason="HDFS encryption is not supported with ADLS")
 
-  # These ones need test infra work to re-enable.
+  # These need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_ADLS, reason="udas/udfs not copied to ADLS")
   datasrc = pytest.mark.skipif(IS_ADLS, reason="data sources not copied to ADLS")
   hbase = pytest.mark.skipif(IS_ADLS, reason="HBase not started with ADLS")
@@ -132,7 +132,7 @@ class SkipIfIsilon:
   jira = partial(pytest.mark.skipif, IS_ISILON)
 
 class SkipIfLocal:
-  # These ones are skipped due to product limitations.
+  # These are skipped due to product limitations.
   caching = pytest.mark.skipif(IS_LOCAL,
       reason="HDFS caching not supported on local file system")
   hdfs_blocks = pytest.mark.skipif(IS_LOCAL,
@@ -148,7 +148,7 @@ class SkipIfLocal:
   hdfs_fd_caching = pytest.mark.skipif(IS_LOCAL,
       reason="HDFS file handle caching not supported for local non-HDFS files")
 
-  # These ones need test infra work to re-enable.
+  # These need test infra work to re-enable.
   hbase = pytest.mark.skipif(IS_LOCAL,
       reason="HBase not started when using local file system")
   hdfs_client = pytest.mark.skipif(IS_LOCAL,
@@ -159,7 +159,7 @@ class SkipIfLocal:
       reason="Tests rely on the root directory")
 
 class SkipIfNotHdfsMinicluster:
-  # These ones are skipped when not running against a local HDFS mini-cluster.
+  # These are skipped when not running against a local HDFS mini-cluster.
   plans = pytest.mark.skipif(not IS_HDFS or pytest.config.option.testing_remote_cluster,
       reason="Test assumes plans from local HDFS mini-cluster")
   tuned_for_minicluster = pytest.mark.skipif(

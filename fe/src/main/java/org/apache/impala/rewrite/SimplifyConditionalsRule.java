@@ -78,8 +78,8 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     // 'select if (true, 0, sum(id)) from alltypes' != 'select 0 from alltypes'
     if (expr != simplified) {
       simplified.analyze(analyzer);
-      if (expr.contains(Expr.isAggregatePredicate())
-          && !simplified.contains(Expr.isAggregatePredicate())) {
+      if (expr.contains(Expr.IS_AGGREGATE)
+          && !simplified.contains(Expr.IS_AGGREGATE)) {
         return expr;
       }
     }

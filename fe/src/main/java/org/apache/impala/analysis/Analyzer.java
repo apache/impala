@@ -1755,6 +1755,7 @@ public class Analyzer {
    * among slots in ignoreSlots are assumed to have already been enforced.
    * TODO: Consider optimizing for the cheapest minimum set of predicates.
    */
+  @SuppressWarnings("unchecked")
   public <T extends Expr> void createEquivConjuncts(TupleId tid, List<T> conjuncts,
       Set<SlotId> ignoreSlots) {
     // Maps from a slot id to its set of equivalent slots. Used to track equivalences
@@ -1929,7 +1930,7 @@ public class Analyzer {
   }
 
   public void registerValueTransfer(SlotId id1, SlotId id2) {
-    globalState_.registeredValueTransfers.add(new Pair(id1, id2));
+    globalState_.registeredValueTransfers.add(new Pair<SlotId, SlotId>(id1, id2));
   }
 
   public boolean isOuterJoined(TupleId tid) {

@@ -131,6 +131,13 @@ public class ComputeStatsStmt extends StatementBase {
   private static final String STATS_FETCH_NUM_PARTITIONS_WITH_STATS =
       STATS_FETCH_PREFIX + ".NumPartitionsWithStats";
 
+  // The maximum number of partitions that may be explicitly selected by filter
+  // predicates. Any query that selects more than this automatically drops back to a full
+  // incremental stats recomputation.
+  // TODO: We can probably do better than this, e.g. running several queries, each of
+  // which selects up to MAX_INCREMENTAL_PARTITIONS partitions.
+  private static final int MAX_INCREMENTAL_PARTITIONS = 1000;
+
   protected final TableName tableName_;
   protected final TableSampleClause sampleParams_;
 
@@ -151,14 +158,14 @@ public class ComputeStatsStmt extends StatementBase {
   protected String columnStatsQueryStr_;
 
   // If true, stats will be gathered incrementally per-partition.
-  private boolean isIncremental_ = false;
+  private boolean isIncremental_;
 
   // If true, expect the compute stats process to produce output for all partitions in the
   // target table. In that case, 'expectedPartitions_' will be empty. The point of this
   // flag is to optimize the case where all partitions are targeted.
   // False for unpartitioned HDFS tables, non-HDFS tables or when stats extrapolation
   // is enabled.
-  private boolean expectAllPartitions_ = false;
+  private boolean expectAllPartitions_;
 
   // The list of valid partition statistics that can be used in an incremental computation
   // without themselves being recomputed. Populated in analyze().
@@ -173,23 +180,16 @@ public class ComputeStatsStmt extends StatementBase {
 
   // If non-null, partitions that an incremental computation might apply to. Must be
   // null if this is a non-incremental computation.
-  private PartitionSet partitionSet_ = null;
+  private PartitionSet partitionSet_;
 
   // If non-null, represents the user-specified list of columns for computing statistics.
   // Not supported for incremental statistics.
-  private List<String> columnWhitelist_ = null;
+  private List<String> columnWhitelist_;
 
   // The set of columns to be analyzed. Each column is valid: it must exist in the table
   // schema, it must be of a type that can be analyzed, and cannot refer to a partitioning
   // column for HDFS tables. If the set is null, no columns are restricted.
-  private Set<Column> validatedColumnWhitelist_ = null;
-
-  // The maximum number of partitions that may be explicitly selected by filter
-  // predicates. Any query that selects more than this automatically drops back to a full
-  // incremental stats recomputation.
-  // TODO: We can probably do better than this, e.g. running several queries, each of
-  // which selects up to MAX_INCREMENTAL_PARTITIONS partitions.
-  private static final int MAX_INCREMENTAL_PARTITIONS = 1000;
+  private Set<Column> validatedColumnWhitelist_;
 
   /**
    * Should only be constructed via static creation functions.
