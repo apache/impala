@@ -37,11 +37,13 @@ under the License.
 
     <p>
       <indexterm audience="hidden">HBase</indexterm>
-      You can use Impala to query HBase tables. This capability allows convenient access to a storage system that
-      is tuned for different kinds of workloads than the default with Impala. The default Impala tables use data
-      files stored on HDFS, which are ideal for bulk loads and queries using full-table scans. In contrast, HBase
-      can do efficient queries for data organized for OLTP-style workloads, with lookups of individual rows or
-      ranges of values.
+      You can use Impala to query HBase tables. This is useful for accessing any of
+      your existing HBase tables via SQL and performing analytics over them. HDFS
+      and Kudu tables are preferred over HBase for analytic workloads and offer
+      superior performance. Kudu supports efficient inserts, updates and deletes
+      of small numbers of rows and can replace HBase for most analytics-oriented use
+      cases.  See <xref href="impala_kudu.xml#impala_kudu"/> for information on using
+      Impala with Kudu.
     </p>
 
     <p>
@@ -227,17 +229,19 @@ under the License.
 
       <ul>
         <li>
-          Use HBase table for queries that return a single row or a range of rows, not queries that scan the entire
-          table. (If a query has no <codeph>WHERE</codeph> clause, that is a strong indicator that it is an
-          inefficient query for an HBase table.)
+          Use HBase table for queries that return a single row or a small range of rows,
+          not queries that perform a full table scan of an entire table. (If a query has
+          a HBase table and no <codeph>WHERE</codeph> clause referencing that table,
+          that is a strong indicator that it is an inefficient query for an HBase table.)
         </li>
 
         <li>
-          If you have join queries that do aggregation operations on large fact tables and join the results against
-          small dimension tables, consider using Impala for the fact tables and HBase for the dimension tables.
-          (Because Impala does a full scan on the HBase table in this case, rather than doing single-row HBase
-          lookups based on the join column, only use this technique where the HBase table is small enough that
-          doing a full table scan does not cause a performance bottleneck for the query.)
+          HBase may offer acceptable performance for storing small dimension tables where
+          the table is small enough that executing a full table scan for every query is
+          efficient enough. However, Kudu is almost always a superior alternative for
+          storing dimension tables. HDFS tables are also appropriate for dimension
+          tables that do not need to support update queries, delete queries or insert
+          queries with small numbers of rows.
         </li>
       </ul>
 
@@ -577,16 +581,10 @@ set hbase_caching=1000;
     <conbody>
 
       <p>
-        The following are popular use cases for using Impala to query HBase tables:
+        The following are representative use cases for using Impala to query HBase tables:
       </p>
 
       <ul>
-        <li>
-          Keeping large fact tables in Impala, and smaller dimension tables in HBase. The fact tables use Parquet
-          or other binary file format optimized for scan operations. Join queries scan through the large Impala
-          fact tables, and cross-reference the dimension tables using efficient single-row lookups in HBase.
-        </li>
-
         <li>
           Using HBase to store rapidly incrementing counters, such as how many times a web page has been viewed, or
           on a social network, how many connections a user has or how many votes a post received. HBase is
@@ -605,13 +603,6 @@ set hbase_caching=1000;
             visited a particular part of the site, and so on.) A typical query against this kind of table is to
             look up a single row to retrieve all the information about a specific subject, rather than summing,
             averaging, or filtering millions of rows as in typical Impala-managed tables.
-          </p>
-          <p>
-            Or the HBase table could be joined with a larger Impala-managed table. For example, analyze the large
-            Impala table representing web traffic for a site and pick out 50 users who view the most pages. Join
-            that result with the wide user table in HBase to look up attributes of those users. The HBase side of
-            the join would result in 50 efficient single-row lookups in HBase, rather than scanning the entire user
-            table.
           </p>
         </li>
       </ul>
