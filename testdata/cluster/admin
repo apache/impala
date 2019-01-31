@@ -335,9 +335,11 @@ function start_cluster {
         NTP_CANARY=pool.ntp.org
         if ! ping -c 1 -w 5 "${NTP_CANARY}" >/dev/null 2>/dev/null; then
           echo "WARNING: cannot reach ${NTP_CANARY}; ntp sync recommended for Kudu"
-        elif ! ntp-wait --help >/dev/null 2>/dev/null; then
+        # ntp-wait is in /usr/sbin on both CentOS and Debian-based systems, but regular
+        # users don't always have /usr/sbin in $PATH. Use the absolute path.
+        elif ! /usr/sbin/ntp-wait --help >/dev/null 2>/dev/null; then
           echo "WARNING: ntp-wait not installed; ntp sync recommended for Kudu"
-        elif ! ntp-wait -v; then
+        elif ! /usr/sbin/ntp-wait -v; then
           echo "ntp-wait failed; cannot start kudu"
           return 1
         fi
