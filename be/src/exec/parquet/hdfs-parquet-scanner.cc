@@ -400,7 +400,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     assemble_rows_timer_.Stop();
     RETURN_IF_ERROR(status);
     row_group_rows_read_ += max_tuples;
-    COUNTER_ADD(scan_node_->rows_read_counter(), row_group_rows_read_);
+    COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
     return Status::OK();
   }
 

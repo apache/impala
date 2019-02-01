@@ -128,3 +128,114 @@ select count(*) from alltypessmall
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-5861: RowsRead counter should be accurate for table scan that materializes
+# zero slots from this files. This test is run with various batch_size values,
+# which helps reproduce the Parquet bug.
+select 1 from alltypessmall
+---- TYPES
+tinyint
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
