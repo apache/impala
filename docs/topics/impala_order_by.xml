@@ -32,21 +32,22 @@ under the License.
 
   <conbody>
 
-    <p>
-      The familiar <codeph>ORDER BY</codeph> clause of a <codeph>SELECT</codeph> statement sorts the result set
-      based on the values from one or more columns.
-    </p>
+    <p> The <codeph>ORDER BY</codeph> clause of a <codeph>SELECT</codeph>
+      statement sorts the result set based on the values from one or more
+      columns. </p>
 
-    <p>
-      For distributed queries, this is a relatively expensive operation, because the entire result set must be
-      produced and transferred to one node before the sorting can happen. This can require more memory capacity
-      than a query without <codeph>ORDER BY</codeph>. Even if the query takes approximately the same time to finish
-      with or without the <codeph>ORDER BY</codeph> clause, subjectively it can appear slower because no results
-      are available until all processing is finished, rather than results coming back gradually as rows matching
-      the <codeph>WHERE</codeph> clause are found. Therefore, if you only need the first N results from the sorted
-      result set, also include the <codeph>LIMIT</codeph> clause, which reduces network overhead and the memory
-      requirement on the coordinator node.
-    </p>
+    <p> First, data is sorted locally by each <codeph>impalad</codeph> daemon,
+      then streamed to the coordinator daemon, which merges the sorted result
+      sets. For distributed queries, this is a relatively expensive operation
+      and can require more memory capacity than a query without <codeph>ORDER
+        BY</codeph>. Even if the query takes approximately the same time to
+      finish with or without the <codeph>ORDER BY</codeph> clause, subjectively
+      it can appear slower because no results are available until all processing
+      is finished, rather than results coming back gradually as rows matching
+      the <codeph>WHERE</codeph> clause are found. Therefore, if you only need
+      the first N results from the sorted result set, also include the
+        <codeph>LIMIT</codeph> clause, which reduces network overhead and the
+      memory requirement on the coordinator node. </p>
 
     <note>
       <p rev="1.4.0 obwl">
