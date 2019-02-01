@@ -141,7 +141,6 @@ public class AuthorizationTest extends FrontendTestBase {
     testCtxs_ = new ArrayList<>();
     // Create and init file based auth config.
     AuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
-    filePolicyAuthzConfig.validateConfig();
     ImpaladTestCatalog filePolicyCatalog = new ImpaladTestCatalog(filePolicyAuthzConfig);
     testCtxs_.add(new TestContext(filePolicyAuthzConfig, filePolicyCatalog));
 
@@ -180,7 +179,6 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthorizationConfig result =
         AuthorizationConfig.createHadoopGroupAuthConfig("server1", AUTHZ_POLICY_FILE,
         System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    result.validateConfig();
     return result;
   }
 
@@ -841,7 +839,7 @@ public class AuthorizationTest extends FrontendTestBase {
     //     </value>
     //   </property>
     AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
-        AUTHZ_POLICY_FILE, "",
+        AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
         LocalGroupResourceAuthorizationProvider.class.getName());
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
       // This test relies on the auth_to_local rule -
@@ -903,7 +901,8 @@ public class AuthorizationTest extends FrontendTestBase {
     if (ctx_.authzConfig.isFileBasedPolicy()) {
       // Authorization config that has a different server name from policy file.
       TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig(
-          "differentServerName", AUTHZ_POLICY_FILE, ""),
+          "differentServerName", AUTHZ_POLICY_FILE,
+          ctx_.authzConfig.getSentryConfig().getConfigFile()),
           new User(System.getProperty("user.name")));
     } // TODO: Test using policy server.
   }
@@ -917,7 +916,8 @@ public class AuthorizationTest extends FrontendTestBase {
     // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
     // resolved in the absence of the policy file.
     TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig("server1",
-        AUTHZ_POLICY_FILE + "_does_not_exist", ""),
+        AUTHZ_POLICY_FILE + "_does_not_exist",
+        ctx_.authzConfig.getSentryConfig().getConfigFile()),
         new User(System.getProperty("user.name")));
   }
 
@@ -927,87 +927,83 @@ public class AuthorizationTest extends FrontendTestBase {
     // Valid configs pass validation.
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
         "server1", AUTHZ_POLICY_FILE, sentryConfig);
-    config.validateConfig();
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(config.isFileBasedPolicy());
 
     config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
         sentryConfig);
-    config.validateConfig();
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(!config.isFileBasedPolicy());
 
     // Invalid configs
     // No sentry configuration file.
-    config = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", AUTHZ_POLICY_FILE, null);
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
+      config = AuthorizationConfig.createHadoopGroupAuthConfig(
+          "server1", AUTHZ_POLICY_FILE, null);
+      Assert.assertTrue(config.isEnabled());
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "A valid path to a sentry-site.xml config " +
-          "file must be set using --sentry_config to enable authorization.");
+      Assert.assertEquals("A valid path to a sentry-site.xml config " +
+          "file must be set using --sentry_config to enable authorization.",
+          e.getMessage());
     }
 
     // Empty / null server name.
-    config = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "", AUTHZ_POLICY_FILE, sentryConfig);
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
+      config = AuthorizationConfig.createHadoopGroupAuthConfig(
+          "", AUTHZ_POLICY_FILE, sentryConfig);
+      Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
-      Assert.assertEquals(e.getMessage(),
+      Assert.assertEquals(
           "Authorization is enabled but the server name is null or empty. Set the " +
-          "server name using the impalad --server_name flag.");
+          "server name using the impalad --server_name flag.",
+          e.getMessage());
     }
-    config = AuthorizationConfig.createHadoopGroupAuthConfig(null, AUTHZ_POLICY_FILE,
-        sentryConfig);
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
+      config = AuthorizationConfig.createHadoopGroupAuthConfig(null, AUTHZ_POLICY_FILE,
+          sentryConfig);
+      Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
-      Assert.assertEquals(e.getMessage(),
+      Assert.assertEquals(
           "Authorization is enabled but the server name is null or empty. Set the " +
-          "server name using the impalad --server_name flag.");
+          "server name using the impalad --server_name flag.",
+          e.getMessage());
     }
 
     // Sentry config file does not exist.
-    config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
-        "/path/does/not/exist.xml");
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
+      config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
+          "/path/does/not/exist.xml");
+      Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Sentry configuration file does not exist: \"/path/does/not/exist.xml\"");
+      Assert.assertEquals(
+          "Sentry configuration file does not exist: \"/path/does/not/exist.xml\"",
+          e.getMessage());
     }
 
     // Invalid ResourcePolicyProvider class name.
-    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, "",
-        "ClassDoesNotExist");
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
-      fail("Expected configuration to fail.");
+      config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+          "ClassDoesNotExist");
+      Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
-      Assert.assertEquals(e.getMessage(),
-          "The authorization policy provider class 'ClassDoesNotExist' was not found.");
+      Assert.assertEquals(
+          "The authorization policy provider class 'ClassDoesNotExist' was not found.",
+          e.getMessage());
     }
 
     // Valid class name, but class is not derived from ResourcePolicyProvider
-    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, "",
-        this.getClass().getName());
-    Assert.assertTrue(config.isEnabled());
     try {
-      config.validateConfig();
-      fail("Expected configuration to fail.");
+      config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+          this.getClass().getName());
+      Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
-      Assert.assertEquals(e.getMessage(), String.format("The authorization policy " +
+      Assert.assertEquals(String.format("The authorization policy " +
           "provider class '%s' must be a subclass of '%s'.", this.getClass().getName(),
-          ResourceAuthorizationProvider.class.getName()));
+          ResourceAuthorizationProvider.class.getName()),
+          e.getMessage());
     }
 
     // Config validations skipped if authorization disabled
@@ -1027,7 +1023,7 @@ public class AuthorizationTest extends FrontendTestBase {
     // Use an authorization configuration that uses the
     // LocalGroupResourceAuthorizationProvider.
     AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
-        AUTHZ_POLICY_FILE, "",
+        AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
         LocalGroupResourceAuthorizationProvider.class.getName());
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
       // Create an analysis context + FE with the test user

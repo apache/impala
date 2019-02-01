@@ -61,7 +61,6 @@ public class SentryProxyTest {
     authzConfig_ = AuthorizationConfig.createHadoopGroupAuthConfig(
         SENTRY_SERVER, null, System.getenv("IMPALA_HOME") +
             "/fe/src/test/resources/sentry-site.xml");
-    authzConfig_.validateConfig();
     sentryService_ = new SentryPolicyService(authzConfig_.getSentryConfig());
   }
 

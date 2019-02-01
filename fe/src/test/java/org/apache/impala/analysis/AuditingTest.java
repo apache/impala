@@ -364,12 +364,12 @@ public class AuditingTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestAccessEventsOnAuthFailure() throws AuthorizationException,
-      ImpalaException {
+  public void TestAccessEventsOnAuthFailure() throws ImpalaException {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", "/does/not/exist", "");
+        "server1", "/does/not/exist", System.getenv("IMPALA_HOME") +
+        "/fe/src/test/resources/sentry-site.xml");
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
       Frontend fe = new Frontend(config, catalog);
       AnalysisContext analysisCtx = createAnalysisCtx(config);

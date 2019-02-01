@@ -451,7 +451,6 @@ public class FrontendTestBase {
     AuthorizationConfig authzConfig = AuthorizationConfig.createHadoopGroupAuthConfig(
         "server1", null, System.getenv("IMPALA_HOME") +
             "/fe/src/test/resources/sentry-site.xml");
-    authzConfig.validateConfig();
     return authzConfig;
   }
 }

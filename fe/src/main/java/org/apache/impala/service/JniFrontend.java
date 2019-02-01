@@ -142,7 +142,6 @@ public class JniFrontend {
     AuthorizationConfig authConfig = new AuthorizationConfig(cfg.server_name,
         cfg.authorization_policy_file, cfg.sentry_config,
         cfg.authorization_policy_provider_class);
-    authConfig.validateConfig();
     if (authConfig.isEnabled()) {
       LOG.info(String.format("Authorization is 'ENABLED' using %s",
           authConfig.isFileBasedPolicy() ? " file based policy from: " +

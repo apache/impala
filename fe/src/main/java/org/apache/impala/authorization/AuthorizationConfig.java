@@ -51,6 +51,7 @@ public class AuthorizationConfig {
       policyProviderClassName = policyProviderClassName.trim();
     }
     policyProviderClassName_ = policyProviderClassName;
+    validateConfig();
   }
 
   /**
@@ -74,7 +75,7 @@ public class AuthorizationConfig {
    * Validates the authorization configuration and throws an AuthorizationException
    * if any problems are found. If authorization is disabled, config checks are skipped.
    */
-  public void validateConfig() throws IllegalArgumentException {
+  private void validateConfig() throws IllegalArgumentException {
     // If authorization is not enabled, config checks are skipped.
     if (!isEnabled()) return;
 
