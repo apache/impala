@@ -153,7 +153,10 @@ inline bool BatchedBitReader::GetUleb128Int(uint32_t* v) {
   do {
     if (UNLIKELY(shift >= MAX_VLQ_BYTE_LEN * 7)) return false;
     if (!GetBytes(1, &byte)) return false;
-    *v |= (byte & 0x7F) << shift;
+    // The constant below must be explicitly unsigned to ensure that the result of the
+    // bitwise-and is unsigned, so that the left shift is always defined behavior under
+    // the C++ standard.
+    *v |= (byte & 0x7Fu) << shift;
     shift += 7;
   } while ((byte & 0x80) != 0);
   return true;
