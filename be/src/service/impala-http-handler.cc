@@ -32,10 +32,10 @@
 #include "runtime/query-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
+#include "scheduling/admission-controller.h"
 #include "service/impala-server.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
-#include "scheduling/admission-controller.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/logging-support.h"
@@ -845,11 +845,15 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
 
 void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
+  std::unordered_map<string, pair<int64_t, int64_t>> host_mem_map;
+  ExecEnv::GetInstance()->admission_controller()->PopulatePerHostMemReservedAndAdmitted(
+      &host_mem_map);
   Value backends_list(kArrayType);
   for (const auto& entry : server_->GetKnownBackends()) {
     TBackendDescriptor backend = entry.second;
     Value backend_obj(kObjectType);
-    Value str(TNetworkAddressToString(backend.address).c_str(), document->GetAllocator());
+    string address = TNetworkAddressToString(backend.address);
+    Value str(address.c_str(), document->GetAllocator());
     backend_obj.AddMember("address", str, document->GetAllocator());
     backend_obj.AddMember("is_coordinator", backend.is_coordinator,
         document->GetAllocator());
@@ -858,6 +862,14 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
     Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit).c_str(),
         document->GetAllocator());
     backend_obj.AddMember("admit_mem_limit", admit_mem_limit, document->GetAllocator());
+    // If the host address does not exist in the 'host_mem_map', this would ensure that a
+    // value of zero is used for those addresses.
+    Value mem_reserved(PrettyPrinter::PrintBytes(host_mem_map[address].first).c_str(),
+        document->GetAllocator());
+    backend_obj.AddMember("mem_reserved", mem_reserved, document->GetAllocator());
+    Value mem_admitted(PrettyPrinter::PrintBytes(host_mem_map[address].second).c_str(),
+        document->GetAllocator());
+    backend_obj.AddMember("mem_admitted", mem_admitted, document->GetAllocator());
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());

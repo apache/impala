@@ -198,8 +198,12 @@ function reset_method(pool_name) {
   <a href='/admission'> < Show all Resource Pools</a>
 </p>
 {{/get_all_pools}}
-<p class="lead">This page lists all resource pools to which queries have been submitted
-  at least once and their corresponding state and statistics.</p>
+<p class="lead">
+  This page lists all resource pools to which queries have been submitted
+  at least once and their corresponding state and statistics.<br>See the
+  <a href='/backends'>backends</a> debug page for memory admitted and reserved per
+  backend.
+</p>
 {{#resource_pools}}
 <div class="container-fluid">
   <h3><a href='/admission?pool_name={{pool_name}}'>{{pool_name}}</a></h3>

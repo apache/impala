@@ -28,6 +28,8 @@ under the License.
       <th>Executor</th>
       <th>Quiescing</th>
       <th>Memory Limit for Admission</th>
+      <th>Memory Reserved</th>
+      <th>Memory Admitted by Queries Submitted to this Coordinator</th>
     </tr>
   </thead>
   <tbody>
@@ -38,6 +40,8 @@ under the License.
       <td>{{is_executor}}</td>
       <td>{{is_quiescing}}</td>
       <td>{{admit_mem_limit}}</td>
+      <td>{{mem_reserved}}</td>
+      <td>{{mem_admitted}}</td>
     </tr>
     {{/backends}}
   </tbody>

@@ -271,6 +271,12 @@ class AdmissionController {
   /// Calls ResetInformationalStats on all pools.
   void ResetAllPoolInformationalStats();
 
+  // Populates the input map with the per host memory reserved and admitted in the
+  // following format: <host_address_str, pair<mem_reserved, mem_admitted>>.
+  // Only used for populating the 'backends' debug page.
+  void PopulatePerHostMemReservedAndAdmitted(
+      std::unordered_map<std::string, std::pair<int64_t, int64_t>>* mem_map);
+
  private:
   class PoolStats;
   friend class PoolStats;

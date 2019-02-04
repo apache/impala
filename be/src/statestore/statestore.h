@@ -142,11 +142,15 @@ class Statestore : public CacheLineAligned {
   /// Registers a new subscriber with the given unique subscriber ID, running a subscriber
   /// service at the given location, with the provided list of topic subscriptions.
   /// The registration_id output parameter is the unique ID for this registration, used to
-  /// distinguish old registrations from new ones for the same subscriber.
-  //
-  /// If a registration already exists for this subscriber, the old registration is removed
+  /// distinguish old registrations from new ones for the same subscriber. On successful
+  /// registration, the subscriber is added to the update queue, with an immediate
+  /// schedule.
+  ///
+  /// If a registration already exists for this subscriber, the old registration is
+  /// removed
   /// and a new one is created. Subscribers may receive an update intended for the old
-  /// registration, since one may be in flight when a new RegisterSubscriber() is received.
+  /// registration, since one may be in flight when a new RegisterSubscriber() is
+  /// received.
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
       const std::vector<TTopicRegistration>& topic_registrations,

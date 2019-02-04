@@ -478,7 +478,8 @@ int ImpalaServer::GetHS2Port() {
   return hs2_server_->port();
 }
 
-const ImpalaServer::BackendDescriptorMap& ImpalaServer::GetKnownBackends() {
+const ImpalaServer::BackendDescriptorMap ImpalaServer::GetKnownBackends() {
+  lock_guard<mutex> l(known_backends_lock_);
   return known_backends_;
 }
 
@@ -1710,15 +1711,20 @@ void ImpalaServer::MembershipCallback(
   // statestore heartbeat less frequently.
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(Statestore::IMPALA_MEMBERSHIP_TOPIC);
+  if (topic == incoming_topic_deltas.end()) return;
 
-  if (topic != incoming_topic_deltas.end()) {
-    const TTopicDelta& delta = topic->second;
+  const TTopicDelta& delta = topic->second;
+  // Create a set of known backend network addresses. Used to test for cluster
+  // membership by network address.
+  set<TNetworkAddress> current_membership;
+  {
+    lock_guard<mutex> l(known_backends_lock_);
     // If this is not a delta, the update should include all entries in the topic so
     // clear the saved mapping of known backends.
     if (!delta.is_delta) known_backends_.clear();
 
     // Process membership additions/deletions.
-    for (const TTopicItem& item: delta.topic_entries) {
+    for (const TTopicItem& item : delta.topic_entries) {
       if (item.deleted) {
         auto entry = known_backends_.find(item.key);
         // Remove stale connections to removed members.
@@ -1730,8 +1736,9 @@ void ImpalaServer::MembershipCallback(
       }
       uint32_t len = item.value.size();
       TBackendDescriptor backend_descriptor;
-      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &backend_descriptor);
+      Status status =
+          DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(item.value.data()),
+              &len, false, &backend_descriptor);
       if (!status.ok()) {
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
@@ -1745,18 +1752,15 @@ void ImpalaServer::MembershipCallback(
       }
     }
 
-    // Register the local backend in the statestore and update the list of known backends.
-    // Only register if all ports have been opened and are ready.
+    // Register the local backend in the statestore and update the list of known
+    // backends. Only register if all ports have been opened and are ready.
     if (services_started_.load()) AddLocalBackendToStatestore(subscriber_topic_updates);
 
-    // Create a set of known backend network addresses. Used to test for cluster
-    // membership by network address.
-    set<TNetworkAddress> current_membership;
     // Also reflect changes to the frontend. Initialized only if any_changes is true.
     // Only send the hostname and ip_address of the executors to the frontend.
     TUpdateExecutorMembershipRequest update_req;
     bool any_changes = !delta.topic_entries.empty() || !delta.is_delta;
-    for (const BackendDescriptorMap::value_type& backend: known_backends_) {
+    for (const BackendDescriptorMap::value_type& backend : known_backends_) {
       current_membership.insert(backend.second.address);
       if (any_changes && backend.second.is_executor) {
         update_req.hostnames.insert(backend.second.address.hostname);
@@ -1771,60 +1775,65 @@ void ImpalaServer::MembershipCallback(
                      << status.GetDetail();
       }
     }
+  }
 
-    // Maps from query id (to be cancelled) to a list of failed Impalads that are
-    // the cause of the cancellation.
-    map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
-    {
-      // Build a list of queries that are running on failed hosts (as evidenced by their
-      // absence from the membership list).
-      // TODO: crash-restart failures can give false negatives for failed Impala demons.
-      lock_guard<mutex> l(query_locations_lock_);
-      QueryLocations::const_iterator loc_entry = query_locations_.begin();
-      while (loc_entry != query_locations_.end()) {
-        if (current_membership.find(loc_entry->first) == current_membership.end()) {
-          unordered_set<TUniqueId>::const_iterator query_id = loc_entry->second.begin();
-          // Add failed backend locations to all queries that ran on that backend.
-          for(; query_id != loc_entry->second.end(); ++query_id) {
-            vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
-            failed_hosts.push_back(loc_entry->first);
-          }
-          // We can remove the location wholesale once we know backend's failed. To do so
-          // safely during iteration, we have to be careful not in invalidate the current
-          // iterator, so copy the iterator to do the erase(..) and advance the original.
-          QueryLocations::const_iterator failed_backend = loc_entry;
-          ++loc_entry;
-          query_locations_.erase(failed_backend);
-        } else {
-          ++loc_entry;
+  CancelQueriesOnFailedBackends(current_membership);
+}
+
+void ImpalaServer::CancelQueriesOnFailedBackends(
+    const set<TNetworkAddress>& current_membership) {
+  // Maps from query id (to be cancelled) to a list of failed Impalads that are
+  // the cause of the cancellation.
+  map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
+  {
+    // Build a list of queries that are running on failed hosts (as evidenced by their
+    // absence from the membership list).
+    // TODO: crash-restart failures can give false negatives for failed Impala demons.
+    lock_guard<mutex> l(query_locations_lock_);
+    QueryLocations::const_iterator loc_entry = query_locations_.begin();
+    while (loc_entry != query_locations_.end()) {
+      if (current_membership.find(loc_entry->first) == current_membership.end()) {
+        unordered_set<TUniqueId>::const_iterator query_id = loc_entry->second.begin();
+        // Add failed backend locations to all queries that ran on that backend.
+        for(; query_id != loc_entry->second.end(); ++query_id) {
+          vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
+          failed_hosts.push_back(loc_entry->first);
         }
+        // We can remove the location wholesale once we know backend's failed. To do so
+        // safely during iteration, we have to be careful not in invalidate the current
+        // iterator, so copy the iterator to do the erase(..) and advance the original.
+        QueryLocations::const_iterator failed_backend = loc_entry;
+        ++loc_entry;
+        query_locations_.erase(failed_backend);
+      } else {
+        ++loc_entry;
       }
     }
+  }
 
-    if (cancellation_thread_pool_->GetQueueSize() + queries_to_cancel.size() >
-        MAX_CANCELLATION_QUEUE_SIZE) {
-      // Ignore the cancellations - we'll be able to process them on the next heartbeat
-      // instead.
-      LOG_EVERY_N(WARNING, 60) << "Cancellation queue is full";
-    } else {
-      // Since we are the only producer for this pool, we know that this cannot block
-      // indefinitely since the queue is large enough to accept all new cancellation
-      // requests.
-      map<TUniqueId, vector<TNetworkAddress>>::iterator cancellation_entry;
-      for (cancellation_entry = queries_to_cancel.begin();
-          cancellation_entry != queries_to_cancel.end();
-          ++cancellation_entry) {
-        stringstream backends_ss;
-        for (int i = 0; i < cancellation_entry->second.size(); ++i) {
-          backends_ss << TNetworkAddressToString(cancellation_entry->second[i]);
-          if (i + 1 != cancellation_entry->second.size()) backends_ss << ", ";
-        }
-        VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry->first)
-                   << ", adding to queue to check for cancellation: "
-                   << backends_ss.str();
-        cancellation_thread_pool_->Offer(CancellationWork::BackendFailure(
-            cancellation_entry->first, cancellation_entry->second));
+  if (cancellation_thread_pool_->GetQueueSize() + queries_to_cancel.size() >
+      MAX_CANCELLATION_QUEUE_SIZE) {
+    // Ignore the cancellations - we'll be able to process them on the next heartbeat
+    // instead.
+    LOG_EVERY_N(WARNING, 60) << "Cancellation queue is full";
+  } else {
+    // Since we are the only producer for this pool, we know that this cannot block
+    // indefinitely since the queue is large enough to accept all new cancellation
+    // requests.
+    map<TUniqueId, vector<TNetworkAddress>>::iterator cancellation_entry;
+    for (cancellation_entry = queries_to_cancel.begin();
+        cancellation_entry != queries_to_cancel.end();
+        ++cancellation_entry) {
+      stringstream backends_ss;
+      for (int i = 0; i < cancellation_entry->second.size(); ++i) {
+        backends_ss << TNetworkAddressToString(cancellation_entry->second[i]);
+        if (i + 1 != cancellation_entry->second.size()) backends_ss << ", ";
       }
+      VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry->first)
+                 << ", adding to queue to check for cancellation: "
+                 << backends_ss.str();
+      cancellation_thread_pool_->Offer(CancellationWork::BackendFailure(
+          cancellation_entry->first, cancellation_entry->second));
     }
   }
 }

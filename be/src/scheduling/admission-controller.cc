@@ -1261,4 +1261,12 @@ void AdmissionController::PoolStats::InitMetrics() {
   metrics_.clamp_mem_limit_query_option = parent_->metrics_group_->AddProperty<bool>(
       POOL_CLAMP_MEM_LIMIT_QUERY_OPTION_METRIC_KEY_FORMAT, false, name_);
 }
+
+void AdmissionController::PopulatePerHostMemReservedAndAdmitted(
+    std::unordered_map<string, pair<int64_t, int64_t>>* mem_map) {
+  lock_guard<mutex> l(admission_ctrl_lock_);
+  for (const auto& elem: host_mem_reserved_) {
+    (*mem_map)[elem.first] = make_pair(elem.second, host_mem_admitted_[elem.first]);
+  }
+}
 }

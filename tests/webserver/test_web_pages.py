@@ -44,6 +44,7 @@ class TestWebPage(ImpalaTestSuite):
   JMX_URL = "http://localhost:{0}/jmx"
   ADMISSION_URL = "http://localhost:{0}/admission"
   RESET_RESOURCE_POOL_STATS_URL = "http://localhost:{0}/resource_pool_reset"
+  BACKENDS_URL = "http://localhost:{0}/backends"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -457,3 +458,14 @@ class TestWebPage(ImpalaTestSuite):
     assert 'resource_pools' in response_json
     assert len(response_json['resource_pools']) == 1
     return response_json['resource_pools']
+
+  @SkipIfBuildType.remote
+  def test_backends_page(self):
+    """Sanity check for the backends debug page's http end point"""
+    responses = self.get_and_check_status(self.BACKENDS_URL + '?json',
+                                          ports_to_test=[25000])
+    assert len(responses) == 1
+    response_json = json.loads(responses[0].text)
+    assert 'backends' in response_json
+    # When this test runs, all impalads would have already started.
+    assert len(response_json['backends']) == 3

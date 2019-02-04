@@ -156,6 +156,7 @@ class QuerySchedule;
 /// * uuid_lock_
 /// * catalog_version_lock_
 /// * connection_to_sessions_map_lock_
+/// * known_backends_lock_
 ///
 /// TODO: The same doesn't apply to the execution state of an individual plan
 /// fragment: the originating coordinator might die, but we can get notified of
@@ -401,7 +402,7 @@ class ImpalaServer : public ImpalaServiceIf,
   int GetHS2Port();
 
   typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
-  const BackendDescriptorMap& GetKnownBackends();
+  const BackendDescriptorMap GetKnownBackends();
 
   /// Start the shutdown process. Return an error if it could not be started. Otherwise,
   /// if it was successfully started by this or a previous call, return OK along with
@@ -709,9 +710,14 @@ class ImpalaServer : public ImpalaServiceIf,
   Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user)
       WARN_UNUSED_RESULT;
 
-  // Check if the local backend descriptor is in the list of known backends. If not, add
-  // it to the list of known backends and add it to the 'topic_updates'.
+  /// Check if the local backend descriptor is in the list of known backends. If not, add
+  /// it to the list of known backends and add it to the 'topic_updates'.
+  /// 'known_backends_lock_' must be held by the caller.
   void AddLocalBackendToStatestore(std::vector<TTopicDelta>* topic_updates);
+
+  /// Takes a set of network addresses of active backends and cancels all the queries
+  /// running on failed ones (that is, addresses not in the active set).
+  void CancelQueriesOnFailedBackends(const std::set<TNetworkAddress>& current_membership);
 
   /// Snapshot of a query's state, archived in the query log.
   struct QueryStateRecord {
@@ -1077,6 +1083,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// component (the scheduler?) that tracks this information and calls other interested
   /// components.
   BackendDescriptorMap known_backends_;
+
+  /// Lock to protect 'known_backends_'. Not held in conjunction with other locks.
+  boost::mutex known_backends_lock_;
 
   /// Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;
