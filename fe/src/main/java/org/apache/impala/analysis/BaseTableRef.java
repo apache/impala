@@ -79,7 +79,7 @@ public class BaseTableRef extends TableRef {
     if (alias != null) aliasSql = " " + ToSqlUtils.getIdentSql(alias);
     String tableSampleSql = "";
     if (sampleParams_ != null) tableSampleSql = " " + sampleParams_.toSql(options);
-    String tableHintsSql = ToSqlUtils.getPlanHintsSql(tableHints_);
+    String tableHintsSql = ToSqlUtils.getPlanHintsSql(options, tableHints_);
     return getTable().getTableName().toSql() + aliasSql + tableSampleSql + tableHintsSql;
   }
 

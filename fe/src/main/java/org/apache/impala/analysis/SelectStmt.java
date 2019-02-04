@@ -1051,7 +1051,8 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append("DISTINCT ");
     }
     if (selectList_.hasPlanHints()) {
-      strBuilder.append(ToSqlUtils.getPlanHintsSql(selectList_.getPlanHints()) + " ");
+      strBuilder.append(ToSqlUtils.getPlanHintsSql(options, selectList_.getPlanHints()))
+          .append(" ");
     }
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       strBuilder.append(selectList_.getItems().get(i).toSql(options));

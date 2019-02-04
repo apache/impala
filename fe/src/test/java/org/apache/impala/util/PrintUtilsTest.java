@@ -97,17 +97,6 @@ public class PrintUtilsTest {
             + " AS DOUBLE) < CAST(10 AS DOUBLE)",
         "Analyzed query: SELECT * FROM functional_kudu.alltypestiny\n"
             + "WHERE CAST(bigint_col AS DOUBLE) < CAST(10 AS DOUBLE)");
-    // Simple query with a hint retains newlines surrounding hint.
-    assertWrap("SELECT\n"
-            + "-- +straight_join\n"
-            + " * FROM tpch_parquet.orders INNER JOIN\n"
-            + "-- +shuffle\n"
-            + " tpch_parquet.customer ON o_custkey = c_custkey",
-        "SELECT\n"
-            + "-- +straight_join\n"
-            + "* FROM tpch_parquet.orders INNER JOIN\n"
-            + "-- +shuffle\n"
-            + "tpch_parquet.customer ON o_custkey = c_custkey");
     // test that a long string of blanks prints OK, some may be lost for clarity
     assertWrap("insert into foo values ('                                      "
             + "                                                                          "

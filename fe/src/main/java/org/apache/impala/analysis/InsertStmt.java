@@ -928,7 +928,7 @@ public class InsertStmt extends StatementBase {
 
     strBuilder.append(getOpName());
     if (!planHints_.isEmpty() && hintLoc_ == HintLocation.Start) {
-      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
+      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(options, getPlanHints()));
     }
     if (overwrite_) {
       strBuilder.append(" OVERWRITE");
@@ -955,7 +955,7 @@ public class InsertStmt extends StatementBase {
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");
     }
     if (!planHints_.isEmpty() && hintLoc_ == HintLocation.End) {
-      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
+      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(options, getPlanHints()));
     }
     if (!needsGeneratedQueryStatement_) {
       strBuilder.append(" " + queryStmt_.toSql(options));

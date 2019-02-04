@@ -82,6 +82,11 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql(query, System.getProperty("user.name"), expected);
   }
 
+  private void testToSql(String query, String expected, ToSqlOptions options) {
+    String defaultDb = System.getProperty("user.name");
+    testToSql(createAnalysisCtx(defaultDb), query, defaultDb, expected, false, options);
+  }
+
   private void testToSql(AnalysisContext ctx, String query, String expected) {
     testToSql(ctx, query, System.getProperty("user.name"), expected);
   }
@@ -92,23 +97,24 @@ public class ToSqlTest extends FrontendTestBase {
 
   private void testToSql(AnalysisContext ctx, String query, String defaultDb,
       String expected) {
-    testToSql(ctx, query, defaultDb, expected, false);
+    testToSql(ctx, query, defaultDb, expected, false, ToSqlOptions.DEFAULT);
   }
 
   private void testToSql(String query, String defaultDb, String expected,
       boolean ignoreWhitespace) {
-    testToSql(createAnalysisCtx(defaultDb), query, defaultDb, expected, ignoreWhitespace);
+    testToSql(createAnalysisCtx(defaultDb), query, defaultDb, expected, ignoreWhitespace,
+        ToSqlOptions.DEFAULT);
   }
 
   private void testToSql(AnalysisContext ctx, String query, String defaultDb,
-      String expected, boolean ignoreWhitespace) {
+      String expected, boolean ignoreWhitespace, ToSqlOptions options) {
     String actual = null;
     try {
       ParseNode node = AnalyzesOk(query, ctx);
-      if (node instanceof QueryStmt) {
+      if (node instanceof QueryStmt && !options.showRewritten()) {
         actual = ((QueryStmt)node).getOrigSqlString();
       } else {
-        actual = node.toSql();
+        actual = node.toSql(options);
       }
       if (ignoreWhitespace) {
         // Transform whitespace to single space.
@@ -686,6 +692,23 @@ public class ToSqlTest extends FrontendTestBase {
           String.format("select distinct %sstraight_join%s * from functional.alltypes",
           prefix, suffix),
           "SELECT DISTINCT \n-- +straight_join\n * FROM functional.alltypes");
+
+      // Tests for analyzed/rewritten sql.
+      // First test the test by passing ToSqlOptions.DEFAULT which should result in the
+      // hints appearing with '--' style comments.
+      testToSql(
+          String.format("select distinct %sstraight_join%s * from functional.alltypes",
+              prefix, suffix),
+          "SELECT DISTINCT \n-- +straight_join\n * FROM functional.alltypes",
+          ToSqlOptions.DEFAULT);
+      // Test that analyzed queries use the '/*' style comments.
+      testToSql(
+          String.format("select distinct %sstraight_join%s * from functional.alltypes "
+                  + "where bool_col = false and id <= 5 and id >= 2",
+              prefix, suffix),
+          "SELECT DISTINCT /* +straight_join */ * FROM functional.alltypes "
+              + "WHERE bool_col = FALSE AND id <= 5 AND id >= 2",
+          ToSqlOptions.REWRITTEN);
     }
   }
 

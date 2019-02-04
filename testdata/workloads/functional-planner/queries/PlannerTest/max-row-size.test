@@ -6,10 +6,8 @@ from tpch_parquet.customer
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=33.97MB Threads=5
 Per-Host Resource Estimates: Memory=68MB
-Analyzed query: SELECT
--- +straight_join
-* FROM tpch_parquet.customer INNER JOIN tpch_parquet.nation ON c_nationkey =
-n_nationkey
+Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.customer INNER
+JOIN tpch_parquet.nation ON c_nationkey = n_nationkey
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.33MB mem-reservation=0B thread-reservation=1
@@ -67,10 +65,8 @@ from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=110.00MB Threads=5
 Per-Host Resource Estimates: Memory=410MB
-Analyzed query: SELECT
--- +straight_join
-* FROM tpch_parquet.lineitem LEFT OUTER JOIN tpch_parquet.orders ON l_orderkey =
-o_orderkey
+Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.lineitem LEFT
+OUTER JOIN tpch_parquet.orders ON l_orderkey = o_orderkey
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=11.20MB mem-reservation=0B thread-reservation=1
@@ -184,11 +180,10 @@ having count(*) = 1
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=110.00MB Threads=7
 Per-Host Resource Estimates: Memory=272MB
-Analyzed query: SELECT
--- +straight_join
-l_orderkey, o_orderstatus, count(*) FROM tpch_parquet.lineitem INNER JOIN
-tpch_parquet.orders ON o_orderkey = l_orderkey GROUP BY l_orderkey,
-o_orderstatus HAVING count(*) = CAST(1 AS BIGINT)
+Analyzed query: SELECT /* +straight_join */ l_orderkey, o_orderstatus, count(*)
+FROM tpch_parquet.lineitem INNER JOIN tpch_parquet.orders ON o_orderkey =
+l_orderkey GROUP BY l_orderkey, o_orderstatus HAVING count(*) = CAST(1 AS
+BIGINT)
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.10MB mem-reservation=0B thread-reservation=1

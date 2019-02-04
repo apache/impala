@@ -175,16 +175,9 @@ public class PrintUtils {
    * Any newlines in the input are maintained.
    */
   public static String wrapString(String s, int wrapLength) {
-    StringBuilder ret = new StringBuilder(s.length());
-    String[] split = s.split("\n");
-    for (int i = 0; i < split.length; i++) {
-      String line = split[i];
-      String wrappedLine = WordUtils.wrap(line, wrapLength, null, true);
-      // we keep any existing newlines in text - these should be commented hints
-      wrappedLine = wrappedLine.replaceAll(" +$", "");
-      ret.append(wrappedLine);
-      if (i < split.length - 1) ret.append("\n");
-    }
-    return ret.toString();
+    String wrapped = WordUtils.wrap(s, wrapLength, null, true);
+    // Remove any trailing blanks from a line.
+    wrapped = wrapped.replaceAll(" +$", "");
+    return wrapped;
   }
 }

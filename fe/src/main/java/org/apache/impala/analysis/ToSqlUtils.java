@@ -533,13 +533,19 @@ public class ToSqlUtils {
    * commented plan hint style such that hinted views created by Impala are readable by
    * Hive (parsed as a comment by Hive).
    */
-  public static String getPlanHintsSql(List<PlanHint> hints) {
+  public static String getPlanHintsSql(ToSqlOptions options, List<PlanHint> hints) {
     Preconditions.checkNotNull(hints);
     if (hints.isEmpty()) return "";
     StringBuilder sb = new StringBuilder();
-    sb.append("\n-- +");
-    sb.append(Joiner.on(",").join(hints));
-    sb.append("\n");
+    if (options.showRewritten()) {
+      sb.append("/* +");
+      sb.append(Joiner.on(",").join(hints));
+      sb.append(" */");
+    } else {
+      sb.append("\n-- +");
+      sb.append(Joiner.on(",").join(hints));
+      sb.append("\n");
+    }
     return sb.toString();
   }
 }

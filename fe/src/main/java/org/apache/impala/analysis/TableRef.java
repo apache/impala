@@ -600,7 +600,8 @@ public class TableRef extends StmtNode {
     }
 
     StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
-    if(!joinHints_.isEmpty()) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
+    if (!joinHints_.isEmpty())
+      output.append(ToSqlUtils.getPlanHintsSql(options, joinHints_)).append(" ");
     output.append(tableRefToSql(options));
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
