@@ -135,6 +135,10 @@ under the License.
       </li>
 
       <li>
+        <xref href="#string_functions/levenshtein">LEVENSHTEIN, LE_DST</xref>
+      </li>
+
+      <li>
         <xref href="#string_functions/locate">LOCATE</xref>
       </li>
 
@@ -767,7 +771,58 @@ select instr('foo bar bletch', 'b', 1, null);
         </dd>
 
       </dlentry>
+    </dl>
 
+    <dl>
+      <dlentry id="levenshtein" rev="3.2">
+
+        <dt>
+          LEVENSHTEIN(STRING str1, STRING str2), <ph id="le_dst"
+            >LE_DST(STRING
+          str1, STRING str2)</ph>
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the Levenshtein distance between two input strings. The
+          Levenshtein distance between two strings is the minimum number of single-character
+          edits required to transform one string to other. The function indicates how different
+          the input strings are.
+          <p>
+            <b>Return type:</b> <codeph>INT</codeph>
+          </p>
+          <b>Usage notes:</b>
+          <p>
+            If input strings are equal, the function returns 0.
+          </p>
+
+          <p>
+            If either input exceeds 255 characters, the function returns an error.
+          </p>
+
+          <p>
+            If either input string is <codeph>NULL</codeph>, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+
+          <p>
+            If the length of one input string is zero, the function returns the length of the
+            other string.
+          </p>
+
+          <p>
+            <b>Example:</b>
+          </p>
+          <p>
+            <codeph>LEVENSHTEIN ('welcome', 'We come')</codeph> returns 2, first change to
+            replace '<codeph>w</codeph>' to '<codeph>W</codeph>', and then to replace
+            '<codeph>l</codeph>' to a space character.
+          </p>
+        </dd>
+
+      </dlentry>
+    </dl>
+
+    <dl>
       <dlentry id="locate">
 
         <dt>
