@@ -117,9 +117,11 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
           memcpy(input_ptr, v, 8);
           break;
         case TYPE_TIMESTAMP:
+          memcpy(input_ptr, v, sizeof(TimestampValue));
+          break;
         case TYPE_STRING:
         case TYPE_VARCHAR:
-          memcpy(input_ptr, v, 16);
+          memcpy(input_ptr, v, sizeof(StringValue));
           break;
         default:
           DCHECK(false) << "NYI";
