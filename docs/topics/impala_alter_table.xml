@@ -46,11 +46,8 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">ALTER TABLE statement</indexterm>
-      The <codeph>ALTER TABLE</codeph> statement changes the structure or properties of an
-      existing Impala table.
-    </p>
+    <p> The <codeph>ALTER TABLE</codeph> statement changes the structure or
+      properties of an existing Impala table. </p>
 
     <p>
       In Impala, this is primarily a logical operation that updates the table metadata in the
@@ -66,11 +63,12 @@ under the License.
 
 <codeblock>ALTER TABLE [<varname>old_db_name</varname>.]<varname>old_table_name</varname> RENAME TO [<varname>new_db_name</varname>.]<varname>new_table_name</varname>
 
-ALTER TABLE <varname>name</varname> ADD COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
+ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
+ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
+
+ALTER TABLE <varname>name</varname> ADD COLUMN [IF NOT EXISTS] <varname>col_spec</varname>
 ALTER TABLE <varname>name</varname> DROP [COLUMN] <varname>column_name</varname>
 ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>col_spec</varname>
-
-ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 
 <ph rev="3.1 IMPALA-6988">ALTER TABLE <varname>name</varname> SET OWNER USER <varname>user_name</varname>
 ALTER TABLE <varname>name</varname> SET OWNER ROLE <varname>role_name</varname>
@@ -546,23 +544,19 @@ ALTER TABLE <varname>table_name</varname> SET SERDEPROPERTIES ('<varname>key1</v
     <p>
       <b>To reorganize columns for a table:</b>
     </p>
-
-<codeblock>ALTER TABLE <varname>table_name</varname> ADD COLUMNS (<varname>column_defs</varname>);
-ALTER TABLE <varname>table_name</varname> REPLACE COLUMNS (<varname>column_defs</varname>);
-ALTER TABLE <varname>table_name</varname> CHANGE <varname>column_name</varname> <varname>new_name</varname> <varname>new_type</varname>;
-ALTER TABLE <varname>table_name</varname> DROP <varname>column_name</varname>;</codeblock>
-
-    <p>
-      The <varname>column_spec</varname> is the same as in the <codeph>CREATE TABLE</codeph>
-      statement: the column name, then its data type, then an optional comment. You can add
-      multiple columns at a time. The parentheses are required whether you add a single column
-      or multiple columns. When you replace columns, all the original column definitions are
-      discarded. You might use this technique if you receive a new set of data files with
-      different data types or columns in a different order. (The data files are retained, so if
-      the new columns are incompatible with the old ones, use <codeph>INSERT OVERWRITE</codeph>
-      or <codeph>LOAD DATA OVERWRITE</codeph> to replace all the data before issuing any further
-      queries.)
-    </p>
+    <p>You can add multiple columns at a time using the <codeph>ALTER
+        TABLE</codeph> statement. If you specify the <codeph>IF NOT
+        EXISTS</codeph> clause, Impala silently ignores the <codeph>ADD</codeph>
+      request and does not return an error if a column with the same name exists
+      in the table.</p>
+    <p>When you replace columns, all the original column definitions are
+      discarded. </p>
+    <p>You might use these statements if you receive a new set of data files
+      with different data types or columns in a different order. The data files
+      are retained, so if the new columns are incompatible with the old ones,
+      use <codeph>INSERT OVERWRITE</codeph> or <codeph>LOAD DATA
+        OVERWRITE</codeph> to replace all the data before issuing any further
+      queries.</p>
 
     <p rev="">
       For example, here is how you might add columns to an existing table. The first
