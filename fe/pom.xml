@@ -603,6 +603,7 @@ under the License.
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.20</version>
         <configuration>
+          <trimStackTrace>false</trimStackTrace>
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>-Djava.library.path=${java.library.path}:${backend.library.path} ${surefireJacocoArg}</argLine>
