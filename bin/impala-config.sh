@@ -160,7 +160,7 @@ fi
 : ${CDH_DOWNLOAD_HOST:=native-toolchain.s3.amazonaws.com}
 export CDH_DOWNLOAD_HOST
 export CDH_MAJOR_VERSION=6
-export CDH_BUILD_NUMBER=742221
+export CDH_BUILD_NUMBER=909265
 export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
@@ -170,7 +170,7 @@ export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
-export KUDU_JAVA_VERSION=1.9.0-cdh6.x-SNAPSHOT
+export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -282,6 +282,12 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
 export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
 export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
+if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
+    # On S3, disable Sentry HDFS sync plugin.
+    export SENTRY_PROCESSOR_FACTORIES="org.apache.sentry.api.service.thrift.SentryPolicyStoreProcessorFactory"
+else
+    export SENTRY_PROCESSOR_FACTORIES="org.apache.sentry.api.service.thrift.SentryPolicyStoreProcessorFactory,org.apache.sentry.hdfs.SentryHDFSServiceProcessorFactory"
+fi
 RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_IMPALA_HOME)}
 # The DB script in Ranger expects the database name to be in lower case.
 export RANGER_POLICY_DB=$(echo ${RANGER_POLICY_DB} | tr '[:upper:]' '[:lower:]')
@@ -615,7 +621,7 @@ fi
 export KUDU_IS_SUPPORTED
 
 if $USE_CDH_KUDU; then
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.9.0-cdh6.x-SNAPSHOT"}
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.10.0-cdh6.x-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
 else
   export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5211897"}

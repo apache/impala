@@ -81,7 +81,7 @@
   <!-- These properties enable HMS follower. -->
   <property>
     <name>sentry.service.processor.factories</name>
-    <value>org.apache.sentry.api.service.thrift.SentryPolicyStoreProcessorFactory,org.apache.sentry.hdfs.SentryHDFSServiceProcessorFactory</value>
+    <value>${SENTRY_PROCESSOR_FACTORIES}</value>
   </property>
   <property>
     <name>sentry.policy.store.plugins</name>
