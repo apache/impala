@@ -31,8 +31,8 @@ PATH_TO_REPORTS = '/tmp/query_gen/reports'
 PATH_TO_FINISHED_JOBS = '/tmp/query_gen/completed_jobs'
 PATH_TO_LOG = '/tmp/query_gen/log'
 RUN_TIME_LIMIT = 12 * 3600
-GENERATION_FREQUENCY = RUN_TIME_LIMIT
-MAX_CONCURRENCY = 2
+GENERATION_FREQUENCY = 300 + RUN_TIME_LIMIT
+MAX_CONCURRENCY = 1
 DEFAULT_RUN_NAME = 'AUTO_RUN'
 SLEEP_LENGTH = 3
 
@@ -40,9 +40,9 @@ NESTED_TYPES_MODE = False
 DELETE_SCHEDULE_ITEMS_ON_STARTUP = True
 SHOULD_BUILD_IMPALA = True
 SHOULD_LOAD_DATA = False
-SHOULD_PULL_DOCKER_IMAGE = True
-DATABASE_NAME = 'randomness'
-POSTGRES_DATABASE_NAME = 'randomness'
+SHOULD_PULL_DOCKER_IMAGE = False
+DATABASE_NAME = 'tpch_kudu'
+POSTGRES_DATABASE_NAME = 'tpch_kudu'
 
 LOG = logging.getLogger('Controller')
 
@@ -161,7 +161,7 @@ class Controller(object):
 
 if __name__ == '__main__':
   controller = Controller()
-  logging.basicConfig(level=logging.DEBUG,
+  logging.basicConfig(level=logging.INFO,
       filename=PATH_TO_LOG,
       format='%(asctime)s %(threadName)s:%(module)s[%(lineno)s]:%(message)s',
       datefmt='%H:%M:%S')

@@ -50,7 +50,7 @@ DOCKER_IMPALA_USER_GID = int(os.environ.get(
 
 HOST_TESTDATA_EXTERNAL_VOLUME_PATH = normpath(os.environ.get(
     'HOST_TESTDATA_EXTERNAL_VOLUME_PATH',
-    os.path.sep + join_path('data', '1', 'dockervols', 'cluster')))
+    os.path.sep + join_path('var', 'lib', 'docker', 'scratch', 'cluster')))
 
 DEFAULT_DOCKER_TESTDATA_VOLUME_PATH = os.path.sep + join_path(
     'home', DOCKER_USER_NAME, 'Impala', 'testdata', 'cluster')
@@ -312,8 +312,9 @@ class ImpalaDockerEnv(object):
             'mkdir -p {host_testdata_path} && '
             'rsync -e "ssh -i {priv_key} -o StrictHostKeyChecking=no '
             ''         '-o UserKnownHostsFile=/dev/null -p {ssh_port}" '
-            '--delete --archive --verbose --progress --chown={uid}:{gid} '
-            '{user}@127.0.0.1:{container_testdata_path} {host_testdata_path}'.format(
+            '--delete --archive --verbose --progress '
+            '{user}@127.0.0.1:{container_testdata_path} {host_testdata_path} && '
+            'chown -R {uid}:{gid} {host_testdata_path}'.format(
                 host_testdata_path=HOST_TESTDATA_EXTERNAL_VOLUME_PATH,
                 priv_key=HOST_TO_DOCKER_SSH_KEY,
                 ssh_port=self.ssh_port,
