@@ -152,6 +152,7 @@ under the License.
       <topicref href="topics/impala_invalidate_metadata.xml"/>
       <topicref href="topics/impala_load_data.xml"/>
       <topicref href="topics/impala_refresh.xml"/>
+      <topicref href="topics/impala_refresh_authorization.xml"/>
       <topicref href="topics/impala_refresh_functions.xml"/>
       <topicref href="topics/impala_revoke.xml"/>
       <topicref href="topics/impala_select.xml">

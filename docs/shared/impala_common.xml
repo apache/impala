@@ -383,6 +383,11 @@ under the License.
                 <entry>TABLE</entry>
               </row>
               <row>
+                <entry>REFRESH AUTHORIZATION</entry>
+                <entry>REFRESH</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
                 <entry>REFRESH FUNCTIONS</entry>
                 <entry>REFRESH</entry>
                 <entry>DATABASE</entry>
