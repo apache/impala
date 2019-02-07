@@ -72,6 +72,9 @@ DECLARE_string(krb5_ccname);
 DECLARE_string(krb5_conf);
 DECLARE_string(krb5_debug_file);
 
+// Defined in kudu/security/init.cc
+DECLARE_bool(use_system_auth_to_local);
+
 DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
 DEFINE_bool(enable_ldap_auth, false,
@@ -784,6 +787,8 @@ Status SaslAuthProvider::Start() {
   if (needs_kinit_) {
     DCHECK(is_internal_);
     DCHECK(!principal_.empty());
+    // IMPALA-8154: Disable any Kerberos auth_to_local mappings.
+    FLAGS_use_system_auth_to_local = false;
     // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
     // process does.
     KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_, keytab_file_,
