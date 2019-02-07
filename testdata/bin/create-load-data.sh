@@ -31,7 +31,6 @@
 set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
-set -x
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 . ${IMPALA_HOME}/testdata/bin/run-step.sh
