@@ -27,7 +27,8 @@ under the License.
   {{/is_quiescing}}
 
   {{?impala_server_mode}}
-  <h2>Impala Server Mode: {{?is_coordinator}}Coordinator{{/is_coordinator}}
+  <h2>Impala Server Mode: {{?is_coordinator}}Coordinator{{?use_local_catalog}}
+    (Local Catalog Mode){{/use_local_catalog}}{{/is_coordinator}}
     {{?is_executor}}Executor{{/is_executor}}</h2>
   {{/impala_server_mode}}
 

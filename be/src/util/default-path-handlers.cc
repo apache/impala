@@ -48,6 +48,7 @@ using namespace rapidjson;
 using namespace strings;
 
 DECLARE_bool(enable_process_lifetime_heap_profiling);
+DECLARE_bool(use_local_catalog);
 DEFINE_int64(web_log_bytes, 1024 * 1024,
     "The maximum number of bytes to display on the debug webserver's log page");
 
@@ -284,6 +285,8 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
   ImpalaServer* impala_server = env->impala_server();
   document->AddMember("impala_server_mode", true, document->GetAllocator());
   document->AddMember("is_coordinator", impala_server->IsCoordinator(),
+      document->GetAllocator());
+  document->AddMember("use_local_catalog", FLAGS_use_local_catalog,
       document->GetAllocator());
   document->AddMember("is_executor", impala_server->IsExecutor(),
       document->GetAllocator());

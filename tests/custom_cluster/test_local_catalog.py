@@ -29,21 +29,6 @@ RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
 
 class TestCompactCatalogUpdates(CustomClusterTestSuite):
 
-  def get_catalog_cache_metrics(self, impalad):
-    """ Returns catalog cache metrics as a dict by scraping the json metrics page on the
-    given impalad"""
-    child_groups =\
-        impalad.service.get_debug_webpage_json('metrics')['metric_group']['child_groups']
-    for group in child_groups:
-      if group['name'] != 'impala-server': continue
-      # Filter catalog cache metrics.
-      for child_group in group['child_groups']:
-        if child_group['name'] != 'catalog': continue
-        metrics_data = [(metric['name'], metric['value'])
-            for metric in child_group['metrics'] if 'catalog.cache' in metric['name']]
-        return dict(metrics_data)
-    assert False, "Catalog cache metrics not found in %s" % child_groups
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
@@ -167,52 +152,6 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
     finally:
       client.close()
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
-  def test_cache_metrics(self, unique_database):
-    """
-    Test that profile output includes impalad local cache metrics. Also verifies that
-    the daemon level metrics are updated between query runs.
-    """
-    try:
-      impalad = self.cluster.impalads[0]
-      client = impalad.service.create_beeswax_client()
-      cache_hit_rate_metric_key = "catalog.cache.hit-rate"
-      cache_miss_rate_metric_key = "catalog.cache.miss-rate"
-      cache_hit_count_metric_key = "catalog.cache.hit-count"
-      cache_request_count_metric_key = "catalog.cache.request-count"
-      cache_request_count_prev_run = 0
-      cache_hit_count_prev_run = 0
-      test_table_name = "%s.test_cache_metrics_test_tbl" % unique_database
-      # A mix of queries of various types.
-      queries_to_test = ["select count(*) from functional.alltypes",
-          "explain select count(*) from functional.alltypes",
-          "create table %s (a int)" % test_table_name,
-          "drop table %s" % test_table_name]
-      for _ in xrange(0, 10):
-        for query in queries_to_test:
-          ret = self.execute_query_expect_success(client, query)
-          assert ret.runtime_profile.count("Frontend:") == 1
-          assert ret.runtime_profile.count("CatalogFetch") > 1
-          cache_metrics = self.get_catalog_cache_metrics(impalad)
-          cache_hit_rate = cache_metrics[cache_hit_rate_metric_key]
-          cache_miss_rate = cache_metrics[cache_miss_rate_metric_key]
-          cache_hit_count = cache_metrics[cache_hit_count_metric_key]
-          cache_request_count = cache_metrics[cache_request_count_metric_key]
-          assert cache_hit_rate > 0.0 and cache_hit_rate < 1.0
-          assert cache_miss_rate > 0.0 and cache_miss_rate < 1.0
-          assert cache_hit_count > cache_hit_count_prev_run,\
-              "%s not updated between two query runs, query - %s"\
-              % (cache_hit_count_metric_key, query)
-          assert cache_request_count > cache_request_count_prev_run,\
-             "%s not updated betweeen two query runs, query - %s"\
-             % (cache_request_count_metric_key, query)
-          cache_hit_count_prev_run = cache_hit_count
-          cache_request_count_prev_run = cache_request_count
-    finally:
-      client.close()
 
 class TestLocalCatalogRetries(CustomClusterTestSuite):
 
@@ -373,3 +312,70 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     finally:
       client1.close()
       client2.close()
+
+
+class TestObservability(CustomClusterTestSuite):
+
+  def get_catalog_cache_metrics(self, impalad):
+    """ Returns catalog cache metrics as a dict by scraping the json metrics page on the
+    given impalad"""
+    child_groups =\
+        impalad.service.get_debug_webpage_json('metrics')['metric_group']['child_groups']
+    for group in child_groups:
+      if group['name'] != 'impala-server': continue
+      # Filter catalog cache metrics.
+      for child_group in group['child_groups']:
+        if child_group['name'] != 'catalog': continue
+        metrics_data = [(metric['name'], metric['value'])
+            for metric in child_group['metrics'] if 'catalog.cache' in metric['name']]
+        return dict(metrics_data)
+    assert False, "Catalog cache metrics not found in %s" % child_groups
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_cache_metrics(self, unique_database):
+    """
+    Test that profile output includes impalad local cache metrics. Also verifies that
+    the daemon level metrics are updated between query runs.
+    """
+    try:
+      impalad = self.cluster.impalads[0]
+      # Make sure local catalog mode is enabled and visible on web UI.
+      assert '(Local Catalog Mode)' in impalad.service.read_debug_webpage('/')
+      client = impalad.service.create_beeswax_client()
+      cache_hit_rate_metric_key = "catalog.cache.hit-rate"
+      cache_miss_rate_metric_key = "catalog.cache.miss-rate"
+      cache_hit_count_metric_key = "catalog.cache.hit-count"
+      cache_request_count_metric_key = "catalog.cache.request-count"
+      cache_request_count_prev_run = 0
+      cache_hit_count_prev_run = 0
+      test_table_name = "%s.test_cache_metrics_test_tbl" % unique_database
+      # A mix of queries of various types.
+      queries_to_test = ["select count(*) from functional.alltypes",
+          "explain select count(*) from functional.alltypes",
+          "create table %s (a int)" % test_table_name,
+          "drop table %s" % test_table_name]
+      for _ in xrange(0, 10):
+        for query in queries_to_test:
+          ret = self.execute_query_expect_success(client, query)
+          assert ret.runtime_profile.count("Frontend:") == 1
+          assert ret.runtime_profile.count("CatalogFetch") > 1
+          cache_metrics = self.get_catalog_cache_metrics(impalad)
+          cache_hit_rate = cache_metrics[cache_hit_rate_metric_key]
+          cache_miss_rate = cache_metrics[cache_miss_rate_metric_key]
+          cache_hit_count = cache_metrics[cache_hit_count_metric_key]
+          cache_request_count = cache_metrics[cache_request_count_metric_key]
+          assert cache_hit_rate > 0.0 and cache_hit_rate < 1.0
+          assert cache_miss_rate > 0.0 and cache_miss_rate < 1.0
+          assert cache_hit_count > cache_hit_count_prev_run,\
+              "%s not updated between two query runs, query - %s"\
+              % (cache_hit_count_metric_key, query)
+          assert cache_request_count > cache_request_count_prev_run,\
+             "%s not updated betweeen two query runs, query - %s"\
+             % (cache_request_count_metric_key, query)
+          cache_hit_count_prev_run = cache_hit_count
+          cache_request_count_prev_run = cache_request_count
+    finally:
+      client.close()
