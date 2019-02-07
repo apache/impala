@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="num_rows_produced_limit">
+
+  <title>NUM_ROWS_PRODUCED_LIMIT Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>NUM_ROWS_PRODUCED_LIMIT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Scalability"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>NUM_ROWS_PRODUCED_LIMIT</codeph> query option limits the number of rows
+      produced by a query. A query is canceled when its execution produces more rows than the
+      specified limit set by the <codeph>NUM_ROWS_PRODUCED_LIMIT</codeph> option.
+    </p>
+
+    <p>
+      This limit only applies when the results are returned to a client, for example, to a
+      <codeph>SELECT</codeph> query, but not to an <codeph>INSERT</codeph> query.
+    </p>
+
+    <p>
+      The default value of <codeph>0</codeph> specifies that there is no limit on the number of
+      rows produced.
+    </p>
+
+    <p>
+      <b>Type:</b> <codeph>INT</codeph>
+    </p>
+
+    <p>
+      <b>Allowed values:</b> 0 or positive numbers
+    </p>
+
+    <p>
+      <b>Default:</b> 0
+    </p>
+
+  </conbody>
+
+</concept>
