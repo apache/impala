@@ -192,7 +192,7 @@ def execute_using_impala_beeswax(query, query_config):
   # create a map for query options and the query names to send to the plugin
   context = build_context(query, query_config)
   if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
-  result = ImpalaBeeswaxResult()
+  result = None
   try:
     result = client.execute(query.query_str)
   except Exception, e:
@@ -232,7 +232,7 @@ def construct_exec_result(result, exec_result):
   """
 
   # Return immedietely if the query failed.
-  if not result.success: return exec_result
+  if result is None or not result.success: return exec_result
   exec_result.success = True
   attrs = ['data', 'runtime_profile', 'start_time',
       'time_taken', 'summary', 'exec_summary']

@@ -112,19 +112,20 @@ class Scheduler(object):
           try:
             query_executor.prepare(self._get_next_impalad())
             query_executor.execute(plan_first=self.plan_first)
-          # QueryExecutor only throws an exception if the query fails and abort_on_error
-          # is set to True. If abort_on_error is False, then the exception is logged on
+          # QueryExecutor only throws an exception if the query fails and exit_on_error
+          # is set to True. If exit_on_error is False, then the exception is logged on
           # the console and execution moves on to the next query.
           except Exception as e:
             LOG.error("Query %s Failed: %s" % (query_name, str(e)))
             self._exit.set()
           finally:
-            LOG.info("%s query iteration %d finished in %.2f seconds" % (query_name, i+1,
-              query_executor.result.time_taken))
-            result = query_executor.result
-            result.client_name = thread_num + 1
-            self._results.append(result)
-          workload_time_sec += query_executor.result.time_taken
+            if query_executor.result:
+              LOG.info("%s query iteration %d finished in %.2f seconds" %
+                       (query_name, i + 1, query_executor.result.time_taken))
+              result = query_executor.result
+              result.client_name = thread_num + 1
+              self._results.append(result)
+              workload_time_sec += query_executor.result.time_taken
       if self.query_iterations == 1:
         LOG.info("Workload iteration %d finished in %s seconds" % (j+1, workload_time_sec))
       cursor = getattr(threading.current_thread(), 'cursor', None)
@@ -139,3 +140,8 @@ class Scheduler(object):
     for thread_num,t in enumerate(self._threads):
       t.join()
       LOG.info("Finished %s" % self._thread_name % thread_num)
+    num_expected_results = len(self._threads) * self.iterations * \
+        self.query_iterations * len(self.query_executors)
+    if len(self._results) != num_expected_results:
+      raise RuntimeError("Unexpected number of results generated (%s vs. %s)." %
+          (len(self._results), num_expected_results))
