@@ -30,4 +30,4 @@ fi
 . ${IMPALA_HOME}/bin/set-classpath.sh
 # LLVM must be on path to symbolise sanitiser stack traces.
 export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
-"$@"
+exec "$@"

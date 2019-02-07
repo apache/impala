@@ -24,10 +24,12 @@ import pytest
 from decimal import Decimal
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.comparison.cluster import MiniCluster
 from tests.util.parse_util import (
     EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
     EXPECTED_TPCH_QUERIES_COUNT, match_memory_estimate)
 from tests.util.test_file_parser import load_tpc_queries
+from tests.util.filesystem_utils import IS_LOCAL
 
 
 class TestStressInfra(ImpalaTestSuite):
@@ -59,3 +61,14 @@ class TestStressInfra(ImpalaTestSuite):
     assert count == len(queries)
     for name in queries:
       assert name is not None
+
+  def tests_minicluster_obj(self):
+    """
+    Test that the minicluster abstraction finds the minicluster.
+    """
+    cluster = MiniCluster()
+    if IS_LOCAL:
+      expected_pids = 1
+    else:
+      expected_pids = 3
+    assert expected_pids == len(cluster.impala.for_each_impalad(lambda i: i.find_pid()))
