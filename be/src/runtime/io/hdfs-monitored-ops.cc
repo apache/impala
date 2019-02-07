@@ -69,7 +69,7 @@ Status OpenHdfsFileOp::Execute() {
   if (hdfs_file_ == nullptr) {
     // GetHdfsErrorMsg references thread local state to get error information, so it
     // must happen in the same thread as the hdfsOpenFile().
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         GetHdfsErrorMsg("Failed to open HDFS file ", fname_));
   }
   return Status::OK();

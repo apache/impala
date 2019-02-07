@@ -293,15 +293,15 @@ void DiskIoMgr::UnregisterContext(RequestContext* reader) {
 Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
   int disk_id = range->disk_id();
   if (disk_id < 0 || disk_id >= disk_queues_.size()) {
-    return Status(TErrorCode::DISK_IO_ERROR,
-        Substitute("Invalid scan range.  Bad disk id: $0", disk_id));
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+        Substitute("Invalid scan range. Bad disk id: $0", disk_id));
   }
   if (range->offset() < 0) {
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Invalid scan range. Negative offset $0", range->offset()));
   }
   if (range->len() <= 0) {
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Invalid scan range. Non-positive length $0", range->len()));
   }
   return Status::OK();

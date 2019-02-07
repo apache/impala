@@ -59,7 +59,7 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
   if (hdfsSeek(hdfs_fs_, exclusive_hdfs_fh_->file(), scan_range_->offset_) != 0) {
     // Destroy the file handle
     io_mgr->ReleaseExclusiveHdfsFileHandle(std::move(exclusive_hdfs_fh_));
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Error seeking to $0 in file: $1 $2", scan_range_->offset(),
             *scan_range_->file_string(), GetHdfsErrorMsg("")));
   }
@@ -165,7 +165,7 @@ Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_
   if (FLAGS_use_hdfs_pread) {
     *bytes_read = hdfsPread(hdfs_fs_, hdfs_file, position_in_file, buffer, chunk_size);
     if (*bytes_read == -1) {
-      return Status(TErrorCode::DISK_IO_ERROR,
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           GetHdfsErrorMsg("Error reading from HDFS file: ",
               *scan_range_->file_string()));
     }
@@ -174,14 +174,14 @@ Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_
     // location. Seek to the appropriate location.
     if (is_borrowed_fh) {
       if (hdfsSeek(hdfs_fs_, hdfs_file, position_in_file) != 0) {
-        return Status(TErrorCode::DISK_IO_ERROR,
+        return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
             Substitute("Error seeking to $0 in file: $1: $2",
                 position_in_file, *scan_range_->file_string(), GetHdfsErrorMsg("")));
       }
     }
     *bytes_read = hdfsRead(hdfs_fs_, hdfs_file, buffer, chunk_size);
     if (*bytes_read == -1) {
-      return Status(TErrorCode::DISK_IO_ERROR,
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           GetHdfsErrorMsg("Error reading from HDFS file: ",
               *scan_range_->file_string()));
     }

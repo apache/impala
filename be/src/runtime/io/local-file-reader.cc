@@ -40,7 +40,7 @@ Status LocalFileReader::Open(bool use_file_handle_cache) {
 
   file_ = fopen(scan_range_->file(), "r");
   if (file_ == nullptr) {
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Could not open file: $0: $1", *scan_range_->file_string(),
             GetStrErrMsg()));
   }
@@ -68,7 +68,7 @@ Status LocalFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
   if (fseek(file_, file_offset, SEEK_SET) == -1) {
     fclose(file_);
     file_ = nullptr;
-    return Status(TErrorCode::DISK_IO_ERROR,
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Could not seek to $0 "
             "for file: $1: $2", scan_range_->offset(),
             *scan_range_->file_string(), GetStrErrMsg()));
@@ -78,7 +78,7 @@ Status LocalFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
   DCHECK_LE(*bytes_read, bytes_to_read);
   if (*bytes_read < bytes_to_read) {
     if (ferror(file_) != 0) {
-      return Status(TErrorCode::DISK_IO_ERROR,
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           Substitute("Error reading from $0"
               "at byte offset: $1: $2", file_,
               file_offset, GetStrErrMsg()));

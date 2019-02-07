@@ -30,6 +30,7 @@
 #include "gutil/strings/ascii_ctype.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "util/debug-util.h"
 #include "util/filesystem-util.h"
 #include "util/hdfs-util.h"
 #include "util/string-parser.h"
@@ -387,7 +388,7 @@ Status TimezoneDatabase::LoadZoneAliasesFromHdfs(const string& hdfs_zone_alias_c
     current_bytes_read = hdfsRead(hdfs_conn, hdfs_file, buffer.data(), buffer.size());
     if (current_bytes_read == 0) break;
     if (current_bytes_read < 0) {
-      status = Status(TErrorCode::DISK_IO_ERROR,
+      status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           GetHdfsErrorMsg("Error reading from HDFS file: ", hdfs_zone_alias_conf));
       break;
     }

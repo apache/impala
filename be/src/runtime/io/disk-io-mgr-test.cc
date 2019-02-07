@@ -360,8 +360,9 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes, new_range,
           nullptr, nullptr, nullptr, data,
-          Status(TErrorCode::DISK_IO_ERROR, "open() failed for /non-existent/file.txt. "
-              "The given path doesn't exist. errno=2"), _1);
+          Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+            "open() failed for /non-existent/file.txt. "
+            "The given path doesn't exist. errno=2"), _1);
   *new_range = pool_.Add(new WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -378,7 +379,8 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   new_range = pool_.Add(new WriteRange*);
   callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes,
       new_range, nullptr, nullptr, nullptr, data,
-      Status(TErrorCode::DISK_IO_ERROR, "fseek() failed for /tmp/disk_io_mgr_test.txt. "
+      Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+          "fseek() failed for /tmp/disk_io_mgr_test.txt. "
           "Invalid inputs. errno=22, offset=-1"), _1);
 
   *new_range = pool_.Add(new WriteRange(tmp_file, -1, 0, callback));
@@ -466,7 +468,7 @@ void DiskIoMgrTest::AddWriteRange(int num_of_writes, int32_t* data,
   WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes,
           nullptr, nullptr, nullptr, nullptr, data,
-          Status(TErrorCode::DISK_IO_ERROR, expected_output), _1);
+          Status(TErrorCode::DISK_IO_ERROR, GetBackendString(), expected_output), _1);
   WriteRange* write_range = pool_.Add(new WriteRange(file_name, offset, 0, callback));
   write_range->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
   EXPECT_OK(writer->AddWriteRange(write_range));

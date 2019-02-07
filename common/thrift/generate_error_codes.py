@@ -335,7 +335,7 @@ error_codes = (
 
   ("THREAD_CREATION_FAILED", 109, "Failed to create thread $0 in category $1: $2"),
 
-  ("DISK_IO_ERROR", 110, "Disk I/O error: $0"),
+  ("DISK_IO_ERROR", 110, "Disk I/O error on $0: $1"),
 
   ("DATASTREAM_RECVR_CLOSED", 111,
    "DataStreamRecvr for fragment=$0, node=$1 is closed already"),

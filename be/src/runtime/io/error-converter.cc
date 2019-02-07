@@ -49,8 +49,8 @@ unordered_map<int, string> ErrorConverter::errno_to_error_text_map_(
 
 Status ErrorConverter::GetErrorStatusFromErrno(const string& function_name,
     const string& file_path, int err_no, const Params& params) {
-  return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR, GetErrorText(function_name,
-      file_path, err_no, params)));
+  return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+      GetErrorText(function_name, file_path, err_no, params)));
 }
 
 string ErrorConverter::GetErrorText(const string& function_name,
