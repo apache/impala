@@ -82,13 +82,13 @@ under the License.
       </p>
       <ul>
         <li>
-          <p>
-            What a <term>plan fragment</term> is.
-            Impala decomposes each query into smaller units of work that are distributed across the cluster.
-            Wherever possible, a data block is read, filtered, and aggregated by plan fragments executing
-            on the same host. For some operations, such as joins and combining intermediate results into
-            a final result set, data is transmitted across the network from one DataNode to another.
-          </p>
+          <p> What a <term>plan fragment</term> is. Impala decomposes each query
+            into smaller units of work that are distributed across the cluster.
+            Wherever possible, a data block is read, filtered, and aggregated by
+            plan fragments executing on the same host. For some operations, such
+            as joins and combining intermediate results into a final result set,
+            data is transmitted across the network from one Impala daemon to
+            another. </p>
         </li>
         <li>
           <p>

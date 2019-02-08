@@ -143,15 +143,13 @@ under the License.
           </li>
 
           <li>
-            <p>
-              Data is physically divided based on units of storage called
+            <p> Data is physically divided based on units of storage called
                 <term>tablets</term>. Tablets are stored by <term>tablet
                 servers</term>. Each tablet server can store multiple tablets,
               and each tablet is replicated across multiple tablet servers,
               managed automatically by Kudu. Where practical, co-locate the
-              tablet servers on the same hosts as the DataNodes, although that
-              is not required.
-            </p>
+              tablet servers on the same hosts as the Impala daemons, although
+              that is not required. </p>
           </li>
         </ul>
 

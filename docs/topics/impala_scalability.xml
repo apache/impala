@@ -601,9 +601,7 @@ Memory Usage: Additional Notes
               available to Impala and reduce the amount of memory required on each node.
             </li>
 
-            <li>
-              Increase the overall memory capacity of each DataNode at the hardware level.
-            </li>
+            <li> Add more memory to the hosts running Impala daemons. </li>
 
             <li>
               On a cluster with resources shared between Impala and other Hadoop components, use

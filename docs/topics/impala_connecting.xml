@@ -57,33 +57,30 @@ Lots of nuances to illustrate through sample code.
       See <xref href="impala_shell_options.xml"/> for the command-line and configuration file options you can use.
     </p>
 
-    <p>
-      You can connect to any DataNode where an instance of <cmdname>impalad</cmdname> is running,
-      and that host coordinates the execution of all queries sent to it.
-    </p>
+    <p> You can connect to any Impala daemon (<cmdname>impalad</cmdname>), and
+      that daemon coordinates the execution of all queries sent to it. </p>
 
     <p>
       For simplicity during development, you might always connect to the same host, perhaps running <cmdname>impala-shell</cmdname> on
       the same host as <cmdname>impalad</cmdname> and specifying the hostname as <codeph>localhost</codeph>.
     </p>
 
-    <p>
-      In a production environment, you might enable load balancing, in which you connect to specific host/port combination
-      but queries are forwarded to arbitrary hosts. This technique spreads the overhead of acting as the coordinator
-      node among all the DataNodes in the cluster. See <xref href="impala_proxy.xml"/> for details.
-    </p>
+    <p> In a production environment, you might enable load balancing, in which
+      you connect to specific host/port combination but queries are forwarded to
+      arbitrary hosts. This technique spreads the overhead of acting as the
+      coordinator node among all the Impala daemons in the cluster. See <xref
+        href="impala_proxy.xml"/> for details. </p>
 
     <p>
       <b>To connect the Impala shell during shell startup:</b>
     </p>
 
     <ol>
-      <li>
-        Locate the hostname of a DataNode within the cluster that is running an instance of the
-        <cmdname>impalad</cmdname> daemon. If that DataNode uses a non-default port (something
-        other than port 21000) for <cmdname>impala-shell</cmdname> connections, find out the
-        port number also.
-      </li>
+      <li> Locate the hostname that is running an instance of the
+          <cmdname>impalad</cmdname> daemon. If that <cmdname>impalad</cmdname>
+        uses a non-default port (something other than port 21000) for
+          <cmdname>impala-shell</cmdname> connections, find out the port number
+        also. </li>
 
       <li>
         Use the <codeph>-i</codeph> option to the
@@ -126,21 +123,17 @@ $ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</v
 [Not connected] &gt; </codeblock>
       </li>
 
-      <li>
-        Locate the hostname of a DataNode within the cluster that is running an instance of the
-        <cmdname>impalad</cmdname> daemon. If that DataNode uses a non-default port (something
-        other than port 21000) for <cmdname>impala-shell</cmdname> connections, find out the
-        port number also.
-      </li>
+      <li> Locate the hostname that is running the <cmdname>impalad</cmdname>
+        daemon. If that <cmdname>impalad</cmdname> uses a non-default port
+        (something other than port 21000) for <cmdname>impala-shell</cmdname>
+        connections, find out the port number also. </li>
 
-      <li>
-        Use the <codeph>connect</codeph> command to connect to an Impala instance. Enter a command of the form:
-<codeblock>[Not connected] &gt; connect <varname>impalad-host</varname>
+      <li> Use the <codeph>connect</codeph> command to connect to an Impala
+        instance. Enter a command of the form: <codeblock>[Not connected] &gt; connect <varname>impalad-host</varname>
 [<varname>impalad-host</varname>:21000] &gt;</codeblock>
-        <note>
-          Replace <varname>impalad-host</varname> with the hostname you have configured for any DataNode running
-          Impala in your environment. The changed prompt indicates a successful connection.
-        </note>
+        <note> Replace <varname>impalad-host</varname> with the hostname you
+          have configured to run Impala in your environment. The changed prompt
+          indicates a successful connection. </note>
       </li>
     </ol>
 
@@ -148,11 +141,9 @@ $ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</v
       <b>To start <cmdname>impala-shell</cmdname> in a specific database:</b>
     </p>
 
-    <p>
-      You can use all the same connection options as in previous examples.
-      For simplicity, these examples assume that you are logged into one of
-      the DataNodes that is running the <cmdname>impalad</cmdname> daemon.
-    </p>
+    <p> You can use all the same connection options as in previous examples. For
+      simplicity, these examples assume that you are logged into one of the
+      Impala daemons. </p>
 
     <ol>
       <li>
@@ -182,11 +173,9 @@ $ impala-shell -i localhost -d parquet_gzip_compression
       <b>To run one or several statements in non-interactive mode:</b>
     </p>
 
-    <p>
-      You can use all the same connection options as in previous examples.
-      For simplicity, these examples assume that you are logged into one of
-      the DataNodes that is running the <cmdname>impalad</cmdname> daemon.
-    </p>
+    <p> You can use all the same connection options as in previous examples. For
+      simplicity, these examples assume that you are logged into one of the
+      Impala daemons. </p>
 
     <ol>
       <li>

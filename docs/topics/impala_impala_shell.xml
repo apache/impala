@@ -98,10 +98,9 @@ under the License.
       For information on installing the Impala shell, see <xref href="impala_install.xml#install"/>.
     </p>
 
-    <p>
-      For information about establishing a connection to a DataNode running the <codeph>impalad</codeph> daemon
-      through the <codeph>impala-shell</codeph> command, see <xref href="impala_connecting.xml#connecting"/>.
-    </p>
+    <p> For information about establishing a connection to a coordinator Impala
+      daemon through the <codeph>impala-shell</codeph> command, see <xref
+        href="impala_connecting.xml#connecting"/>. </p>
 
     <p>
       For a list of the <codeph>impala-shell</codeph> command-line options, see
