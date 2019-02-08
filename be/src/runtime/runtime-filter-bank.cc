@@ -146,9 +146,8 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
       filter = it->second;
     }
     filter->SetFilter(bloom_filter, min_max_filter);
-    state_->runtime_profile()->AddInfoString(
-        Substitute("Filter $0 arrival", filter_id),
-        PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
+    state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
+        PrettyPrinter::Print(filter->arrival_delay_ms(), TUnit::TIME_MS));
   }
 
   if (has_remote_target
@@ -211,7 +210,7 @@ void RuntimeFilterBank::PublishGlobalFilter(const TPublishFilterParams& params) 
   it->second->SetFilter(bloom_filter, min_max_filter);
   state_->runtime_profile()->AddInfoString(
       Substitute("Filter $0 arrival", params.filter_id),
-      PrettyPrinter::Print(it->second->arrival_delay(), TUnit::TIME_MS));
+      PrettyPrinter::Print(it->second->arrival_delay_ms(), TUnit::TIME_MS));
 }
 
 BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {

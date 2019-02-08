@@ -76,10 +76,11 @@ class RuntimeFilter {
   /// Inlined in IR so that the constant 'col_type' can be propagated.
   bool IR_ALWAYS_INLINE Eval(void* val, const ColumnType& col_type) const noexcept;
 
-  /// Returns the amount of time waited since registration for the filter to
-  /// arrive. Returns 0 if filter has not yet arrived.
-  int32_t arrival_delay() const {
-    if (arrival_time_.Load() == 0L) return 0L;
+  /// Returns the amount of time in milliseconds elapsed between the registration of the
+  /// filter and its arrival. If the filter has not yet arrived, it returns the time
+  /// elapsed since registration.
+  int32_t arrival_delay_ms() const {
+    if (arrival_time_.Load() == 0L) return MonotonicMillis() - registration_time_;
     return arrival_time_.Load() - registration_time_;
   }
 
