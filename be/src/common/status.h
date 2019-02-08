@@ -359,6 +359,15 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
     if (UNLIKELY(!_status.ok())) return _status; \
   } while (false)
 
+#define LOG_AND_RETURN_IF_ERROR(stmt) \
+  do { \
+    const ::impala::Status& _status = (stmt); \
+    if (UNLIKELY(!_status.ok()))  { \
+      LOG(INFO) << _status.GetDetail(); \
+      return _status; \
+    } \
+  } while (false)
+
 #define RETURN_VOID_IF_ERROR(stmt)                     \
   do {                                                 \
     if (UNLIKELY(!(stmt).ok())) return;                \

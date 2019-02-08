@@ -21,6 +21,7 @@
 #include <limits>
 #include <gutil/strings/substitute.h>
 
+#include "common/status.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "runtime/backend-client.h"
@@ -183,7 +184,7 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
     }
     case TStmtType::DDL: {
       DCHECK(exec_request_.__isset.catalog_op_request);
-      RETURN_IF_ERROR(ExecDdlRequest());
+      LOG_AND_RETURN_IF_ERROR(ExecDdlRequest());
       break;
     }
     case TStmtType::LOAD: {
