@@ -75,7 +75,8 @@ OS_MAPPING = [
   OsMapping("ubuntu14.04", "ec2-package-ubuntu-14-04", None),
   OsMapping("ubuntu15.04", "ec2-package-ubuntu-14-04", None),
   OsMapping("ubuntu15.10", "ec2-package-ubuntu-14-04", None),
-  OsMapping('ubuntu16.04', "ec2-package-ubuntu-16-04", "ubuntu1604")
+  OsMapping('ubuntu16.04', "ec2-package-ubuntu-16-04", "ubuntu1604"),
+  OsMapping('ubuntu18.04', "ec2-package-ubuntu-18-04", "ubuntu1804")
 ]
 
 class Package(object):

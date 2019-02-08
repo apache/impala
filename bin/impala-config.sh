@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=241-259ecff082
+export IMPALA_TOOLCHAIN_BUILD_ID=43961c5c-7ece-489c-a6e3-ec4cbe7ef4b5-b23c19a002
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p4
@@ -93,7 +93,7 @@ export IMPALA_FLATBUFFERS_VERSION=1.6.0
 unset IMPALA_FLATBUFFERS_URL
 export IMPALA_GCC_VERSION=4.9.2
 unset IMPALA_GCC_URL
-export IMPALA_GDB_VERSION=7.9.1
+export IMPALA_GDB_VERSION=7.9.1-p1
 unset IMPALA_GDB_URL
 export IMPALA_GFLAGS_VERSION=2.2.0-p2
 unset IMPALA_GFLAGS_URL
@@ -118,11 +118,11 @@ export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p1
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.7.5
 unset IMPALA_LZ4_URL
-export IMPALA_OPENLDAP_VERSION=2.4.25
+export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
 export IMPALA_OPENSSL_VERSION=1.0.2l
 unset IMPALA_OPENSSL_URL
-export IMPALA_ORC_VERSION=1.4.3-p2
+export IMPALA_ORC_VERSION=1.4.3-p3
 unset IMPALA_ORC_URL
 export IMPALA_PROTOBUF_VERSION=3.5.1
 unset IMPALA_PROTOBUF_URL
@@ -141,7 +141,7 @@ export IMPALA_TPC_DS_VERSION=2.1.0
 unset IMPALA_TPC_DS_URL
 export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
-export IMPALA_THRIFT_VERSION=0.9.3-p4
+export IMPALA_THRIFT_VERSION=0.9.3-p5
 unset IMPALA_THRIFT_URL
 export IMPALA_THRIFT11_VERSION=0.11.0-p2
 unset IMPALA_THRIFT11_URL
@@ -595,7 +595,7 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
       # Remove spaces, trim minor versions, and convert to lowercase.
       DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
       case "$DISTRO_VERSION" in
-        centos6 | centos7 | debian8 | suselinux12 | suse12 | ubuntu16 )
+        centos6 | centos7 | debian8 | suselinux12 | suse12 | ubuntu16 | ubuntu18)
           USE_CDH_KUDU=true
           KUDU_IS_SUPPORTED=true;;
         ubuntu14 )
@@ -611,7 +611,7 @@ if $USE_CDH_KUDU; then
   export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.9.0-cdh6.x-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
 else
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"4ec2598"}
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5211897"}
   export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
 fi
 
