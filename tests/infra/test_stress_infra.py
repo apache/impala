@@ -17,13 +17,14 @@
 
 # This module attempts to enforce infrastructural assumptions that bind test tools to
 # product or other constraints. We want to stop these assumptions from breaking at
-# pre-commit time, not later.
+# pre-merge time, not later.
 
 import pytest
 
 from decimal import Decimal
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfBuildType
 from tests.comparison.cluster import MiniCluster
 from tests.util.parse_util import (
     EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
@@ -33,6 +34,10 @@ from tests.util.filesystem_utils import IS_LOCAL
 
 
 class TestStressInfra(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
 
   def test_stress_binary_search_start_point(self):
     """
@@ -62,10 +67,13 @@ class TestStressInfra(ImpalaTestSuite):
     for name in queries:
       assert name is not None
 
+  @SkipIfBuildType.remote
   def tests_minicluster_obj(self):
     """
     Test that the minicluster abstraction finds the minicluster.
     """
+    if self.exploration_strategy() == "exhaustive":
+      pytest.skip("Test does not need to run in exhaustive")
     cluster = MiniCluster()
     if IS_LOCAL:
       expected_pids = 1

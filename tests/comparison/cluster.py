@@ -845,8 +845,10 @@ class MiniClusterImpalad(Impalad):
 
   def find_pid(self):
     # Need to filter results to avoid pgrep picking up its parent bash script.
-    pid = self.shell("pgrep -f -a 'impalad.*%s' | grep -v pgrep | "
-        "grep -o '^[0-9]*' || true" % self.hs2_port)
+    # Test with:
+    # sh -c "pgrep -l -f 'impala.*21050' | grep [i]mpalad | grep -o '^[0-9]*' || true"
+    pid = self.shell("pgrep -l -f 'impalad.*%s' | grep [i]mpalad | "
+                     "grep -o '^[0-9]*' || true" % self.hs2_port)
     if pid:
       return int(pid)
 
