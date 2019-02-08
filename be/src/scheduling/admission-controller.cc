@@ -39,6 +39,18 @@ using namespace strings;
 DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
     "milliseconds) that a request will wait to be admitted before timing out.");
 
+// The stale topic warning threshold is made configurable to allow suppressing the
+// error if it turns out to be noisy on some deployments or allow lowering the
+// threshold to help debug admission control issues. Hidden so that we have the
+// option of making this a no-op later.
+DEFINE_int64_hidden(admission_control_stale_topic_threshold_ms, 5 * 1000,
+    "Threshold above which the admission controller will append warnings to "
+    "error messages and profiles warning that the admission control topic is "
+    "stale so that the admission control decision may have been based on stale "
+    "state data. The default, 5 seconds, is chosen to minimise false positives but "
+    "capture most cases where the Impala daemon is disconnected from the statestore "
+    "or topic updates are seriously delayed.");
+
 namespace impala {
 
 const int64_t AdmissionController::PoolStats::HISTOGRAM_NUM_OF_BINS = 128;
@@ -124,6 +136,10 @@ const string AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON =
     "Latest admission queue reason";
 const string AdmissionController::PROFILE_INFO_KEY_ADMITTED_MEM =
     "Cluster Memory Admitted";
+const string AdmissionController::PROFILE_INFO_KEY_STALENESS_WARNING =
+    "Admission control state staleness";
+const string AdmissionController::PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME =
+    "AdmissionControlTimeSinceLastUpdate";
 
 // Error status string details
 const string REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION =
@@ -145,7 +161,8 @@ const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
 const string REASON_DISABLED_MAX_MEM_RESOURCES =
     "disabled by pool max mem resources set to 0";
 const string REASON_DISABLED_REQUESTS_LIMIT = "disabled by requests limit set to 0";
-const string REASON_QUEUE_FULL = "queue full, limit=$0, num_queued=$1";
+// $2 is the staleness detail.
+const string REASON_QUEUE_FULL = "queue full, limit=$0, num_queued=$1.$2";
 const string REASON_REQ_OVER_POOL_MEM =
     "request memory needed $0 is greater than pool max mem resources $1.\n\n"
     "Use the MEM_LIMIT query option to indicate how much memory is required per node. "
@@ -163,17 +180,19 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
     "THREAD_RESERVATION_AGGREGATE_LIMIT query option value: $1 > $2.";
 
 // Queue decision details
-// $0 = num running queries, $1 = num queries limit
-const string QUEUED_NUM_RUNNING = "number of running queries $0 is at or over limit $1";
-// $0 = queue size
+// $0 = num running queries, $1 = num queries limit, $2 = staleness detail
+const string QUEUED_NUM_RUNNING =
+    "number of running queries $0 is at or over limit $1.$2";
+// $0 = queue size, $1 = staleness detail
 const string QUEUED_QUEUE_NOT_EMPTY = "queue is not empty (size $0); queued queries are "
-    "executed first";
-// $0 = pool name, $1 = pool max memory, $2 = pool mem needed, $3 = pool mem available
+    "executed first.$1";
+// $0 = pool name, $1 = pool max memory, $2 = pool mem needed, $3 = pool mem available,
+// $4 = staleness detail
 const string POOL_MEM_NOT_AVAILABLE = "Not enough aggregate memory available in pool $0 "
-    "with max mem resources $1. Needed $2 but only $3 was available.";
-// $0 = host name, $1 = host mem needed, $3 = host mem available
+    "with max mem resources $1. Needed $2 but only $3 was available.$4";
+// $0 = host name, $1 = host mem needed, $3 = host mem available, $4 = staleness detail
 const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0."
-    "Needed $1 but only $2 out of $3 was available.";
+    "Needed $1 but only $2 out of $3 was available.$4";
 
 // Parses the pool name and backend_id from the topic key if it is valid.
 // Returns true if the topic key is valid and pool_name and backend_id are set.
@@ -265,10 +284,9 @@ Status AdmissionController::Init() {
   auto cb = [this](
       const StatestoreSubscriber::TopicDeltaMap& state,
       vector<TTopicDelta>* topic_updates) { UpdatePoolStats(state, topic_updates); };
-  Status status =
-      subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC,
-          /* is_transient=*/ true, /* populate_min_subscriber_topic_version=*/ false,
-          /* filter_prefix=*/"", cb);
+  Status status = subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC,
+      /* is_transient=*/true, /* populate_min_subscriber_topic_version=*/false,
+      /* filter_prefix=*/"", cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }
@@ -397,7 +415,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   if (stats->EffectiveMemReserved() + cluster_mem_to_admit > pool_max_mem) {
     *mem_unavailable_reason = Substitute(POOL_MEM_NOT_AVAILABLE, pool_name,
         PrintBytes(pool_max_mem), PrintBytes(cluster_mem_to_admit),
-        PrintBytes(max(pool_max_mem - stats->EffectiveMemReserved(), 0L)));
+        PrintBytes(max(pool_max_mem - stats->EffectiveMemReserved(), 0L)),
+        GetStalenessDetailLocked(" "));
     return false;
   }
 
@@ -418,7 +437,7 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
       *mem_unavailable_reason =
           Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(per_host_mem_to_admit),
               PrintBytes(max(admit_mem_limit - effective_host_mem_reserved, 0L)),
-              PrintBytes(admit_mem_limit));
+              PrintBytes(admit_mem_limit), GetStalenessDetailLocked(" "));
       return false;
     }
   }
@@ -449,12 +468,12 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
   PoolStats* stats = GetPoolStats(pool_name);
   if (!admit_from_queue && stats->local_stats().num_queued > 0) {
     *not_admitted_reason = Substitute(QUEUED_QUEUE_NOT_EMPTY,
-        stats->local_stats().num_queued);
+        stats->local_stats().num_queued, GetStalenessDetailLocked(" "));
     return false;
   } else if (pool_cfg.max_requests >= 0 &&
       stats->agg_num_running() >= pool_cfg.max_requests) {
     *not_admitted_reason = Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(),
-        pool_cfg.max_requests);
+        pool_cfg.max_requests, GetStalenessDetailLocked(" "));
     return false;
   } else if (!HasAvailableMemResources(schedule, pool_cfg, not_admitted_reason)) {
     return false;
@@ -565,7 +584,7 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
   PoolStats* stats = GetPoolStats(schedule.request_pool());
   if (stats->agg_num_queued() >= pool_cfg.max_queued) {
     *rejection_reason = Substitute(REASON_QUEUE_FULL, pool_cfg.max_queued,
-        stats->agg_num_queued());
+        stats->agg_num_queued(), GetStalenessDetailLocked(" "));
     return true;
   }
 
@@ -763,6 +782,7 @@ void AdmissionController::UpdatePoolStats(
       HandleTopicUpdates(delta.topic_entries);
     }
     UpdateClusterAggregates();
+    last_topic_update_time_ms_ = MonotonicMillis();
   }
   dequeue_cv_.NotifyOne(); // Dequeue and admit queries on the dequeue thread
 }
@@ -968,7 +988,8 @@ void AdmissionController::DequeueLoop() {
         if (total_available <= 0) {
           if (!queue.empty()) {
             LogDequeueFailed(queue.head(),
-                Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(), max_requests));
+                Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(), max_requests,
+                    GetStalenessDetailLocked(" ")));
           }
           continue;
         }
@@ -1077,6 +1098,38 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
       PROFILE_INFO_KEY_ADMISSION_RESULT, admission_result);
   schedule->summary_profile()->AddInfoString(
       PROFILE_INFO_KEY_ADMITTED_MEM, PrintBytes(schedule->GetClusterMemoryToAdmit()));
+  // We may have admitted based on stale information. Include a warning in the profile
+  // if this this may be the case.
+  int64_t time_since_update_ms;
+  string staleness_detail = GetStalenessDetailLocked("", &time_since_update_ms);
+  COUNTER_SET(ADD_COUNTER(schedule->summary_profile(),
+      PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME, TUnit::TIME_MS), time_since_update_ms);
+  if (!staleness_detail.empty()) {
+    schedule->summary_profile()->AddInfoString(
+        PROFILE_INFO_KEY_STALENESS_WARNING, staleness_detail);
+  }
+
+}
+
+string AdmissionController::GetStalenessDetail(const string& prefix,
+    int64_t* ms_since_last_update) {
+  lock_guard<mutex> lock(admission_ctrl_lock_);
+  return GetStalenessDetailLocked(prefix, ms_since_last_update);
+}
+
+string AdmissionController::GetStalenessDetailLocked(const string& prefix,
+    int64_t* ms_since_last_update) {
+  int64_t ms_since_update = MonotonicMillis() - last_topic_update_time_ms_;
+  if (ms_since_last_update != nullptr) *ms_since_last_update = ms_since_update;
+  if (last_topic_update_time_ms_ == 0) {
+    return Substitute("$0Warning: admission control information from statestore "
+                      "is stale: no update has been received.", prefix);
+  } else if (ms_since_update >= FLAGS_admission_control_stale_topic_threshold_ms) {
+    return Substitute("$0Warning: admission control information from statestore "
+                      "is stale: $1 since last update was received.",
+        prefix, PrettyPrinter::Print(ms_since_update, TUnit::TIME_MS));
+  }
+  return "";
 }
 
 void AdmissionController::PoolToJsonLocked(const string& pool_name,

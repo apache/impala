@@ -147,6 +147,9 @@ QUERY_END_BEHAVIORS = ['EOS', 'CLIENT_CANCEL', 'QUERY_TIMEOUT', 'CLIENT_CLOSE']
 # The timeout used for the QUERY_TIMEOUT end behaviour
 QUERY_END_TIMEOUT_S = 1
 
+# Value used for --admission_control_stale_topic_threshold_ms in tests.
+STALE_TOPIC_THRESHOLD_MS = 500
+
 # Regex that matches the first part of the profile info string added when a query is
 # queued.
 INITIAL_QUEUE_REASON_REGEX = \
@@ -267,12 +270,19 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     HS2TestSuite.check_response(get_profile_resp)
     self.__check_query_options(get_profile_resp.profile, expected_options)
 
-  def _execute_and_collect_profiles(self, queries, timeout_s, config_options={}):
+  def _execute_and_collect_profiles(self, queries, timeout_s, config_options={},
+      allow_query_failure=False):
     """Submit the query statements in 'queries' in parallel to the first impalad in
     the cluster. After submission, the results are fetched from the queries in
     sequence and their profiles are collected. Wait for up to timeout_s for
-    each query to finish. Returns the profile strings."""
+    each query to finish. If 'allow_query_failure' is True, succeeds if the query
+    completes successfully or ends up in the EXCEPTION state. Otherwise expects the
+    queries to complete successfully.
+    Returns the profile strings."""
     client = self.cluster.impalads[0].service.create_beeswax_client()
+    expected_states = [client.QUERY_STATES['FINISHED']]
+    if allow_query_failure:
+      expected_states.append(client.QUERY_STATES['EXCEPTION'])
     try:
       handles = []
       profiles = []
@@ -280,8 +290,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       for query in queries:
         handles.append(client.execute_async(query))
       for query, handle in zip(queries, handles):
-        self.wait_for_state(handle, client.QUERY_STATES['FINISHED'], timeout_s)
-        self.client.fetch(query, handle)
+        state = self.wait_for_any_state(handle, expected_states, timeout_s)
+        if state == client.QUERY_STATES['FINISHED']:
+          self.client.fetch(query, handle)
         profiles.append(self.client.get_runtime_profile(handle))
       return profiles
     finally:
@@ -849,6 +860,66 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.close(long_query_resp.operationHandle)
     # Close the queued query.
     self.close(queued_query_resp.operationHandle)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=3,
+          pool_max_mem=1024 * 1024 * 1024) +
+      " --admission_control_stale_topic_threshold_ms={0}".format(
+          STALE_TOPIC_THRESHOLD_MS),
+      statestored_args=_STATESTORED_ARGS)
+  def test_statestore_outage(self):
+    """Test behaviour with a failed statestore. Queries should continue to be admitted
+    but we should generate diagnostics about the stale topic."""
+    self.cluster.statestored.kill()
+    impalad = self.cluster.impalads[0]
+    # Sleep until the update should be definitely stale.
+    sleep(STALE_TOPIC_THRESHOLD_MS / 1000. * 1.5)
+    ac_json = impalad.service.get_debug_webpage_json('/admission')
+    ms_since_update = ac_json["statestore_admission_control_time_since_last_update_ms"]
+    assert ms_since_update > STALE_TOPIC_THRESHOLD_MS
+    assert ("Warning: admission control information from statestore is stale:" in
+        ac_json["statestore_update_staleness_detail"])
+
+    # Submit a batch of queries. One should get to run, one will be rejected because
+    # of the full queue, and the others will run after being queued.
+    STMT = "select sleep(100)"
+    TIMEOUT_S = 60
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S, allow_query_failure=True)
+    ADMITTED_STALENESS_WARNING = \
+        "Warning: admission control information from statestore is stale"
+    ADMITTED_STALENESS_PROFILE_ENTRY = \
+        "Admission control state staleness: " + ADMITTED_STALENESS_WARNING
+
+    num_queued = 0
+    num_admitted_immediately = 0
+    num_rejected = 0
+    for profile in profiles:
+      if "Admission result: Admitted immediately" in profile:
+        assert ADMITTED_STALENESS_PROFILE_ENTRY in profile, profile
+        num_admitted_immediately += 1
+      elif "Admission result: Rejected" in profile:
+        num_rejected += 1
+        # Check that the rejection error returned to the client contains a warning.
+        query_statuses = [line for line in profile.split("\n")
+                          if "Query Status:" in line]
+        assert len(query_statuses) == 1, profile
+        assert ADMITTED_STALENESS_WARNING in query_statuses[0]
+      else:
+        assert "Admission result: Admitted (queued)" in profile, profile
+        assert ADMITTED_STALENESS_PROFILE_ENTRY in profile, profile
+
+        # Check that the queued reason contains a warning.
+        queued_reasons = [line for line in profile.split("\n")
+                         if "Initial admission queue reason:" in line]
+        assert len(queued_reasons) == 1, profile
+        assert ADMITTED_STALENESS_WARNING in queued_reasons[0]
+        num_queued += 1
+    assert num_admitted_immediately == 1
+    assert num_queued == 3
+    assert num_rejected == NUM_QUERIES - num_admitted_immediately - num_queued
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):

@@ -85,9 +85,17 @@ Example of json received from the impala server
                 }
             ]
         }
-    ]
+    ],
+    "statestore_admission_control_time_since_last_update_ms": 745,
+    "statestore_update_staleness_detail": "Warning: admission control information from statestore is stale: 745ms since last update was received.",
+    "get_all_pools": true
 -->
 {{> www/common-header.tmpl }}
+{{?statestore_update_staleness_detail}}
+<div class="alert alert-danger" role="alert">
+<strong>{{statestore_update_staleness_detail}}</strong>
+</div>
+{{/statestore_update_staleness_detail}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js" type="text/javascript"></script>
 <script type="text/javascript">
 window.onload = function() {
@@ -203,6 +211,12 @@ function reset_method(pool_name) {
   at least once and their corresponding state and statistics.<br>See the
   <a href='/backends'>backends</a> debug page for memory admitted and reserved per
   backend.
+</p>
+<p class="lead">
+<strong>
+Time since last statestore update containing admission control topic state (ms):
+</strong>
+{{statestore_admission_control_time_since_last_update_ms}}
 </p>
 {{#resource_pools}}
 <div class="container-fluid">

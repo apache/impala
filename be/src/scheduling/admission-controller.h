@@ -226,6 +226,8 @@ class AdmissionController {
   static const string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON;
   static const string PROFILE_INFO_KEY_LAST_QUEUED_REASON;
   static const string PROFILE_INFO_KEY_ADMITTED_MEM;
+  static const string PROFILE_INFO_KEY_STALENESS_WARNING;
+  static const string PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME;
 
   AdmissionController(StatestoreSubscriber* subscriber,
       RequestPoolService* request_pool_service, MetricGroup* metrics,
@@ -277,6 +279,13 @@ class AdmissionController {
   void PopulatePerHostMemReservedAndAdmitted(
       std::unordered_map<std::string, std::pair<int64_t, int64_t>>* mem_map);
 
+  /// Returns a non-empty string with a warning if the admission control data is stale.
+  /// 'prefix' is added to the start of the string. Returns an empty string if not stale.
+  /// If 'ms_since_last_update' is non-null, set it to the time in ms since last update.
+  /// Caller must not hold 'admission_ctrl_lock_'.
+  std::string GetStalenessDetail(const std::string& prefix,
+      int64_t* ms_since_last_update = nullptr);
+
  private:
   class PoolStats;
   friend class PoolStats;
@@ -303,6 +312,10 @@ class AdmissionController {
 
   /// Protects all access to all variables below.
   boost::mutex admission_ctrl_lock_;
+
+  /// The last time a topic update was processed. Time is obtained from
+  /// MonotonicMillis(), or is 0 if an update was never received.
+  int64_t last_topic_update_time_ms_ = 0;
 
   /// Maps from host id to memory reserved and memory admitted, both aggregates over all
   /// pools. See the class doc for a detailed definition of reserved and admitted.
@@ -609,8 +622,12 @@ class AdmissionController {
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
   void PoolToJsonLocked(const string& pool_name, rapidjson::Value* resource_pools,
       rapidjson::Document* document);
+
+  /// Same as GetStalenessDetail() except caller must hold 'admission_ctrl_lock_'.
+  std::string GetStalenessDetailLocked(const std::string& prefix,
+      int64_t* ms_since_last_update = nullptr);
 };
 
-}
+} // namespace impala
 
 #endif // SCHEDULING_ADMISSION_CONTROLLER_H
