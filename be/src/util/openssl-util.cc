@@ -25,6 +25,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <openssl/tls1.h>
 
 #include "common/atomic.h"
 #include "gutil/port.h" // ATTRIBUTE_WEAK
@@ -70,7 +71,13 @@ static const int RNG_RESEED_INTERVAL = 128;
 static const int RNG_RESEED_BYTES = 512;
 
 int MaxSupportedTlsVersion() {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   return SSLv23_method()->version;
+#else
+  // OpenSSL 1.1+ doesn't let us detect the supported TLS version at runtime. Assume
+  // that the OpenSSL library we're linked against supports only up to TLS1.2
+  return TLS1_2_VERSION;
+#endif
 }
 
 bool IsInternalTlsConfigured() {
@@ -97,13 +104,25 @@ struct ScopedEVPCipherCtx {
   DISALLOW_COPY_AND_ASSIGN(ScopedEVPCipherCtx);
 
   explicit ScopedEVPCipherCtx(int padding) {
-    EVP_CIPHER_CTX_init(&ctx);
-    EVP_CIPHER_CTX_set_padding(&ctx, padding);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    ctx = static_cast<EVP_CIPHER_CTX*>(malloc(sizeof(*ctx)));
+    EVP_CIPHER_CTX_init(ctx);
+#else
+    ctx = EVP_CIPHER_CTX_new();
+#endif
+    EVP_CIPHER_CTX_set_padding(ctx, padding);
   }
 
-  ~ScopedEVPCipherCtx() { EVP_CIPHER_CTX_cleanup(&ctx); }
+  ~ScopedEVPCipherCtx() {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    EVP_CIPHER_CTX_cleanup(ctx);
+    free(ctx);
+#else
+    EVP_CIPHER_CTX_free(ctx);
+#endif
+  }
 
-  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX* ctx;
 };
 
 // Callback used by OpenSSLErr() - write the error given to us through buf to the
@@ -170,13 +189,13 @@ Status EncryptionKey::EncryptInternal(
   // mode is well-optimized(instruction level parallelism) with hardware acceleration
   // on x86 and PowerPC
   const EVP_CIPHER* evpCipher = GetCipher();
-  int success = encrypt ? EVP_EncryptInit_ex(&ctx.ctx, evpCipher, NULL, key_, iv_) :
-                          EVP_DecryptInit_ex(&ctx.ctx, evpCipher, NULL, key_, iv_);
+  int success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, evpCipher, NULL, key_, iv_) :
+                          EVP_DecryptInit_ex(ctx.ctx, evpCipher, NULL, key_, iv_);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex", err_context);
   }
   if (IsGcmMode()) {
-    if (EVP_CIPHER_CTX_ctrl(&ctx.ctx, EVP_CTRL_GCM_SET_IVLEN, AES_BLOCK_SIZE, NULL)
+    if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_SET_IVLEN, AES_BLOCK_SIZE, NULL)
         != 1) {
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
@@ -189,8 +208,8 @@ Status EncryptionKey::EncryptInternal(
     int in_len = static_cast<int>(min<int64_t>(len - offset, numeric_limits<int>::max()));
     int out_len;
     success = encrypt ?
-        EVP_EncryptUpdate(&ctx.ctx, out + offset, &out_len, data + offset, in_len) :
-        EVP_DecryptUpdate(&ctx.ctx, out + offset, &out_len, data + offset, in_len);
+        EVP_EncryptUpdate(ctx.ctx, out + offset, &out_len, data + offset, in_len) :
+        EVP_DecryptUpdate(ctx.ctx, out + offset, &out_len, data + offset, in_len);
     if (success != 1) {
       return OpenSSLErr(encrypt ? "EVP_EncryptUpdate" : "EVP_DecryptUpdate", err_context);
     }
@@ -201,7 +220,7 @@ Status EncryptionKey::EncryptInternal(
 
   if (IsGcmMode() && !encrypt) {
     // Set expected tag value
-    if (EVP_CIPHER_CTX_ctrl(&ctx.ctx, EVP_CTRL_GCM_SET_TAG, AES_BLOCK_SIZE, gcm_tag_)
+    if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_SET_TAG, AES_BLOCK_SIZE, gcm_tag_)
         != 1) {
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
@@ -209,14 +228,14 @@ Status EncryptionKey::EncryptInternal(
 
   // Finalize encryption or decryption.
   int final_out_len;
-  success = encrypt ? EVP_EncryptFinal_ex(&ctx.ctx, out + offset, &final_out_len) :
-                      EVP_DecryptFinal_ex(&ctx.ctx, out + offset, &final_out_len);
+  success = encrypt ? EVP_EncryptFinal_ex(ctx.ctx, out + offset, &final_out_len) :
+                      EVP_DecryptFinal_ex(ctx.ctx, out + offset, &final_out_len);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptFinal" : "EVP_DecryptFinal", err_context);
   }
 
   if (IsGcmMode() && encrypt) {
-    if (EVP_CIPHER_CTX_ctrl(&ctx.ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, gcm_tag_)
+    if (EVP_CIPHER_CTX_ctrl(ctx.ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, gcm_tag_)
         != 1) {
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
