@@ -139,23 +139,14 @@ under the License.
 
         </stentry>
 
-        <stentry><codeph>The value of the <codeph>--shutdown_deadline_s</codeph>
-            flag, which defaults to 1 hour.</codeph>
-
-        </stentry>
+        <stentry>The value of the <codeph>‑‑shutdown_deadline_s</codeph> flag,
+          which defaults to 1 hour. </stentry>
 
         <stentry>
-
-          <p>
-            <codeph><varname>deadline</varname></codeph> must be a non-negative number,
-            specified in seconds.
-          </p>
-
-          <p>
-            The value, 0, for <varname>deadline</varname> specifies an immediate shutdown.
-          </p>
-
-        </stentry>
+          <codeph><varname>deadline</varname></codeph> must be a non-negative
+          number, specified in seconds. <p> The value, 0, for
+              <varname>deadline</varname> specifies an immediate shutdown.
+          </p></stentry>
 
       </strow>
 
