@@ -40,15 +40,17 @@ namespace impala {
 /// in the two output bytes: [ 0 0 1 | 0 0 0 0 1 ] [ x x x x x x | 1 0 ]
 ///            lower bits of 17--^         1         next value     ^--upper bits of 17
 ///
-/// Bit widths from 0 to 32 are supported (0 bit width means that every value is 0).
+/// Bit widths from 0 to 64 are supported (0 bit width means that every value is 0).
 /// The batched unpacking functions operate on batches of 32 values. This batch size
 /// is convenient because for every supported bit width, the end of a 32 value batch
 /// falls on a byte boundary. It is also large enough to amortise loop overheads.
 class BitPacking {
  public:
+  static constexpr int MAX_BITWIDTH = sizeof(uint64_t) * 8;
+
   /// Unpack bit-packed values with 'bit_width' from 'in' to 'out'. Keeps unpacking until
   /// either all 'in_bytes' are read or 'num_values' values are unpacked. 'out' must have
-  /// enough space for 'num_values'. 0 <= 'bit_width' <= 32 and 'bit_width' <= # of bits
+  /// enough space for 'num_values'. 0 <= 'bit_width' <= 64 and 'bit_width' <= # of bits
   /// in OutType. 'in' must point to 'in_bytes' of addressable memory.
   ///
   /// Returns a pointer to the byte after the last byte of 'in' that was read and also the
@@ -86,7 +88,7 @@ class BitPacking {
   /// Unpack exactly 32 values of 'bit_width' from 'in' to 'out'. 'in' must point to
   /// 'in_bytes' of addressable memory, and 'in_bytes' must be at least
   /// (32 * bit_width / 8). 'out' must have space for 32 OutType values.
-  /// 0 <= 'bit_width' <= 32 and 'bit_width' <= # of bits in OutType.
+  /// 0 <= 'bit_width' <= 64 and 'bit_width' <= # of bits in OutType.
   template <typename OutType>
   static const uint8_t* Unpack32Values(int bit_width, const uint8_t* __restrict__ in,
       int64_t in_bytes, OutType* __restrict__ out);
@@ -113,7 +115,7 @@ class BitPacking {
   /// 'num_values' must be at most 31. 'in' must point to 'in_bytes' of addressable
   /// memory, and 'in_bytes' must be at least ceil(num_values * bit_width / 8).
   /// 'out' must have space for 'num_values' OutType values.
-  /// 0 <= 'bit_width' <= 32 and 'bit_width' <= # of bits in OutType.
+  /// 0 <= 'bit_width' <= 64 and 'bit_width' <= # of bits in OutType.
   template <typename OutType, int BIT_WIDTH>
   static const uint8_t* UnpackUpTo31Values(const uint8_t* __restrict__ in,
       int64_t in_bytes, int num_values, OutType* __restrict__ out);
