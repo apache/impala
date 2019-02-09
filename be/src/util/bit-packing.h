@@ -86,6 +86,25 @@ class BitPacking {
       int64_t dict_len, int64_t num_values, OutType* __restrict__ out, int64_t stride,
       bool* __restrict__ decode_error);
 
+  /// Unpack values as above and delta decode them. `delta_offset` is added to each delta
+  /// before decoding.`base_value` is a pointer to the previous decoded value to which the
+  /// first delta should be added. The value of `base_value` is updated to the last
+  /// decoded value. Writes the decoded values to 'out' with a stride of 'stride' bytes.
+  /// Sets 'decode_error' to true if an error occurs. Does not modify 'decode_error' on
+  /// success.
+  template <typename OutType, typename ParquetType>
+  static std::pair<const uint8_t*, int64_t> UnpackAndDeltaDecodeValues(int bit_width,
+      const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+      ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+      int64_t stride, bool* __restrict__ decode_error);
+
+  /// Same as above, templated by BIT_WIDTH.
+  template <typename OutType, typename ParquetType, int BIT_WIDTH>
+  static std::pair<const uint8_t*, int64_t> UnpackAndDeltaDecodeValues(
+      const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+      ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+      int64_t stride, bool* __restrict__ decode_error);
+
   /// Unpack exactly 32 values of 'bit_width' from 'in' to 'out'. 'in' must point to
   /// 'in_bytes' of addressable memory, and 'in_bytes' must be at least
   /// (32 * bit_width / 8). 'out' must have space for 32 OutType values.
@@ -112,6 +131,14 @@ class BitPacking {
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len,
       OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error);
 
+
+  /// Same as Unpack32Values() with delta decoding and templated by BIT_WIDTH.
+  template <typename OutType, typename ParquetType, int BIT_WIDTH>
+  static const uint8_t* UnpackAndDeltaDecode32Values(
+      const uint8_t* __restrict__ in, int64_t in_bytes,
+      ParquetType* __restrict__ base_value, ParquetType delta_offset,
+      OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error);
+
   /// Unpacks 'num_values' values with the given BIT_WIDTH from 'in' to 'out'.
   /// 'num_values' must be at most 31. 'in' must point to 'in_bytes' of addressable
   /// memory, and 'in_bytes' must be at least ceil(num_values * bit_width / 8).
@@ -126,6 +153,13 @@ class BitPacking {
   static const uint8_t* UnpackAndDecodeUpTo31Values(const uint8_t* __restrict__ in,
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len, int num_values,
       OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error);
+
+  /// Same as UnpackUpTo31Values() with delta decoding.
+  template <typename OutType, typename ParquetType, int BIT_WIDTH>
+  static const uint8_t* UnpackAndDeltaDecodeUpTo31Values(
+      const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+      ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+      int64_t stride, bool* __restrict__ decode_error);
 
  private:
   /// Compute the number of values with the given bit width that can be unpacked from

@@ -24,6 +24,7 @@
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
 #include "testutil/mem-util.h"
+#include "util/arithmetic-util.h"
 #include "util/bit-packing.h"
 #include "util/bit-stream-utils.inline.h"
 
@@ -317,6 +318,152 @@ TEST(BitPackingTest, RandomUnpackAndDecode32) {
 
 TEST(BitPackingTest, RandomUnpackAndDecode64) {
   RandomUnpackAndDecodeTest<uint64_t>();
+}
+
+template <typename INT_T>
+struct DeltaData {
+  DeltaData(INT_T base_value, INT_T delta_offset, std::size_t num_values,
+      std::vector<uint8_t> packed_deltas)
+      : base_value(base_value), delta_offset(delta_offset), num_values(num_values),
+      packed_deltas(packed_deltas)
+  {}
+
+  INT_T base_value;
+  INT_T delta_offset;
+  std::size_t num_values;
+  std::vector<uint8_t> packed_deltas;
+};
+
+template <typename ParquetType>
+DeltaData<ParquetType> DeltaEncode(const std::vector<ParquetType>& input, int bit_width) {
+  using UnsignedParquetType = typename std::make_unsigned<ParquetType>::type;
+  const ParquetType base_value = input.empty() ? 0 : input[0];
+  std::vector<ParquetType> deltas;
+
+  /// Calculate the deltas.
+  for (int i = 1; i < input.size(); i++) {
+    UnsignedParquetType current = input[i];
+    UnsignedParquetType previous = input[i - 1];
+    ParquetType delta = current - previous;
+    deltas.push_back(delta);
+  }
+
+  /// Offset the deltas.
+  const auto it = std::min_element(deltas.begin(), deltas.end());
+  const ParquetType min_delta = (it == deltas.end()) ? 0 : *it;
+
+  std::for_each(deltas.begin(), deltas.end(), [min_delta](ParquetType& element) {
+      element = ArithmeticUtil::AsUnsigned<std::minus>(element, min_delta);
+      });
+
+  // Bit pack the deltas.
+  const int bytes_required = BitUtil::RoundUpNumBytes(bit_width * deltas.size());
+  std::vector<uint8_t> out_data(bytes_required);
+
+  if (bytes_required > 0) {
+    BitWriter writer(out_data.data(), bytes_required);
+    if (bit_width > 0) {
+      for (const ParquetType delta : deltas) {
+        const UnsignedParquetType delta_unsigned = delta;
+        EXPECT_TRUE(writer.PutValue(delta_unsigned, bit_width));
+      }
+    }
+    writer.Flush();
+  }
+
+  return DeltaData<ParquetType>(base_value, min_delta, deltas.size(), out_data);
+}
+
+template <typename INT_T, typename ParquetType>
+void RandomUnpackAndDeltaDecodeTest() {
+  constexpr int MAX_BITWIDTH = std::min<int>(BitPacking::MAX_BITWIDTH,
+      sizeof(INT_T) * 8);
+  for (int bit_width = 0; bit_width <= MAX_BITWIDTH; ++bit_width) {
+    const INT_T max_delta = bit_width == 0 ? 0 : (1UL << (bit_width - 1)) - 1;
+    const INT_T min_delta = bit_width == 0 ? 0 : -max_delta - 1;
+
+    const std::vector<ParquetType> delta_data = GenerateRandomInput<ParquetType>(
+        NUM_IN_VALUES, min_delta, max_delta);
+
+    const std::vector<int> lengths = GetLengths();
+
+    for (int length : lengths) {
+      std::vector<ParquetType> in_data;
+
+      std::partial_sum(delta_data.begin(), delta_data.begin() + length,
+          std::back_inserter(in_data),
+          /// We add the elements as unsigned to have defined overflow.
+          ArithmeticUtil::AsUnsigned<std::plus, ParquetType>);
+
+      /// Convert the input values to INT_T to compare them with the output.
+      const std::vector<INT_T> in_data_as_int_t(in_data.begin(), in_data.end());
+
+      DeltaData<ParquetType> encoded = DeltaEncode<ParquetType>(in_data, bit_width);
+
+      const std::vector<int> strides = {sizeof(INT_T), sizeof(INT_T) + 5,
+        2 * sizeof(INT_T) + 5};
+
+      for (int stride : strides) {
+        bool decode_error = false;
+        std::vector<uint8_t> out(in_data.size() * stride);
+
+        uint8_t* out_ptr = nullptr;
+        if (in_data.empty()) {
+          /// We do not copy anything and do not increment the pointer if we do not have
+          /// any elements.
+          out_ptr = out.data();
+        } else {
+          /// If we have elements, copy the base value to the beginning so the vector
+          /// after unpacking can be compared directly to the vector of input numbers.
+          memcpy(out.data(), &encoded.base_value, sizeof(INT_T));
+          out_ptr = out.data() + stride;
+        }
+
+        /// Converting to ParquetType.
+        ParquetType base_value = encoded.base_value;
+        ParquetType delta_offset = encoded.delta_offset;
+
+        std::pair<const uint8_t*, int64_t> res
+            = BitPacking::UnpackAndDeltaDecodeValues<INT_T, ParquetType>(
+                bit_width, encoded.packed_deltas.data(), encoded.packed_deltas.size(),
+                &base_value, delta_offset, encoded.num_values,
+                reinterpret_cast<INT_T*>(out_ptr), stride, &decode_error);
+
+        EXPECT_FALSE(decode_error);
+        EXPECT_EQ(in_data_as_int_t.size(), res.second + (length == 0 ? 0 : 1));
+        ExpectEqualsWithStride<INT_T>(in_data_as_int_t.data(), in_data_as_int_t.size(),
+            out.data(), out.size(), stride);
+      }
+    }
+  }
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode8_32) {
+  RandomUnpackAndDeltaDecodeTest<int8_t, int32_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode16_32) {
+  RandomUnpackAndDeltaDecodeTest<int16_t, int32_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode32_32) {
+  RandomUnpackAndDeltaDecodeTest<int32_t, int32_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode8_64) {
+  RandomUnpackAndDeltaDecodeTest<int8_t, int64_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode16_64) {
+  RandomUnpackAndDeltaDecodeTest<int16_t, int64_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode32_64) {
+  RandomUnpackAndDeltaDecodeTest<int32_t, int64_t>();
+}
+
+TEST(BitPackingTest, RandomUnpackAndDeltaDecode64_64) {
+  RandomUnpackAndDeltaDecodeTest<int64_t, int64_t>();
 }
 
 }

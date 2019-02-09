@@ -32,6 +32,7 @@
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "util/bit-util.h"
+#include "util/mem-util.h"
 
 namespace impala {
 
@@ -127,6 +128,7 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(int bit_wid
   }
 #pragma pop_macro("UNPACK_VALUES_CASE")
 }
+
 template <typename OutType, int BIT_WIDTH>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(
     const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
@@ -150,6 +152,54 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(
   if (remainder_values > 0) {
     in_pos = UnpackAndDecodeUpTo31Values<OutType, BIT_WIDTH>(
         in_pos, in_bytes, dict, dict_len, remainder_values,
+        reinterpret_cast<OutType*>(out_pos), stride, decode_error);
+  }
+  return std::make_pair(in_pos, values_to_read);
+}
+
+template <typename OutType, typename ParquetType>
+std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDeltaDecodeValues(int bit_width,
+    const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+    ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+    int64_t stride, bool* __restrict__ decode_error) {
+#pragma push_macro("DELTA_UNPACK_VALUES_CASE")
+#define DELTA_UNPACK_VALUES_CASE(ignore1, i, ignore2) \
+    case i: return UnpackAndDeltaDecodeValues<OutType, ParquetType, i>(in, in_bytes, \
+                base_value, delta_offset, num_values, out, stride, decode_error);
+
+  switch (bit_width) {
+    // Expand cases from 0 to 64.
+    BOOST_PP_REPEAT_FROM_TO(0, 65, DELTA_UNPACK_VALUES_CASE, ignore);
+    default: DCHECK(false); return std::make_pair(nullptr, -1);
+  }
+#pragma pop_macro("DELTA_UNPACK_VALUES_CASE")
+}
+
+/// Same as above, templated by BIT_WIDTH.
+template <typename OutType, typename ParquetType, int BIT_WIDTH>
+std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDeltaDecodeValues(
+    const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+    ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+    int64_t stride, bool* __restrict__ decode_error) {
+  constexpr int BATCH_SIZE = 32;
+  const int64_t values_to_read = NumValuesToUnpack(BIT_WIDTH, in_bytes, num_values);
+  const int64_t batches_to_read = values_to_read / BATCH_SIZE;
+  const int64_t remainder_values = values_to_read % BATCH_SIZE;
+  const uint8_t* in_pos = in;
+  uint8_t* out_pos = reinterpret_cast<uint8_t*>(out);
+
+  // First unpack as many full batches as possible.
+  for (int64_t i = 0; i < batches_to_read; ++i) {
+    in_pos = UnpackAndDeltaDecode32Values<OutType, ParquetType, BIT_WIDTH>(
+        in_pos, in_bytes, base_value, delta_offset, reinterpret_cast<OutType*>(out_pos),
+        stride, decode_error);
+    out_pos += stride * BATCH_SIZE;
+    in_bytes -= (BATCH_SIZE * BIT_WIDTH) / CHAR_BIT;
+  }
+  // Then unpack the final partial batch.
+  if (remainder_values > 0) {
+    in_pos = UnpackAndDeltaDecodeUpTo31Values<OutType, ParquetType, BIT_WIDTH>(
+        in_pos, in_bytes, base_value, delta_offset, remainder_values,
         reinterpret_cast<OutType*>(out_pos), stride, decode_error);
   }
   return std::make_pair(in_pos, values_to_read);
@@ -192,7 +242,7 @@ inline uint64_t ALWAYS_INLINE UnpackValue(const uint8_t* __restrict__ in_buf) {
   static_assert(WORDS_TO_READ <= 3, "At most three 32-bit words need to be loaded.");
 
   constexpr int FIRST_BIT_OFFSET = FIRST_BIT_IDX - FIRST_WORD_IDX * 32;
-  constexpr uint64_t mask = BIT_WIDTH == 64 ? ~0L : (1UL << BIT_WIDTH) - 1;
+  constexpr uint64_t MASK = BIT_WIDTH == 64 ? ~0L : (1UL << BIT_WIDTH) - 1;
   const uint32_t* const in = reinterpret_cast<const uint32_t*>(in_buf);
 
   // Avoid reading past the end of the buffer. We can safely read 64 bits if we know that
@@ -210,22 +260,28 @@ inline uint64_t ALWAYS_INLINE UnpackValue(const uint8_t* __restrict__ in_buf) {
   constexpr bool READ_32_BITS = WORDS_TO_READ == 1
       && (!CAN_SAFELY_READ_64_BITS || BitUtil::IsPowerOf2(BIT_WIDTH));
 
+  // Shifting with the size of a type is undefined behaviour but this is guaranteed to
+  // not be the case here.
+  static_assert(FIRST_BIT_OFFSET < sizeof(uint32_t) * CHAR_BIT);
   if (READ_32_BITS) {
     uint32_t word = in[FIRST_WORD_IDX];
-    word >>= FIRST_BIT_OFFSET < 32 ? FIRST_BIT_OFFSET : 0;
-    return word & mask;
+    word >>= FIRST_BIT_OFFSET;
+    return word & MASK;
   }
 
   uint64_t word = *reinterpret_cast<const uint64_t*>(in + FIRST_WORD_IDX);
   word >>= FIRST_BIT_OFFSET;
 
   if (WORDS_TO_READ > 2) {
-    constexpr int USEFUL_BITS = FIRST_BIT_OFFSET == 0 ? 0 : 64 - FIRST_BIT_OFFSET;
+    constexpr int USEFUL_BITS = 64 - FIRST_BIT_OFFSET;
+    // If we have to read 3 32-bit words, then the number of useful bits in the first 2
+    // words cannot be 64 because the max bit width is 64.
+    static_assert(WORDS_TO_READ <= 2 || USEFUL_BITS < sizeof(uint64_t) * CHAR_BIT);
     uint64_t extra_word = in[FIRST_WORD_IDX + 2];
     word |= extra_word << USEFUL_BITS;
   }
 
-  return word & mask;
+  return word & MASK;
 }
 
 template <typename OutType>
@@ -290,9 +346,9 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
 
   // Call UnpackValue() and DecodeValue() for 0 <= i < 32.
 #pragma push_macro("DECODE_VALUE_CALL")
-#define DECODE_VALUE_CALL(ignore1, i, ignore2)               \
-  {                                                          \
-    uint32_t idx = UnpackValue<BIT_WIDTH, i, true>(in);            \
+#define DECODE_VALUE_CALL(ignore1, i, ignore2) \
+  { \
+    uint32_t idx = UnpackValue<BIT_WIDTH, i, true>(in); \
     uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + i * stride; \
     DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }
@@ -300,6 +356,33 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
   BOOST_PP_REPEAT_FROM_TO(0, 32, DECODE_VALUE_CALL, ignore);
   return in + BYTES_TO_READ;
 #pragma pop_macro("DECODE_VALUE_CALL")
+}
+
+template <typename OutType, typename ParquetType, int BIT_WIDTH>
+const uint8_t* BitPacking::UnpackAndDeltaDecode32Values(
+    const uint8_t* __restrict__ in, int64_t in_bytes,
+    ParquetType* __restrict__ base_value, ParquetType delta_offset,
+    OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error) {
+  static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
+  constexpr int BYTES_TO_READ = BitUtil::RoundUpNumBytes(32 * BIT_WIDTH);
+  DCHECK_GE(in_bytes, BYTES_TO_READ);
+
+  StrideWriter<OutType> writer(out, stride);
+
+#pragma push_macro("DELTA_DECODE_VALUE_CALL")
+#define DELTA_DECODE_VALUE_CALL(ignore1, i, ignore2) \
+  { \
+    using UINT_T = std::make_unsigned_t<ParquetType>; \
+    UINT_T delta = UnpackValue<BIT_WIDTH, i, true>(in) + delta_offset; \
+    *base_value += delta; \
+    *writer.Advance() = *base_value; \
+  }
+
+  BOOST_PP_REPEAT_FROM_TO(0, 32, DELTA_DECODE_VALUE_CALL, ignore);
+#pragma pop_macro("DELTA_DECODE_VALUE_CALL")
+
+  return in + BYTES_TO_READ;
 }
 
 template <typename OutType, int BIT_WIDTH>
@@ -367,9 +450,9 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
   }
 
 #pragma push_macro("DECODE_VALUES_CASE")
-#define DECODE_VALUES_CASE(ignore1, i, ignore2)                   \
-  case 31 - i: {                                                  \
-    uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer);     \
+#define DECODE_VALUES_CASE(ignore1, i, ignore2) \
+  case 31 - i: { \
+    uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer); \
     uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + (30 - i) * stride; \
     DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }
@@ -386,4 +469,50 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
   return in + BYTES_TO_READ;
 #pragma pop_macro("DECODE_VALUES_CASE")
 }
+
+template <typename OutType, typename ParquetType, int BIT_WIDTH>
+const uint8_t* BitPacking::UnpackAndDeltaDecodeUpTo31Values(
+    const uint8_t* __restrict__ in, int64_t in_bytes, ParquetType* base_value,
+    ParquetType delta_offset, int64_t num_values, OutType* __restrict__ out,
+    int64_t stride, bool* __restrict__ decode_error) {
+  static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
+  constexpr int MAX_BATCH_SIZE = 31;
+  const int bytes_to_read = BitUtil::RoundUpNumBytes(num_values * BIT_WIDTH);
+  DCHECK_GE(in_bytes, bytes_to_read);
+  DCHECK_LE(num_values, MAX_BATCH_SIZE);
+
+  // Make sure the buffer is at least 1 byte.
+  constexpr int TMP_BUFFER_SIZE = BIT_WIDTH ?
+    (BIT_WIDTH * (MAX_BATCH_SIZE + 1)) / CHAR_BIT : 1;
+  uint8_t tmp_buffer[TMP_BUFFER_SIZE];
+
+  const uint8_t* in_buffer = in;
+  // Copy into padded temporary buffer to avoid reading past the end of 'in' if the
+  // last 32-bit load would go past the end of the buffer.
+  if (BitUtil::RoundUp(bytes_to_read, sizeof(uint32_t)) > in_bytes) {
+    memcpy(tmp_buffer, in, bytes_to_read);
+    in_buffer = tmp_buffer;
+  }
+
+  StrideWriter<OutType> writer(out, stride);
+
+  /// Here we cannot use the switch with fallthrough in reverse order because the order is
+  /// important.
+#pragma push_macro("DELTA_DECODE_VALUES_CASE")
+#define DELTA_DECODE_VALUES_CASE(ignore1, i, ignore2) \
+  { \
+    if (i >= num_values) return in + bytes_to_read; \
+    using UINT_T = std::make_unsigned_t<ParquetType>; \
+    UINT_T delta = UnpackValue<BIT_WIDTH, i, false>(in_buffer) + delta_offset; \
+    *base_value += delta; \
+    *writer.Advance() = *base_value; \
+  }
+
+  BOOST_PP_REPEAT_FROM_TO(0, 31, DELTA_DECODE_VALUES_CASE, ignore);
+#pragma pop_macro("DELTA_DECODE_VALUES_CASE")
+
+  return in + bytes_to_read;
+}
+
 } // namespace impala

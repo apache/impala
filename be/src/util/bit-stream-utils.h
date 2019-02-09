@@ -86,7 +86,16 @@ class BitWriter {
   void Flush(bool align=false);
 
   /// Maximum supported bitwidth for writer.
-  static const int MAX_BITWIDTH = 64;
+  static constexpr int MAX_BITWIDTH = 64;
+
+  template<typename T>
+  static constexpr int NumberOfSignificantBits(T value);
+
+  template<typename T>
+  static constexpr int VlqRequiredSize(T value);
+
+  template<typename T>
+  static constexpr int ZigZagRequiredBytes(T value);
 
  private:
   uint8_t* buffer_;
@@ -158,6 +167,18 @@ class BatchedBitReader {
   template <typename T>
   WARN_UNUSED_RESULT int UnpackAndDecodeBatch(
       int bit_width, T* dict, int64_t dict_len, int num_values, T* v, int64_t stride);
+
+  /// Unpack bit-packed values in the same way as UnpackBatch() and delta decode them,
+  /// interpreting them as the differences between consecutive numbers. `delta_offset` is
+  /// added to each delta before decoding. `base_value` is a pointer to the previous
+  /// decoded value to which the first delta should be added. The value of `base_value` is
+  /// updated to the last decoded value. Return -1 if a decoding error is encountered
+  /// Otherwise returns the number of values decoded. The values are written to 'v' with a
+  /// stride of 'stride' bytes.
+  template <typename T, typename ParquetType>
+  WARN_UNUSED_RESULT int UnpackAndDeltaDecodeBatch(
+      int bit_width, ParquetType* base_value, ParquetType delta_offset, int num_values,
+      T* v, int64_t stride);
 
   /// Reads an unpacked 'num_bytes'-sized value from the buffer and stores it in 'v'. T
   /// needs to be a little-endian native type and big enough to store 'num_bytes'.

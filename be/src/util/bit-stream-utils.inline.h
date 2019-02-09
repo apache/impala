@@ -21,6 +21,7 @@
 #include "util/bit-stream-utils.h"
 
 #include "common/compiler-util.h"
+#include "util/bit-packing.inline.h"
 
 namespace impala {
 
@@ -119,6 +120,44 @@ bool BitWriter::PutZigZagInteger(INT_T v) {
 }
 
 template<typename T>
+constexpr int BitWriter::NumberOfSignificantBits(T value) {
+  static_assert(std::is_integral_v<T>, "Integral type required.");
+  static_assert(std::is_unsigned_v<T>, "Unsigned type required.");
+  static_assert(!std::is_same_v<T, bool>, "Bools are not supported.");
+
+  if (value == 0) return 0;
+
+  return sizeof(T) * 8 - BitUtil::CountLeadingZeros(value);
+}
+
+template<typename T>
+constexpr int BitWriter::VlqRequiredSize(T value) {
+  static_assert(std::is_integral_v<T>, "Integral type required.");
+  static_assert(std::is_unsigned_v<T>, "Unsigned type required.");
+  static_assert(!std::is_same_v<T, bool>, "Bools are not supported.");
+
+  /// 0 has zero significant bits but we cannot store it on zero bytes.
+  if (value == 0) return 1;
+
+  int significant_bits = NumberOfSignificantBits(value);
+
+  return (significant_bits + 6) / 7;
+}
+
+template<typename T>
+constexpr int BitWriter::ZigZagRequiredBytes(T value) {
+  static_assert(std::is_integral_v<T>, "Integral type required.");
+  static_assert(std::is_signed_v<T>, "Signed type required.");
+
+  using T_UNSIGNED = std::make_unsigned_t<T>;
+  constexpr int bit_number = sizeof(T) * 8;
+
+  T_UNSIGNED value_unsigned = value;
+  T_UNSIGNED value_zigzag = (value_unsigned << 1) ^ (value >> (bit_number - 1));
+  return VlqRequiredSize(value_zigzag);
+}
+
+template<typename T>
 inline int BatchedBitReader::UnpackBatch(int bit_width, int num_values, T* v) {
   DCHECK(buffer_pos_ != nullptr);
   DCHECK_GE(bit_width, 0);
@@ -159,6 +198,28 @@ inline int BatchedBitReader::UnpackAndDecodeBatch(
   bool decode_error = false;
   std::tie(new_buffer_pos, num_read) = BitPacking::UnpackAndDecodeValues(bit_width,
       buffer_pos_, bytes_left(), dict, dict_len, num_values, v, stride, &decode_error);
+  if (UNLIKELY(decode_error)) return -1;
+  buffer_pos_ = new_buffer_pos;
+  DCHECK_LE(buffer_pos_, buffer_end_);
+  DCHECK_LE(num_read, num_values);
+  return static_cast<int>(num_read);
+}
+
+template <typename T, typename ParquetType>
+inline int BatchedBitReader::UnpackAndDeltaDecodeBatch(
+    int bit_width, ParquetType* base_value, ParquetType delta_offset, int num_values,
+    T* v, int64_t stride) {
+  DCHECK(buffer_pos_ != nullptr);
+  DCHECK_GE(bit_width, 0);
+  DCHECK_LE(bit_width, MAX_BITWIDTH);
+  DCHECK_GE(num_values, 0);
+
+  const uint8_t* new_buffer_pos;
+  int64_t num_read;
+  bool decode_error = false;
+  std::tie(new_buffer_pos, num_read)
+      = BitPacking::UnpackAndDeltaDecodeValues<T, ParquetType>(bit_width, buffer_pos_,
+          bytes_left(), base_value, delta_offset, num_values, v, stride, &decode_error);
   if (UNLIKELY(decode_error)) return -1;
   buffer_pos_ = new_buffer_pos;
   DCHECK_LE(buffer_pos_, buffer_end_);

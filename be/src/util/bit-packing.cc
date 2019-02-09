@@ -60,6 +60,19 @@ INSTANTIATE_UNPACK_AND_DECODE(StringValue);
 INSTANTIATE_UNPACK_AND_DECODE(TimestampValue);
 INSTANTIATE_UNPACK_AND_DECODE(DateValue);
 
+#define INSTANTIATE_UNPACK_AND_DELTA_DECODE(OUT_TYPE, PARQUET_TYPE)               \
+  template std::pair<const uint8_t*, int64_t>                                     \
+  BitPacking::UnpackAndDeltaDecodeValues<OUT_TYPE>(int bit_width,                 \
+      const uint8_t* __restrict__ in, int64_t in_bytes, PARQUET_TYPE* base_value, \
+      PARQUET_TYPE delta_offset, int64_t num_values, OUT_TYPE* __restrict__ out,  \
+      int64_t stride, bool* __restrict__ decode_error);
+
+INSTANTIATE_UNPACK_AND_DELTA_DECODE(int8_t, int32_t);
+INSTANTIATE_UNPACK_AND_DELTA_DECODE(int16_t, int32_t);
+INSTANTIATE_UNPACK_AND_DELTA_DECODE(int32_t, int32_t);
+INSTANTIATE_UNPACK_AND_DELTA_DECODE(int64_t, int32_t);
+INSTANTIATE_UNPACK_AND_DELTA_DECODE(int64_t, int64_t);
+
 // Required for bit-packing-benchmark.cc.
 template
 const uint8_t* BitPacking::Unpack32Values(int bit_width, const uint8_t* __restrict__ in,
