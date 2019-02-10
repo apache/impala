@@ -394,7 +394,8 @@ class StringParser {
     if (exponent > digits_after_dot_count) {
       // Ex: 0.1e3 (which at this point would have precision == 1 and scale == 1), the
       //     scale must be set to 0 and the value set to 100 which means a precision of 3.
-      *value *= DecimalUtil::GetScaleMultiplier<T>(exponent - digits_after_dot_count);
+      *value = ArithmeticUtil::AsUnsigned<std::multiplies>(
+          *value, DecimalUtil::GetScaleMultiplier<T>(exponent - digits_after_dot_count));
       *precision = total_digits_count + (exponent - digits_after_dot_count);
       *scale = 0;
     } else {
