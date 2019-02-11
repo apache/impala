@@ -80,7 +80,7 @@ import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -91,6 +91,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -171,7 +172,7 @@ import com.google.common.collect.Sets;
  * loading thread pool.
  */
 public class CatalogServiceCatalog extends Catalog {
-  public static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
+  public static final Logger LOG = LoggerFactory.getLogger(CatalogServiceCatalog.class);
 
   private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
@@ -1279,7 +1280,7 @@ public class CatalogServiceCatalog extends Catalog {
         tableLoadingMgr_.backgroundLoad(tblName);
       }
     } catch (Exception e) {
-      LOG.error(e);
+      LOG.error("Error initializing Catalog", e);
       throw new CatalogException("Error initializing Catalog. Catalog may be empty.", e);
     } finally {
       versionLock_.writeLock().unlock();
@@ -2237,6 +2238,10 @@ public class CatalogServiceCatalog extends Catalog {
         if (lastSentTopicUpdate != currentTopicUpdate) {
           ++numAttempts;
           if (numAttempts > maxNumAttempts) {
+            LOG.error(String.format("Couldn't retrieve the covering topic version for "
+                + "catalog objects. Updated objects: %s, deleted objects: %s",
+                FeCatalogUtils.debugString(result.updated_catalog_objects),
+                FeCatalogUtils.debugString(result.removed_catalog_objects)));
             throw new CatalogException("Couldn't retrieve the catalog topic version " +
                 "for the SYNC_DDL operation after " + maxNumAttempts + " attempts." +
                 "The operation has been successfully executed but its effects may have " +

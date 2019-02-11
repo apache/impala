@@ -20,7 +20,8 @@ package org.apache.impala.catalog;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -37,7 +38,7 @@ import com.google.common.base.Strings;
 // by the catalog for at least TOPIC_UPDATE_LOG_GC_FREQUENCY updates to be removed from
 // the log.
 public class TopicUpdateLog {
-  private static final Logger LOG = Logger.getLogger(TopicUpdateLog.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TopicUpdateLog.class);
   // Frequency at which the entries of the topic update log are garbage collected.
   // An entry may survive for (2 * TOPIC_UPDATE_LOG_GC_FREQUENCY) - 1 topic updates.
   private final static int TOPIC_UPDATE_LOG_GC_FREQUENCY = 1000;
@@ -104,9 +105,8 @@ public class TopicUpdateLog {
       return;
     }
     if (numTopicUpdatesToGc_ == 0) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Topic update log GC started.");
-      }
+      LOG.info("Topic update log GC started. GC-ing topics with versions " +
+          "<= {}", oldestTopicUpdateToGc_);
       Preconditions.checkState(oldestTopicUpdateToGc_ > 0);
       int numEntriesRemoved = 0;
       for (Map.Entry<String, Entry> entry:
@@ -120,10 +120,8 @@ public class TopicUpdateLog {
       }
       numTopicUpdatesToGc_ = TOPIC_UPDATE_LOG_GC_FREQUENCY;
       oldestTopicUpdateToGc_ = lastTopicUpdateVersion;
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Topic update log GC finished. Removed " + numEntriesRemoved +
-            " entries.");
-      }
+      LOG.info("Topic update log GC finished. Removed {} entries.",
+          numEntriesRemoved);
     } else {
       --numTopicUpdatesToGc_;
     }
