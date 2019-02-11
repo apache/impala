@@ -22,9 +22,11 @@ from datetime import datetime
 # changed, and the stress test loses the ability to run the full set of queries. Set
 # these constants and assert that when a workload is used, all the queries we expect to
 # use are there.
-EXPECTED_TPCDS_QUERIES_COUNT = 71
+EXPECTED_TPCDS_QUERIES_COUNT = 72
 EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
-EXPECTED_TPCH_QUERIES_COUNT = 25
+EXPECTED_TPCH_QUERIES_COUNT = 22
+# Add the number of stress test specific queries, i.e. in files like '*-stress-*.test'
+EXPECTED_TPCH_STRESS_QUERIES_COUNT = EXPECTED_TPCH_QUERIES_COUNT + 3
 # Regex to extract the estimated memory from an explain plan.
 # The unit prefixes can be found in
 # fe/src/main/java/org/apache/impala/common/PrintUtils.java

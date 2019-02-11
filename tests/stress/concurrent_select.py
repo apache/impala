@@ -87,7 +87,7 @@ from tests.comparison.query_generator import QueryGenerator
 from tests.comparison.query_profile import DefaultProfile
 from tests.util.parse_util import (
     EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
-    EXPECTED_TPCH_QUERIES_COUNT, match_memory_estimate, parse_mem_to_mb)
+    EXPECTED_TPCH_STRESS_QUERIES_COUNT, match_memory_estimate, parse_mem_to_mb)
 from tests.util.thrift_util import op_handle_to_query_id
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -1307,7 +1307,8 @@ def load_tpc_queries(workload):
   """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
   LOG.info("Loading %s queries", workload)
   queries = []
-  for query_name, query_sql in test_file_parser.load_tpc_queries(workload).iteritems():
+  for query_name, query_sql in test_file_parser.load_tpc_queries(workload,
+      include_stress_queries=True).iteritems():
     query = Query()
     query.name = query_name
     query.sql = query_sql
@@ -2186,7 +2187,7 @@ def main():
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_db:
     tpch_queries = load_tpc_queries("tpch")
-    assert len(tpch_queries) == EXPECTED_TPCH_QUERIES_COUNT
+    assert len(tpch_queries) == EXPECTED_TPCH_STRESS_QUERIES_COUNT
     for query in tpch_queries:
       query.db_name = args.tpch_db
     queries.extend(tpch_queries)
@@ -2204,7 +2205,7 @@ def main():
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_kudu_db:
     tpch_kudu_queries = load_tpc_queries("tpch")
-    assert len(tpch_kudu_queries) == EXPECTED_TPCH_QUERIES_COUNT
+    assert len(tpch_kudu_queries) == EXPECTED_TPCH_STRESS_QUERIES_COUNT
     for query in tpch_kudu_queries:
       query.db_name = args.tpch_kudu_db
     queries.extend(tpch_kudu_queries)

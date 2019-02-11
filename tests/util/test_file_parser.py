@@ -317,15 +317,18 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
     test_file.write(('\n').join(test_file_text))
 
 
-def load_tpc_queries(workload):
+def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=[]):
   """
   Returns a list of queries for the given workload. 'workload' should either be 'tpch',
-  'tpcds', or 'tpch_nested'. Two types of queries are returned:
+  'tpcds', 'tpch_nested', or 'targeted-perf'. The types of queries that are returned:
   - 'standard' queries, i.e. from the spec for that workload. These queries will have
     filenames like '{workload}-q*.test' and one query per file.
-  - 'targeted' queries, which run against data from the workkload but were designed to
-    stress specific aspects of Impala. These queries have filenames like
-    '{workload}-stress-*.test' and may have multiple queries per file.
+  - 'stress' queries, if 'include_stress_queries' is true, which run against data from
+    the workkload but were designed to stress specific aspects of Impala. These queries
+    have filenames like '{workload}-stress-*.test' and may have multiple queries per file.
+  - 'targeted' queries, if the workload is 'targeted-perf', which have no restrictions.
+  The returned queries are filtered according to 'query_name_filters', a list of query
+  name regexes, if specified.
   All queries are required to have a name specified, i.e. each test case should have:
     ---- QUERY: WORKLOAD-<QUERY_NAME>
   """
@@ -333,29 +336,54 @@ def load_tpc_queries(workload):
   queries = dict()
   query_dir = os.path.join(
       os.environ['IMPALA_HOME'], "testdata", "workloads", workload, "queries")
+  # Check whether the workload name corresponds to an existing directory.
+  if not os.path.isdir(query_dir):
+    raise ValueError("Workload %s not found in %s" % (workload, query_dir))
+
   # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
   # find. Both workload directories contain other queries that are not part of the TPC
   # spec.
-  file_name_pattern = re.compile(r"^{0}-(q.*|stress-.*).test$".format(workload))
+  file_workload = workload
+  if workload == "tpcds":
+    # TPCDS is assumed to always use decimal_v2, which is the default since 3.0
+    file_workload = "tpcds-decimal_v2"
+  if include_stress_queries:
+    file_name_pattern = re.compile(r"^{0}-(q.*|stress-.*).test$".format(file_workload))
+  else:
+    file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(file_workload))
+
   query_name_pattern = re.compile(r"^{0}-(.*)$".format(workload.upper()))
   if workload == "tpch_nested":
     query_name_pattern = re.compile(r"^TPCH-(.*)$")
+
+  if workload == "targeted-perf":
+    # We don't enforce any restrictions on targeted-perf queries.
+    file_name_pattern = re.compile(r"(.*)")
+    query_name_pattern = re.compile(r"(.*)")
+
+  query_name_filters = map(str.strip, query_name_filters) if query_name_filters else []
+  filter_regex = re.compile(r'|'.join(['^%s$' % n for n in query_name_filters]), re.I)
+
   for query_file in os.listdir(query_dir):
-    match = file_name_pattern.search(query_file)
-    if not match:
+    is_standard = "stress" not in query_file and workload != "targeted-perf"
+    file_match = file_name_pattern.search(query_file)
+    if not file_match:
       continue
     file_path = os.path.join(query_dir, query_file)
     test_cases = parse_query_test_file(file_path)
     for test_case in test_cases:
       query_sql = remove_comments(test_case["QUERY"])
-      query_name = query_name_pattern.search(test_case["QUERY_NAME"]).group(1).lower()
-      # For standard queries, we require that the query name matches the file name.
-      if "stress" not in query_file: assert match.group(1) == query_name
-      queries[query_name] = query_sql
+
+      if re.match(filter_regex, test_case["QUERY_NAME"]):
+        query_name_match = query_name_pattern.search(test_case["QUERY_NAME"])
+        # For standard queries, we require that the query name matches the file name.
+        if is_standard and file_match.group(1).upper() != query_name_match.group(1):
+          raise Exception("Query name '%s' does not match file name '%s'"
+              % (query_name_match.group(1), file_match.group(1).upper()))
+        queries[query_name_match.group(0)] = query_sql
 
     # The standard tpc queries must have one query per file.
-    if "stress" not in query_file and len(test_cases) != 1:
-      raise Exception(
-          "Expected exactly 1 query to be in file %s but got %s"
-          % (file_path, len(file_queries)))
+    if is_standard and len(test_cases) != 1:
+      raise Exception("Expected exactly 1 query to be in file %s but got %s"
+          % (file_path, len(test_cases)))
   return queries

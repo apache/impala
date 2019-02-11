@@ -21,7 +21,7 @@ import fnmatch
 import re
 
 from tests.performance.query import Query
-from tests.util.test_file_parser import parse_query_test_file
+from tests.util.test_file_parser import load_tpc_queries
 
 class Workload(object):
   """Represents a workload.
@@ -47,7 +47,8 @@ class Workload(object):
     self._query_map = dict()
     # Build the query name -> string mapping in the c'tor. We want to fail fast and early
     # if the user input is bad.
-    self._validate_and_load(query_name_filters)
+    self._query_map = load_tpc_queries(self._name, query_name_filters=query_name_filters)
+    assert len(self._query_map) > 0, "No matching queries found for %s" % self._name
 
   @property
   def name(self):
@@ -56,38 +57,6 @@ class Workload(object):
   @property
   def query_map(self):
     return self._query_map
-
-  def _validate_and_load(self, query_name_filters):
-    """Validates that the Workload is legal."""
-    query_name_filters = map(str.strip, query_name_filters) if query_name_filters else []
-    self._base_dir = os.path.join(Workload.WORKLOAD_DIR, self._name, 'queries')
-    # Check whether the workload name corresponds to an existing directory.
-    if not os.path.isdir(self._base_dir):
-      raise ValueError("Workload %s not found in %s" % (self._name, self._base_dir))
-    sections = list()
-    # Parse all queries files for the given workload.
-    for file_name in self._list_query_files():
-      sections.extend(parse_query_test_file(file_name))
-    # If the user has specified query names, check whether all the user specified queries
-    # exist in the query files.
-    all_query_names = [s['QUERY_NAME'] for s in sections if s['QUERY_NAME'].strip()]
-    regex = re.compile(r'|'.join(['^%s$' % n for n in query_name_filters]), re.I)
-    matched_query_names = filter(lambda x: re.match(regex, x), all_query_names)
-    assert len(matched_query_names) > 0, "No matching queries found for %s" % self._name
-    # Filter the sections based on the queries the user wants.
-    sections = filter(lambda x: x['QUERY_NAME'] in matched_query_names, sections)
-    # Add the filtered queries to the query map
-    for section in sections:
-      self._query_map[section['QUERY_NAME']] = section['QUERY']
-
-  def _list_query_files(self):
-    """Return a list of all the .test files that contain queries"""
-    query_files = list()
-    for root, dirs, file_names in os.walk(self._base_dir):
-      for file_name in fnmatch.filter(file_names, '*.test'):
-        query_files.append(os.path.join(root, file_name))
-    assert len(query_files) > 0, "No Query Files found in %s" % self._base_dir
-    return query_files
 
   def construct_queries(self, test_vector, scale_factor):
     """Transform a query map into a list of query objects.
