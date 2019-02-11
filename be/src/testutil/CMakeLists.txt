@@ -37,10 +37,12 @@ add_dependencies(TestUtil gen-deps)
 target_link_libraries(TestUtil security-test-for-impala)
 
 add_library(TestUdfs SHARED test-udfs.cc)
+set_target_properties(TestUdfs PROPERTIES COMPILE_FLAGS "${HIDE_SYMBOLS}")
 add_dependencies(TestUdfs gen-deps)
 
 COMPILE_TO_IR(test-udfs.cc)
 add_dependencies(test-udfs-ir gen-deps)
 
 add_library(TestUdas SHARED test-udas.cc)
+set_target_properties(TestUdas PROPERTIES COMPILE_FLAGS "${HIDE_SYMBOLS}")
 add_dependencies(TestUdas gen-deps)

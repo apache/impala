@@ -23,20 +23,24 @@ using namespace impala_udf;
 // ---------------------------------------------------------------------------
 // This is a sample of implementing a COUNT aggregate function.
 // ---------------------------------------------------------------------------
+IMPALA_UDF_EXPORT
 void CountInit(FunctionContext* context, BigIntVal* val) {
   val->is_null = false;
   val->val = 0;
 }
 
+IMPALA_UDF_EXPORT
 void CountUpdate(FunctionContext* context, const IntVal& input, BigIntVal* val) {
   if (input.is_null) return;
   ++val->val;
 }
 
+IMPALA_UDF_EXPORT
 void CountMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
   dst->val += src.val;
 }
 
+IMPALA_UDF_EXPORT
 BigIntVal CountFinalize(FunctionContext* context, const BigIntVal& val) {
   return val;
 }
@@ -49,11 +53,13 @@ struct AvgStruct {
   int64_t count;
 };
 
+IMPALA_UDF_EXPORT
 void AvgInit(FunctionContext* context, BufferVal* val) {
   static_assert(sizeof(AvgStruct) == 16, "AvgStruct is an unexpected size");
   memset(*val, 0, sizeof(AvgStruct));
 }
 
+IMPALA_UDF_EXPORT
 void AvgUpdate(FunctionContext* context, const DoubleVal& input, BufferVal* val) {
   if (input.is_null) return;
   AvgStruct* avg = reinterpret_cast<AvgStruct*>(*val);
@@ -61,6 +67,7 @@ void AvgUpdate(FunctionContext* context, const DoubleVal& input, BufferVal* val)
   ++avg->count;
 }
 
+IMPALA_UDF_EXPORT
 void AvgMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst) {
   if (src == NULL) return;
   const AvgStruct* src_struct = reinterpret_cast<const AvgStruct*>(src);
@@ -69,6 +76,7 @@ void AvgMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst) {
   dst_struct->count += src_struct->count;
 }
 
+IMPALA_UDF_EXPORT
 DoubleVal AvgFinalize(FunctionContext* context, const BufferVal& val) {
   if (val == NULL) return DoubleVal::null();
   AvgStruct* val_struct = reinterpret_cast<AvgStruct*>(val);
@@ -79,10 +87,12 @@ DoubleVal AvgFinalize(FunctionContext* context, const BufferVal& val) {
 // This is a sample of implementing the STRING_CONCAT aggregate function.
 // Example: select string_concat(string_col, ",") from table
 // ---------------------------------------------------------------------------
+IMPALA_UDF_EXPORT
 void StringConcatInit(FunctionContext* context, StringVal* val) {
   val->is_null = true;
 }
 
+IMPALA_UDF_EXPORT
 void StringConcatUpdate(FunctionContext* context, const StringVal& arg1,
     const StringVal& arg2, StringVal* val) {
   if (val->is_null) {
@@ -100,11 +110,13 @@ void StringConcatUpdate(FunctionContext* context, const StringVal& arg1,
   }
 }
 
+IMPALA_UDF_EXPORT
 void StringConcatMerge(FunctionContext* context, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;
   StringConcatUpdate(context, src, ",", dst);
 }
 
+IMPALA_UDF_EXPORT
 StringVal StringConcatFinalize(FunctionContext* context, const StringVal& val) {
   return val;
 }
@@ -115,11 +127,13 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal& val) {
 // It is different than the builtin sum since it can easily overflow but can
 // be faster for small tables.
 // ---------------------------------------------------------------------------
+IMPALA_UDF_EXPORT
 void SumSmallDecimalInit(FunctionContext*, DecimalVal* val) {
   val->is_null = true;
   val->val4 = 0;
 }
 
+IMPALA_UDF_EXPORT
 void SumSmallDecimalUpdate(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   assert(ctx->GetArgType(0)->scale == 2);
@@ -129,6 +143,7 @@ void SumSmallDecimalUpdate(FunctionContext* ctx,
   dst->val4 += src.val4;
 }
 
+IMPALA_UDF_EXPORT
 void SumSmallDecimalMerge(FunctionContext*, const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
   dst->is_null = false;

@@ -432,6 +432,25 @@ class TestUdfTargeted(TestUdfBase):
       assert "Unable to find class" in str(ex)
     self.client.execute(drop_fn_stmt)
 
+  def test_hidden_symbol(self, vector, unique_database):
+    """Test that symbols in the test UDFs are hidden by default and that therefore
+    they cannot be used as a UDF entry point."""
+    symbol = "_Z16UnexportedSymbolPN10impala_udf15FunctionContextE"
+    ex = self.execute_query_expect_failure(self.client, """
+        create function `{0}`.unexported() returns BIGINT LOCATION '{1}'
+        SYMBOL='{2}'""".format(
+        unique_database, get_fs_path('/test-warehouse/libTestUdfs.so'), symbol))
+    assert "Could not find symbol '{0}'".format(symbol) in str(ex), str(ex)
+    # IMPALA-8196: IR UDFs ignore whether symbol is hidden or not. Exercise the current
+    # behaviour, where the UDF can be created and executed.
+    result = self.execute_query_expect_success(self.client, """
+        create function `{0}`.unexported() returns BIGINT LOCATION '{1}'
+        SYMBOL='{2}'""".format(
+        unique_database, get_fs_path('/test-warehouse/test-udfs.ll'), symbol))
+    result = self.execute_query_expect_success(self.client,
+        "select `{0}`.unexported()".format(unique_database))
+    assert result.data[0][0] == '5'
+
   @SkipIfLocal.multiple_impalad
   def test_hive_udfs_missing_jar(self, vector, unique_database):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present

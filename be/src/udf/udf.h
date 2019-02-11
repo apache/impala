@@ -34,6 +34,12 @@
 #define NOEXCEPT
 #endif
 
+// Macro to prepend to function definitions that will export the symbols to be visible
+// for loading by Impala. It is recommended that UDFs be built with the compiler flags
+// "-fvisibility=hidden -fvisibility-inlines-hidden" and only functions that are entry
+// points for UDFs be exported with this macro.
+#define IMPALA_UDF_EXPORT __attribute__ ((visibility ("default")))
+
 /// This is the only Impala header required to develop UDFs and UDAs. This header
 /// contains the types that need to be used and the FunctionContext object. The context
 /// object serves as the interface object between the UDF/UDA and the impala process.

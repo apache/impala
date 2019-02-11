@@ -26,26 +26,37 @@ using namespace impala_udf;
 // These functions are intended to test the "glue" that runs UDFs. Thus, the UDFs
 // themselves are kept very simple.
 
+IMPALA_UDF_EXPORT
 BooleanVal Identity(FunctionContext* context, const BooleanVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 TinyIntVal Identity(FunctionContext* context, const TinyIntVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 SmallIntVal Identity(FunctionContext* context, const SmallIntVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 IntVal Identity(FunctionContext* context, const IntVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 BigIntVal Identity(FunctionContext* context, const BigIntVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 FloatVal Identity(FunctionContext* context, const FloatVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 DoubleVal Identity(FunctionContext* context, const DoubleVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 StringVal Identity(FunctionContext* context, const StringVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 TimestampVal Identity(FunctionContext* context, const TimestampVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 DecimalVal Identity(FunctionContext* context, const DecimalVal& arg) { return arg; }
 
+IMPALA_UDF_EXPORT
 IntVal AllTypes(
     FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
@@ -57,6 +68,7 @@ IntVal AllTypes(
   return IntVal(result);
 }
 
+IMPALA_UDF_EXPORT
 StringVal NoArgs(FunctionContext* context) {
   const char* result = "string";
   StringVal ret(context, strlen(result));
@@ -64,6 +76,7 @@ StringVal NoArgs(FunctionContext* context) {
   return ret;
 }
 
+IMPALA_UDF_EXPORT
 BooleanVal VarAnd(FunctionContext* context, int n, const BooleanVal* args) {
   bool result = true;
   for (int i = 0; i < n; ++i) {
@@ -73,6 +86,7 @@ BooleanVal VarAnd(FunctionContext* context, int n, const BooleanVal* args) {
   return BooleanVal(result);
 }
 
+IMPALA_UDF_EXPORT
 IntVal VarSum(FunctionContext* context, int n, const IntVal* args) {
   int result = 0;
   bool is_null = true;
@@ -85,6 +99,7 @@ IntVal VarSum(FunctionContext* context, int n, const IntVal* args) {
   return IntVal(result);
 }
 
+IMPALA_UDF_EXPORT
 DoubleVal VarSum(FunctionContext* context, int n, const DoubleVal* args) {
   double result = 0;
   bool is_null = true;
@@ -99,6 +114,7 @@ DoubleVal VarSum(FunctionContext* context, int n, const DoubleVal* args) {
 
 // TODO: have this return a StringVal (make sure not to use functions defined in other
 // compilation units, or change how this is built).
+IMPALA_UDF_EXPORT
 IntVal VarSum(FunctionContext* context, int n, const StringVal* args) {
   int total_len = 0;
   for (int i = 0; i < n; ++i) {
@@ -109,6 +125,7 @@ IntVal VarSum(FunctionContext* context, int n, const StringVal* args) {
 }
 
 // Decimal4Value... => Decimal8Value
+IMPALA_UDF_EXPORT
 DecimalVal VarSum(FunctionContext* context, int n, const DecimalVal* args) {
   int64_t result = 0;
   bool is_null = true;
@@ -126,6 +143,7 @@ DecimalVal VarSum(FunctionContext* context, int n, const DecimalVal* args) {
   return DecimalVal(result);
 }
 
+IMPALA_UDF_EXPORT
 DoubleVal NO_INLINE VarSumMultiply(FunctionContext* context,
     const DoubleVal& d, int n, const IntVal* args) {
   if (d.is_null) return DoubleVal::null();
@@ -142,6 +160,7 @@ DoubleVal NO_INLINE VarSumMultiply(FunctionContext* context,
 }
 
 // Call the non-inlined function in the same module to make sure linking works correctly.
+IMPALA_UDF_EXPORT
 DoubleVal VarSumMultiply2(FunctionContext* context,
     const DoubleVal& d, int n, const IntVal* args) {
   return VarSumMultiply(context, d, n, args);
@@ -152,6 +171,7 @@ extern "C" StringVal
     _ZN6impala15StringFunctions5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE(
         FunctionContext* context, const StringVal& str);
 
+IMPALA_UDF_EXPORT
 StringVal ToLower(FunctionContext* context, const StringVal& str) {
   // StringVal::null() doesn't inline its callee when compiled without optimization.
   // Useful for testing cases such as IMPALA-4595.
@@ -168,10 +188,12 @@ extern "C" StringVal
 
 typedef StringVal (*ToUpperFn)(FunctionContext* context, const StringVal& str);
 
+IMPALA_UDF_EXPORT
 StringVal ToUpperWork(FunctionContext* context, const StringVal& str, ToUpperFn fn) {
   return fn(context, str);
 }
 
+IMPALA_UDF_EXPORT
 StringVal ToUpper(FunctionContext* context, const StringVal& str) {
   // StringVal::null() doesn't inline its callee when compiled without optimization.
   // Useful for testing cases such as IMPALA-4595.
@@ -216,6 +238,7 @@ namespace impala {
 
 // This function has the same signature as a built-in function (pow()) in Impalad.
 // It has a weak linkage type so it can be overridden at linking when tested as IR UDF.
+IMPALA_UDF_EXPORT
 DoubleVal WEAK_SYM impala::MathFunctions::Pow(FunctionContext* context,
     const DoubleVal& base, const DoubleVal& exp) {
   // Just references 'global_array' to stop the compiler from complaining.
@@ -225,12 +248,14 @@ DoubleVal WEAK_SYM impala::MathFunctions::Pow(FunctionContext* context,
   return PrivateFn1(base, exp);
 }
 
+IMPALA_UDF_EXPORT
 BooleanVal TestError(FunctionContext* context) {
   context->SetError("test UDF error");
   context->SetError("this shouldn't show up");
   return BooleanVal(false);
 }
 
+IMPALA_UDF_EXPORT
 BooleanVal TestWarnings(FunctionContext* context) {
   context->AddWarning("test UDF warning 1");
   context->AddWarning("test UDF warning 2");
@@ -238,17 +263,25 @@ BooleanVal TestWarnings(FunctionContext* context) {
 }
 
 // Dummy functions to test ddl.
+IMPALA_UDF_EXPORT
 IntVal Fn(FunctionContext*) { return IntVal::null(); }
+IMPALA_UDF_EXPORT
 IntVal Fn(FunctionContext*, const IntVal&) { return IntVal::null(); }
+IMPALA_UDF_EXPORT
 IntVal Fn(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::null(); }
+IMPALA_UDF_EXPORT
 IntVal Fn(FunctionContext*, const StringVal&, const IntVal&) { return IntVal::null(); }
+IMPALA_UDF_EXPORT
 IntVal Fn2(FunctionContext*, const IntVal&) { return IntVal::null(); }
+IMPALA_UDF_EXPORT
 IntVal Fn2(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::null(); }
 
+IMPALA_UDF_EXPORT
 TimestampVal ConstantTimestamp(FunctionContext* context) {
   return TimestampVal(2456575, 1); // 2013-10-09 00:00:00.000000001
 }
 
+IMPALA_UDF_EXPORT
 BooleanVal ValidateArgType(FunctionContext* context, const StringVal& dummy) {
   if (context->GetArgType(0)->type != FunctionContext::TYPE_STRING) {
     return BooleanVal(false);
@@ -259,6 +292,7 @@ BooleanVal ValidateArgType(FunctionContext* context, const StringVal& dummy) {
 }
 
 // Count UDF: counts the number of input rows per thread-local FunctionContext
+IMPALA_UDF_EXPORT
 void CountPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
     uint64_t* state = reinterpret_cast<uint64_t*>(context->Allocate(sizeof(uint64_t)));
@@ -267,12 +301,14 @@ void CountPrepare(FunctionContext* context, FunctionContext::FunctionStateScope 
   }
 }
 
+IMPALA_UDF_EXPORT
 BigIntVal Count(FunctionContext* context) {
   uint64_t* state = reinterpret_cast<uint64_t*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   return BigIntVal(++(*state));
 }
 
+IMPALA_UDF_EXPORT
 void CountClose(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
     void* state = context->GetFunctionState(scope);
@@ -282,6 +318,7 @@ void CountClose(FunctionContext* context, FunctionContext::FunctionStateScope sc
 }
 
 // ConstantArg UDF: returns the first argument if it's constant, otherwise returns NULL.
+IMPALA_UDF_EXPORT
 void ConstantArgPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
@@ -295,12 +332,14 @@ void ConstantArgPrepare(
   }
 }
 
+IMPALA_UDF_EXPORT
 IntVal ConstantArg(FunctionContext* context, const IntVal& const_val) {
   IntVal* state = reinterpret_cast<IntVal*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   return *state;
 }
 
+IMPALA_UDF_EXPORT
 void ConstantArgClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
@@ -312,6 +351,7 @@ void ConstantArgClose(
 
 // ValidateOpen UDF: returns true if the UDF was opened, false otherwise. Can also be
 // used to validate close since it will leak if it's not closed.
+IMPALA_UDF_EXPORT
 void ValidateOpenPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
@@ -320,11 +360,13 @@ void ValidateOpenPrepare(
   }
 }
 
+IMPALA_UDF_EXPORT
 BooleanVal ValidateOpen(FunctionContext* context, const IntVal& dummy) {
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   return BooleanVal(state != NULL);
 }
 
+IMPALA_UDF_EXPORT
 void ValidateOpenClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
@@ -335,6 +377,7 @@ void ValidateOpenClose(
 }
 
 // This prepare function always fails to make sure clean up is done afterwards.
+IMPALA_UDF_EXPORT
 void BadExprPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::FRAGMENT_LOCAL) {
     int32_t* state = reinterpret_cast<int32_t*>(context->Allocate(sizeof(int32_t)));
@@ -347,6 +390,7 @@ void BadExprPrepare(FunctionContext* context, FunctionContext::FunctionStateScop
 // This prepare function always fails for cloned evaluators to exercise IMPALA-6184.
 // It does so by detecting whether the caller is a cloned evaluator and inserts an error
 // in FunctionContext if that's the case.
+IMPALA_UDF_EXPORT
 void BadExpr2Prepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::FRAGMENT_LOCAL) {
@@ -363,6 +407,7 @@ void BadExpr2Prepare(FunctionContext* context,
 }
 
 // Used by both BadExprPrepare() and BadExpr2Prepare() above.
+IMPALA_UDF_EXPORT
 BooleanVal BadExpr(FunctionContext* context, const DoubleVal& slot) {
   static int32_t count = 0;
   if (slot.is_null) return BooleanVal(false);
@@ -374,6 +419,7 @@ BooleanVal BadExpr(FunctionContext* context, const DoubleVal& slot) {
 }
 
 // Used by both BadExprPrepare() and BadExpr2Prepare() above.
+IMPALA_UDF_EXPORT
 void BadExprClose(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::FRAGMENT_LOCAL) {
     int32_t* state = reinterpret_cast<int32_t*>(context->GetFunctionState(scope));
@@ -384,6 +430,7 @@ void BadExprClose(FunctionContext* context, FunctionContext::FunctionStateScope 
 }
 
 // MemTest UDF: "Allocates" the specified number of bytes per call.
+IMPALA_UDF_EXPORT
 void MemTestPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
     int64_t* total =
@@ -393,6 +440,7 @@ void MemTestPrepare(FunctionContext* context, FunctionContext::FunctionStateScop
   }
 }
 
+IMPALA_UDF_EXPORT
 BigIntVal MemTest(FunctionContext* context, const BigIntVal& bytes) {
   int64_t* total = reinterpret_cast<int64_t*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
@@ -401,6 +449,7 @@ BigIntVal MemTest(FunctionContext* context, const BigIntVal& bytes) {
   return bytes;
 }
 
+IMPALA_UDF_EXPORT
 void MemTestClose(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
     int64_t* total = reinterpret_cast<int64_t*>(
@@ -413,6 +462,7 @@ void MemTestClose(FunctionContext* context, FunctionContext::FunctionStateScope 
   }
 }
 
+IMPALA_UDF_EXPORT
 BigIntVal DoubleFreeTest(FunctionContext* context, BigIntVal bytes) {
   context->TrackAllocation(bytes.val);
   context->Free(bytes.val);
@@ -420,38 +470,51 @@ BigIntVal DoubleFreeTest(FunctionContext* context, BigIntVal bytes) {
   return bytes;
 }
 
-extern "C" BigIntVal UnmangledSymbol(FunctionContext* context) {
+extern "C"
+IMPALA_UDF_EXPORT
+BigIntVal UnmangledSymbol(FunctionContext* context) {
+  return BigIntVal(5);
+}
+
+// Test that unexported symbols can't be found.
+BigIntVal UnexportedSymbol(FunctionContext* context) {
   return BigIntVal(5);
 }
 
 // Functions to test interpreted path
+IMPALA_UDF_EXPORT
 IntVal FourArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4) {
   return IntVal(v1.val + v2.val + v3.val + v4.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal FiveArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5) {
   return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal SixArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6) {
   return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal SevenArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
     const IntVal& v7) {
   return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal EightArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
     const IntVal& v7, const IntVal& v8) {
   return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal NineArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
     const IntVal& v7, const IntVal& v8, const IntVal& v9) {
@@ -459,6 +522,7 @@ IntVal NineArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
       v9.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal TwentyArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
     const IntVal& v7, const IntVal& v8, const IntVal& v9, const IntVal& v10,
@@ -470,6 +534,7 @@ IntVal TwentyArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
       v17.val + v18.val + v19.val + v20.val);
 }
 
+IMPALA_UDF_EXPORT
 IntVal TwentyOneArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
     const IntVal& v7, const IntVal& v8, const IntVal& v9, const IntVal& v10,

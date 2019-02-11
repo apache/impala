@@ -256,6 +256,13 @@ endif()
 #  -inline: inline with low threshold to get rid of trivial accessor functions.
 set(LLVM_OPT_IR_FLAGS "-inline" "-inlinehint-threshold=10" "-inline-threshold=10")
 
+# Additional compile flags that will hide symbols by default, e.g. for building
+# UDFs. We have both a concatenated string version and a list version for convenience,
+# depending on what is needed in the context.
+set(HIDE_SYMBOLS "-fvisibility=hidden -fvisibility-inlines-hidden")
+set(HIDE_SYMBOLS_ARGS "${HIDE_SYMBOLS_STRING}")
+separate_arguments(HIDE_SYMBOLS_ARGS)
+
 # setup doc generation with Doxygen
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
@@ -650,7 +657,8 @@ function(COMPILE_TO_IR SRC_FILE)
   set(OUTPUT_FILE "${LIBRARY_OUTPUT_PATH}/${BASE_NAME}.ll")
   add_custom_command(
     OUTPUT ${OUTPUT_FILE}
-    COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${SRC_FILE} -o ${OUTPUT_FILE}
+    COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${HIDE_SYMBOLS_ARGS}
+            ${CLANG_INCLUDE_FLAGS} ${SRC_FILE} -o ${OUTPUT_FILE}
     DEPENDS ${SRC_FILE})
   add_custom_target(${BASE_NAME}-ir ALL DEPENDS ${OUTPUT_FILE})
 endfunction(COMPILE_TO_IR)
