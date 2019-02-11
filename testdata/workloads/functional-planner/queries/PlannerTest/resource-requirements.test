@@ -13,9 +13,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -39,9 +39,9 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=40.00MB thread-reservat
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -65,9 +65,9 @@ Per-Host Resources: mem-estimate=160.00MB mem-reservation=80.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -88,9 +88,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -114,9 +114,9 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=4.00MB thread-reservati
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -140,9 +140,9 @@ Per-Host Resources: mem-estimate=160.00MB mem-reservation=8.00MB thread-reservat
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=0
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -417,9 +417,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.customer]
    partitions=1/1 files=1 size=12.31MB
    stored statistics:
-     table: rows=150000 size=12.31MB
+     table: rows=150.00K size=12.31MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=150000
+   extrapolated-rows=disabled max-scan-range-rows=150.00K
    mem-estimate=24.00MB mem-reservation=128.00KB thread-reservation=1
    tuple-ids=0 row-size=2B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -440,9 +440,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.customer]
    partitions=1/1 files=1 size=12.31MB
    stored statistics:
-     table: rows=150000 size=12.31MB
+     table: rows=150.00K size=12.31MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=150000
+   extrapolated-rows=disabled max-scan-range-rows=150.00K
    mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -490,9 +490,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.22K
    mem-estimate=88.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=64B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -515,9 +515,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.22K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=16B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -539,9 +539,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.22K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -591,9 +591,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=32.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -641,9 +641,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -692,9 +692,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -742,9 +742,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -792,9 +792,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns: unavailable
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=12B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -865,9 +865,9 @@ PLAN-ROOT SINK
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -887,9 +887,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -913,9 +913,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -939,9 +939,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -961,9 +961,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -987,9 +987,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1013,9 +1013,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1036,8 +1036,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1064,8 +1064,8 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservat
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1092,8 +1092,8 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservat
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
@@ -1355,9 +1355,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_orc_def.lineitem]
    partitions=1/1 files=6 size=144.66MB
    stored statistics:
-     table: rows=6001215 size=144.66MB
+     table: rows=6.00M size=144.66MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1075682
+   extrapolated-rows=disabled max-scan-range-rows=1.08M
    mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1377,9 +1377,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_orc_def.lineitem]
    partitions=1/1 files=6 size=144.66MB
    stored statistics:
-     table: rows=6001215 size=144.66MB
+     table: rows=6.00M size=144.66MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1075682
+   extrapolated-rows=disabled max-scan-range-rows=1.08M
    mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1726,9 +1726,9 @@ PLAN-ROOT SINK
 |--02:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=231B cardinality=6.00M
 |     in pipelines: 02(GETNEXT)
@@ -1736,9 +1736,9 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 01(GETNEXT)
@@ -1769,9 +1769,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 |--02:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=231B cardinality=6.00M
 |     in pipelines: 02(GETNEXT)
@@ -1779,9 +1779,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 01:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 01(GETNEXT)
@@ -1812,9 +1812,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 |--02:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=1 row-size=231B cardinality=6.00M
 |     in pipelines: 02(GETNEXT)
@@ -1822,9 +1822,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 01:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 01(GETNEXT)
@@ -1854,9 +1854,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1902,9 +1902,9 @@ Per-Host Resources: mem-estimate=114.00MB mem-reservation=38.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1948,11 +1948,11 @@ Per-Host Resources: mem-estimate=228.00MB mem-reservation=76.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   partitions=1/1 files=3 size=193.59MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -1978,9 +1978,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2016,9 +2016,9 @@ Per-Host Resources: mem-estimate=11.00MB mem-reservation=128.00KB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2054,9 +2054,9 @@ Per-Host Resources: mem-estimate=180.00MB mem-reservation=256.00KB thread-reserv
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2084,9 +2084,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2117,9 +2117,9 @@ Per-Host Resources: mem-estimate=118.00MB mem-reservation=52.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2150,9 +2150,9 @@ Per-Host Resources: mem-estimate=236.00MB mem-reservation=104.00MB thread-reserv
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2182,9 +2182,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2217,9 +2217,9 @@ Per-Host Resources: mem-estimate=80.02MB mem-reservation=40.00MB thread-reservat
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2252,9 +2252,9 @@ Per-Host Resources: mem-estimate=160.04MB mem-reservation=80.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2284,9 +2284,9 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2295,9 +2295,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2337,9 +2337,9 @@ Per-Host Resources: mem-estimate=368.29MB mem-reservation=43.00MB thread-reserva
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2348,9 +2348,9 @@ Per-Host Resources: mem-estimate=368.29MB mem-reservation=43.00MB thread-reserva
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2398,9 +2398,9 @@ Per-Host Resources: mem-estimate=715.89MB mem-reservation=86.00MB thread-reserva
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2409,9 +2409,9 @@ Per-Host Resources: mem-estimate=715.89MB mem-reservation=86.00MB thread-reserva
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2441,9 +2441,9 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2452,9 +2452,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2494,9 +2494,9 @@ Per-Host Resources: mem-estimate=111.68MB mem-reservation=35.00MB thread-reserva
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2512,9 +2512,9 @@ Per-Host Resources: mem-estimate=89.00MB mem-reservation=9.00MB thread-reservati
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2562,9 +2562,9 @@ Per-Host Resources: mem-estimate=114.40MB mem-reservation=70.00MB thread-reserva
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2580,9 +2580,9 @@ Per-Host Resources: mem-estimate=178.00MB mem-reservation=18.00MB thread-reserva
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2608,9 +2608,9 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2618,9 +2618,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2656,9 +2656,9 @@ Per-Host Resources: mem-estimate=342.84MB mem-reservation=8.00MB thread-reservat
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2666,9 +2666,9 @@ Per-Host Resources: mem-estimate=342.84MB mem-reservation=8.00MB thread-reservat
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2711,9 +2711,9 @@ Per-Host Resources: mem-estimate=686.35MB mem-reservation=16.00MB thread-reserva
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=1 row-size=171B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -2721,9 +2721,9 @@ Per-Host Resources: mem-estimate=686.35MB mem-reservation=16.00MB thread-reserva
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -2807,8 +2807,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -2856,8 +2856,8 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservat
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -2905,8 +2905,8 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservat
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
@@ -2976,9 +2976,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.orders]
    partitions=1/1 files=2 size=54.07MB
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -3047,9 +3047,9 @@ Per-Host Resources: mem-estimate=56.00MB mem-reservation=36.00MB thread-reservat
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.07MB
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -3118,9 +3118,9 @@ Per-Host Resources: mem-estimate=112.00MB mem-reservation=72.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.07MB
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=0
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -3171,9 +3171,9 @@ PLAN-ROOT SINK
 |  |--09:SCAN HDFS [tpch_parquet.orders]
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |     tuple-ids=6 row-size=8B cardinality=1.50M
 |  |     in pipelines: 09(GETNEXT)
@@ -3183,9 +3183,9 @@ PLAN-ROOT SINK
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
 |     parquet dictionary predicates: l_shipmode = 'F'
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3204,9 +3204,9 @@ PLAN-ROOT SINK
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     predicates: o_orderpriority = '2-HIGH'
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
 |  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
 |  |     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
@@ -3217,9 +3217,9 @@ PLAN-ROOT SINK
 |     partitions=1/1 files=3 size=193.60MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
 |     tuple-ids=3 row-size=66B cardinality=6.00M
 |     in pipelines: 05(GETNEXT)
@@ -3241,9 +3241,9 @@ PLAN-ROOT SINK
 |--02:SCAN HDFS [tpch_parquet.orders]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 02(GETNEXT)
@@ -3253,9 +3253,9 @@ PLAN-ROOT SINK
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    parquet dictionary predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3309,9 +3309,9 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |  |  09:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |     tuple-ids=6 row-size=8B cardinality=1.50M
 |  |     in pipelines: 09(GETNEXT)
@@ -3321,9 +3321,9 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
 |     parquet dictionary predicates: l_shipmode = 'F'
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3349,9 +3349,9 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     predicates: o_orderpriority = '2-HIGH'
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
 |  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
 |  |     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
@@ -3362,9 +3362,9 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |     partitions=1/1 files=3 size=193.60MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
 |     tuple-ids=3 row-size=66B cardinality=6.00M
 |     in pipelines: 05(GETNEXT)
@@ -3406,9 +3406,9 @@ Per-Host Resources: mem-estimate=55.73MB mem-reservation=39.75MB thread-reservat
 |  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 02(GETNEXT)
@@ -3425,9 +3425,9 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=25.00MB thread-reservat
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    parquet dictionary predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3489,9 +3489,9 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |  |  09:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=0
 |  |     tuple-ids=6 row-size=8B cardinality=1.50M
 |  |     in pipelines: 09(GETNEXT)
@@ -3501,9 +3501,9 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
 |     parquet dictionary predicates: l_shipmode = 'F'
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=0
@@ -3537,9 +3537,9 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     predicates: o_orderpriority = '2-HIGH'
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
 |  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
 |  |     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0
@@ -3550,9 +3550,9 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |     partitions=1/1 files=3 size=193.60MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6001215 size=193.60MB
+|       table: rows=6.00M size=193.59MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2141702
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=0
 |     tuple-ids=3 row-size=66B cardinality=6.00M
 |     in pipelines: 05(GETNEXT)
@@ -3602,9 +3602,9 @@ Per-Host Resources: mem-estimate=62.67MB mem-reservation=41.75MB thread-reservat
 |  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=0
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 02(GETNEXT)
@@ -3621,9 +3621,9 @@ Per-Host Resources: mem-estimate=162.00MB mem-reservation=50.00MB thread-reserva
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    parquet dictionary predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=0
@@ -3712,9 +3712,9 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=3 row-size=16B cardinality=6.00M
 |     in pipelines: 03(GETNEXT)
@@ -3730,9 +3730,9 @@ PLAN-ROOT SINK
 |--00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
 |     stored statistics:
-|       table: rows=150000 size=23.08MB
+|       table: rows=150.00K size=23.08MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=150000
+|     extrapolated-rows=disabled max-scan-range-rows=150.00K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=0 row-size=38B cardinality=150.00K
 |     in pipelines: 00(GETNEXT)
@@ -3749,9 +3749,9 @@ PLAN-ROOT SINK
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=46B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -3760,9 +3760,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=2 row-size=16B cardinality=6.00M
    in pipelines: 02(GETNEXT)
@@ -3850,9 +3850,9 @@ Per-Host Resources: mem-estimate=149.22MB mem-reservation=116.38MB thread-reserv
 |  03:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=3 row-size=16B cardinality=6.00M
 |     in pipelines: 03(GETNEXT)
@@ -3875,9 +3875,9 @@ Per-Host Resources: mem-estimate=149.22MB mem-reservation=116.38MB thread-reserv
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
 |     stored statistics:
-|       table: rows=150000 size=23.08MB
+|       table: rows=150.00K size=23.08MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=150000
+|     extrapolated-rows=disabled max-scan-range-rows=150.00K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=0 row-size=38B cardinality=150.00K
 |     in pipelines: 00(GETNEXT)
@@ -3901,9 +3901,9 @@ Per-Host Resources: mem-estimate=149.22MB mem-reservation=116.38MB thread-reserv
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=46B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -3919,9 +3919,9 @@ Per-Host Resources: mem-estimate=90.00MB mem-reservation=10.00MB thread-reservat
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=2 row-size=16B cardinality=6.00M
    in pipelines: 02(GETNEXT)
@@ -4017,9 +4017,9 @@ Per-Host Resources: mem-estimate=115.27MB mem-reservation=94.88MB thread-reserva
 |  03:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
 |     stored statistics:
-|       table: rows=6001215 size=718.94MB
+|       table: rows=6.00M size=718.94MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1068457
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=3 row-size=16B cardinality=6.00M
 |     in pipelines: 03(GETNEXT)
@@ -4050,9 +4050,9 @@ Per-Host Resources: mem-estimate=115.27MB mem-reservation=94.88MB thread-reserva
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
 |     stored statistics:
-|       table: rows=150000 size=23.08MB
+|       table: rows=150.00K size=23.08MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=150000
+|     extrapolated-rows=disabled max-scan-range-rows=150.00K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=0 row-size=38B cardinality=150.00K
 |     in pipelines: 00(GETNEXT)
@@ -4084,9 +4084,9 @@ Per-Host Resources: mem-estimate=115.27MB mem-reservation=94.88MB thread-reserva
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
 |     stored statistics:
-|       table: rows=1500000 size=162.56MB
+|       table: rows=1.50M size=162.56MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1181132
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
 |     tuple-ids=1 row-size=46B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -4102,9 +4102,9 @@ Per-Host Resources: mem-estimate=180.00MB mem-reservation=20.00MB thread-reserva
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=2 row-size=16B cardinality=6.00M
    in pipelines: 02(GETNEXT)
@@ -4134,10 +4134,10 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
    partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
-     table: rows=7300 size=478.45KB
+     table: rows=7.30K size=478.45KB
      partitions: 1/1 rows=310
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=7300
+   extrapolated-rows=disabled max-scan-range-rows=7.30K
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=81B cardinality=310
    in pipelines: 00(GETNEXT)
@@ -4160,10 +4160,10 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
    partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
-     table: rows=7300 size=478.45KB
+     table: rows=7.30K size=478.45KB
      partitions: 1/1 rows=310
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=7300
+   extrapolated-rows=disabled max-scan-range-rows=7.30K
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=81B cardinality=310
    in pipelines: 00(GETNEXT)
@@ -4186,10 +4186,10 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
    partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
-     table: rows=7300 size=478.45KB
+     table: rows=7.30K size=478.45KB
      partitions: 1/1 rows=310
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=7300
+   extrapolated-rows=disabled max-scan-range-rows=7.30K
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
    tuple-ids=0 row-size=81B cardinality=310
    in pipelines: 00(GETNEXT)
@@ -4218,9 +4218,9 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4251,9 +4251,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4284,9 +4284,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4309,9 +4309,9 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4336,9 +4336,9 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4363,9 +4363,9 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stored statistics:
-     table: rows=6001215 size=718.94MB
+     table: rows=6.00M size=718.94MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1068457
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=46B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -4449,9 +4449,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4546,9 +4546,9 @@ Per-Host Resources: mem-estimate=345.94MB mem-reservation=85.94MB thread-reserva
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4643,9 +4643,9 @@ Per-Host Resources: mem-estimate=691.88MB mem-reservation=171.88MB thread-reserv
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4740,9 +4740,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=1
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4835,9 +4835,9 @@ Per-Host Resources: mem-estimate=136.00MB mem-reservation=104.00MB thread-reserv
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=1
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4930,9 +4930,9 @@ Per-Host Resources: mem-estimate=272.00MB mem-reservation=208.00MB thread-reserv
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150000 size=288.99MB
+     table: rows=150.00K size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=44.23K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4992,9 +4992,9 @@ PLAN-ROOT SINK
 |  |  |--03:SCAN HDFS [tpch_parquet.orders t4]
 |  |  |     partitions=1/1 files=2 size=54.07MB
 |  |  |     stored statistics:
-|  |  |       table: rows=1500000 size=54.07MB
+|  |  |       table: rows=1.50M size=54.07MB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |  |     tuple-ids=3 row-size=8B cardinality=1.50M
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5003,9 +5003,9 @@ PLAN-ROOT SINK
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     runtime filters: RF004[bloom] -> t3.o_orderkey
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |     tuple-ids=2 row-size=8B cardinality=1.50M
 |  |     in pipelines: 02(GETNEXT)
@@ -5014,9 +5014,9 @@ PLAN-ROOT SINK
 |     partitions=1/1 files=2 size=54.07MB
 |     runtime filters: RF002[bloom] -> t2.o_orderkey
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -5025,9 +5025,9 @@ PLAN-ROOT SINK
    partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> t1.o_orderkey
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -5094,9 +5094,9 @@ Per-Host Resources: mem-estimate=88.84MB mem-reservation=59.00MB thread-reservat
 |  |  |  03:SCAN HDFS [tpch_parquet.orders t4, RANDOM]
 |  |  |     partitions=1/1 files=2 size=54.07MB
 |  |  |     stored statistics:
-|  |  |       table: rows=1500000 size=54.07MB
+|  |  |       table: rows=1.50M size=54.07MB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |  |     tuple-ids=3 row-size=8B cardinality=1.50M
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5112,9 +5112,9 @@ Per-Host Resources: mem-estimate=88.84MB mem-reservation=59.00MB thread-reservat
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     runtime filters: RF004[bloom] -> t3.o_orderkey
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |  |     tuple-ids=2 row-size=8B cardinality=1.50M
 |  |     in pipelines: 02(GETNEXT)
@@ -5130,9 +5130,9 @@ Per-Host Resources: mem-estimate=88.84MB mem-reservation=59.00MB thread-reservat
 |     partitions=1/1 files=2 size=54.07MB
 |     runtime filters: RF002[bloom] -> t2.o_orderkey
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -5141,9 +5141,9 @@ Per-Host Resources: mem-estimate=88.84MB mem-reservation=59.00MB thread-reservat
    partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> t1.o_orderkey
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -5234,9 +5234,9 @@ Per-Host Resources: mem-estimate=157.53MB mem-reservation=118.00MB thread-reserv
 |  |  |  03:SCAN HDFS [tpch_parquet.orders t4, RANDOM]
 |  |  |     partitions=1/1 files=2 size=54.07MB
 |  |  |     stored statistics:
-|  |  |       table: rows=1500000 size=54.07MB
+|  |  |       table: rows=1.50M size=54.07MB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=0
 |  |  |     tuple-ids=3 row-size=8B cardinality=1.50M
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5252,9 +5252,9 @@ Per-Host Resources: mem-estimate=157.53MB mem-reservation=118.00MB thread-reserv
 |  |     partitions=1/1 files=2 size=54.07MB
 |  |     runtime filters: RF004[bloom] -> t3.o_orderkey
 |  |     stored statistics:
-|  |       table: rows=1500000 size=54.07MB
+|  |       table: rows=1.50M size=54.07MB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1177136
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=0
 |  |     tuple-ids=2 row-size=8B cardinality=1.50M
 |  |     in pipelines: 02(GETNEXT)
@@ -5270,9 +5270,9 @@ Per-Host Resources: mem-estimate=157.53MB mem-reservation=118.00MB thread-reserv
 |     partitions=1/1 files=2 size=54.07MB
 |     runtime filters: RF002[bloom] -> t2.o_orderkey
 |     stored statistics:
-|       table: rows=1500000 size=54.07MB
+|       table: rows=1.50M size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1177136
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=0
 |     tuple-ids=1 row-size=8B cardinality=1.50M
 |     in pipelines: 01(GETNEXT)
@@ -5281,9 +5281,9 @@ Per-Host Resources: mem-estimate=157.53MB mem-reservation=118.00MB thread-reserv
    partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> t1.o_orderkey
    stored statistics:
-     table: rows=1500000 size=54.07MB
+     table: rows=1.50M size=54.07MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1177136
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
    mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=0
    tuple-ids=0 row-size=171B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -5335,9 +5335,9 @@ PLAN-ROOT SINK
 |  |  |--03:SCAN HDFS [tpch_parquet.supplier t4]
 |  |  |     partitions=1/1 files=1 size=882.47KB
 |  |  |     stored statistics:
-|  |  |       table: rows=10000 size=882.47KB
+|  |  |       table: rows=10.00K size=882.49KB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=10000
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=10.00K
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=1
 |  |  |     tuple-ids=3 row-size=8B cardinality=10.00K
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5345,7 +5345,7 @@ PLAN-ROOT SINK
 |  |  02:SCAN HDFS [tpch_parquet.nation t3]
 |  |     partitions=1/1 files=1 size=2.75KB
 |  |     stored statistics:
-|  |       table: rows=25 size=2.75KB
+|  |       table: rows=25 size=2.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=25
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -5355,7 +5355,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpch_parquet.nation t2]
 |     partitions=1/1 files=1 size=2.75KB
 |     stored statistics:
-|       table: rows=25 size=2.75KB
+|       table: rows=25 size=2.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=25
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -5365,7 +5365,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.nation t1]
    partitions=1/1 files=1 size=2.75KB
    stored statistics:
-     table: rows=25 size=2.75KB
+     table: rows=25 size=2.76KB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=25
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -5431,9 +5431,9 @@ Per-Host Resources: mem-estimate=97.55MB mem-reservation=32.00KB thread-reservat
 |  |  |  03:SCAN HDFS [tpch_parquet.supplier t4, RANDOM]
 |  |  |     partitions=1/1 files=1 size=882.47KB
 |  |  |     stored statistics:
-|  |  |       table: rows=10000 size=882.47KB
+|  |  |       table: rows=10.00K size=882.49KB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=10000
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=10.00K
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=1
 |  |  |     tuple-ids=3 row-size=8B cardinality=10.00K
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5441,7 +5441,7 @@ Per-Host Resources: mem-estimate=97.55MB mem-reservation=32.00KB thread-reservat
 |  |  02:SCAN HDFS [tpch_parquet.nation t3, RANDOM]
 |  |     partitions=1/1 files=1 size=2.75KB
 |  |     stored statistics:
-|  |       table: rows=25 size=2.75KB
+|  |       table: rows=25 size=2.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=25
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -5449,9 +5449,9 @@ Per-Host Resources: mem-estimate=97.55MB mem-reservation=32.00KB thread-reservat
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpch_parquet.nation t2, RANDOM]
-|     partitions=1/1 files=1 size=2.75KB
+|     partitions=1/1 files=1 size=2.76KB
 |     stored statistics:
-|       table: rows=25 size=2.75KB
+|       table: rows=25 size=2.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=25
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -5461,7 +5461,7 @@ Per-Host Resources: mem-estimate=97.55MB mem-reservation=32.00KB thread-reservat
 00:SCAN HDFS [tpch_parquet.nation t1, RANDOM]
    partitions=1/1 files=1 size=2.75KB
    stored statistics:
-     table: rows=25 size=2.75KB
+     table: rows=25 size=2.76KB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=25
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -5548,9 +5548,9 @@ Per-Host Resources: mem-estimate=195.14MB mem-reservation=64.00KB thread-reserva
 |  |  |  03:SCAN HDFS [tpch_parquet.supplier t4, RANDOM]
 |  |  |     partitions=1/1 files=1 size=882.47KB
 |  |  |     stored statistics:
-|  |  |       table: rows=10000 size=882.47KB
+|  |  |       table: rows=10.00K size=882.49KB
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=10000
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=10.00K
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |  |     tuple-ids=3 row-size=8B cardinality=10.00K
 |  |  |     in pipelines: 03(GETNEXT)
@@ -5558,7 +5558,7 @@ Per-Host Resources: mem-estimate=195.14MB mem-reservation=64.00KB thread-reserva
 |  |  02:SCAN HDFS [tpch_parquet.nation t3, RANDOM]
 |  |     partitions=1/1 files=1 size=2.75KB
 |  |     stored statistics:
-|  |       table: rows=25 size=2.75KB
+|  |       table: rows=25 size=2.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=25
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
@@ -5568,7 +5568,7 @@ Per-Host Resources: mem-estimate=195.14MB mem-reservation=64.00KB thread-reserva
 |  01:SCAN HDFS [tpch_parquet.nation t2, RANDOM]
 |     partitions=1/1 files=1 size=2.75KB
 |     stored statistics:
-|       table: rows=25 size=2.75KB
+|       table: rows=25 size=2.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=25
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
@@ -5576,9 +5576,9 @@ Per-Host Resources: mem-estimate=195.14MB mem-reservation=64.00KB thread-reserva
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.nation t1, RANDOM]
-   partitions=1/1 files=1 size=2.75KB
+   partitions=1/1 files=1 size=2.76KB
    stored statistics:
-     table: rows=25 size=2.75KB
+     table: rows=25 size=2.76KB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=25
    mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
@@ -5645,10 +5645,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
    stored statistics:
-     table: rows=11000 size=814.73KB
-     partitions: 11/11 rows=11000
+     table: rows=11.00K size=814.73KB
+     partitions: 11/11 rows=11.00K
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1005
+   extrapolated-rows=disabled max-scan-range-rows=1.00K
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=1
    tuple-ids=0 row-size=3B cardinality=11.00K
    in pipelines: 00(GETNEXT)
@@ -5757,9 +5757,9 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
@@ -5805,9 +5805,9 @@ Per-Host Resources: mem-estimate=806.43MB mem-reservation=74.00MB thread-reserva
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.60MB
    stored statistics:
-     table: rows=6001215 size=193.60MB
+     table: rows=6.00M size=193.59MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2141702
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)

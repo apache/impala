@@ -44,7 +44,7 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     # Test row count extrapolation
     self.client.execute("set explain_level=2")
     explain_result = self.client.execute("explain select * from functional.alltypes")
-    assert "extrapolated-rows=7300" in " ".join(explain_result.data)
+    assert "extrapolated-rows=7.30K" in " ".join(explain_result.data)
     # Test COMPUTE STATS TABLESAMPLE
     part_test_tbl = unique_database + ".alltypes"
     self.clone_table("functional.alltypes", part_test_tbl, True, vector)

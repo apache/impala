@@ -41,7 +41,7 @@ row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-re
 row_regex:.*partitions=1/1 files=1 size=.*
 '     runtime filters: RF000[bloom] -> l_orderkey'
 '     stored statistics:'
-row_regex:.*table: rows=6001215 size=.*
+row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
 '       columns: all'
 row_regex:.*extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1.*
@@ -55,7 +55,7 @@ row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thre
 '  01:SCAN HDFS [tpch.orders, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '     stored statistics:'
-row_regex:.*table: rows=1500000 size=.*
+row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
 '       columns: all'
 row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*

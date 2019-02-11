@@ -65,10 +65,10 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=12 size=.*
 '   stored statistics:'
-row_regex:.*table: rows=3650 size=.*
+row_regex:.*table: rows=3.65K size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-row_regex:.* extrapolated-rows=3650.*
+row_regex:.* extrapolated-rows=3.65K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3.65K'
 '   in pipelines: 00(GETNEXT)'
@@ -94,7 +94,7 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 '   partition predicates: `month` IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
 row_regex:.*partitions=3/12 files=3 size=.*
 '   stored statistics:'
-row_regex:.*table: rows=3650 size=.*
+row_regex:.*table: rows=3.65K size=.*
 '     partitions: 0/3 rows=unavailable'
 '     columns: all'
 row_regex:.* extrapolated-rows=904.*
@@ -122,10 +122,10 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=24 size=.*
 '   stored statistics:'
-row_regex:.*table: rows=3650 size=.*
+row_regex:.*table: rows=3.65K size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-row_regex:.* extrapolated-rows=7300.*
+row_regex:.* extrapolated-rows=7.30K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=7.30K'
 '   in pipelines: 00(GETNEXT)'
@@ -153,10 +153,10 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 '   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'
-row_regex:.*table: rows=3650 size=.*
+row_regex:.*table: rows=3.65K size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-row_regex:.* extrapolated-rows=3651.*
+row_regex:.* extrapolated-rows=3.65K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3.65K'
 '   in pipelines: 00(GETNEXT)'
@@ -183,10 +183,10 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 '   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'
-row_regex:.*table: rows=10950 size=.*
+row_regex:.*table: rows=10.95K size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-row_regex:.* extrapolated-rows=3651
+row_regex:.* extrapolated-rows=3.65K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3.65K'
 '   in pipelines: 00(GETNEXT)'

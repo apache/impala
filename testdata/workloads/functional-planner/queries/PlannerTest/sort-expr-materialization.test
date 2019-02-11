@@ -16,8 +16,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -42,8 +42,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -67,8 +67,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -94,8 +94,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -129,8 +129,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -156,8 +156,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -182,8 +182,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
@@ -208,8 +208,8 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    stored statistics:
-     table: rows=7300 size=478.45KB
-     partitions: 24/24 rows=7300
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1

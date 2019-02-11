@@ -345,7 +345,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append("row-size=")
         .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
         .append(" cardinality=")
-        .append(PrintUtils.printCardinality(cardinality_))
+        .append(PrintUtils.printEstCardinality(cardinality_))
         .append("\n");
     }
 

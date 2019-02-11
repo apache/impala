@@ -26,6 +26,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryOptions;
@@ -111,12 +112,12 @@ abstract public class ScanNode extends PlanNode {
    * when the string returned by this method is embedded in a query's explain plan.
    */
   protected String getTableStatsExplainString(String prefix) {
-    StringBuilder output = new StringBuilder();
     TTableStats tblStats = desc_.getTable().getTTableStats();
-    String numRows = String.valueOf(tblStats.num_rows);
-    if (tblStats.num_rows == -1) numRows = "unavailable";
-    output.append(prefix + "table: rows=" + numRows);
-    return output.toString();
+    return new StringBuilder()
+      .append(prefix)
+      .append("table: rows=")
+      .append(PrintUtils.printEstCardinality(tblStats.num_rows))
+      .toString();
   }
 
   /**
@@ -132,12 +133,13 @@ abstract public class ScanNode extends PlanNode {
         columnsMissingStats.add(slot.getColumn().getName());
       }
     }
+    output.append(prefix);
     if (columnsMissingStats.isEmpty()) {
-      output.append(prefix + "columns: all");
+      output.append("columns: all");
     } else if (columnsMissingStats.size() == desc_.getSlots().size()) {
-      output.append(prefix + "columns: unavailable");
+      output.append("columns: unavailable");
     } else {
-      output.append(String.format("%scolumns missing stats: %s", prefix,
+      output.append(String.format("columns missing stats: %s",
           Joiner.on(", ").join(columnsMissingStats)));
     }
     return output.toString();

@@ -38,6 +38,7 @@ import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
 
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -137,7 +138,7 @@ public class TestUtils {
 
   // Ignore the exact estimated row count, which depends on the file sizes.
   static IgnoreValueFilter SCAN_RANGE_ROW_COUNT_FILTER =
-      new IgnoreValueFilter("max-scan-range-rows", NUMBER_REGEX);
+      new IgnoreValueFilter("max-scan-range-rows", PrintUtils.METRIC_REGEX);
 
   // Filters that are always applied
   private static final List<ResultFilter> DEFAULT_FILTERS = Arrays.<ResultFilter>asList(

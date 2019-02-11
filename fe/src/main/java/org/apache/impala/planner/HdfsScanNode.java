@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.impala.analysis.AggregateInfo;
@@ -92,6 +91,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Scan of a single table.
@@ -1284,19 +1284,19 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      output.append(getStatsExplainString(detailPrefix));
-      output.append("\n");
-      String extrapRows = String.valueOf(extrapolatedNumRows_);
-      if (!FeFsTable.Utils.isStatsExtrapolationEnabled(tbl_)) {
+      output.append(getStatsExplainString(detailPrefix)).append("\n");
+      String extrapRows;
+      if (FeFsTable.Utils.isStatsExtrapolationEnabled(tbl_)) {
+        extrapRows = PrintUtils.printEstCardinality(extrapolatedNumRows_);
+      } else {
         extrapRows = "disabled";
-      } else if (extrapolatedNumRows_ == -1) {
-        extrapRows = "unavailable";
       }
       output.append(detailPrefix)
-        .append(String.format("extrapolated-rows=%s", extrapRows));
-      output.append(String.format(" max-scan-range-rows=%s",
-          maxScanRangeNumRows_ == -1 ? "unavailable" : maxScanRangeNumRows_));
-      output.append("\n");
+            .append("extrapolated-rows=")
+            .append(extrapRows)
+            .append(" max-scan-range-rows=")
+            .append(PrintUtils.printEstCardinality(maxScanRangeNumRows_))
+            .append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
         output.append(detailPrefix)
           .append(String.format("missing disk ids: "
@@ -1382,18 +1382,17 @@ public class HdfsScanNode extends ScanNode {
   protected String getTableStatsExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
     TTableStats tblStats = desc_.getTable().getTTableStats();
-    String numRows = String.valueOf(tblStats.num_rows);
-    if (tblStats.num_rows == -1) numRows = "unavailable";
     String totalBytes = PrintUtils.printBytes(tblStats.total_file_bytes);
     if (tblStats.total_file_bytes == -1) totalBytes = "unavailable";
     output.append(String.format("%stable: rows=%s size=%s",
-        prefix, numRows, totalBytes));
+        prefix,
+        PrintUtils.printEstCardinality(tblStats.num_rows),
+        totalBytes));
     if (tbl_.getNumClusteringCols() > 0) {
       output.append("\n");
-      String partNumRows = String.valueOf(partitionNumRows_);
-      if (partitionNumRows_ == -1) partNumRows = "unavailable";
       output.append(String.format("%spartitions: %s/%s rows=%s",
-          prefix, numPartitionsWithNumRows_, partitions_.size(), partNumRows));
+          prefix, numPartitionsWithNumRows_, partitions_.size(),
+          PrintUtils.printEstCardinality(partitionNumRows_)));
     }
     return output.toString();
   }

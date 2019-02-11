@@ -134,8 +134,26 @@ public class PrintUtils {
     return bytes + "B";
   }
 
-  public static String printCardinality(long cardinality) {
+  /**
+   * Print an estimated cardinality. No need to print the exact value
+   * because estimates are not super-precise.
+   */
+  public static String printEstCardinality(long cardinality) {
     return (cardinality != -1) ? printMetric(cardinality) : "unavailable";
+  }
+
+  /**
+   * Print an exact cardinality (such as a row count) as one of three formats:
+   *
+   * * "unavailable" (if value < 0)
+   * * number (if value is small)
+   * * xx.xxU (dd,ddd) (if the value is large)
+   */
+  public static String printExactCardinality(long value) {
+    if (value == -1) return "unavailable";
+    String result = printMetric(value);
+    if (value < KILO) return result;
+    return String.format("%s (%,d)", result, value);
   }
 
   public static String printNumHosts(String prefix, long numHosts) {

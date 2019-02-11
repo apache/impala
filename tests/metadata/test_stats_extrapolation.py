@@ -124,7 +124,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
   def __run_sampling_test(self, tbl, cols, expected_tbl, perc, seed):
     """Drops stats on 'tbl' and then runs COMPUTE STATS TABLESAMPLE on 'tbl' with the
     given column restriction clause, sampling percent and random seed. Checks that
-    the resulting table and column stats are reasoanbly close to those of
+    the resulting table and column stats are reasonably close to those of
     'expected_tbl'."""
     self.client.execute("drop stats {0}".format(tbl))
     self.client.execute("compute stats {0}{1} tablesample system ({2}) repeatable ({3})"\
