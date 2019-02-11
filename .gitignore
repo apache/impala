@@ -85,3 +85,13 @@ gdb.txt
 
 # OS X Artifacts
 .DS_Store
+
+# Eclipse
+.cproject
+.project
+.classpath
+.settings
+
+# Debugging
+ad-hoc.test
+nohup.out
