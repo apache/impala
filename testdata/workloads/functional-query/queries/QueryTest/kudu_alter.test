@@ -14,7 +14,7 @@ AnalysisException: SHOW RANGE PARTITIONS requested but table does not have range
 ---- QUERY
 # Alter master address to a different location
 alter table simple set tblproperties (
-  'kudu.master_addresses' = 'localhost'
+  'kudu.master_addresses' = '$INTERNAL_LISTEN_HOST'
 )
 ---- RESULTS
 'Updated table.'
@@ -23,14 +23,15 @@ STRING
 ====
 ---- QUERY
 # Show that new address is picked up
+# Note that "describe formatted" pads the hostname string so we need to use a regex.
 describe formatted simple
 ---- RESULTS: VERIFY_IS_SUBSET
-'','kudu.master_addresses','localhost           '
+row_regex:'','kudu.master_addresses','$INTERNAL_LISTEN_HOST *'
 ---- TYPES
 STRING,STRING,STRING
 ====
 ---- QUERY
-alter table simple set tblproperties ('kudu.master_addresses' = '127.0.0.1')
+alter table simple set tblproperties ('kudu.master_addresses' = '$INTERNAL_LISTEN_IP')
 ---- RESULTS
 'Updated table.'
 ---- TYPES

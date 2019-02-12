@@ -24,7 +24,8 @@ import os
 import pytest
 from functools import partial
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import (IMPALA_TEST_CLUSTER_PROPERTIES,
+    IS_DOCKERIZED_TEST_CLUSTER)
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
@@ -178,3 +179,20 @@ class SkipIfEC:
   oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
   fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")
   scheduling = pytest.mark.skipif(IS_EC, reason="Scheduling is different on EC")
+
+
+class SkipIfDockerizedCluster:
+  catalog_service_not_exposed = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Catalog service not exposed.")
+  statestore_not_exposed = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Statestore service not exposed.")
+  internal_hostname = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Internal hostname is used, not local hostname.")
+  daemon_logs_not_exposed = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon logs not exposed in host.")
+  accesses_host_filesystem = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon would need to access host filesystem.")
+  jvm_oom_large_string = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
+      reason="IMPALA-4865: JVM hits OOM for large string. Heap is smaller in docker.")
+  insert_acls = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
+      reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")

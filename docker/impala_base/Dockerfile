@@ -17,10 +17,13 @@
 
 FROM ubuntu:16.04
 
+# Install minimal dependencies required for Impala services to run.
+# liblzo2-2 may be needed by the Impala-lzo plugin, which is used in tests.
+# We install it in the base image for convenience.
 RUN apt-get update && \
   apt-get install -y openjdk-8-jre-headless \
   libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
-  tzdata
+  tzdata liblzo2-2
 
 # Copy build artifacts required for the daemon processes.
 # Need to have multiple copy commands to preserve directory structure.

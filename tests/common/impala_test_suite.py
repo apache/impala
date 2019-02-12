@@ -25,6 +25,7 @@ import pwd
 import pytest
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -102,6 +103,9 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
+INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST")
+# Some tests use the IP instead of the host.
+INTERNAL_LISTEN_IP = socket.gethostbyname_ex(INTERNAL_LISTEN_HOST)[2][0]
 EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 # Match any SET statement. Assume that query options' names
 # only contain alphabets, underscores and digits after position 1.
@@ -311,7 +315,9 @@ class ImpalaTestSuite(BaseTestSuite):
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
           .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
           .replace('$NAMENODE', NAMENODE) \
-          .replace('$IMPALA_HOME', IMPALA_HOME)
+          .replace('$IMPALA_HOME', IMPALA_HOME) \
+          .replace('$INTERNAL_LISTEN_HOST', INTERNAL_LISTEN_HOST)\
+          .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP)
       if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
       # Strip newlines so we can split error message into multiple lines
       expected_str = expected_str.replace('\n', '')
@@ -339,7 +345,10 @@ class ImpalaTestSuite(BaseTestSuite):
                                      .replace('$NAMENODE', NAMENODE) \
                                      .replace('$IMPALA_HOME', IMPALA_HOME) \
                                      .replace('$USER', getuser()) \
-                                     .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)
+                                     .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
+                                     .replace('$INTERNAL_LISTEN_HOST',
+                                              INTERNAL_LISTEN_HOST) \
+                                     .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP)
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
@@ -436,7 +445,9 @@ class ImpalaTestSuite(BaseTestSuite):
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
           .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)
           .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str())
-          .replace('$USER', getuser()))
+          .replace('$USER', getuser())
+          .replace('$INTERNAL_LISTEN_HOST', INTERNAL_LISTEN_HOST)
+          .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP))
       if use_db: query = query.replace('$DATABASE', use_db)
 
       reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$FILESYSTEM_NAME",
@@ -512,7 +523,9 @@ class ImpalaTestSuite(BaseTestSuite):
       if pytest.config.option.update_results and 'RESULTS' in test_section:
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace(NAMENODE, '$NAMENODE') \
-            .replace('$IMPALA_HOME', IMPALA_HOME)
+            .replace('$IMPALA_HOME', IMPALA_HOME) \
+            .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
+            .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
       rt_profile_info = None
       if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
         # If this table format has a RUNTIME_PROFILE section specifically for it, evaluate

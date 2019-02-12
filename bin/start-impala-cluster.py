@@ -128,6 +128,7 @@ options, args = parser.parse_args()
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 CORE_SITE_PATH = os.path.join(IMPALA_HOME, "fe/src/test/resources/core-site.xml")
 KNOWN_BUILD_TYPES = ["debug", "release", "latest"]
+IMPALA_LZO = os.environ["IMPALA_LZO"]
 
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
@@ -539,6 +540,13 @@ class DockerMiniClusterOperations(object):
     # for config changes to take effect.
     conf_dir = os.path.join(IMPALA_HOME, "fe/target/test-classes")
     mount_args = ["--mount", "type=bind,src={0},dst=/opt/impala/conf".format(conf_dir)]
+
+    # Allow loading LZO plugin, if built.
+    lzo_lib_dir = os.path.join(IMPALA_LZO, "build")
+    if os.path.isdir(lzo_lib_dir):
+      mount_args += ["--mount",
+                     "type=bind,src={0},dst=/opt/impala/lib/plugins".format(lzo_lib_dir)]
+
     mem_limit_args = []
     if mem_limit is not None:
       mem_limit_args = ["--memory", str(mem_limit)]

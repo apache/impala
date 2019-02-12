@@ -25,7 +25,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, \
-    SkipIfNotHdfsMinicluster, SkipIfS3
+    SkipIfNotHdfsMinicluster, SkipIfS3, SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -80,6 +80,7 @@ class TestInsertQueries(ImpalaTestSuite):
             v.get_value('compression_codec') == 'none'))
 
   @pytest.mark.execute_serially
+  @SkipIfDockerizedCluster.jvm_oom_large_string
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
     if "-Xcheck:jni" in os.environ.get("LIBHDFS_OPTS", ""):
@@ -147,7 +148,8 @@ class TestInsertQueries(ImpalaTestSuite):
     # IMPALA-7023: These queries can linger and use up memory, causing subsequent
     # tests to hit memory limits. Wait for some time to allow the query to
     # be reclaimed.
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=60)
 

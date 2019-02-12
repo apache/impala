@@ -225,9 +225,9 @@ def build_ignore_dir_arg_list(valid_dirs):
 
 def print_metrics(substring):
   """Prints metrics with the given substring in the name"""
-  for impalad in ImpalaCluster().impalads:
+  for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
     print ">" * 80
-    port = impalad._get_webserver_port()
+    port = impalad.get_webserver_port()
     print "connections metrics for impalad at port {0}:".format(port)
     debug_info = json.loads(ImpaladService(impalad.hostname, webserver_port=port)
         .read_debug_webpage('metrics?json'))

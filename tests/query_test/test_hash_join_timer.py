@@ -103,7 +103,7 @@ class TestHashJoinTimer(ImpalaTestSuite):
     join_type = test_case[1]
 
     # Ensure that the cluster is idle before starting the test query.
-    for impalad in ImpalaCluster().impalads:
+    for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
       verifier = MetricVerifier(impalad.service)
       verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 

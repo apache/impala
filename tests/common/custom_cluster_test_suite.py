@@ -230,7 +230,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       check_call(cmd + options, close_fds=True)
     finally:
       # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
-      cls.cluster = ImpalaCluster()
+      cls.cluster = ImpalaCluster.get_e2e_test_cluster()
     statestored = cls.cluster.statestored
     if statestored is None:
       raise Exception("statestored was not found")

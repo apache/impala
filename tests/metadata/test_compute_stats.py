@@ -145,7 +145,8 @@ class TestComputeStats(ImpalaTestSuite):
        incremental statistics.
     """
     try:
-      client = ImpalaCluster().impalads[0].service.create_beeswax_client()
+      impalad = ImpalaCluster.get_e2e_test_cluster().impalads[0]
+      client = impalad.service.create_beeswax_client()
       create = "create table test like functional.alltypes"
       load = "insert into test partition(year, month) select * from functional.alltypes"
       insert = """insert into test partition(year=2009, month=1) values
@@ -156,7 +157,7 @@ class TestComputeStats(ImpalaTestSuite):
 
       # Checks that profile does not have metrics for incremental stats when
       # the operation is not 'compute incremental stats'.
-      self.execute_query_expect_success(client, "use %s" % unique_database)
+      self.execute_query_expect_success(client, "use `%s`" % unique_database)
       profile = self.execute_query_expect_success(client, create).runtime_profile
       assert profile.count("StatsFetch") == 0
       # Checks that incremental stats metrics are present when 'compute incremental

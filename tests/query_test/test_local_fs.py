@@ -18,6 +18,7 @@
 # Validates table stored on the LocalFileSystem.
 #
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestLocalFileSystem(ImpalaTestSuite):
@@ -34,5 +35,6 @@ class TestLocalFileSystem(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and \
         v.get_value('table_format').compression_codec == 'none')
 
+  @SkipIfDockerizedCluster.accesses_host_filesystem
   def test_local_filesystem(self, vector, unique_database):
     self.run_test_case('QueryTest/local-filesystem', vector, unique_database)

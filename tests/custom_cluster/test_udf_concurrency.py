@@ -68,7 +68,7 @@ class TestUdfConcurrency(CustomClusterTestSuite):
 
     # Tracks number of impalads prior to tests to check that none have crashed.
     # All impalads are assumed to be coordinators.
-    cluster = ImpalaCluster()
+    cluster = ImpalaCluster.get_e2e_test_cluster()
     exp_num_coordinators = cluster.num_responsive_coordinators()
 
     setup_client = self.create_impala_client()

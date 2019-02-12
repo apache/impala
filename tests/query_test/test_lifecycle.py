@@ -36,7 +36,8 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_failure_in_prepare(self):
     # Fail the scan node
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     self.client.execute("SET DEBUG_ACTION='-1:0:PREPARE:FAIL'");
     try:
       self.client.execute("SELECT COUNT(*) FROM functional.alltypes")
@@ -51,7 +52,8 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
   def test_failure_in_prepare_multi_fragment(self):
     # Test that if one fragment fails that the others are cleaned up during the ensuing
     # cancellation.
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     # Fail the scan node
     self.client.execute("SET DEBUG_ACTION='-1:0:PREPARE:FAIL'");
 

@@ -53,7 +53,8 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
     """Verifies that the memory used by KRPC is returned to the memtrackers and that
     metrics in 'non_zero_peak_metrics' have a peak value > 0.
     """
-    verifiers = [ MemUsageVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MemUsageVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     for verifier in verifiers:
       for metric_name in ALL_METRICS:
         usage = verifier.get_mem_usage_values(metric_name)

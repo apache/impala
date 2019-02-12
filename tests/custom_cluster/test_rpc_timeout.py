@@ -45,7 +45,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
         self.execute_query(query, query_options)
       except ImpalaBeeswaxException:
         pass
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
 
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0)
@@ -61,7 +62,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
         pass
       finally:
         self.client.close_query(handle)
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
 
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0)
@@ -93,7 +95,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
     for i in range(3):
       ex= self.execute_query_expect_failure(self.client, self.TEST_QUERY)
       assert "RPC recv timed out" in str(ex)
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service) for i in
+                 ImpalaCluster.get_e2e_test_cluster().impalads]
 
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0)

@@ -24,8 +24,10 @@ import time
 from urllib2 import urlopen
 
 from ImpalaService import ImpalaHiveServer2Service
+from tests.common.skip import SkipIfDockerizedCluster
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from TCLIService import TCLIService
+
 
 SQLSTATE_GENERAL_ERROR = "HY000"
 
@@ -117,6 +119,7 @@ class TestHS2(HS2TestSuite):
     # Removed options should not be returned.
     assert "MAX_IO_BUFFERS" not in vals
 
+  @SkipIfDockerizedCluster.internal_hostname
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""
     open_session_req = TCLIService.TOpenSessionReq()

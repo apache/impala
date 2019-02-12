@@ -35,6 +35,13 @@ if build_type_arg_search_result is not None:
 else:
   build_type_dir = 'latest'
 
+docker_network = None
+docker_network_regex = re.compile(r'--docker_network=(\S+)', re.I)
+docker_network_search_result = re.search(docker_network_regex, test_start_cluster_args)
+if docker_network_search_result is not None:
+  docker_network = docker_network_search_result.groups()[0]
+IS_DOCKERIZED_TEST_CLUSTER = docker_network is not None
+
 # Resolve any symlinks in the path.
 impalad_basedir = \
     os.path.realpath(os.path.join(IMPALA_HOME, 'be/build', build_type_dir)).rstrip('/')

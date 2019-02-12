@@ -32,7 +32,7 @@ class TestFetchFirst(HS2TestSuite):
   def __test_invalid_result_caching(self, sql_stmt):
     """ Tests that invalid requests for query-result caching fail
     using the given sql_stmt."""
-    impala_cluster = ImpalaCluster()
+    impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     impalad = impala_cluster.impalads[0].service
 
     execute_statement_req = TCLIService.TExecuteStatementReq()

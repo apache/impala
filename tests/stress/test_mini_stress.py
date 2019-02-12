@@ -73,7 +73,7 @@ class TestMiniStress(ImpalaTestSuite):
     don't cause failures with other running workloads and ensures catalog versions
     are strictly increasing."""
     target_db = self.execute_scalar('select current_database()', vector=vector)
-    impala_cluster = ImpalaCluster()
+    impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     impalad = impala_cluster.impalads[0].service
     catalogd = impala_cluster.catalogd.service
 

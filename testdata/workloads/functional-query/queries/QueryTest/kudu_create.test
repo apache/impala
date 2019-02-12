@@ -112,7 +112,7 @@ Couldn't resolve this master's address bogus.host.name:7051
 ---- QUERY
 # Valid host with whitespace
 create table tdata_master_addresses_whitespace (id int primary key) stored as kudu
-  tblproperties('kudu.master_addresses' = '  localhost  ')
+  tblproperties('kudu.master_addresses' = '  $INTERNAL_LISTEN_HOST  ')
 ---- RESULTS
 'Table has been created.'
 ====

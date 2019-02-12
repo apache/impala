@@ -31,6 +31,9 @@ export LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/
 LD_LIBRARY_PATH+=:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server/
 LD_LIBRARY_PATH+=:/opt/kudu/release/lib
 
+# Add directory with optional plugins that can be mounted for the container.
+LD_LIBRARY_PATH+=:/opt/impala/lib/plugins
+
 # Configs should be first on classpath
 export CLASSPATH=/opt/impala/conf
 # Append all of the jars in /opt/impala/lib to the classpath.

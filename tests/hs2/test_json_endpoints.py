@@ -22,15 +22,15 @@ import pytest
 
 from urllib2 import urlopen
 
+from tests.common.impala_cluster import ImpalaCluster
 from tests.hs2.hs2_test_suite import HS2TestSuite
 from TCLIService import TCLIService
 
 class TestJsonEndpoints(HS2TestSuite):
   def _get_json_queries(self, http_addr):
     """Get the json output of the /queries page from the impalad web UI at http_addr."""
-    resp = urlopen("http://%s/queries?json" % http_addr)
-    assert resp.msg == 'OK'
-    return json.loads(resp.read())
+    cluster = ImpalaCluster.get_e2e_test_cluster()
+    return cluster.impalads[0].service.get_debug_webpage_json("/queries")
 
   @pytest.mark.execute_serially
   def test_waiting_in_flight_queries(self):

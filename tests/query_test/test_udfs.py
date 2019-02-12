@@ -45,7 +45,7 @@ class TestUdfBase(ImpalaTestSuite):
     raise e
 
   def _run_query_all_impalads(self, exec_options, query, expected):
-    impala_cluster = ImpalaCluster()
+    impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     for impalad in impala_cluster.impalads:
       client = impalad.service.create_beeswax_client()
       result = self.execute_query_expect_success(client, query, exec_options)
@@ -359,7 +359,7 @@ class TestUdfExecution(TestUdfBase):
     # It takes a long time for Impala to free up memory after this test, especially if
     # ASAN is enabled. Verify that all fragments finish executing before moving on to the
     # next test to make sure that the next test is not affected.
-    for impalad in ImpalaCluster().impalads:
+    for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
       verifier = MetricVerifier(impalad.service)
       verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
       verifier.verify_num_unused_buffers()
@@ -467,7 +467,7 @@ class TestUdfTargeted(TestUdfBase):
         "create function `{0}`.`pi_missing_jar`() returns double location '{1}' "
         "symbol='org.apache.hadoop.hive.ql.udf.UDFPI'".format(unique_database, jar_path))
 
-    cluster = ImpalaCluster()
+    cluster = ImpalaCluster.get_e2e_test_cluster()
     impalad = cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Create and drop functions with sync_ddl to make sure they are reflected

@@ -27,6 +27,7 @@ from thrift.protocol import TBinaryProtocol
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.thrift_util import create_transport
@@ -53,9 +54,9 @@ class TestCatalogServiceClient(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'parquet' and\
         v.get_value('table_format').compression_codec == 'none')
 
-
+  @SkipIfDockerizedCluster.catalog_service_not_exposed
   def test_get_functions(self, vector, unique_database):
-    impala_cluster = ImpalaCluster()
+    impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     catalogd = impala_cluster.catalogd.service
     trans_type = 'buffered'
     if pytest.config.option.use_kerberos:

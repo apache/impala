@@ -31,15 +31,16 @@ from signal import SIGKILL
 from subprocess import check_call
 from time import sleep
 
-if sys.version_info >= (2, 7):
-  # We use some functions in the docker code that don't exist in Python 2.6.
-  from subprocess import check_output
-
+import tests.common.environ
 from tests.common.impala_service import (
     CatalogdService,
     ImpaladService,
     StateStoredService)
 from tests.util.shell_util import exec_process, exec_process_async
+
+if sys.version_info >= (2, 7):
+  # We use some functions in the docker code that don't exist in Python 2.6.
+  from subprocess import check_output
 
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
@@ -76,6 +77,12 @@ class ImpalaCluster(object):
   def __init__(self, docker_network=None):
     self.docker_network = docker_network
     self.refresh()
+
+  @classmethod
+  def get_e2e_test_cluster(cls):
+    """Within end-to-end tests, get the cluster under test with settings detected from
+    the environment."""
+    return ImpalaCluster(docker_network=tests.common.environ.docker_network)
 
   def refresh(self):
     """ Re-loads the impalad/statestored/catalogd processes if they exist.
@@ -222,11 +229,7 @@ class ImpalaCluster(object):
       elif process.name == 'catalogd':
         catalogd = CatalogdProcess(cmdline)
 
-    # If the operating system PIDs wrap around during startup of the local minicluster,
-    # the order of the impalads is incorrect. We order them by their HS2 port, so that
-    # get_first_impalad() always returns the first one. We need to use a port that is
-    # exposed and mapped to a host port for the containerised cluster.
-    impalads.sort(key=lambda i: i.service.hs2_port)
+    self.__sort_impalads(impalads)
     return impalads, statestored, catalogd
 
   def __find_docker_containers(self):
@@ -239,7 +242,7 @@ class ImpalaCluster(object):
     output = check_output(["docker", "network", "inspect", self.docker_network])
     # Only one network should be present in the top level array.
     for container_id in json.loads(output)[0]["Containers"]:
-      container_info = self._get_container_info(container_id)
+      container_info = get_container_info(container_id)
       if container_info["State"]["Status"] != "running":
         # Skip over stopped containers.
         continue
@@ -262,16 +265,15 @@ class ImpalaCluster(object):
         assert catalogd is None
         catalogd = CatalogdProcess(args, container_id=container_id,
                                    port_map=port_map)
-    impalads.sort(key=lambda i: i.service.be_port)
+    self.__sort_impalads(impalads)
     return impalads, statestoreds, catalogd
 
-  def _get_container_info(self, container_id):
-    """Get the output of "docker container inspect" as a python data structure."""
-    containers = json.loads(
-        check_output(["docker", "container", "inspect", container_id]))
-    # Only one container should be present in the top level array.
-    assert len(containers) == 1, json.dumps(containers, indent=4)
-    return containers[0]
+  def __sort_impalads(self, impalads):
+    """Does an in-place sort of a list of ImpaladProcess objects into a canonical order.
+    We order them by their HS2 port, so that get_first_impalad() always returns the
+    first one. We need to use a port that is exposed and mapped to a host port for
+    the containerised cluster."""
+    impalads.sort(key=lambda i: i.service.hs2_port)
 
 
 # Represents a process running on a machine and common actions that can be performed
@@ -332,10 +334,10 @@ class Process(object):
 
   def __get_pids(self):
     if self.container_id is not None:
-      container_info = self._get_container_info(self.container_id)
+      container_info = get_container_info(self.container_id)
       if container_info["State"]["Status"] != "running":
         return []
-      return [container_info["State"]["Status"]["Pid"]]
+      return [container_info["State"]["Pid"]]
 
     # In non-containerised case, search for process based on matching command lines.
     pids = []
@@ -394,8 +396,13 @@ class BaseImpalaProcess(Process):
     super(BaseImpalaProcess, self).__init__(cmd, container_id, port_map)
     self.hostname = self._get_hostname()
 
-  def _get_webserver_port(self, default=None):
-    return int(self._get_port('webserver_port', default))
+  def get_webserver_port(self):
+    """Return the port for the webserver of this process."""
+    return int(self._get_port('webserver_port', self._get_default_webserver_port()))
+
+  def _get_default_webserver_port(self):
+    """Different daemons have different defaults. Subclasses must override."""
+    raise NotImplementedError()
 
   def _get_webserver_certificate_file(self):
     # TODO: if this is containerised, the path will likely not be the same on the host.
@@ -410,7 +417,7 @@ class BaseImpalaProcess(Process):
       if ('%s=' % arg_name) in arg.strip().lstrip('-'):
         return arg.split('=')[1]
     if default is None:
-      assert 0, "No command line argument '%s' found." % arg_name
+      assert 0, "Argument '{0}' not found in cmd '{1}'.".format(arg_name, self.cmd)
     return default
 
   def _get_port(self, arg_name, default):
@@ -426,13 +433,13 @@ class BaseImpalaProcess(Process):
 class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
-    self.service = ImpaladService(self.hostname,
-                                  self._get_webserver_port(
-                                      default=DEFAULT_IMPALAD_WEBSERVER_PORT),
-                                  self.__get_beeswax_port(),
-                                  self.__get_be_port(),
+    self.service = ImpaladService(self.hostname, self.get_webserver_port(),
+                                  self.__get_beeswax_port(), self.__get_be_port(),
                                   self.__get_hs2_port(),
                                   self._get_webserver_certificate_file())
+
+  def _get_default_webserver_port(self):
+    return DEFAULT_IMPALAD_WEBSERVER_PORT
 
   def __get_beeswax_port(self):
     return int(self._get_port('beeswax_port', DEFAULT_BEESWAX_PORT))
@@ -485,17 +492,21 @@ class StateStoreProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(StateStoreProcess, self).__init__(cmd, container_id, port_map)
     self.service = StateStoredService(self.hostname,
-        self._get_webserver_port(default=DEFAULT_STATESTORED_WEBSERVER_PORT),
-        self._get_webserver_certificate_file())
+        self.get_webserver_port(), self._get_webserver_certificate_file())
+
+  def _get_default_webserver_port(self):
+    return DEFAULT_STATESTORED_WEBSERVER_PORT
 
 
 # Represents a catalogd process
 class CatalogdProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(CatalogdProcess, self).__init__(cmd, container_id, port_map)
-    self.service = CatalogdService(self.hostname,
-        self._get_webserver_port(default=DEFAULT_CATALOGD_WEBSERVER_PORT),
+    self.service = CatalogdService(self.hostname, self.get_webserver_port(),
         self._get_webserver_certificate_file(), self.__get_port())
+
+  def _get_default_webserver_port(self):
+    return DEFAULT_CATALOGD_WEBSERVER_PORT
 
   def __get_port(self):
     return int(self._get_port('catalog_service_port', DEFAULT_CATALOG_SERVICE_PORT))
@@ -548,3 +559,12 @@ def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_fil
       cmd=' '.join([pipes.quote(tok) for tok in cmd]),
       redirect=redirect))
   os.system(sys_cmd)
+
+
+def get_container_info(container_id):
+  """Get the output of "docker container inspect" as a python data structure."""
+  containers = json.loads(
+      check_output(["docker", "container", "inspect", container_id]))
+  # Only one container should be present in the top level array.
+  assert len(containers) == 1, json.dumps(containers, indent=4)
+  return containers[0]

@@ -174,7 +174,9 @@ def pytest_assertrepr_compare(op, left, right):
   if isinstance(left, set) and isinstance(right, set) and op == '<=':
     # If expected is not a subset of actual, print out the set difference.
     result = ['Items in expected results not found in actual results:']
-    result.append(('').join(list(left - right)))
+    result.extend(list(left - right))
+    result.append('Items in actual results:')
+    result.extend(list(right))
     LOG.error('\n'.join(result))
     return result
 

@@ -16,6 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfDockerizedCluster
 
 import re
 import time
@@ -24,6 +25,7 @@ import time
 class TestLogFragments(ImpalaTestSuite):
   """Checks that logging includes query/fragment ids when available."""
 
+  @SkipIfDockerizedCluster.daemon_logs_not_exposed
   def test_log_fragments(self):
     """Tests that fragment ids percolate through to the logs.
 

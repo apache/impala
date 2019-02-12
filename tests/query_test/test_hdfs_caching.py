@@ -22,7 +22,7 @@ import re
 import time
 from subprocess import check_call
 
-from tests.common.environ import build_flavor_timeout
+from tests.common.environ import build_flavor_timeout, IS_DOCKERIZED_TEST_CLUSTER
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, \
@@ -58,7 +58,7 @@ class TestHdfsCaching(ImpalaTestSuite):
     cached_read_metric = "impala-server.io-mgr.cached-bytes-read"
     query_string = "select count(*) from tpch.nation"
     expected_bytes_delta = 2199
-    impala_cluster = ImpalaCluster()
+    impala_cluster = ImpalaCluster.get_e2e_test_cluster()
 
     # Collect the cached read metric on all the impalads before running the query
     cached_bytes_before = list()
@@ -85,7 +85,9 @@ class TestHdfsCaching(ImpalaTestSuite):
       if cached_bytes_after[i] > cached_bytes_before[i]:
         num_metrics_increased = num_metrics_increased + 1
 
-    if num_metrics_increased != 1:
+    if IS_DOCKERIZED_TEST_CLUSTER:
+      assert num_metrics_increased == 0, "HDFS caching is disabled in dockerised cluster."
+    elif num_metrics_increased != 1:
       # Test failed, print the metrics
       for i in range(0, len(cached_bytes_before)):
         print "%d %d" % (cached_bytes_before[i], cached_bytes_after[i])

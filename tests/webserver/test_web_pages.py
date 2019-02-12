@@ -128,7 +128,7 @@ class TestWebPage(ImpalaTestSuite):
     """Test that /query_profile_encoded error message starts with the expected line in
     case of missing query and does not contain any leading whitespace.
     """
-    cluster = ImpalaCluster()
+    cluster = ImpalaCluster.get_e2e_test_cluster()
     impalad = cluster.get_any_impalad()
     result = impalad.service.read_debug_webpage("query_profile_encoded?query_id=123")
     assert result.startswith("Could not obtain runtime profile: Query id")

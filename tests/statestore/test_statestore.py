@@ -40,6 +40,7 @@ from ErrorCodes.ttypes import TErrorCode
 from Status.ttypes import TStatus
 
 from tests.common.environ import build_flavor_timeout
+from tests.common.skip import SkipIfDockerizedCluster
 
 LOG = logging.getLogger('test_statestore')
 
@@ -158,7 +159,6 @@ class KillableThreadedServer(TServer):
 
     itrans.close()
     otrans.close()
-
 
 class StatestoreSubscriber(object):
   """A bare-bones subscriber skeleton. Tests should create a new StatestoreSubscriber(),
@@ -341,6 +341,8 @@ class StatestoreSubscriber(object):
             self.subscriber_id, timeout))
       time.sleep(0.2)
 
+
+@SkipIfDockerizedCluster.statestore_not_exposed
 class TestStatestore():
   def make_topic_update(self, topic_name, key_template="foo", value_template="bar",
                         num_updates=1, clear_topic_entries=False):

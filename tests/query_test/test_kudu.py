@@ -1124,6 +1124,7 @@ class TestKuduMemLimits(KuduTestSuite):
     # additional minute. This ensures that the num fragments 'in flight' reaches 0 in
     # less time than IMPALA-4654 was reproducing (~60sec) but yet still enough time that
     # this test won't be flaky.
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    verifiers = [MetricVerifier(i.service)
+                 for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=30)
