@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationProvider;
@@ -85,6 +87,7 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -182,6 +185,7 @@ public class CatalogServiceCatalog extends Catalog {
 
   private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
+
   private final TUniqueId catalogServiceId_;
 
   // Fair lock used to synchronize reads/writes of catalogVersion_. Because this lock
@@ -336,6 +340,10 @@ public class CatalogServiceCatalog extends Catalog {
   @VisibleForTesting
   public ExternalEventsProcessor getMetastoreEventProcessor() {
     return metastoreEventProcessor_;
+  }
+
+  public boolean isExternalEventProcessingEnabled() {
+    return !(metastoreEventProcessor_ instanceof NoOpEventProcessor);
   }
 
   /**
@@ -715,6 +723,82 @@ public class CatalogServiceCatalog extends Catalog {
     return ctx.toVersion;
   }
 
+  /**
+   * Gets the list of versions for in-flight events for the given table. Applicable
+   * only when external event processing is enabled.
+   * @param dbName database name
+   * @param tblName table name
+   * @return List of previous version numbers for in-flight events on this table.
+   * If table is not laoded returns a empty list. If event processing is disabled,
+   * returns a empty list
+   */
+  public List<Long> getInFlightVersionsForEvents(String dbName, String tblName)
+      throws DatabaseNotFoundException, TableNotFoundException {
+    Preconditions.checkState(isExternalEventProcessingEnabled(),
+        "Event processing should be enabled before calling this method");
+    List<Long> result = Collections.EMPTY_LIST;
+    versionLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException(
+            String.format("Database %s not found", dbName));
+      }
+      Table tbl = getTable(dbName, tblName);
+      if (tbl == null) {
+        throw new TableNotFoundException(
+            String.format("Table %s not found", new TableName(dbName, tblName)));
+      }
+      if (tbl instanceof IncompleteTable) return result;
+      return tbl.getVersionsForInflightEvents();
+    } finally {
+      versionLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a given version number from the catalog table's list of versions for
+   * in-flight events. Applicable only when external event processing is enabled.
+   * @param dbName database name
+   * @param tblName table name
+   */
+  public void removeFromInFlightVersionsForEvents(String dbName, String tblName,
+      long versionNumber) throws DatabaseNotFoundException, TableNotFoundException {
+    Preconditions.checkState(isExternalEventProcessingEnabled(),
+        "Event processing should be enabled when calling this method");
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) return;
+      Table tbl = getTable(dbName, tblName);
+      if (tbl == null) {
+        throw new TableNotFoundException(
+            String.format("Table %s not found", new TableName(dbName, tblName)));
+      }
+      if (tbl instanceof IncompleteTable) return;
+      tbl.removeFromVersionsForInflightEvents(versionNumber);
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Adds a given version number from the catalog table's list of versions for in-flight
+   * events. Applicable only when external event processing is enabled.
+   *
+   * @param tbl Catalog table
+   * @param versionNumber version number to be added
+   */
+  public void addVersionsForInflightEvents(Table tbl, long versionNumber) {
+    if (!isExternalEventProcessingEnabled()) return;
+    versionLock_.writeLock().lock();
+    try {
+      if (tbl instanceof IncompleteTable) return;
+      tbl.addToVersionsForInflightEvents(versionNumber);
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
 
   /**
    * Get a snapshot view of all the catalog objects that were deleted between versions
@@ -865,10 +949,11 @@ public class CatalogServiceCatalog extends Catalog {
    * @return Value of the parameter which maps to property key, null if the table
    * doesn't exist, if it is a incomplete table or if the parameter is not found
    */
-  public String getTableProperty(String dbName, String tblName, String propertyKey) {
+  public List<String> getTableProperties(
+      String dbName, String tblName, List<String> propertyKeys) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tblName);
-    Preconditions.checkNotNull(propertyKey);
+    Preconditions.checkNotNull(propertyKeys);
     versionLock_.readLock().lock();
     try {
       Db db = getDb(dbName);
@@ -876,7 +961,11 @@ public class CatalogServiceCatalog extends Catalog {
       Table tbl = db.getTable(tblName);
       if (tbl == null || tbl instanceof IncompleteTable) return null;
       if (!tbl.getMetaStoreTable().isSetParameters()) return null;
-      return tbl.getMetaStoreTable().getParameters().get(propertyKey);
+      List<String> propertyValues = new ArrayList<>(propertyKeys.size());
+      for (String propertyKey : propertyKeys) {
+        propertyValues.add(tbl.getMetaStoreTable().getParameters().get(propertyKey));
+      }
+      return propertyValues;
     } finally {
       versionLock_.readLock().unlock();
     }
@@ -2479,6 +2568,13 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (InterruptedException e) {
       throw new CatalogException("Error running getPartialCatalogObject(): ", e);
     }
+  }
+
+  /**
+   * Gets the id for this catalog service
+   */
+  public String getCatalogServiceId() {
+    return TUniqueIdUtil.PrintId(catalogServiceId_).intern();
   }
 
   /**

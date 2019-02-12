@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
@@ -114,6 +116,14 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // CatalogdTableInvalidator.nanoTime(). This is only set in catalogd and not used by
   // impalad.
   protected long lastUsedTime_;
+
+  // maximum number of catalog versions to store for in-flight events for this table
+  private static final int MAX_NUMBER_OF_INFLIGHT_EVENTS = 10;
+
+  // FIFO list of versions for all the in-flight metastore events in this table
+  // This queue can only grow up to MAX_NUMBER_OF_INFLIGHT_EVENTS size. Anything which
+  // is attempted to be added to this list when its at maximum capacity is ignored
+  private final LinkedList<Long> versionsForInflightEvents_ = new LinkedList<>();
 
   // Table metrics. These metrics are applicable to all table types. Each subclass of
   // Table can define additional metrics specific to that table type.
@@ -599,5 +609,42 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   public void refreshLastUsedTime() {
     lastUsedTime_ = CatalogdTableInvalidator.nanoTime();
+  }
+
+  /**
+   * Gets the current list of versions for in-flight events for this table
+   */
+  public List<Long> getVersionsForInflightEvents() {
+    return Collections.unmodifiableList(versionsForInflightEvents_);
+  }
+
+  /**
+   * Removes a given version from the collection of version numbers for in-flight events
+   * @param versionNumber version number to remove from the collection
+   * @return true if version was successfully removed, false if didn't exist
+   */
+  public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    return versionsForInflightEvents_.remove(versionNumber);
+  }
+
+  /**
+   * Adds a version number to the collection of versions for in-flight events. If the
+   * collection is already at the max size defined by
+   * <code>MAX_NUMBER_OF_INFLIGHT_EVENTS</code>, then it ignores the given version and
+   * does not add it
+   * @param versionNumber version number to add
+   * @return True if version number was added, false if the collection is at its max
+   * capacity
+   */
+  public boolean addToVersionsForInflightEvents(long versionNumber) {
+    if (versionsForInflightEvents_.size() == MAX_NUMBER_OF_INFLIGHT_EVENTS) {
+      LOG.warn(String.format("Number of versions to be stored for table %s is at "
+              + " its max capacity %d. Ignoring add request for version number %d. This "
+              + "could cause unnecessary table invalidation when the event is processed",
+          getFullName(), MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
+      return false;
+    }
+    versionsForInflightEvents_.add(versionNumber);
+    return true;
   }
 }

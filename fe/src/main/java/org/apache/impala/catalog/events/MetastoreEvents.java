@@ -19,24 +19,31 @@ package org.apache.impala.catalog.events;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
+
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.messaging.AddPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.CreateTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.DropPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONAlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONCreateDatabaseMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropTableMessage;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
@@ -51,7 +58,14 @@ import org.slf4j.Logger;
  */
 public class MetastoreEvents {
 
+  // key to be used for catalog version in table properties for detecting self-events
+  public static final String CATALOG_VERSION_PROP_KEY = "impala.events.catalogVersion";
+  // key to be used for catalog service id for detecting self-events
+  public static final String CATALOG_SERVICE_ID_PROP_KEY =
+      "impala.events.catalogServiceId";
   // flag to be set in the table/database parameters to disable event based metadata sync
+  // Note the this is a user-facing property. Any changes to this key name
+  // will break backwards compatibility
   public static final String DISABLE_EVENT_HMS_SYNC_KEY = "impala.disableHmsSync";
 
   public enum MetastoreEventType {
@@ -113,8 +127,8 @@ public class MetastoreEvents {
     }
 
     /**
-     * creates instance of <code>MetastoreEvent</code> used to process a given
-     * event type. If the event type is unknown, returns a IgnoredEvent
+     * creates instance of <code>MetastoreEvent</code> used to process a given event type.
+     * If the event type is unknown, returns a IgnoredEvent
      */
     private MetastoreEvent get(NotificationEvent event)
         throws MetastoreNotificationException {
@@ -152,15 +166,15 @@ public class MetastoreEvents {
      * filtered out
      *
      * This is needed to avoid the replay problem. For example, if catalog created and
-     * removed a table, the create event received will try to add the object again.
-     * This table will be visible until the drop table event is processed. This can be
-     * avoided by "looking ahead" in the event stream to see if the table with the same
-     * name was dropped. In such a case, the create event can be ignored
+     * removed a table, the create event received will try to add the object again. This
+     * table will be visible until the drop table event is processed. This can be avoided
+     * by "looking ahead" in the event stream to see if the table with the same name was
+     * dropped. In such a case, the create event can be ignored
      *
      * @param events NotificationEvents fetched from metastore
      * @return A list of MetastoreEvents corresponding to the given the NotificationEvents
      * @throws MetastoreNotificationException if a NotificationEvent could not be
-     * parsed into MetastoreEvent
+     *     parsed into MetastoreEvent
      */
     List<MetastoreEvent> getFilteredEvents(List<NotificationEvent> events)
         throws MetastoreNotificationException {
@@ -245,6 +259,7 @@ public class MetastoreEvents {
 
     /**
      * Process this event if it is enabled based on the flags on this object
+     *
      * @throws CatalogException If  Catalog operations fail
      * @throws MetastoreNotificationException If NotificationEvent parsing fails
      */
@@ -265,8 +280,8 @@ public class MetastoreEvents {
      * @throws MetastoreNotificationException in case of event parsing errors out
      * @throws CatalogException in case catalog operations could not be performed
      */
-    protected abstract void process() throws MetastoreNotificationException,
-        CatalogException;
+    protected abstract void process()
+        throws MetastoreNotificationException, CatalogException;
 
     /**
      * Helper method to get debug string with helpful event information prepended to the
@@ -279,8 +294,7 @@ public class MetastoreEvents {
      */
     protected String debugString(String msgFormatString, Object... args) {
       String formatString =
-          new StringBuilder(STR_FORMAT_EVENT_ID_TYPE).append(msgFormatString)
-              .toString();
+          new StringBuilder(STR_FORMAT_EVENT_ID_TYPE).append(msgFormatString).toString();
       Object[] formatArgs = getLogFormatArgs(args);
       return String.format(formatString, formatArgs);
     }
@@ -301,19 +315,15 @@ public class MetastoreEvents {
     }
 
     /**
-     * Logs at info level the given log formatted string and its args. The log
-     * formatted string should have {} pair at the appropriate location in the string
-     * for each arg value provided. This method prepends the event id and event type
-     * before logging the message. No-op if the log level is not at INFO
-
-     * @param logFormattedStr
-     * @param args
+     * Logs at info level the given log formatted string and its args. The log formatted
+     * string should have {} pair at the appropriate location in the string for each arg
+     * value provided. This method prepends the event id and event type before logging the
+     * message. No-op if the log level is not at INFO
      */
     protected void infoLog(String logFormattedStr, Object... args) {
       if (!LOG.isInfoEnabled()) return;
       String formatString =
-          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr)
-              .toString();
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
       Object[] formatArgs = getLogFormatArgs(args);
       LOG.info(formatString, formatArgs);
     }
@@ -324,16 +334,15 @@ public class MetastoreEvents {
     protected void debugLog(String logFormattedStr, Object... args) {
       if (!LOG.isDebugEnabled()) return;
       String formatString =
-          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr)
-              .toString();
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
       Object[] formatArgs = getLogFormatArgs(args);
       LOG.debug(formatString, formatArgs);
     }
 
     /**
      * Search for a inverse event (for example drop_table is a inverse event for
-     * create_table) for this event from a given list of notificationEvents starting
-     * for the startIndex. This is useful for skipping certain events from processing
+     * create_table) for this event from a given list of notificationEvents starting for
+     * the startIndex. This is useful for skipping certain events from processing
      *
      * @param events List of NotificationEvents to be searched
      * @return true if the object is removed after this event, else false
@@ -353,7 +362,6 @@ public class MetastoreEvents {
    * Base class for all the table events
    */
   public static abstract class MetastoreTableEvent extends MetastoreEvent {
-
     // tblName from the event
     protected final String tblName_;
 
@@ -384,27 +392,32 @@ public class MetastoreEvents {
      * does not exist
      */
     protected boolean invalidateCatalogTable() {
-      return catalog_.invalidateTableIfExists(dbName_, tblName_) != null;
+      boolean tableInvalidated =
+          catalog_.invalidateTableIfExists(dbName_, tblName_) != null;
+      if (tableInvalidated) {
+        metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).inc();
+      }
+      return tableInvalidated;
     }
 
     /**
-     * Checks if the table level property is set in the parameters of the table from
-     * the event. If it is available, it takes precedence over database level flag for
-     * this table. If the table level property is not set, returns the value from the
-     * database level property.f
+     * Checks if the table level property is set in the parameters of the table from the
+     * event. If it is available, it takes precedence over database level flag for this
+     * table. If the table level property is not set, returns the value from the database
+     * level property.f
      *
      * @return Boolean value of the table property with the key
-     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. Else, returns the database property
-     * which is associated with this table. Returns false if neither of the properties
-     * are set.
+     *     <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. Else, returns the database property
+     *     which is associated with this table. Returns false if neither of the properties
+     *     are set.
      */
     @Override
     protected boolean isEventProcessingDisabled() {
       Preconditions.checkNotNull(msTbl_);
       Boolean tblProperty = getHmsSyncProperty(msTbl_);
       if (tblProperty != null) {
-        infoLog("Found table level flag {} is set to {}",
-            DISABLE_EVENT_HMS_SYNC_KEY, tblProperty.toString());
+        infoLog("Found table level flag {} is set to {} for table {}",
+            DISABLE_EVENT_HMS_SYNC_KEY, tblProperty.toString(), getFullyQualifiedTblName());
         return tblProperty;
       }
       // if the tbl property is not set check at db level
@@ -412,8 +425,8 @@ public class MetastoreEvents {
       if (dbFlagVal != null) {
         // no need to spew unnecessary logs. Most tables/databases are expected to not
         // have this flag set when event based HMS polling is enabled
-        infoLog("Table level flag is not set. Db level flag {} at Db level is {}",
-                DISABLE_EVENT_HMS_SYNC_KEY, dbFlagVal);
+        debugLog("Table level flag is not set. Db level flag {} is {} for "
+            + "database {}", DISABLE_EVENT_HMS_SYNC_KEY, dbFlagVal, dbName_);
       }
       // flag value of null also returns false
       return Boolean.valueOf(dbFlagVal);
@@ -424,7 +437,7 @@ public class MetastoreEvents {
      * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> from the given table
      *
      * @return the Boolean value of the property with the key
-     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> if it is available else returns null
+     *     <code>DISABLE_EVENT_HMS_SYNC_KEY</code> if it is available else returns null
      */
     public static Boolean getHmsSyncProperty(
         org.apache.hadoop.hive.metastore.api.Table tbl) {
@@ -451,6 +464,7 @@ public class MetastoreEvents {
      * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> it is only used for tables within that
      * database. As such this property does not control if the database level DDLs are
      * skipped or not.
+     *
      * @return false
      */
     @Override
@@ -498,8 +512,8 @@ public class MetastoreEvents {
       // MetastoreEventsProcessor)
       try {
         if (!catalog_.addTableIfNotExists(dbName_, tblName_)) {
-          debugLog("Not adding the table {} since it already exists in catalog",
-                  tblName_);
+          debugLog(
+              "Not adding the table {} since it already exists in catalog", tblName_);
           return;
         }
       } catch (CatalogException e) {
@@ -523,8 +537,8 @@ public class MetastoreEvents {
           DropTableEvent dropTableEvent = (DropTableEvent) event;
           if (dbName_.equalsIgnoreCase(dropTableEvent.dbName_) && tblName_
               .equalsIgnoreCase(dropTableEvent.tblName_)) {
-            infoLog("Found table {} is removed later in event {} type {}",
-                tblName_, dropTableEvent.eventId_, dropTableEvent.eventType_);
+            infoLog("Found table {} is removed later in event {} type {}", tblName_,
+                dropTableEvent.eventId_, dropTableEvent.eventType_);
             return true;
           }
         } else if (event.eventType_.equals(MetastoreEventType.ALTER_TABLE)) {
@@ -537,11 +551,11 @@ public class MetastoreEvents {
           // the create table event, the alter rename event just becomes a addIfNotExists
           // event which is valid for both a self-event and external event cases
           AlterTableEvent alterTableEvent = (AlterTableEvent) event;
-          if (alterTableEvent.isRename_ &&
-              dbName_.equalsIgnoreCase(alterTableEvent.msTbl_.getDbName()) &&
-              tblName_.equalsIgnoreCase(alterTableEvent.msTbl_.getTableName())) {
-            infoLog("Found table {} is renamed later in event {} type {}",
-                tblName_, alterTableEvent.eventId_, alterTableEvent.eventType_);
+          if (alterTableEvent.isRename_
+              && dbName_.equalsIgnoreCase(alterTableEvent.msTbl_.getDbName())
+              && tblName_.equalsIgnoreCase(alterTableEvent.msTbl_.getTableName())) {
+            infoLog("Found table {} is renamed later in event {} type {}", tblName_,
+                alterTableEvent.eventId_, alterTableEvent.eventType_);
             return true;
           }
         }
@@ -553,8 +567,7 @@ public class MetastoreEvents {
   /**
    * MetastoreEvent for ALTER_TABLE event type
    */
-  public static class AlterTableEvent extends MetastoreTableEvent {
-
+  public static class AlterTableEvent extends TableInvalidatingEvent {
     // the table object after alter operation, as parsed from the NotificationEvent
     protected org.apache.hadoop.hive.metastore.api.Table tableAfter_;
     // true if this alter event was due to a rename operation
@@ -588,21 +601,48 @@ public class MetastoreEvents {
       // changed
       isRename_ = !msTbl_.getDbName().equalsIgnoreCase(tableAfter_.getDbName())
           || !msTbl_.getTableName().equalsIgnoreCase(tableAfter_.getTableName());
-      eventSyncBeforeFlag_ =
-          getHmsSyncProperty(msTbl_);
+      eventSyncBeforeFlag_ = getHmsSyncProperty(msTbl_);
       eventSyncAfterFlag_ = getHmsSyncProperty(tableAfter_);
       dbFlagVal =
           Boolean.valueOf(catalog_.getDbProperty(dbName_, DISABLE_EVENT_HMS_SYNC_KEY));
     }
 
+    @Override
+    protected void initSelfEventIdentifiersFromEvent() {
+      versionNumberFromEvent_ = Long.parseLong(
+          getStringProperty(tableAfter_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+      serviceIdFromEvent_ =
+          getStringProperty(tableAfter_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+      try {
+        if (isRename_) {
+          //if this is rename event then identifiers will be in tableAfter
+          pendingVersionNumbersFromCatalog_ = catalog_
+              .getInFlightVersionsForEvents(tableAfter_.getDbName(),
+                  tableAfter_.getTableName());
+        } else {
+          pendingVersionNumbersFromCatalog_ = catalog_
+              .getInFlightVersionsForEvents(msTbl_.getDbName(), msTbl_.getTableName());
+        }
+      } catch (TableNotFoundException | DatabaseNotFoundException e) {
+        debugLog("Received exception {}. Ignoring self-event evaluation",
+            e.getMessage());
+      }
+    }
+
     /**
      * If the ALTER_TABLE event is due a table rename, this method removes the old table
      * and creates a new table with the new name. Else, this just issues a invalidate
-     * table on the tblName from the event//TODO Check if we can rename the existing table
-     * in-place
+     * table on the tblName from the event
      */
     @Override
     public void process() throws MetastoreNotificationException, CatalogException {
+      // Determine whether this is an event which we have already seen or if it is a new
+      // event
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event or "
+            + "update is already present in catalog.");
+        return;
+      }
       // in case of table level alters from external systems it is better to do a full
       // invalidate  eg. this could be due to as simple as adding a new parameter or a
       // full blown adding  or changing column type
@@ -680,23 +720,23 @@ public class MetastoreEvents {
      * In case of alter table events, it is possible that the alter event is generated
      * because user changed the value of the parameter
      * <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. If the parameter is unchanged, it doesn't
-     * matter if you use the before or after table object here since the eventual
-     * action is going be invalidate or rename. If however, the parameter is changed,
-     * couple of things could happen. The flag changes from unset/false to true or it
-     * changes from true to false/unset. In the first case, we want to process the
-     * event (and ignore subsequent events on this table). In the second case, we
-     * should process the event (as well as all the subsequent events on the table). So
-     * we always process this event when the value of the flag is changed.
+     * matter if you use the before or after table object here since the eventual action
+     * is going be invalidate or rename. If however, the parameter is changed, couple of
+     * things could happen. The flag changes from unset/false to true or it changes from
+     * true to false/unset. In the first case, we want to process the event (and ignore
+     * subsequent events on this table). In the second case, we should process the event
+     * (as well as all the subsequent events on the table). So we always process this
+     * event when the value of the flag is changed.
      *
      * @return true, if this event needs to be skipped. false if this event needs to be
-     * processed.
+     *     processed.
      */
     @Override
     protected boolean isEventProcessingDisabled() {
       // if the event sync flag was changed then we always process this event
       if (!Objects.equals(eventSyncBeforeFlag_, eventSyncAfterFlag_)) {
-        infoLog("Before flag value {} after flag value {} changed",
-            eventSyncBeforeFlag_, eventSyncAfterFlag_);
+        infoLog("Before flag value {} after flag value {} changed for table {}",
+            eventSyncBeforeFlag_, eventSyncAfterFlag_, getFullyQualifiedTblName());
         return false;
       }
       // flag is unchanged, use the default impl from base class
@@ -740,16 +780,14 @@ public class MetastoreEvents {
     public void process() {
       Reference<Boolean> tblWasFound = new Reference<>();
       Reference<Boolean> tblMatched = new Reference<>();
-      Table removedTable =
-          catalog_.removeTableIfExists(msTbl_, tblWasFound, tblMatched);
+      Table removedTable = catalog_.removeTableIfExists(msTbl_, tblWasFound, tblMatched);
       if (removedTable != null) {
         infoLog("Removed table {} ", getFullyQualifiedTblName());
       } else if (!tblMatched.getRef()) {
         LOG.warn(debugString("Table %s was not removed from "
             + "catalog since the creation time of the table did not match", tblName_));
       } else if (!tblWasFound.getRef()) {
-        debugLog("Table {} was not removed since it did not exist in catalog.",
-                tblName_);
+        debugLog("Table {} was not removed since it did not exist in catalog.", tblName_);
       }
     }
   }
@@ -812,9 +850,8 @@ public class MetastoreEvents {
         if (event.eventType_.equals(MetastoreEventType.DROP_DATABASE)) {
           DropDatabaseEvent dropDatabaseEvent = (DropDatabaseEvent) event;
           if (dbName_.equalsIgnoreCase(dropDatabaseEvent.dbName_)) {
-            infoLog(
-                "Found database {} is removed later in event {} of type {} ",
-                dbName_, dropDatabaseEvent.eventId_, dropDatabaseEvent.eventType_);
+            infoLog("Found database {} is removed later in event {} of type {} ", dbName_,
+                dropDatabaseEvent.eventId_, dropDatabaseEvent.eventType_);
             return true;
           }
         }
@@ -863,6 +900,15 @@ public class MetastoreEvents {
    * MetastoreEvent for which issues invalidate on a table from the event
    */
   public static abstract class TableInvalidatingEvent extends MetastoreTableEvent {
+    // version number from the event object parameters used for self-event detection
+    protected long versionNumberFromEvent_ = -1;
+    // service id from the event object parameters used for self-event detection
+    protected String serviceIdFromEvent_ = null;
+    // the list of versions which this catalog expects to be see in the
+    // self-generated events in order. Anything which is seen out of order of this list
+    // will be used to determine that this is not a self-event and table will be
+    // invalidated. See <code>isSelfEvent</code> for more details.
+    protected List<Long> pendingVersionNumbersFromCatalog_ = Collections.EMPTY_LIST;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -873,6 +919,69 @@ public class MetastoreEvents {
     }
 
     /**
+     * This method detects if this event is self-generated or not (see class
+     * documentation of <code>MetastoreEventProcessor</code> to understand what a
+     * self-event is).
+     *
+     * In order to determine this, it compares the value of catalogVersion from the
+     * event with the list of pending version numbers stored in the catalog table. The
+     * event could be generated by another instance of CatalogService which can
+     * potentially have the same versionNumber. In order to resolve such conflict, it
+     * compares the CatalogService's serviceId before comparing the version number. If
+     * it is determined that this is indeed a self-event, this method also clears the
+     * version number from the catalog table's list of pending versions for in-flight
+     * events. This is needed so that a subsequent event with the same service id or
+     * version number is not incorrectly determined as a self-event. A subsequent
+     * event with the same serviceId and versionNumber is most likely generated by a
+     * non-Impala system because it cached the table object having those values of
+     * serviceId and version. More details on complete flow of self-event handling
+     * logic can be read in <code>MetastoreEventsProcessor</code> documentation.
+     *
+     * @return True if this event is a self-generated event. If the returned value is
+     * true, this method also clears the version number from the catalog table. Returns
+     * false if the version numbers or service id don't match
+     * @throws CatalogException in case of exceptions while removing the version number
+     * from the table or when reading the values of version list from catalog table
+     */
+    protected boolean isSelfEvent() throws CatalogException {
+      initSelfEventIdentifiersFromEvent();
+      if (versionNumberFromEvent_ == -1 || pendingVersionNumbersFromCatalog_.isEmpty())
+        return false;
+
+      if (catalog_.getCatalogServiceId().equals(serviceIdFromEvent_)) {
+        // service id is a match. Now check if the event version is what we expect
+        // in the list
+        if (pendingVersionNumbersFromCatalog_.get(0).equals(versionNumberFromEvent_)) {
+          // we see this version for the first time. This is a self-event
+          // remove this version number from the catalog so that next time we see this
+          // version we don't determine it wrongly as self-event
+          //TODO we should improve by atomically doing this check and invalidating the
+          // table to avoid any races. Currently, it is possible the some other thread
+          // in CatalogService changes the pendingVersionNumbersFromCatalog after do
+          // the check here. However, there are only two possible operations that can
+          // happen from outside with respect to this version list. Either some thread
+          // adds a new version to the list after we looked at it, or the table is
+          // invalidated. In both the cases, it is OK since the new version added is
+          // guaranteed to be greater than versionNumberFromEvent and if the table is
+          // invalidated, this operation (this whole event) becomes a no-op
+          catalog_.removeFromInFlightVersionsForEvents(
+              dbName_, tblName_, versionNumberFromEvent_);
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).inc();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * This method should be implemented by subclasses to initialize the values of
+     * self-event identifiers by parsing the event data. These identifiers are later
+     * used to determine if this event needs to be processed or not. See
+     * <code>isSelfEvent</code> method for details.
+     */
+    protected abstract void initSelfEventIdentifiersFromEvent();
+
+    /**
      * Issues a invalidate table on the catalog on the table from the event. This
      * invalidate does not fetch information from metastore unlike the invalidate metadata
      * command since event is triggered post-metastore activity. This handler invalidates
@@ -880,7 +989,13 @@ public class MetastoreEvents {
      * IncompleteTable. If the table doesn't exist in catalog this operation is a no-op
      */
     @Override
-    public void process() {
+    public void process() throws MetastoreNotificationException, CatalogException {
+      // skip event processing in case its a self-event
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
+
       if (invalidateCatalogTable()) {
         infoLog("Table {} is invalidated", getFullyQualifiedTblName());
       } else {
@@ -888,9 +1003,16 @@ public class MetastoreEvents {
             + "it does not exist anymore", getFullyQualifiedTblName());
       }
     }
+
+    protected static String getStringProperty(
+        Map<String, String> params, String key, String defaultVal) {
+      if (params == null) return defaultVal;
+      return params.getOrDefault(key, defaultVal);
+    }
   }
 
   public static class AddPartitionEvent extends TableInvalidatingEvent {
+    private final Partition lastAddedPartition_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -902,18 +1024,50 @@ public class MetastoreEvents {
       if (event.getMessage() == null) {
         throw new IllegalStateException(debugString("Event message is null"));
       }
-      AddPartitionMessage addPartitionMessage =
-          MetastoreEventsProcessor.getMessageFactory().getDeserializer()
-              .getAddPartitionMessage(event.getMessage());
       try {
-        msTbl_ = addPartitionMessage.getTableObj();
+        AddPartitionMessage addPartitionMessage_ =
+            MetastoreEventsProcessor.getMessageFactory()
+                .getDeserializer()
+                .getAddPartitionMessage(event.getMessage());
+        List<Map<String, String>> keyValues = addPartitionMessage_.getPartitions();
+        Preconditions.checkState(keyValues.size() > 0);
+        ArrayList<Partition> addedPartitions =
+            Lists.newArrayList(addPartitionMessage_.getPartitionObjs());
+        Preconditions.checkState(addedPartitions.size() > 0);
+        // when multiple partitions are added in HMS they are all added as one transaction
+        // Hence all the partitions which are present in the message must have the same
+        // serviceId and version if it is set. hence it is fine to just look at the
+        // last added partition in the list and use it for the self-event ids
+        lastAddedPartition_ = addedPartitions.get(addedPartitions.size() - 1);
+        msTbl_ = addPartitionMessage_.getTableObj();
       } catch (Exception ex) {
         throw new MetastoreNotificationException(ex);
+      }
+    }
+
+    @Override
+    protected void initSelfEventIdentifiersFromEvent() {
+      versionNumberFromEvent_ = Long.parseLong(getStringProperty(
+          lastAddedPartition_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+      serviceIdFromEvent_ = getStringProperty(
+          lastAddedPartition_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+      try {
+        pendingVersionNumbersFromCatalog_ =
+            catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
+      } catch (DatabaseNotFoundException | TableNotFoundException e) {
+        // ok to ignore this exception, since if the db doesn't exit, this event needs
+        // to be ignored anyways
+        debugLog("Received exception {}. Ignoring self-event evaluation",
+            e.getMessage());
       }
     }
   }
 
   public static class AlterPartitionEvent extends TableInvalidatingEvent {
+    // the Partition object before alter operation, as parsed from the NotificationEvent
+    private final org.apache.hadoop.hive.metastore.api.Partition partitionBefore_;
+    // the Partition object after alter operation, as parsed from the NotificationEvent
+    private final org.apache.hadoop.hive.metastore.api.Partition partitionAfter_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -926,34 +1080,74 @@ public class MetastoreEvents {
       AlterPartitionMessage alterPartitionMessage =
           MetastoreEventsProcessor.getMessageFactory().getDeserializer()
               .getAlterPartitionMessage(event.getMessage());
+
       try {
+        partitionBefore_ =
+            Preconditions.checkNotNull(alterPartitionMessage.getPtnObjBefore());
+        partitionAfter_ =
+            Preconditions.checkNotNull(alterPartitionMessage.getPtnObjAfter());
         msTbl_ = alterPartitionMessage.getTableObj();
-      } catch (Exception ex) {
-        throw new MetastoreNotificationException(ex);
+      } catch (Exception e) {
+        throw new MetastoreNotificationException(
+            debugString("Unable to parse the alter partition message"), e);
+      }
+    }
+
+    @Override
+    protected void initSelfEventIdentifiersFromEvent() {
+      versionNumberFromEvent_ = Long.parseLong(getStringProperty(
+          partitionAfter_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+      serviceIdFromEvent_ = getStringProperty(
+          partitionAfter_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+      try {
+        pendingVersionNumbersFromCatalog_ =
+            catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
+      } catch (DatabaseNotFoundException | TableNotFoundException e) {
+        // ok to ignore since if the db or table doesn't exist the event is ignored
+        // anyways
+        debugLog("Received exception {}. Ignoring self-event evaluation",
+            e.getMessage());
       }
     }
   }
 
   public static class DropPartitionEvent extends TableInvalidatingEvent {
 
-    private final boolean isEventProcessingDisabled_;
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private DropPartitionEvent(
-        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+    private DropPartitionEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
       super(catalog, metrics, event);
       Preconditions.checkState(eventType_.equals(MetastoreEventType.DROP_PARTITION));
       Preconditions.checkNotNull(event.getMessage());
-      //TODO we should use DropPartitionMessage to get the table object here but
-      // current DropPartitionMessage does not provide the table object
-      isEventProcessingDisabled_ = Boolean.valueOf(
-          catalog_.getTableProperty(dbName_, tblName_, DISABLE_EVENT_HMS_SYNC_KEY));
+      DropPartitionMessage dropPartitionMessage =
+          MetastoreEventsProcessor.getMessageFactory()
+              .getDeserializer()
+              .getDropPartitionMessage(event.getMessage());
+      try {
+        msTbl_ = dropPartitionMessage.getTableObj();
+      } catch (Exception ex) {
+        throw new MetastoreNotificationException(
+            debugString("Could not parse event message. "
+                    + "Check if %s is set to true in metastore configuration",
+                MetastoreEventsProcessor.HMS_ADD_THRIFT_OBJECTS_IN_EVENTS_CONFIG_KEY),
+            ex);
+      }
     }
 
     @Override
-    public boolean isEventProcessingDisabled() {
-      return isEventProcessingDisabled_;
+    protected boolean isSelfEvent() {
+      // TODO currently we don't have a way to determine if drop_partition is a self-event
+      // since this NotificationEvent does not contain the partition objects
+      // However, detecting this as a self-event will not be needed once we have
+      // IMPALA-7973
+      return false;
+    }
+
+    @Override
+    protected void initSelfEventIdentifiersFromEvent() {
+      // no-op
     }
   }
 

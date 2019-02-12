@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -56,6 +57,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
@@ -70,8 +72,18 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.thrift.TAlterTableAddColsParams;
+import org.apache.impala.thrift.TAlterTableAddPartitionParams;
+import org.apache.impala.thrift.TAlterTableDropColParams;
+import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableOrViewRenameParams;
+import org.apache.impala.thrift.TAlterTableOrViewSetOwnerParams;
 import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableReplaceColsParams;
+import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
+import org.apache.impala.thrift.TAlterTableSetLocationParams;
+import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
+import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
@@ -83,10 +95,16 @@ import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TOwnerType;
+import org.apache.impala.thrift.TPartitionDef;
+import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTablePropertyType;
+import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
@@ -400,6 +418,8 @@ public class MetastoreEventsProcessorTest {
    * Test generates ALTER_TABLE events for various cases (table rename, parameter change,
    * add/remove/change column) and makes sure that the table is updated on the CatalogD
    * side after the ALTER_TABLE event is processed.
+   * We also remove the DDL_TIME from the table parameters so that it would be set from
+   * the metastore, same way as Impala does in actual alters.
    */
   @Test
   public void testAlterTableEvent() throws TException, ImpalaException {
@@ -410,6 +430,8 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     // simulate the table being loaded by explicitly calling load table
     loadTable("old_name");
+    long numberOfInvalidatesBefore = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
 
     // test renaming a table from outside aka metastore client
     alterTableRename("old_name", testTblName);
@@ -430,7 +452,6 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Table should be incomplete after alter table add parameter",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-
     // check invalidate after alter table add col
     loadTable(testTblName);
     alterTableAddCol(testTblName, "newCol", "int", "null");
@@ -438,7 +459,6 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Table should have been invalidated after alter table add column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-
     // check invalidate after alter table change column type
     loadTable(testTblName);
     altertableChangeCol(testTblName, "newCol", "string", null);
@@ -446,7 +466,6 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Table should have been invalidated after changing column type",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-
     // check invalidate after alter table remove column
     loadTable(testTblName);
     alterTableRemoveCol(testTblName, "newCol");
@@ -454,6 +473,11 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Table should have been invalidated after removing a column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
+    // 5 alters above. Each one of them except rename should increment the counter by 1
+    long numberOfInvalidatesAfter = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
+    assertEquals("Unexpected number of table invalidates",
+        numberOfInvalidatesBefore + 4, numberOfInvalidatesAfter);
   }
 
   /**
@@ -618,7 +642,7 @@ public class MetastoreEventsProcessorTest {
     assertNotNull("Table should have been found after create table statement",
         catalog_.getTable(TEST_DB_NAME, testTblName));
     loadTable(testTblName);
-    dropTableFromImpala(testTblName);
+    dropTableFromImpala(TEST_DB_NAME, testTblName);
     // now catalogD does not have the table entry, create the table again
     createTableFromImpala(TEST_DB_NAME, testTblName, false);
     assertNotNull("Table should have been found after create table statement",
@@ -675,7 +699,7 @@ public class MetastoreEventsProcessorTest {
     assertFalse("Table should have been loaded since it was already latest", catalog_
         .getTable(TEST_DB_NAME, testTblName) instanceof IncompleteTable);
 
-    dropTableFromImpala(testTblName);
+    dropTableFromImpala(TEST_DB_NAME, testTblName);
     assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
     events = eventsProcessor_.getNextMetastoreEvents();
     // should have 1 drop_table event
@@ -697,7 +721,7 @@ public class MetastoreEventsProcessorTest {
     createTableFromImpala(TEST_DB_NAME, testTblName, false);
     loadTable(testTblName);
     assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-    dropTableFromImpala(testTblName);
+    dropTableFromImpala(TEST_DB_NAME, testTblName);
     // the create table event should be filtered out
     verifyFilterEvents(3, 2, Arrays.asList(CREATE_DATABASE, DROP_TABLE));
 
@@ -717,7 +741,7 @@ public class MetastoreEventsProcessorTest {
     createTableFromImpala(TEST_DB_NAME, testTblName, false);
     loadTable(TEST_DB_NAME, testTblName);
     assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-    dropTableFromImpala(testTblName);
+    dropTableFromImpala(TEST_DB_NAME, testTblName);
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
     verifyFilterEvents(4, 2, Arrays.asList(DROP_TABLE, DROP_DATABASE));
 
@@ -937,12 +961,17 @@ public class MetastoreEventsProcessorTest {
       return super.getDbProperty(dbName, propertyKey);
     }
 
+    private static final List<String> TABLE_SYNC_PROPERTYLIST =
+        Arrays.asList(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY);
+
     @Override
-    public String getTableProperty(String dbName, String tblName, String propertyKey) {
-      if (dbName_.equals(dbName) && tblName_.equals(tblName)) {
-        return tblFlag_;
+    public List<String> getTableProperties(
+        String dbName, String tblName, List<String> propertyKey) {
+      if (TABLE_SYNC_PROPERTYLIST.equals(propertyKey) && dbName_.equals(dbName)
+          && tblName_.equals(tblName)) {
+        return Arrays.asList(tblFlag_);
       }
-      return super.getTableProperty(dbName, tblName, propertyKey);
+      return super.getTableProperties(dbName, tblName, propertyKey);
     }
   }
 
@@ -955,14 +984,15 @@ public class MetastoreEventsProcessorTest {
   private void runDDLTestForFlagTransitionWithMock(String dbName, String tblName,
       String dbFlag, Pair<String, String> tblFlagTransition,
       boolean shouldNextEventBeSkipped) throws Exception {
-
-    Map<String, String> beforeParams = new HashMap<>();
+    Map<String, String> beforeParams = new HashMap<>(2);
+    beforeParams.put(Table.TBL_PROP_LAST_DDL_TIME, String.valueOf(1000));
     if (tblFlagTransition.first != null) {
       beforeParams
           .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblFlagTransition.first);
     }
 
-    Map<String, String> afterParams = new HashMap<>(1);
+    Map<String, String> afterParams = new HashMap<>(2);
+    afterParams.put(Table.TBL_PROP_LAST_DDL_TIME, String.valueOf(1001));
     if (tblFlagTransition.second != null) {
       afterParams
           .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblFlagTransition.second);
@@ -1064,9 +1094,11 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
     assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
-    assertEquals(numEventsReceivedBefore + 5, response.getEvents_received());
+    assertTrue("Atleast 5 events should have been received",
+        response.getEvents_received() >= numEventsReceivedBefore + 5);
     // two events on tbl which is skipped
-    assertEquals(numEventsSkippedBefore + 2, response.getEvents_skipped());
+    assertTrue("Atleast 2 events should have been skipped",
+        response.getEvents_skipped() >= numEventsSkippedBefore + 2);
     assertTrue("Event fetch duration should be greater than zero",
         response.getEvents_fetch_duration_mean() > 0);
     assertTrue("Event process duration should be greater than zero",
@@ -1379,6 +1411,258 @@ public class MetastoreEventsProcessorTest {
         + " disabled", catalog_.getTable(TEST_DB_NAME, testTblName));
   }
 
+  private void confirmTableIsLoaded(String dbName, String tblname)
+      throws DatabaseNotFoundException {
+    Table catalogTbl = catalog_.getTable(dbName, tblname);
+    assertNotNull(catalogTbl);
+    assertFalse(
+        "Table should not be invalidated after process events as it is a self-event.",
+        catalogTbl instanceof IncompleteTable);
+  }
+
+  /**
+   * Test issues different types of alter table command from the test catalogOpExecutor
+   * and makes sure that the self-event generated does not invalidate the table.
+   */
+  @Test
+  public void testSelfEventsForTable() throws ImpalaException, TException {
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    final String testTblName = "testSelfEventsForTable";
+    createTableFromImpala(TEST_DB_NAME, testTblName, true);
+    long numberOfSelfEventsBefore = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
+
+    alterTableSetTblPropertiesFromImpala(testTblName);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // add a col
+    alterTableAddColsFromImpala(
+        TEST_DB_NAME, testTblName, "newCol", TPrimitiveType.STRING);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // remove a col
+    alterTableRemoveColFromImpala(TEST_DB_NAME, testTblName, "newCol");
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // replace cols
+    alterTableReplaceColFromImpala(TEST_DB_NAME, testTblName,
+        Arrays.asList(getScalarColumn("testCol", TPrimitiveType.STRING)));
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    TPartitionDef partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "100"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
+
+    // add partition
+    alterTableAddPartition(TEST_DB_NAME, testTblName, partitionDef);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // set fileformat
+    alterTableSetFileFormatFromImpala(
+        TEST_DB_NAME, testTblName, THdfsFileFormat.TEXT);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // set rowformat
+    alterTableSetRowFormatFromImpala(TEST_DB_NAME, testTblName, ",");
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // set owner
+    alterTableSetOwnerFromImpala(TEST_DB_NAME, testTblName, "testowner");
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    // rename table
+    // Since rename is implemented as add+remove in impala, the new table is already
+    // incomplete. We should load the table manually and make sure that events does not
+    // invalidate it
+    String newTblName = "newTableName";
+    alterTableRenameFromImpala(TEST_DB_NAME, testTblName, newTblName);
+    loadTable(TEST_DB_NAME, newTblName);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, newTblName);
+
+    org.apache.hadoop.hive.metastore.api.Table hmsTbl = catalog_.getTable(TEST_DB_NAME,
+        newTblName).getMetaStoreTable();
+    assertNotNull("Location is expected to be set to proceed forward in the test",
+        hmsTbl.getSd().getLocation());
+    String tblLocation = hmsTbl.getSd().getLocation();
+    // set location
+    alterTableSetLocationFromImpala(TEST_DB_NAME, newTblName, tblLocation + "_changed");
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, newTblName);
+
+    //TODO add test for alterview
+    //add test for alterCommentOnTableOrView
+
+    long selfEventsCountAfter = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
+    // 10 alter commands above. Everyone except alterRename should generate
+    // self-events so we expect the count to go up by 9
+    assertEquals("Unexpected number of self-events generated",
+        numberOfSelfEventsBefore + 9, selfEventsCountAfter);
+  }
+
+  private abstract class AlterTableExecutor {
+    protected abstract void execute() throws Exception;
+  }
+
+  private class HiveAlterTableExecutor extends AlterTableExecutor {
+    private final String tblName_;
+    private final String colName_ = "hiveColName";
+    private final String colType_ = "string";
+    private final AtomicBoolean toggle_ = new AtomicBoolean(true);
+
+    private HiveAlterTableExecutor(String dbName, String tblName) {
+      this.tblName_ = tblName;
+    }
+
+    public void execute() throws Exception {
+      if (toggle_.get()) {
+        alterTableAddCol(tblName_, colName_, colType_, "");
+        verify();
+      } else {
+        alterTableRemoveCol(tblName_, colName_);
+        verify();
+      }
+      toggle_.compareAndSet(toggle_.get(), !toggle_.get());
+    }
+
+    private void verify() throws Exception {
+      eventsProcessor_.processEvents();
+      Table catTable = catalog_.getTable(TEST_DB_NAME, tblName_);
+      assertNotNull(catTable);
+      assertTrue(catTable instanceof IncompleteTable);
+    }
+  }
+
+
+  private class ImpalaAlterTableExecutor extends AlterTableExecutor {
+    private final String tblName_;
+    private final String colName_ = "impalaColName";
+    private final TPrimitiveType colType_ = TPrimitiveType.STRING;
+    private final AtomicBoolean toggle_ = new AtomicBoolean(true);
+
+    private ImpalaAlterTableExecutor(String dbName, String tblName) {
+      this.tblName_ = tblName;
+    }
+
+    public void execute() throws Exception {
+      if (toggle_.get()) {
+        alterTableAddColsFromImpala(TEST_DB_NAME, tblName_, colName_, colType_);
+        verify();
+      } else {
+        alterTableRemoveColFromImpala(TEST_DB_NAME, tblName_, colName_);
+        verify();
+      }
+      toggle_.compareAndSet(toggle_.get(), !toggle_.get());
+    }
+
+    public void verify() throws Exception {
+      eventsProcessor_.processEvents();
+      Table catTable = catalog_.getTable(TEST_DB_NAME, tblName_);
+      assertNotNull(catTable);
+      assertFalse(catTable instanceof IncompleteTable);
+    }
+  }
+
+  /**
+   * Test generates alter table events from Hive and Impala. Any event generated by
+   * Impala should not invalidate the table while the event from Hive should invalidate
+   * the table
+   */
+  @Test
+  public void testSelfEventsWithInterleavedClients() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    createTable("self_event_tbl", false);
+    eventsProcessor_.processEvents();
+
+    int numOfExecutions = 100;
+    AlterTableExecutor hiveExecutor = new HiveAlterTableExecutor(TEST_DB_NAME,
+        "self_event_tbl");
+    AlterTableExecutor impalaExecutor = new ImpalaAlterTableExecutor(TEST_DB_NAME,
+        "self_event_tbl");
+    // fixed seed makes the test repeatable
+    Random random = new Random(117);
+    for (int i=0; i<numOfExecutions; i++) {
+      if (random.nextBoolean()) {
+        hiveExecutor.execute();
+      } else {
+        impalaExecutor.execute();
+      }
+    }
+  }
+
+  /**
+   * Tests executes DDLs for which self-events are not supported. Makes sure that the
+   * table is invalidated after receiving these events
+   */
+  @Test
+  public void testSelfEventsForTableUnsupportedCases() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    final String testTblName = "testSelfEventsForTableUnsupportedCases";
+    createTableFromImpala(TEST_DB_NAME, testTblName, true);
+    TPartitionDef partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "100"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
+    alterTableAddPartition(TEST_DB_NAME, testTblName, partitionDef);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+
+    TPartitionKeyValue partitionKeyValue1 = new TPartitionKeyValue("p1", "100");
+    TPartitionKeyValue partitionKeyValue2 = new TPartitionKeyValue("p2", "200");
+
+    // remove a partition
+    alterTableDropPartition(TEST_DB_NAME, testTblName,
+        Arrays.asList(partitionKeyValue1, partitionKeyValue2));
+    eventsProcessor_.processEvents();
+    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
+    assertTrue(catalog_.getTable(TEST_DB_NAME, testTblName)
+                   instanceof IncompleteTable);
+  }
+
+  /**
+   * Test executes alter partition events from Impala and makes sure that table is not
+   * invalidated
+   */
+  @Test
+  public void testSelfEventsForPartition() throws ImpalaException, TException {
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testSelfEventsForPartition";
+    createTable(testTblName, true);
+    // create 2 partitions
+    List<List<String>> partVals = new ArrayList<>(2);
+    partVals.add(Arrays.asList("1"));
+    partVals.add(Arrays.asList("2"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+    eventsProcessor_.processEvents();
+    List<TPartitionKeyValue> partKeyVals = new ArrayList<>();
+    partKeyVals.add(new TPartitionKeyValue("p1", "1"));
+    alterTableSetPartitionPropertiesFromImpala(testTblName, partKeyVals);
+    HdfsPartition hdfsPartition =
+        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals);
+    assertNotNull(hdfsPartition.getParameters());
+    assertEquals("dummyValue1", hdfsPartition.getParameters().get("dummyKey1"));
+
+    eventsProcessor_.processEvents();
+    Table catalogTbl = catalog_.getTable(TEST_DB_NAME, testTblName);
+    assertFalse(
+        "Table should not be invalidated after process events as it is a self-event.",
+        catalogTbl instanceof IncompleteTable);
+    hdfsPartition =
+        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals);
+    assertNotNull(hdfsPartition.getParameters());
+    assertEquals("dummyValue1", hdfsPartition.getParameters().get("dummyKey1"));
+  }
+
   private void createDatabase(String dbName, Map<String, String> params)
       throws TException {
     DatabaseBuilder databaseBuilder =
@@ -1445,18 +1729,14 @@ public class MetastoreEventsProcessorTest {
     return tblBuilder.build();
   }
 
-  private void createTable(String tblName, boolean isPartitioned) throws TException {
-    createTable(TEST_DB_NAME, tblName, null, isPartitioned);
-  }
-
   /**
    * Drops table from Impala
    */
-  private void dropTableFromImpala(String tblName) throws ImpalaException {
+  private void dropTableFromImpala(String dbName, String tblName) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
     req.setDdl_type(TDdlType.DROP_TABLE);
     TDropTableOrViewParams dropTableParams = new TDropTableOrViewParams();
-    dropTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));
+    dropTableParams.setTable_name(new TTableName(dbName, tblName));
     dropTableParams.setIf_exists(true);
     req.setDrop_table_or_view_params(dropTableParams);
     catalogOpExecutor_.execDdlRequest(req);
@@ -1493,6 +1773,7 @@ public class MetastoreEventsProcessorTest {
       throws ImpalaException {
     createTableFromImpala(dbName, tblName, null, isPartitioned);
   }
+
   /**
    * Creates a table using CatalogOpExecutor to simulate a DDL operation from Impala
    * client
@@ -1542,11 +1823,261 @@ public class MetastoreEventsProcessorTest {
     catalogOpExecutor_.execDdlRequest(req);
   }
 
+  /**
+   * Adds a dummy col to a given table from Impala
+   */
+  private void alterTableAddColsFromImpala(String dbName, String tblName, String colName,
+      TPrimitiveType colType) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.ADD_COLUMNS);
+    TAlterTableAddColsParams addColsParams = new TAlterTableAddColsParams();
+    addColsParams.addToColumns(getScalarColumn(colName, colType));
+    alterTableParams.setAdd_cols_params(addColsParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+    Table tbl = catalog_.getTable(dbName, tblName);
+    assertNotNull(tbl.getColumn(colName));
+  }
+
+  /**
+   * Adds a dummy col to a given table from Impala
+   */
+  private void alterTableRemoveColFromImpala(
+      String dbName, String tblName, String colName) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.DROP_COLUMN);
+    TAlterTableDropColParams dropColParams = new TAlterTableDropColParams();
+    dropColParams.setCol_name(colName);
+    alterTableParams.setDrop_col_params(dropColParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+    Table tbl = catalog_.getTable(dbName, tblName);
+    assertNull(tbl.getColumn(colName));
+  }
+
+  private void alterTableReplaceColFromImpala(
+      String dbName, String tblName, List<TColumn> newCols) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.REPLACE_COLUMNS);
+    TAlterTableReplaceColsParams replaceColsParams = new TAlterTableReplaceColsParams();
+    replaceColsParams.setColumns(newCols);
+    alterTableParams.setReplace_cols_params(replaceColsParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+    Table tbl = catalog_.getTable(dbName, tblName);
+    assertNotNull(tbl.getColumn(newCols.get(0).getColumnName()));
+  }
+
+  /**
+   * Adds dummy partition from Impala. Assumes that given table is a partitioned table
+   * and the has a partition key of type string and value of type string
+   */
+  private void alterTableAddPartition(
+      String dbName, String tblName, TPartitionDef partitionDef) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.ADD_PARTITION);
+    TAlterTableAddPartitionParams addPartitionParams =
+        new TAlterTableAddPartitionParams();
+    addPartitionParams.addToPartitions(partitionDef);
+    alterTableParams.setAdd_partition_params(addPartitionParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Drops the partition for the given table
+   */
+  private void alterTableDropPartition(String dbName, String tblName,
+      List<TPartitionKeyValue> keyValue) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.DROP_PARTITION);
+    TAlterTableDropPartitionParams dropPartitionParams =
+        new TAlterTableDropPartitionParams();
+    dropPartitionParams.addToPartition_set(keyValue);
+    alterTableParams.setDrop_partition_params(dropPartitionParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Sets the given file foramt for a table
+   */
+  private void alterTableSetFileFormatFromImpala(
+      String dbName, String tblName, THdfsFileFormat fileformat) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.SET_FILE_FORMAT);
+    TAlterTableSetFileFormatParams fileFormatParams =
+        new TAlterTableSetFileFormatParams();
+    fileFormatParams.setFile_format(fileformat);
+    alterTableParams.setSet_file_format_params(fileFormatParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Sets the given field delimite for the table row format of the given table
+   */
+  private void alterTableSetRowFormatFromImpala(
+      String dbName, String tblName, String fieldTerminator) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.SET_ROW_FORMAT);
+    TAlterTableSetRowFormatParams rowFormatParams = new TAlterTableSetRowFormatParams();
+    TTableRowFormat rowFormat = new TTableRowFormat();
+    rowFormat.setField_terminator(fieldTerminator);
+    rowFormatParams.setRow_format(rowFormat);
+    alterTableParams.setSet_row_format_params(rowFormatParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Sets the owner for the given table
+   */
+  private void alterTableSetOwnerFromImpala(String dbName, String tblName, String owner)
+      throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.SET_OWNER);
+    TAlterTableOrViewSetOwnerParams alterTableOrViewSetOwnerParams =
+        new TAlterTableOrViewSetOwnerParams();
+    alterTableOrViewSetOwnerParams.setOwner_name(owner);
+    alterTableOrViewSetOwnerParams.setOwner_type(TOwnerType.USER);
+    alterTableParams.setSet_owner_params(alterTableOrViewSetOwnerParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Sets the given location for a the give table using impala
+   */
+  private void alterTableSetLocationFromImpala(
+      String dbName, String tblName, String location) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.SET_LOCATION);
+    TAlterTableSetLocationParams setLocationParams = new TAlterTableSetLocationParams();
+    setLocationParams.setLocation(location);
+    alterTableParams.setSet_location_params(setLocationParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Renames a table from Impala
+   */
+  private void alterTableRenameFromImpala(String dbName, String tblName, String newTable)
+      throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(dbName, tblName));
+    alterTableParams.setAlter_type(TAlterTableType.RENAME_TABLE);
+    TAlterTableOrViewRenameParams renameParams = new TAlterTableOrViewRenameParams();
+    renameParams.setNew_table_name(new TTableName(dbName, newTable));
+    alterTableParams.setRename_params(renameParams);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Set table properties from impala
+   */
+  private void alterTableSetTblPropertiesFromImpala(String tblName)
+      throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));
+    TAlterTableSetTblPropertiesParams setTblPropertiesParams =
+        new TAlterTableSetTblPropertiesParams();
+    setTblPropertiesParams.setTarget(TTablePropertyType.TBL_PROPERTY);
+    Map<String, String> propertiesMap = new HashMap<String, String>() {
+      { put("dummyKey1", "dummyValue1"); }
+    };
+    setTblPropertiesParams.setProperties(propertiesMap);
+    alterTableParams.setSet_tbl_properties_params(setTblPropertiesParams);
+    alterTableParams.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+    Table catalogTbl = catalog_.getTable(TEST_DB_NAME, tblName);
+    assertNotNull(catalogTbl.getMetaStoreTable().getParameters());
+    assertEquals(
+        "dummyValue1", catalogTbl.getMetaStoreTable().getParameters().get("dummyKey1"));
+  }
+
+  /**
+   * Set partition properties from Impala
+   */
+  private void alterTableSetPartitionPropertiesFromImpala(
+      String tblName, List<TPartitionKeyValue> partKeyVal) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));
+    TAlterTableSetTblPropertiesParams setTblPropertiesParams =
+        new TAlterTableSetTblPropertiesParams();
+    List<List<TPartitionKeyValue>> partitionsToAlter = new ArrayList<>();
+    partitionsToAlter.add(partKeyVal);
+
+    setTblPropertiesParams.setPartition_set(partitionsToAlter);
+    setTblPropertiesParams.setTarget(TTablePropertyType.TBL_PROPERTY);
+    Map<String, String> propertiesMap = new HashMap<String, String>() {
+      { put("dummyKey1", "dummyValue1"); }
+    };
+    setTblPropertiesParams.setProperties(propertiesMap);
+    alterTableParams.setSet_tbl_properties_params(setTblPropertiesParams);
+    alterTableParams.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
+    req.setAlter_table_params(alterTableParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
   private TColumn getScalarColumn(String colName, TPrimitiveType type) {
     TTypeNode tTypeNode = new TTypeNode(TTypeNodeType.SCALAR);
     tTypeNode.setScalar_type(new TScalarType(type));
     TColumnType columnType = new TColumnType(Arrays.asList(tTypeNode));
     return new TColumn(colName, columnType);
+  }
+
+  private TPartitionDef getScalarPartitionDef(
+      List<String> partNames, List<String> partVals) {
+    TPartitionDef partitionDef = new TPartitionDef();
+    List<TPartitionKeyValue> partKeyVals = new ArrayList<>();
+    int i = 0;
+    for (String partName : partNames) {
+      partKeyVals.add(new TPartitionKeyValue(partName, partVals.get(i)));
+      i++;
+    }
+    partitionDef.setPartition_spec(partKeyVals);
+    return partitionDef;
+  }
+
+  private void createTable(String tblName, boolean isPartitioned) throws TException {
+    createTable(TEST_DB_NAME, tblName, null, isPartitioned);
   }
 
   private void dropTable(String tableName) throws TException {
