@@ -67,6 +67,8 @@ class DiskInfo {
   static std::string DebugString();
 
  private:
+  friend class DiskInfoTest;
+
   static bool initialized_;
 
   struct Disk {
@@ -93,6 +95,11 @@ class DiskInfo {
   static std::map<std::string, int> disk_name_to_disk_id_;
 
   static void GetDeviceNames();
+
+  /// See if 'name_in' is an NVME device. If it is, set 'basename_out' to the base
+  /// NVME device name (i.e. nvme0n1p1 -> nvme0n1) and return true. Otherwise,
+  /// return false and leave 'basename_out' unmodified.
+  static bool TryNVMETrim(const std::string& name_in, std::string* basename_out);
 };
 }
 #endif

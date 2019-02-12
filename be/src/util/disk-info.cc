@@ -17,6 +17,7 @@
 
 #include "util/disk-info.h"
 
+#include <regex>
 #ifdef __APPLE__
 #include <sys/mount.h>
 #else
@@ -50,6 +51,22 @@ vector<DiskInfo::Disk> DiskInfo::disks_;
 map<dev_t, int> DiskInfo::device_id_to_disk_id_;
 map<string, int> DiskInfo::disk_name_to_disk_id_;
 
+bool DiskInfo::TryNVMETrim(const std::string& name_in, std::string* basename_out) {
+  // NVME drives do not follow the typical device naming pattern. The pattern for NVME
+  // drives is nvme{device_id}n{namespace_id}p{partition_id}. The appropriate thing
+  // to do for this pattern is to trim the "p{partition_id}" part.
+  std::regex nvme_regex = std::regex("(nvme[0-9]+n[0-9]+)(p[0-9]+)*");
+  std::smatch nvme_match_result;
+  if (std::regex_match(name_in, nvme_match_result, nvme_regex)) {
+    DCHECK_GE(nvme_match_result.size(), 2);
+    // Match 0 contains the whole string.
+    // Match 1 contains the base nvme device without the partition.
+    *basename_out = nvme_match_result[1];
+    return true;
+  }
+  return false;
+}
+
 // Parses /proc/partitions to get the number of disks.  A bit of looking around
 // seems to indicate this as the best way to do this.
 // TODO: is there not something better than this?
@@ -70,8 +87,17 @@ void DiskInfo::GetDeviceNames() {
     string name = fields[3];
     if (name == "name") continue;
 
-    // Remove the partition# from the name.  e.g. sda2 --> sda
-    trim_right_if(name, is_any_of("0123456789"));
+    // NVME devices have a special format. Try to detect that, falling back to the normal
+    // method if this is not an NVME device.
+    std::string nvme_basename;
+    if (TryNVMETrim(name, &nvme_basename)) {
+      // This is an NVME device, use the returned basename
+      name = nvme_basename;
+    } else {
+      // Does not follow the NVME pattern, so use the logic for a normal disk device
+      // Remove the partition# from the name.  e.g. sda2 --> sda
+      trim_right_if(name, is_any_of("0123456789"));
+    }
 
     // Create a mapping of all device ids (one per partition) to the disk id.
     int major_dev_id = atoi(fields[0].c_str());

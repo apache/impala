@@ -56,7 +56,22 @@ TEST(CpuInfoTest, InvalidSchedGetCpuValue) {
 
 }
 
-TEST(DiskInfoTest, Basic) {
+class DiskInfoTest : public ::testing::Test {
+ protected:
+  void TestTryNVMETrimPositive(const string& name, const string& expected_basename) {
+    string nvme_basename;
+    ASSERT_TRUE(DiskInfo::TryNVMETrim(name, &nvme_basename));
+    ASSERT_EQ(nvme_basename, expected_basename);
+  }
+
+  void TestTryNVMETrimNegative(const string& name) {
+    string nvme_basename;
+    ASSERT_FALSE(DiskInfo::TryNVMETrim(name, &nvme_basename));
+    ASSERT_EQ(nvme_basename, "");
+  }
+};
+
+TEST_F(DiskInfoTest, Basic) {
   cout << DiskInfo::DebugString();
   cout << "Device name for disk 0: " << DiskInfo::device_name(0) << endl;
 
@@ -69,5 +84,33 @@ TEST(DiskInfoTest, Basic) {
     cout << "No device name for /home";
   }
 }
+
+TEST_F(DiskInfoTest, NVMEDetection) {
+  // Positive case 1: NVME device with a partition specified
+  TestTryNVMETrimPositive("nvme0n1p2", "nvme0n1");
+
+  // Positive case 2: NVME device without partition specified
+  TestTryNVMETrimPositive("nvme0n1", "nvme0n1");
+
+  // Positive case 3: NVME multi-digit device id, namespace id, partition id
+  TestTryNVMETrimPositive("nvme15n13p24", "nvme15n13");
+
+  // Negative case 1: disk drive
+  TestTryNVMETrimNegative("sda3");
+  TestTryNVMETrimNegative("sda");
+
+  // Negative case 2: malformed NVME, missing namespace
+  TestTryNVMETrimNegative("nvme0p1");
+  TestTryNVMETrimNegative("nvme0");
+
+  // Negative case 3: malformed NVME, missing device id
+  TestTryNVMETrimNegative("nvmen1p3");
+  TestTryNVMETrimNegative("nvmen1");
+
+  // Negative case 4: extra garbage before / after
+  TestTryNVMETrimNegative("sdanvme0n1");
+  TestTryNVMETrimNegative("nvme0n1p0blah");
+}
+
 }
 
