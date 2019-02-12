@@ -128,7 +128,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   # Inject jitter into the RPC handler of ReportExecStatus() to trigger RPC timeout.
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--status_report_interval_ms=10"
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=100"
       " --backend_client_rpc_timeout_ms=1000")
   def test_reportexecstatus_timeout(self, vector):
     query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:JITTER@1500@0.5'}
@@ -137,7 +137,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
   # Use a small service queue memory limit and a single service thread to exercise
   # the retry paths in the ReportExecStatus() RPC
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--status_report_interval_ms=10"
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=100"
       " --control_service_queue_mem_limit=1 --control_service_num_svc_threads=1")
   def test_reportexecstatus_retry(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
