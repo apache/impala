@@ -51,3 +51,5 @@ echo "# Configuration to use docker network ${NETWORK_NAME}" \
 echo "export INTERNAL_LISTEN_HOST=${GATEWAY}" >> "$IMPALA_HOME"/bin/impala-config-local.sh
 echo "export DEFAULT_FS=hdfs://\${INTERNAL_LISTEN_HOST}:20500" \
       >> "$IMPALA_HOME"/bin/impala-config-local.sh
+echo "export KUDU_MASTER_HOSTS=\${INTERNAL_LISTEN_HOST}" \
+      >> "$IMPALA_HOME"/bin/impala-config-local.sh
