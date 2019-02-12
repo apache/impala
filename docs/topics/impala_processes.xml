@@ -55,10 +55,7 @@ under the License.
         Start one instance of the Impala catalog service.
       </li>
 
-      <li>
-        Start the main Impala service on one or more DataNodes, ideally on all DataNodes to maximize local
-        processing and avoid network traffic due to remote reads.
-      </li>
+      <li> Start the main Impala daemon services. </li>
     </ol>
 
     <p>
@@ -101,9 +98,8 @@ under the License.
 
 <codeblock rev="1.2">$ sudo service impala-catalog start</codeblock>
 
-      <p>
-        Start the Impala service on each DataNode using a command similar to the following:
-      </p>
+      <p> Start the Impala daemon services using a command similar to the
+        following: </p>
 
       <p>
 <codeblock>$ sudo service impala-server start</codeblock>

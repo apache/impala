@@ -123,17 +123,17 @@ terminate called after throwing an instance of 'boost::exception_detail::clone_i
   <concept id="trouble_io" rev="">
     <title>Troubleshooting I/O Capacity Problems</title>
     <conbody>
-      <p>
-        Impala queries are typically I/O-intensive. If there is an I/O problem with storage devices,
-        or with HDFS itself, Impala queries could show slow response times with no obvious cause
-        on the Impala side. Slow I/O on even a single DataNode could result in an overall slowdown, because
-        queries involving clauses such as <codeph>ORDER BY</codeph>, <codeph>GROUP BY</codeph>, or <codeph>JOIN</codeph>
-        do not start returning results until all DataNodes have finished their work.
-      </p>
-      <p>
-        To test whether the Linux I/O system itself is performing as expected, run Linux commands like
-        the following on each DataNode:
-      </p>
+      <p> Impala queries are typically I/O-intensive. If there is an I/O problem
+        with storage devices, or with HDFS itself, Impala queries could show
+        slow response times with no obvious cause on the Impala side. Slow I/O
+        on even a single Impala daemon could result in an overall slowdown,
+        because queries involving clauses such as <codeph>ORDER BY</codeph>,
+          <codeph>GROUP BY</codeph>, or <codeph>JOIN</codeph> do not start
+        returning results until all executor Impala daemons have finished their
+        work. </p>
+      <p> To test whether the Linux I/O system itself is performing as expected,
+        run Linux commands like the following on each host Impala daemon is
+        running: </p>
 <codeblock>
 $ sudo sysctl -w vm.drop_caches=3 vm.drop_caches=0
 vm.drop_caches = 3
@@ -265,14 +265,15 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
                 </p>
 
                 <p>
-                  <note>
-                    Replace <varname>hostname</varname> and <varname>port</varname> with the hostname and port of
-                    your Impala state store host machine and web server port. The default port is 25010.
-                  </note>
-                  The number of <codeph>impalad</codeph> instances listed should match the expected number of
-                  <codeph>impalad</codeph> instances installed in the cluster. There should also be one
-                  <codeph>impalad</codeph> instance installed on each DataNode
-                </p>
+                  <note> Replace <varname>hostname</varname> and
+                      <varname>port</varname> with the hostname and port of your
+                    Impala state store host machine and web server port. The
+                    default port is 25010. </note> The number of
+                    <codeph>impalad</codeph> instances listed should match the
+                  expected number of <codeph>impalad</codeph> instances
+                  installed in the cluster. There should also be one
+                    <codeph>impalad</codeph> instance installed on each
+                  DataNode.</p>
               </entry>
               <entry>
                 <p>
