@@ -34,7 +34,7 @@ class TestPauseMonitor(CustomClusterTestSuite):
     time.sleep(5)
     impalad.kill(signal.SIGCONT)
     # Wait for over a second for the cache metrics to expire.
-    time.sleep(1.2)
+    time.sleep(2)
     # Check that the pause is detected.
     self.assert_impalad_log_contains('INFO', "Detected pause in JVM or host machine")
     # Check that the metrics we have for this updated as well
