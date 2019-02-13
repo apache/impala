@@ -18,6 +18,8 @@
 package org.apache.impala.catalog.events;
 
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 
 /**
  * Interface to process external events
@@ -51,4 +53,16 @@ public interface ExternalEventsProcessor {
    * Implements the core logic of processing external events
    */
   void processEvents();
+
+  /**
+   * Gets the event processor status and metrics. This method is used to show up the
+   * metrics on the metrics UI page
+   */
+  TEventProcessorMetrics getEventProcessorMetrics();
+
+  /**
+   * Gets a detailed view of the event processor which can be used to populate the
+   * content of a dedicated page for the event processor
+   */
+  TEventProcessorMetricsSummaryResponse getEventProcessorSummary();
 }

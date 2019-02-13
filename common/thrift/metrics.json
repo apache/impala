@@ -2000,5 +2000,85 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "catalog.partial-fetch-rpc.queue-len"
+  },
+  {
+    "description": "Metastore event processor status",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "The status of Metastore event processor",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "events-processor.status"
+  },
+  {
+    "description": "Total number of metastore events received",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Total number of metastore events received",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "events-processor.events-received"
+  },
+  {
+    "description": "Total number of metastore events skipped",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Total number of metastore events skipped",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "events-processor.events-skipped"
+  },
+  {
+    "description": "Average time taken to fetch a batch of metastore events",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Average duration to fetch metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.avg-events-fetch-duration"
+  },
+  {
+    "description": "Average time taken to process a batch of events received from metastore",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Average duration to process a batch of metastore events",
+    "units": "TIME_S",
+    "kind": "GAUGE",
+    "key": "events-processor.avg-events-process-duration"
+  },
+  {
+    "description": "Exponentially weighted moving average (EWMA) of number of events received in last 1 min",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "EWMA of events received in last 1 min",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "events-processor.events-received-1min-rate"
+  },
+  {
+    "description": "Exponentially weighted moving average (EWMA) of number of events received in last 5 min",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "EWMA of number of events received in last 5 min",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "events-processor.events-received-5min-rate"
+  },
+  {
+    "description": "Exponentially weighted moving average (EWMA) of number of events received in last 15 min",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "EWMA of number of events received in last 15 min",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "events-processor.events-received-15min-rate"
   }
 ]

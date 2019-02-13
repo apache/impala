@@ -210,6 +210,10 @@ class CatalogServer {
   void TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
+  // url handler for the metastore events page. It calls into JniCatalog to get the latest
+  // metastore event processor metrics and adds it to the document
+  void EventMetricsUrlCallback(
+      const Webserver::ArgumentMap& args, rapidjson::Document* document);
 };
 
 }

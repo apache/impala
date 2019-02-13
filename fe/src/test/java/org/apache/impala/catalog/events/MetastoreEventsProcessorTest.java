@@ -19,6 +19,7 @@ package org.apache.impala.catalog.events;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -75,6 +76,8 @@ import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
+import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.thrift.TScalarType;
@@ -159,6 +162,7 @@ public class MetastoreEventsProcessorTest {
     // reset the event processor to the current eventId
     eventsProcessor_.stop();
     eventsProcessor_.start(eventsProcessor_.getCurrentEventId());
+    eventsProcessor_.processEvents();
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
   }
 
@@ -882,8 +886,8 @@ public class MetastoreEventsProcessorTest {
     NotificationEvent fakeAlterTableNotification =
         createFakeAlterTableNotification(dbName, tblName, tableBefore, tableAfter);
 
-    AlterTableEvent alterTableEvent =
-        new AlterTableEvent(fakeCatalog, fakeAlterTableNotification);
+    AlterTableEvent alterTableEvent = new AlterTableEvent(
+        fakeCatalog, eventsProcessor_.getMetrics(), fakeAlterTableNotification);
     Assert.assertFalse("Alter table which " + "changes the flags should not be skipped. "
             + printFlagTransistions(dbFlag, tblFlagTransition),
         alterTableEvent.isEventProcessingDisabled());
@@ -894,7 +898,8 @@ public class MetastoreEventsProcessorTest {
         getTestTable(dbName, tblName, afterParams, false);
     NotificationEvent nextNotification =
         createFakeAlterTableNotification(dbName, tblName, tableAfter, nextTable);
-    alterTableEvent = new AlterTableEvent(fakeCatalog, nextNotification);
+    alterTableEvent =
+        new AlterTableEvent(fakeCatalog, eventsProcessor_.getMetrics(), nextNotification);
     if (shouldNextEventBeSkipped) {
       assertTrue("Alter table event should not skipped following this table flag "
               + "transition. " + printFlagTransistions(dbFlag, tblFlagTransition),
@@ -932,6 +937,89 @@ public class MetastoreEventsProcessorTest {
         .toString();
   }
 
+  /**
+   * Test generates some events and makes sure that the metrics match with expected
+   * number of events
+   */
+  @Test
+  public void testEventProcessorMetrics() throws TException {
+    TEventProcessorMetrics responseBefore = eventsProcessor_.getEventProcessorMetrics();
+    long numEventsReceivedBefore = responseBefore.getEvents_received();
+    long numEventsSkippedBefore = responseBefore.getEvents_skipped();
+    // event 1
+    createDatabase();
+    Map<String, String> tblParams = new HashMap<>(1);
+    tblParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, "true");
+    // event 2
+    createTable(TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
+    // event 3
+    createTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, null, true);
+    List<List<String>> partitionVals = new ArrayList<>();
+    partitionVals.add(Arrays.asList("1"));
+    partitionVals.add(Arrays.asList("2"));
+    partitionVals.add(Arrays.asList("3"));
+    // event 4
+    addPartitions(TEST_DB_NAME, "tbl_should_skipped", partitionVals);
+    // event 5
+    addPartitions(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, partitionVals);
+    eventsProcessor_.processEvents();
+    TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
+    assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
+    assertEquals(numEventsReceivedBefore + 5, response.getEvents_received());
+    // two events on tbl which is skipped
+    assertEquals(numEventsSkippedBefore + 2, response.getEvents_skipped());
+    assertTrue("Event fetch duration should be greater than zero",
+        response.getEvents_fetch_duration_mean() > 0);
+    assertTrue("Event process duration should be greater than zero",
+        response.getEvents_process_duration_mean() > 0);
+    TEventProcessorMetricsSummaryResponse summaryResponse =
+        catalog_.getEventProcessorSummary();
+    assertNotNull(summaryResponse);
+  }
+
+  /**
+   * Test makes sure that the event metrics are not set when event processor is not active
+   */
+  @Test
+  public void testEventProcessorWhenNotActive() throws TException {
+    try {
+      eventsProcessor_.stop();
+      assertEquals(EventProcessorStatus.STOPPED, eventsProcessor_.getStatus());
+      TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
+      assertNotNull(response);
+      assertEquals(EventProcessorStatus.STOPPED.toString(), response.getStatus());
+      assertFalse(response.isSetEvents_fetch_duration_mean());
+      assertFalse(response.isSetEvents_process_duration_mean());
+      assertFalse(response.isSetEvents_received());
+      assertFalse(response.isSetEvents_skipped());
+      assertFalse(response.isSetEvents_received_1min_rate());
+      assertFalse(response.isSetEvents_received_5min_rate());
+      assertFalse(response.isSetEvents_received_15min_rate());
+      TEventProcessorMetricsSummaryResponse summaryResponse =
+          eventsProcessor_.getEventProcessorSummary();
+      assertNotNull(summaryResponse);
+    } finally {
+      // reset the state of event process once the test completes
+      eventsProcessor_.start();
+    }
+  }
+
+  /**
+   * Tests makes sure that event metrics show valid state when event processing is not
+   * configured
+   */
+  @Test
+  public void testEventMetricsWhenNotConfigured() {
+    CatalogServiceCatalog testCatalog = CatalogServiceTestCatalog.create();
+    assertTrue("Events processed is not expected to be configured for this test",
+        testCatalog.getMetastoreEventProcessor() instanceof NoOpEventProcessor);
+    TEventProcessorMetrics response = testCatalog.getEventProcessorMetrics();
+    assertNotNull(response);
+    assertEquals(EventProcessorStatus.STOPPED.toString(), response.getStatus());
+    TEventProcessorMetricsSummaryResponse summaryResponse =
+        testCatalog.getEventProcessorSummary();
+    assertNotNull(summaryResponse);
+  }
   /**
    * Test runs all the supported DDL operations with the given value of flag at
    * database and table level

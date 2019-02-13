@@ -68,6 +68,7 @@ Catalog::Catalog() {
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
     {"getCatalogServerMetrics", "()[B", &get_catalog_server_metrics_},
+    {"getEventProcessorSummary", "()[B", &get_event_processor_summary_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_},
     {"getPartitionStats", "([B)[B", &get_partition_stats_id_},
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
@@ -157,6 +158,11 @@ Status Catalog::GetTableMetrics(const string& db, const string& tbl,
 
 Status Catalog::GetCatalogUsage(TGetCatalogUsageResponse* response) {
   return JniUtil::CallJniMethod(catalog_, get_catalog_usage_id_, response);
+}
+
+Status Catalog::GetEventProcessorSummary(
+    TEventProcessorMetricsSummaryResponse* response) {
+  return JniUtil::CallJniMethod(catalog_, get_event_processor_summary_, response);
 }
 
 Status Catalog::GetCatalogServerMetrics(TGetCatalogServerMetricsResponse* response) {

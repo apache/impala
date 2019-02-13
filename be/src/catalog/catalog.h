@@ -108,6 +108,10 @@ class Catalog {
   /// tables as well as the tables with the highest memory requirements.
   Status GetCatalogUsage(TGetCatalogUsageResponse* response);
 
+  /// Returns the metastore event processor summary view. The summary string
+  /// in the response can contain detailed metrics along with status
+  Status GetEventProcessorSummary(TEventProcessorMetricsSummaryResponse* response);
+
   /// Gets all functions in the catalog matching the parameters in the given
   /// TFunctionsRequest.
   Status GetFunctions(const TGetFunctionsRequest& request,
@@ -144,6 +148,7 @@ class Catalog {
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
   jmethodID get_catalog_usage_id_; // JniCatalog.getCatalogUsage()
   jmethodID get_catalog_server_metrics_; // JniCatalog.getCatalogServerMetrics()
+  jmethodID get_event_processor_summary_; // JniCatalog.getEventProcessorMetrics()
   jmethodID get_dbs_id_; // JniCatalog.getDbs()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_table_metrics_id_; // JniCatalog.getTableMetrics()

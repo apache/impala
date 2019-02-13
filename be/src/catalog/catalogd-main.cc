@@ -30,8 +30,9 @@
 #include "service/fe-support.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
-#include "util/jni-util.h"
 #include "util/default-path-handlers.h"
+#include "util/event-metrics.h"
+#include "util/jni-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
@@ -82,6 +83,7 @@ int CatalogdMain(int argc, char** argv) {
   metrics->AddProperty<string>("catalog.version", GetVersionString(true));
 
   CommonMetrics::InitCommonMetrics(metrics.get());
+  MetastoreEventMetrics::InitMetastoreEventMetrics(metrics.get());
 
   CatalogServer catalog_server(metrics.get());
   ABORT_IF_ERROR(catalog_server.Start());

@@ -65,6 +65,8 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -331,12 +333,17 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
+  @VisibleForTesting
+  public ExternalEventsProcessor getMetastoreEventProcessor() {
+    return metastoreEventProcessor_;
+  }
+
   /**
    * Initializes the Catalog using the default MetastoreClientPool impl.
    * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
-   *                                 to establish an initial connection to the HMS before
-   *                                 giving up.
+   * to establish an initial connection to the HMS before giving up.
    */
+
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
       int initialHmsCnxnTimeoutSec, AuthorizationConfig authConfig,
       TUniqueId catalogServiceId, String kerberosPrincipal, String localLibraryPath)
@@ -2379,6 +2386,21 @@ public class CatalogServiceCatalog extends Catalog {
       usage.addToFrequently_accessed_tables(tableUsageMetrics);
     }
     return usage;
+  }
+
+  /**
+   * Gets the events processor metrics. Used for publishing metrics on the webUI
+   */
+  public TEventProcessorMetrics getEventProcessorMetrics() {
+    return metastoreEventProcessor_.getEventProcessorMetrics();
+  }
+
+  /**
+   * Gets the events processor summary. Used for populating the contents of the events
+   * processor detailed view page
+   */
+  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
+    return metastoreEventProcessor_.getEventProcessorSummary();
   }
 
   /**

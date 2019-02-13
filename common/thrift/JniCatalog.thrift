@@ -744,13 +744,51 @@ struct TCommentOnParams {
   4: optional TColumnName column_name
 }
 
+struct TEventProcessorMetrics {
+  // status of event processor
+  1: required string status
+
+  // Total number of events received so far
+  2: optional i64 events_received
+
+  // Total number of events skipped so far
+  3: optional i64 events_skipped
+
+  // Mean time in sec for the fetching metastore events
+  4: optional double events_fetch_duration_mean
+
+  // Mean time in sec for processing a given batch of events
+  5: optional double events_process_duration_mean
+
+  // Average number of events received in 1 min
+  6: optional double events_received_1min_rate
+
+  // Average number of events received in 1 min
+  7: optional double events_received_5min_rate
+
+  // Average number of events received in 1 min
+  8: optional double events_received_15min_rate
+
+  // Average number events skipped in a polling interval
+  9: optional double events_skipped_per_poll_mean
+}
+
 // Response to GetCatalogServerMetrics() call.
 struct TGetCatalogServerMetricsResponse {
   // Partial fetch RPC queue length.
   1: required i32 catalog_partial_fetch_rpc_queue_len
+
+  // gets the events processor metrics if configured
+  2: optional TEventProcessorMetrics event_metrics;
 }
 
 // Request to copy the generated testcase from a given input path.
 struct TCopyTestCaseReq {
   1: required string input_path
+}
+
+struct TEventProcessorMetricsSummaryResponse {
+  // summary view of the events processor which can include status,
+  // metrics and other details
+  1: required string summary
 }

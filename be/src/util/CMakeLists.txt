@@ -48,6 +48,7 @@ add_library(Util
   default-path-handlers.cc
   disk-info.cc
   error-util.cc
+  event-metrics.cc
   filesystem-util.cc
   flat_buffer.cc
   hdfs-util.cc
@@ -92,8 +93,7 @@ add_library(Util
   webserver.cc
   zip-util.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
-  ${MPFIT_SRC_DIR}/mpfit.c
-)
+  ${MPFIT_SRC_DIR}/mpfit.c)
 add_dependencies(Util gen-deps gen_ir_descriptions)
 
 add_library(UtilTests

@@ -17,6 +17,7 @@
 
 package org.apache.impala.common;
 
+import java.text.DecimalFormat;
 import java.util.Map.Entry;
 
 import com.codahale.metrics.Counter;
@@ -33,6 +34,9 @@ import com.codahale.metrics.Timer;
  * TODO: Expose the metrics in Json format via a toJson() function.
  */
 public final class Metrics {
+
+  // formatter to round the double values of the rate counters to 4 digits after decimal
+  private static final DecimalFormat decimalFormatter_ = new DecimalFormat("#.####");
 
   private final MetricRegistry registry_ = new MetricRegistry();
 
@@ -115,6 +119,10 @@ public final class Metrics {
           snapshotToString(entry.getValue().getSnapshot()));
       result.append("\n");
     }
+    for (Entry<String, Meter> entry : registry_.getMeters().entrySet()) {
+      result.append(entry.getKey()).append(":").append(meterToString(entry.getValue()));
+      result.append("\n");
+    }
     return result.toString();
   }
 
@@ -123,12 +131,34 @@ public final class Metrics {
    */
   private String timerToString(Timer timer) {
     StringBuilder builder = new StringBuilder();
-    return builder.append("\n\tCount: " + timer.getCount() + "\n")
-        .append("\tMean rate: " + timer.getMeanRate() + "\n")
-        .append("\t1min rate: " + timer.getOneMinuteRate() + "\n")
-        .append("\t5min rate: " + timer.getFiveMinuteRate() + "\n")
-        .append("\t15min rate: " + timer.getFifteenMinuteRate() + "\n")
+    return builder.append("\n   Count: " + timer.getCount())
+        .append("\n   Mean rate: ")
+        .append(decimalFormatter_.format(timer.getMeanRate()))
+        .append("\n   1 min. rate: ")
+        .append(decimalFormatter_.format(timer.getOneMinuteRate()))
+        .append("\n   5 min. rate: ")
+        .append(decimalFormatter_.format(timer.getFiveMinuteRate()))
+        .append("\n   15 min. rate: ")
+        .append(decimalFormatter_.format(timer.getFifteenMinuteRate()))
         .append(snapshotToString(timer.getSnapshot()))
+        .toString();
+  }
+
+  /**
+   * Helper method to pretty print the contents of a Meter
+   */
+  private String meterToString(Meter meter) {
+    StringBuilder builder = new StringBuilder();
+    return builder.append("\n   Count: ")
+        .append(meter.getCount())
+        .append("\n   Mean rate: ")
+        .append(decimalFormatter_.format(meter.getMeanRate()))
+        .append("\n   1 min. rate: ")
+        .append(decimalFormatter_.format(meter.getOneMinuteRate()))
+        .append("\n   5 min. rate: ")
+        .append(decimalFormatter_.format(meter.getFiveMinuteRate()))
+        .append("\n   15 min. rate: ")
+        .append(decimalFormatter_.format(meter.getFifteenMinuteRate()))
         .toString();
   }
 
@@ -137,13 +167,21 @@ public final class Metrics {
    */
   private String snapshotToString(Snapshot snapshot) {
     StringBuilder builder = new StringBuilder();
-    return builder.append("\n\tMin (msec): " + snapshot.getMin() / 1000000 + "\n")
-        .append("\tMax (msec): " + snapshot.getMax() / 1000000 + "\n")
-        .append("\tMean (msec): " + snapshot.getMean() / 1000000 + "\n")
-        .append("\tMedian (msec): " + snapshot.getMedian() / 1000000 + "\n")
-        .append("\t75th-% (msec): " + snapshot.get75thPercentile() / 1000000 + "\n")
-        .append("\t95th-% (msec): " + snapshot.get95thPercentile() / 1000000 + "\n")
-        .append("\t99th-% (msec): " + snapshot.get99thPercentile() / 1000000 + "\n")
+    return builder.append("\n   Min (msec): ")
+        .append(decimalFormatter_.format(snapshot.getMin() / 1000000))
+        .append("\n   Max (msec): ")
+        .append(decimalFormatter_.format(snapshot.getMax() / 1000000))
+        .append("\n   Mean (msec): ")
+        .append(decimalFormatter_.format(snapshot.getMean() / 1000000))
+        .append("\n   Median (msec): ")
+        .append(decimalFormatter_.format(snapshot.getMedian() / 1000000))
+        .append("\n   75th-% (msec): ")
+        .append(decimalFormatter_.format(snapshot.get75thPercentile() / 1000000))
+        .append("\n   95th-% (msec): ")
+        .append(decimalFormatter_.format(snapshot.get95thPercentile() / 1000000))
+        .append("\n   99th-% (msec): ")
+        .append(decimalFormatter_.format(snapshot.get99thPercentile() / 1000000))
+        .append("\n")
         .toString();
   }
 }

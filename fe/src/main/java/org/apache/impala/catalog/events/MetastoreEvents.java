@@ -37,6 +37,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TTableName;
@@ -103,9 +104,12 @@ public class MetastoreEvents {
 
     // catalog service instance to be used for creating eventHandlers
     private final CatalogServiceCatalog catalog_;
+    // metrics registry to be made available for each events to publish metrics
+    private final Metrics metrics_;
 
-    public MetastoreEventFactory(CatalogServiceCatalog catalog) {
+    public MetastoreEventFactory(CatalogServiceCatalog catalog, Metrics metrics) {
       this.catalog_ = Preconditions.checkNotNull(catalog);
+      this.metrics_ = Preconditions.checkNotNull(metrics);
     }
 
     /**
@@ -118,31 +122,26 @@ public class MetastoreEvents {
       MetastoreEventType metastoreEventType =
           MetastoreEventType.from(event.getEventType());
       switch (metastoreEventType) {
-        case CREATE_TABLE:
-          return new CreateTableEvent(catalog_, event);
-        case DROP_TABLE:
-          return new DropTableEvent(catalog_, event);
-        case ALTER_TABLE:
-          return new AlterTableEvent(catalog_, event);
-        case CREATE_DATABASE:
-          return new CreateDatabaseEvent(catalog_, event);
-        case DROP_DATABASE:
-          return new DropDatabaseEvent(catalog_, event);
+        case CREATE_TABLE: return new CreateTableEvent(catalog_, metrics_, event);
+        case DROP_TABLE: return new DropTableEvent(catalog_, metrics_, event);
+        case ALTER_TABLE: return new AlterTableEvent(catalog_, metrics_, event);
+        case CREATE_DATABASE: return new CreateDatabaseEvent(catalog_, metrics_, event);
+        case DROP_DATABASE: return new DropDatabaseEvent(catalog_, metrics_, event);
         case ALTER_DATABASE:
           // alter database events are currently ignored
-          return new IgnoredEvent(catalog_, event);
+          return new IgnoredEvent(catalog_, metrics_, event);
         case ADD_PARTITION:
           // add partition events triggers invalidate table currently
-          return new AddPartitionEvent(catalog_, event);
+          return new AddPartitionEvent(catalog_, metrics_, event);
         case DROP_PARTITION:
           // drop partition events triggers invalidate table currently
-          return new DropPartitionEvent(catalog_, event);
+          return new DropPartitionEvent(catalog_, metrics_, event);
         case ALTER_PARTITION:
           // alter partition events triggers invalidate table currently
-          return new AlterPartitionEvent(catalog_, event);
+          return new AlterPartitionEvent(catalog_, metrics_, event);
         default:
           // ignore all the unknown events by creating a IgnoredEvent
-          return new IgnoredEvent(catalog_, event);
+          return new IgnoredEvent(catalog_, metrics_, event);
       }
     }
 
@@ -226,15 +225,21 @@ public class MetastoreEvents {
     // eventType from the NotificationEvent
     protected final MetastoreEventType eventType_;
 
+    // Actual notificationEvent object received from Metastore
     protected final NotificationEvent metastoreNotificationEvent_;
 
-    MetastoreEvent(CatalogServiceCatalog catalogServiceCatalog, NotificationEvent event) {
+    // metrics registry so that events can add metrics
+    protected final Metrics metrics_;
+
+    MetastoreEvent(CatalogServiceCatalog catalogServiceCatalog, Metrics metrics,
+        NotificationEvent event) {
       this.catalog_ = catalogServiceCatalog;
       this.event_ = event;
       this.eventId_ = event_.getEventId();
       this.eventType_ = MetastoreEventType.from(event.getEventType());
-      dbName_ = Preconditions.checkNotNull(event.getDbName());
-      metastoreNotificationEvent_ = event;
+      this.dbName_ = Preconditions.checkNotNull(event.getDbName());
+      this.metastoreNotificationEvent_ = event;
+      this.metrics_ = metrics;
     }
 
     /**
@@ -244,7 +249,10 @@ public class MetastoreEvents {
      */
     public void processIfEnabled()
         throws CatalogException, MetastoreNotificationException {
-      if (isEventProcessingDisabled()) return;
+      if (isEventProcessingDisabled()) {
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+        return;
+      }
       process();
     }
 
@@ -352,8 +360,8 @@ public class MetastoreEvents {
     protected org.apache.hadoop.hive.metastore.api.Table msTbl_;
 
     private MetastoreTableEvent(CatalogServiceCatalog catalogServiceCatalog,
-        NotificationEvent event) {
-      super(catalogServiceCatalog, event);
+        Metrics metrics, NotificationEvent event) {
+      super(catalogServiceCatalog, metrics, event);
       tblName_ = Preconditions.checkNotNull(event.getTableName());
       debugLog("Creating event {} of type {} on table {}", eventId_, eventType_,
           getFullyQualifiedTblName());
@@ -429,10 +437,9 @@ public class MetastoreEvents {
    * Base class for all the database events
    */
   public static abstract class MetastoreDatabaseEvent extends MetastoreEvent {
-
-    MetastoreDatabaseEvent(CatalogServiceCatalog catalogServiceCatalog,
+    MetastoreDatabaseEvent(CatalogServiceCatalog catalogServiceCatalog, Metrics metrics,
         NotificationEvent event) {
-      super(catalogServiceCatalog, event);
+      super(catalogServiceCatalog, metrics, event);
       debugLog("Creating event {} of type {} on database {}", eventId_,
               eventType_, dbName_);
     }
@@ -457,9 +464,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private CreateTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    private CreateTableEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkArgument(MetastoreEventType.CREATE_TABLE.equals(eventType_));
       Preconditions
           .checkNotNull(event.getMessage(), debugString("Event message is null"));
@@ -561,9 +568,9 @@ public class MetastoreEvents {
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
     @VisibleForTesting
-    AlterTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    AlterTableEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkArgument(MetastoreEventType.ALTER_TABLE.equals(eventType_));
       JSONAlterTableMessage alterTableMessage =
           (JSONAlterTableMessage) MetastoreEventsProcessor.getMessageFactory()
@@ -699,9 +706,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private DropTableEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    private DropTableEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkArgument(MetastoreEventType.DROP_TABLE.equals(eventType_));
       JSONDropTableMessage dropTableMessage =
           (JSONDropTableMessage) MetastoreEventsProcessor.getMessageFactory()
@@ -752,9 +759,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private CreateDatabaseEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    private CreateDatabaseEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkArgument(MetastoreEventType.CREATE_DATABASE.equals(eventType_));
       JSONCreateDatabaseMessage createDatabaseMessage =
           (JSONCreateDatabaseMessage) MetastoreEventsProcessor.getMessageFactory()
@@ -818,8 +825,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private DropDatabaseEvent(CatalogServiceCatalog catalog, NotificationEvent event) {
-      super(catalog, event);
+    private DropDatabaseEvent(
+        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+      super(catalog, metrics, event);
     }
 
     /**
@@ -853,9 +861,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private TableInvalidatingEvent(CatalogServiceCatalog catalog,
-        NotificationEvent event) {
-      super(catalog, event);
+    private TableInvalidatingEvent(
+        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+      super(catalog, metrics, event);
     }
 
     /**
@@ -881,9 +889,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private AddPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    private AddPartitionEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkState(eventType_.equals(MetastoreEventType.ADD_PARTITION));
       if (event.getMessage() == null) {
         throw new IllegalStateException(debugString("Event message is null"));
@@ -904,9 +912,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private AlterPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event)
-        throws MetastoreNotificationException {
-      super(catalog, event);
+    private AlterPartitionEvent(CatalogServiceCatalog catalog, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalog, metrics, event);
       Preconditions.checkState(eventType_.equals(MetastoreEventType.ALTER_PARTITION));
       Preconditions.checkNotNull(event.getMessage());
       AlterPartitionMessage alterPartitionMessage =
@@ -926,8 +934,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private DropPartitionEvent(CatalogServiceCatalog catalog, NotificationEvent event) {
-      super(catalog, event);
+    private DropPartitionEvent(
+        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+      super(catalog, metrics, event);
       Preconditions.checkState(eventType_.equals(MetastoreEventType.DROP_PARTITION));
       Preconditions.checkNotNull(event.getMessage());
       //TODO we should use DropPartitionMessage to get the table object here but
@@ -950,8 +959,9 @@ public class MetastoreEvents {
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
-    private IgnoredEvent(CatalogServiceCatalog catalog, NotificationEvent event) {
-      super(catalog, event);
+    private IgnoredEvent(
+        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+      super(catalog, metrics, event);
     }
 
     @Override

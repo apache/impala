@@ -314,6 +314,11 @@ public class JniCatalog {
     return serializer.serialize(catalog_.getCatalogUsage());
   }
 
+  public byte[] getEventProcessorSummary() throws TException {
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(catalog_.getEventProcessorSummary());
+  }
+
   public void updateTableUsage(byte[] req) throws ImpalaException {
     TUpdateTableUsageRequest thriftReq = new TUpdateTableUsageRequest();
     JniUtil.deserializeThrift(protocolFactory_, thriftReq, req);
@@ -324,6 +329,7 @@ public class JniCatalog {
     TGetCatalogServerMetricsResponse response = new TGetCatalogServerMetricsResponse();
     response.setCatalog_partial_fetch_rpc_queue_len(
         catalog_.getPartialFetchRpcQueueLength());
+    response.setEvent_metrics(catalog_.getEventProcessorMetrics());
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(response);
   }
