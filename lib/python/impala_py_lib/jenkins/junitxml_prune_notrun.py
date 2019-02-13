@@ -22,11 +22,12 @@ Some tests that produce JUnitXML include tests that did not run (i.e. status="no
 This script walks through the JUnitXML and removes these elements.
 """
 from optparse import OptionParser
-from xml.etree.ElementTree import ElementTree
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
 
 
 def junitxml_prune_notrun(junitxml_filename):
-    tree = ElementTree()
+    tree = ET.ElementTree()
     root = tree.parse(junitxml_filename)
 
     for testsuite in root.findall("testsuite"):
@@ -52,7 +53,12 @@ def junitxml_prune_notrun(junitxml_filename):
             # Fixup the total number of tests
             testsuite.attrib["tests"] = str(num_tests - len(notrun_testcases))
     # Write out the pruned JUnitXML
-    tree.write(junitxml_filename, encoding="utf-8", xml_declaration=True)
+    # An XML declaration is optional, but it is nice to have. ElementTree.write() does
+    # not support an XML declaration on Python 2.6, so use minidom to write the XML.
+    root_node_minidom = minidom.parseString(ET.tostring(root))
+    junitxml_string = root_node_minidom.toxml(encoding="utf-8")
+    with open(junitxml_filename, "w") as f:
+        f.write(junitxml_string)
 
 
 def main():
