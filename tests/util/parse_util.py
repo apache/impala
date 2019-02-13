@@ -17,7 +17,6 @@
 
 import re
 from datetime import datetime
-from RuntimeProfile.ttypes import TSummaryStatsCounter
 
 # IMPALA-6715: Every so often the stress test or the TPC workload directories get
 # changed, and the stress test loses the ability to run the full set of queries. Set
@@ -148,6 +147,9 @@ def get_bytes_summary_stats_counter(counter_name, runtime_profile):
               summary_stats[0].max_value == 8192 and \
               summary_stats[0].total_num_values == 1
   """
+  # This requires the Thrift definitions to be generated. We limit the scope of the import
+  # to allow tools like the stress test to import this file without building Impala.
+  from RuntimeProfile.ttypes import TSummaryStatsCounter
 
   regex_summary_stat = re.compile(r"""\(
     Avg:[^\(]*\((?P<avg>[0-9]+)\)\s;\s # Matches Avg: [?].[?] [?]B (?)
