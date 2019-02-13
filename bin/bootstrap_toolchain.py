@@ -415,6 +415,17 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
 
   execute_many(download, cdh_components)
 
+
+def download_ranger(toolchain_root):
+  env_var_version = "IMPALA_RANGER_VERSION"
+  version = os.environ.get(env_var_version)
+  file_name = "ranger-{0}-admin.tar.gz".format(version)
+  if not version:
+    raise Exception("Could not find version for Ranger in environment var {0}"
+                    .format(env_var_version))
+  download_url = "{0}/ranger/{1}/{2}".format(TOOLCHAIN_HOST, version, file_name)
+  wget_and_unpack_package(download_url, file_name, toolchain_root, False)
+
 if __name__ == "__main__":
   """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment.-
   By checking $IMPALA_HOME is present, we assume that IMPALA_{LIB}_VERSION will be present
@@ -499,3 +510,5 @@ if __name__ == "__main__":
   cdh_components = [Package("llama-minikdc")]
   download_path_prefix = "{0}/cdh_components/".format(TOOLCHAIN_HOST)
   download_cdh_components(toolchain_root, cdh_components, download_path_prefix)
+
+  download_ranger(toolchain_root)

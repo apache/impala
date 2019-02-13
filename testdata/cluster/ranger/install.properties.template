@@ -1,0 +1,79 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#------------------------- DB CONFIG - BEGIN ----------------------------------
+PYTHON_COMMAND_INVOKER=python
+
+DB_FLAVOR=POSTGRES
+SQL_CONNECTOR_JAR=${POSTGRES_JDBC_DRIVER}
+
+db_root_user=hiveuser
+db_root_password=password
+db_host=localhost
+
+db_ssl_enabled=false
+db_ssl_required=false
+db_ssl_verifyServerCertificate=false
+db_ssl_auth_type=2-way
+
+javax_net_ssl_keyStore=
+javax_net_ssl_keyStorePassword=
+javax_net_ssl_trustStore=
+javax_net_ssl_trustStorePassword=
+
+db_name=${RANGER_POLICY_DB}
+db_user=hiveuser
+db_password=password
+
+rangerAdmin_password=
+rangerTagsync_password=
+rangerUsersync_password=
+keyadmin_password=
+#------------------------- DB CONFIG - END ----------------------------------
+
+# #################  DO NOT MODIFY ANY VARIABLES BELOW #########################
+#
+# --- These deployment variables are not to be modified unless you understand the full impact of the changes
+#
+################################################################################
+XAPOLICYMGR_DIR=$PWD
+app_home=$PWD/ews/webapp
+TMPFILE=$PWD/.fi_tmp
+LOGFILE=$PWD/logfile
+LOGFILES="$LOGFILE"
+
+JAVA_BIN='java'
+JAVA_VERSION_REQUIRED='1.7'
+JAVA_ORACLE='Java(TM) SE Runtime Environment'
+
+#mysql_create_user_file=${PWD}/db/mysql/create_dev_user.sql
+mysql_core_file=db/mysql/optimized/current/ranger_core_db_mysql.sql
+mysql_audit_file=db/mysql/xa_audit_db.sql
+#mysql_asset_file=${PWD}/db/mysql/reset_asset.sql
+
+#oracle_create_user_file=${PWD}/db/oracle/create_dev_user_oracle.sql
+oracle_core_file=db/oracle/optimized/current/ranger_core_db_oracle.sql
+oracle_audit_file=db/oracle/xa_audit_db_oracle.sql
+#oracle_asset_file=${PWD}/db/oracle/reset_asset_oracle.sql
+#
+postgres_core_file=db/postgres/optimized/current/ranger_core_db_postgres.sql
+postgres_audit_file=db/postgres/xa_audit_db_postgres.sql
+#
+sqlserver_core_file=db/sqlserver/optimized/current/ranger_core_db_sqlserver.sql
+sqlserver_audit_file=db/sqlserver/xa_audit_db_sqlserver.sql
+#
+sqlanywhere_core_file=db/sqlanywhere/optimized/current/ranger_core_db_sqlanywhere.sql
+sqlanywhere_audit_file=db/sqlanywhere/xa_audit_db_sqlanywhere.sql
+cred_keystore_filename=$app_home/WEB-INF/classes/conf/.jceks/rangeradmin.jceks

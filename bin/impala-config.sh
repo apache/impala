@@ -165,6 +165,7 @@ export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
 export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
+export IMPALA_RANGER_VERSION=1.2.0
 export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
@@ -281,6 +282,9 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
 export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
 export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
+RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_IMPALA_HOME)}
+# The DB script in Ranger expects the database name to be in lower case.
+export RANGER_POLICY_DB=$(echo ${RANGER_POLICY_DB} | tr '[:upper:]' '[:lower:]')
 
 # Environment variables carrying AWS security credentials are prepared
 # according to the following rules:
@@ -498,6 +502,9 @@ export MINIKDC_HOME="$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_V
 export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
 export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
+export RANGER_HOME="${IMPALA_TOOLCHAIN}/ranger-${IMPALA_RANGER_VERSION}-admin"
+export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
+
 # Extract the first component of the hive version.
 export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
 export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
@@ -690,6 +697,10 @@ echo "HIVE_CONF_DIR           = $HIVE_CONF_DIR"
 echo "HIVE_SRC_DIR            = $HIVE_SRC_DIR"
 echo "HBASE_HOME              = $HBASE_HOME"
 echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
+echo "SENTRY_HOME             = $SENTRY_HOME"
+echo "SENTRY_CONF_DIR         = $SENTRY_CONF_DIR"
+echo "RANGER_HOME             = $RANGER_HOME"
+echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
 echo "MINIKDC_HOME            = $MINIKDC_HOME"
 echo "THRIFT_HOME             = $THRIFT_HOME"
 echo "HADOOP_LZO              = $HADOOP_LZO"

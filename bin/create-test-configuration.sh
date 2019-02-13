@@ -25,8 +25,38 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
+# Perform search-replace on $1, output to $2.
+# Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
+# the environment then replace "${FOO}" with the environment value.  Also
+# remove or leave special kerberos settings as desired.  Sanity check at end.
+function generate_config {
+  GCIN="$1"
+  GCOUT="$2"
+
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+      "${GCIN}" > "${GCOUT}.tmp"
+
+  if [ "${IMPALA_KERBERIZE}" = "" ]; then
+    sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
+        "${GCOUT}.tmp" > "${GCOUT}"
+  else
+    cp "${GCOUT}.tmp" "${GCOUT}"
+  fi
+  rm -f "${GCOUT}.tmp"
+
+  # Check for anything that might have been missed.
+  # Assumes that environment variables will be ALL CAPS...
+  if grep '\${[A-Z_]*}' "${GCOUT}"; then
+    echo "Found undefined variables in ${GCOUT}, aborting"
+    exit 1
+  fi
+
+  echo "Generated `pwd`/${GCOUT}"
+}
+
 CREATE_METASTORE=0
 CREATE_SENTRY_POLICY_DB=0
+CREATE_RANGER_POLICY_DB=0
 : ${IMPALA_KERBERIZE=}
 
 # parse command line options
@@ -39,6 +69,9 @@ do
     -create_sentry_policy_db)
       CREATE_SENTRY_POLICY_DB=1
       ;;
+    -create_ranger_policy_db)
+      CREATE_RANGER_POLICY_DB=1
+      ;;
     -k|-kerberize|-kerberos|-kerb)
       # This could also come in through the environment...
       export IMPALA_KERBERIZE=1
@@ -46,6 +79,7 @@ do
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
       echo "[-create_sentry_policy_db] : If true, creates a new sentry policy db."
+      echo "[-create_ranger_policy_db] : If true, creates a new Ranger policy db."
       echo "[-kerberize] : Enable kerberos on the cluster"
       exit 1
       ;;
@@ -79,9 +113,13 @@ fi
 export CURRENT_USER=`whoami`
 
 CONFIG_DIR=${IMPALA_HOME}/fe/src/test/resources
+RANGER_TEST_CONF_DIR="${IMPALA_HOME}/testdata/cluster/ranger"
+
 echo "Config dir: ${CONFIG_DIR}"
 echo "Current user: ${CURRENT_USER}"
 echo "Metastore DB: ${METASTORE_DB}"
+echo "Sentry DB   : ${SENTRY_POLICY_DB}"
+echo "Ranger DB   : ${RANGER_POLICY_DB}"
 
 pushd ${CONFIG_DIR}
 # Cleanup any existing files
@@ -110,34 +148,15 @@ if [ $CREATE_SENTRY_POLICY_DB -eq 1 ]; then
   createdb -U hiveuser $SENTRY_POLICY_DB
 fi
 
-# Perform search-replace on $1, output to $2.
-# Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
-# the environment then replace "${FOO}" with the environment value.  Also
-# remove or leave special kerberos settings as desired.  Sanity check at end.
-function generate_config {
-  GCIN="$1"
-  GCOUT="$2"
-
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-      "${GCIN}" > "${GCOUT}.tmp"
-
-  if [ "${IMPALA_KERBERIZE}" = "" ]; then
-    sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
-        "${GCOUT}.tmp" > "${GCOUT}"
-  else
-    cp "${GCOUT}.tmp" "${GCOUT}"
-  fi
-  rm -f "${GCOUT}.tmp"
-
-  # Check for anything that might have been missed.
-  # Assumes that environment variables will be ALL CAPS...
-  if grep '\${[A-Z_]*}' "${GCOUT}"; then
-    echo "Found undefined variables in ${GCOUT}, aborting"
-    exit 1
-  fi
-
-  echo "Generated `pwd`/${GCOUT}"
-}
+if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then
+  echo "Creating Ranger Policy Server DB"
+  dropdb -U hiveuser "${RANGER_POLICY_DB}" 2> /dev/null || true
+  createdb -U hiveuser "${RANGER_POLICY_DB}"
+  pushd "${RANGER_HOME}"
+  generate_config "${RANGER_TEST_CONF_DIR}/install.properties.template" install.properties
+  python ./db_setup.py
+  popd
+fi
 
 echo "Linking core-site.xml from local cluster"
 CLUSTER_HADOOP_CONF_DIR=$(${CLUSTER_DIR}/admin get_hadoop_client_conf_dir)
@@ -174,6 +193,26 @@ if [ ! -z "${IMPALA_KERBERIZE}" ]; then
   generate_config hbase-jaas-client.conf.template hbase-jaas-client.conf
 fi
 
+popd
+
+RANGER_SERVER_CONF_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf"
+RANGER_SERVER_LIB_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/lib"
+if [[ ! -d "${RANGER_SERVER_CONF_DIR}" ]]; then
+    mkdir -p "${RANGER_SERVER_CONF_DIR}"
+fi
+
+cp -f "${RANGER_TEST_CONF_DIR}/java_home.sh" "${RANGER_SERVER_CONF_DIR}"
+cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-logdir.sh" "${RANGER_SERVER_CONF_DIR}"
+cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-piddir.sh" "${RANGER_SERVER_CONF_DIR}"
+cp -f "${RANGER_TEST_CONF_DIR}/security-applicationContext.xml" \
+    "${RANGER_SERVER_CONF_DIR}"
+cp -f "${POSTGRES_JDBC_DRIVER}" "${RANGER_SERVER_LIB_DIR}"
+
+pushd "${RANGER_SERVER_CONF_DIR}"
+generate_config "${RANGER_TEST_CONF_DIR}/ranger-admin-default-site.xml.template" \
+    ranger-admin-default-site.xml
+generate_config "${RANGER_TEST_CONF_DIR}/ranger-admin-site.xml.template" \
+    ranger-admin-site.xml
 popd
 
 echo "Completed config generation"

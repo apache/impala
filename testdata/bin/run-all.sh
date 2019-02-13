@@ -94,3 +94,7 @@ else
   $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
 fi
+
+echo " --> Starting Ranger Server"
+"${IMPALA_HOME}/testdata/bin/run-ranger-server.sh" 2>&1 | \
+    tee "${IMPALA_CLUSTER_LOGS_DIR}/run-ranger-server.log"
