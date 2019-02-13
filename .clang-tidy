@@ -30,7 +30,6 @@ Checks: "-*,clang*,\
 -clang-analyzer-unix.Malloc,\
 -clang-analyzer-unix.MallocSizeof,\
 -clang-diagnostic-c++1z-extensions,\
--clang-diagnostic-c++98*,\
 -clang-diagnostic-cast-align,\
 -clang-diagnostic-class-varargs,\
 -clang-diagnostic-conversion,\
@@ -51,8 +50,6 @@ Checks: "-*,clang*,\
 -clang-diagnostic-nested-anon-types,\
 -clang-diagnostic-old-style-cast,\
 -clang-diagnostic-overlength-strings,\
--clang-diagnostic-packed,\
--clang-diagnostic-padded,\
 -clang-diagnostic-return-type-c-linkage,\
 -clang-diagnostic-shadow,\
 -clang-diagnostic-shadow-field-in-constructor,\
@@ -69,7 +66,6 @@ Checks: "-*,clang*,\
 -clang-diagnostic-unused-parameter,\
 -clang-diagnostic-used-but-marked-unused,\
 -clang-diagnostic-vla-extension,\
--clang-diagnostic-weak-vtables"
 
 # Ignore warnings in gutil
 
