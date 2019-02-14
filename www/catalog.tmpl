@@ -101,6 +101,46 @@ under the License.
 </script>
 {{/has_frequent_tables}}
 
+{{?has_high_file_count_tables}}
+<div class="panel panel-info">
+  <div class="panel-heading">
+      <h2 class="panel-title">
+      Top-{{num_high_file_count_tables}} Tables with Most Number of Files
+      </h2>
+  </div>
+  <div class="panel-body">
+    <table id="high-file-count-tables" class='table table-hover table-bordered'>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Number of Files</th>
+          <th>Metrics</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#high_file_count_tables}}
+        <tr>
+          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          </td>
+          <td>{{num_files}}</td>
+          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+        </tr>
+        {{/high_file_count_tables}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#high-file-count-tables').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 10
+        });
+    });
+</script>
+{{/has_high_file_count_tables}}
+
 <h3>Databases</h3>
 <ol class="breadcrumb">
 {{#databases}}

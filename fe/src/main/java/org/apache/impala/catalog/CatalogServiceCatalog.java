@@ -2372,6 +2372,7 @@ public class CatalogServiceCatalog extends Catalog {
     TGetCatalogUsageResponse usage = new TGetCatalogUsageResponse();
     usage.setLarge_tables(new ArrayList<>());
     usage.setFrequently_accessed_tables(new ArrayList<>());
+    usage.setHigh_file_count_tables(new ArrayList<>());
     for (Table largeTable: CatalogUsageMonitor.INSTANCE.getLargestTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(largeTable.getTableName().toThrift());
@@ -2384,6 +2385,14 @@ public class CatalogServiceCatalog extends Catalog {
           new TTableUsageMetrics(frequentTable.getTableName().toThrift());
       tableUsageMetrics.setNum_metadata_operations(frequentTable.getMetadataOpsCount());
       usage.addToFrequently_accessed_tables(tableUsageMetrics);
+    }
+
+    for (Table mostFilesTable:
+        CatalogUsageMonitor.INSTANCE.getHighFileCountTables()) {
+      TTableUsageMetrics tableUsageMetrics =
+          new TTableUsageMetrics(mostFilesTable.getTableName().toThrift());
+      tableUsageMetrics.setNum_files(mostFilesTable.getNumFiles());
+      usage.addToHigh_file_count_tables(tableUsageMetrics);
     }
     return usage;
   }

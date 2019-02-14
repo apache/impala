@@ -511,6 +511,32 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   num_frequent_tables.SetInt(catalog_usage_result.frequently_accessed_tables.size());
   document->AddMember("num_frequent_tables", num_frequent_tables,
       document->GetAllocator());
+
+  // Collect information about the most number of files tables.
+  Value high_filecount_tbls(kArrayType);
+  for (int i = 0; i < catalog_usage_result.high_file_count_tables.size(); ++i) {
+    Value tbl_obj(kObjectType);
+    const auto& high_filecount_tbl = catalog_usage_result.high_file_count_tables[i];
+    Value tbl_name(Substitute("$0.$1", high_filecount_tbl.table_name.db_name,
+        high_filecount_tbl.table_name.table_name).c_str(), document->GetAllocator());
+    tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
+    Value num_files;
+    DCHECK(high_filecount_tbl.__isset.num_files);
+    num_files.SetInt64(high_filecount_tbl.num_files);
+    tbl_obj.AddMember("num_files", num_files,
+        document->GetAllocator());
+    high_filecount_tbls.PushBack(tbl_obj, document->GetAllocator());
+  }
+  Value has_high_filecount_tbls;
+  has_high_filecount_tbls.SetBool(true);
+  document->AddMember("has_high_file_count_tables", has_high_filecount_tbls,
+      document->GetAllocator());
+  document->AddMember("high_file_count_tables", high_filecount_tbls,
+      document->GetAllocator());
+  Value num_high_filecount_tbls;
+  num_high_filecount_tbls.SetInt(catalog_usage_result.high_file_count_tables.size());
+  document->AddMember("num_high_file_count_tables", num_high_filecount_tbls,
+      document->GetAllocator());
 }
 
 void CatalogServer::EventMetricsUrlCallback(

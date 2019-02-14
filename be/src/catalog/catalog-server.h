@@ -183,8 +183,9 @@ class CatalogServer {
 
   /// Retrieves from the FE information about the current catalog usage and populates
   /// the /catalog debug webpage. The catalog usage includes information about the TOP-N
-  /// frequently used (in terms of number of metadata operations) tables as well as the
-  /// TOP-N tables with the highest memory requirements.
+  /// frequently used (in terms of number of metadata operations) tables, the TOP-N
+  /// tables with the highest memory requirements and the TOP-N tables with the most
+  /// number of files.
   ///
   /// Example output:
   /// "large_tables": [
@@ -197,6 +198,12 @@ class CatalogServer {
   ///      {
   ///        "name": "functional.alltypestiny",
   ///        "frequency": 10
+  ///      }
+  ///  ]
+  ///  "high_file_count_tables": [
+  ///      {
+  ///        "name": functional.alltypesagg",
+  ///        "num_files": 30
   ///      }
   ///  ]
   void GetCatalogUsage(rapidjson::Document* document);

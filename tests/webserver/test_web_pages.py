@@ -25,7 +25,6 @@ import pytest
 import re
 import requests
 
-
 class TestWebPage(ImpalaTestSuite):
 
   ROOT_URL = "http://localhost:{0}/"
@@ -280,7 +279,9 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_catalog_object("functional", "alltypesnopart")
     self.__test_catalog_object("functional_kudu", "alltypes")
     self.__test_table_metrics("functional", "alltypes", "total-file-size-bytes")
+    self.__test_table_metrics("functional", "alltypes", "num-files")
     self.__test_table_metrics("functional_kudu", "alltypes", "alter-duration")
+    self.__test_catalog_tablesfilesusage("functional", "alltypes", "24")
 
   def __test_catalog_object(self, db_name, tbl_name):
     """Tests the /catalog_object endpoint for the given db/table. Runs
@@ -298,6 +299,38 @@ class TestWebPage(ImpalaTestSuite):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))
     self.get_and_check_status(self.TABLE_METRICS_URL +
       "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
+
+  def __test_catalog_tablesfilesusage(self, db_name, tbl_name, numfiles):
+    """Test the list of tables with  most number of files in the catalog page.
+    Make sure the loaded table is in the list and with correct file number."""
+    self.client.execute("refresh %s.%s" % (db_name, tbl_name))
+    response = self.get_and_check_status(self.CATALOG_URL,
+      "Tables with Most Number of Files", ports_to_test=self.CATALOG_TEST_PORT)
+    list_file_str = re.search('<table id="high-file-count-tables"( .*?)</table>',
+      response[0].text, re.MULTILINE | re.DOTALL)
+    target_metric = "%s.%s-metric" % (db_name, tbl_name)
+    # Check the db table is in the list
+    assert target_metric in list_file_str.group(0)
+    list_files = re.findall('<tr>(.*?)</tr>', list_file_str.group(0),
+      re.MULTILINE | re.DOTALL)
+    for trow in list_files:
+      # Find the entry for the db table and verify its file count.
+      if re.search(target_metric, trow) is not None:
+        # Get the number following <td> in the entry
+        nfiles = re.search('(?<=\<td\>)\d+', trow)
+        assert nfiles.group(0) == numfiles
+    response = self.get_and_check_status(self.CATALOG_URL + "?json",
+      "high_file_count_tables", ports_to_test=self.CATALOG_TEST_PORT)
+    response_json = json.loads(response[0].text)
+    high_filecount_tbls = response_json["high_file_count_tables"]
+    tbl_fname = "%s.%s" % (db_name, tbl_name)
+    hasTbl = 0
+    assert len(high_filecount_tbls) > 0
+    for tblinfo in high_filecount_tbls:
+      if tblinfo["name"] == tbl_fname:
+        assert tblinfo["num_files"] == int(numfiles)
+        hasTbl = 1
+    assert hasTbl == 1
 
   def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
                                      expected_state=None):

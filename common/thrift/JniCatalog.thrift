@@ -706,6 +706,10 @@ struct TTableUsageMetrics {
 
   // Number of metadata operations performed on the table since it was loaded.
   3: optional i64 num_metadata_operations
+
+  // Number of files in this table. For partitioned table, this includes file counts
+  // across all the partitions.
+  4: optional i64 num_files
 }
 
 // Response to a GetCatalogUsage request.
@@ -716,6 +720,9 @@ struct TGetCatalogUsageResponse{
   // List of the most frequently accessed (in terms of number of metadata operations)
   // tables.
   2: required list<TTableUsageMetrics> frequently_accessed_tables
+
+  // List of the tables that have most number of files
+  3: required list<TTableUsageMetrics> high_file_count_tables
 }
 
 struct TColumnName {

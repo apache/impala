@@ -89,6 +89,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // table lock.
   protected AtomicLong metadataOpsCount_ = new AtomicLong(0);
 
+  // Number of files that the table has.
+  // Stored in an AtomicLong to allow this field to be accessed without holding the
+  // table lock.
+  protected AtomicLong numFiles_ = new AtomicLong(0);
+
   // Metrics for this table
   protected final Metrics metrics_ = new Metrics();
 
@@ -144,6 +149,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   public long getMetadataOpsCount() { return metadataOpsCount_.get(); }
   public long getEstimatedMetadataSize() { return estimatedMetadataSize_.get(); }
+  public long getNumFiles() { return numFiles_.get(); }
+
   public void setEstimatedMetadataSize(long estimatedMetadataSize) {
     estimatedMetadataSize_.set(estimatedMetadataSize);
     if (!isStoredInImpaladCatalogCache()) {
@@ -155,6 +162,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     metadataOpsCount_.incrementAndGet();
     if (!isStoredInImpaladCatalogCache()) {
       CatalogUsageMonitor.INSTANCE.updateFrequentlyAccessedTables(this);
+    }
+  }
+
+  public void setNumFiles(long numFiles) {
+    numFiles_.set(numFiles);
+    if (!isStoredInImpaladCatalogCache()) {
+      CatalogUsageMonitor.INSTANCE.updateHighFileCountTables(this);
     }
   }
 
