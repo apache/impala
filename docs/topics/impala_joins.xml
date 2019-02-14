@@ -34,13 +34,11 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">joins</indexterm>
-      A join query is a <codeph>SELECT</codeph> statement that combines data from two or more tables,
-      and returns a result set containing items from some or all of those tables. It is a way to
-      cross-reference and correlate related data that is organized into multiple tables, typically
-      using identifiers that are repeated in each of the joined tables.
-    </p>
+    <p> A join query is a <codeph>SELECT</codeph> statement that combines data
+      from two or more tables, and returns a result set containing items from
+      some or all of those tables. It is a way to cross-reference and correlate
+      related data that is organized into multiple tables, typically using
+      identifiers that are repeated in each of the joined tables. </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
@@ -119,25 +117,6 @@ SELECT t1.c1, t2.c2 FROM <b>t1 JOIN t2</b>
 
 <codeblock>-- Combine fields from both parent and child rows.
 SELECT lhs.id, rhs.parent, lhs.c1, rhs.c2 FROM tree_data lhs, tree_data rhs WHERE lhs.id = rhs.parent;</codeblock>
-
-    <p>
-      <b>Cartesian joins:</b>
-    </p>
-
-    <p>
-      To avoid producing huge result sets by mistake, Impala does not allow Cartesian joins of the form:
-<codeblock>SELECT ... FROM t1 JOIN t2;
-SELECT ... FROM t1, t2;</codeblock>
-      If you intend to join the tables based on common values, add <codeph>ON</codeph> or <codeph>WHERE</codeph>
-      clauses to compare columns across the tables. If you truly intend to do a Cartesian join, use the
-      <codeph>CROSS JOIN</codeph> keyword as the join operator. The <codeph>CROSS JOIN</codeph> form does not use
-      any <codeph>ON</codeph> clause, because it produces a result set with all combinations of rows from the
-      left-hand and right-hand tables. The result set can still be filtered by subsequent <codeph>WHERE</codeph>
-      clauses. For example:
-    </p>
-
-<codeblock>SELECT ... FROM t1 CROSS JOIN t2;
-SELECT ... FROM t1 CROSS JOIN t2 WHERE <varname>tests_on_non_join_columns</varname>;</codeblock>
 
     <p>
       <b>Inner and outer joins:</b>
