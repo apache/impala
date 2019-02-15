@@ -219,18 +219,21 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
             </li>
           </ul>
         </p><p> When the
-            <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting
-          is enabled, Impala recognizes the Parquet data files written by Hive,
-          and applies the same UTC-to-local-timezone conversion logic during the
-          query as Hive does. </p><p>In <keyword keyref="impala30"/> and lower,
-          this option had severe impact on multi-threaded performance. The new
+            <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph>
+          setting is enabled, Impala recognizes the Parquet data files written
+          by Hive, and applies the same UTC-to-local-timezone conversion logic
+          during the query as Hive does. </p><p>In <keyword keyref="impala30"/>
+          and lower, the
+            <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph>
+          setting had a severe impact on multi-threaded performance. The new
           time zone implementation in <keyword keyref="impala31"/> eliminated
           most of the performance overhead and made Impala scale well to
           multiple threads. Although
-            <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> is
-          turned off by default for this performance reason, where practical
-          turn it on when processing <codeph>TIMESTAMP</codeph> columns in
-          Parquet files written by Hive, to avoid unexpected behavior. </p></li>
+            <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph> is
+          turned off by default for a performance reason, to avoid unexpected
+          behavior, turn on the option when processing
+            <codeph>TIMESTAMP</codeph> columns in Parquet files written by
+          Hive.</p></li>
     </ul>
 
     <p>
