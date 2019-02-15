@@ -88,11 +88,15 @@ class TestBreakpadBase(CustomClusterTestSuite):
   def wait_for_all_processes_dead(self, processes, timeout=300):
     for process in processes:
       try:
-        pid = process.get_pid()
-        if not pid:
-          continue
-        psutil_process = psutil.Process(pid)
-        psutil_process.wait(timeout)
+        # For every process in the list we might see the original Impala process plus a
+        # forked off child that is writing the minidump. We need to catch both.
+        for pid in process.get_pids():
+          print "Checking pid %s" % pid
+          psutil_process = psutil.Process(pid)
+          psutil_process.wait(timeout)
+      except psutil.NoSuchProcess:
+        # Process has exited in the meantime
+        pass
       except psutil.TimeoutExpired:
         raise RuntimeError("Unable to kill %s (pid %d) after %d seconds." %
             (psutil_process.name, psutil_process.pid, timeout))

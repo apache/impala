@@ -287,39 +287,71 @@ class Process(object):
     self.container_id = container_id
     self.port_map = port_map
 
+  def __class_name(self):
+    return self.__class__.__name__
+
+  def __str__(self):
+    return "<%s PID: %s (%s)>" % (self.__class_name(), self.__get_pid(),
+                                  ' '.join(self.cmd))
+
+  def __repr__(self):
+    return str(self)
+
   def get_pid(self):
     """Gets the PID of the process. Returns None if the PID cannot be determined"""
-    LOG.info("Attempting to find PID for %s" % ' '.join(self.cmd))
-    return self.__get_pid()
+    pid = self.__get_pid()
+    if pid:
+      LOG.info("Found PID %s for %s" % (pid, " ".join(self.cmd)))
+    else:
+      LOG.info("No PID found for process cmdline: %s. Process is dead?" %
+               " ".join(self.cmd))
+    return pid
+
+  def get_pids(self):
+    """Gets the PIDs of the process. In some circumstances, a process can run multiple
+    times, e.g. when it forks in the Breakpad crash handler. Returns an empty list if no
+    PIDs can be determined."""
+    pids = self.__get_pids()
+    if pids:
+      LOG.info("Found PIDs %s for %s" % (", ".join(map(str, pids)), " ".join(self.cmd)))
+    else:
+      LOG.info("No PID found for process cmdline: %s. Process is dead?" %
+               " ".join(self.cmd))
+    return pids
 
   def __get_pid(self):
+    pids = self.__get_pids()
+    assert len(pids) < 2, "Expected single pid but found %s" % ", ".join(map(str, pids))
+    return len(pids) == 1 and pids[0] or None
+
+  def __get_pids(self):
     if self.container_id is not None:
       container_info = self._get_container_info(self.container_id)
       if container_info["State"]["Status"] != "running":
-        return None
-      return container_info["State"]["Status"]["Pid"]
+        return []
+      return [container_info["State"]["Status"]["Pid"]]
 
     # In non-containerised case, search for process based on matching command lines.
+    pids = []
     for pid in psutil.get_pid_list():
       try:
         process = psutil.Process(pid)
         if set(self.cmd) == set(process.cmdline):
-          return pid
-      except psutil.NoSuchProcess, e:
-        # A process from get_pid_list() no longer exists, continue.
-        LOG.info(e)
-    LOG.info("No PID found for process cmdline: %s. Process is dead?" % self.cmd)
-    return None
+          pids.append(pid)
+      except psutil.NoSuchProcess:
+        # A process from get_pid_list() no longer exists, continue. We don't log this
+        # error since it can refer to arbitrary processes outside of our testing code.
+        pass
+    return pids
 
   def kill(self, signal=SIGKILL):
     """
     Kills the given processes.
     """
     if self.container_id is None:
-      pid = self.get_pid()
-      if pid is None:
-        assert 0, "No processes %s found" % self.cmd
-      LOG.info('Killing: %s (PID: %d) with signal %s' % (' '.join(self.cmd), pid, signal))
+      pid = self.__get_pid()
+      assert pid is not None, "No processes for %s" % self
+      LOG.info('Killing %s with signal %s' % (self, signal))
       exec_process("kill -%d %d" % (signal, pid))
     else:
       LOG.info("Stopping container: {0}".format(self.container_id))
@@ -348,9 +380,6 @@ class Process(object):
         ' '.join(self.cmd), self.get_pid()))
     while self.__get_pid() is not None:
       sleep(0.01)
-
-  def __str__(self):
-    return "Command: %s PID: %s" % (self.cmd, self.get_pid())
 
 
 # Base class for all Impala processes
