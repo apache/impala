@@ -21,7 +21,13 @@ under the License.
 <concept id="disable_codegen">
 
   <title>DISABLE_CODEGEN Query Option</title>
-  <titlealts audience="PDF"><navtitle>DISABLE_CODEGEN</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DISABLE_CODEGEN</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -34,23 +40,43 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">DISABLE_CODEGEN query option</indexterm>
-      This is a debug option, intended for diagnosing and working around issues that cause crashes. If a query
-      fails with an <q>illegal instruction</q> or other hardware-specific message, try setting
-      <codeph>DISABLE_CODEGEN=true</codeph> and running the query again. If the query succeeds only when the
-      <codeph>DISABLE_CODEGEN</codeph> option is turned on, submit the problem to <keyword keyref="support_org"/> and include that
-      detail in the problem report. Do not otherwise run with this setting turned on, because it results in lower
-      overall performance.
+      The <codeph>DISABLE_CODEGEN</codeph> is a debug option, and it's used to work around any
+      issues with Impala's runtime code generation. If a query fails with an <q>illegal
+      instruction</q> or other hardware-specific message, try setting
+      <codeph>DISABLE_CODEGEN=true</codeph> and running the query again. If the query succeeds
+      only when the <codeph>DISABLE_CODEGEN</codeph> option is turned on, submit the problem to
+      <keyword keyref="support_org"> </keyword> and include that detail in the problem report.
     </p>
 
     <p>
-      Because the code generation phase adds a small amount of overhead for each query, you might turn on the
-      <codeph>DISABLE_CODEGEN</codeph> option to achieve maximum throughput when running many short-lived queries
-      against small tables.
+      Most queries will run significantly slower with <codeph>DISABLE_CODEGEN=true</codeph>.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p>
+      In Impala 2.10 and higher, the <codeph>DISABLE_CODEGEN_ROWS_THRESHOLD</codeph>
+      optimisation automatically disables codegen for small queries because short-running
+      queries may run faster without the overhead of codegen.
+    </p>
+
+    <p>
+      The following values are supported:
+      <ul>
+        <li>
+          <codeph>TRUE</codeph> or <codeph>1</codeph>: Disables codegen.
+        </li>
+
+        <li>
+          <codeph>FALSE</codeph> or <codeph>0</codeph>: Enables codegen.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Type:</b> Boolean
+    </p>
+
     <p conref="../shared/impala_common.xml#common/default_false_0"/>
 
   </conbody>
+
 </concept>
