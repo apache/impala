@@ -595,7 +595,7 @@ class StressRunner(object):
       if self.leak_check_interval_mins:
         self._next_leak_check_unix_time.value = int(
             time() + 60 * self.leak_check_interval_mins)
-      query_sumbission_is_locked = False
+      query_submission_is_locked = False
 
       # Query submission will be unlocked after a memory report has been collected twice
       # while no queries were running.
@@ -603,17 +603,17 @@ class StressRunner(object):
       try:
         while self._num_queries_submitted.value < self._num_queries_to_run:
           if ready_to_unlock:
-            assert query_sumbission_is_locked, "Query submission not yet locked"
+            assert query_submission_is_locked, "Query submission not yet locked"
             assert not self._num_queries_active, "Queries are still running"
             LOG.debug("Resuming query submission")
             self._next_leak_check_unix_time.value = int(
                 time() + 60 * self.leak_check_interval_mins)
             self._submit_query_lock.release()
-            query_sumbission_is_locked = False
+            query_submission_is_locked = False
             ready_to_unlock = None
 
           if (
-              not query_sumbission_is_locked and
+              not query_submission_is_locked and
               self.leak_check_interval_mins and
               time() > self._next_leak_check_unix_time.value
           ):
@@ -621,7 +621,7 @@ class StressRunner(object):
                 "Each running query should belong to a runner"
             LOG.debug("Stopping query submission")
             self._submit_query_lock.acquire()
-            query_sumbission_is_locked = True
+            query_submission_is_locked = True
 
           max_reported, max_actual = self._get_mem_usage_values()
           if max_reported != -1 and max_actual != -1:
@@ -642,14 +642,14 @@ class StressRunner(object):
             max_actual = -1
           self._set_mem_usage_values(max_reported, max_actual)
 
-          if query_sumbission_is_locked and not self._num_queries_active:
+          if query_submission_is_locked and not self._num_queries_active:
             if ready_to_unlock is None:
               ready_to_unlock = False
             else:
               ready_to_unlock = True
       except Exception:
         LOG.debug("Error collecting impalad mem usage", exc_info=True)
-        if query_sumbission_is_locked:
+        if query_submission_is_locked:
           LOG.debug("Resuming query submission")
           self._submit_query_lock.release()
     self._mem_polling_thread = create_and_start_daemon_thread(
