@@ -301,6 +301,7 @@ class RleTest : public ::testing::Test {
       return uni_dist(random_eng) == 0;
     };
     auto NextVal = [bit_width](int val) {
+      if (bit_width == CHAR_BIT * sizeof(int)) return val + 1;
       return (val + 1) % (1 << bit_width);
     };
 
