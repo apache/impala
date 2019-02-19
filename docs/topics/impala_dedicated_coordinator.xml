@@ -589,7 +589,7 @@ under the License.
 
         <li >
           <p>
-            <b>(Dedicated) Executors: </b>They should be collocated with DataNodes as usual. The
+            <b>(Dedicated) Executors: </b>They should be colocated with DataNodes as usual. The
             number of hosts with this setting typically increases as the cluster grows larger
             and handles more table partitions, data files, and concurrent queries.
           </p>
