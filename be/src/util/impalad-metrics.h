@@ -64,12 +64,6 @@ class ImpaladMetricKeys {
   /// Number of scan ranges with missing volume id metadata
   static const char* NUM_SCAN_RANGES_MISSING_VOLUME_ID;
 
-  /// Number of bytes currently in use across all mem pools
-  static const char* MEM_POOL_TOTAL_BYTES;
-
-  /// Number of bytes currently in use across all hash tables
-  static const char* HASH_TABLE_TOTAL_BYTES;
-
   /// Number of files currently opened by the io mgr
   static const char* IO_MGR_NUM_OPEN_FILES;
 
@@ -210,7 +204,6 @@ class ImpaladMetricKeys {
 class ImpaladMetrics {
  public:
   // Counters
-  static IntGauge* HASH_TABLE_TOTAL_BYTES;
   static IntCounter* BACKEND_NUM_QUERIES_EXECUTED;
   /// BACKEND_NUM_QUERIES_EXECUTING is used to determine when the backend has quiesced
   /// and can be safely shut down without causing query failures. See IMPALA-7931 for
@@ -261,7 +254,6 @@ class ImpaladMetrics {
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT;
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
   static IntGauge* IO_MGR_TOTAL_BYTES;
-  static IntGauge* MEM_POOL_TOTAL_BYTES;
   static IntGauge* NUM_FILES_OPEN_FOR_INSERT;
   static IntGauge* NUM_QUERIES_REGISTERED;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;

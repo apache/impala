@@ -24,9 +24,7 @@ METRIC_LIST = [
                # "impala-server.backends.client-cache.clients-in-use", disabled as a
                # work-around due to IMPALA-3327.
                #"impala-server.backends.client-cache.clients-in-use",
-               "impala-server.hash-table.total-bytes",
                "impala-server.io-mgr.num-open-files",
-               "impala-server.mem-pool.total-bytes",
                "impala-server.num-files-open-for-insert",
                "impala-server.scan-ranges.num-missing-volume-id",
                # Buffer pool pages belong to specific queries. Therefore there should be

@@ -360,16 +360,6 @@
     "key": "impala-server.backends.client-cache.total-clients"
   },
   {
-    "description": "The current size of all allocated hash tables.",
-    "contexts": [
-      "IMPALAD"
-    ],
-    "label": "Hash Tables Size",
-    "units": "BYTES",
-    "kind": "GAUGE",
-    "key": "impala-server.hash-table.total-bytes"
-  },
-  {
     "description": "The total number of bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"
@@ -458,16 +448,6 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "impala-server.io-mgr.total-bytes"
-  },
-  {
-    "description": "The current size of the memory pool shared by all queries",
-    "contexts": [
-      "IMPALAD"
-    ],
-    "label": "Memory Pool Size",
-    "units": "BYTES",
-    "kind": "GAUGE",
-    "key": "impala-server.mem-pool.total-bytes"
   },
   {
     "description": "The number of HDFS files currently open for writing.",

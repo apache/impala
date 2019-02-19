@@ -67,7 +67,6 @@ void HdfsOrcScanner::OrcMemPool::FreeAll() {
   }
   mem_tracker_->Release(total_bytes_released);
   chunk_sizes_.clear();
-  ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-total_bytes_released);
 }
 
 // orc-reader will not check the malloc result. We throw an exception if we can't
@@ -83,7 +82,6 @@ char* HdfsOrcScanner::OrcMemPool::malloc(uint64_t size) {
     throw ResourceError(Status(TErrorCode::MEM_ALLOC_FAILED, size));
   }
   chunk_sizes_[addr] = size;
-  ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(size);
   return addr;
 }
 
@@ -93,7 +91,6 @@ void HdfsOrcScanner::OrcMemPool::free(char* p) {
   std::free(p);
   int64_t size = chunk_sizes_[p];
   mem_tracker_->Release(size);
-  ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-size);
   chunk_sizes_.erase(p);
 }
 

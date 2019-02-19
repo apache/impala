@@ -425,9 +425,6 @@ void HashTable::Close() {
   if ((num_buckets_ > LARGE_HT) || (num_probes_ > HEAVILY_USED)) VLOG(2) << PrintStats();
   for (auto& data_page : data_pages_) allocator_->Free(move(data_page));
   data_pages_.clear();
-  if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-total_data_page_size_);
-  }
   if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
 }
 
@@ -505,7 +502,6 @@ bool HashTable::GrowNodeArray(Status* status) {
   if (!status->ok() || allocation == nullptr) return false;
   next_node_ = reinterpret_cast<DuplicateNode*>(allocation->data());
   data_pages_.push_back(move(allocation));
-  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(DATA_PAGE_SIZE);
   node_remaining_current_page_ = DATA_PAGE_SIZE / sizeof(DuplicateNode);
   total_data_page_size_ += DATA_PAGE_SIZE;
   return true;

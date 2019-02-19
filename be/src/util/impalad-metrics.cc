@@ -46,10 +46,6 @@ const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED =
     "impala-server.scan-ranges.total";
 const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID =
     "impala-server.scan-ranges.num-missing-volume-id";
-const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES =
-    "impala-server.mem-pool.total-bytes";
-const char* ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES =
-    "impala-server.hash-table.total-bytes";
 const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
 const char* ImpaladMetricKeys::IO_MGR_BYTES_READ =
@@ -131,7 +127,6 @@ const char* ImpaladMetricKeys::HEDGED_READ_OPS_WIN =
 // These are created by impala-server during startup.
 // =======
 // Counters
-IntGauge* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
 IntCounter* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTED = NULL;
 IntGauge* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING = NULL;
 IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
@@ -174,7 +169,6 @@ IntGauge* ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_TOTAL_BYTES = NULL;
-IntGauge* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
 IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
@@ -279,12 +273,6 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0);
   NUM_RANGES_MISSING_VOLUME_ID = m->AddCounter(
       ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0);
-
-  // Initialize memory usage metrics
-  MEM_POOL_TOTAL_BYTES = m->AddGauge(
-      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0);
-  HASH_TABLE_TOTAL_BYTES = m->AddGauge(
-      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0);
 
   // Initialize insert metrics
   NUM_FILES_OPEN_FOR_INSERT = m->AddGauge(
