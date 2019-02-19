@@ -2685,6 +2685,34 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE foo (PRIMARY KEY(a), a INT) STORED AS KUDU");
     ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
 
+    // Primary key and foreign key specification.
+    ParsesOk("create table foo(id int, year int, primary key (id))");
+    ParsesOk("create table foo(id int, year int, primary key (id, year))");
+    ParsesOk("create table foo(id int, year int, primary key (id, year) disable "
+        + "novalidate rely)");
+    ParsesOk("create table foo(id int, year int, primary key (id, year) "
+        + "novalidate rely)");
+    ParsesOk("create table foo(id int, year int, primary key (id, year) "
+        + "rely)");
+    ParserError("create table foo(id int, year string, primary key(id), primary key"
+        + "(year))");
+    ParsesOk("create table fk(id int, year int, primary key (id, year) disable "
+        + "novalidate rely, foreign key(id) REFERENCES pk(id) DISABLE NOVALIDATE RELY)");
+    ParsesOk("create table foo(id int, year int, foreign key (id) references "
+        + "pk(id))");
+    ParsesOk("create table fk(id int, year string, foreign key(year) references pk"
+        + "(year), primary key(id))");
+    ParsesOk("create table foo(id int, year int, primary key (id, year) enable "
+        + "novalidate rely)");
+    // Different order of constraints is not supported.
+    ParserError("create table foo(id int, year int, primary key (id, year) novalidate "
+        + "disable rely)");
+    ParserError("create table fk(id int, year int, foreign key(id) REFERENCES pk(id) "
+        + "NOVALIDATE DISABLE RELY)");
+    // Multiple foreign keys
+    ParsesOk("create table fk(id int, year string, primary key(id), foreign key(id) "
+        + "references pk(id), foreign key (year) references pk(year))");
+
     // Table Properties
     String[] tblPropTypes = {"TBLPROPERTIES", "WITH SERDEPROPERTIES"};
     for (String propType: tblPropTypes) {

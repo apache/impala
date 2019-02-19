@@ -81,7 +81,7 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   private void testToSql(AnalysisContext ctx, String query) {
-    testToSql(ctx, query, query);
+    testToSql(ctx, query, query, false);
   }
 
   private void testToSql(String query, String expected) {
@@ -93,8 +93,9 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql(createAnalysisCtx(defaultDb), query, defaultDb, expected, false, options);
   }
 
-  private void testToSql(AnalysisContext ctx, String query, String expected) {
-    testToSql(ctx, query, System.getProperty("user.name"), expected);
+  private void testToSql(AnalysisContext ctx, String query, String expected,
+      boolean ignoreWhiteSpace) {
+    testToSql(ctx, query, System.getProperty("user.name"), expected, ignoreWhiteSpace);
   }
 
   private void testToSql(String query, String defaultDb, String expected) {
@@ -102,8 +103,8 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   private void testToSql(AnalysisContext ctx, String query, String defaultDb,
-      String expected) {
-    testToSql(ctx, query, defaultDb, expected, false, ToSqlOptions.DEFAULT);
+      String expected, boolean ignoreWhiteSpace) {
+    testToSql(ctx, query, defaultDb, expected, ignoreWhiteSpace, ToSqlOptions.DEFAULT);
   }
 
   private void testToSql(String query, String defaultDb, String expected,
@@ -365,6 +366,24 @@ public class ToSqlTest extends FrontendTestBase {
         "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
         kuduMasters),
         true);
+
+    // Test primary key and foreign key toSqls.
+    // TODO: Add support for displaying constraint information (DISABLE, NOVALIDATE, RELY)
+    testToSql("create table pk(id int, year string, primary key (id, year))", "default",
+        "CREATE TABLE default.pk ( id INT, year STRING, PRIMARY KEY (id, year) ) "
+            + "STORED AS TEXTFILE", true);
+
+    // Foreign Key test requires a valid primary key table.
+    addTestDb("test_pk_fk", "Test DB for PK/FK tests");
+    addTestTable("create table test_pk_fk.pk (id int, year string, primary key (id, "
+        + "year))");
+    AnalysisContext ctx = createAnalysisCtx("test_pk_fk");
+
+    testToSql(ctx, "create table fk(id int, year string, FOREIGN KEY (id) "
+        + "REFERENCES pk(id), FOREIGN KEY (year) REFERENCES pk"
+        + "(year))", "CREATE TABLE test_pk_fk.fk ( id INT, year STRING, "
+        + "FOREIGN KEY(id) REFERENCES test_pk_fk.pk(id), FOREIGN KEY(year) REFERENCES "
+        + "test_pk_fk.pk(year) ) STORED AS TEXTFILE", true);
   }
 
   @Test
@@ -1600,7 +1619,7 @@ public class ToSqlTest extends FrontendTestBase {
           testToSql(ctx, String.format("GRANT %s ON SERVER server1 TO %s %s", p,
               pt, testRole));
           testToSql(ctx, String.format("GRANT %s ON SERVER TO %s", p, testRole),
-              String.format("GRANT %s ON SERVER server1 TO ROLE %s", p, testRole));
+              String.format("GRANT %s ON SERVER server1 TO ROLE %s", p, testRole), false);
           testToSql(ctx, String.format(
               "GRANT %s ON SERVER server1 TO %s %s WITH GRANT OPTION", p, pt,
               testRole));
@@ -1609,7 +1628,7 @@ public class ToSqlTest extends FrontendTestBase {
           testToSql(ctx, String.format("REVOKE %s ON SERVER FROM %s %s", p, pt,
               testRole),
               String.format("REVOKE %s ON SERVER server1 FROM %s %s", p, pt,
-                  testRole));
+                  testRole), false);
           testToSql(ctx, String.format(
               "REVOKE GRANT OPTION FOR %s ON SERVER server1 FROM %s %s", p, pt,
               testRole));

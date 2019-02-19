@@ -280,28 +280,30 @@ terminal
   KW_ARRAY, KW_AS, KW_ASC, KW_AUTHORIZATION, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY,
   KW_BLOCKSIZE, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
   KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPRESSION,
-  KW_COMPUTE, KW_COPY, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE,
-  KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE, KW_DELIMITED,
-  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_ENCODING,
-  KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL, KW_FALSE,
-  KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FOLLOWING,
-  KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT,
-  KW_GROUP, KW_HASH, KW_IGNORE, KW_HAVING, KW_IF, KW_ILIKE, KW_IN, KW_INCREMENTAL,
-  KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
-  KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS, KW_JOIN, KW_KUDU, KW_LAST, KW_LEFT,
-  KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN,
-  KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORC, KW_ORDER,
-  KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION,
-  KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED,
-  KW_PURGE, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH, KW_REGEXP, KW_RENAME,
-  KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS, KW_REVOKE, KW_RIGHT,
-  KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI,
-  KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT,
-  KW_SORT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE,
-  KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
-  KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED,
-  KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING,
-  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
+  KW_COMPUTE, KW_CONSTRAINT, KW_COPY, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
+  KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE,
+  KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISABLE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
+  KW_DROP, KW_ELSE, KW_ENABLE, KW_ENCODING, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
+  KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
+  KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FOREIGN, KW_FORMAT, KW_FORMATTED,
+  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH, KW_IGNORE,
+  KW_HAVING, KW_IF, KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH,
+  KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP,
+  KW_IS, KW_JOIN,  KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
+  KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NORELY, KW_NOT,
+  KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORC, KW_ORDER, KW_OUTER,
+  KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
+  KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
+  KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
+  KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
+  KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA,
+  KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
+  KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
+  KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
+  KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
+  KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE,
+  KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VIEW,
+  KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
 
@@ -457,6 +459,7 @@ nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal TableDef tbl_def_without_col_defs, tbl_def_with_col_defs;
 nonterminal TableDataLayout opt_tbl_data_layout, partitioned_data_layout;
 nonterminal TableDef.Options tbl_options;
+nonterminal List<TableDef.ForeignKey> foreign_keys_list;
 nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
@@ -512,6 +515,8 @@ nonterminal Expr default_val;
 nonterminal LiteralExpr block_size_val;
 nonterminal Pair<Option, Object> column_option;
 nonterminal Map<Option, Object> column_options_map;
+// Used for integrity constraints(DISABLE, NOVALIDATE, RELY)
+nonterminal Boolean enable_spec, validate_spec, rely_spec;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
@@ -1428,18 +1433,112 @@ tbl_def_with_col_defs ::=
     tbl_def.getColumnDefs().addAll(list);
     RESULT = tbl_def;
   :}
+    // Adding Primary Keys and Foreign Keys constraints
+    // PRIMARY KEY(..) DISABLE NOVALIDATE RELY
   | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
     primary_keys:primary_keys RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
+    TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
+        primary_keys, null, true, false, false);
+    tbl_def.setPrimaryKey(pk);
     RESULT = tbl_def;
+  :}
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
+      primary_keys:primary_keys enable_spec:enable_spec validate_spec:validate_spec
+      rely_spec:rely_spec RPAREN
+  {:
+    tbl_def.getColumnDefs().addAll(list);
+    TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
+        primary_keys, null, rely_spec, validate_spec, enable_spec);
+    tbl_def.setPrimaryKey(pk);
+    RESULT = tbl_def;
+  :}
+  // PRIMARY KEY(..) DISABLE NOVALIDATE RELY FOREIGN KEY (...) REFERENCES parent_table(..)
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
+    primary_keys:primary_keys enable_spec:enable_spec validate_spec:validate_spec
+    rely_spec:rely_spec COMMA foreign_keys_list:foreign_keys_list RPAREN
+  {:
+    tbl_def.getColumnDefs().addAll(list);
+    TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
+      primary_keys, null, rely_spec, validate_spec, enable_spec);
+    tbl_def.setPrimaryKey(pk);
+    tbl_def.getForeignKeysList().addAll(foreign_keys_list);
+    RESULT = tbl_def;
+  :}
+  // FOREIGN KEYS followed by PRIMARY KEYS
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
+    foreign_keys_list:foreign_keys_list COMMA primary_keys:primary_keys
+    enable_spec:enable_spec validate_spec:validate_spec rely_spec:rely_spec RPAREN
+  {:
+    tbl_def.getColumnDefs().addAll(list);
+    TableDef.PrimaryKey pk = new TableDef.PrimaryKey(tbl_def.getTblName(),
+        primary_keys, null, rely_spec, validate_spec, enable_spec);
+    tbl_def.setPrimaryKey(pk);
+    tbl_def.getForeignKeysList().addAll(foreign_keys_list);
+    RESULT = tbl_def;
+  :}
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
+    foreign_keys_list:foreign_keys_list RPAREN
+  {:
+      tbl_def.getColumnDefs().addAll(list);
+      tbl_def.getForeignKeysList().addAll(foreign_keys_list);
+      RESULT = tbl_def;
+  :}
+  ;
+
+foreign_keys_list ::=
+  KW_FOREIGN key_ident LPAREN ident_list:fk_col_names RPAREN KW_REFERENCES
+      table_name:parent_tbl_name LPAREN ident_list:pk_col_names RPAREN
+      enable_spec:fk_enable_spec validate_spec:fk_validate_spec rely_spec:fk_rely_spec
+  {:
+    List<TableDef.ForeignKey> fk_list = new ArrayList<TableDef.ForeignKey>();
+    fk_list.add(new TableDef.ForeignKey(parent_tbl_name, pk_col_names, fk_col_names, null,
+        fk_rely_spec, fk_validate_spec, fk_enable_spec));
+    RESULT = fk_list;
+  :}
+  | foreign_keys_list:fk_list COMMA KW_FOREIGN key_ident LPAREN ident_list:fk_col_names
+      RPAREN KW_REFERENCES table_name:parent_tbl_name LPAREN ident_list:pk_col_names
+      RPAREN enable_spec:fk_enable_spec validate_spec:fk_validate_spec
+      rely_spec:fk_rely_spec
+  {:
+    fk_list.add(new TableDef.ForeignKey(parent_tbl_name, pk_col_names, fk_col_names, null,
+        fk_rely_spec, fk_validate_spec, fk_enable_spec));
+    RESULT = fk_list;
   :}
   ;
 
 primary_keys ::=
   KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN
   {: RESULT = col_names; :}
+  ;
+
+rely_spec ::=
+  KW_RELY
+  {: RESULT = true; :}
+  | KW_NORELY
+  {: RESULT = false; :}
+  | // Empty
+  {: RESULT = false; :}
+  ;
+
+validate_spec ::=
+  KW_VALIDATE
+  {: RESULT = true; :}
+  | KW_NOVALIDATE
+  {: RESULT = false; :}
+  | //Empty
+  {: RESULT = false; :}
+  ;
+
+enable_spec ::=
+  KW_ENABLE
+  {: RESULT = true; :}
+  | KW_DISABLE
+  {: RESULT = false; :}
+  |  //Empty
+  {: RESULT = false; :}
   ;
 
 tbl_options ::=
@@ -3581,6 +3680,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_COMPUTE:r
   {: RESULT = r.toString(); :}
+  | KW_CONSTRAINT:r
+  {: RESULT = r.toString(); :}
   | KW_COPY:r
   {: RESULT = r.toString(); :}
   | KW_CREATE:r
@@ -3611,6 +3712,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_DESCRIBE:r
   {: RESULT = r.toString(); :}
+  | KW_DISABLE:r
+  {: RESULT = r.toString(); :}
   | KW_DISTINCT:r
   {: RESULT = r.toString(); :}
   | KW_DIV:r
@@ -3620,6 +3723,8 @@ word ::=
   | KW_DROP:r
   {: RESULT = r.toString(); :}
   | KW_ELSE:r
+  {: RESULT = r.toString(); :}
+  | KW_ENABLE:r
   {: RESULT = r.toString(); :}
   | KW_ENCODING:r
   {: RESULT = r.toString(); :}
@@ -3652,6 +3757,8 @@ word ::=
   | KW_FOLLOWING:r
   {: RESULT = r.toString(); :}
   | KW_FOR:r
+  {: RESULT = r.toString(); :}
+  | KW_FOREIGN:r
   {: RESULT = r.toString(); :}
   | KW_FORMAT:r
   {: RESULT = r.toString(); :}
@@ -3731,7 +3838,11 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_METADATA:r
   {: RESULT = r.toString(); :}
+  | KW_NORELY:r
+  {: RESULT = r.toString(); :}
   | KW_NOT:r
+  {: RESULT = r.toString(); :}
+  | KW_NOVALIDATE:r
   {: RESULT = r.toString(); :}
   | KW_NULL:r
   {: RESULT = r.toString(); :}
@@ -3779,9 +3890,13 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_RECOVER:r
   {: RESULT = r.toString(); :}
+  | KW_REFERENCES:r
+  {: RESULT = r.toString(); :}
   | KW_REFRESH:r
   {: RESULT = r.toString(); :}
   | KW_REGEXP:r
+  {: RESULT = r.toString(); :}
+  | KW_RELY:r
   {: RESULT = r.toString(); :}
   | KW_RENAME:r
   {: RESULT = r.toString(); :}
@@ -3884,6 +3999,8 @@ word ::=
   | KW_USE:r
   {: RESULT = r.toString(); :}
   | KW_USING:r
+  {: RESULT = r.toString(); :}
+  | KW_VALIDATE:r
   {: RESULT = r.toString(); :}
   | KW_VALUES:r
   {: RESULT = r.toString(); :}

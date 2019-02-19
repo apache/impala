@@ -31,6 +31,8 @@ import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -127,6 +129,15 @@ public class MetastoreShim {
     client.alter_partitions(dbName, tableName, partitions, null);
   }
 
+  /**
+   * Wrapper around IMetaStoreClient.createTableWithConstraints() to deal with added
+   * arguments.
+   */
+  public static void createTableWithConstraints(IMetaStoreClient client,
+      Table newTbl, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+      throws InvalidOperationException, MetaException, TException {
+    client.createTableWithConstraints(newTbl, primaryKeys, foreignKeys);
+  }
 
  /**
   * Hive-3 only function

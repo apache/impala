@@ -45,6 +45,8 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -218,6 +220,18 @@ public class MetastoreShim {
       String tableName, List<Partition> partitions)
       throws InvalidOperationException, MetaException, TException {
     client.alter_partitions(dbName, tableName, partitions, null);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.createTableWithConstraints() to deal with added
+   * arguments. Hive four new arguments are uniqueConstraints, notNullConstraints,
+   * defaultConstraints, and checkConstraints.
+   */
+  public static void createTableWithConstraints(IMetaStoreClient client,
+      Table newTbl, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+      throws InvalidOperationException, MetaException, TException {
+    client.createTableWithConstraints(newTbl,primaryKeys, foreignKeys, null, null,
+        null, null);
   }
 
   /**

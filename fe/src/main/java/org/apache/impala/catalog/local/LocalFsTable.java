@@ -31,6 +31,8 @@ import org.apache.avro.Schema;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
@@ -520,5 +522,15 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public ListMap<TNetworkAddress> getHostIndex() {
     return hostIndex_;
+  }
+
+  @Override
+  public List<SQLPrimaryKey> getPrimaryKeys() {
+    return null;
+  }
+
+  @Override
+  public List<SQLForeignKey> getForeignKeys() {
+    return null;
   }
 }

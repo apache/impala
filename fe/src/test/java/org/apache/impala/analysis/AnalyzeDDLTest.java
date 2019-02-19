@@ -2350,6 +2350,49 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table functional.new_table (c char(250))");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (c char(3))");
 
+     // Primary key and foreign key specification.
+    AnalyzesOk("create table foo(id int, year int, primary key (id))");
+    AnalyzesOk("create table foo(id int, year int, primary key (id, year))");
+    AnalyzesOk("create table foo(id int, year int, primary key (id, year) disable "
+        + "novalidate rely)");
+    AnalysisError("create table foo(id int, year int, primary key (id, year) enable"
+        + " novalidate rely)", "ENABLE feature is not supported yet.");
+    AnalysisError("create table foo(id int, year int, primary key (id, year) disable"
+        + " validate rely)", "VALIDATE feature is not supported yet.");
+    AnalysisError("create table pk(id int, primary key(year))", "PRIMARY KEY column "
+        + "'year' does not exist in the table");
+
+    // Foreign key test needs a valid primary key table to pass.
+    addTestDb("test_pk_fk", "Test DB for PK/FK tests");
+    addTestTable("create table test_pk_fk.pk (id int, year string, primary key (id, "
+        + "year) disable novalidate rely)");
+    addTestTable("create table test_pk_fk.non_pk_table(id int)");
+    AnalysisContext ctx = createAnalysisCtx("test_pk_fk");
+    AnalysisError("create table foo(id int, year int, foreign key (id) references "
+        + "pk(id) enable novalidate rely)", ctx,"ENABLE feature is "
+        + "not supported yet.");
+    AnalysisError("create table foo(id int, year int, foreign key (id) references "
+        + "pk(id) disable validate rely)", ctx,"VALIDATE feature is "
+        + "not supported yet.");
+    AnalyzesOk("create table fk(id int, year int, primary key (id, year) disable "
+        + "novalidate rely, foreign key(id) REFERENCES pk(id) "
+        + "DISABLE NOVALIDATE RELY)", ctx);
+    AnalyzesOk("create table foo(id int, year int, foreign key (id) references "
+        + "pk(id) disable novalidate rely)", ctx);
+    AnalyzesOk("create table foo(id int, year int, foreign key (id) references "
+        + "pk(id))", ctx);
+    AnalysisError("create table fk(id int, year string, foreign key(year) references "
+        + "pk2(year))", ctx, "Parent table not found: test_pk_fk.pk2");
+    AnalyzesOk("create table fk(id int, year string, foreign key(id, year) references"
+        + " pk(id, year))", ctx);
+    AnalysisError("create table fk(id int, year string, foreign key(id, year) "
+        + "references pk(year))", ctx, "The number of foreign key columns should be same"
+        + " as the number of parent key columns.");
+    AnalysisError("create table fk(id int, foreign key(id) references pk(foo))", ctx,
+        "Parent column not found: foo");
+    AnalysisError("create table fk(id int, foreign key(id) references "
+        + "non_pk_table(id))", ctx, "Parent column id is not part of primary key.");
+
     {
       // Check that long_properties fail at the analysis layer
       String long_property_key = "";
@@ -2414,8 +2457,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       AnalysisError(String.format("create table t (i int primary key) stored as %s",
           format), String.format("Unsupported column options for file format " +
               "'%s': 'i INT PRIMARY KEY'", fileFormatsStr[formatIndx]));
-      AnalysisError(String.format("create table t (i int, primary key(i)) stored as %s",
-          format), "Only Kudu tables can specify a PRIMARY KEY");
       formatIndx++;
     }
 

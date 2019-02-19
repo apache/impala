@@ -44,7 +44,11 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.Expr;
@@ -228,6 +232,10 @@ public class HdfsTable extends Table implements FeFsTable {
   // Flag to check if the table schema has been loaded. Used as a precondition
   // for setAvroSchema().
   private boolean isSchemaLoaded_ = false;
+
+  // Primary Key and Foreign Key information. Set in load() method.
+  private final List<SQLPrimaryKey> primaryKeys_ = new ArrayList<>();
+  private final List<SQLForeignKey> foreignKeys_ = new ArrayList<>();
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -963,13 +971,13 @@ public class HdfsTable extends Table implements FeFsTable {
       try {
         if (loadTableSchema) {
             // set nullPartitionKeyValue from the hive conf.
-            nullPartitionKeyValue_ =
-                MetaStoreUtil.getNullPartitionKeyValue(client).intern();
-            loadSchema(msTbl);
-            loadAllColumnStats(client);
+          nullPartitionKeyValue_ =
+            MetaStoreUtil.getNullPartitionKeyValue(client).intern();
+          loadSchema(msTbl);
+          loadAllColumnStats(client);
+          loadPkFkInfo(client, msTbl);
         }
         loadValidWriteIdList(client);
-
         // Load partition and file metadata
         if (reuseMetadata) {
           // Incrementally update this table's partitions and file metadata
@@ -1012,6 +1020,26 @@ public class HdfsTable extends Table implements FeFsTable {
             "warning threshold. Time: " + load_time_duration + " ns");
       }
       updateTableLoadingTime();
+    }
+  }
+
+  /**
+   * Load Primary Key and Foreign Key information for table. Throws TableLoadingException
+   * if the load fails.
+   */
+  private void loadPkFkInfo(IMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException{
+    try {
+      // Reset and add primary keys info and foreign keys info.
+      primaryKeys_.clear();
+      foreignKeys_.clear();
+      primaryKeys_.addAll(client.getPrimaryKeys(
+          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())));
+      foreignKeys_.addAll(client.getForeignKeys(new ForeignKeysRequest(null, null,
+          msTbl.getDbName(), msTbl.getTableName())));
+    } catch (Exception e) {
+      throw new TableLoadingException("Failed to load primary keys/foreign keys for "
+          + "table: " + getFullName(), e);
     }
   }
 
@@ -1400,6 +1428,10 @@ public class HdfsTable extends Table implements FeFsTable {
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
     hostIndex_.populate(hdfsTable.getNetwork_addresses());
+    primaryKeys_.clear();
+    primaryKeys_.addAll(hdfsTable.getPrimary_keys());
+    foreignKeys_.clear();
+    foreignKeys_.addAll(hdfsTable.getForeign_keys());
     resetPartitions();
     try {
       for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
@@ -1560,6 +1592,8 @@ public class HdfsTable extends Table implements FeFsTable {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
+    hdfsTable.setPrimary_keys(primaryKeys_);
+    hdfsTable.setForeign_keys(foreignKeys_);
     if (type == ThriftObjectType.FULL) {
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
@@ -1585,6 +1619,61 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override // FeFsTable
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
+
+  @Override
+  public List<SQLPrimaryKey> getPrimaryKeys() { return primaryKeys_; }
+
+  @Override
+  public List<SQLForeignKey> getForeignKeys() { return foreignKeys_; }
+
+  /**
+   * Get primary keys column names, useful for toSqlUtils.
+   */
+  public List<String> getPrimaryKeysSql() {
+    List<String> primaryKeyColNames = new ArrayList<>();
+    if (getPrimaryKeys() != null && !getPrimaryKeys().isEmpty()) {
+      getPrimaryKeys().stream().forEach(p -> primaryKeyColNames.add(p.getColumn_name()));
+    }
+    return primaryKeyColNames;
+  }
+
+  /**
+   * Get foreign keys information as strings. Useful for toSqlUtils.
+   * @return List of strings of the form "(col1, col2,..) REFERENCES [pk_db].pk_table
+   * (colA, colB,..)".
+   */
+  public List<String> getForeignKeysSql() {
+    List<String> foreignKeysSql = new ArrayList<>();
+    // Iterate through foreign keys list. This list may contain multiple foreign keys
+    // and each foreign key may contain multiple columns. The outerloop collects
+    // information common to a foreign key (pk table information). The inner
+    // loop collects column information.
+    List<SQLForeignKey> foreignKeys = getForeignKeys();
+    for (int i = 0; i < foreignKeys.size(); i++) {
+      String pkTableDb = foreignKeys.get(i).getPktable_db();
+      String pkTableName = foreignKeys.get(i).getPktable_name();
+      List<String> pkList = new ArrayList<>();
+      List<String> fkList = new ArrayList<>();
+      StringBuilder sb = new StringBuilder();
+      sb.append("(");
+      for (; i<foreignKeys.size(); i++) {
+        fkList.add(foreignKeys.get(i).getFkcolumn_name());
+        pkList.add(foreignKeys.get(i).getPkcolumn_name());
+        // Bail out of inner loop if the key_seq of the next ForeignKey is 1.
+        if (i + 1 < foreignKeys.size() && foreignKeys.get(i + 1).getKey_seq() == 1) {
+          break;
+        }
+      }
+      Joiner.on(", ").appendTo(sb, fkList).append(") ");
+      sb.append("REFERENCES ");
+      if (pkTableDb != null) sb.append(pkTableDb + ".");
+      sb.append(pkTableName + "(");
+      Joiner.on(", ").appendTo(sb, pkList).append(")");
+      foreignKeysSql.add(sb.toString());
+    }
+    return foreignKeysSql;
+  }
+
 
   /**
    * Returns the set of file formats that the partitions are stored in.

@@ -203,6 +203,7 @@ public class FrontendFixture {
       try {
         HdfsTable hdfsTable = (HdfsTable) dummyTable;
         hdfsTable.initializePartitionMetadata(msTbl);
+        hdfsTable.getPrimaryKeys().addAll(createTableStmt.getPrimaryKeys());
       } catch (CatalogException e) {
         e.printStackTrace();
         fail("Failed to add test table:\n" + createTableSql);

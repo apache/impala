@@ -364,7 +364,13 @@ struct THdfsTable {
   // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
   // Used so that each THdfsFileBlock can just reference an index in this list rather
   // than duplicate the list of network address, which helps reduce memory usage.
-  7: optional list<Types.TNetworkAddress> network_addresses
+  7: optional list<Types.TNetworkAddress> network_addresses,
+
+  // Primary Keys information for HDFS Tables
+  11: optional list<hive_metastore.SQLPrimaryKey> primary_keys,
+
+  // Foreign Keys information for HDFS Tables
+  12: optional list<hive_metastore.SQLForeignKey> foreign_keys
 }
 
 struct THBaseTable {

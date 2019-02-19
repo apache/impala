@@ -54,6 +54,8 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.io.IOUtils;
@@ -2120,7 +2122,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
     return createTable(tbl, params.if_not_exists, params.getCache_op(),
-        params.server_name, response);
+        params.server_name, params.getPrimary_keys(), params.getForeign_keys(), response);
   }
 
   /**
@@ -2273,11 +2275,19 @@ public class CatalogOpExecutor {
    */
   private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       boolean if_not_exists, THdfsCachingOp cacheOp, String serverName,
+      List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys,
       TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(!KuduTable.isKuduTable(newTable));
     synchronized (metastoreDdlLock_) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        msClient.getHiveClient().createTable(newTable);
+        if (primaryKeys == null && foreignKeys == null) {
+          msClient.getHiveClient().createTable(newTable);
+        } else {
+          MetastoreShim.createTableWithConstraints(
+              msClient.getHiveClient(), newTable,
+              primaryKeys == null ? new ArrayList<>() : primaryKeys,
+              foreignKeys == null ? new ArrayList<>() : foreignKeys);
+        }
         // TODO (HIVE-21807): Creating a table and retrieving the table information is
         // not atomic.
         addSummary(response, "Table has been created.");
@@ -2360,7 +2370,8 @@ public class CatalogOpExecutor {
         new org.apache.hadoop.hive.metastore.api.Table();
     setCreateViewAttributes(params, view);
     LOG.trace(String.format("Creating view %s", tableName));
-    if (!createTable(view, params.if_not_exists, null, params.server_name, response)) {
+    if (!createTable(view, params.if_not_exists, null, params.server_name,
+        new ArrayList<>(), new ArrayList<>(), response)) {
       addSummary(response, "View already exists.");
     } else {
       addSummary(response, "View has been created.");
@@ -2481,7 +2492,8 @@ public class CatalogOpExecutor {
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
     setDefaultTableCapabilities(tbl);
     LOG.trace(String.format("Creating table %s LIKE %s", tblName, srcTblName));
-    createTable(tbl, params.if_not_exists, null, params.server_name, response);
+    createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
+        response);
   }
 
   private static void setDefaultTableCapabilities(

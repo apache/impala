@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
@@ -178,6 +180,16 @@ public interface FeFsTable extends FeTable {
    * @throws IllegalArgumentException if any partition ID does not exist
    */
   List<? extends FeFsPartition> loadPartitions(Collection<Long> ids);
+
+  /**
+   * @return: Primary keys information.
+   */
+  List<SQLPrimaryKey> getPrimaryKeys();
+
+  /**
+   * @return Foreign keys information.
+   */
+  List<SQLForeignKey> getForeignKeys();
 
   /**
    * Parses and returns the value of the 'skip.header.line.count' table property. If the
