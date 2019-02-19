@@ -34,46 +34,44 @@ under the License.
 
   <conbody>
 
-    <p id="webui_intro">
-      <indexterm audience="hidden">web UI</indexterm>
-      <indexterm audience="hidden">debug UI</indexterm>
-      Each of the Impala daemons (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>,
-      and <cmdname>catalogd</cmdname>) includes a built-in web server that displays
-      diagnostic and status information:
-      <ul>
-      <li>
-        <p>
-          The <cmdname>impalad</cmdname> web UI (default port: 25000) includes
-          information about configuration settings, running and completed queries, and associated performance and
-          resource usage for queries. In particular, the <uicontrol>Details</uicontrol> link for each query displays
-          alternative views of the query including a graphical representation of the plan, and the
-          output of the <codeph>EXPLAIN</codeph>, <codeph>SUMMARY</codeph>, and <codeph>PROFILE</codeph>
-          statements from <cmdname>impala-shell</cmdname>.
-          Each host that runs the <cmdname>impalad</cmdname> daemon has
-          its own instance of the web UI, with details about those queries for which that
-          host served as the coordinator. The <cmdname>impalad</cmdname> web UI is mainly
-          for diagnosing query problems that can be traced to a particular node.
-        </p>
-      </li>
-      <li>
-        <p>
-          The <cmdname>statestored</cmdname> web UI (default port: 25010) includes
-          information about memory usage, configuration settings, and ongoing health checks
-          performed by this daemon. Because there is only a single instance of this
-          daemon within any cluster, you view the web UI only on the particular host
-          that serves as the Impala Statestore.
-        </p>
-      </li>
-      <li>
-        <p>
-          The <cmdname>catalogd</cmdname> web UI (default port: 25020) includes
-          information about the databases, tables, and other objects managed by Impala,
-          in addition to the resource usage and configuration settings of the daemon itself.
-          The catalog information is represented as the underlying Thrift data structures.
-          Because there is only a single instance of this daemon within any cluster, you view the
-          web UI only on the particular host that serves as the Impala Catalog Server.
-        </p>
-      </li>
+    <p id="webui_intro">Each of the Impala daemons (<cmdname>impalad</cmdname>,
+        <cmdname>statestored</cmdname>, and <cmdname>catalogd</cmdname>)
+      includes a built-in web server that displays diagnostic and status
+      information: <ul>
+        <li>
+          <p> The <cmdname>impalad</cmdname> web UI (default port: 25000)
+            includes information about configuration settings, running and
+            completed queries, and associated performance and resource usage for
+            queries. In particular, the <uicontrol>Details</uicontrol> link for
+            each query displays alternative views of the query including a
+            graphical representation of the plan, and the output of the
+              <codeph>EXPLAIN</codeph>, <codeph>SUMMARY</codeph>, and
+              <codeph>PROFILE</codeph> statements from
+              <cmdname>impala-shell</cmdname>. Each host that runs the
+              <cmdname>impalad</cmdname> daemon has its own instance of the web
+            UI, with details about those queries for which that host served as
+            the coordinator. The <cmdname>impalad</cmdname> web UI is mainly for
+            diagnosing query problems that can be traced to a particular node.
+          </p>
+        </li>
+        <li>
+          <p> The <cmdname>statestored</cmdname> web UI (default port: 25010)
+            includes information about memory usage, configuration settings, and
+            ongoing health checks performed by this daemon. Because there is
+            only a single instance of this daemon within any cluster, you view
+            the web UI only on the particular host that serves as the Impala
+            StateStore. </p>
+        </li>
+        <li>
+          <p> The <cmdname>catalogd</cmdname> web UI (default port: 25020)
+            includes information about the databases, tables, and other objects
+            managed by Impala, in addition to the resource usage and
+            configuration settings of the daemon itself. The catalog information
+            is represented as the underlying Thrift data structures. Because
+            there is only a single instance of this daemon within any cluster,
+            you view the web UI only on the particular host that serves as the
+            Impala Catalog Server. </p>
+        </li>
       </ul>
     </p>
 
@@ -109,7 +107,7 @@ under the License.
 
       <conbody>
 
-        <p></p>
+        <p>To disable web UI for an impalad, restart </p>
       </conbody>
     </concept>
 
@@ -132,6 +130,56 @@ under the License.
         </p>
       </conbody>
     </concept>
+    <concept id="webui_impalad_admission">
+      <title>Admission Control Page</title>
+      <conbody>
+        <p> By default, the <uicontrol>admission</uicontrol> page of the debug
+          web UI is at
+            <codeph>http://<varname>impala-server-hostname</varname>:25000/admission</codeph>
+          (non-secure cluster) or
+              <codeph>https://<varname>impala-server-hostname</varname>:25000/admission</codeph>
+          (secure cluster). </p>
+        <p>Use the <uicontrol>admission</uicontrol> page to troubleshoot queued
+          queries and the admission control.</p>
+        <p>The <uicontrol>admission</uicontrol> page provides the following
+          information about each resource pool to which queries have been
+          submitted at least once:</p>
+        <ul>
+          <li>Time since the <codeph>statestored</codeph> received the last
+            update</li>
+          <li>A warning if this <codeph>impalad</codeph> is considered
+            disconnected from the <codeph>statestored</codeph> and thus the
+            information on this page could be stale.</li>
+          <li>Pool configuration</li>
+          <li>Queued queries submitted to this coordinator, in the order of
+            submission</li>
+          <li>Running queries submitted to this coordinator</li>
+          <li>Pool stats<ul>
+              <li>Average of time in queue<p>This is an exponential moving
+                  average with the factor of 0.2, which factors in close to past
+                  10 queries. If a query is admitted immediately, the wait time
+                  of 0 is used in calculating this average wait time.</p></li>
+            </ul></li>
+          <li>Histogram of the distribution of peak memory used by queries
+            admitted to the pool<p>Use the histogram to figure out the minimum
+              and maximum query <codeph>MEM_LIMIT</codeph> ranges of the this
+              pool.</p><p>The histogram displays data for all queries admitted
+              to the pool, including the queries finished, got canceled, or hit
+              an error. </p></li>
+        </ul>
+        <p>Click on the pool name to only display information relevant to that
+          pool. You can then refresh the debug page to see only the information
+          for that specific pool.</p>
+        <p>You can reset the stats that keep track of historical data, such as
+            <b>Totals</b> stats, <b>Time in queue (exponential moving
+            average)</b>, and the histogram.</p>
+        <p>The above information is also available as a JSON object from the
+          following HTTP
+          endpoint:<codeblock><codeph>http://<varname>impala-server-hostname</varname>:<varname>port</varname>/admission?json</codeph></codeblock></p>
+        <p>See <xref href="impala_admission.xml#admission_control"/> for the
+          description of the properties in admission control.</p>
+      </conbody>
+    </concept>
 
     <concept id="webui_impalad_backends">
 
@@ -145,12 +193,13 @@ under the License.
           <codeph>https://<varname>impala-server-hostname</varname>:25000/backends</codeph> (secure cluster).
         </p>
 
-        <p>
-          This page lists the host and port info for each of the <cmdname>impalad</cmdname> nodes in the cluster.
-          Because each <cmdname>impalad</cmdname> daemon knows about every other <cmdname>impalad</cmdname> daemon
-          through the statestore, this information should be the same regardless of which node you select. Links
-          take you to the corresponding debug web pages for any of the other nodes in the cluster.
-        </p>
+        <p> This page lists the host and port info for each of the
+            <cmdname>impalad</cmdname> nodes in the cluster. Because each
+            <cmdname>impalad</cmdname> daemon knows about every other
+            <cmdname>impalad</cmdname> daemon through the StateStore, this
+          information should be the same regardless of which node you select.
+          Links take you to the corresponding debug web pages for any of the
+          other nodes in the cluster. </p>
       </conbody>
     </concept>
 
