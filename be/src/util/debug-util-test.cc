@@ -34,7 +34,7 @@ TEST(DebugUtil, UniqueID) {
   std::string str("feedbeeff00d7777:2020202020202020");
   EXPECT_EQ(str, PrintId(unique_id));
   unique_id.lo = 0x20ULL;
-  EXPECT_EQ("feedbeeff00d7777:20", PrintId(unique_id));
+  EXPECT_EQ("feedbeeff00d7777:0000000000000020", PrintId(unique_id));
 }
 
 string RecursionStack(int level) {

@@ -73,7 +73,8 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     utc_timestamp_(new TimestampValue(
         TimestampValue::Parse(query_state->query_ctx().utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
-    profile_(RuntimeProfile::Create(obj_pool(), "<fragment instance>")),
+    profile_(RuntimeProfile::Create(
+        obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
     instance_buffer_reservation_(new ReservationTracker) {
   Init();
 }

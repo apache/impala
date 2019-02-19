@@ -22,6 +22,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import json
 import pytest
+import re
 import requests
 
 
@@ -40,6 +41,7 @@ class TestWebPage(ImpalaTestSuite):
   QUERY_FINSTANCES_URL = "http://localhost:{0}/query_finstances"
   RPCZ_URL = "http://localhost:{0}/rpcz"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
+  MEMZ_URL = "http://localhost:{0}/memz"
   METRICS_URL = "http://localhost:{0}/metrics"
   JMX_URL = "http://localhost:{0}/jmx"
   ADMISSION_URL = "http://localhost:{0}/admission"
@@ -110,6 +112,18 @@ class TestWebPage(ImpalaTestSuite):
     assert page.status_code == requests.codes.ok
     page = requests.get("http://localhost:25020/memz")
     assert page.status_code == requests.codes.ok
+
+  def test_memz_shows_fragment_instance_id(self):
+    """Tests that the memory breakdown on memz shows fragment instance IDs."""
+    query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
+    query_handle = self.client.execute_async(query)
+    try:
+      self.wait_for_state(query_handle, self.client.QUERY_STATES['RUNNING'], 1000)
+      memz_breakdown = self.get_debug_page(self.MEMZ_URL)['detailed']
+      finstance_re = re.compile("Fragment [0-9a-f]{16}:[0-9a-f]{16}")
+      assert finstance_re.search(memz_breakdown), memz_breakdown
+    finally:
+      self.client.close_query(query_handle)
 
   def test_query_profile_encoded_unknown_query_id(self):
     """Test that /query_profile_encoded error message starts with the expected line in

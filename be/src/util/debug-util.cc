@@ -88,7 +88,8 @@ PRINT_THRIFT_ENUM_IMPL(TUnit)
 
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
-  out << hex << id.hi << separator << id.lo;
+  // Outputting the separator string resets the stream width.
+  out << hex << setfill('0') << setw(16) << id.hi << separator << setw(16) << id.lo;
   return out.str();
 }
 
