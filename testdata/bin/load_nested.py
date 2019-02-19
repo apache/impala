@@ -104,7 +104,7 @@ def load():
     for chunk_idx in xrange(chunks):
       sql_params["chunk_idx"] = chunk_idx
       tmp_customer_sql = r"""
-          SELECT
+          SELECT STRAIGHT_JOIN
             c_custkey, c_name, c_address, c_nationkey, c_phone, c_acctbal, c_mktsegment,
             c_comment,
             GROUP_CONCAT(
@@ -120,8 +120,8 @@ def load():
                 CAST(lineitems_string AS STRING)
               ), '\002'
             ) orders_string
-          FROM {source_db}.customer
-          LEFT JOIN tmp_orders_string ON c_custkey = o_custkey
+          FROM tmp_orders_string
+          RIGHT JOIN [SHUFFLE] {source_db}.customer ON c_custkey = o_custkey
           WHERE c_custkey % {chunks} = {chunk_idx}
           GROUP BY 1, 2, 3, 4, 5, 6, 7, 8""".format(**sql_params)
       LOG.info("Creating temp customers (chunk {chunk} of {chunks})".format(

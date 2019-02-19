@@ -219,7 +219,7 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=88.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -275,14 +275,14 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=150000 size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=50116
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
-   mem-estimate=88.00MB mem-reservation=88.00MB thread-reservation=0
+   mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=15.00K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
@@ -297,7 +297,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=264.00MB mem-reservation=264.00MB thread-reservation=3
+Per-Host Resources: mem-estimate=312.00MB mem-reservation=312.00MB thread-reservation=3
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2,1,0 row-size=482B cardinality=1.50M
@@ -350,14 +350,14 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=264.00MB thread-reserv
    stored statistics:
      table: rows=150000 size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=50116
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
-   mem-estimate=88.00MB mem-reservation=88.00MB thread-reservation=0
+   mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=15.00K
    in pipelines: 00(GETNEXT)
 ====
@@ -413,7 +413,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=150000 size=288.99MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=50116
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
@@ -474,7 +474,7 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=53.81MB thread-reserva
    stored statistics:
      table: rows=150000 size=288.99MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44225
+   extrapolated-rows=disabled max-scan-range-rows=50116
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0

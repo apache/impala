@@ -3192,7 +3192,7 @@ PLAN-ROOT SINK
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
    row-size=47B cardinality=15.00K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=25.94MB Threads=8
+Max Per-Host Resource Reservation: Memory=27.94MB Threads=8
 Per-Host Resource Estimates: Memory=688MB
 PLAN-ROOT SINK
 |
