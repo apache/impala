@@ -419,10 +419,13 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
 def download_ranger(toolchain_root):
   env_var_version = "IMPALA_RANGER_VERSION"
   version = os.environ.get(env_var_version)
-  file_name = "ranger-{0}-admin.tar.gz".format(version)
+  # If Ranger has already been downloaded, do not re-download it.
   if not version:
     raise Exception("Could not find version for Ranger in environment var {0}"
                     .format(env_var_version))
+  pkg_directory = "{0}/ranger-{1}-admin".format(toolchain_root, version)
+  if os.path.isdir(pkg_directory): return
+  file_name = "ranger-{0}-admin.tar.gz".format(version)
   download_url = "{0}/ranger/{1}/{2}".format(TOOLCHAIN_HOST, version, file_name)
   wget_and_unpack_package(download_url, file_name, toolchain_root, False)
 
