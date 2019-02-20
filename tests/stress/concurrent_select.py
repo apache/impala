@@ -111,7 +111,6 @@ NUM_QUERIES_EXCEEDED_MEM_LIMIT = "num_queries_exceeded_mem_limit"
 NUM_QUERIES_AC_REJECTED = "num_queries_ac_rejected"
 NUM_QUERIES_AC_TIMEDOUT = "num_queries_ac_timedout"
 NUM_QUERIES_CANCELLED = "num_queries_cancelled"
-NUM_QUERIES_TIMEDOUT = "num_queries_timedout"
 NUM_RESULT_MISMATCHES = "num_result_mismatches"
 NUM_OTHER_ERRORS = "num_other_errors"
 
@@ -464,7 +463,7 @@ class StressRunner(object):
 
     self._status_headers = [
         "Done", "Active", "Executing", "Mem Lmt Ex", "AC Reject", "AC Timeout",
-        "Time Out", "Cancel", "Err", "Incorrect", "Next Qry Mem Lmt",
+        "Cancel", "Err", "Incorrect", "Next Qry Mem Lmt",
         "Tot Qry Mem Lmt", "Tracked Mem", "RSS Mem"]
 
     self._num_queries_to_run = None
@@ -801,10 +800,10 @@ class StressRunner(object):
         if should_cancel:
           timeout = randrange(1, max(int(solo_runtime), 2))
         else:
-          metrics = self._calc_total_runner_metrics()
-          timeout = solo_runtime * max(
-              10, metrics[NUM_QUERIES_SUBMITTED] - metrics[NUM_QUERIES_FINISHED])
-        report = query_runner.run_query(query, timeout, mem_limit,
+          # Let the query run as long as necessary - it is nearly impossible to pick a
+          # good value that won't have false positives under load - see IMPALA-8222.
+          timeout = maxint
+        report = query_runner.run_query(query, mem_limit, timeout_secs=timeout,
             should_cancel=should_cancel)
         LOG.debug("Got execution report for query")
         if report.timed_out and should_cancel:
@@ -899,8 +898,6 @@ class StressRunner(object):
         metrics[NUM_QUERIES_AC_REJECTED],
         # AC Timed Out
         metrics[NUM_QUERIES_AC_TIMEDOUT],
-        # Time Out
-        metrics[NUM_QUERIES_TIMEDOUT] - metrics[NUM_QUERIES_CANCELLED],
         # Cancel
         metrics[NUM_QUERIES_CANCELLED],
         # Err
@@ -932,10 +929,7 @@ class StressRunner(object):
 
   def _check_for_test_failure(self):
     metrics = self._calc_total_runner_metrics()
-    if (
-        metrics[NUM_OTHER_ERRORS] > 0 or metrics[NUM_RESULT_MISMATCHES] > 0 or
-        metrics[NUM_QUERIES_TIMEDOUT] - metrics[NUM_QUERIES_CANCELLED] > 0
-    ):
+    if metrics[NUM_OTHER_ERRORS] > 0 or metrics[NUM_RESULT_MISMATCHES] > 0:
       LOG.error("Failing the stress test due to unexpected errors, incorrect results, or "
                 "timed out queries. See the report line above for details.")
       self.print_duration()
@@ -1134,7 +1128,6 @@ class QueryRunner(object):
         NUM_QUERIES_AC_REJECTED: Value("i", 0),
         NUM_QUERIES_AC_TIMEDOUT: Value("i", 0),
         NUM_QUERIES_CANCELLED: Value("i", 0),
-        NUM_QUERIES_TIMEDOUT: Value("i", 0),
         NUM_RESULT_MISMATCHES: Value("i", 0),
         NUM_OTHER_ERRORS: Value("i", 0)}
 
@@ -1146,8 +1139,8 @@ class QueryRunner(object):
       self.impalad_conn.close()
       self.impalad_conn = None
 
-  def run_query(self, query, timeout_secs, mem_limit_mb, run_set_up=False,
-                should_cancel=False, retain_profile=False):
+  def run_query(self, query, mem_limit_mb, run_set_up=False,
+                timeout_secs=maxint, should_cancel=False, retain_profile=False):
     """Run a query and return an execution report. If 'run_set_up' is True, set up sql
     will be executed before the main query. This should be the case during the binary
     search phase of the stress test.
@@ -1281,8 +1274,6 @@ class QueryRunner(object):
       increment(self._metrics[NUM_QUERIES_AC_TIMEDOUT])
     if report.was_cancelled:
       increment(self._metrics[NUM_QUERIES_CANCELLED])
-    if report.timed_out:
-      increment(self._metrics[NUM_QUERIES_TIMEDOUT])
 
   def _cancel(self, cursor, report):
     report.timed_out = True
@@ -1548,8 +1539,8 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     reports_by_outcome = defaultdict(list)
     leading_outcome = None
     for remaining_samples in xrange(samples - 1, -1, -1):
-      report = runner.run_query(query, timeout_secs, mem_limit,
-                                run_set_up=True, retain_profile=True)
+      report = runner.run_query(query, mem_limit, run_set_up=True,
+          timeout_secs=timeout_secs, retain_profile=True)
       if report.timed_out:
         report.write_query_profile(
             os.path.join(results_dir, PROFILES_DIR), profile_error_prefix)
@@ -2156,7 +2147,7 @@ def main():
       " amount of memory to smaller queries as to the big ones.")
   parser.add_argument(
       "--timeout-multiplier", type=float, default=1.0,
-      help="Query timeouts will be multiplied by this value.")
+      help="Deprecated - has no effect.")
   parser.add_argument("--max-queries", type=int, default=100)
   parser.add_argument(
       "--reset-databases-before-binary-search", action="store_true",
@@ -2373,10 +2364,6 @@ def main():
       query.required_mem_mb_without_spilling += int(
           query.required_mem_mb_without_spilling * args.mem_limit_padding_pct / 100.0) + \
           args.mem_limit_padding_abs
-    if query.solo_runtime_secs_with_spilling:
-      query.solo_runtime_secs_with_spilling *= args.timeout_multiplier
-    if query.solo_runtime_secs_without_spilling:
-      query.solo_runtime_secs_without_spilling *= args.timeout_multiplier
 
     # Remove any queries that would use "too many" resources. This way a larger number
     # of queries will run concurrently.
