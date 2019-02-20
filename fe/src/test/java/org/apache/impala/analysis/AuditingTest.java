@@ -21,6 +21,7 @@ import java.util.Set;
 
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
@@ -372,7 +373,7 @@ public class AuditingTest extends FrontendTestBase {
             "/does/not/exist", System.getenv("IMPALA_HOME") +
             "/fe/src/test/resources/sentry-site.xml");
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
-      Frontend fe = new Frontend(config, catalog);
+      Frontend fe = new Frontend(new SentryAuthorizationFactory(config), catalog);
       AnalysisContext analysisCtx = createAnalysisCtx(config);
       // We should get an audit event even when an authorization failure occurs.
       try {

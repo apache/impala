@@ -29,6 +29,7 @@ import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.AuthorizationException;
@@ -60,7 +61,7 @@ import com.google.common.collect.Lists;
 public class AnalysisContext {
   private final static Logger LOG = LoggerFactory.getLogger(AnalysisContext.class);
   private final TQueryCtx queryCtx_;
-  private final AuthorizationConfig authzConfig_;
+  private final AuthorizationFactory authzFactory_;
   private final EventSequence timeline_;
 
   // Set in analyzeAndAuthorize().
@@ -70,10 +71,10 @@ public class AnalysisContext {
   // Use Hive's scheme for auto-generating column labels. Only used for testing.
   private boolean useHiveColLabels_;
 
-  public AnalysisContext(TQueryCtx queryCtx, AuthorizationConfig authzConfig,
+  public AnalysisContext(TQueryCtx queryCtx, AuthorizationFactory authzFactory,
       EventSequence timeline) {
     queryCtx_ = queryCtx;
-    authzConfig_ = authzConfig;
+    authzFactory_ = authzFactory;
     timeline_ = timeline;
   }
 
@@ -395,7 +396,7 @@ public class AnalysisContext {
   }
 
   public Analyzer createAnalyzer(StmtTableCache stmtTableCache) {
-    Analyzer result = new Analyzer(stmtTableCache, queryCtx_, authzConfig_);
+    Analyzer result = new Analyzer(stmtTableCache, queryCtx_, authzFactory_);
     result.setUseHiveColLabels(useHiveColLabels_);
     return result;
   }

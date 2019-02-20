@@ -37,7 +37,9 @@ import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
@@ -91,8 +93,8 @@ public class FrontendFixture {
   protected final ImpaladTestCatalog catalog_ = new ImpaladTestCatalog();
 
   // The actual Impala frontend that backs this fixture.
-  protected final Frontend frontend_ = new Frontend(
-      SentryAuthorizationConfig.createAuthDisabledConfig(), catalog_);
+  protected final Frontend frontend_ = new Frontend(new NoneAuthorizationFactory(),
+      catalog_);
 
   // Test-local list of test databases and tables.
   protected final List<Db> testDbs_ = new ArrayList<>();
@@ -294,16 +296,24 @@ public class FrontendFixture {
         defaultDb, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
+        new NoneAuthorizationFactory(), timeline);
     return analysisCtx;
   }
 
   public AnalysisContext createAnalysisCtx(TQueryOptions queryOptions) {
+    return createAnalysisCtx(queryOptions,
+        new NoneAuthorizationFactory().getAuthorizationConfig());
+  }
+
+  public AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
+      AuthorizationConfig authzConfig) {
     TQueryCtx queryCtx = TestUtils.createQueryContext();
     queryCtx.client_request.query_options = queryOptions;
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
+        authzConfig.getProvider() == AuthorizationProvider.SENTRY ?
+            new SentryAuthorizationFactory(authzConfig) : new NoneAuthorizationFactory(),
+        timeline);
     return analysisCtx;
   }
 
@@ -315,7 +325,10 @@ public class FrontendFixture {
       String user) {
     TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB, user);
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
-    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzConfig, timeline);
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
+        authzConfig.getProvider() == AuthorizationProvider.SENTRY ?
+        new SentryAuthorizationFactory(authzConfig) : new NoneAuthorizationFactory(),
+        timeline);
     return analysisCtx;
   }
 

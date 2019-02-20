@@ -62,13 +62,6 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
   }
 
   /**
-   * Returns an AuthorizationConfig object that has authorization disabled.
-   */
-  public static SentryAuthorizationConfig createAuthDisabledConfig() {
-    return new SentryAuthorizationConfig(null, null, null, null);
-  }
-
-  /**
    * Returns an AuthorizationConfig object configured to use Hadoop user->group mappings
    * for the authorization provider.
    */

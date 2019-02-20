@@ -18,7 +18,6 @@
 package org.apache.impala.authorization;
 
 import java.util.EnumSet;
-import java.util.Set;
 
 import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.common.InternalException;
@@ -34,15 +33,10 @@ public abstract class AuthorizationChecker {
   /*
    * Creates a new AuthorizationChecker based on the config values.
    */
-  public AuthorizationChecker(AuthorizationConfig config) {
+  protected AuthorizationChecker(AuthorizationConfig config) {
     Preconditions.checkNotNull(config);
     config_ = config;
   }
-
-  /*
-   * Returns the configuration used to create this AuthorizationProvider.
-   */
-  public AuthorizationConfig getConfig() { return config_; }
 
   /**
    * Authorizes the PrivilegeRequest, throwing an Authorization exception if
@@ -93,15 +87,27 @@ public abstract class AuthorizationChecker {
     return hasGrantOption ? " with 'GRANT OPTION'" : "";
   }
 
-  /**
-   * Returns the set of groups this user belongs to.
-   */
-  public abstract Set<String> getUserGroups(User user) throws InternalException;
-
   /*
    * Returns true if the given user has permission to execute the given
-   * request, false otherwise. Always returns true if authorization is disabled.
+   * request, false otherwise. Always returns true if authorization is disabled or the
+   * given user is an admin user.
    */
-  public abstract boolean hasAccess(User user, PrivilegeRequest request)
+  public boolean hasAccess(User user, PrivilegeRequest request)
+      throws InternalException {
+    Preconditions.checkNotNull(user);
+    Preconditions.checkNotNull(request);
+
+    // If authorization is not enabled the user will always have access. If this is
+    // an internal request, the user will always have permission.
+    if (!config_.isEnabled() || user instanceof ImpalaInternalAdminUser) {
+      return true;
+    }
+    return authorize(user, request);
+  }
+
+  /**
+   * Performs an authorization for a given user.
+   */
+  protected abstract boolean authorize(User user, PrivilegeRequest request)
       throws InternalException;
 }

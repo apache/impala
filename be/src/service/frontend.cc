@@ -37,6 +37,9 @@ using namespace impala;
 
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
+DEFINE_string(authorization_factory_class,
+    "org.apache.impala.authorization.sentry.SentryAuthorizationFactory",
+    "Specifies the class name that implements the authorization provider.");
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
     "server during authorization. Set to enable authorization. By default, the "
     "authorization policy will be loaded from the catalog server (via the statestore)."
@@ -46,7 +49,7 @@ DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization pol
     "read from a file.");
 DEFINE_string(authorization_policy_provider_class,
     "org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider",
-    "Advanced: The authorization policy provider class name.");
+    "Advanced: The authorization policy provider class name for Sentry.");
 DEFINE_string(authorized_proxy_user_config, "",
     "Specifies the set of authorized proxy users (users who can delegate to other "
     "users during authorization) and whom they are allowed to delegate. "

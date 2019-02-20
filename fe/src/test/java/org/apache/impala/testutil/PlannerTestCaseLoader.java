@@ -17,8 +17,7 @@
 
 package org.apache.impala.testutil;
 
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -55,10 +54,9 @@ public class PlannerTestCaseLoader implements AutoCloseable {
   private final Frontend frontend_;
 
   public PlannerTestCaseLoader() throws ImpalaException {
-    AuthorizationConfig config = SentryAuthorizationConfig.createAuthDisabledConfig();
     catalog_ = new ImpaladTestCatalog(
         CatalogServiceTestCatalog.createTransientTestCatalog());
-    frontend_ = new Frontend(config, catalog_);
+    frontend_ = new Frontend(new NoneAuthorizationFactory(), catalog_);
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_.getSrcCatalog());
   }
 

@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -119,12 +118,14 @@ public class CopyTestCaseStmt extends StatementBase {
       // referenced objects.
       Pair<Set<FeDb>, Set<FeTable>> referencedObjects = getReferencedCatalogObjects();
       for (FeDb db: referencedObjects.first) {
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onDb(db.getName()).allOf
-            (Privilege.VIEW_METADATA).build());
+        analyzer.registerPrivReq(builder ->
+            builder.onDb(db.getName()).allOf(Privilege.VIEW_METADATA).build());
       }
       for (FeTable table: referencedObjects.second) {
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onTable(table.getDb()
-            .getName(), table.getName()).allOf(Privilege.VIEW_METADATA).build());
+        analyzer.registerPrivReq(builder ->
+            builder.onTable(table.getDb().getName(), table.getName())
+                .allOf(Privilege.VIEW_METADATA)
+                .build());
       }
     } else {
       hdfsPath_.analyze(analyzer, Privilege.ALL, FsAction.READ, /*registerPrivReq*/ true,

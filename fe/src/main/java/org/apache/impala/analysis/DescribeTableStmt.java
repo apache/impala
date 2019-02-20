@@ -22,7 +22,6 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -99,11 +98,15 @@ public class DescribeTableStmt extends StatementBase {
       // an analysis error. We should not accidentally reveal the non-existence of a
       // table/database if the user is not authorized.
       if (rawPath_.size() > 1) {
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-            .onTable(rawPath_.get(0), rawPath_.get(1)).any().build());
+        analyzer.registerPrivReq(builder ->
+            builder.onTable(rawPath_.get(0), rawPath_.get(1))
+                .any()
+                .build());
       }
-      analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-          .onTable(analyzer.getDefaultDb(), rawPath_.get(0)).any().build());
+      analyzer.registerPrivReq(builder ->
+          builder.onTable(analyzer.getDefaultDb(), rawPath_.get(0))
+              .any()
+              .build());
       throw ae;
     } catch (TableLoadingException tle) {
       throw new AnalysisException(tle.getMessage(), tle);
@@ -118,9 +121,12 @@ public class DescribeTableStmt extends StatementBase {
     // Describing a table.
     if (path_.destTable() != null) return;
 
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-        .onColumn(path_.getRootTable().getDb().getName(), path_.getRootTable().getName(),
-        path_.getRawPath().get(0)).any().build());
+    analyzer.registerPrivReq(builder ->
+        builder.onColumn(path_.getRootTable().getDb().getName(),
+            path_.getRootTable().getName(),
+            path_.getRawPath().get(0))
+            .any()
+            .build());
 
     if (path_.destType().isComplexType()) {
       if (outputStyle_ == TDescribeOutputStyle.FORMATTED ||

@@ -57,7 +57,9 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
     }
   }
 
-  @Override
+  /**
+   * Returns the set of groups this user belongs to.
+   */
   public Set<String> getUserGroups(User user) throws InternalException {
     try {
       return provider_.getGroupMapping().getGroups(user.getShortName());
@@ -80,16 +82,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
   }
 
   @Override
-  public boolean hasAccess(User user, PrivilegeRequest request) throws InternalException {
-    Preconditions.checkNotNull(user);
-    Preconditions.checkNotNull(request);
-
-    // If authorization is not enabled the user will always have access. If this is
-    // an internal request, the user will always have permission.
-    if (!config_.isEnabled() || user instanceof ImpalaInternalAdminUser) {
-      return true;
-    }
-
+  public boolean authorize(User user, PrivilegeRequest request) throws InternalException {
     EnumSet<ImpalaAction> actions = ImpalaAction.from(request.getPrivilege());
 
     List<DBModelAuthorizable> authorizables = Lists.newArrayList(

@@ -18,37 +18,32 @@
 package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
-import org.apache.impala.authorization.sentry.SentryAuthorizableColumn;
-import org.apache.impala.authorization.sentry.SentryAuthorizableDb;
-import org.apache.impala.authorization.sentry.SentryAuthorizableFn;
-import org.apache.impala.authorization.sentry.SentryAuthorizableServer;
-import org.apache.impala.authorization.sentry.SentryAuthorizableTable;
-import org.apache.impala.authorization.sentry.SentryAuthorizableUri;
 
 /**
  * Class that helps build PrivilegeRequest objects.
- * For example:
- * PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder();
- * PrivilegeRequest = builder.allOf(Privilege.SELECT).onTable("db", "tbl").build();
  *
- * TODO: In the future, this class could be extended to provide the option to specify
- * multiple permissions. For example:
- * builder.allOf(SELECT, INSERT).onTable(..);
- * It could also be extended to support an "anyOf" to check if the user has any of the
- * permissions specified:
- * builder.anyOf(SELECT, INSERT).onTable(...);
+ * For example:
+ * PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
+ *     new AuthorizableFactory(AuthorizationProvider.SENTRY));
+ * PrivilegeRequest = builder.allOf(Privilege.SELECT).onTable("db", "tbl").build();
  */
 public class PrivilegeRequestBuilder {
+  private final AuthorizableFactory authzFactory_;
   private Authorizable authorizable_;
   private Privilege privilege_;
   private boolean grantOption_ = false;
 
+  public PrivilegeRequestBuilder(AuthorizableFactory authzFactory) {
+    Preconditions.checkNotNull(authzFactory);
+    authzFactory_ = authzFactory;
+  }
+
   /**
-   * Sets the authorizable object to be a URI.
+   * Sets the authorizable object to be a function.
    */
   public PrivilegeRequestBuilder onFunction(String dbName, String fnName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableFn(dbName, fnName);
+    authorizable_ = authzFactory_.newFunction(dbName, fnName);
     return this;
   }
 
@@ -57,7 +52,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onUri(String uriName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableUri(uriName);
+    authorizable_ = authzFactory_.newUri(uriName);
     return this;
   }
 
@@ -67,7 +62,7 @@ public class PrivilegeRequestBuilder {
   public PrivilegeRequestBuilder onColumn(String dbName, String tableName,
       String columnName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableColumn(dbName, tableName, columnName);
+    authorizable_ = authzFactory_.newColumn(dbName, tableName, columnName);
     return this;
   }
 
@@ -76,7 +71,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onTable(String dbName, String tableName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableTable(dbName, tableName);
+    authorizable_ = authzFactory_.newTable(dbName, tableName);
     return this;
   }
 
@@ -85,7 +80,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onServer(String serverName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableServer(serverName);
+    authorizable_ = authzFactory_.newServer(serverName);
     return this;
   }
 
@@ -94,16 +89,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onDb(String dbName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableDb(dbName);
-    return this;
-  }
-
-  /**
-   * Specifies that permissions on any table in the given database.
-   */
-  public PrivilegeRequestBuilder onAnyTable(String dbName) {
-    Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableTable(dbName);
+    authorizable_ = authzFactory_.newDatabase(dbName);
     return this;
   }
 
@@ -112,7 +98,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onAnyColumn(String dbName, String tableName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableColumn(dbName, tableName);
+    authorizable_ = authzFactory_.newColumn(dbName, tableName);
     return this;
   }
 
@@ -121,7 +107,7 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onAnyColumn(String dbName) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = new SentryAuthorizableColumn(dbName);
+    authorizable_ = authzFactory_.newColumn(dbName);
     return this;
   }
 

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.net.ntp.TimeStamp;
+import org.apache.impala.authorization.sentry.SentryAuthorizationChecker;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObjectCache;
 import org.apache.impala.catalog.CatalogObjectVersionSet;
@@ -494,8 +495,9 @@ public class AuthorizationPolicy {
     result.setRows(new ArrayList<>());
 
     // A user should be considered to not exist if they do not have any groups.
-    Set<String> groupNames = fe.getAuthzChecker().getUserGroups(
-        new org.apache.impala.authorization.User(principalName));
+    Preconditions.checkState(fe.getAuthzChecker() instanceof SentryAuthorizationChecker);
+    Set<String> groupNames = ((SentryAuthorizationChecker) fe.getAuthzChecker())
+        .getUserGroups(new org.apache.impala.authorization.User(principalName));
     if (groupNames.isEmpty()) {
       throw new AnalysisException(String.format("User '%s' does not exist.",
           principalName));

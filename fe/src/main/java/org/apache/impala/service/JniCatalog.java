@@ -18,7 +18,6 @@
 package org.apache.impala.service;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -26,8 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryConfig;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -107,18 +107,33 @@ public class JniCatalog {
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);
 
-    // Check if the Sentry Service is configured. If so, create a configuration object.
-    SentryConfig sentryConfig = new SentryConfig(null);
-    if (!Strings.isNullOrEmpty(cfg.sentry_config)) {
-      sentryConfig = new SentryConfig(cfg.sentry_config);
-      sentryConfig.loadConfig();
+    AuthorizationFactory authzFactory;
+    try {
+      authzFactory = (AuthorizationFactory) Class.forName(
+          BackendConfig.INSTANCE.getAuthorizationFactoryClass())
+          .getConstructor(BackendConfig.class).newInstance(BackendConfig.INSTANCE);
+    } catch (Exception e) {
+      String msg = String.format("Unable to instantiate authorization provider: %s",
+          BackendConfig.INSTANCE.getAuthorizationFactoryClass());
+      LOG.error(msg);
+      throw new InternalException(msg, e);
+    }
+    AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
+    if (!authzConfig.isEnabled()) {
+      // For backward compatibility to keep the existing behavior, when authorization
+      // is not enabled, we need to use a dummy authorization config.
+      authzFactory = new NoneAuthorizationFactory(BackendConfig.INSTANCE);
+      authzConfig = authzFactory.getAuthorizationConfig();
+      LOG.info("Authorization is 'DISABLED'.");
+    } else {
+      LOG.info(String.format("Authorization is 'ENABLED' using %s.",
+          authzConfig.getProvider()));
     }
     LOG.info(JniUtil.getJavaVersion());
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
         cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s,
-        new SentryAuthorizationConfig(sentryConfig), getServiceId(), cfg.principal,
-        cfg.local_library_path);
+        authzConfig, getServiceId(), cfg.principal, cfg.local_library_path);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

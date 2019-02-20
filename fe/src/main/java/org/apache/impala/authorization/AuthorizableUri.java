@@ -15,13 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 package org.apache.impala.authorization;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+
 /**
- * This enum contains the list of authorization providers supported in Impala.
+ * A class to authorize access to a URI.
  */
-public enum AuthorizationProvider {
-  SENTRY,
-  NONE
+public class AuthorizableUri extends Authorizable {
+  private final String uriName_;
+
+  public AuthorizableUri(String uriName) {
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(uriName));
+    uriName_ = uriName;
+  }
+
+  @Override
+  public String getName() { return uriName_; }
+
+  @Override
+  public Type getType() { return Type.URI; }
 }

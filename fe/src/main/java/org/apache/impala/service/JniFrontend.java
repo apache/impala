@@ -44,9 +44,12 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
+import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.authorization.User;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationChecker;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
@@ -137,21 +140,28 @@ public class JniFrontend {
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);
 
-    // Validate the authorization configuration before initializing the Frontend.
-    // If there are any configuration problems Impala startup will fail.
-    SentryAuthorizationConfig authConfig = new SentryAuthorizationConfig(cfg.server_name,
-        cfg.authorization_policy_file, cfg.sentry_config,
-        cfg.authorization_policy_provider_class);
-    if (authConfig.isEnabled()) {
-      LOG.info(String.format("Authorization is 'ENABLED' using %s",
-          authConfig.isFileBasedPolicy() ? " file based policy from: " +
-          authConfig.getPolicyFile() : " using Sentry Policy Service."));
-    } else {
+    AuthorizationFactory authzFactory;
+    try {
+      authzFactory = (AuthorizationFactory) Class.forName(
+          BackendConfig.INSTANCE.getAuthorizationFactoryClass())
+          .getConstructor(BackendConfig.class).newInstance(BackendConfig.INSTANCE);
+    } catch (Exception e) {
+      String msg = String.format("Unable to instantiate authorization provider: %s",
+          BackendConfig.INSTANCE.getAuthorizationFactoryClass());
+      throw new InternalException(msg,e);
+    }
+    AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
+    if (!authzConfig.isEnabled()) {
+      // For backward compatibility to keep the existing behavior, when authorization
+      // is not enabled, we need to use a dummy authorization config.
+      authzFactory = new NoneAuthorizationFactory(BackendConfig.INSTANCE);
       LOG.info("Authorization is 'DISABLED'.");
+    } else {
+      LOG.info(String.format("Authorization is 'ENABLED' using %s.",
+          authzConfig.getProvider()));
     }
     LOG.info(JniUtil.getJavaVersion());
-
-    frontend_ = new Frontend(authConfig);
+    frontend_ = new Frontend(authzFactory);
   }
 
   /**
@@ -528,7 +538,10 @@ public class JniFrontend {
       User user = new User(params.getRequesting_user());
       Set<String> groupNames;
       if (params.isIs_show_current_roles()) {
-        groupNames = frontend_.getAuthzChecker().getUserGroups(user);
+        Preconditions.checkState(
+            frontend_.getAuthzChecker() instanceof SentryAuthorizationChecker);
+        groupNames = ((SentryAuthorizationChecker) frontend_.getAuthzChecker())
+            .getUserGroups(user);
       } else {
         Preconditions.checkState(params.isSetGrant_group());
         groupNames = Sets.newHashSet(params.getGrant_group());

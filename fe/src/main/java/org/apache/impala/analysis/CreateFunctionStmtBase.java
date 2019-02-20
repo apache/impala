@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -143,9 +142,10 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
       fn_ = createFunction(fnName_, null, null, false);
     }
 
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-        .onFunction(fn_.dbName(), fn_.signatureString()).allOf(Privilege.CREATE)
-        .build());
+    analyzer.registerPrivReq(builder ->
+        builder.onFunction(fn_.dbName(), fn_.signatureString())
+            .allOf(Privilege.CREATE)
+            .build());
 
     db_ = analyzer.getDb(fn_.dbName(), true);
     Function existingFn = db_.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);

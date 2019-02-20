@@ -15,13 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 package org.apache.impala.authorization;
 
 /**
- * This enum contains the list of authorization providers supported in Impala.
+ * A class to authorize access to a server.
  */
-public enum AuthorizationProvider {
-  SENTRY,
-  NONE
+public class AuthorizableServer extends Authorizable {
+  private final String serverName_;
+
+  public AuthorizableServer(String serverName) {
+    serverName_ = serverName == null ? "server" : serverName;
+  }
+
+  @Override
+  public String getName() { return serverName_; }
+
+  @Override
+  public Type getType() { return Type.SERVER; }
 }

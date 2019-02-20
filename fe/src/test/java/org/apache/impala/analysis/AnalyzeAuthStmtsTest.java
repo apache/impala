@@ -19,7 +19,9 @@ package org.apache.impala.analysis;
 
 import java.util.HashSet;
 
+import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
@@ -67,7 +69,8 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         defaultDb, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null),
+        new SentryAuthorizationFactory(
+            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null)),
         timeline);
     return analysisCtx;
   }
@@ -77,7 +80,7 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         Catalog.DEFAULT_DB, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
+        new NoneAuthorizationFactory(), timeline);
     return analysisCtx;
   }
 
@@ -308,7 +311,8 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         Catalog.DEFAULT_DB, "");
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null),
+        new SentryAuthorizationFactory(
+            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null)),
         timeline);
     AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
         "Cannot execute authorization statement with an empty username.");

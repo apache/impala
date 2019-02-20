@@ -190,6 +190,11 @@ public class FrontendTestBase extends AbstractFrontendTest {
     return feFixture_.createAnalysisCtx(queryOptions);
   }
 
+  protected AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
+      AuthorizationConfig authzConfig) {
+    return feFixture_.createAnalysisCtx(queryOptions, authzConfig);
+  }
+
   protected AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig) {
     return feFixture_.createAnalysisCtx(authzConfig);
   }

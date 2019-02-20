@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
@@ -34,12 +35,13 @@ public class AuthorizationStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!analyzer.getAuthzConfig().isEnabled()) {
+    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
+    if (!authzConfig.isEnabled()) {
       throw new AnalysisException("Authorization is not enabled. To enable " +
           "authorization restart Impala with the --server_name=<name> flag.");
     }
-    if (analyzer.getAuthzConfig().getProvider() == AuthorizationProvider.SENTRY) {
-      if (((SentryAuthorizationConfig) analyzer.getAuthzConfig()).isFileBasedPolicy()) {
+    if (authzConfig.getProvider() == AuthorizationProvider.SENTRY) {
+      if (((SentryAuthorizationConfig) authzConfig).isFileBasedPolicy()) {
         throw new AnalysisException("Cannot execute authorization statement using a " +
             "file based policy. To disable file based policies, restart Impala without " +
             "the -authorization_policy_file flag set.");

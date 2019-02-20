@@ -134,6 +134,10 @@ public class BackendConfig {
     return backendCfg_.enable_orc_scanner;
   }
 
+  public String getAuthorizationFactoryClass() {
+    return backendCfg_.getAuthorization_factory_class();
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

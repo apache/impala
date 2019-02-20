@@ -37,6 +37,7 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.authorization.sentry.SentryPolicyService;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.ImpaladCatalog;
@@ -175,7 +176,7 @@ public class AuthorizationTest extends FrontendTestBase {
   public AuthorizationTest(TestContext ctx) throws Exception {
     ctx_ = ctx;
     analysisContext_ = createAnalysisCtx(ctx_.authzConfig, USER.getName());
-    fe_ = new Frontend(ctx_.authzConfig, ctx_.catalog);
+    fe_ = new Frontend(new SentryAuthorizationFactory(ctx_.authzConfig), ctx_.catalog);
   }
 
   public static SentryAuthorizationConfig createPolicyFileAuthzConfig() {
@@ -857,7 +858,7 @@ public class AuthorizationTest extends FrontendTestBase {
           new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
       User user = new User("authtest/hostname@REALM.COM");
       AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
-      Frontend fe = new Frontend(authzConfig, catalog);
+      Frontend fe = new Frontend(new SentryAuthorizationFactory(authzConfig), catalog);
 
       // Can select from table that user has privileges on.
       AuthzOk(fe, ctx, "select * from tpcds.customer");
@@ -992,7 +993,8 @@ public class AuthorizationTest extends FrontendTestBase {
     try {
       config = new SentryAuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
           "ClassDoesNotExist");
-      Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
+      Assert.assertTrue(config.isEnabled());
+      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
       Assert.assertEquals(
           "The authorization policy provider class 'ClassDoesNotExist' was not found.",
@@ -1030,12 +1032,13 @@ public class AuthorizationTest extends FrontendTestBase {
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
         AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
         LocalGroupResourceAuthorizationProvider.class.getName());
+    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
       // Create an analysis context + FE with the test user
       // (as defined in the policy file)
       User user = new User("test_user");
       AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
-      Frontend fe = new Frontend(authzConfig, catalog);
+      Frontend fe = new Frontend(authzFactory, catalog);
 
       // Can select from table that user has privileges on.
       AuthzOk(fe, ctx, "select * from functional.alltypesagg");
@@ -1047,7 +1050,7 @@ public class AuthorizationTest extends FrontendTestBase {
       // Verify with the admin user
       user = new User("admin_user");
       ctx = createAnalysisCtx(authzConfig, user.getName());
-      fe = new Frontend(authzConfig, catalog);
+      fe = new Frontend(authzFactory, catalog);
 
       // Admin user should have privileges to do anything
       AuthzOk(fe, ctx, "select * from functional.alltypesagg");
@@ -1060,7 +1063,8 @@ public class AuthorizationTest extends FrontendTestBase {
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws ImpalaException {
-    Frontend fe = new Frontend(authzConfig, ctx_.catalog);
+    Frontend fe = new Frontend(new SentryAuthorizationFactory(authzConfig),
+        ctx_.catalog);
     AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
     AuthzError(fe, ctx, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
@@ -420,9 +419,10 @@ public class InsertStmt extends StatementBase {
       table_ = analyzer.getTable(targetTableName_, privilegeRequired);
     } else {
       targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
-      PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-      analyzer.registerPrivReq(pb.onTable(table_.getDb().getName(), table_.getName())
-          .allOf(privilegeRequired).build());
+      analyzer.registerPrivReq(builder ->
+          builder.onTable(table_.getDb().getName(), table_.getName())
+              .allOf(privilegeRequired)
+              .build());
     }
 
     // We do not support (in|up)serting into views.

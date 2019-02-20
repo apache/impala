@@ -15,13 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 package org.apache.impala.authorization;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+
 /**
- * This enum contains the list of authorization providers supported in Impala.
+ * A class to authorize access to a database.
  */
-public enum AuthorizationProvider {
-  SENTRY,
-  NONE
+public class AuthorizableDb extends Authorizable {
+  private final String dbName_;
+
+  public AuthorizableDb(String dbName) {
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
+    dbName_ = dbName;
+  }
+
+  @Override
+  public String getName() { return dbName_; }
+
+  @Override
+  public String getDbName() { return getName(); }
+
+  @Override
+  public Type getType() { return Authorizable.Type.DB; }
 }

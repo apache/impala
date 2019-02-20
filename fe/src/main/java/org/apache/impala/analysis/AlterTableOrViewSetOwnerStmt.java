@@ -52,7 +52,7 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
     // We don't allow assigning to a non-existent role because Sentry should know about
     // all roles. Sentry does not track all users so we allow assigning to a user
     // that Sentry doesn't know about yet.
-    if (analyzer.getAuthzConfig().isEnabled() && owner_.getOwnerType() == TOwnerType.ROLE
+    if (analyzer.isAuthzEnabled() && owner_.getOwnerType() == TOwnerType.ROLE
         && analyzer.getCatalog().getAuthPolicy().getRole(ownerName) == null) {
       throw new AnalysisException(String.format("Role '%s' does not exist.", ownerName));
     }

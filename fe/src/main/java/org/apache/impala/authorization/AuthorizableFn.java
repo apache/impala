@@ -15,13 +15,34 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 package org.apache.impala.authorization;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+
 /**
- * This enum contains the list of authorization providers supported in Impala.
+ * A class to authorize access to a function.
  */
-public enum AuthorizationProvider {
-  SENTRY,
-  NONE
+public class AuthorizableFn extends Authorizable {
+  private final String dbName_;
+  private final String fnName_;
+
+  public AuthorizableFn(String dbName, String fnName) {
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(fnName));
+    dbName_ = dbName;
+    fnName_ = fnName;
+  }
+
+  @Override
+  public String getName() { return dbName_ + "." + fnName_; }
+
+  @Override
+  public Type getType() { return Type.FUNCTION; }
+
+  @Override
+  public String getDbName() { return dbName_; }
+
+  @Override
+  public String getFnName() { return fnName_; }
 }

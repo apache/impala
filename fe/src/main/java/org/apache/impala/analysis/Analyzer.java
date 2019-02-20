@@ -30,10 +30,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
@@ -193,7 +195,7 @@ public class Analyzer {
   // them properties of the tuple descriptor itself.
   private static class GlobalState {
     public final TQueryCtx queryCtx;
-    public final AuthorizationConfig authzConfig;
+    public final AuthorizationFactory authzFactory;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
     public final ColumnLineageGraph lineageGraph;
@@ -309,10 +311,10 @@ public class Analyzer {
     private final ExprRewriter exprRewriter_;
 
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
-        AuthorizationConfig authzConfig) {
+        AuthorizationFactory authzFactory) {
       this.stmtTableCache = stmtTableCache;
       this.queryCtx = queryCtx;
-      this.authzConfig = authzConfig;
+      this.authzFactory = authzFactory;
       this.lineageGraph = new ColumnLineageGraph();
       List<ExprRewriteRule> rules = new ArrayList<>();
       // BetweenPredicates must be rewritten to be executable. Other non-essential
@@ -376,9 +378,9 @@ public class Analyzer {
   private boolean hasEmptySpjResultSet_ = false;
 
   public Analyzer(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
-      AuthorizationConfig authzConfig) {
+      AuthorizationFactory authzFactory) {
     ancestors_ = new ArrayList<>();
-    globalState_ = new GlobalState(stmtTableCache, queryCtx, authzConfig);
+    globalState_ = new GlobalState(stmtTableCache, queryCtx, authzFactory);
     user_ = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
   }
 
@@ -411,7 +413,7 @@ public class Analyzer {
    */
   public static Analyzer createWithNewGlobalState(Analyzer parentAnalyzer) {
     GlobalState globalState = new GlobalState(parentAnalyzer.globalState_.stmtTableCache,
-        parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzConfig());
+        parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzFactory());
     return new Analyzer(parentAnalyzer, globalState);
   }
 
@@ -566,21 +568,22 @@ public class Analyzer {
       // an analysis error. We should not accidentally reveal the non-existence of a
       // table/database if the user is not authorized.
       if (rawPath.size() > 1) {
-        PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
-            .onTable(rawPath.get(0), rawPath.get(1))
-            .allOf(tableRef.getPrivilege());
+        registerPrivReq(builder -> {
+          builder.onTable(rawPath.get(0), rawPath.get(1)).allOf(tableRef.getPrivilege());
+          if (tableRef.requireGrantOption()) {
+            builder.grantOption();
+          }
+          return builder.build();
+        });
+      }
+
+      registerPrivReq(builder -> {
+        builder.onTable(getDefaultDb(), rawPath.get(0)).allOf(tableRef.getPrivilege());
         if (tableRef.requireGrantOption()) {
           builder.grantOption();
         }
-        registerPrivReq(builder.build());
-      }
-      PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
-          .onTable(getDefaultDb(), rawPath.get(0))
-          .allOf(tableRef.getPrivilege());
-      if (tableRef.requireGrantOption()) {
-        builder.grantOption();
-      }
-      registerPrivReq(builder.build());
+        return builder.build();
+      });
       throw e;
     } catch (TableLoadingException e) {
       throw new AnalysisException(String.format(
@@ -968,9 +971,10 @@ public class Analyzer {
       Column column = tupleDesc.getTable().getColumn(
           slotDesc.getPath().getRawPath().get(0));
       if (column != null) {
-        registerPrivReq(new PrivilegeRequestBuilder().
-            allOf(Privilege.SELECT).onColumn(tupleDesc.getTableName().getDb(),
-            tupleDesc.getTableName().getTbl(), column.getName()).build());
+        registerPrivReq(builder -> builder
+            .allOf(Privilege.SELECT)
+            .onColumn(tupleDesc.getTableName().getDb(), tupleDesc.getTableName().getTbl(),
+                column.getName()).build());
       }
     }
   }
@@ -2352,7 +2356,11 @@ public class Analyzer {
     return globalState_.queryCtx.client_request.getQuery_options();
   }
   public boolean isDecimalV2() { return getQueryOptions().isDecimal_v2(); }
-  public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
+  public AuthorizationFactory getAuthzFactory() { return globalState_.authzFactory; }
+  public AuthorizationConfig getAuthzConfig() {
+    return getAuthzFactory().getAuthorizationConfig();
+  }
+  public boolean isAuthzEnabled() { return getAuthzConfig().isEnabled(); }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
   public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }
   public TLineageGraph getThriftSerializedLineageGraph() {
@@ -2425,17 +2433,21 @@ public class Analyzer {
       throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
-    tableName = getFqTableName(tableName);
+    TableName fqTableName = getFqTableName(tableName);
     for (Privilege priv : privilege) {
       if (priv == Privilege.ANY || addColumnPrivilege) {
-        registerPrivReq(new PrivilegeRequestBuilder()
-            .allOf(priv).onAnyColumn(tableName.getDb(), tableName.getTbl()).build());
+        registerPrivReq(builder ->
+            builder.allOf(priv)
+                .onAnyColumn(fqTableName.getDb(), fqTableName.getTbl())
+                .build());
       } else {
-        registerPrivReq(new PrivilegeRequestBuilder()
-            .allOf(priv).onTable(tableName.getDb(), tableName.getTbl()).build());
+        registerPrivReq(builder ->
+            builder.allOf(priv)
+                .onTable(fqTableName.getDb(), fqTableName.getTbl())
+                .build());
       }
     }
-    FeTable table = getTable(tableName.getDb(), tableName.getTbl());
+    FeTable table = getTable(fqTableName.getDb(), fqTableName.getTbl());
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access
@@ -2443,7 +2455,7 @@ public class Analyzer {
       if (table instanceof FeView) objectType = TCatalogObjectType.VIEW;
       for (Privilege priv : privilege) {
         globalState_.accessEvents.add(new TAccessEvent(
-            tableName.toString(), objectType, priv.toString()));
+            fqTableName.toString(), objectType, priv.toString()));
       }
     }
     return table;
@@ -2509,15 +2521,14 @@ public class Analyzer {
    */
   public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist,
       boolean requireGrantOption) throws AnalysisException {
-    PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-    if (requireGrantOption) {
-      pb.grantOption();
-    }
-    if (privilege == Privilege.ANY) {
-      registerPrivReq(pb.any().onAnyColumn(dbName).build());
-    } else {
-      registerPrivReq(pb.allOf(privilege).onDb(dbName).build());
-    }
+    registerPrivReq(builder -> {
+      if (requireGrantOption) {
+        builder.grantOption();
+      }
+      return privilege == Privilege.ANY ?
+          builder.any().onAnyColumn(dbName).build() :
+          builder.allOf(privilege).onDb(dbName).build();
+    });
 
     FeDb db = getDb(dbName, throwIfDoesNotExist);
     globalState_.accessEvents.add(new TAccessEvent(
@@ -2547,8 +2558,10 @@ public class Analyzer {
    */
   public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
       throws AnalysisException {
-    registerPrivReq(new PrivilegeRequestBuilder().allOf(privilege)
-        .onTable(dbName,  tableName).build());
+    registerPrivReq(builder ->
+        builder.allOf(privilege)
+            .onTable(dbName, tableName)
+            .build());
     try {
       FeDb db = getCatalog().getDb(dbName);
       if (db == null) {
@@ -2641,6 +2654,16 @@ public class Analyzer {
   }
 
   /**
+   * Registers a new PrivilegeRequest in the analyzer. The given function is used to
+   * create a PrivilegeRequest.
+   */
+  public void registerPrivReq(
+      Function<PrivilegeRequestBuilder, PrivilegeRequest> function) {
+    registerPrivReq(function.apply(new PrivilegeRequestBuilder(
+        getAuthzFactory().getAuthorizableFactory())));
+  }
+
+  /**
    * This method does not require the grant option permission.
    */
   public void registerAuthAndAuditEvent(FeTable table, Privilege priv) {
@@ -2669,13 +2692,13 @@ public class Analyzer {
     }
     // Add privilege request.
     TableName tableName = table.getTableName();
-    PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
-        .onTable(tableName.getDb(), tableName.getTbl())
-        .allOf(priv);
-    if (requireGrantOption) {
-      builder.grantOption();
-    }
-    registerPrivReq(builder.build());
+    registerPrivReq(builder -> {
+      builder.onTable(tableName.getDb(), tableName.getTbl()).allOf(priv);
+      if (requireGrantOption) {
+        builder.grantOption();
+      }
+      return builder.build();
+    });
   }
 
   /**
@@ -2683,7 +2706,6 @@ public class Analyzer {
    * is not enabled.
    */
   public String getServerName() {
-    return getAuthzConfig().isEnabled() ? getAuthzConfig().getServerName().intern() :
-        null;
+    return isAuthzEnabled() ? getAuthzConfig().getServerName().intern() : null;
   }
 }

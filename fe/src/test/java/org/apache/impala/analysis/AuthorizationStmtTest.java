@@ -33,6 +33,7 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.authorization.sentry.SentryPolicyService;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
@@ -78,7 +79,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     SentryAuthorizationConfig authzConfig = createAuthorizationConfig();
     analysisContext_ = createAnalysisCtx(authzConfig, USER.getName());
     authzCatalog_ = new ImpaladTestCatalog(authzConfig);
-    authzFrontend_ = new Frontend(authzConfig, authzCatalog_);
+    authzFrontend_ = new Frontend(new SentryAuthorizationFactory(authzConfig),
+        authzCatalog_);
     sentryService_ = new SentryPolicyService(authzConfig.getSentryConfig());
   }
 
@@ -165,8 +167,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
         "select alltypes.id from alltypes", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "select id from alltypes",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "select id from alltypes", expectedAuthorizables);
     verifyPrivilegeReqs("select alltypes.id from functional.alltypes",
         expectedAuthorizables);
     verifyPrivilegeReqs("select a.id from functional.alltypes a", expectedAuthorizables);
@@ -175,8 +177,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("insert into functional.alltypes(id) partition(month, year) " +
         "values(1, 1, 2018)", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "insert into alltypes(id) " +
-        "partition(month, year) values(1, 1, 2018)", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "insert into alltypes(id) partition(month, year) values(1, 1, 2018)",
+        expectedAuthorizables);
 
     // Insert with constant select.
     expectedAuthorizables = Sets.newHashSet("functional.zipcode_incomes");
@@ -209,8 +212,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Reset metadata.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("invalidate metadata functional.alltypes", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "invalidate metadata alltypes",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "invalidate metadata alltypes", expectedAuthorizables);
     verifyPrivilegeReqs("refresh functional.alltypes", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"), "refresh alltypes",
         expectedAuthorizables);
@@ -224,8 +227,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Show partitions.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("show partitions functional.alltypes", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "show partitions alltypes",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "show partitions alltypes", expectedAuthorizables);
 
     // Show range partitions.
     expectedAuthorizables = Sets.newHashSet("functional_kudu.dimtbl");
@@ -238,14 +241,14 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("show table stats functional.alltypes",
         expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "show table stats alltypes",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "show table stats alltypes", expectedAuthorizables);
 
     // Show column stats.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("show column stats functional.alltypes", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "show column stats alltypes",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "show column stats alltypes", expectedAuthorizables);
 
     // Show create table.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
@@ -276,8 +279,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     expectedAuthorizables = Sets.newHashSet("functional.new_table");
     verifyPrivilegeReqs("create table functional.new_table(i int)",
         expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "create table new_table(i int)",
-        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "create table new_table(i int)", expectedAuthorizables);
 
     // Create view.
     expectedAuthorizables = Sets.newHashSet("functional.new_view");
@@ -295,7 +298,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Drop view.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes_view");
     verifyPrivilegeReqs("drop view functional.alltypes_view", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "drop view alltypes_view",
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "drop view alltypes_view",
         expectedAuthorizables);
 
     // Update table.
@@ -320,22 +324,23 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         "functional_kudu.alltypes",
         "functional_kudu.alltypes.id");
     verifyPrivilegeReqs("delete from functional_kudu.alltypes", expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional_kudu"), "delete from alltypes",
+    verifyPrivilegeReqs(createAnalysisCtx("functional_kudu"),
+        "delete from alltypes",
         expectedAuthorizables);
 
     // Alter table.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes");
     verifyPrivilegeReqs("alter table functional.alltypes add columns(c1 int)",
         expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "alter table alltypes " +
-        "add columns(c1 int)", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "alter table alltypes add columns(c1 int)", expectedAuthorizables);
 
     // Alter view.
     expectedAuthorizables = Sets.newHashSet("functional.alltypes_view");
     verifyPrivilegeReqs("alter view functional.alltypes_view as select 1",
         expectedAuthorizables);
-    verifyPrivilegeReqs(createAnalysisCtx("functional"), "alter view alltypes_view as " +
-        "select 1", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "alter view alltypes_view as select 1", expectedAuthorizables);
   }
 
   @Test
@@ -2704,7 +2709,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       for (AuthzTest test: new AuthzTest[] {
           authorize("select functional.to_lower('ABCDEF')"),
           // Also test with expression rewrite enabled.
-          authorize(createAnalysisCtx(options),
+          authorize(createAnalysisCtx(options, createAuthorizationConfig()),
               "select functional.to_lower('ABCDEF')")}) {
         test.ok(onServer(TPrivilegeLevel.SELECT))
             .ok(onDatabase("functional", TPrivilegeLevel.ALL))
@@ -3253,7 +3258,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   private void verifyPrivilegeReqs(String stmt, Set<String> expectedPrivilegeNames)
       throws ImpalaException {
-    verifyPrivilegeReqs(createAnalysisCtx(), stmt, expectedPrivilegeNames);
+    verifyPrivilegeReqs(createAnalysisCtx(createAuthorizationConfig()), stmt,
+        expectedPrivilegeNames);
   }
 
   private void verifyPrivilegeReqs(AnalysisContext ctx, String stmt,

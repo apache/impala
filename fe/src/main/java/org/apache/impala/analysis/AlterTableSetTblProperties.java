@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
@@ -127,13 +127,13 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
           String.format("Not allowed to set '%s' manually for managed Kudu tables .",
               KuduTable.KEY_TABLE_NAME));
     }
-    if (analyzer.getAuthzConfig().isEnabled()) {
+    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
+    if (authzConfig.isEnabled()) {
       if (keyForExternalProperty != null ||
           tblProperties_.containsKey(KuduTable.KEY_MASTER_HOSTS)) {
-        String authzServer = analyzer.getAuthzConfig().getServerName();
+        String authzServer = authzConfig.getServerName();
         Preconditions.checkNotNull(authzServer);
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
-            authzServer).all().build());
+        analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
       }
     }
   }

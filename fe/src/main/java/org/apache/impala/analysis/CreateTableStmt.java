@@ -23,7 +23,7 @@ import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
@@ -244,7 +244,8 @@ public class CreateTableStmt extends StatementBase {
    * Kudu tables.
    */
   private void analyzeKuduTableProperties(Analyzer analyzer) throws AnalysisException {
-    if (analyzer.getAuthzConfig().isEnabled()) {
+    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
+    if (authzConfig.isEnabled()) {
       // Today there is no comprehensive way of enforcing a Sentry authorization policy
       // against tables stored in Kudu. This is why only users with ALL privileges on
       // SERVER may create external Kudu tables or set the master addresses.
@@ -253,10 +254,9 @@ public class CreateTableStmt extends StatementBase {
           MetaStoreUtil.findTblPropKeyCaseInsensitive(
               getTblProperties(), "EXTERNAL") != null;
       if (getTblProperties().containsKey(KuduTable.KEY_MASTER_HOSTS) || isExternal) {
-        String authzServer = analyzer.getAuthzConfig().getServerName();
+        String authzServer = authzConfig.getServerName();
         Preconditions.checkNotNull(authzServer);
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
-            authzServer).all().build());
+        analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
       }
     }
 

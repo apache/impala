@@ -66,6 +66,7 @@ import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -224,7 +225,7 @@ public class Frontend {
   }
 
   private final FeCatalogManager catalogManager_;
-  private final AuthorizationConfig authzConfig_;
+  private final AuthorizationFactory authzFactory_;
   /**
    * Authorization checker. Initialized and periodically loaded by a task
    * running on the {@link #policyReader_} thread.
@@ -236,8 +237,8 @@ public class Frontend {
 
   private final ImpaladTableUsageTracker impaladTableUsageTracker_;
 
-  public Frontend(AuthorizationConfig authorizationConfig) {
-    this(authorizationConfig, FeCatalogManager.createFromBackendConfig());
+  public Frontend(AuthorizationFactory authzFactory) {
+    this(authzFactory, FeCatalogManager.createFromBackendConfig());
   }
 
   /**
@@ -245,19 +246,18 @@ public class Frontend {
    * updates and will be used for all requests.
    */
   @VisibleForTesting
-  public Frontend(AuthorizationConfig authorizationConfig,
-      FeCatalog testCatalog) {
-    this(authorizationConfig, FeCatalogManager.createForTests(testCatalog));
+  public Frontend(AuthorizationFactory authzFactory, FeCatalog testCatalog) {
+    this(authzFactory, FeCatalogManager.createForTests(testCatalog));
   }
 
-  private Frontend(AuthorizationConfig authorizationConfig,
-      FeCatalogManager catalogManager) {
-    authzConfig_ = authorizationConfig;
+  private Frontend(AuthorizationFactory authzFactory, FeCatalogManager catalogManager) {
     catalogManager_ = catalogManager;
+    authzFactory_ = authzFactory;
 
-    if (authzConfig_.getProvider() == AuthorizationProvider.SENTRY) {
+    AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
+    if (authzConfig.getProvider() == AuthorizationProvider.SENTRY) {
       SentryAuthorizationConfig sentryAuthzConfig =
-          (SentryAuthorizationConfig) authzConfig_;
+          (SentryAuthorizationConfig) authzConfig;
       // Load the authorization policy once at startup, initializing
       // authzChecker_. This ensures that, if the policy fails to load,
       // we will throw an exception and fail to start.
@@ -274,6 +274,8 @@ public class Frontend {
         policyReader_.scheduleAtFixedRate(policyReaderTask,
             delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
       }
+    } else {
+      authzChecker_.set(authzFactory.newAuthorizationChecker());
     }
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
@@ -293,7 +295,7 @@ public class Frontend {
     public void run() {
       try {
         LOG.info("Reloading authorization policy file from: " + config_.getPolicyFile());
-        authzChecker_.set(new SentryAuthorizationChecker(config_,
+        authzChecker_.set(authzFactory_.newAuthorizationChecker(
             getCatalog().getAuthPolicy()));
       } catch (Exception e) {
         LOG.error("Error reloading policy file: ", e);
@@ -315,8 +317,8 @@ public class Frontend {
     if (!req.is_delta) {
       // In the case that it was a non-delta update, the catalog might have reloaded
       // itself, and we need to reset the AuthorizationChecker accordingly.
-      authzChecker_.set(new SentryAuthorizationChecker(
-          authzConfig_, getCatalog().getAuthPolicy()));
+      authzChecker_.set(authzFactory_.newAuthorizationChecker(
+          getCatalog().getAuthPolicy()));
     }
     return resp;
   }
@@ -533,8 +535,9 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_ROLES;
       ShowRolesStmt showRolesStmt = (ShowRolesStmt) analysis.getStmt();
       ddl.setShow_roles_params(showRolesStmt.toThrift());
-      Set<String> groupNames =
-          getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
+      Preconditions.checkState(getAuthzChecker() instanceof SentryAuthorizationChecker);
+      Set<String> groupNames = ((SentryAuthorizationChecker) getAuthzChecker())
+          .getUserGroups(analysis.getAnalyzer().getUser());
       // Check if the user is part of the group (case-sensitive) this SHOW ROLE
       // statement is targeting. If they are already a member of the group,
       // the admin requirement can be removed.
@@ -550,8 +553,8 @@ public class Frontend {
       ShowGrantPrincipalStmt showGrantPrincipalStmt =
           (ShowGrantPrincipalStmt) analysis.getStmt();
       ddl.setShow_grant_principal_params(showGrantPrincipalStmt.toThrift());
-      Set<String> groupNames =
-          getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
+      Set<String> groupNames = ((SentryAuthorizationChecker) getAuthzChecker())
+          .getUserGroups(analysis.getAnalyzer().getUser());
       // User must be an admin to execute this operation if they have not been granted
       // this principal, or the same user as the request.
       boolean requiresAdmin;
@@ -784,11 +787,12 @@ public class Frontend {
   private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
       User user) throws ImpalaException {
     List<String> tblNames = getCatalog().getTableNames(dbName, matcher);
-    if (authzConfig_.isEnabled()) {
+    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
         String tblName = iter.next();
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
+            authzFactory_.getAuthorizableFactory())
             .any().onAnyColumn(dbName, tblName).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           iter.remove();
@@ -810,10 +814,11 @@ public class Frontend {
     for (Column column: table.getColumnsInHiveOrder()) {
       String colName = column.getName();
       if (!matcher.matches(colName)) continue;
-      if (authzConfig_.isEnabled()) {
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+      if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
+            authzFactory_.getAuthorizableFactory())
             .any().onColumn(table.getTableName().getDb(), table.getTableName().getTbl(),
-            colName).build();
+                colName).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) continue;
       }
       columns.add(column);
@@ -830,7 +835,7 @@ public class Frontend {
     List<? extends FeDb> dbs = getCatalog().getDbs(matcher);
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
-    if (authzConfig_.isEnabled()) {
+    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       Iterator<? extends FeDb> iter = dbs.iterator();
       while (iter.hasNext()) {
         FeDb db = iter.next();
@@ -849,8 +854,8 @@ public class Frontend {
       // Default DB should always be shown.
       return true;
     }
-    PrivilegeRequest request = new PrivilegeRequestBuilder()
-        .any().onAnyColumn(db.getName()).build();
+    PrivilegeRequest request = new PrivilegeRequestBuilder(
+        authzFactory_.getAuthorizableFactory()).any().onAnyColumn(db.getName()).build();
     return authzChecker_.get().hasAccess(user, request);
   }
 
@@ -1018,9 +1023,10 @@ public class Frontend {
     FeTable table = getCatalog().getTable(tableName.db_name,
         tableName.table_name);
     List<Column> filteredColumns;
-    if (authzConfig_.isEnabled()) {
+    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       // First run a table check
-      PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+      PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
+          authzFactory_.getAuthorizableFactory())
           .allOf(Privilege.VIEW_METADATA).onTable(table.getDb().getName(),
               table.getName())
           .build();
@@ -1029,7 +1035,8 @@ public class Frontend {
         filteredColumns = new ArrayList<Column>();
         for (Column col: table.getColumnsInHiveOrder()) {
           String colName = col.getName();
-          privilegeRequest = new PrivilegeRequestBuilder()
+          privilegeRequest = new PrivilegeRequestBuilder(
+              authzFactory_.getAuthorizableFactory())
               .allOf(Privilege.VIEW_METADATA)
               .onColumn(table.getDb().getName(), table.getName(), colName)
               .build();
@@ -1057,14 +1064,15 @@ public class Frontend {
       TDescribeResult result = DescribeResultFactory.buildDescribeFormattedResult(table,
           filteredColumns);
       // Filter out LOCATION text
-      if (authzConfig_.isEnabled()) {
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+      if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
+            authzFactory_.getAuthorizableFactory())
             .allOf(Privilege.VIEW_METADATA)
             .onTable(table.getDb().getName(),table.getName())
             .build();
         // Only filter if the user doesn't have table access.
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
-          List<TResultRow> results = new ArrayList<TResultRow>();
+          List<TResultRow> results = new ArrayList<>();
           for(TResultRow row: result.getResults()) {
             String stringVal = row.getColVals().get(0).getString_val();
             if (!stringVal.contains("Location")) {
@@ -1286,7 +1294,7 @@ public class Frontend {
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
 
     // Analyze and authorize stmt
-    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzConfig_, timeline);
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult =
         analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache, authzChecker_.get());
     LOG.info("Analysis finished.");

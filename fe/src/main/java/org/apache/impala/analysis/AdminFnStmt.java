@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
@@ -96,12 +96,12 @@ public class AdminFnStmt extends StatementBase {
    * shutdown('host:port'), shutdown(deadline), shutdown('host:port', deadline).
    */
   private void analyzeShutdown(Analyzer analyzer) throws AnalysisException {
-    if (analyzer.getAuthzConfig().isEnabled()) {
+    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
+    if (authzConfig.isEnabled()) {
       // Only admins (i.e. user with ALL privilege on server) can execute admin functions.
-      String authzServer = analyzer.getAuthzConfig().getServerName();
+      String authzServer = authzConfig.getServerName();
       Preconditions.checkNotNull(authzServer);
-      analyzer.registerPrivReq(
-          new PrivilegeRequestBuilder().onServer(authzServer).all().build());
+      analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
     }
 
     // TODO: this parsing and type checking logic is specific to the command, similar to

@@ -117,4 +117,6 @@ struct TBackendGflags {
   45: required i32 hms_event_polling_interval_s
 
   46: required string impala_build_version
+
+  47: required string authorization_factory_class
 }
