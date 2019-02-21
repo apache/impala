@@ -87,12 +87,13 @@ under the License.
 
         </stentry>
 
-        <stentry>The current <codeph>impalad</codeph> host</stentry>
+        <stentry>The current <codeph>impalad</codeph> host to whom the
+            <codeph>SHUTDOWN</codeph> statement is submitted.</stentry>
 
         <stentry>
 
           <p>
-            Address of the backend to be shut down.
+            Address of the <codeph>impalad</codeph> to be shut down.
           </p>
 
         </stentry>
@@ -113,19 +114,32 @@ under the License.
 
           <ul>
             <li>
-              In Impala 3.1, the same backend port as the current <codeph>impalad</codeph>.
+              In Impala 3.1, the current <codeph>impalad</codeph>'s port used for the thrift
+              based communication with other <codeph>impalad</codeph>s (by default, 22000).
             </li>
 
             <li>
-              In Impala 3.2 and higher, the KRPC port for the current <codeph>impalad</codeph>.
+              In Impala 3.2 and higher, the current <codeph>impalad</codeph>'s port used for the
+              KRPC based communication with other <codeph>impalad</codeph>s (by default, 27000).
             </li>
           </ul>
 
         </stentry>
 
         <stentry>Specifies the port by which the <codeph>impalad</codeph> can be
-          contacted. Use the KRPC port for your
-          <codeph>impalad</codeph>.</stentry>
+          contacted. <ul>
+            <li>
+              In Impala 3.1, use the same <codeph>impalad</codeph> port used for the thrift
+              based inter-Impala communication.
+            </li>
+
+            <li>
+              In Impala 3.2 and higher, use the same <codeph>impalad</codeph> port used for the
+              KRPC based inter-Impala communication.
+            </li>
+          </ul>
+
+        </stentry>
 
       </strow>
 
@@ -142,11 +156,12 @@ under the License.
         <stentry>The value of the <codeph>‑‑shutdown_deadline_s</codeph> flag,
           which defaults to 1 hour. </stentry>
 
-        <stentry>
-          <codeph><varname>deadline</varname></codeph> must be a non-negative
-          number, specified in seconds. <p> The value, 0, for
-              <varname>deadline</varname> specifies an immediate shutdown.
-          </p></stentry>
+        <stentry><codeph><varname>deadline</varname></codeph> must be a non-negative
+          number, specified in seconds. <p>
+            The value, 0, for <varname>deadline</varname> specifies an immediate shutdown.
+          </p>
+
+        </stentry>
 
       </strow>
 
@@ -166,7 +181,7 @@ under the License.
       </li>
 
       <li>
-        A client can remotely shut down another non-coordinator <codeph>impalad</codeph> via
+        A client can remotely shut down any <codeph>impalad</codeph> via
         <codeph>:SHUTDOWN('<varname>hostname</varname>')</codeph>.
       </li>
 
@@ -179,7 +194,7 @@ under the License.
       <li>
         <xref href="impala_components.xml#intro_impalad">Executors</xref> can be shut down
         without disrupting running queries. Short-running queries will finish, and long-running
-        queries will continue until a threshold time limit is reached.
+        queries will continue until the <varname>deadline</varname> is reached.
       </li>
 
       <li>
