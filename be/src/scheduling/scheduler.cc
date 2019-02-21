@@ -261,6 +261,7 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       hdfs_scan_range.__set_mtime(fb_desc->last_modification_time());
       hdfs_scan_range.__set_offset(scan_range_offset);
       hdfs_scan_range.__set_partition_id(spec.partition_id);
+      hdfs_scan_range.__set_is_erasure_coded(fb_desc->is_ec());
       TScanRange scan_range;
       scan_range.__set_hdfs_file_split(hdfs_scan_range);
       TScanRangeLocationList scan_range_list;

@@ -199,11 +199,13 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   // lock across the read call.
   // To use the file handle cache:
   // 1. It must be enabled at the daemon level.
-  // 2. The file is a local HDFS file (expected_local_) OR it is a remote HDFS file and
+  // 2. The file cannot be erasure coded.
+  // 3. The file is a local HDFS file (expected_local_) OR it is a remote HDFS file and
   //    'cache_remote_file_handles' is true
-  // Note: S3, ADLS, and ABFS file handles are not cached.
+  // Note: S3, ADLS, and ABFS file handles are not cached. Erasure coded HDFS files
+  // are also not cached (IMPALA-8178), due to excessive memory usage (see HDFS-14308).
   bool use_file_handle_cache = false;
-  if (is_file_handle_caching_enabled() &&
+  if (is_file_handle_caching_enabled() && !is_erasure_coded_ &&
       (expected_local_ ||
        (FLAGS_cache_remote_file_handles && disk_id_ == io_mgr_->RemoteDfsDiskId()))) {
     use_file_handle_cache = true;
@@ -444,13 +446,15 @@ ScanRange::~ScanRange() {
 }
 
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, const BufferOpts& buffer_opts, void* meta_data) {
-  Reset(fs, file, len, offset, disk_id, expected_local, buffer_opts, {}, meta_data);
+    int disk_id, bool expected_local, bool is_erasure_coded,
+    const BufferOpts& buffer_opts, void* meta_data) {
+  Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded, buffer_opts,
+      {}, meta_data);
 }
 
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, const BufferOpts& buffer_opts,
-    vector<SubRange>&& sub_ranges, void* meta_data) {
+    int disk_id, bool expected_local, bool is_erasure_coded,
+    const BufferOpts& buffer_opts, vector<SubRange>&& sub_ranges, void* meta_data) {
   DCHECK(ready_buffers_.empty());
   DCHECK(!read_in_flight_);
   DCHECK(file != nullptr);
@@ -479,7 +483,10 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   } else {
     external_buffer_tag_ = ExternalBufferTag::NO_BUFFER;
   }
+  // Erasure coded should not be considered local (see IMPALA-7019).
+  DCHECK(!(expected_local && is_erasure_coded));
   expected_local_ = expected_local;
+  is_erasure_coded_ = is_erasure_coded;
   io_mgr_ = nullptr;
   reader_ = nullptr;
   sub_ranges_.clear();

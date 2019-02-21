@@ -956,7 +956,8 @@ public class HdfsScanNode extends ScanNode {
         TScanRange scanRange = new TScanRange();
         scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getFileName(),
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
-            fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime()));
+            fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
+            fileDesc.getIsEc()));
         TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
         scanRangeLocations.scan_range = scanRange;
         scanRangeLocations.locations = locations;

@@ -188,6 +188,9 @@ struct THdfsFileSplit {
 
   // last modified time of the file
   7: required i64 mtime
+
+  // whether this file is erasure-coded
+  8: required bool is_erasure_coded
 }
 
 // key range for single THBaseScanNode

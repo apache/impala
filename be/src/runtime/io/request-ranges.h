@@ -250,18 +250,20 @@ class ScanRange : public RequestRange {
   /// it is not generally safe to do so, but some unit tests reuse ranges after
   /// successfully reading to eos.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, const BufferOpts& buffer_opts, void* meta_data = nullptr);
+      bool expected_local, bool is_erasure_coded, const BufferOpts& buffer_opts,
+      void* meta_data = nullptr);
 
   /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
   /// in advance, as this method will do the merge.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, const BufferOpts& buffer_opts,
+      bool expected_local, bool is_erasure_coded, const BufferOpts& buffer_opts,
       std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr);
 
   void* meta_data() const { return meta_data_; }
   bool try_cache() const { return try_cache_; }
   bool read_in_flight() const { return read_in_flight_; }
   bool expected_local() const { return expected_local_; }
+  bool is_erasure_coded() const { return is_erasure_coded_; }
   int64_t bytes_to_read() const { return bytes_to_read_; }
 
   /// Returns the next buffer for this scan range. buffer is an output parameter.
@@ -445,6 +447,9 @@ class ScanRange : public RequestRange {
   /// local.
   /// TODO: we can do more with this
   bool expected_local_ = false;
+
+  /// If true, the file associated with the scan range is erasure coded. Set in Reset().
+  bool is_erasure_coded_ = false;
 
   /// Last modified time of the file associated with the scan range. Set in Reset().
   int64_t mtime_;

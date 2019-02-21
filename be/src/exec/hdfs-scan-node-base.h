@@ -54,7 +54,7 @@ class TScanRange;
 struct HdfsFileDesc {
   HdfsFileDesc(const std::string& filename)
     : fs(NULL), filename(filename), file_length(0), mtime(0),
-      file_compression(THdfsCompression::NONE) {
+      file_compression(THdfsCompression::NONE), is_erasure_coded(false) {
   }
 
   /// Connection to the filesystem containing the file.
@@ -71,6 +71,9 @@ struct HdfsFileDesc {
   int64_t mtime;
 
   THdfsCompression::type file_compression;
+
+  /// is erasure coded
+  bool is_erasure_coded;
 
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<io::ScanRange*> splits;
@@ -249,6 +252,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// This is thread safe.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
+      bool is_erasure_coded,
       const io::BufferOpts& buffer_opts,
       const io::ScanRange* original_split = NULL);
 
@@ -256,12 +260,14 @@ class HdfsScanNodeBase : public ScanNode {
   /// the partition_id, original_splits, and other information about the scan range.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
-      const io::BufferOpts& buffer_opts);
+      bool is_erasure_coded, const io::BufferOpts& buffer_opts);
 
   /// Old API for compatibility with text scanners (e.g. LZO text scanner).
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
-      bool expected_local, int mtime, const io::ScanRange* original_split = NULL);
+      bool expected_local, int mtime,
+      bool is_erasure_coded = false,
+      const io::ScanRange* original_split = NULL);
 
   /// Adds ranges to the io mgr queue. Can be overridden to add scan-node specific
   /// actions like starting scanner threads. Must not be called once
