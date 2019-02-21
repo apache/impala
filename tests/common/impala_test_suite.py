@@ -644,7 +644,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @execute_wrapper
   def execute_query_async(self, query, query_options=None):
-    self.client.set_configuration(query_options)
+    if query_options is not None: self.client.set_configuration(query_options)
     return self.client.execute_async(query)
 
   @execute_wrapper

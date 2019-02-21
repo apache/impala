@@ -515,3 +515,39 @@ class TestObservability(ImpalaTestSuite):
 
     assert len(end_time_sub_sec_str) == 9, end_time
     assert len(start_time_sub_sec_str) == 9, start_time
+
+  @pytest.mark.execute_serially
+  def test_end_time(self):
+    """ Test that verifies that the end time of a query with a coordinator is set once
+    the coordinator releases its admission control resources. This ensures that the
+    duration of the query will be determined by the time taken to do real work rather
+    than the duration for which the query remains open. On the other hand, for queries
+    without coordinators, the End Time is set only when UnregisterQuery() is called."""
+    # Test the end time of a query with a coordinator.
+    query = "select 1"
+    handle = self.execute_query_async(query)
+    result = self.client.fetch(query, handle)
+    # Ensure that the query returns a non-empty result set.
+    assert result is not None
+    # Once the results have been fetched, the query End Time must be set.
+    query_id = handle.get_handle().id
+    tree = self._get_thrift_profile(query_id)
+    end_time = tree.nodes[1].info_strings["End Time"]
+    assert end_time is not None
+    self.client.close_query(handle)
+    # Test the end time of a query without a coordinator.
+    query = "describe functional.alltypes"
+    handle = self.execute_query_async(query)
+    result = self.client.fetch(query, handle)
+    # Ensure that the query returns a non-empty result set.
+    assert result is not None
+    # The query End Time must not be set until the query is unregisterted
+    query_id = handle.get_handle().id
+    tree = self._get_thrift_profile(query_id)
+    end_time = tree.nodes[1].info_strings["End Time"]
+    assert len(end_time) == 0, end_time
+    self.client.close_query(handle)
+    # The query End Time must be set after the query is unregistered
+    tree = self._get_thrift_profile(query_id)
+    end_time = tree.nodes[1].info_strings["End Time"]
+    assert end_time is not None

@@ -43,6 +43,7 @@
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "scheduling/query-schedule.h"
+#include "service/client-request-state.h"
 #include "util/bloom-filter.h"
 #include "util/counting-barrier.h"
 #include "util/hdfs-bulk-ops.h"
@@ -69,9 +70,10 @@ using namespace impala;
 // Maximum number of fragment instances that can publish each broadcast filter.
 static const int MAX_BROADCAST_FILTER_PRODUCERS = 3;
 
-Coordinator::Coordinator(
-    const QuerySchedule& schedule, RuntimeProfile::EventSequence* events)
-  : schedule_(schedule),
+Coordinator::Coordinator(ClientRequestState* parent, const QuerySchedule& schedule,
+    RuntimeProfile::EventSequence* events)
+  : parent_request_state_(parent),
+    schedule_(schedule),
     filter_mode_(schedule.query_options().runtime_filter_mode),
     obj_pool_(new ObjectPool()),
     query_events_(events) {}
@@ -564,6 +566,8 @@ void Coordinator::HandleExecStateTransition(
     CancelBackends();
   }
   ReleaseAdmissionControlResources();
+  // Once the query has released its admission control resources, update its end time.
+  parent_request_state_->UpdateEndTime();
   // Can compute summary only after we stop accepting reports from the backends. Both
   // WaitForBackends() and CancelBackends() ensures that.
   // TODO: should move this off of the query execution path?

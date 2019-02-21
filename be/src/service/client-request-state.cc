@@ -525,7 +525,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;
   }
-  coord_.reset(new Coordinator(*schedule_, query_events_));
+  coord_.reset(new Coordinator(this, *schedule_, query_events_));
   Status exec_status = coord_->Exec();
 
   DebugActionNoFail(schedule_->query_options(), "CRS_AFTER_COORD_STARTS");
@@ -734,14 +734,9 @@ void ClientRequestState::Done() {
     }
   }
 
+  UpdateEndTime();
   unique_lock<mutex> l(lock_);
-  end_time_us_ = UnixMicros();
-  // Certain API clients expect Start Time and End Time to be date-time strings
-  // of nanosecond precision, so we explicitly specify the precision here.
-  summary_profile_->AddInfoString("End Time", ToStringFromUnixMicros(end_time_us(),
-      TimePrecision::Nanosecond));
   query_events_->MarkEvent("Unregister query");
-
   // Update result set cache metrics, and update mem limit accounting before tearing
   // down the coordinator.
   ClearResultCache();
@@ -1312,5 +1307,15 @@ Status ClientRequestState::UpdateBackendExecStatus(
 void ClientRequestState::UpdateFilter(const TUpdateFilterParams& params) {
   DCHECK(coord_.get());
   coord_->UpdateFilter(params);
+}
+
+void ClientRequestState::UpdateEndTime() {
+  // Update the query's end time only if it isn't set previously.
+  if (end_time_us_.CompareAndSwap(0, UnixMicros())) {
+    // Certain API clients expect Start Time and End Time to be date-time strings
+    // of nanosecond precision, so we explicitly specify the precision here.
+    summary_profile_->AddInfoString(
+        "End Time", ToStringFromUnixMicros(end_time_us(), TimePrecision::Nanosecond));
+  }
 }
 }

@@ -223,7 +223,7 @@ class ClientRequestState {
   const RuntimeProfile* profile() const { return profile_; }
   const RuntimeProfile* summary_profile() const { return summary_profile_; }
   int64_t start_time_us() const { return start_time_us_; }
-  int64_t end_time_us() const { return end_time_us_; }
+  int64_t end_time_us() const { return end_time_us_.Load(); }
   const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }
   const TQueryOptions& query_options() const {
     return query_ctx_.client_request.query_options;
@@ -259,7 +259,17 @@ class ClientRequestState {
   RuntimeProfile::EventSequence* query_events() const { return query_events_; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
 
+ protected:
+  /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
+  /// when this function is called for the first time, calling it multiple times does not
+  /// change the end time.
+  void UpdateEndTime();
+
  private:
+  /// The coordinator is a friend class because it needs to be able to call
+  /// UpdateEndTime() when a query's admission control resources are released.
+  friend class Coordinator;
+
   const TQueryCtx query_ctx_;
 
   /// Ensures single-threaded execution of FetchRows(). Callers of FetchRows() are
@@ -424,10 +434,11 @@ class ClientRequestState {
   ImpalaServer* parent_server_;
 
   /// Start/end time of the query, in Unix microseconds.
+  int64_t start_time_us_;
   /// end_time_us_ is initialized to 0, which is used to indicate that the query is not
-  /// yet done. It is assinged the final value in
-  /// ClientRequestState::Done().
-  int64_t start_time_us_, end_time_us_ = 0;
+  /// yet done. It is assinged the final value in ClientRequestState::Done() or when the
+  /// coordinator relases its admission control resources.
+  AtomicInt64 end_time_us_{0};
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

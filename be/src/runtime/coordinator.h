@@ -37,6 +37,7 @@
 namespace impala {
 
 class CountingBarrier;
+class ClientRequestState;
 class FragmentInstanceState;
 class MemTracker;
 class ObjectPool;
@@ -97,7 +98,8 @@ class TUpdateCatalogRequest;
 /// and unnest them
 class Coordinator { // NOLINT: The member variables could be re-ordered to save space
  public:
-  Coordinator(const QuerySchedule& schedule, RuntimeProfile::EventSequence* events);
+  Coordinator(ClientRequestState* parent, const QuerySchedule& schedule,
+      RuntimeProfile::EventSequence* events);
   ~Coordinator();
 
   /// Initiate asynchronous execution of a query with the given schedule. When it
@@ -217,6 +219,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   struct FilterTarget;
   class FilterState;
   class FragmentStats;
+
+  /// The parent ClientRequestState object for this coordinator. The reference is set in
+  /// the constructor. It always outlives the this coordinator.
+  ClientRequestState* parent_request_state_;
 
   /// owned by the ClientRequestState that owns this coordinator
   const QuerySchedule& schedule_;
