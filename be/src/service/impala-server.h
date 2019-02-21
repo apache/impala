@@ -367,7 +367,7 @@ class ImpalaServer : public ImpalaServiceIf,
       const TUniqueId& catalog_service_id);
 
   /// Wait until the minimum catalog object version in the local cache is
-  /// greater than or equal to 'min_catalog_update_version' or until the catalog
+  /// greater than 'min_catalog_update_version' or until the catalog
   /// service id has changed.
   void WaitForMinCatalogUpdate(const int64_t min_catalog_update_version,
       const TUniqueId& catalog_service_id);

@@ -1644,10 +1644,10 @@ void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_
       catalog_update_info_.min_catalog_object_version;
   // TODO: Set a timeout to eventually break out of this loop is something goes
   // wrong?
-  VLOG_QUERY << "Waiting for minimum catalog object version: "
-      << min_req_catalog_object_version << " current version: "
+  VLOG_QUERY << "Waiting for local minimum catalog object version to be > "
+      << min_req_catalog_object_version << ", current local minimum version: "
       << min_catalog_object_version;
-  while (catalog_update_info_.min_catalog_object_version < min_req_catalog_object_version
+  while (catalog_update_info_.min_catalog_object_version <= min_req_catalog_object_version
       && catalog_update_info_.catalog_service_id == catalog_service_id) {
     catalog_version_update_cv_.Wait(unique_lock);
   }
