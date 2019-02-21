@@ -1102,8 +1102,10 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
   // if this this may be the case.
   int64_t time_since_update_ms;
   string staleness_detail = GetStalenessDetailLocked("", &time_since_update_ms);
+  // IMPALA-8235: convert to TIME_NS because of issues with tools consuming TIME_MS.
   COUNTER_SET(ADD_COUNTER(schedule->summary_profile(),
-      PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME, TUnit::TIME_MS), time_since_update_ms);
+      PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME, TUnit::TIME_NS),
+      static_cast<int64_t>(time_since_update_ms * NANOS_PER_MICRO * MICROS_PER_MILLI));
   if (!staleness_detail.empty()) {
     schedule->summary_profile()->AddInfoString(
         PROFILE_INFO_KEY_STALENESS_WARNING, staleness_detail);
