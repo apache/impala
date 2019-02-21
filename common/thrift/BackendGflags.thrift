@@ -19,8 +19,8 @@ namespace cpp impala
 namespace java org.apache.impala.thrift
 
 enum TReservedWordsVersion {
-  IMPALA_2_11
-  IMPALA_3_0
+  IMPALA_2_11 = 0
+  IMPALA_3_0 = 1
 }
 
 // Used to pass gflags from backend to frontend, JniCatalog and JniFrontend

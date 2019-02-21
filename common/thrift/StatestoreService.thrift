@@ -22,7 +22,7 @@ include "Status.thrift"
 include "Types.thrift"
 
 enum StatestoreServiceVersion {
-   V1
+   V1 = 0
 }
 
 // Structure serialized for the topic AdmissionController::IMPALA_REQUEST_QUEUE_TOPIC.

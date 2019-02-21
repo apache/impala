@@ -43,28 +43,28 @@ const i32 NUM_NODES_ALL_RACKS = -1
 const i32 INVALID_PLAN_NODE_ID = -1
 
 enum TParquetFallbackSchemaResolution {
-  POSITION,
-  NAME
+  POSITION = 0
+  NAME = 1
 }
 
 // The order of the enum values needs to be kept in sync with
 // ParquetMetadataUtils::ORDERED_ARRAY_ENCODINGS in parquet-metadata-utils.cc.
 enum TParquetArrayResolution {
-  THREE_LEVEL,
-  TWO_LEVEL,
-  TWO_LEVEL_THEN_THREE_LEVEL
+  THREE_LEVEL = 0
+  TWO_LEVEL = 1
+  TWO_LEVEL_THEN_THREE_LEVEL = 2
 }
 
 enum TJoinDistributionMode {
-  BROADCAST,
-  SHUFFLE
+  BROADCAST = 0
+  SHUFFLE = 1
 }
 
 // Consistency level options for Kudu scans.
 enum TKuduReadMode {
-  DEFAULT,
-  READ_LATEST,
-  READ_AT_SNAPSHOT
+  DEFAULT = 0
+  READ_LATEST = 1
+  READ_AT_SNAPSHOT = 2
 }
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
@@ -327,8 +327,8 @@ struct TQueryOptions {
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
 enum TSessionType {
-  BEESWAX,
-  HIVESERVER2
+  BEESWAX = 0
+  HIVESERVER2 = 1
 }
 
 // Per-client session state
@@ -540,7 +540,7 @@ struct TPlanFragmentInstanceCtx {
 // Service Protocol Details
 
 enum ImpalaInternalServiceVersion {
-  V1
+  V1 = 0
 }
 
 // The following contains the per-rpc structs for the parameters and the result.

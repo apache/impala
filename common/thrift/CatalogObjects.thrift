@@ -29,82 +29,82 @@ include "hive_metastore.thrift"
 enum TCatalogObjectType {
   // UNKNOWN is used to indicate an error condition when converting
   // strings to their matching TCatalogObjectType.
-  UNKNOWN,
-  CATALOG,
-  DATABASE,
-  TABLE,
-  VIEW,
-  FUNCTION,
-  DATA_SOURCE,
-  PRINCIPAL,
-  PRIVILEGE,
-  HDFS_CACHE_POOL,
+  UNKNOWN = 0
+  CATALOG = 1
+  DATABASE = 2
+  TABLE = 3
+  VIEW = 4
+  FUNCTION = 5
+  DATA_SOURCE = 6
+  PRINCIPAL = 7
+  PRIVILEGE = 8
+  HDFS_CACHE_POOL = 9
 }
 
 enum TTableType {
-  HDFS_TABLE,
-  HBASE_TABLE,
-  VIEW,
-  DATA_SOURCE_TABLE,
-  KUDU_TABLE,
+  HDFS_TABLE = 0
+  HBASE_TABLE = 1
+  VIEW = 2
+  DATA_SOURCE_TABLE = 3
+  KUDU_TABLE = 4
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.
 // TODO: Make the names consistent with the file format keywords specified in
 // the parser.
 enum THdfsFileFormat {
-  TEXT,
-  RC_FILE,
-  SEQUENCE_FILE,
-  AVRO,
-  PARQUET,
-  KUDU,
-  ORC
+  TEXT = 0
+  RC_FILE = 1
+  SEQUENCE_FILE = 2
+  AVRO = 3
+  PARQUET = 4
+  KUDU = 5
+  ORC = 6
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should
 // rename this enum to not be Hdfs specific.
 enum THdfsCompression {
-  NONE,
-  DEFAULT,
-  GZIP,
-  DEFLATE,
-  BZIP2,
-  SNAPPY,
-  SNAPPY_BLOCKED,
-  LZO,
-  LZ4,
-  ZLIB,
-  ZSTD
+  NONE = 0
+  DEFAULT = 1
+  GZIP = 2
+  DEFLATE = 3
+  BZIP2 = 4
+  SNAPPY = 5
+  SNAPPY_BLOCKED = 6
+  LZO = 7
+  LZ4 = 8
+  ZLIB = 9
+  ZSTD = 10
 }
 
 enum TColumnEncoding {
-  AUTO,
-  PLAIN,
-  PREFIX,
-  GROUP_VARINT,
-  RLE,
-  DICTIONARY,
-  BIT_SHUFFLE
+  AUTO = 0
+  PLAIN = 1
+  PREFIX = 2
+  GROUP_VARINT = 3
+  RLE = 4
+  DICTIONARY = 5
+  BIT_SHUFFLE = 6
 }
 
 enum THdfsSeqCompressionMode {
-  RECORD,
-  BLOCK
+  RECORD = 0
+  BLOCK = 1
 }
 
 // The table property type.
 enum TTablePropertyType {
-  TBL_PROPERTY,
-  SERDE_PROPERTY
+  TBL_PROPERTY = 0
+  SERDE_PROPERTY = 1
 }
 
 // The access level that is available to Impala on the Catalog object.
 enum TAccessLevel {
-  NONE,
-  READ_WRITE,
-  READ_ONLY,
-  WRITE_ONLY,
+  NONE = 0
+  READ_WRITE = 1
+  READ_ONLY = 2
+  WRITE_ONLY = 3
 }
 
 // Mapping from names defined by Avro to values in the THdfsCompression enum.
@@ -485,8 +485,8 @@ struct TDatabase {
 // Represents a principal type that maps to Sentry principal type.
 // https://github.com/apache/sentry/blob/3d062f39ce6a047138660a7b3d0024bde916c5b4/sentry-service/sentry-service-api/src/gen/thrift/gen-javabean/org/apache/sentry/api/service/thrift/TSentryPrincipalType.java
 enum TPrincipalType {
-  ROLE,
-  USER
+  ROLE = 0
+  USER = 1
 }
 
 // Represents a principal in an authorization policy.
@@ -508,23 +508,23 @@ struct TPrincipal {
 
 // The scope a TPrivilege applies to.
 enum TPrivilegeScope {
-  SERVER,
-  URI,
-  DATABASE,
-  TABLE,
-  COLUMN,
+  SERVER = 0
+  URI = 1
+  DATABASE = 2
+  TABLE = 3
+  COLUMN = 4
 }
 
 // The privilege level allowed.
 enum TPrivilegeLevel {
-  ALL,
-  INSERT,
-  SELECT,
-  REFRESH,
-  CREATE,
-  ALTER,
-  DROP,
-  OWNER
+  ALL = 0
+  INSERT = 1
+  SELECT = 2
+  REFRESH = 3
+  CREATE = 4
+  ALTER = 5
+  DROP = 6
+  OWNER = 7
 }
 
 // Represents a privilege in an authorization policy. Privileges contain the level

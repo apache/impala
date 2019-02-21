@@ -18,6 +18,10 @@
 namespace cpp impala
 namespace java org.apache.impala.thrift
 
+// NOTE: The definitions in this file are part of the binary format of the Impala query
+// profiles. They should preserve backwards compatibility and as such some rules apply
+// when making changes. Please see RuntimeProfile.thrift for more details.
+
 typedef i64 TTimestamp
 typedef i32 TFragmentIdx
 typedef i32 TPlanNodeId
@@ -30,31 +34,31 @@ typedef i32 TJoinTableId
 // TODO: Consider moving unrelated enums to better locations.
 
 enum TPrimitiveType {
-  INVALID_TYPE,
-  NULL_TYPE,
-  BOOLEAN,
-  TINYINT,
-  SMALLINT,
-  INT,
-  BIGINT,
-  FLOAT,
-  DOUBLE,
-  DATE,
-  DATETIME,
-  TIMESTAMP,
-  STRING,
-  BINARY, // Unsupported
-  DECIMAL,
-  CHAR,
-  VARCHAR,
-  FIXED_UDA_INTERMEDIATE,
+  INVALID_TYPE = 0
+  NULL_TYPE = 1
+  BOOLEAN = 2
+  TINYINT = 3
+  SMALLINT = 4
+  INT = 5
+  BIGINT = 6
+  FLOAT = 7
+  DOUBLE = 8
+  DATE = 9
+  DATETIME = 10
+  TIMESTAMP = 11
+  STRING = 12
+  BINARY = 13
+  DECIMAL = 14
+  CHAR = 15
+  VARCHAR = 16
+  FIXED_UDA_INTERMEDIATE = 17
 }
 
 enum TTypeNodeType {
-  SCALAR,
-  ARRAY,
-  MAP,
-  STRUCT
+  SCALAR = 0
+  ARRAY = 1
+  MAP = 2
+  STRUCT = 3
 }
 
 struct TScalarType {
@@ -96,42 +100,42 @@ struct TColumnType {
 }
 
 enum TStmtType {
-  QUERY,
-  DDL, // Data definition, e.g. CREATE TABLE (includes read-only functions e.g. SHOW)
-  DML, // Data modification e.g. INSERT
-  EXPLAIN,
-  TESTCASE, // For generating a testcase for QueryStmts.
-  LOAD, // Statement type for LOAD commands
-  SET,
-  ADMIN_FN // Admin function, e.g. ": shutdown()".
+  QUERY = 0
+  DDL = 1
+  DML = 2
+  EXPLAIN = 3
+  LOAD = 4
+  SET = 5
+  ADMIN_FN = 6
+  TESTCASE = 7
 }
 
 // Level of verboseness for "explain" output.
 enum TExplainLevel {
-  MINIMAL,
-  STANDARD,
-  EXTENDED,
-  VERBOSE
+  MINIMAL = 0
+  STANDARD = 1
+  EXTENDED = 2
+  VERBOSE = 3
 }
 
 enum TRuntimeFilterMode {
   // No filters are computed in the FE or the BE.
-  OFF,
+  OFF = 0
 
   // Only broadcast filters are computed in the BE, and are only published to the local
   // fragment.
-  LOCAL,
+  LOCAL = 1
 
   // All fiters are computed in the BE, and are published globally.
-  GLOBAL
+  GLOBAL = 2
 }
 
 enum TPrefetchMode {
   // No prefetching at all.
-  NONE,
+  NONE = 0
 
   // Prefetch the hash table buckets.
-  HT_BUCKET
+  HT_BUCKET = 1
 }
 
 // A TNetworkAddress is the standard host, port representation of a
@@ -149,24 +153,24 @@ struct TUniqueId {
 }
 
 enum TFunctionCategory {
-  SCALAR,
-  AGGREGATE,
-  ANALYTIC
+  SCALAR = 0
+  AGGREGATE = 1
+  ANALYTIC = 2
 }
 
 enum TFunctionBinaryType {
   // Impala builtin. We can either run this interpreted or via codegen
   // depending on the query option.
-  BUILTIN,
+  BUILTIN = 0
 
   // Java UDFs, loaded from *.jar
-  JAVA,
+  JAVA = 1
 
   // Native-interface, precompiled UDFs loaded from *.so
-  NATIVE,
+  NATIVE = 2
 
   // Native-interface, precompiled to IR; loaded from *.ll
-  IR,
+  IR = 3
 }
 
 // Represents a fully qualified function name.

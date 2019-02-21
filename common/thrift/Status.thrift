@@ -15,10 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-include "ErrorCodes.thrift"
-
 namespace cpp impala
 namespace java org.apache.impala.thrift
+
+include "ErrorCodes.thrift"
+
+// NOTE: The definitions in this file are part of the binary format of the Impala query
+// profiles. They should preserve backwards compatibility and as such some rules apply
+// when making changes. Please see RuntimeProfile.thrift for more details.
 
 struct TStatus {
   1: required ErrorCodes.TErrorCode status_code

@@ -22,17 +22,26 @@ include "ExecStats.thrift"
 include "Metrics.thrift"
 include "Types.thrift"
 
+// NOTE: This file and the includes above define the format of Impala query profiles. As
+// newer versions of Impala should be able to read profiles written by older versions,
+// some best practices must be followed when making changes to the structures below:
+//
+// - Only append new values at the end of enums.
+// - Only add new fields at the end of structures, and always make them optional.
+// - Don't remove fields.
+// - Don't change the numbering of fields.
+
 // Represents the different formats a runtime profile can be represented in.
 enum TRuntimeProfileFormat {
   // Pretty printed.
-  STRING,
+  STRING = 0
 
   // The thrift profile, serialized, compressed, and encoded. Used for the query log.
   // See RuntimeProfile::SerializeToArchiveString.
-  BASE64,
+  BASE64 = 1
 
   // TRuntimeProfileTree.
-  THRIFT
+  THRIFT = 2
 }
 
 // Counter data

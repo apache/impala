@@ -25,23 +25,23 @@ include "Descriptors.thrift"
 include "Partitions.thrift"
 
 enum TDataSinkType {
-  DATA_STREAM_SINK,
-  TABLE_SINK,
-  JOIN_BUILD_SINK,
-  PLAN_ROOT_SINK
+  DATA_STREAM_SINK = 0
+  TABLE_SINK = 1
+  JOIN_BUILD_SINK = 2
+  PLAN_ROOT_SINK = 3
 }
 
 enum TSinkAction {
-  INSERT,
-  UPDATE,
-  UPSERT,
-  DELETE
+  INSERT = 0
+  UPDATE = 1
+  UPSERT = 2
+  DELETE = 3
 }
 
 enum TTableSinkType {
-  HDFS,
-  HBASE,
-  KUDU
+  HDFS = 0
+  HBASE = 1
+  KUDU = 2
 }
 
 // Sink which forwards data to a remote plan fragment,

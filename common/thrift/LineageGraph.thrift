@@ -29,8 +29,8 @@ struct TVertex {
 }
 
 enum TEdgeType {
-    PROJECTION,
-    PREDICATE
+    PROJECTION = 0
+    PREDICATE = 1
 }
 
 struct TMultiEdge {

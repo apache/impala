@@ -21,15 +21,19 @@ namespace java org.apache.impala.thrift
 include "Status.thrift"
 include "Types.thrift"
 
-enum TExecState {
-  REGISTERED = 0,
-  PLANNING = 1,
-  QUEUED = 2,
-  RUNNING = 3,
-  FINISHED = 4,
+// NOTE: The definitions in this file are part of the binary format of the Impala query
+// profiles. They should preserve backwards compatibility and as such some rules apply
+// when making changes. Please see RuntimeProfile.thrift for more details.
 
-  CANCELLED = 5,
-  FAILED = 6,
+enum TExecState {
+  REGISTERED = 0
+  PLANNING = 1
+  QUEUED = 2
+  RUNNING = 3
+  FINISHED = 4
+
+  CANCELLED = 5
+  FAILED = 6
 }
 
 // Execution stats for a single plan node.

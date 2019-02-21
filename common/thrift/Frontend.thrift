@@ -154,13 +154,13 @@ struct TGetDataSrcsResult {
 enum TDescribeOutputStyle {
   // The default output style if no options are specified for
   // DESCRIBE DATABASE <db> and DESCRIBE <table>.
-  MINIMAL,
+  MINIMAL = 0
 
   // Output additional information on the database or table.
   // Set for both DESCRIBE DATABASE FORMATTED|EXTENDED <db>
   // and DESCRIBE FORMATTED|EXTENDED <table> statements.
-  EXTENDED,
-  FORMATTED
+  EXTENDED = 1
+  FORMATTED = 2
 }
 
 // Arguments to DescribeDb, which returns a list of properties for a given database.
@@ -213,10 +213,10 @@ struct TShowDbsParams {
 
 // Used by SHOW STATS and SHOW PARTITIONS to control what information is returned.
 enum TShowStatsOp {
-  TABLE_STATS,
-  COLUMN_STATS,
-  PARTITIONS,
-  RANGE_PARTITIONS
+  TABLE_STATS = 0
+  COLUMN_STATS = 1
+  PARTITIONS = 2
+  RANGE_PARTITIONS = 3
 }
 
 // Parameters for SHOW TABLE/COLUMN STATS and SHOW PARTITIONS commands
@@ -441,21 +441,21 @@ struct TQueryExecRequest {
 }
 
 enum TCatalogOpType {
-  SHOW_TABLES,
-  SHOW_DBS,
-  SHOW_STATS,
-  USE,
-  DESCRIBE_TABLE,
-  DESCRIBE_DB,
-  SHOW_FUNCTIONS,
-  RESET_METADATA,
-  DDL,
-  SHOW_CREATE_TABLE,
-  SHOW_DATA_SRCS,
-  SHOW_ROLES,
-  SHOW_GRANT_PRINCIPAL,
-  SHOW_FILES,
-  SHOW_CREATE_FUNCTION
+  SHOW_TABLES = 0
+  SHOW_DBS = 1
+  SHOW_STATS = 2
+  USE = 3
+  DESCRIBE_TABLE = 4
+  DESCRIBE_DB = 5
+  SHOW_FUNCTIONS = 6
+  RESET_METADATA = 7
+  DDL = 8
+  SHOW_CREATE_TABLE = 9
+  SHOW_DATA_SRCS = 10
+  SHOW_ROLES = 11
+  SHOW_GRANT_PRINCIPAL = 12
+  SHOW_FILES = 13
+  SHOW_CREATE_FUNCTION = 14
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -540,7 +540,7 @@ struct TShutdownParams {
 
 // The type of administrative function to be executed.
 enum TAdminRequestType {
-  SHUTDOWN
+  SHUTDOWN = 0
 }
 
 // Parameters for administrative function statement. This is essentially a tagged union
@@ -554,13 +554,13 @@ struct TAdminRequest {
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
 enum TMetadataOpcode {
-  GET_TYPE_INFO,
-  GET_CATALOGS,
-  GET_SCHEMAS,
-  GET_TABLES,
-  GET_TABLE_TYPES,
-  GET_COLUMNS,
-  GET_FUNCTIONS
+  GET_TYPE_INFO = 0
+  GET_CATALOGS = 1
+  GET_SCHEMAS = 2
+  GET_TABLES = 3
+  GET_TABLE_TYPES = 4
+  GET_COLUMNS = 5
+  GET_FUNCTIONS = 6
 }
 
 // Input parameter to JniFrontend.hiveServer2MetadataOperation
@@ -669,9 +669,9 @@ struct TCacheJarResult {
 // A UDF may include optional prepare and close functions in addition the main evaluation
 // function. This enum distinguishes between these when doing a symbol lookup.
 enum TSymbolType {
-  UDF_EVALUATE,
-  UDF_PREPARE,
-  UDF_CLOSE,
+  UDF_EVALUATE = 0
+  UDF_PREPARE = 1
+  UDF_CLOSE = 2
 }
 
 // Parameters to pass to validate that the binary contains the symbol. If the
@@ -710,9 +710,9 @@ struct TSymbolLookupParams {
 }
 
 enum TSymbolLookupResultCode {
-  SYMBOL_FOUND,
-  BINARY_NOT_FOUND,
-  SYMBOL_NOT_FOUND,
+  SYMBOL_FOUND = 0
+  BINARY_NOT_FOUND = 1
+  SYMBOL_NOT_FOUND = 2
 }
 
 struct TSymbolLookupResult {

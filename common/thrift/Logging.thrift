@@ -22,13 +22,13 @@ namespace java org.apache.impala.thrift
 
 // Convenience type to map between log4j levels and glog severity
 enum TLogLevel {
-  VLOG_3,
-  VLOG_2
-  VLOG,
-  INFO,
-  WARN,
-  ERROR,
-  FATAL
+  VLOG_3 = 0
+  VLOG_2 = 1
+  VLOG = 2
+  INFO = 3
+  WARN = 4
+  ERROR = 5
+  FATAL = 6
 }
 
 // Helper structs for GetJavaLogLevel(), SetJavaLogLevel() methods.

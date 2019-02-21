@@ -53,7 +53,14 @@ struct TRowBatch {
 
 // Comparison operators used in predicates.
 enum TComparisonOp {
-  LT, LE, EQ, NE, GE, GT, DISTINCT_FROM, NOT_DISTINCT
+  LT = 0
+  LE = 1
+  EQ = 2
+  NE = 3
+  GE = 4
+  GT = 5
+  DISTINCT_FROM = 6
+  NOT_DISTINCT = 7
 }
 
 // Binary predicates that can be pushed to the external data source and

@@ -21,24 +21,24 @@ namespace java org.apache.impala.thrift
 include "Exprs.thrift"
 
 enum TPartitionType {
-  UNPARTITIONED,
+  UNPARTITIONED = 0
 
   // round-robin partition
-  RANDOM,
+  RANDOM = 1
 
   // unordered partition on a set of exprs
   // (partition bounds overlap)
-  HASH_PARTITIONED,
+  HASH_PARTITIONED = 2
 
   // ordered partition on a list of exprs
   // (partition bounds don't overlap)
-  RANGE_PARTITIONED,
+  RANGE_PARTITIONED = 3
 
   // use the partitioning scheme of a Kudu table
   // TODO: this is a special case now because Kudu supports multilevel partition
   // schemes. We should add something like lists of TDataPartitions to reflect that
   // and then this can be removed. (IMPALA-5255)
-  KUDU
+  KUDU = 4
 }
 
 // Specification of how a single logical data stream is partitioned.
