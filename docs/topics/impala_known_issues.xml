@@ -310,8 +310,10 @@ under the License.
             <codeph>--use_system_auth_to_local=false</codeph> flag to ignore the
           system-wide <codeph>auth_to_local</codeph> mappings configured in
             <codeph>/etc/krb5.conf</codeph>.</p>
-        <p><b>Bug:</b> KUDU-2198</p>
+        <p><b>Bug:</b>
+          <xref keyref="IMPALA-8154">IMPALA-8154</xref></p>
         <p><b>Affected Versions:</b> Impala 2.12, Impala 3.0 / Kudu 1.6</p>
+        <p><b>Fixed Versions:</b> Impala 3.2</p>
       </conbody>
     </concept>
 </concept>
