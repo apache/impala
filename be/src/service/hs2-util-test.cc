@@ -158,5 +158,3 @@ TEST(PrintTColumnValueTest, TestAllTypes) {
   }
 }
 
-
-IMPALA_TEST_MAIN();

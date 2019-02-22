@@ -963,5 +963,3 @@ TEST(DateTest, MonthsBetween) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

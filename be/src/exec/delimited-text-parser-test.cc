@@ -221,4 +221,3 @@ TEST(DelimitedTextParser, SpecialDelimiters) {
 
 }
 
-IMPALA_TEST_MAIN();

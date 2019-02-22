@@ -9944,9 +9944,3 @@ INSTANTIATE_TEST_CASE_P(Instantiations, ExprTest, ::testing::Values(
   // additional incidental coverage from codegening some additional expr tree
   // shapes but mostly it isn't that interesting since the majority of
   // expressions get folded to a constant anyway.
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}

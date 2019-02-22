@@ -207,4 +207,3 @@ TEST_F(RawValueTest, TemplatizedHash) {
 
 }
 
-IMPALA_TEST_MAIN();

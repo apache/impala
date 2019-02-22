@@ -104,5 +104,3 @@ TEST(ParquetPageIndex, DeterminePageIndexRangesInRowGroup) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

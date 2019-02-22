@@ -121,4 +121,3 @@ TEST(StringValueTest, TestCompare) {
 
 }
 
-IMPALA_TEST_MAIN();

@@ -521,4 +521,3 @@ TEST(MemPoolTest, TryAllocateAligned) {
 }
 }
 
-IMPALA_TEST_MAIN();

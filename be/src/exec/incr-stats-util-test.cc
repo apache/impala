@@ -32,7 +32,7 @@ extern string DecodeNdv(const string& ndv, bool is_encoded);
 
 static const int HLL_LEN = pow(2, AggregateFunctions::HLL_PRECISION);
 
-TEST(RleTest, TestEmptyRle) {
+TEST(IncrStatsUtilTest, TestEmptyRle) {
   string test(HLL_LEN, 0);
 
   bool is_encoded;
@@ -45,7 +45,7 @@ TEST(RleTest, TestEmptyRle) {
   ASSERT_EQ(test, decoded);
 }
 
-TEST(RleTest, TestNoEncode) {
+TEST(IncrStatsUtilTest, TestNoEncode) {
   string test;
   for (int i = 0; i < HLL_LEN; ++i) {
     test += (i % 2 == 0) ? 'A' : 'B';
@@ -59,7 +59,7 @@ TEST(RleTest, TestNoEncode) {
   ASSERT_EQ(DecodeNdv(encoded, is_encoded), test);
 }
 
-TEST(RleTest, TestEncode) {
+TEST(IncrStatsUtilTest, TestEncode) {
   string test;
   for (int i = 0; i < HLL_LEN; ++i) {
     test += (i < 512) ? 'A' : 'B';
@@ -72,5 +72,3 @@ TEST(RleTest, TestEncode) {
   ASSERT_EQ(DecodeNdv(encoded, is_encoded), test);
 }
 
-
-IMPALA_TEST_MAIN();

@@ -78,5 +78,3 @@ TEST(ExecutorGroupTest, RemoveExecutorOnSameHost) {
       executor_group.GetExecutorsForHost("10.0.0.1");
   EXPECT_EQ(1, backend_list.size());
 }
-
-IMPALA_TEST_MAIN();

@@ -139,4 +139,3 @@ TEST(MultiPrecisionFloatTest, Example) {
 
 }
 
-IMPALA_TEST_MAIN();

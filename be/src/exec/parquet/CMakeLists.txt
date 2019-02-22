@@ -39,9 +39,20 @@ add_library(Parquet
 
 add_dependencies(Parquet gen-deps)
 
-ADD_BE_LSAN_TEST(parquet-bool-decoder-test)
-ADD_BE_LSAN_TEST(parquet-common-test)
-ADD_BE_LSAN_TEST(parquet-page-index-test)
-ADD_BE_LSAN_TEST(parquet-plain-test)
-ADD_BE_LSAN_TEST(parquet-version-test)
-ADD_BE_LSAN_TEST(hdfs-parquet-scanner-test)
+add_library(ParquetTests STATIC
+  hdfs-parquet-scanner-test.cc
+  parquet-bool-decoder-test.cc
+  parquet-common-test.cc
+  parquet-page-index-test.cc
+  parquet-plain-test.cc
+  parquet-version-test.cc
+)
+add_dependencies(ParquetTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(parquet-bool-decoder-test ParquetBoolDecoder.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-common-test ParquetCommon.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-page-index-test ParquetPageIndex.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-plain-test PlainEncoding.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-version-test ParquetVersionTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(hdfs-parquet-scanner-test HdfsParquetScannerTest.*)
+

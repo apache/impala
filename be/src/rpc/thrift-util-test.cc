@@ -93,5 +93,3 @@ TEST(ThriftUtil, TNetworkAddressComparator) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

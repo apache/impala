@@ -162,4 +162,3 @@ TEST(ThreadResourceMgr, MultiCallbacks) {
 
 }
 
-IMPALA_TEST_MAIN();

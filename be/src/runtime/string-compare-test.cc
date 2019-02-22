@@ -71,4 +71,3 @@ TEST(StringCompareTest, Basic) {
 }
 }
 
-IMPALA_TEST_MAIN();

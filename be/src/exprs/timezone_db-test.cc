@@ -226,5 +226,3 @@ TEST_F(TimezoneDbLoadZoneInfoTest, LoadZoneInfo) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

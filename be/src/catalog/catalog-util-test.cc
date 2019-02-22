@@ -133,5 +133,3 @@ TEST(CatalogUtil, TestTPrivilegeFromObjectName) {
       &privilege), TErrorCode::GENERAL);
 }
 
-IMPALA_TEST_MAIN();
-

@@ -761,13 +761,3 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
 }
 
 }
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  InitFeSupport();
-  uint32_t seed = time(NULL);
-  cout << "seed = " << seed << endl;
-  srand(seed);
-  return RUN_ALL_TESTS();
-}

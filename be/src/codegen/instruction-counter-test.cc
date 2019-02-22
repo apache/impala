@@ -174,6 +174,3 @@ TEST_F(InstructionCounterTest, TestMemInstrCount) {
 }
 
 }  // namespace impala
-
-IMPALA_TEST_MAIN();
-

@@ -70,5 +70,3 @@ TEST(ImpalaServerTest, PopulateAuthorizedProxyConfig) {
     EXPECT_EQ(proxy_map.end(), proxy_map.find("doesnotexist"));
   }
 }
-
-IMPALA_TEST_MAIN();

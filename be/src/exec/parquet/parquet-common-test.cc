@@ -118,5 +118,3 @@ TEST(ParquetCommon, ComputeCandidatePages) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

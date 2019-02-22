@@ -82,24 +82,50 @@ add_library(Runtime
 )
 add_dependencies(Runtime gen-deps)
 
-ADD_BE_LSAN_TEST(mem-pool-test)
-ADD_BE_LSAN_TEST(free-pool-test)
-ADD_BE_LSAN_TEST(string-buffer-test)
+add_library(RuntimeTests STATIC
+  date-test.cc
+  decimal-test.cc
+  free-pool-test.cc
+  hdfs-fs-cache-test.cc
+  mem-pool-test.cc
+  mem-tracker-test.cc
+  multi-precision-test.cc
+  raw-value-test.cc
+  row-batch-serialize-test.cc
+  string-buffer-test.cc
+  string-compare-test.cc
+  string-search-test.cc
+  string-value-test.cc
+  thread-resource-mgr-test.cc
+  timestamp-test.cc
+  tmp-file-mgr-test.cc
+)
+add_dependencies(RuntimeTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(mem-pool-test MemPoolTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(free-pool-test FreePoolTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(string-buffer-test StringBufferTest.*)
+# Exception to unified be tests: Custom main function (initializes LLVM)
 ADD_BE_TEST(data-stream-test) # TODO: this test leaks
-ADD_BE_LSAN_TEST(date-test)
-ADD_BE_LSAN_TEST(timestamp-test)
-ADD_BE_LSAN_TEST(raw-value-test)
-ADD_BE_LSAN_TEST(string-compare-test)
-ADD_BE_LSAN_TEST(string-search-test)
-ADD_BE_LSAN_TEST(string-value-test)
-ADD_BE_LSAN_TEST(thread-resource-mgr-test)
-ADD_BE_LSAN_TEST(mem-tracker-test)
-ADD_BE_LSAN_TEST(multi-precision-test)
-ADD_BE_LSAN_TEST(decimal-test)
+ADD_UNIFIED_BE_LSAN_TEST(date-test DateTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(timestamp-test TimestampTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(raw-value-test "RawValueTest.*:HashUtil.*")
+ADD_UNIFIED_BE_LSAN_TEST(string-compare-test StringCompareTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(string-search-test StringSearchTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(string-value-test StringValueTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(thread-resource-mgr-test ThreadResourceMgr.*)
+ADD_UNIFIED_BE_LSAN_TEST(mem-tracker-test MemTestTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(multi-precision-test
+    "MultiPrecisionIntTest.*:MultiPrecisionFloatTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(decimal-test DecimalTest.*)
+# Exception to unified be tests: Custom main function (initializes LLVM)
 ADD_BE_LSAN_TEST(buffered-tuple-stream-test)
-ADD_BE_LSAN_TEST(hdfs-fs-cache-test)
-ADD_BE_LSAN_TEST(tmp-file-mgr-test)
-ADD_BE_LSAN_TEST(row-batch-serialize-test)
+ADD_UNIFIED_BE_LSAN_TEST(hdfs-fs-cache-test "HdfsFsCacheTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(tmp-file-mgr-test "TmpFileMgrTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(row-batch-serialize-test "RowBatchSerializeTest.*")
+# Exception to unified be tests: Custom main function with global Frontend object
 ADD_BE_LSAN_TEST(row-batch-test)
+# Exception to unified be tests: Custom main function with global Frontend object
 ADD_BE_LSAN_TEST(collection-value-builder-test)
+# Exception to unified be tests: Custom main function (initializes LLVM)
 ADD_BE_LSAN_TEST(runtime-state-test)

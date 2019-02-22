@@ -39,7 +39,16 @@ add_library(Rpc
 )
 add_dependencies(Rpc gen-deps)
 
-ADD_BE_LSAN_TEST(thrift-util-test)
+add_library(RpcTests STATIC
+  thrift-util-test.cc
+)
+add_dependencies(RpcTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(thrift-util-test ThriftUtil.*)
+
+# Exception to unified be tests: The following tests have extra link libraries and some
+# have custom main() functions.
+
 ADD_BE_TEST(thrift-server-test) # TODO: this test leaks servers
 # The thrift-server-test uses some utilities from the Kudu security test code.
 target_link_libraries(thrift-server-test security-test-for-impala)

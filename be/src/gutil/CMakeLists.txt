@@ -72,7 +72,7 @@ ADD_EXPORTABLE_LIBRARY(gutil
 
 add_kudu_test(strings/string_util-test)
 
-add_library(GUtilTests
+add_library(GUtilTests STATIC
   sysinfo-test.cc
 )
 add_dependencies(GUtilTests gen-deps gen_ir_descriptions)

@@ -80,5 +80,4 @@ TEST(ParquetVersionTest, Comparisons) {
 
 }
 
-IMPALA_TEST_MAIN();
 

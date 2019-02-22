@@ -226,5 +226,3 @@ TEST_F(HashRingTest, MaxMinRatio) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

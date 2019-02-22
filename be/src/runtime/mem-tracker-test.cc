@@ -355,4 +355,3 @@ TEST(MemTestTest, GcFunctions) {
 }
 }
 
-IMPALA_TEST_MAIN();

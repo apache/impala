@@ -471,5 +471,3 @@ TEST_F(ClusterMembershipMgrTest, RandomizedMembershipUpdates) {
 /// quiesce, delete).
 
 } // end namespace impala
-
-IMPALA_TEST_MAIN();

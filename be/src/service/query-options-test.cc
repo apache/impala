@@ -509,4 +509,3 @@ TEST(QueryOptions, CompressionCodec) {
 #undef ENTRIES
 #undef ENTRY
 }
-IMPALA_TEST_MAIN();

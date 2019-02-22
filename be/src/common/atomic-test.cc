@@ -251,5 +251,3 @@ TEST(AtomicTest, MultipleTreadsAcquireReleaseLoadStoreInt64) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

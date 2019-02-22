@@ -702,5 +702,3 @@ TEST_F(SchedulerTest, TestExecAtCoordWithoutLocalBackend) {
 }
 
 } // end namespace impala
-
-IMPALA_TEST_MAIN();

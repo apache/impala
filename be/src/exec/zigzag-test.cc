@@ -163,5 +163,4 @@ TEST(ZigzagTest, Weird) {
 }
 }
 
-IMPALA_TEST_MAIN();
 

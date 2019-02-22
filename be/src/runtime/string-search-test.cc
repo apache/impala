@@ -128,8 +128,3 @@ TEST(StringSearchTest, ReverseSearch) {
   EXPECT_EQ(0, TestRSearch("cacacbaba", "cacacba"));
 }
 }
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

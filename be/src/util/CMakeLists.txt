@@ -99,7 +99,7 @@ add_library(Util
   ${MPFIT_SRC_DIR}/mpfit.c)
 add_dependencies(Util gen-deps gen_ir_descriptions)
 
-add_library(UtilTests
+add_library(UtilTests STATIC
   benchmark-test.cc
   bitmap-test.cc
   bit-packing-test.cc

@@ -457,5 +457,3 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

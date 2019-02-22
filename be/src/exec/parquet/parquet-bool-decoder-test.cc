@@ -105,4 +105,3 @@ TEST(ParquetBoolDecoder, TestDecodeAndSkipping) {
 
 }
 
-IMPALA_TEST_MAIN();

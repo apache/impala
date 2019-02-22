@@ -1066,4 +1066,3 @@ TEST(TimestampTest, TimezoneConversions) {
 }
 }
 
-IMPALA_TEST_MAIN();

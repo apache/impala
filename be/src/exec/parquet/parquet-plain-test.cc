@@ -488,4 +488,3 @@ TEST(PlainEncoding, CorruptString) {
 
 }
 
-IMPALA_TEST_MAIN();

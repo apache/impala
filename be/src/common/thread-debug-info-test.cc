@@ -142,5 +142,3 @@ TEST(ThreadDebugInfo, Scoping) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

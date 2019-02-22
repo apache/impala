@@ -105,10 +105,21 @@ add_library(Exec
 
 add_dependencies(Exec gen-deps)
 
-ADD_BE_LSAN_TEST(zigzag-test)
-ADD_BE_LSAN_TEST(hash-table-test)
-ADD_BE_LSAN_TEST(delimited-text-parser-test)
-ADD_BE_LSAN_TEST(read-write-util-test)
+add_library(ExecTests STATIC
+  delimited-text-parser-test.cc
+  hash-table-test.cc
+  hdfs-avro-scanner-test.cc
+  incr-stats-util-test.cc
+  read-write-util-test.cc
+  zigzag-test.cc
+)
+add_dependencies(ExecTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(zigzag-test ZigzagTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(hash-table-test HashTableTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(delimited-text-parser-test DelimitedTextParser.*)
+ADD_UNIFIED_BE_LSAN_TEST(read-write-util-test ReadWriteUtil.*)
+# Exception to unified be tests: Custom main with global Frontend object
 ADD_BE_LSAN_TEST(row-batch-list-test)
-ADD_BE_LSAN_TEST(incr-stats-util-test)
-ADD_BE_LSAN_TEST(hdfs-avro-scanner-test)
+ADD_UNIFIED_BE_LSAN_TEST(incr-stats-util-test IncrStatsUtilTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(hdfs-avro-scanner-test HdfsAvroScannerTest.*)

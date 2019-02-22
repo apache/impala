@@ -69,9 +69,17 @@ add_library(Exprs
 )
 add_dependencies(Exprs gen-deps gen_ir_descriptions)
 
-ADD_BE_LSAN_TEST(expr-test)
+add_library(ExprsTests STATIC
+  expr-test.cc
+  timezone_db-test.cc
+)
+add_dependencies(ExprsTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(expr-test "Instantiations/ExprTest.*")
+# Exception to unified be tests: custom main initiailizes LLVM
 ADD_BE_LSAN_TEST(expr-codegen-test)
-ADD_BE_LSAN_TEST(timezone_db-test)
+ADD_UNIFIED_BE_LSAN_TEST(timezone_db-test
+ "TimezoneDbNamesTest.*:TimezoneDbLoadAliasTest.*:TimezoneDbLoadZoneInfoTest.*")
 
 # expr-codegen-test includes test IR functions
 COMPILE_TO_IR(expr-codegen-test.cc)

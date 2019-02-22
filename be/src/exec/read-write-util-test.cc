@@ -122,4 +122,3 @@ TEST(ReadWriteUtil, ZeroCompressedLong) {
 
 }
 
-IMPALA_TEST_MAIN();

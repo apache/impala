@@ -249,4 +249,3 @@ TEST(FreePoolTest, ReAlloc) {
 
 }
 
-IMPALA_TEST_MAIN();

@@ -36,8 +36,17 @@ add_library(Scheduling STATIC
 )
 add_dependencies(Scheduling gen-deps)
 
-ADD_BE_LSAN_TEST(admission-controller-test)
-ADD_BE_LSAN_TEST(cluster-membership-mgr-test)
-ADD_BE_LSAN_TEST(executor-group-test)
-ADD_BE_LSAN_TEST(hash-ring-test)
-ADD_BE_LSAN_TEST(scheduler-test)
+add_library(SchedulingTests STATIC
+  admission-controller-test.cc
+  cluster-membership-mgr-test.cc
+  executor-group-test.cc
+  hash-ring-test.cc
+  scheduler-test.cc
+)
+add_dependencies(SchedulingTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(admission-controller-test AdmissionControllerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(cluster-membership-mgr-test ClusterMembershipMgrTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(executor-group-test ExecutorGroupTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(hash-ring-test HashRingTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(scheduler-test SchedulerTest.*)

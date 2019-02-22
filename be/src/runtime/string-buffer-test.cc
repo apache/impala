@@ -92,5 +92,3 @@ TEST(StringBufferTest, AppendBoundary) {
 }
 
 }
-
-IMPALA_TEST_MAIN();

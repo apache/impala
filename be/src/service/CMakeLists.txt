@@ -46,6 +46,13 @@ add_library(Service
 )
 add_dependencies(Service gen-deps)
 
+add_library(ServiceTests STATIC
+  hs2-util-test.cc
+  impala-server-test.cc
+  query-options-test.cc
+)
+add_dependencies(ServiceTests gen-deps)
+
 # this shared library provides Impala executor functionality to FE test.
 add_library(fesupport SHARED
   fe-support.cc
@@ -102,7 +109,8 @@ target_link_libraries(unifiedbetests
   ${JAVA_JSIG_LIBRARY} ${UNIFIED_TEST_LINK_LIBS})
 ADD_DEPENDENCIES(unified-be-test-executable unifiedbetests)
 
+# Exception to unified be tests: Custom main() due to leak
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server
-ADD_BE_LSAN_TEST(hs2-util-test hs2-util-test.cc)
-ADD_BE_LSAN_TEST(query-options-test query-options-test.cc)
-ADD_BE_LSAN_TEST(impala-server-test impala-server-test.cc)
+ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
+ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)

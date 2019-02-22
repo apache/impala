@@ -63,4 +63,3 @@ TEST(HdfsFsCacheTest, Basic) {
 
 }
 
-IMPALA_TEST_MAIN();

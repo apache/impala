@@ -31,8 +31,17 @@ add_library(BufferPool
 )
 add_dependencies(BufferPool gen-deps)
 
+add_library(BufferPoolTests STATIC
+  free-list-test.cc
+  suballocator-test.cc
+)
+add_dependencies(BufferPoolTests gen-deps)
+
+# Exception to unified be tests: Custom main() with test repeats, messages, etc.
 ADD_BE_LSAN_TEST(buffer-allocator-test)
 ADD_BE_LSAN_TEST(buffer-pool-test)
-ADD_BE_LSAN_TEST(free-list-test)
+
+ADD_UNIFIED_BE_LSAN_TEST(free-list-test FreeListTest.*)
+# Exception to unified be tests: Custom main() with InitFeSupport(disable_codegen=false)
 ADD_BE_LSAN_TEST(reservation-tracker-test)
-ADD_BE_LSAN_TEST(suballocator-test)
+ADD_UNIFIED_BE_LSAN_TEST(suballocator-test SuballocatorTest.*)

@@ -36,9 +36,15 @@ add_library(Io
 )
 add_dependencies(Io gen-deps)
 
+add_library(IoTests STATIC
+  disk-io-mgr-test.cc
+)
+add_dependencies(IoTests gen-deps)
+
 # This test runs forever so should not be part of 'make test'
 add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
 target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})
 
-ADD_BE_LSAN_TEST(disk-io-mgr-test)
+ADD_UNIFIED_BE_LSAN_TEST(disk-io-mgr-test DiskIoMgrTest.*)
+# Exception to unified be: Custom main function (platform tests)
 ADD_BE_LSAN_TEST(data-cache-test)
