@@ -370,8 +370,7 @@ public class AuditingTest extends FrontendTestBase {
     // an AuthorizationError
     SentryAuthorizationConfig config =
         SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
-            "/does/not/exist", System.getenv("IMPALA_HOME") +
-            "/fe/src/test/resources/sentry-site.xml");
+            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
       SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(config);
       Frontend fe = new Frontend(authzFactory, catalog);

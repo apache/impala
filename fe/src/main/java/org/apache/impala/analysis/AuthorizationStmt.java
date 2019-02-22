@@ -40,13 +40,6 @@ public class AuthorizationStmt extends StatementBase {
       throw new AnalysisException("Authorization is not enabled. To enable " +
           "authorization restart Impala with the --server_name=<name> flag.");
     }
-    if (authzConfig.getProvider() == AuthorizationProvider.SENTRY) {
-      if (((SentryAuthorizationConfig) authzConfig).isFileBasedPolicy()) {
-        throw new AnalysisException("Cannot execute authorization statement using a " +
-            "file based policy. To disable file based policies, restart Impala without " +
-            "the -authorization_policy_file flag set.");
-      }
-    }
     if (Strings.isNullOrEmpty(analyzer.getUser().getName())) {
       throw new AnalysisException("Cannot execute authorization statement with an " +
           "empty username.");

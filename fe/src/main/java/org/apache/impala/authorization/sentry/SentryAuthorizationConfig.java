@@ -29,23 +29,18 @@ import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
  */
 public class SentryAuthorizationConfig implements AuthorizationConfig {
   private final String serverName_;
-  // Set only if the policy provider is file-based.
-  private final String policyFile_;
   private final SentryConfig sentryConfig_;
   private final String policyProviderClassName_;
 
   /**
    * Creates a new authorization configuration object.
    * @param serverName - The name of this Impala server.
-   * @param policyFile - The path to the authorization policy file or null if
-   *                     the policy engine is not file based.
    * @param sentryConfigFile - Absolute path and file name of the sentry service.
    * @param policyProviderClassName - Class name of the policy provider to use.
    */
-  public SentryAuthorizationConfig(String serverName, String policyFile,
-      String sentryConfigFile, String policyProviderClassName) {
+  public SentryAuthorizationConfig(String serverName, String sentryConfigFile,
+      String policyProviderClassName) {
     serverName_ = serverName;
-    policyFile_ = policyFile;
     sentryConfig_ = new SentryConfig(sentryConfigFile);
     if (!Strings.isNullOrEmpty(policyProviderClassName)) {
       policyProviderClassName = policyProviderClassName.trim();
@@ -57,8 +52,14 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
   public SentryAuthorizationConfig(SentryConfig config) {
     sentryConfig_ = config;
     serverName_ = null;
-    policyFile_ = null;
     policyProviderClassName_ = null;
+  }
+
+  /**
+   * Returns an AuthorizationConfig object that has authorization disabled.
+   */
+  public static SentryAuthorizationConfig createAuthDisabledConfig() {
+    return new SentryAuthorizationConfig(null, null, null);
   }
 
   /**
@@ -66,8 +67,8 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
    * for the authorization provider.
    */
   public static SentryAuthorizationConfig createHadoopGroupAuthConfig(String serverName,
-      String policyFile, String sentryConfigFile) {
-    return new SentryAuthorizationConfig(serverName, policyFile, sentryConfigFile,
+      String sentryConfigFile) {
+    return new SentryAuthorizationConfig(serverName, sentryConfigFile,
         HadoopGroupResourceAuthorizationProvider.class.getName());
   }
 
@@ -121,7 +122,7 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
    */
   @Override
   public boolean isEnabled() {
-    return !Strings.isNullOrEmpty(serverName_) || !Strings.isNullOrEmpty(policyFile_) ||
+    return !Strings.isNullOrEmpty(serverName_) ||
         !Strings.isNullOrEmpty(sentryConfig_.getConfigFile());
   }
 
@@ -129,22 +130,10 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
   public AuthorizationProvider getProvider() { return AuthorizationProvider.SENTRY; }
 
   /**
-   * Returns true if using an authorization policy from a file in HDFS. If false,
-   * uses an authorization policy based on cached metadata sent from the catalog server
-   * via the statestore.
-   */
-  public boolean isFileBasedPolicy() { return !Strings.isNullOrEmpty(policyFile_); }
-
-  /**
    * The server name to secure.
    */
   @Override
   public String getServerName() { return serverName_; }
-
-  /**
-   * The policy file path.
-   */
-  public String getPolicyFile() { return policyFile_; }
 
   /**
    * The Sentry configuration.

@@ -45,7 +45,6 @@ DECLARE_string(lineage_event_log_dir);
 DECLARE_string(principal);
 DECLARE_string(local_library_dir);
 DECLARE_string(server_name);
-DECLARE_string(authorization_policy_file);
 DECLARE_string(authorization_policy_provider_class);
 DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
@@ -81,7 +80,6 @@ namespace impala {
 
 Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   TBackendGflags cfg;
-  cfg.__set_authorization_policy_file(FLAGS_authorization_policy_file);
   cfg.__set_load_catalog_in_background(FLAGS_load_catalog_in_background);
   cfg.__set_enable_orc_scanner(FLAGS_enable_orc_scanner);
   cfg.__set_use_local_catalog(FLAGS_use_local_catalog);

@@ -42,37 +42,25 @@ class SentryAuthProvider {
     Preconditions.checkArgument(config instanceof SentryAuthorizationConfig);
     SentryAuthorizationConfig sentryAuthzConfig = (SentryAuthorizationConfig) config;
     try {
-      ProviderBackend providerBe;
-      // Create the appropriate backend provider.
-      if (sentryAuthzConfig.isFileBasedPolicy()) {
-        providerBe = new SimpleFileProviderBackend(
-            sentryAuthzConfig.getSentryConfig().getConfig(),
-            sentryAuthzConfig.getPolicyFile());
-        ProviderBackendContext context = new ProviderBackendContext();
-        providerBe.initialize(context);
-      } else {
-        // Note: The second parameter to the ProviderBackend is a "resourceFile" path
-        // which is not used by Impala. We cannot pass 'null' so instead pass an empty
-        // string.
-        providerBe = new SimpleCacheProviderBackend(
-            sentryAuthzConfig.getSentryConfig().getConfig(), "");
-        Preconditions.checkNotNull(policy);
-        ProviderBackendContext context = new ProviderBackendContext();
-        context.setBindingHandle(policy);
-        providerBe.initialize(context);
-      }
+      // Note: The second parameter to the ProviderBackend is a "resourceFile" path
+      // which is not used by Impala. We cannot pass 'null' so instead pass an empty
+      // string.
+      ProviderBackend providerBe = new SimpleCacheProviderBackend(
+          sentryAuthzConfig.getSentryConfig().getConfig(), "");
+      Preconditions.checkNotNull(policy);
+      ProviderBackendContext context = new ProviderBackendContext();
+      context.setBindingHandle(policy);
+      providerBe.initialize(context);
 
       CommonPolicyEngine engine =
           new CommonPolicyEngine(providerBe);
 
       // Try to create an instance of the specified policy provider class.
       // Re-throw any exceptions that are encountered.
-      String policyFile = sentryAuthzConfig.getPolicyFile() == null ?
-          "" : sentryAuthzConfig.getPolicyFile();
 
       return (ResourceAuthorizationProvider) ConstructorUtils.invokeConstructor(
           Class.forName(sentryAuthzConfig.getPolicyProviderClassName()),
-          new Object[] {policyFile, engine, ImpalaPrivilegeModel.INSTANCE});
+          new Object[] {"", engine, ImpalaPrivilegeModel.INSTANCE});
     } catch (Exception e) {
       // Re-throw as unchecked exception.
       throw new IllegalStateException(

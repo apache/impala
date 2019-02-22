@@ -675,10 +675,6 @@ public class JniFrontend {
     if (BackendConfig.INSTANCE.isAuthorizedProxyGroupEnabled()) {
       output.append(checkGroupsMappingProvider(CONF));
     }
-    if (BackendConfig.INSTANCE.isAuthorizationFileSet()) {
-      LOG.warn("authorization_policy_file flag is deprecated. Object Ownership feature" +
-          " is not supported with authorization_policy_file.");
-    }
     return output.toString();
   }
 

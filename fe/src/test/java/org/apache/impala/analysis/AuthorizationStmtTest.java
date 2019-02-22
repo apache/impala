@@ -106,7 +106,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     switch (authzProvider) {
       case SENTRY:
         authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-            "server1", null,
+            "server1",
             System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
         authzFactory_ = new SentryAuthorizationFactory(authzConfig_);
         authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());

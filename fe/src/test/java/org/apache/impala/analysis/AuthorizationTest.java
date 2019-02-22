@@ -21,545 +21,159 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryPolicyService;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeDb;
-import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.CustomClusterGroupMapper;
+import org.apache.impala.service.CustomClusterResourceAuthorizationProvider;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.PatternMatcher;
-import org.apache.sentry.core.model.db.AccessConstants;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
-import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
-@RunWith(Parameterized.class)
 public class AuthorizationTest extends FrontendTestBase {
-  // Policy file has defined current user and 'test_user' have:
-  //   ALL permission on 'tpch' database and 'newdb' database
-  //   ALL permission on 'functional_seq_snap' database
-  //   SELECT permissions on all tables in 'tpcds' database
-  //   SELECT, REFRESH, DROP permissions on 'functional.alltypesagg'
-  //   ALTER permissions on 'functional.alltypeserror'
-  //   SELECT permissions on 'functional.complex_view'
-  //   SELECT, REFRESH permissions on 'functional.view_view'
-  //   ALTER, DROP permissions on 'functional.alltypes_view'
-  //   SELECT permissions on columns ('id', 'int_col', and 'year') on
-  //   'functional.alltypessmall' (no SELECT permissions on 'functional.alltypessmall')
-  //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
-  //   'int_map_col') on 'functional.allcomplextypes' (no SELECT permissions on
-  //   'functional.allcomplextypes')
-  //   ALL permissions on 'functional_parquet.allcomplextypes'
-  //   SELECT permissions on all the columns of 'functional.alltypestiny' (no SELECT
-  //   permissions on table 'functional.alltypestiny')
-  //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
-  //   INSERT permissions on all tables in 'functional_parquet' database
-  //   No permissions on database 'functional_rc'
-  //   Only column level permissions in 'functional_avro':
-  //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
-  //   REFRESH, INSERT, CREATE, ALTER, DROP permissions on 'functional_text_lzo' database
-  public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
-  public final static User USER = new User(System.getProperty("user.name"));
-
+  public static final User USER = new User(System.getProperty("user.name"));
   // Tables in functional that the current user and 'test_user' have table- or
   // column-level SELECT or INSERT permission. I.e. that should be returned by
   // 'SHOW TABLES'.
   private static final List<String> FUNCTIONAL_VISIBLE_TABLES = Lists.newArrayList(
-      "allcomplextypes", "alltypes", "alltypes_view", "alltypesagg", "alltypeserror",
-      "alltypessmall", "alltypestiny", "complex_view", "view_view");
+      "alltypes", "alltypesagg", "alltypeserror", "alltypessmall", "alltypestiny");
 
-  /**
-   * Test context whose instances are used to parameterize this test.
-   */
-  private static class TestContext {
-    public final SentryAuthorizationConfig authzConfig;
-    public final ImpaladTestCatalog catalog;
+  private static final SentryAuthorizationConfig AUTHZ_CONFIG =
+      SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
+          System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+  private static final ImpaladTestCatalog AUTHZ_CATALOG =
+      new ImpaladTestCatalog(AUTHZ_CONFIG);
+  private static final AuthorizationFactory AUTHZ_FACTORY =
+      new SentryAuthorizationFactory(AUTHZ_CONFIG);
 
-    public TestContext(SentryAuthorizationConfig authzConfig,
-        ImpaladTestCatalog catalog) {
-      this.authzConfig = authzConfig;
-      this.catalog = catalog;
-    }
-  }
+  private static final Frontend AUTHZ_FE = new Frontend(AUTHZ_FACTORY, AUTHZ_CATALOG);
 
-  private final TestContext ctx_;
-  private final AnalysisContext analysisContext_;
-  private final Frontend fe_;
+  private final AnalysisContext authzCtx;
 
-  // Parameterize the test suite to run all tests using:
-  // - a file based authorization policy
-  // - a sentry service based authorization policy
-  // These test contexts are statically initialized.
-  private static final List<TestContext> testCtxs_;
-
-  @Parameters
-  public static Collection<TestContext> testVectors() { return testCtxs_; }
-
-  /**
-   * Create test contexts used for parameterizing this test. We create these statically
-   * so that we do not have to re-create and initialize the auth policy and the catalog
-   * for every test. Reloading the policy and the table metadata is very expensive
-   * relative to the work done in the tests.
-   */
-  static {
-    testCtxs_ = new ArrayList<>();
-    // Create and init file based auth config.
-    SentryAuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
-    ImpaladTestCatalog filePolicyCatalog = new ImpaladTestCatalog(filePolicyAuthzConfig);
-    testCtxs_.add(new TestContext(filePolicyAuthzConfig, filePolicyCatalog));
-
-    // Create and init sentry service based auth config.
-    SentryAuthorizationConfig sentryServiceAuthzConfig;
-    try {
-      sentryServiceAuthzConfig = createSentryServiceAuthzConfig();
-    } catch (ImpalaException e) {
-      // Convert the checked exception into an unchecked one because we have
-      // no control of the initialization process, so there is no good place to
-      // handle a checked exception thrown from a static block.
-      throw new RuntimeException(e);
-    }
-    ImpaladTestCatalog sentryServiceCatalog =
-        new ImpaladTestCatalog(sentryServiceAuthzConfig);
-    testCtxs_.add(new TestContext(sentryServiceAuthzConfig, sentryServiceCatalog));
+  public AuthorizationTest() throws ImpalaException {
+    authzCtx = createAnalysisCtx(AUTHZ_FACTORY, USER.getName());
+    setupImpalaCatalog(AUTHZ_CATALOG);
   }
 
   @BeforeClass
-  public static void setUp() throws Exception {
+  public static void setUp() throws ImpalaException {
     RuntimeEnv.INSTANCE.setTestEnv(true);
   }
 
   @AfterClass
-  public static void cleanUp() {
+  public static void cleanUp() throws ImpalaException {
     RuntimeEnv.INSTANCE.reset();
   }
 
-  public AuthorizationTest(TestContext ctx) throws Exception {
-    ctx_ = ctx;
-    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
-        ctx_.authzConfig);
-    analysisContext_ = createAnalysisCtx(authzFactory, USER.getName());
-    fe_ = new Frontend(authzFactory, ctx_.catalog);
-  }
-
-  public static SentryAuthorizationConfig createPolicyFileAuthzConfig() {
-    SentryAuthorizationConfig result =
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
-            AUTHZ_POLICY_FILE,
-            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    return result;
-  }
-
-  public static SentryAuthorizationConfig createSentryServiceAuthzConfig()
+  private static void setupImpalaCatalog(ImpaladTestCatalog catalog)
       throws ImpalaException {
-    SentryAuthorizationConfig result =
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
-        System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    setupSentryService(result);
-    return result;
-  }
-
-  private static void setupSentryService(SentryAuthorizationConfig authzConfig)
-      throws ImpalaException {
-    SentryPolicyService sentryService = new SentryPolicyService(
-        authzConfig.getSentryConfig());
-    // Server admin. Don't grant to any groups, that is done within
-    // the test cases.
-    String roleName = "admin";
-    sentryService.createRole(USER, roleName, true);
-
+    // Create admin user
+    String role_ = "admin";
     TPrivilege privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.SERVER,
         false);
-    privilege.setServer_name("server1");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-    sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
+    Role role = catalog.addRole(role_);
+    addRolePrivilege(catalog, privilege, role);
+    catalog.addRoleGrantGroup(role_, CustomClusterGroupMapper.SERVER_ADMIN);
 
-    // insert functional alltypes
-    roleName = "insert_functional_alltypes";
-    roleName = roleName.toLowerCase();
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+    // Create test users
+    Set<String> groups = new HashSet<>(Arrays.asList(
+        USER.getName(),
+        CustomClusterGroupMapper.AUTH_TO_LOCAL,
+        CustomClusterGroupMapper.TEST_USER));
+      role_ = "testRole";
+      role = catalog.addRole(role_);
 
+
+    // Insert on functional.alltypes
     privilege = new TPrivilege(TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("alltypes");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
+    addRolePrivilege(catalog, privilege, role);
 
-    // insert_parquet
-    roleName = "insert_parquet";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+    // All on functional.[alltypesagg, alltypeserror, alltypestiny]
+    List<String> tables = Arrays.asList(
+        "alltypesagg",
+        "alltypeserror",
+        "alltypestiny");
+    for (String table : tables) {
+      privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.TABLE, false);
+      privilege.setDb_name("functional");
+      privilege.setTable_name(table);
+      addRolePrivilege(catalog, privilege, role);
+    }
 
-    privilege = new TPrivilege(TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_parquet");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
+    // Columns [id, int_col, year] on functional.alltypessmall
+    List<String> columns = Arrays.asList("id", "int_col", "year");
+    for (String column : columns) {
+      privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN, false);
+      privilege.setDb_name("functional");
+      privilege.setTable_name("alltypessmall");
+      privilege.setColumn_name(column);
+      addRolePrivilege(catalog, privilege, role);
+    }
 
-    // refresh_functional_text_lzo
-    roleName = "refresh_functional_text_lzo";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.REFRESH, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // refresh_functional_alltypesagg
-    roleName = "refresh_functional_alltypesagg";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.REFRESH, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypesagg");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // drop_functional_alltypesagg
-    roleName = "drop_functional_alltypesagg";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.DROP, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypesagg");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // refresh_functional_view_view
-    roleName = "refresh_functional_view_view";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.REFRESH, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("view_view");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // drop_functional_alltypes_view
-    roleName = "drop_functional_alltypes_view";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.DROP, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypes_view");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // insert_functional_text_lzo
-    roleName = "insert_functional_text_lzo";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.INSERT, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // create_functional_text_lzo
-    roleName = "create_functional_text_lzo";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.CREATE, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // alter_functional_text_lzo
-    roleName = "alter_functional_text_lzo";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALTER, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // drop_functional_text_lzo
-    roleName = "drop_functional_text_lzo";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.DROP, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // alter_functional_alltypeserror
-    roleName = "alter_functional_alltypeserror";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALTER, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypeserror");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // alter_functional_alltypes_view
-    roleName = "alter_functional_alltypes_view";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALTER, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypes_view");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // all newdb w/ all on URI
-    roleName = "all_newdb";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("newdb");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
-    privilege.setServer_name("server1");
-    privilege.setUri("hdfs://localhost:20500/test-warehouse/new_table");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
-    privilege.setServer_name("server1");
-    privilege.setUri("hdfs://localhost:20500/test-warehouse/UPPER_CASE");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
-    privilege.setServer_name("server1");
-    privilege.setUri("hdfs://localhost:20500/test-warehouse/libTestUdfs.so");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // all tpch
-    roleName = "all_tpch";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
-    privilege.setServer_name("server1");
-    privilege.setUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("tpch");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // select tpcds
-    roleName = "select_tpcds";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
+    // Select on tpcds
+    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.DATABASE, false);
     privilege.setDb_name("tpcds");
-    privilege.setTable_name(AccessConstants.ALL);
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
+    addRolePrivilege(catalog, privilege, role);
 
-    // select_functional_alltypesagg
-    roleName = "select_functional_alltypesagg";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+    // Select on tpch
+    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.DATABASE, false);
+    privilege.setDb_name("tpch");
+    addRolePrivilege(catalog, privilege, role);
 
-    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("alltypesagg");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // select_functional_complex_view
-    roleName = "select_functional_complex_view";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("complex_view");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // select_functional_view_view
-    roleName = "select_functional_view_view";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional");
-    privilege.setTable_name("view_view");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // all_functional_seq_snap
-    roleName = "all_functional_seq_snap";
-    // Verify we are able to drop a role.
-    sentryService.dropRole(USER, roleName, true);
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_seq_snap");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    // select_column_level_functional
-    roleName = "select_column_level_functional";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    // select (id, int_col, year) on functional.alltypessmall
-    List<TPrivilege> privileges = new ArrayList<>();
-    for (String columnName: Arrays.asList("id", "int_col", "year")) {
-      TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
-          false);
-      priv.setServer_name("server1");
-      priv.setDb_name("functional");
-      priv.setTable_name("alltypessmall");
-      priv.setColumn_name(columnName);
-      privileges.add(priv);
+    for (String group: groups) {
+      catalog.addRoleGrantGroup(role_, group);
     }
-    sentryService.grantRolePrivileges(USER, roleName, privileges);
-    privileges.clear();
-
-    // select (id, int_struct_col) on functional.allcomplextypes
-    for (String columnName: Arrays.asList("id", "int_struct_col", "struct_array_col",
-        "int_map_col")) {
-      TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
-          false);
-      priv.setServer_name("server1");
-      priv.setDb_name("functional");
-      priv.setTable_name("allcomplextypes");
-      priv.setColumn_name(columnName);
-      privileges.add(priv);
-    }
-    sentryService.grantRolePrivileges(USER, roleName, privileges);
-    privileges.clear();
-
-    // table privileges on functional_parquet.allcomplextypes
-    privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.TABLE, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_parquet");
-    privilege.setTable_name("allcomplextypes");
-    privileges.add(privilege);
-    sentryService.grantRolePrivileges(USER, roleName, privileges);
-    privileges.clear();
-
-    // select (*) on functional.alltypestiny
-    String[] columnNames = {"id", "bool_col", "tinyint_col", "smallint_col",
-        "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
-        "timestamp_col", "string_col", "year", "month"};
-    for (String columnName: Arrays.asList(columnNames)) {
-      TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
-          false);
-      priv.setServer_name("server1");
-      priv.setDb_name("functional");
-      priv.setTable_name("alltypestiny");
-      priv.setColumn_name(columnName);
-      privileges.add(priv);
-    }
-    sentryService.grantRolePrivileges(USER, roleName, privileges);
-
-    // select_column_level_functional_avro
-    roleName = "select_column_level_functional_avro";
-    sentryService.createRole(USER, roleName, true);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-
-    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN, false);
-    privilege.setServer_name("server1");
-    privilege.setDb_name("functional_avro");
-    privilege.setTable_name("alltypessmall");
-    privilege.setColumn_name("id");
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
   }
 
-  @Test
-  public void TestSentryService() throws ImpalaException {
-    SentryPolicyService sentryService = new SentryPolicyService(
-        ctx_.authzConfig.getSentryConfig());
-    String roleName = "testRoleName";
-    roleName = roleName.toLowerCase();
-
-    sentryService.createRole(USER, roleName, true);
-    String dbName = UUID.randomUUID().toString();
-    TPrivilege privilege =
-        new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
+  private static void addRolePrivilege(ImpaladTestCatalog catalog, TPrivilege privilege,
+      Role role) throws CatalogException {
     privilege.setServer_name("server1");
-    privilege.setDb_name(dbName);
-    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-    sentryService.grantRolePrivilege(USER, roleName, privilege);
-
-    for (int i = 0; i < 2; ++i) {
-      privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
-      privilege.setServer_name("server1");
-      privilege.setDb_name(dbName);
-      privilege.setTable_name("test_tbl_" + String.valueOf(i));
-      sentryService.grantRolePrivilege(USER, roleName, privilege);
-    }
-
-    List<TPrivilege> privileges = new ArrayList<>();
-    for (int i = 0; i < 10; ++i) {
-      TPrivilege priv = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
-          false);
-      priv.setServer_name("server1");
-      priv.setDb_name(dbName);
-      priv.setTable_name("test_tbl_1");
-      priv.setColumn_name("col_" + String.valueOf(i));
-      privileges.add(priv);
-    }
-    sentryService.grantRolePrivileges(USER, roleName, privileges);
+    privilege.setPrincipal_type(TPrincipalType.ROLE);
+    privilege.setPrincipal_id(role.getId());
+    catalog.addRolePrivilege(role.getName(), privilege);
   }
 
   @After
@@ -567,7 +181,7 @@ public class AuthorizationTest extends FrontendTestBase {
     // Failure to cleanup TPCH can cause:
     // TestDropDatabase(org.apache.impala.analysis.AuthorizationTest):
     // Cannot drop non-empty database: tpch
-    if (ctx_.catalog.getDb("tpch").numFunctions() != 0) {
+    if (catalog_.getDb("tpch").numFunctions() != 0) {
       fail("Failed to clean up functions in tpch.");
     }
   }
@@ -576,29 +190,29 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestShowDbResultsFiltered() throws ImpalaException {
     // These are the only dbs that should show up because they are the only
     // dbs the user has any permissions on.
-    List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_avro", "functional_parquet", "functional_seq_snap",
-        "functional_text_lzo", "tpcds", "tpch");
+    List<String> expectedDbs = Lists.newArrayList("default", "functional", "tpcds",
+        "tpch");
 
-    List<? extends FeDb> dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("*"), USER);
+    List<? extends FeDb> dbs = AUTHZ_FE.getDbs(
+        PatternMatcher.createHivePatternMatcher("*"), USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.MATCHER_MATCH_ALL, USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.MATCHER_MATCH_ALL, USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher(null), USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.createHivePatternMatcher(null), USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.MATCHER_MATCH_NONE, USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.MATCHER_MATCH_NONE, USER);
     assertEquals(Collections.emptyList(), extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher(""), USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.createHivePatternMatcher(""), USER);
     assertEquals(Collections.emptyList(), extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("functional_rc"), USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.createHivePatternMatcher("functional_rc"), USER);
     assertEquals(Collections.emptyList(), extractDbNames(dbs));
 
-    dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("tp*|de*"), USER);
+    dbs = AUTHZ_FE.getDbs(PatternMatcher.createHivePatternMatcher("tp*|de*"), USER);
     expectedDbs = Lists.newArrayList("default", "tpcds", "tpch");
     assertEquals(expectedDbs, extractDbNames(dbs));
   }
@@ -611,31 +225,30 @@ public class AuthorizationTest extends FrontendTestBase {
 
   @Test
   public void TestShowTableResultsFiltered() throws ImpalaException {
-    List<String> tables = fe_.getTableNames("functional",
+    List<String> tables = AUTHZ_FE.getTableNames("functional",
         PatternMatcher.createHivePatternMatcher("*"), USER);
     Assert.assertEquals(FUNCTIONAL_VISIBLE_TABLES, tables);
 
-    tables = fe_.getTableNames("functional",
+    tables = AUTHZ_FE.getTableNames("functional",
         PatternMatcher.MATCHER_MATCH_ALL, USER);
     Assert.assertEquals(FUNCTIONAL_VISIBLE_TABLES, tables);
 
-    tables = fe_.getTableNames("functional",
+    tables = AUTHZ_FE.getTableNames("functional",
         PatternMatcher.createHivePatternMatcher(null), USER);
     Assert.assertEquals(FUNCTIONAL_VISIBLE_TABLES, tables);
 
-    tables = fe_.getTableNames("functional",
+    tables = AUTHZ_FE.getTableNames("functional",
         PatternMatcher.MATCHER_MATCH_NONE, USER);
     Assert.assertEquals(Collections.emptyList(), tables);
 
-    tables = fe_.getTableNames("functional",
+    tables = AUTHZ_FE.getTableNames("functional",
         PatternMatcher.createHivePatternMatcher(""), USER);
     Assert.assertEquals(Collections.emptyList(), tables);
 
-    tables = fe_.getTableNames("functional",
-        PatternMatcher.createHivePatternMatcher("alltypes*|view_view"), USER);
+    tables = AUTHZ_FE.getTableNames("functional",
+        PatternMatcher.createHivePatternMatcher("alltypes*"), USER);
     List<String> expectedTables = Lists.newArrayList(
-        "alltypes", "alltypes_view", "alltypesagg", "alltypeserror", "alltypessmall",
-        "alltypestiny", "view_view");
+        "alltypes", "alltypesagg", "alltypeserror", "alltypessmall", "alltypestiny");
     Assert.assertEquals(expectedTables, tables);
   }
 
@@ -648,7 +261,7 @@ public class AuthorizationTest extends FrontendTestBase {
     req.get_tables_req.setSchemaName("functional");
     // Get all tables
     req.get_tables_req.setTableName("%");
-    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
+    TResultSet resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(FUNCTIONAL_VISIBLE_TABLES.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(FUNCTIONAL_VISIBLE_TABLES.get(i),
@@ -656,14 +269,14 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // Pattern "" and null is the same as "%" to match all
     req.get_tables_req.setTableName("");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(FUNCTIONAL_VISIBLE_TABLES.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(FUNCTIONAL_VISIBLE_TABLES.get(i),
           resp.rows.get(i).colVals.get(2).string_val.toLowerCase());
     }
     req.get_tables_req.setTableName(null);
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(FUNCTIONAL_VISIBLE_TABLES.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(FUNCTIONAL_VISIBLE_TABLES.get(i),
@@ -671,14 +284,14 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // Pattern ".*" matches all and "." is a wildcard that matches any single character
     req.get_tables_req.setTableName(".*");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(FUNCTIONAL_VISIBLE_TABLES.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(FUNCTIONAL_VISIBLE_TABLES.get(i),
           resp.rows.get(i).colVals.get(2).string_val.toLowerCase());
     }
     req.get_tables_req.setTableName("alltypesag.");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     List<String> expectedTblNames = Lists.newArrayList("alltypesagg");
     assertEquals(expectedTblNames.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -687,7 +300,7 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // "_" is a wildcard for a single character
     req.get_tables_req.setTableName("alltypesag_");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     expectedTblNames = Lists.newArrayList("alltypesagg");
     assertEquals(expectedTblNames.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -699,7 +312,7 @@ public class AuthorizationTest extends FrontendTestBase {
     final int numTpcdsTables = 24;
     req.get_tables_req.setSchemaName("tpcds");
     req.get_tables_req.setTableName("%");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(numTpcdsTables, resp.rows.size());
   }
 
@@ -711,10 +324,9 @@ public class AuthorizationTest extends FrontendTestBase {
     req.get_schemas_req = new TGetSchemasReq();
     // Get all schema (databases).
     req.get_schemas_req.setSchemaName("%");
-    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
-    List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_avro", "functional_parquet", "functional_seq_snap",
-        "functional_text_lzo", "tpcds", "tpch");
+    TResultSet resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
+    List<String> expectedDbs = Lists.newArrayList("default", "functional", "tpcds",
+        "tpch");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
@@ -722,14 +334,14 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // Pattern "" and null is the same as "%" to match all
     req.get_schemas_req.setSchemaName("");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
           resp.rows.get(i).colVals.get(0).string_val.toLowerCase());
     }
     req.get_schemas_req.setSchemaName(null);
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
@@ -737,14 +349,14 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // Pattern ".*" matches all and "." is a wildcard that matches any single character
     req.get_schemas_req.setSchemaName(".*");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
           resp.rows.get(i).colVals.get(0).string_val.toLowerCase());
     }
     req.get_schemas_req.setSchemaName("defaul.");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     expectedDbs = Lists.newArrayList("default");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -753,7 +365,7 @@ public class AuthorizationTest extends FrontendTestBase {
     }
     // "_" is a wildcard that matches any single character
     req.get_schemas_req.setSchemaName("defaul_");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     expectedDbs = Lists.newArrayList("default");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -772,33 +384,33 @@ public class AuthorizationTest extends FrontendTestBase {
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
     req.get_columns_req.setColumnName("stri%");
-    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
+    TResultSet resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(1, resp.rows.size());
 
     // User does not have permission to access the table, no results should be returned.
     req.get_columns_req.setTableName("alltypesnopart");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(0, resp.rows.size());
 
     // User does not have permission to access db or table, no results should be
     // returned.
     req.get_columns_req.setSchemaName("functional_seq_gzip");
     req.get_columns_req.setTableName("alltypes");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(0, resp.rows.size());
 
     // User has SELECT privileges on all table columns but no table-level privileges.
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypestiny");
     req.get_columns_req.setColumnName("%");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(13, resp.rows.size());
 
     // User has SELECT privileges on some columns but no table-level privileges.
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypessmall");
     req.get_columns_req.setColumnName("%");
-    resp = fe_.execHiveServer2MetadataOp(req);
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     String[] expectedColumnNames = {"id", "int_col", "year"};
     assertEquals(expectedColumnNames.length, resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -820,7 +432,9 @@ public class AuthorizationTest extends FrontendTestBase {
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
       AnalysisContext ctx = createAnalysisCtx(
-          new SentryAuthorizationFactory(ctx_.authzConfig), user.getName());
+          new SentryAuthorizationFactory(AUTHZ_CONFIG), user.getName());
+//    for (User user : users) {
+//      AnalysisContext ctx = createAnalysisCtx(AUTHZ_CONFIG, user.getName());
 
       // Can select from table that user has privileges on.
       AuthzOk(ctx, "select * from functional.alltypesagg");
@@ -847,9 +461,10 @@ public class AuthorizationTest extends FrontendTestBase {
     //     </value>
     //   </property>
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
-        AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
-        LocalGroupResourceAuthorizationProvider.class.getName());
-    try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+       AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
+        CustomClusterResourceAuthorizationProvider.class.getName());
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+      setupImpalaCatalog(catalog);
       // This test relies on the auth_to_local rule -
       // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
       // which converts any principal of type authtest/<hostname>@REALM.COM to user
@@ -870,7 +485,7 @@ public class AuthorizationTest extends FrontendTestBase {
       // Does not have privileges to execute a query
       AuthzError(fe, ctx, "select * from functional.alltypes",
           "User '%s' does not have privileges to execute 'SELECT' on: " +
-          "functional.alltypes");
+              "functional.alltypes");
 
       // Unit tests for User#getShortName()
       // Different auth_to_local rules to apply on the username.
@@ -907,50 +522,21 @@ public class AuthorizationTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestServerNameAuthorized() throws ImpalaException {
-    if (ctx_.authzConfig.isFileBasedPolicy()) {
-      // Authorization config that has a different server name from policy file.
-      TestWithIncorrectConfig(SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-          "differentServerName", AUTHZ_POLICY_FILE,
-          ctx_.authzConfig.getSentryConfig().getConfigFile()),
-          new User(System.getProperty("user.name")));
-    } // TODO: Test using policy server.
-  }
-
-  @Test
-  public void TestNoPermissionsWhenPolicyFileDoesNotExist() throws ImpalaException {
-    // Test doesn't make sense except for file based policies.
-    if (!ctx_.authzConfig.isFileBasedPolicy()) return;
-
-    // Validate a non-existent policy file.
-    // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
-    // resolved in the absence of the policy file.
-    TestWithIncorrectConfig(SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", AUTHZ_POLICY_FILE + "_does_not_exist",
-        ctx_.authzConfig.getSentryConfig().getConfigFile()),
-        new User(System.getProperty("user.name")));
-  }
-
-  @Test
   public void TestConfigValidation() throws InternalException {
-    String sentryConfig = ctx_.authzConfig.getSentryConfig().getConfigFile();
+    String sentryConfig = AUTHZ_CONFIG.getSentryConfig().getConfigFile();
     // Valid configs pass validation.
     SentryAuthorizationConfig config =
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
-            AUTHZ_POLICY_FILE, sentryConfig);
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", sentryConfig);
     Assert.assertTrue(config.isEnabled());
-    Assert.assertTrue(config.isFileBasedPolicy());
 
-    config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+    config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
         sentryConfig);
     Assert.assertTrue(config.isEnabled());
-    Assert.assertTrue(!config.isFileBasedPolicy());
 
     // Invalid configs
     // No sentry configuration file.
     try {
-      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-          "server1", AUTHZ_POLICY_FILE, null);
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null);
       Assert.assertTrue(config.isEnabled());
     } catch (Exception e) {
       Assert.assertEquals("A valid path to a sentry-site.xml config " +
@@ -960,8 +546,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Empty / null server name.
     try {
-      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-          "", AUTHZ_POLICY_FILE, sentryConfig);
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("", sentryConfig);
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -971,8 +556,7 @@ public class AuthorizationTest extends FrontendTestBase {
           e.getMessage());
     }
     try {
-      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(null,
-          AUTHZ_POLICY_FILE, sentryConfig);
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(null, sentryConfig);
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -984,7 +568,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Sentry config file does not exist.
     try {
-      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
           "/path/does/not/exist.xml");
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
@@ -996,7 +580,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Invalid ResourcePolicyProvider class name.
     try {
-      config = new SentryAuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+      config = new SentryAuthorizationConfig("server1", sentryConfig,
           "ClassDoesNotExist");
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
@@ -1008,7 +592,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Valid class name, but class is not derived from ResourcePolicyProvider
     try {
-      config = new SentryAuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+      config = new SentryAuthorizationConfig("server1", sentryConfig,
           this.getClass().getName());
       Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -1019,26 +603,25 @@ public class AuthorizationTest extends FrontendTestBase {
     }
 
     // Config validations skipped if authorization disabled
-    config = new SentryAuthorizationConfig("", "", "", "");
+    config = new SentryAuthorizationConfig("", "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new SentryAuthorizationConfig(null, "", "", null);
+    config = new SentryAuthorizationConfig(null, "", null);
     Assert.assertFalse(config.isEnabled());
-    config = new SentryAuthorizationConfig("", null, "", "");
-    Assert.assertFalse(config.isEnabled());
-    config = new SentryAuthorizationConfig(null, null, null, null);
+    config = new SentryAuthorizationConfig(null, null, null);
     Assert.assertFalse(config.isEnabled());
   }
 
   @Test
   public void TestLocalGroupPolicyProvider() throws ImpalaException {
-    if (!ctx_.authzConfig.isFileBasedPolicy()) return;
     // Use an authorization configuration that uses the
-    // LocalGroupResourceAuthorizationProvider.
+    // CustomClusterResourceAuthorizationProvider.
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
-        AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
-        LocalGroupResourceAuthorizationProvider.class.getName());
+        AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
+        CustomClusterResourceAuthorizationProvider.class.getName());
     SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
-    try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+      setupImpalaCatalog(catalog);
       // Create an analysis context + FE with the test user
       // (as defined in the policy file)
       User user = new User("test_user");
@@ -1050,7 +633,7 @@ public class AuthorizationTest extends FrontendTestBase {
       // Does not have privileges to execute a query
       AuthzError(fe, ctx, "select * from functional.alltypes",
           "User '%s' does not have privileges to execute 'SELECT' on: " +
-          "functional.alltypes");
+              "functional.alltypes");
 
       // Verify with the admin user
       user = new User("admin_user");
@@ -1069,14 +652,11 @@ public class AuthorizationTest extends FrontendTestBase {
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws ImpalaException {
     SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
-    Frontend fe = new Frontend(authzFactory, ctx_.catalog);
+    Frontend fe = new Frontend(authzFactory, AUTHZ_CATALOG);
     AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
     AuthzError(fe, ctx, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypesagg");
-    AuthzError(fe, ctx, "ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)",
-        "User '%s' does not have privileges to execute 'ALTER' on: " +
-        "functional_seq_snap.alltypes");
     AuthzError(fe, ctx, "drop table tpch.lineitem",
         "User '%s' does not have privileges to execute 'DROP' on: tpch.lineitem");
     AuthzError(fe, ctx, "show tables in functional",
@@ -1084,11 +664,11 @@ public class AuthorizationTest extends FrontendTestBase {
   }
 
   private void AuthzOk(String stmt) throws ImpalaException {
-    AuthzOk(analysisContext_, stmt);
+    AuthzOk(authzCtx, stmt);
   }
 
   private void AuthzOk(AnalysisContext context, String stmt) throws ImpalaException {
-    AuthzOk(fe_, context, stmt);
+    AuthzOk(AUTHZ_FE, context, stmt);
   }
 
   private void AuthzOk(Frontend fe, AnalysisContext context, String stmt)
@@ -1102,12 +682,12 @@ public class AuthorizationTest extends FrontendTestBase {
    */
   private void AuthzError(String stmt, String expectedErrorString)
       throws ImpalaException {
-    AuthzError(analysisContext_, stmt, expectedErrorString);
+    AuthzError(authzCtx, stmt, expectedErrorString);
   }
 
   private void AuthzError(AnalysisContext ctx, String stmt, String expectedErrorString)
       throws ImpalaException {
-    AuthzError(fe_, ctx, stmt, expectedErrorString);
+    AuthzError(AUTHZ_FE, ctx, stmt, expectedErrorString);
   }
 
   private void AuthzError(Frontend fe, AnalysisContext ctx,

@@ -70,7 +70,7 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
         new SentryAuthorizationFactory(
-            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null)),
+            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
         timeline);
     return analysisCtx;
   }
@@ -312,7 +312,7 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
         new SentryAuthorizationFactory(
-            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null)),
+            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
         timeline);
     AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
         "Cannot execute authorization statement with an empty username.");

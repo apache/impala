@@ -257,54 +257,16 @@ public class Frontend {
     authzFactory_ = authzFactory;
 
     AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
-    if (authzConfig.getProvider() == AuthorizationProvider.SENTRY) {
-      SentryAuthorizationConfig sentryAuthzConfig =
-          (SentryAuthorizationConfig) authzConfig;
-      // Load the authorization policy once at startup, initializing
-      // authzChecker_. This ensures that, if the policy fails to load,
-      // we will throw an exception and fail to start.
-      AuthorizationPolicyReader policyReaderTask =
-          new AuthorizationPolicyReader(sentryAuthzConfig);
-      policyReaderTask.run();
-
-      // If authorization is enabled, reload the policy on a regular basis.
-      if (sentryAuthzConfig.isEnabled() && sentryAuthzConfig.isFileBasedPolicy()) {
-        // Stagger the reads across nodes
-        Random randomGen = new Random(UUID.randomUUID().hashCode());
-        int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
-
-        policyReader_.scheduleAtFixedRate(policyReaderTask,
-            delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
-      }
+    if (authzConfig.isEnabled()) {
+      authzChecker_.set(authzFactory.newAuthorizationChecker(
+          getCatalog().getAuthPolicy()));
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
     }
     authzManager_ = authzFactory.newAuthorizationManager(catalogManager_,
-        () -> authzChecker_.get());
+        authzChecker_::get);
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
-  }
-
-  /**
-   * Reads (and caches) an authorization policy from HDFS.
-   */
-  private class AuthorizationPolicyReader implements Runnable {
-    private final SentryAuthorizationConfig config_;
-
-    public AuthorizationPolicyReader(SentryAuthorizationConfig config) {
-      config_ = config;
-    }
-
-    @Override
-    public void run() {
-      try {
-        LOG.info("Reloading authorization policy file from: " + config_.getPolicyFile());
-        authzChecker_.set(authzFactory_.newAuthorizationChecker(
-            getCatalog().getAuthPolicy()));
-      } catch (Exception e) {
-        LOG.error("Error reloading policy file: ", e);
-      }
-    }
   }
 
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }

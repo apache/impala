@@ -299,8 +299,11 @@ DEFINE_bool_hidden(unlock_mt_dop, false,
       return true; \
     });
 
+REMOVED_FLAG(authorization_policy_file)
 REMOVED_FLAG(be_service_threads);
 REMOVED_FLAG(cgroup_hierarchy_path);
+REMOVED_FLAG(disable_admission_control);
+REMOVED_FLAG(disable_mem_pools);
 REMOVED_FLAG(enable_accept_queue_server);
 REMOVED_FLAG(enable_partitioned_aggregation);
 REMOVED_FLAG(enable_partitioned_hash_join);
@@ -330,8 +333,6 @@ REMOVED_FLAG(skip_lzo_version_check);
 REMOVED_FLAG(staging_cgroup);
 REMOVED_FLAG(status_report_interval);
 REMOVED_FLAG(suppress_unknown_disk_id_warnings);
-REMOVED_FLAG(use_statestore);
-REMOVED_FLAG(use_kudu_kinit);
-REMOVED_FLAG(disable_admission_control);
-REMOVED_FLAG(disable_mem_pools);
 REMOVED_FLAG(use_krpc);
+REMOVED_FLAG(use_kudu_kinit);
+REMOVED_FLAG(use_statestore);

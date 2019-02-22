@@ -44,7 +44,7 @@ struct TBackendGflags {
 
   9: required string principal
 
-  10: required string authorization_policy_file
+  // REMOVED: 10: required string authorization_policy_file
 
   11: required string server_name
 

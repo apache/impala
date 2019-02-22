@@ -197,6 +197,21 @@ public class SentryPolicyService {
   }
 
   /**
+   * Grants a role to the groups.
+   *
+   * @param requestingUser - The requesting user.
+   * @param roleName - The role to grant to the groups. Role must already exist.
+   * @param groupNames - The groups to grant the role to.
+   * @throws ImpalaException - On any error.
+   */
+  public void grantRoleToGroups(User requestingUser, String roleName,
+      Set<String> groupNames) throws ImpalaException {
+    for (String groupName : groupNames) {
+      grantRoleToGroup(requestingUser, roleName, groupName);
+    }
+  }
+
+  /**
    * Removes a role from a group.
    *
    * @param requestingUser - The requesting user.

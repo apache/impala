@@ -63,147 +63,170 @@ class TestAuthorization(CustomClusterTestSuite):
       self.socket.close()
     shutil.rmtree(self.AUDIT_LOG_DIR, ignore_errors=True)
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=%s\
-      --authorization_policy_provider_class=%s" %\
-      (AUTH_POLICY_FILE,
-       "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider"))
-  def test_custom_authorization_provider(self):
+  def __execute_hs2_stmt(self, statement, verify=True):
+    """
+    Executes an hs2 statement
+
+    :param statement: the statement to execute
+    :param verify: If set to true, will thrown an exception on a failed hs2 execution
+    :return: the result of execution
+    """
+    from tests.hs2.test_hs2 import TestHS2
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = statement
+    result = self.hs2_client.ExecuteStatement(execute_statement_req)
+    if verify:
+      TestHS2.check_response(result)
+    return result
+
+  def __open_hs2(self, user, configuration, verify=True):
+    """
+    Open a session with hs2
+
+    :param user: the user to open the session
+    :param configuration: the configuration for the session
+    :param verify: If set to true, will thrown an exception on failed session open
+    :return: the result of opening the session
+    """
     from tests.hs2.test_hs2 import TestHS2
     open_session_req = TCLIService.TOpenSessionReq()
-    # User is 'test_user' (defined in the authorization policy file)
-    open_session_req.username = 'test_user'
-    open_session_req.configuration = dict()
+    open_session_req.username = user
+    open_session_req.configuration = configuration
     resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-
-    # Try to query a table we are not authorized to access.
-    self.session_handle = resp.sessionHandle
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "describe tpch_seq.lineitem"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    assert 'User \'%s\' does not have privileges to access' % 'test_user' in\
-        str(execute_statement_resp)
-
-    # Now try the same operation on a table we are authorized to access.
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "describe tpch.lineitem"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
-
+    if verify:
+      TestHS2.check_response(resp)
+    return resp
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=%s\
-      --authorized_proxy_user_config=hue=%s" % (AUTH_POLICY_FILE, getuser()))
-  def test_access_runtime_profile(self):
-    from tests.hs2.test_hs2 import TestHS2
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.username = getuser()
-    open_session_req.configuration = dict()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 "
+                   "--sentry_config={0} "
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE),
+      catalogd_args="--sentry_config={0} "
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE),
+      sentry_config=SENTRY_CONFIG_FILE)
+  def test_custom_authorization_provider(self, unique_role):
+    try:
+      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
+      self.__execute_hs2_stmt("create role {0}".format(unique_role))
+      self.__execute_hs2_stmt("grant role {0} to group {1}"
+                              .format(unique_role, grp.getgrnam(getuser()).gr_name))
+      self.__execute_hs2_stmt("grant select on table tpch.lineitem to role {0}"
+                              .format(unique_role))
 
-    # Current user can't access view's underlying tables
-    self.session_handle = resp.sessionHandle
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "explain select * from functional.complex_view"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    assert 'User \'%s\' does not have privileges to EXPLAIN' % getuser() in\
-        str(execute_statement_resp)
-    # User should not have access to the runtime profile
-    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
-        False, False)
-    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
-        False, True)
-
-    # Repeat as a delegated user
-    open_session_req.username = 'hue'
-    open_session_req.configuration = dict()
-    # Delegated user is the current user
-    open_session_req.configuration['impala.doas.user'] = getuser()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-    self.session_handle = resp.sessionHandle
-    # User should not have access to the runtime profile
-    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
-        False, False)
-    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
-        False, True)
-
-    # Create a view for which the user has access to the underlying tables.
-    open_session_req.username = getuser()
-    open_session_req.configuration = dict()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-    self.session_handle = resp.sessionHandle
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = """create view if not exists tpch.customer_view as
-        select * from tpch.customer limit 1"""
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
-
-    # User should be able to run EXPLAIN
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = """explain select * from tpch.customer_view"""
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
-
-    # User should have access to the runtime profile and exec summary
-    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view", True,
-        False)
-    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view", True,
-        True)
-
-    # Repeat as a delegated user
-    open_session_req.username = 'hue'
-    open_session_req.configuration = dict()
-    # Delegated user is the current user
-    open_session_req.configuration['impala.doas.user'] = getuser()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-    self.session_handle = resp.sessionHandle
-    # User should have access to the runtime profile and exec summary
-    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view",
-        True, False)
-    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view",
-        True, True)
-
-    # Clean up
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "drop view if exists tpch.customer_view"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+      bad_resp = self.__execute_hs2_stmt("describe tpch_seq.lineitem", False)
+      assert 'User \'%s\' does not have privileges to access' % getuser() in \
+             str(bad_resp)
+      self.__execute_hs2_stmt("describe tpch.lineitem")
+    finally:
+      self.__execute_hs2_stmt("drop role {0}".format(unique_role))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=%s\
-      --authorized_proxy_user_config=foo=bar;hue=%s\
-      --abort_on_failed_audit_event=false\
-      --audit_event_log_dir=%s" % (AUTH_POLICY_FILE, getuser(), AUDIT_LOG_DIR))
-  def test_user_impersonation(self):
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 "
+                   "--authorized_proxy_user_config=hue={0}".format(getuser()),
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
+  def test_access_runtime_profile(self, unique_role, unique_name):
+    unique_db = unique_name + "_db"
+
+    try:
+      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
+      self.__execute_hs2_stmt("create role {0}".format(unique_role))
+      self.__execute_hs2_stmt("grant create on server to role {0}".format(unique_role))
+      self.__execute_hs2_stmt("grant all on database tpch to role {0}"
+                              .format(unique_role))
+      self.__execute_hs2_stmt("grant select on table functional.complex_view to role {0}"
+                              .format(unique_role))
+      self.__execute_hs2_stmt("grant role {0} to group {1}"
+                              .format(unique_role, grp.getgrnam(getuser()).gr_name))
+      # Create db with permissions
+      self.__execute_hs2_stmt("create database {0}".format(unique_db))
+      self.__execute_hs2_stmt("grant all on database {0} to role {1}"
+                              .format(unique_db, unique_role))
+
+      # Current user can't access view's underlying tables
+      bad_resp = self.__execute_hs2_stmt("explain select * from functional.complex_view",
+                                         False)
+      assert 'User \'%s\' does not have privileges to EXPLAIN' % getuser() in \
+             str(bad_resp)
+      # User should not have access to the runtime profile
+      self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+                                                False, False)
+      self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+                                                False, True)
+
+      # Repeat as a delegated user
+      self.session_handle = \
+          self.__open_hs2('hue', {'impala.doas.user': getuser()}).sessionHandle
+      # User should not have access to the runtime profile
+      self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+                                                False, False)
+      self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+                                                False, True)
+
+      # Create a view for which the user has access to the underlying tables.
+      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
+      self.__execute_hs2_stmt(
+          "create view if not exists {0}.customer_view as select * from tpch.customer "
+          "limit 1".format(unique_db))
+
+      # User should be able to run EXPLAIN
+      self.__execute_hs2_stmt("explain select * from {0}.customer_view"
+                              .format(unique_db))
+
+      # User should have access to the runtime profile and exec summary
+      self.__run_stmt_and_verify_profile_access("select * from {0}.customer_view"
+                                                .format(unique_db), True, False)
+      self.__run_stmt_and_verify_profile_access("select * from {0}.customer_view"
+                                                .format(unique_db), True, True)
+
+      # Repeat as a delegated user
+      self.session_handle = \
+          self.__open_hs2('hue', {'impala.doas.user': getuser()}).sessionHandle
+      # Delegated user is the current user
+      self.__run_stmt_and_verify_profile_access("select * from {0}.customer_view"
+                                                .format(unique_db), True, False)
+      self.__run_stmt_and_verify_profile_access("select * from {0}.customer_view"
+                                                .format(unique_db), True, True)
+    finally:
+      self.__execute_hs2_stmt("grant all on server to role {0}".format(unique_role))
+      self.__execute_hs2_stmt("drop view if exists {0}.customer_view".format(unique_db))
+      self.__execute_hs2_stmt("drop table if exists {0}.customer".format(unique_db))
+      self.__execute_hs2_stmt("drop database if exists {0}".format(unique_db))
+      self.__execute_hs2_stmt("drop role {0}".format(unique_role))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 "
+                   "--authorized_proxy_user_config=foo=bar;hue={0} "
+                   "--abort_on_failed_audit_event=false "
+                   "--audit_event_log_dir={1}"
+                   .format(getuser(), AUDIT_LOG_DIR),
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
+  def test_user_impersonation(self, unique_role):
     """End-to-end user impersonation + authorization test"""
-    self.__test_impersonation()
+    self.__test_impersonation(unique_role)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--server_name=server1\
-        --authorization_policy_file=%s\
-        --authorized_proxy_user_config=hue=bar\
-        --authorized_proxy_group_config=foo=bar;hue=%s\
-        --abort_on_failed_audit_event=false\
-        --audit_event_log_dir=%s" % (AUTH_POLICY_FILE,
-                                     grp.getgrgid(os.getgid()).gr_name,
-                                     AUDIT_LOG_DIR))
-  def test_group_impersonation(self):
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 "
+                   "--authorized_proxy_user_config=hue=bar "
+                   "--authorized_proxy_group_config=foo=bar;hue={0} "
+                   "--abort_on_failed_audit_event=false "
+                   "--audit_event_log_dir={1}"
+                   .format(grp.getgrgid(os.getgid()).gr_name, AUDIT_LOG_DIR),
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
+  def test_group_impersonation(self, unique_role):
     """End-to-end group impersonation + authorization test"""
-    self.__test_impersonation()
+    self.__test_impersonation(unique_role)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
@@ -220,7 +243,7 @@ class TestAuthorization(CustomClusterTestSuite):
     resp = self.hs2_client.OpenSession(open_session_req)
     assert 'User \'hue\' is not authorized to delegate to \'abc\'' in str(resp)
 
-  def __test_impersonation(self):
+  def __test_impersonation(self, role):
     """End-to-end impersonation + authorization test. Expects authorization to be
     configured before running this test"""
     # TODO: To reuse the HS2 utility code from the TestHS2 test suite we need to import
@@ -229,71 +252,59 @@ class TestAuthorization(CustomClusterTestSuite):
     # is to split the utility code out of the TestHS2 class and support HS2 as a first
     # class citizen in our test framework.
     from tests.hs2.test_hs2 import TestHS2
-    open_session_req = TCLIService.TOpenSessionReq()
-    # Connected user is 'hue'
-    open_session_req.username = 'hue'
-    open_session_req.configuration = dict()
-    # Delegated user is the current user
-    open_session_req.configuration['impala.doas.user'] = getuser()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
 
-    # Try to query a table we are not authorized to access.
-    self.session_handle = resp.sessionHandle
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "describe tpch_seq.lineitem"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    assert 'User \'%s\' does not have privileges to access' % getuser() in\
-        str(execute_statement_resp)
+    try:
+      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
+      self.__execute_hs2_stmt("create role {0}".format(role))
+      self.__execute_hs2_stmt("grant all on table tpch.lineitem to role {0}"
+                              .format(role))
+      self.__execute_hs2_stmt("grant role {0} to group {1}"
+                              .format(role, grp.getgrnam(getuser()).gr_name))
+      self.__execute_hs2_stmt("grant role {0} to group {1}"
+                              .format(role, grp.getgrgid(os.getgid()).gr_name))
 
-    assert self.__wait_for_audit_record(user=getuser(), impersonator='hue'),\
-        'No matching audit event recorded in time window'
+      # Try to query a table we are not authorized to access
+      self.session_handle = self.__open_hs2('hue',
+                                            {'impala.doas.user': getuser()}).sessionHandle
+      bad_resp = self.__execute_hs2_stmt("describe tpch_seq.lineitem", False)
+      assert 'User \'%s\' does not have privileges to access' % getuser() in\
+          str(bad_resp)
 
-    # Now try the same operation on a table we are authorized to access.
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "describe tpch.lineitem"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+      assert self.__wait_for_audit_record(user=getuser(), impersonator='hue'),\
+          'No matching audit event recorded in time window'
 
-    TestHS2.check_response(execute_statement_resp)
+      # Now try the same operation on a table we are authorized to access.
+      good_resp = self.__execute_hs2_stmt("describe tpch.lineitem")
+      TestHS2.check_response(good_resp)
 
-    # Verify the correct user information is in the runtime profile
-    query_id = operation_id_to_query_id(
-        execute_statement_resp.operationHandle.operationId)
-    profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
-    self.__verify_profile_user_fields(profile_page, effective_user=getuser(),
-        delegated_user=getuser(), connected_user='hue')
+      # Verify the correct user information is in the runtime profile
+      query_id = operation_id_to_query_id(
+          good_resp.operationHandle.operationId)
+      profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
+      self.__verify_profile_user_fields(profile_page, effective_user=getuser(),
+          delegated_user=getuser(), connected_user='hue')
 
-    # Try to user we are not authorized to delegate to.
-    open_session_req.configuration['impala.doas.user'] = 'some_user'
-    resp = self.hs2_client.OpenSession(open_session_req)
-    assert 'User \'hue\' is not authorized to delegate to \'some_user\'' in str(resp)
+      # Try to user we are not authorized to delegate to.
+      resp = self.__open_hs2('hue', {'impala.doas.user': 'some_user'}, False)
+      assert 'User \'hue\' is not authorized to delegate to \'some_user\'' in str(resp)
 
-    # Create a new session which does not have a do_as_user.
-    open_session_req.username = 'hue'
-    open_session_req.configuration = dict()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
+      # Create a new session which does not have a do_as_user and run a simple query.
+      self.session_handle = self.__open_hs2('hue', dict()).sessionHandle
+      resp = self.__execute_hs2_stmt("select 1")
 
-    # Run a simple query, which should succeed.
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = resp.sessionHandle
-    execute_statement_req.statement = "select 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+      # Verify the correct user information is in the runtime profile. Since there is
+      # no do_as_user the Delegated User field should be empty.
+      query_id = operation_id_to_query_id(resp.operationHandle.operationId)
 
-    # Verify the correct user information is in the runtime profile. Since there is
-    # no do_as_user the Delegated User field should be empty.
-    query_id = operation_id_to_query_id(
-        execute_statement_resp.operationHandle.operationId)
-
-    profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
-    self.__verify_profile_user_fields(profile_page, effective_user='hue',
-        delegated_user='', connected_user='hue')
-
-    self.socket.close()
-    self.socket = None
+      profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
+      self.__verify_profile_user_fields(profile_page, effective_user='hue',
+          delegated_user='', connected_user='hue')
+    finally:
+      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
+      self.__execute_hs2_stmt("grant all on server to role {0}".format(role))
+      self.__execute_hs2_stmt("grant role {0} to group {1}"
+                              .format(role, grp.getgrnam(getuser()).gr_name))
+      self.__execute_hs2_stmt("drop role {0}".format(role))
 
   def __verify_profile_user_fields(self, profile_str, effective_user, connected_user,
       delegated_user):
@@ -334,11 +345,7 @@ class TestAuthorization(CustomClusterTestSuite):
       returned. If 'close_operation' is true, make sure the operation is closed before
       retrieving the profile and exec summary."""
     from tests.hs2.test_hs2 import TestHS2
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = stmt
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    execute_statement_resp = self.__execute_hs2_stmt(stmt, False)
 
     if close_operation:
       close_operation_req = TCLIService.TCloseOperationReq()
@@ -375,19 +382,17 @@ class TestAuthorization(CustomClusterTestSuite):
       impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_none_",
       dir=os.getenv("LOG_DIR")))
   def test_deprecated_flag_doesnt_show(self):
-    assert_no_files_in_dir_contain(self.impala_log_dir, "authorization_policy_file " +
-        "flag is deprecated. Object Ownership feature is not supported")
+    assert_no_files_in_dir_contain(self.impala_log_dir, "Ignoring removed flag "
+                                                        "authorization_policy_file")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=%s\
-      --authorization_policy_provider_class=%s" % (AUTH_POLICY_FILE,
-       "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider"),
+      --authorization_policy_file=%s" % (AUTH_POLICY_FILE),
       impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_",
       dir=os.getenv("LOG_DIR")))
   def test_deprecated_flags(self):
-    assert_file_in_dir_contains(self.impala_log_dir, "authorization_policy_file flag" +
-        " is deprecated. Object Ownership feature is not supported")
+    assert_file_in_dir_contains(self.impala_log_dir, "Ignoring removed flag "
+                                                     "authorization_policy_file")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

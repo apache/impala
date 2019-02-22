@@ -86,10 +86,6 @@ public class BackendConfig {
     return !Strings.isNullOrEmpty(backendCfg_.authorized_proxy_group_config);
   }
 
-  public boolean isAuthorizationFileSet() {
-    return !Strings.isNullOrEmpty(backendCfg_.authorization_policy_file);
-  }
-
   public boolean disableCatalogDataOpsDebugOnly() {
     return backendCfg_.disable_catalog_data_ops_debug_only;
   }

@@ -47,9 +47,6 @@ DEFINE_string(ranger_app_id, "",
     "required when authorization with Ranger is enabled.");
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
     "server during authorization. Set to enable authorization.");
-DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
-    "file. If set, authorization will be enabled and the authorization policy will be "
-    "read from a file.");
 DEFINE_string(authorization_policy_provider_class,
     "org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider",
     "Advanced: The authorization policy provider class name for Sentry.");

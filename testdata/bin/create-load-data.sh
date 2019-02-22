@@ -294,12 +294,6 @@ function load-aux-workloads {
   fi
 }
 
-function copy-auth-policy {
-  echo COPYING AUTHORIZATION POLICY FILE
-  hadoop fs -put -f ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
-      ${FILESYSTEM_PREFIX}/test-warehouse/
-}
-
 function setup-ranger {
   echo "SETTING UP RANGER"
 
@@ -657,7 +651,5 @@ run-step "Computing table stats" compute-table-stats.log \
 
 run-step "Creating tpcds testcase data" create-tpcds-testcase-data.log \
     ${IMPALA_HOME}/testdata/bin/create-tpcds-testcase-files.sh
-
-run-step "Copying auth policy file" copy-auth-policy.log copy-auth-policy
 
 run-step "Setting up Ranger" setup-ranger.log setup-ranger

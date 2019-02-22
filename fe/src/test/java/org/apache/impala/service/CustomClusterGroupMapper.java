@@ -33,6 +33,10 @@ import java.util.Set;
 public class CustomClusterGroupMapper implements GroupMappingService {
   private final Map<String, Set<String>> groupsMap_ = Maps.newHashMap();
 
+  public static final String SERVER_ADMIN = "server_admin";
+  public static final String TEST_USER = "test_user";
+  public static final String AUTH_TO_LOCAL = "auth_to_local_group";
+
   // Needed for sentry service to lookup groups.
   public CustomClusterGroupMapper(Configuration conf, String resource) {
     this();
@@ -57,6 +61,11 @@ public class CustomClusterGroupMapper implements GroupMappingService {
 
     groupsMap_.put("foobar", Sets.newHashSet("foobar"));
     groupsMap_.put("FOOBAR", Sets.newHashSet("FOOBAR"));
+
+    // User to groups for AuthorizationTest tests.
+    groupsMap_.put("auth_to_local_user", Sets.newHashSet(AUTH_TO_LOCAL));
+    groupsMap_.put("test_user", Sets.newHashSet(TEST_USER));
+    groupsMap_.put("admin_user", Sets.newHashSet(SERVER_ADMIN));
   }
 
   @Override

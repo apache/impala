@@ -342,6 +342,17 @@ def unique_role(request, testid_checksum):
   return '{0}_{1}_role'.format(role_name_prefix, testid_checksum)
 
 
+@pytest.fixture
+def unique_name(request, testid_checksum):
+  """Returns a unique name to any test using the fixture."""
+  name_prefix = request.function.__name__
+  fixture_params = getattr(request, 'param', None)
+  if fixture_params is not None:
+    if 'name_prefix' in fixture_params:
+      name_prefix = fixture_params['name_prefix']
+  return '{0}_{1}'.format(name_prefix, testid_checksum)
+
+
 @pytest.yield_fixture
 def kudu_client():
   """Provides a new Kudu client as a pytest fixture. The client only exists for the
