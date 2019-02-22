@@ -42,7 +42,9 @@ under the License.
   <conbody>
 
     <p>
-      The <codeph>TIMESTAMP</codeph> data type holds a value that represents a point in time.
+      In Impala, the <codeph>TIMESTAMP</codeph> data type holds a value of date and time. It can
+      be decomposed into year, month, day, hour, minute and seconds fields, but with no time
+      zone information available, it does not correspond to any specific point in time.
     </p>
 
     <p>
@@ -174,16 +176,19 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
       </ol>
     </p>
 
-    <p> The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph>
-      setting can be used to fix discrepancy in <codeph>INTERVAL</codeph>
-      operations. For example, a <codeph>TIMESTAMP + INTERVAL
-          <varname>n-hours</varname></codeph> can be affected by Daylight Saving
-      Time, which Impala does not consider by default as these operations are
-      applied as if the timestamp was in UTC. You can use the
-        <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting
-      to fix the issue. </p>
-    <p>See <xref href="impala_custom_timezones.xml#custom_timezone"/> for
-      configuring to use custom time zone database and aliases.</p>
+    <p>
+      The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting can be used to
+      fix discrepancy in <codeph>INTERVAL</codeph> operations. For example, a <codeph>TIMESTAMP
+      + INTERVAL <varname>n-hours</varname></codeph> can be affected by Daylight Saving Time,
+      which Impala does not consider by default as these operations are applied as if the
+      timestamp was in UTC. You can use the
+      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting to fix the issue.
+    </p>
+
+    <p>
+      See <xref href="impala_custom_timezones.xml#custom_timezone"/> for configuring to use
+      custom time zone database and aliases.
+    </p>
 
     <p>
       See <xref href="impala_datetime_functions.xml#datetime_functions">Impala Date and Time
@@ -194,23 +199,36 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
     <p>
       <b>Time zone handling between Impala and Hive:</b>
     </p>
-    <p>Interoperability between Hive and Impala is different depending on the
-      file format.</p>
+
+    <p>
+      Interoperability between Hive and Impala is different depending on the file format.
+    </p>
+
     <ul>
-      <li><i>Text</i><p> For text tables, <codeph>TIMESTAMP</codeph> values can
-          be written and read interchangeably by Impala and Hive as Hive reads
-          and writes <codeph>TIMESTAMP</codeph> values without converting with
-          respect to time zones. </p></li>
-      <li><i>Parquet</i><p> When Hive writes to Parquet data files, the
-            <codeph>TIMESTAMP</codeph> values are normalized to UTC from the
-          local time zone of the host where the data was written. On the other
-          hand, Impala does not make any time zone adjustment when it writes or
-          reads <codeph>TIMESTAMP</codeph> values to Parquet files. This
-          difference in time zone handling can cause potentially inconsistent
-          results when Impala processes <codeph>TIMESTAMP</codeph> values in the
-          Parquet files written by Hive. </p><p> To avoid incompatibility
-          problems or having to code workarounds, you can specify one or both of
-          these impalad startup flags: <ul>
+      <li>
+        <i>Text</i>
+        <p>
+          For text tables, <codeph>TIMESTAMP</codeph> values can be written and read
+          interchangeably by Impala and Hive as Hive reads and writes <codeph>TIMESTAMP</codeph>
+          values without converting with respect to time zones.
+        </p>
+      </li>
+
+      <li>
+        <i>Parquet</i>
+        <note> This section only applies to <codeph>INT96 TIMESTAMP</codeph>.
+          See <xref href="impala_parquet.xml#parquet_data_types"/> for
+          information about Parquet data types. </note><p> When Hive writes to
+          Parquet data files, the <codeph>TIMESTAMP</codeph> values are
+          normalized to UTC from the local time zone of the host where the data
+          was written. On the other hand, Impala does not make any time zone
+          adjustment when it writes or reads <codeph>INT96 TIMESTAMP</codeph>
+          values to Parquet files. This difference in time zone handling can
+          cause potentially inconsistent results when Impala processes
+            <codeph>TIMESTAMP</codeph> values in the Parquet files written by
+          Hive. </p>
+        <p> To avoid incompatibility problems or having to code workarounds, you
+          can specify one or both of these impalad startup flags: <ul>
             <li>
               <codeph>--use_local_tz_for_unix_timestamp_conversions=true</codeph>
             </li>
@@ -218,22 +236,33 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
               <codeph>--convert_legacy_hive_parquet_utc_timestamps=true</codeph>
             </li>
           </ul>
-        </p><p> When the
+        </p>
+        <p> When the
             <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph>
           setting is enabled, Impala recognizes the Parquet data files written
           by Hive, and applies the same UTC-to-local-timezone conversion logic
-          during the query as Hive does. </p><p>In <keyword keyref="impala30"/>
-          and lower, the
+          during the query as Hive does. </p>
+        <p> In <keyword keyref="impala30"/> and lower, the
             <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph>
           setting had a severe impact on multi-threaded performance. The new
           time zone implementation in <keyword keyref="impala31"/> eliminated
           most of the performance overhead and made Impala scale well to
-          multiple threads. Although
-            <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph> is
-          turned off by default for a performance reason, to avoid unexpected
-          behavior, turn on the option when processing
-            <codeph>TIMESTAMP</codeph> columns in Parquet files written by
-          Hive.</p></li>
+          multiple threads. The
+            <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph>
+          setting is turned off by default for a performance reason. To avoid
+          unexpected incompatibility problems, you should turn on the option
+          when processing <codeph>TIMESTAMP</codeph> columns in Parquet files
+          written by Hive. </p>
+        <p> Hive currently cannot write <codeph>INT64</codeph>
+          <codeph>TIMESTAMP</codeph> values. </p><p>In <keyword
+            keyref="impala32"/> and higher, <codeph>INT64 TIMESTAMP</codeph>
+          values annotated with the <codeph>TIMESTAMP_MILLIS</codeph> or
+            <codeph>TIMESTAMP_MICROS</codeph>
+          <codeph>OriginalType</codeph> are assumed to be always UTC normalized,
+          so the UTC to local conversion will be always done. <codeph>INT64
+            TIMESTAMP</codeph> annotated with the <codeph>TIMESTAMP</codeph>
+          <codeph>LogicalType</codeph> specifies whether UTC to local conversion
+          is necessary depending on the Parquet metadata. </p></li>
     </ul>
 
     <p>
@@ -285,8 +314,10 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
     <p conref="../shared/impala_common.xml#common/hbase_ok"/>
 
     <p>
-      <b>Parquet consideration:</b> int96 encoded Parquet timestamps are supported in Impala.
-      int64 timestamps will be supported in a future release.
+      <b>Parquet consideration:</b> <codeph>INT96</codeph> encoded Parquet timestamps are
+      supported in Impala. <codeph>INT64</codeph> timestamps are supported in
+      <keyword
+        keyref="impala32"/> and higher.
     </p>
 
     <p/>
@@ -295,13 +326,12 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
     <p conref="../shared/impala_common.xml#common/text_bulky"/>
 
-<!--    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/> -->
-
     <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
 
-    <p conref="../shared/impala_common.xml#common/sqoop_blurb"/>
+    <p conref="../shared/impala_common.xml#common/sqoop_blurb" audience="hidden"/>
 
-    <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"/>
+    <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"
+      audience="hidden"/>
 
     <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
 
@@ -391,7 +421,6 @@ select s, t, b from timestamp_t order by t;
 
     <ul>
       <li>
-<!-- The Timestamp Literals topic is pretty brief. Consider adding more examples there. -->
         <xref href="impala_literals.xml#timestamp_literals"/>.
       </li>
 

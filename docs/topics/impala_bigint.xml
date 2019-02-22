@@ -53,10 +53,12 @@ under the License.
     </p>
 
     <p>
-      <b>Conversions:</b> Impala automatically converts to a floating-point type (<codeph>FLOAT</codeph> or
-      <codeph>DOUBLE</codeph>) automatically. Use <codeph>CAST()</codeph> to convert to <codeph>TINYINT</codeph>,
-      <codeph>SMALLINT</codeph>, <codeph>INT</codeph>, <codeph>STRING</codeph>, or <codeph>TIMESTAMP</codeph>.
-      <ph conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
+      <b>Conversions:</b> Impala automatically converts to a floating-point type
+        (<codeph>FLOAT</codeph> or <codeph>DOUBLE</codeph>) automatically. Use
+        <codeph>CAST()</codeph> to convert to <codeph>TINYINT</codeph>,
+        <codeph>SMALLINT</codeph>, <codeph>INT</codeph>,
+      <codeph>STRING</codeph>, or <codeph>TIMESTAMP</codeph>. <ph
+        conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
     </p>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
@@ -104,9 +106,10 @@ SELECT CAST(1000 AS BIGINT);
 
     <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
 
-    <p conref="../shared/impala_common.xml#common/sqoop_blurb"/>
+    <p conref="../shared/impala_common.xml#common/sqoop_blurb" audience="hidden"/>
 
-    <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"/>
+    <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"
+      audience="hidden"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 

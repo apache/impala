@@ -2141,13 +2141,14 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
         TERMINATED BY '-2'</codeph> sets the field delimiter to ASCII code 254, the <q>Icelandic Thorn</q>
         character used as a delimiter by some data formats.
       </note>
+      <!--The following caveats no longer apply starting in 3.2. Will remove when confirmed. AR-->
 
-      <p id="sqoop_blurb">
+      <p id="sqoop_blurb" audience="hidden" rev="3.2">
         <b>Sqoop considerations:</b>
       </p>
 
-      <p id="sqoop_timestamp_caveat" rev="IMPALA-2111"> If you use Sqoop to
-        convert RDBMS data to Parquet, be careful with interpreting any
+      <p id="sqoop_timestamp_caveat" rev="3.2" audience="hidden"> If you use
+        Sqoop to convert RDBMS data to Parquet, be careful with interpreting any
         resulting values from <codeph>DATE</codeph>, <codeph>DATETIME</codeph>,
         or <codeph>TIMESTAMP</codeph> columns. The underlying values are
         represented as the Parquet <codeph>INT64</codeph> type, which is

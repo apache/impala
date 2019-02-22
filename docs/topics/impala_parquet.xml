@@ -21,7 +21,13 @@ under the License.
 <concept id="parquet">
 
   <title>Using the Parquet File Format with Impala Tables</title>
-  <titlealts audience="PDF"><navtitle>Parquet Data Files</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Parquet Data Files</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -35,25 +41,29 @@ under the License.
   </prolog>
 
   <conbody>
-    <p>
-      Impala allows you to create, manage, and query Parquet tables. Parquet
-      is a column-oriented binary file format intended to be highly efficient
-      for the types of large-scale queries that Impala is best at. Parquet is
-      especially good for queries scanning particular columns within a table,
-      for example to query <q>wide</q> tables with many columns, or to perform
-      aggregation operations such as <codeph>SUM()</codeph> and
-        <codeph>AVG()</codeph> that need to process most or all of the values
-      from a column. Each data file contains the values for a set of rows (the
-        <q>row group</q>). Within a data file, the values from each column are
-      organized so that they are all adjacent, enabling good compression for the
-      values from that column. Queries against a Parquet table can retrieve and
-      analyze these values from any column quickly and with minimal I/O.
-    </p>
-    <p>See <xref href="impala_file_formats.xml#file_formats"/> for the summary
-      of Parquet format support.</p>
-    <p outputclass="toc inpage"/>
-  </conbody>
 
+    <p>
+      Impala allows you to create, manage, and query Parquet tables. Parquet is a
+      column-oriented binary file format intended to be highly efficient for the types of
+      large-scale queries that Impala is best at. Parquet is especially good for queries
+      scanning particular columns within a table, for example, to query <q>wide</q> tables with
+      many columns, or to perform aggregation operations such as <codeph>SUM()</codeph> and
+      <codeph>AVG()</codeph> that need to process most or all of the values from a column. Each
+      Parquet data file written by Impala contains the values for a set of rows (referred to as
+      the <q>row group</q>). Within a data file, the values from each column are organized so
+      that they are all adjacent, enabling good compression for the values from that column.
+      Queries against a Parquet table can retrieve and analyze these values from any column
+      quickly and with minimal I/O.
+    </p>
+
+    <p>
+      See <xref href="impala_file_formats.xml#file_formats"/> for the summary of Parquet format
+      support.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
 
   <concept id="parquet_ddl">
 
@@ -62,19 +72,12 @@ under the License.
     <conbody>
 
       <p>
-        To create a table named <codeph>PARQUET_TABLE</codeph> that uses the Parquet format, you would use a
-        command like the following, substituting your own table name, column names, and data types:
+        To create a table named <codeph>PARQUET_TABLE</codeph> that uses the Parquet format, you
+        would use a command like the following, substituting your own table name, column names,
+        and data types:
       </p>
 
 <codeblock>[impala-host:21000] &gt; create table <varname>parquet_table_name</varname> (x INT, y STRING) STORED AS PARQUET;</codeblock>
-
-<!--
-<note>
-Formerly, the <codeph>STORED AS</codeph> clause required the keyword <codeph>PARQUETFILE</codeph>.
-In Impala 1.2.2 and higher, you can use <codeph>STORED AS PARQUET</codeph>.
-This <codeph>PARQUET</codeph> keyword is recommended for new code.
-</note>
--->
 
       <p>
         Or, to clone the column names and data types of an existing table:
@@ -83,9 +86,10 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
 <codeblock>[impala-host:21000] &gt; create table <varname>parquet_table_name</varname> LIKE <varname>other_table_name</varname> STORED AS PARQUET;</codeblock>
 
       <p rev="1.4.0">
-        In Impala 1.4.0 and higher, you can derive column definitions from a raw Parquet data file, even without an
-        existing Impala table. For example, you can create an external table pointing to an HDFS directory, and
-        base the column definitions on one of the files in that directory:
+        In Impala 1.4.0 and higher, you can derive column definitions from a raw Parquet data
+        file, even without an existing Impala table. For example, you can create an external
+        table pointing to an HDFS directory, and base the column definitions on one of the files
+        in that directory:
       </p>
 
 <codeblock rev="1.4.0">CREATE EXTERNAL TABLE ingest_existing_files LIKE PARQUET '/user/etl/destination/datafile1.dat'
@@ -94,9 +98,9 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
 </codeblock>
 
       <p>
-        Or, you can refer to an existing data file and create a new empty table with suitable column definitions.
-        Then you can use <codeph>INSERT</codeph> to create new data files or <codeph>LOAD DATA</codeph> to transfer
-        existing data files into the new table.
+        Or, you can refer to an existing data file and create a new empty table with suitable
+        column definitions. Then you can use <codeph>INSERT</codeph> to create new data files or
+        <codeph>LOAD DATA</codeph> to transfer existing data files into the new table.
       </p>
 
 <codeblock rev="1.4.0">CREATE TABLE columns_from_data_file LIKE PARQUET '/user/etl/destination/datafile1.dat'
@@ -104,14 +108,16 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
 </codeblock>
 
       <p>
-        The default properties of the newly created table are the same as for any other <codeph>CREATE
-        TABLE</codeph> statement. For example, the default file format is text; if you want the new table to use
-        the Parquet file format, include the <codeph>STORED AS PARQUET</codeph> file also.
+        The default properties of the newly created table are the same as for any other
+        <codeph>CREATE TABLE</codeph> statement. For example, the default file format is text;
+        if you want the new table to use the Parquet file format, include the <codeph>STORED AS
+        PARQUET</codeph> file also.
       </p>
 
       <p>
-        In this example, the new table is partitioned by year, month, and day. These partition key columns are not
-        part of the data file, so you specify them in the <codeph>CREATE TABLE</codeph> statement:
+        In this example, the new table is partitioned by year, month, and day. These partition
+        key columns are not part of the data file, so you specify them in the <codeph>CREATE
+        TABLE</codeph> statement:
       </p>
 
 <codeblock rev="1.4.0">CREATE TABLE columns_from_data_file LIKE PARQUET '/user/etl/destination/datafile1.dat'
@@ -120,25 +126,21 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
 </codeblock>
 
       <p rev="1.4.0">
-        See <xref href="impala_create_table.xml#create_table"/> for more details about the <codeph>CREATE TABLE
-        LIKE PARQUET</codeph> syntax.
+        See <xref href="impala_create_table.xml#create_table"/> for more details about the
+        <codeph>CREATE TABLE LIKE PARQUET</codeph> syntax.
       </p>
 
       <p>
-        Once you have created a table, to insert data into that table, use a command similar to the following,
-        again with your own table names:
+        Once you have created a table, to insert data into that table, use a command similar to
+        the following, again with your own table names:
       </p>
-
-      <!-- To do:
-        Opportunity for another example showing CTAS technique.
-      -->
 
 <codeblock>[impala-host:21000] &gt; insert overwrite table <varname>parquet_table_name</varname> select * from <varname>other_table_name</varname>;</codeblock>
 
       <p>
-        If the Parquet table has a different number of columns or different column names than the other table,
-        specify the names of columns from the other table rather than <codeph>*</codeph> in the
-        <codeph>SELECT</codeph> statement.
+        If the Parquet table has a different number of columns or different column names than
+        the other table, specify the names of columns from the other table rather than
+        <codeph>*</codeph> in the <codeph>SELECT</codeph> statement.
       </p>
 
     </conbody>
@@ -148,106 +150,131 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
   <concept id="parquet_etl">
 
     <title>Loading Data into Parquet Tables</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="ETL"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="ETL"/>
+      </metadata>
+    </prolog>
 
     <conbody>
-      <p> Choose from the following techniques for loading data into Parquet
-        tables, depending on whether the original data is already in an Impala
-        table, or exists as raw data files outside Impala. </p>
-      <p> If you already have data in an Impala or Hive table, perhaps in a
-        different file format or partitioning scheme, you can transfer the data
-        to a Parquet table using the Impala <codeph>INSERT...SELECT</codeph>
-        syntax. You can convert, filter, repartition, and do other things to the
-        data as part of this same <codeph>INSERT</codeph> statement. See <xref
+
+      <p>
+        Choose from the following techniques for loading data into Parquet tables, depending on
+        whether the original data is already in an Impala table, or exists as raw data files
+        outside Impala.
+      </p>
+
+      <p>
+        If you already have data in an Impala or Hive table, perhaps in a different file format
+        or partitioning scheme, you can transfer the data to a Parquet table using the Impala
+        <codeph>INSERT...SELECT</codeph> syntax. You can convert, filter, repartition, and do
+        other things to the data as part of this same <codeph>INSERT</codeph> statement. See
+        <xref
           href="#parquet_compression"/> for some examples showing how to insert
-        data into Parquet tables. </p>
-      <p>When inserting into partitioned tables, especially using the Parquet
-        file format, you can include a hint in the <codeph>INSERT</codeph>
-        statement to fine-tune the overall performance of the operation and its
-        resource usage. See <keyword keyref="hints"/> for using hints in the
-          <codeph>INSERT</codeph> statements.</p>
+        data into Parquet tables.
+      </p>
+
+      <p>
+        When inserting into partitioned tables, especially using the Parquet file format, you
+        can include a hint in the <codeph>INSERT</codeph> statement to fine-tune the overall
+        performance of the operation and its resource usage. See <keyword keyref="hints"/> for
+        using hints in the <codeph>INSERT</codeph> statements.
+      </p>
+
       <p conref="../shared/impala_common.xml#common/insert_parquet_blocksize"/>
-      <draft-comment translate="no"> Add an example here. </draft-comment>
-      <p> Avoid the <codeph>INSERT...VALUES</codeph> syntax for Parquet tables,
-        because <codeph>INSERT...VALUES</codeph> produces a separate tiny data
-        file for each <codeph>INSERT...VALUES</codeph> statement, and the
-        strength of Parquet is in its handling of data (compressing,
-        parallelizing, and so on) in <ph rev="parquet_block_size">large</ph>
-        chunks. </p>
-      <p> If you have one or more Parquet data files produced outside of Impala,
-        you can quickly make the data queryable through Impala by one of the
-        following methods: </p>
+
+      <p>
+        Avoid the <codeph>INSERT...VALUES</codeph> syntax for Parquet tables, because
+        <codeph>INSERT...VALUES</codeph> produces a separate tiny data file for each
+        <codeph>INSERT...VALUES</codeph> statement, and the strength of Parquet is in its
+        handling of data (compressing, parallelizing, and so on) in
+        <ph rev="parquet_block_size">large</ph> chunks.
+      </p>
+
+      <p>
+        If you have one or more Parquet data files produced outside of Impala, you can quickly
+        make the data queryable through Impala by one of the following methods:
+      </p>
+
       <ul>
-        <li> The <codeph>LOAD DATA</codeph> statement moves a single data file
-          or a directory full of data files into the data directory for an
-          Impala table. It does no validation or conversion of the data. The
-          original data files must be somewhere in HDFS, not the local
-          filesystem. <draft-comment translate="no"> Add an example here.
-          </draft-comment>
+        <li>
+          The <codeph>LOAD DATA</codeph> statement moves a single data file or a directory full
+          of data files into the data directory for an Impala table. It does no validation or
+          conversion of the data. The original data files must be somewhere in HDFS, not the
+          local filesystem.
         </li>
-        <li> The <codeph>CREATE TABLE</codeph> statement with the
-            <codeph>LOCATION</codeph> clause creates a table where the data
-          continues to reside outside the Impala data directory. The original
-          data files must be somewhere in HDFS, not the local filesystem. For
-          extra safety, if the data is intended to be long-lived and reused by
-          other applications, you can use the <codeph>CREATE EXTERNAL
-            TABLE</codeph> syntax so that the data files are not deleted by an
-          Impala <codeph>DROP TABLE</codeph> statement. <draft-comment
-            translate="no"> Add an example here. </draft-comment>
+
+        <li>
+          The <codeph>CREATE TABLE</codeph> statement with the <codeph>LOCATION</codeph> clause
+          creates a table where the data continues to reside outside the Impala data directory.
+          The original data files must be somewhere in HDFS, not the local filesystem. For extra
+          safety, if the data is intended to be long-lived and reused by other applications, you
+          can use the <codeph>CREATE EXTERNAL TABLE</codeph> syntax so that the data files are
+          not deleted by an Impala <codeph>DROP TABLE</codeph> statement.
         </li>
-        <li> If the Parquet table already exists, you can copy Parquet data
-          files directly into it, then use the <codeph>REFRESH</codeph>
-          statement to make Impala recognize the newly added data. Remember to
-          preserve the block size of the Parquet data files by using the
-            <codeph>hadoop distcp -pb</codeph> command rather than a
-            <codeph>-put</codeph> or <codeph>-cp</codeph> operation on the
-          Parquet files. See <xref href="#parquet_compression_multiple"/> for an
-          example of this kind of operation. </li>
+
+        <li>
+          If the Parquet table already exists, you can copy Parquet data files directly into it,
+          then use the <codeph>REFRESH</codeph> statement to make Impala recognize the newly
+          added data. Remember to preserve the block size of the Parquet data files by using the
+          <codeph>hadoop distcp -pb</codeph> command rather than a <codeph>-put</codeph> or
+          <codeph>-cp</codeph> operation on the Parquet files. See
+          <xref href="#parquet_compression_multiple"/> for an example of this kind of operation.
+        </li>
       </ul>
+
       <note
         conref="../shared/impala_common.xml#common/restrictions_nonimpala_parquet"/>
-      <p> Recent versions of Sqoop can produce Parquet output files using the
-          <codeph>--as-parquetfile</codeph> option. </p>
-      <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"/>
-      <p> If the data exists outside Impala and is in some other format, combine
-        both of the preceding techniques. First, use a <codeph>LOAD
-          DATA</codeph> or <codeph>CREATE EXTERNAL TABLE ... LOCATION</codeph>
-        statement to bring the data into an Impala table that uses the
-        appropriate file format. Then, use an <codeph>INSERT...SELECT</codeph>
-        statement to copy the data to the Parquet table, converting to Parquet
-        format as part of the process. </p>
-      <draft-comment translate="no"> Add an example here. </draft-comment>
-      <p> Loading data into Parquet tables is a memory-intensive operation,
-        because the incoming data is buffered until it reaches <ph
-          rev="parquet_block_size">one data block</ph> in size, then that chunk
-        of data is organized and compressed in memory before being written out.
-        The memory consumption can be larger when inserting data into
-        partitioned Parquet tables, because a separate data file is written for
-        each combination of partition key column values, potentially requiring
-        several <ph rev="parquet_block_size">large</ph> chunks to be manipulated
-        in memory at once. </p>
-      <p> When inserting into a partitioned Parquet table, Impala redistributes
-        the data among the nodes to reduce memory consumption. You might still
-        need to temporarily increase the memory dedicated to Impala during the
-        insert operation, or break up the load operation into several
-          <codeph>INSERT</codeph> statements, or both. </p>
-      <note> All the preceding techniques assume that the data you are loading
-        matches the structure of the destination table, including column order,
-        column names, and partition layout. To transform or reorganize the data,
-        start by loading the data into a Parquet table that matches the
-        underlying structure of the data, then use one of the table-copying
-        techniques such as <codeph>CREATE TABLE AS SELECT</codeph> or
-          <codeph>INSERT ... SELECT</codeph> to reorder or rename columns,
-        divide the data among multiple partitions, and so on. For example to
-        take a single comprehensive Parquet data file and load it into a
-        partitioned table, you would use an <codeph>INSERT ... SELECT</codeph>
-        statement with dynamic partitioning to let Impala create separate data
-        files with the appropriate partition values; for an example, see <xref
-          href="impala_insert.xml#insert"/>. </note>
+
+      <p>
+        Recent versions of Sqoop can produce Parquet output files using the
+        <codeph>--as-parquetfile</codeph> option.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"
+        audience="hidden"/>
+
+      <p>
+        If the data exists outside Impala and is in some other format, combine both of the
+        preceding techniques. First, use a <codeph>LOAD DATA</codeph> or <codeph>CREATE EXTERNAL
+        TABLE ... LOCATION</codeph> statement to bring the data into an Impala table that uses
+        the appropriate file format. Then, use an <codeph>INSERT...SELECT</codeph> statement to
+        copy the data to the Parquet table, converting to Parquet format as part of the process.
+      </p>
+
+      <p>
+        Loading data into Parquet tables is a memory-intensive operation, because the incoming
+        data is buffered until it reaches <ph
+          rev="parquet_block_size">one data
+        block</ph> in size, then that chunk of data is organized and compressed in memory before
+        being written out. The memory consumption can be larger when inserting data into
+        partitioned Parquet tables, because a separate data file is written for each combination
+        of partition key column values, potentially requiring several
+        <ph rev="parquet_block_size">large</ph> chunks to be manipulated in memory at once.
+      </p>
+
+      <p>
+        When inserting into a partitioned Parquet table, Impala redistributes the data among the
+        nodes to reduce memory consumption. You might still need to temporarily increase the
+        memory dedicated to Impala during the insert operation, or break up the load operation
+        into several <codeph>INSERT</codeph> statements, or both.
+      </p>
+
+      <note>
+        All the preceding techniques assume that the data you are loading matches the structure
+        of the destination table, including column order, column names, and partition layout. To
+        transform or reorganize the data, start by loading the data into a Parquet table that
+        matches the underlying structure of the data, then use one of the table-copying
+        techniques such as <codeph>CREATE TABLE AS SELECT</codeph> or <codeph>INSERT ...
+        SELECT</codeph> to reorder or rename columns, divide the data among multiple partitions,
+        and so on. For example to take a single comprehensive Parquet data file and load it into
+        a partitioned table, you would use an <codeph>INSERT ... SELECT</codeph> statement with
+        dynamic partitioning to let Impala create separate data files with the appropriate
+        partition values; for an example, see <xref
+          href="impala_insert.xml#insert"/>.
+      </note>
+
     </conbody>
 
   </concept>
@@ -255,73 +282,78 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
   <concept id="parquet_performance">
 
     <title>Query Performance for Impala Parquet Tables</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Performance"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Performance"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
       <p>
-        Query performance for Parquet tables depends on the number of columns needed to process the
-        <codeph>SELECT</codeph> list and <codeph>WHERE</codeph> clauses of the query, the way data is divided into
-        <ph rev="parquet_block_size">large data files with block size equal to file size</ph>, the reduction in I/O
-        by reading the data for each column in compressed format, which data files can be skipped (for partitioned
-        tables), and the CPU overhead of decompressing the data for each column.
+        Query performance for Parquet tables depends on the number of columns needed to process
+        the <codeph>SELECT</codeph> list and <codeph>WHERE</codeph> clauses of the query, the
+        way data is divided into <ph rev="parquet_block_size">large data files with block size
+        equal to file size</ph>, the reduction in I/O by reading the data for each column in
+        compressed format, which data files can be skipped (for partitioned tables), and the CPU
+        overhead of decompressing the data for each column.
       </p>
 
       <p>
         For example, the following is an efficient query for a Parquet table:
 <codeblock>select avg(income) from census_data where state = 'CA';</codeblock>
-        The query processes only 2 columns out of a large number of total columns. If the table is partitioned by
-        the <codeph>STATE</codeph> column, it is even more efficient because the query only has to read and decode
-        1 column from each data file, and it can read only the data files in the partition directory for the state
-        <codeph>'CA'</codeph>, skipping the data files for all the other states, which will be physically located
-        in other directories.
+        The query processes only 2 columns out of a large number of total columns. If the table
+        is partitioned by the <codeph>STATE</codeph> column, it is even more efficient because
+        the query only has to read and decode 1 column from each data file, and it can read only
+        the data files in the partition directory for the state <codeph>'CA'</codeph>, skipping
+        the data files for all the other states, which will be physically located in other
+        directories.
       </p>
 
       <p>
         The following is a relatively inefficient query for a Parquet table:
 <codeblock>select * from census_data;</codeblock>
-        Impala would have to read the entire contents of each <ph rev="parquet_block_size">large</ph> data file,
-        and decompress the contents of each column for each row group, negating the I/O optimizations of the
-        column-oriented format. This query might still be faster for a Parquet table than a table with some other
-        file format, but it does not take advantage of the unique strengths of Parquet data files.
+        Impala would have to read the entire contents of each
+        <ph rev="parquet_block_size">large</ph> data file, and decompress the contents of each
+        column for each row group, negating the I/O optimizations of the column-oriented format.
+        This query might still be faster for a Parquet table than a table with some other file
+        format, but it does not take advantage of the unique strengths of Parquet data files.
       </p>
 
       <p>
-        Impala can optimize queries on Parquet tables, especially join queries, better when statistics are
-        available for all the tables. Issue the <codeph>COMPUTE STATS</codeph> statement for each table after
-        substantial amounts of data are loaded into or appended to it. See
-        <xref href="impala_compute_stats.xml#compute_stats"/> for details.
+        Impala can optimize queries on Parquet tables, especially join queries, better when
+        statistics are available for all the tables. Issue the <codeph>COMPUTE STATS</codeph>
+        statement for each table after substantial amounts of data are loaded into or appended
+        to it. See <xref href="impala_compute_stats.xml#compute_stats"/> for details.
       </p>
 
       <p rev="2.5.0">
-        The runtime filtering feature, available in <keyword keyref="impala25_full"/> and higher, works best with Parquet tables.
-        The per-row filtering aspect only applies to Parquet tables.
-        See <xref href="impala_runtime_filtering.xml#runtime_filtering"/> for details.
+        The runtime filtering feature, available in <keyword keyref="impala25_full"/> and
+        higher, works best with Parquet tables. The per-row filtering aspect only applies to
+        Parquet tables. See <xref href="impala_runtime_filtering.xml#runtime_filtering"/> for
+        details.
       </p>
 
       <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
 
       <p rev="IMPALA-3909">
         In <keyword keyref="impala29"/> and higher, Parquet files written by Impala include
-        embedded metadata specifying the minimum and maximum values for each column, within
-        each row group and each data page within the row group. Impala-written Parquet files
-        typically contain a single row group; a row group can contain many data pages.
-        Impala uses this information (currently, only the metadata for each row group)
-        when reading each Parquet data file during a query, to quickly determine whether each
-        row group within the file potentially includes any rows that match the conditions in the
-        <codeph>WHERE</codeph> clause. For example, if the column <codeph>X</codeph> within
-        a particular Parquet file has a minimum value of 1 and a maximum value of 100, then
-        a query including the clause <codeph>WHERE x &gt; 200</codeph> can quickly determine
-        that it is safe to skip that particular file, instead of scanning all the associated
-        column values. This optimization technique is especially effective for tables that
-        use the <codeph>SORT BY</codeph> clause for the columns most frequently checked in
-        <codeph>WHERE</codeph> clauses, because any <codeph>INSERT</codeph> operation on
-        such tables produces Parquet data files with relatively narrow ranges of column values
-        within each file.
+        embedded metadata specifying the minimum and maximum values for each column, within each
+        row group and each data page within the row group. Impala-written Parquet files
+        typically contain a single row group; a row group can contain many data pages. Impala
+        uses this information (currently, only the metadata for each row group) when reading
+        each Parquet data file during a query, to quickly determine whether each row group
+        within the file potentially includes any rows that match the conditions in the
+        <codeph>WHERE</codeph> clause. For example, if the column <codeph>X</codeph> within a
+        particular Parquet file has a minimum value of 1 and a maximum value of 100, then a
+        query including the clause <codeph>WHERE x &gt; 200</codeph> can quickly determine that
+        it is safe to skip that particular file, instead of scanning all the associated column
+        values. This optimization technique is especially effective for tables that use the
+        <codeph>SORT BY</codeph> clause for the columns most frequently checked in
+        <codeph>WHERE</codeph> clauses, because any <codeph>INSERT</codeph> operation on such
+        tables produces Parquet data files with relatively narrow ranges of column values within
+        each file.
       </p>
 
     </conbody>
@@ -333,54 +365,62 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
       <conbody>
 
         <p>
-          As explained in <xref href="impala_partitioning.xml#partitioning"/>, partitioning is an important
-          performance technique for Impala generally. This section explains some of the performance considerations
-          for partitioned Parquet tables.
+          As explained in <xref href="impala_partitioning.xml#partitioning"/>, partitioning is
+          an important performance technique for Impala generally. This section explains some of
+          the performance considerations for partitioned Parquet tables.
         </p>
 
         <p>
-          The Parquet file format is ideal for tables containing many columns, where most queries only refer to a
-          small subset of the columns. As explained in <xref href="#parquet_data_files"/>, the physical layout of
-          Parquet data files lets Impala read only a small fraction of the data for many queries. The performance
-          benefits of this approach are amplified when you use Parquet tables in combination with partitioning.
-          Impala can skip the data files for certain partitions entirely, based on the comparisons in the
-          <codeph>WHERE</codeph> clause that refer to the partition key columns. For example, queries on
-          partitioned tables often analyze data for time intervals based on columns such as <codeph>YEAR</codeph>,
-          <codeph>MONTH</codeph>, and/or <codeph>DAY</codeph>, or for geographic regions. Remember that Parquet
-          data files use a <ph rev="parquet_block_size">large</ph> block size, so when deciding how finely to
-          partition the data, try to find a granularity where each partition contains
-          <ph rev="parquet_block_size">256 MB</ph> or more of data, rather than creating a large number of smaller
-          files split among many partitions.
+          The Parquet file format is ideal for tables containing many columns, where most
+          queries only refer to a small subset of the columns. As explained in
+          <xref href="#parquet_data_files"/>, the physical layout of Parquet data files lets
+          Impala read only a small fraction of the data for many queries. The performance
+          benefits of this approach are amplified when you use Parquet tables in combination
+          with partitioning. Impala can skip the data files for certain partitions entirely,
+          based on the comparisons in the <codeph>WHERE</codeph> clause that refer to the
+          partition key columns. For example, queries on partitioned tables often analyze data
+          for time intervals based on columns such as <codeph>YEAR</codeph>,
+          <codeph>MONTH</codeph>, and/or <codeph>DAY</codeph>, or for geographic regions.
+          Remember that Parquet data files use a <ph rev="parquet_block_size">large</ph> block
+          size, so when deciding how finely to partition the data, try to find a granularity
+          where each partition contains <ph rev="parquet_block_size">256 MB</ph> or more of
+          data, rather than creating a large number of smaller files split among many
+          partitions.
         </p>
 
         <p>
-          Inserting into a partitioned Parquet table can be a resource-intensive operation, because each Impala
-          node could potentially be writing a separate data file to HDFS for each combination of different values
-          for the partition key columns. The large number of simultaneous open files could exceed the HDFS
-          <q>transceivers</q> limit. To avoid exceeding this limit, consider the following techniques:
+          Inserting into a partitioned Parquet table can be a resource-intensive operation,
+          because each Impala node could potentially be writing a separate data file to HDFS for
+          each combination of different values for the partition key columns. The large number
+          of simultaneous open files could exceed the HDFS <q>transceivers</q> limit. To avoid
+          exceeding this limit, consider the following techniques:
         </p>
 
         <ul>
           <li>
-            Load different subsets of data using separate <codeph>INSERT</codeph> statements with specific values
-            for the <codeph>PARTITION</codeph> clause, such as <codeph>PARTITION (year=2010)</codeph>.
+            Load different subsets of data using separate <codeph>INSERT</codeph> statements
+            with specific values for the <codeph>PARTITION</codeph> clause, such as
+            <codeph>PARTITION (year=2010)</codeph>.
           </li>
 
           <li>
-            Increase the <q>transceivers</q> value for HDFS, sometimes spelled <q>xcievers</q> (sic). The property
-            value in the <filepath>hdfs-site.xml</filepath> configuration file is
-<!-- Old name, now deprecated: <codeph>dfs.datanode.max.xcievers</codeph>. -->
-            <codeph>dfs.datanode.max.transfer.threads</codeph>. For example, if you were loading 12 years of data
-            partitioned by year, month, and day, even a value of 4096 might not be high enough. This
-            <xref keyref="hbase-hadoop-xceivers">blog post</xref> explores the considerations for setting this value
-            higher or lower, using HBase examples for illustration.
+            Increase the <q>transceivers</q> value for HDFS, sometimes spelled <q>xcievers</q>
+            (sic). The property value in the <filepath>hdfs-site.xml</filepath> configuration
+            file is <codeph>dfs.datanode.max.transfer.threads</codeph>. For example, if you were
+            loading 12 years of data partitioned by year, month, and day, even a value of 4096
+            might not be high enough. This
+            <xref
+              keyref="hbase-hadoop-xceivers">blog post</xref> explores the
+            considerations for setting this value higher or lower, using HBase examples for
+            illustration.
           </li>
 
           <li>
             Use the <codeph>COMPUTE STATS</codeph> statement to collect
-            <xref href="impala_perf_stats.xml#perf_column_stats">column statistics</xref> on the source table from
-            which data is being copied, so that the Impala query can estimate the number of different values in the
-            partition key columns and distribute the work accordingly.
+            <xref href="impala_perf_stats.xml#perf_column_stats">column statistics</xref> on the
+            source table from which data is being copied, so that the Impala query can estimate
+            the number of different values in the partition key columns and distribute the work
+            accordingly.
           </li>
         </ul>
 
@@ -393,24 +433,26 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
   <concept id="parquet_compression">
 
     <title>Snappy and GZip Compression for Parquet Data Files</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Snappy"/>
-      <data name="Category" value="Gzip"/>
-      <data name="Category" value="Compression"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Snappy"/>
+        <data name="Category" value="Gzip"/>
+        <data name="Category" value="Compression"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
       <p>
-        <indexterm audience="hidden">COMPRESSION_CODEC query option</indexterm>
-        When Impala writes Parquet data files using the <codeph>INSERT</codeph> statement, the underlying
-        compression is controlled by the <codeph>COMPRESSION_CODEC</codeph> query option. (Prior to Impala 2.0, the
-        query option name was <codeph>PARQUET_COMPRESSION_CODEC</codeph>.) The allowed values for this query option
-        are <codeph>snappy</codeph> (the default), <codeph>gzip</codeph>, and <codeph>none</codeph>. The option
-        value is not case-sensitive. If the option is set to an unrecognized value, all kinds of queries will fail
-        due to the invalid option setting, not just queries involving Parquet tables.
+        When Impala writes Parquet data files using the <codeph>INSERT</codeph> statement, the
+        underlying compression is controlled by the <codeph>COMPRESSION_CODEC</codeph> query
+        option. (Prior to Impala 2.0, the query option name was
+        <codeph>PARQUET_COMPRESSION_CODEC</codeph>.) The allowed values for this query option
+        are <codeph>snappy</codeph> (the default), <codeph>gzip</codeph>, and
+        <codeph>none</codeph>. The option value is not case-sensitive. If the option is set to
+        an unrecognized value, all kinds of queries will fail due to the invalid option setting,
+        not just queries involving Parquet tables.
       </p>
 
     </conbody>
@@ -422,11 +464,11 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
       <conbody>
 
         <p>
-          <indexterm audience="hidden">compression</indexterm>
-          By default, the underlying data files for a Parquet table are compressed with Snappy. The combination of
-          fast compression and decompression makes it a good choice for many data sets. To ensure Snappy
-          compression is used, for example after experimenting with other compression codecs, set the
-          <codeph>COMPRESSION_CODEC</codeph> query option to <codeph>snappy</codeph> before inserting the data:
+          By default, the underlying data files for a Parquet table are compressed with Snappy.
+          The combination of fast compression and decompression makes it a good choice for many
+          data sets. To ensure Snappy compression is used, for example after experimenting with
+          other compression codecs, set the <codeph>COMPRESSION_CODEC</codeph> query option to
+          <codeph>snappy</codeph> before inserting the data:
         </p>
 
 <codeblock>[localhost:21000] &gt; create database parquet_compression;
@@ -448,9 +490,9 @@ Inserted 1000000000 rows in 181.98s
       <conbody>
 
         <p>
-          If you need more intensive compression (at the expense of more CPU cycles for uncompressing during
-          queries), set the <codeph>COMPRESSION_CODEC</codeph> query option to <codeph>gzip</codeph> before
-          inserting the data:
+          If you need more intensive compression (at the expense of more CPU cycles for
+          uncompressing during queries), set the <codeph>COMPRESSION_CODEC</codeph> query option
+          to <codeph>gzip</codeph> before inserting the data:
         </p>
 
 <codeblock>[localhost:21000] &gt; create table parquet_gzip like raw_text_data;
@@ -470,9 +512,9 @@ Inserted 1000000000 rows in 1418.24s
       <conbody>
 
         <p>
-          If your data compresses very poorly, or you want to avoid the CPU overhead of compression and
-          decompression entirely, set the <codeph>COMPRESSION_CODEC</codeph> query option to <codeph>none</codeph>
-          before inserting the data:
+          If your data compresses very poorly, or you want to avoid the CPU overhead of
+          compression and decompression entirely, set the <codeph>COMPRESSION_CODEC</codeph>
+          query option to <codeph>none</codeph> before inserting the data:
         </p>
 
 <codeblock>[localhost:21000] &gt; create table parquet_none like raw_text_data;
@@ -492,15 +534,17 @@ Inserted 1000000000 rows in 146.90s
       <conbody>
 
         <p>
-          Here are some examples showing differences in data sizes and query speeds for 1 billion rows of synthetic
-          data, compressed with each kind of codec. As always, run similar tests with realistic data sets of your
-          own. The actual compression ratios, and relative insert and query speeds, will vary depending on the
-          characteristics of the actual data.
+          Here are some examples showing differences in data sizes and query speeds for 1
+          billion rows of synthetic data, compressed with each kind of codec. As always, run
+          similar tests with realistic data sets of your own. The actual compression ratios, and
+          relative insert and query speeds, will vary depending on the characteristics of the
+          actual data.
         </p>
 
         <p>
-          In this case, switching from Snappy to GZip compression shrinks the data by an additional 40% or so,
-          while switching from Snappy compression to no compression expands the data also by about 40%:
+          In this case, switching from Snappy to GZip compression shrinks the data by an
+          additional 40% or so, while switching from Snappy compression to no compression
+          expands the data also by about 40%:
         </p>
 
 <codeblock>$ hdfs dfs -du -h /user/hive/warehouse/parquet_compression.db
@@ -510,17 +554,19 @@ Inserted 1000000000 rows in 146.90s
 </codeblock>
 
         <p>
-          Because Parquet data files are typically <ph rev="parquet_block_size">large</ph>, each directory will
-          have a different number of data files and the row groups will be arranged differently.
+          Because Parquet data files are typically <ph rev="parquet_block_size">large</ph>, each
+          directory will have a different number of data files and the row groups will be
+          arranged differently.
         </p>
 
         <p>
-          At the same time, the less agressive the compression, the faster the data can be decompressed. In this
-          case using a table with a billion rows, a query that evaluates all the values for a particular column
-          runs faster with no compression than with Snappy compression, and faster with Snappy compression than
-          with Gzip compression. Query performance depends on several other factors, so as always, run your own
-          benchmarks with your own data to determine the ideal tradeoff between data size, CPU efficiency, and
-          speed of insert and query operations.
+          At the same time, the less agressive the compression, the faster the data can be
+          decompressed. In this case using a table with a billion rows, a query that evaluates
+          all the values for a particular column runs faster with no compression than with
+          Snappy compression, and faster with Snappy compression than with Gzip compression.
+          Query performance depends on several other factors, so as always, run your own
+          benchmarks with your own data to determine the ideal tradeoff between data size, CPU
+          efficiency, and speed of insert and query operations.
         </p>
 
 <codeblock>[localhost:21000] &gt; desc parquet_snappy;
@@ -572,19 +618,22 @@ Returned 1 row(s) in 3.67s
       <conbody>
 
         <p>
-          Here is a final example, to illustrate how the data files using the various compression codecs are all
-          compatible with each other for read operations. The metadata about the compression format is written into
-          each data file, and can be decoded during queries regardless of the <codeph>COMPRESSION_CODEC</codeph>
-          setting in effect at the time. In this example, we copy data files from the
-          <codeph>PARQUET_SNAPPY</codeph>, <codeph>PARQUET_GZIP</codeph>, and <codeph>PARQUET_NONE</codeph> tables
-          used in the previous examples, each containing 1 billion rows, all to the data directory of a new table
-          <codeph>PARQUET_EVERYTHING</codeph>. A couple of sample queries demonstrate that the new table now
-          contains 3 billion rows featuring a variety of compression codecs for the data files.
+          Here is a final example, to illustrate how the data files using the various
+          compression codecs are all compatible with each other for read operations. The
+          metadata about the compression format is written into each data file, and can be
+          decoded during queries regardless of the <codeph>COMPRESSION_CODEC</codeph> setting in
+          effect at the time. In this example, we copy data files from the
+          <codeph>PARQUET_SNAPPY</codeph>, <codeph>PARQUET_GZIP</codeph>, and
+          <codeph>PARQUET_NONE</codeph> tables used in the previous examples, each containing 1
+          billion rows, all to the data directory of a new table
+          <codeph>PARQUET_EVERYTHING</codeph>. A couple of sample queries demonstrate that the
+          new table now contains 3 billion rows featuring a variety of compression codecs for
+          the data files.
         </p>
 
         <p>
-          First, we create the table in Impala so that there is a destination directory in HDFS to put the data
-          files:
+          First, we create the table in Impala so that there is a destination directory in HDFS
+          to put the data files:
         </p>
 
 <codeblock>[localhost:21000] &gt; create table parquet_everything like parquet_snappy;
@@ -592,10 +641,10 @@ Query: create table parquet_everything like parquet_snappy
 </codeblock>
 
         <p>
-          Then in the shell, we copy the relevant data files into the data directory for this new table. Rather
-          than using <codeph>hdfs dfs -cp</codeph> as with typical files, we use <codeph>hadoop distcp -pb</codeph>
-          to ensure that the special <ph rev="parquet_block_size"> block size</ph> of the Parquet data files is
-          preserved.
+          Then in the shell, we copy the relevant data files into the data directory for this
+          new table. Rather than using <codeph>hdfs dfs -cp</codeph> as with typical files, we
+          use <codeph>hadoop distcp -pb</codeph> to ensure that the special
+          <ph rev="parquet_block_size"> block size</ph> of the Parquet data files is preserved.
         </p>
 
 <codeblock>$ hadoop distcp -pb /user/hive/warehouse/parquet_compression.db/parquet_snappy \
@@ -610,10 +659,11 @@ $ hadoop distcp -pb /user/hive/warehouse/parquet_compression.db/parquet_none  \
 </codeblock>
 
         <p>
-          Back in the <cmdname>impala-shell</cmdname> interpreter, we use the <codeph>REFRESH</codeph> statement to
-          alert the Impala server to the new data files for this table, then we can run queries demonstrating that
-          the data files represent 3 billion rows, and the values for one of the numeric columns match what was in
-          the original smaller tables:
+          Back in the <cmdname>impala-shell</cmdname> interpreter, we use the
+          <codeph>REFRESH</codeph> statement to alert the Impala server to the new data files
+          for this table, then we can run queries demonstrating that the data files represent 3
+          billion rows, and the values for one of the numeric columns match what was in the
+          original smaller tables:
         </p>
 
 <codeblock>[localhost:21000] &gt; refresh parquet_everything;
@@ -650,14 +700,13 @@ Returned 1 row(s) in 13.35s
 
     <conbody>
 
-    <p>
-      In <keyword keyref="impala23_full"/> and higher, Impala supports the complex types
-      <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>
-      See <xref href="impala_complex_types.xml#complex_types"/> for details.
-      Because these data types are currently supported only for the Parquet file format,
-      if you plan to use them, become familiar with the performance and storage aspects
-      of Parquet first.
-    </p>
+      <p>
+        In <keyword keyref="impala23_full"/> and higher, Impala supports the complex types
+        <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> See
+        <xref href="impala_complex_types.xml#complex_types"/> for details. Because these data
+        types are currently supported only for the Parquet file format, if you plan to use them,
+        become familiar with the performance and storage aspects of Parquet first.
+      </p>
 
     </conbody>
 
@@ -666,17 +715,18 @@ Returned 1 row(s) in 13.35s
   <concept id="parquet_interop">
 
     <title>Exchanging Parquet Data Files with Other Hadoop Components</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Hadoop"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Hadoop"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
       <p>
-        You can read and write Parquet data files from other <keyword keyref="distro"/> components.
-        See <xref keyref="cdh_ig_parquet"/> for details.
+        You can read and write Parquet data files from other Hadoop components. See
+        <xref keyref="cdh_ig_parquet"/> for details.
       </p>
 
 <!-- These couple of paragraphs reused in the release notes 'incompatible changes' section. -->
@@ -688,17 +738,18 @@ Returned 1 row(s) in 13.35s
 <!-- <conbodydiv id="upgrade_parquet_metadata"> -->
 
       <p>
-        Previously, it was not possible to create Parquet data through Impala and reuse that table within Hive. Now
-        that Parquet support is available for Hive, reusing existing Impala Parquet data files in Hive
-        requires updating the table metadata. Use the following command if you are already running Impala 1.1.1 or
-        higher:
+        Previously, it was not possible to create Parquet data through Impala and reuse that
+        table within Hive. Now that Parquet support is available for Hive, reusing existing
+        Impala Parquet data files in Hive requires updating the table metadata. Use the
+        following command if you are already running Impala 1.1.1 or higher:
       </p>
 
 <codeblock>ALTER TABLE <varname>table_name</varname> SET FILEFORMAT PARQUET;
 </codeblock>
 
       <p>
-        If you are running a level of Impala that is older than 1.1.1, do the metadata update through Hive:
+        If you are running a level of Impala that is older than 1.1.1, do the metadata update
+        through Hive:
       </p>
 
 <codeblock>ALTER TABLE <varname>table_name</varname> SET SERDE 'parquet.hive.serde.ParquetHiveSerDe';
@@ -708,33 +759,36 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
 </codeblock>
 
       <p>
-        Impala 1.1.1 and higher can reuse Parquet data files created by Hive, without any action required.
+        Impala 1.1.1 and higher can reuse Parquet data files created by Hive, without any action
+        required.
       </p>
 
 <!-- </conbodydiv> -->
 
       <p rev="2.2.0">
-        Impala supports the scalar data types that you can encode in a Parquet data file, but not composite or
-        nested types such as maps or arrays. In <keyword keyref="impala22_full"/> and higher, Impala can query Parquet data
-        files that include composite or nested types, as long as the query only refers to columns with scalar
-        types.
+        Impala supports the scalar data types that you can encode in a Parquet data file, but
+        not composite or nested types such as maps or arrays. In
+        <keyword keyref="impala22_full"/> and higher, Impala can query Parquet data files that
+        include composite or nested types, as long as the query only refers to columns with
+        scalar types.
 <!-- TK: could include an example here, but would require setup in Hive or Pig or something. -->
       </p>
 
       <p>
-        If you copy Parquet data files between nodes, or even between different directories on the same node, make
-        sure to preserve the block size by using the command <codeph>hadoop distcp -pb</codeph>. To verify that the
-        block size was preserved, issue the command <codeph>hdfs fsck -blocks
-        <varname>HDFS_path_of_impala_table_dir</varname></codeph> and check that the average block size is at or
-        near <ph rev="parquet_block_size">256 MB (or whatever other size is defined by the
-        <codeph>PARQUET_FILE_SIZE</codeph> query option).</ph>. (The <codeph>hadoop distcp</codeph> operation
-        typically leaves some directories behind, with names matching <filepath>_distcp_logs_*</filepath>, that you
+        If you copy Parquet data files between nodes, or even between different directories on
+        the same node, make sure to preserve the block size by using the command <codeph>hadoop
+        distcp -pb</codeph>. To verify that the block size was preserved, issue the command
+        <codeph>hdfs fsck -blocks <varname>HDFS_path_of_impala_table_dir</varname></codeph> and
+        check that the average block size is at or near <ph rev="parquet_block_size">256 MB (or
+        whatever other size is defined by the <codeph>PARQUET_FILE_SIZE</codeph> query
+        option).</ph>. (The <codeph>hadoop distcp</codeph> operation typically leaves some
+        directories behind, with names matching <filepath>_distcp_logs_*</filepath>, that you
         can delete from the destination directory afterward.)
 <!-- The Apache wiki page keeps disappearing, even though Google still points to it as of Nov. 11/2014. -->
 <!-- Now there is a 'distcp2' guide: http://hadoop.apache.org/docs/r1.2.1/distcp2.html but I haven't tried that so let's play it safe for now and hide the link. -->
 <!--      See the <xref href="http://hadoop.apache.org/docs/r0.19.0/distcp.html" scope="external" format="html">Hadoop DistCP Guide</xref> for details. -->
-        Issue the command <cmdname>hadoop distcp</cmdname> for details about <cmdname>distcp</cmdname> command
-        syntax.
+        Issue the command <cmdname>hadoop distcp</cmdname> for details about
+        <cmdname>distcp</cmdname> command syntax.
       </p>
 
 <!-- Sample commands/output for when the 'distcp' business is expanded into a tutorial later.
@@ -764,6 +818,7 @@ The filesystem under path '/user/impala/warehouse/parquet_compression.db/parquet
 -->
 
       <p conref="../shared/impala_common.xml#common/impala_parquet_encodings_caveat"/>
+
       <p conref="../shared/impala_common.xml#common/parquet_tools_blurb"/>
 
     </conbody>
@@ -773,68 +828,72 @@ The filesystem under path '/user/impala/warehouse/parquet_compression.db/parquet
   <concept id="parquet_data_files">
 
     <title>How Parquet Data Files Are Organized</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Concepts"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Concepts"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
       <p>
-        Although Parquet is a column-oriented file format, do not expect to find one data file for each column.
-        Parquet keeps all the data for a row within the same data file, to ensure that the columns for a row are
-        always available on the same node for processing. What Parquet does is to set a large HDFS block size and a
-        matching maximum data file size, to ensure that I/O and network transfer requests apply to large batches of
-        data.
+        Although Parquet is a column-oriented file format, do not expect to find one data file
+        for each column. Parquet keeps all the data for a row within the same data file, to
+        ensure that the columns for a row are always available on the same node for processing.
+        What Parquet does is to set a large HDFS block size and a matching maximum data file
+        size, to ensure that I/O and network transfer requests apply to large batches of data.
       </p>
 
       <p>
-        Within that data file, the data for a set of rows is rearranged so that all the values from the first
-        column are organized in one contiguous block, then all the values from the second column, and so on.
-        Putting the values from the same column next to each other lets Impala use effective compression techniques
-        on the values in that column.
+        Within that data file, the data for a set of rows is rearranged so that all the values
+        from the first column are organized in one contiguous block, then all the values from
+        the second column, and so on. Putting the values from the same column next to each other
+        lets Impala use effective compression techniques on the values in that column.
       </p>
 
       <note>
         <p>
-          Impala <codeph>INSERT</codeph> statements write Parquet data files using an HDFS block size
-          <ph rev="parquet_block_size">that matches the data file size</ph>, to ensure that each data file is
-          represented by a single HDFS block, and the entire file can be processed on a single node without
-          requiring any remote reads.
+          Impala <codeph>INSERT</codeph> statements write Parquet data files using an HDFS block
+          size <ph rev="parquet_block_size">that matches the data file size</ph>, to ensure that
+          each data file is represented by a single HDFS block, and the entire file can be
+          processed on a single node without requiring any remote reads.
         </p>
 
         <p>
-          If you create Parquet data files outside of Impala, such as through a MapReduce or Pig job, ensure that
-          the HDFS block size is greater than or equal to the file size, so that the <q>one file per block</q>
-          relationship is maintained. Set the <codeph>dfs.block.size</codeph> or the <codeph>dfs.blocksize</codeph>
-          property large enough that each file fits within a single HDFS block, even if that size is larger than
-          the normal HDFS block size.
+          If you create Parquet data files outside of Impala, such as through a MapReduce or Pig
+          job, ensure that the HDFS block size is greater than or equal to the file size, so
+          that the <q>one file per block</q> relationship is maintained. Set the
+          <codeph>dfs.block.size</codeph> or the <codeph>dfs.blocksize</codeph> property large
+          enough that each file fits within a single HDFS block, even if that size is larger
+          than the normal HDFS block size.
         </p>
 
         <p>
-          If the block size is reset to a lower value during a file copy, you will see lower performance for
-          queries involving those files, and the <codeph>PROFILE</codeph> statement will reveal that some I/O is
-          being done suboptimally, through remote reads. See
-          <xref href="impala_parquet.xml#parquet_compression_multiple"/> for an example showing how to preserve the
-          block size when copying Parquet data files.
+          If the block size is reset to a lower value during a file copy, you will see lower
+          performance for queries involving those files, and the <codeph>PROFILE</codeph>
+          statement will reveal that some I/O is being done suboptimally, through remote reads.
+          See <xref href="impala_parquet.xml#parquet_compression_multiple"/> for an example
+          showing how to preserve the block size when copying Parquet data files.
         </p>
       </note>
 
       <p>
-        When Impala retrieves or tests the data for a particular column, it opens all the data files, but only
-        reads the portion of each file containing the values for that column. The column values are stored
-        consecutively, minimizing the I/O required to process the values within a single column. If other columns
-        are named in the <codeph>SELECT</codeph> list or <codeph>WHERE</codeph> clauses, the data for all columns
-        in the same row is available within that same data file.
+        When Impala retrieves or tests the data for a particular column, it opens all the data
+        files, but only reads the portion of each file containing the values for that column.
+        The column values are stored consecutively, minimizing the I/O required to process the
+        values within a single column. If other columns are named in the <codeph>SELECT</codeph>
+        list or <codeph>WHERE</codeph> clauses, the data for all columns in the same row is
+        available within that same data file.
       </p>
 
       <p>
-        If an <codeph>INSERT</codeph> statement brings in less than <ph rev="parquet_block_size">one Parquet
-        block's worth</ph> of data, the resulting data file is smaller than ideal. Thus, if you do split up an ETL
-        job to use multiple <codeph>INSERT</codeph> statements, try to keep the volume of data for each
-        <codeph>INSERT</codeph> statement to approximately <ph rev="parquet_block_size">256 MB, or a multiple of
-        256 MB</ph>.
+        If an <codeph>INSERT</codeph> statement brings in less than
+        <ph rev="parquet_block_size">one Parquet block's worth</ph> of data, the resulting data
+        file is smaller than ideal. Thus, if you do split up an ETL job to use multiple
+        <codeph>INSERT</codeph> statements, try to keep the volume of data for each
+        <codeph>INSERT</codeph> statement to approximately <ph rev="parquet_block_size">256 MB,
+        or a multiple of 256 MB</ph>.
       </p>
 
     </conbody>
@@ -846,37 +905,42 @@ The filesystem under path '/user/impala/warehouse/parquet_compression.db/parquet
       <conbody>
 
         <p>
-          Parquet uses some automatic compression techniques, such as run-length encoding (RLE) and dictionary
-          encoding, based on analysis of the actual data values. Once the data values are encoded in a compact
-          form, the encoded data can optionally be further compressed using a compression algorithm. Parquet data
-          files created by Impala can use Snappy, GZip, or no compression; the Parquet spec also allows LZO
-          compression, but currently Impala does not support LZO-compressed Parquet files.
+          Parquet uses some automatic compression techniques, such as run-length encoding (RLE)
+          and dictionary encoding, based on analysis of the actual data values. Once the data
+          values are encoded in a compact form, the encoded data can optionally be further
+          compressed using a compression algorithm. Parquet data files created by Impala can use
+          Snappy, GZip, or no compression; the Parquet spec also allows LZO compression, but
+          currently Impala does not support LZO-compressed Parquet files.
         </p>
 
         <p>
-          RLE and dictionary encoding are compression techniques that Impala applies automatically to groups of
-          Parquet data values, in addition to any Snappy or GZip compression applied to the entire data files.
-          These automatic optimizations can save you time and planning that are normally needed for a traditional
-          data warehouse. For example, dictionary encoding reduces the need to create numeric IDs as abbreviations
+          RLE and dictionary encoding are compression techniques that Impala applies
+          automatically to groups of Parquet data values, in addition to any Snappy or GZip
+          compression applied to the entire data files. These automatic optimizations can save
+          you time and planning that are normally needed for a traditional data warehouse. For
+          example, dictionary encoding reduces the need to create numeric IDs as abbreviations
           for longer string values.
         </p>
 
         <p>
-          Run-length encoding condenses sequences of repeated data values. For example, if many consecutive rows
-          all contain the same value for a country code, those repeating values can be represented by the value
-          followed by a count of how many times it appears consecutively.
+          Run-length encoding condenses sequences of repeated data values. For example, if many
+          consecutive rows all contain the same value for a country code, those repeating values
+          can be represented by the value followed by a count of how many times it appears
+          consecutively.
         </p>
 
         <p>
-          Dictionary encoding takes the different values present in a column, and represents each one in compact
-          2-byte form rather than the original value, which could be several bytes. (Additional compression is
-          applied to the compacted values, for extra space savings.) This type of encoding applies when the number
-          of different values for a column is less than 2**16 (16,384). It does not apply to columns of data type
-          <codeph>BOOLEAN</codeph>, which are already very short. <codeph>TIMESTAMP</codeph> columns sometimes have
-          a unique value for each row, in which case they can quickly exceed the 2**16 limit on distinct values.
-          The 2**16 limit on different values within a column is reset for each data file, so if several different
-          data files each contained 10,000 different city names, the city name column in each data file could still
-          be condensed using dictionary encoding.
+          Dictionary encoding takes the different values present in a column, and represents
+          each one in compact 2-byte form rather than the original value, which could be several
+          bytes. (Additional compression is applied to the compacted values, for extra space
+          savings.) This type of encoding applies when the number of different values for a
+          column is less than 2**16 (16,384). It does not apply to columns of data type
+          <codeph>BOOLEAN</codeph>, which are already very short. <codeph>TIMESTAMP</codeph>
+          columns sometimes have a unique value for each row, in which case they can quickly
+          exceed the 2**16 limit on distinct values. The 2**16 limit on different values within
+          a column is reset for each data file, so if several different data files each
+          contained 10,000 different city names, the city name column in each data file could
+          still be condensed using dictionary encoding.
         </p>
 
       </conbody>
@@ -892,9 +956,9 @@ The filesystem under path '/user/impala/warehouse/parquet_compression.db/parquet
     <conbody>
 
       <p>
-        If you reuse existing table structures or ETL processes for Parquet tables, you might encounter a <q>many
-        small files</q> situation, which is suboptimal for query efficiency. For example, statements like these
-        might produce inefficiently organized data files:
+        If you reuse existing table structures or ETL processes for Parquet tables, you might
+        encounter a <q>many small files</q> situation, which is suboptimal for query efficiency.
+        For example, statements like these might produce inefficiently organized data files:
       </p>
 
 <codeblock>-- In an N-node cluster, each node produces a data file
@@ -915,16 +979,17 @@ insert into partitioned_parquet_table partition (year, month, day)
 </codeblock>
 
       <p>
-        Here are techniques to help you produce large data files in Parquet <codeph>INSERT</codeph> operations, and
-        to compact existing too-small data files:
+        Here are techniques to help you produce large data files in Parquet
+        <codeph>INSERT</codeph> operations, and to compact existing too-small data files:
       </p>
 
       <ul>
         <li>
           <p>
-            When inserting into a partitioned Parquet table, use statically partitioned <codeph>INSERT</codeph>
-            statements where the partition key values are specified as constant values. Ideally, use a separate
-            <codeph>INSERT</codeph> statement for each partition.
+            When inserting into a partitioned Parquet table, use statically partitioned
+            <codeph>INSERT</codeph> statements where the partition key values are specified as
+            constant values. Ideally, use a separate <codeph>INSERT</codeph> statement for each
+            partition.
           </p>
         </li>
 
@@ -934,38 +999,41 @@ insert into partitioned_parquet_table partition (year, month, day)
 
         <li>
           <p>
-            Be prepared to reduce the number of partition key columns from what you are used to with traditional
-            analytic database systems.
+            Be prepared to reduce the number of partition key columns from what you are used to
+            with traditional analytic database systems.
           </p>
         </li>
 
         <li>
           <p>
-            Do not expect Impala-written Parquet files to fill up the entire Parquet block size. Impala estimates
-            on the conservative side when figuring out how much data to write to each Parquet file. Typically, the
-            of uncompressed data in memory is substantially reduced on disk by the compression and encoding
-            techniques in the Parquet file format.
+            Do not expect Impala-written Parquet files to fill up the entire Parquet block size.
+            Impala estimates on the conservative side when figuring out how much data to write
+            to each Parquet file. Typically, the of uncompressed data in memory is substantially
+            reduced on disk by the compression and encoding techniques in the Parquet file
+            format.
 <!--
   Impala reserves <ph rev="parquet_block_size">1 GB</ph> of memory to buffer the data before writing,
   but the actual data file might be smaller, in the hundreds of megabytes.
   -->
-            The final data file size varies depending on the compressibility of the data. Therefore, it is not an
-            indication of a problem if <ph rev="parquet_block_size">256 MB</ph> of text data is turned into 2
-            Parquet data files, each less than <ph rev="parquet_block_size">256 MB</ph>.
+            The final data file size varies depending on the compressibility of the data.
+            Therefore, it is not an indication of a problem if <ph rev="parquet_block_size">256
+            MB</ph> of text data is turned into 2 Parquet data files, each less than
+            <ph rev="parquet_block_size">256 MB</ph>.
           </p>
         </li>
 
         <li>
           <p>
-            If you accidentally end up with a table with many small data files, consider using one or more of the
-            preceding techniques and copying all the data into a new Parquet table, either through <codeph>CREATE
-            TABLE AS SELECT</codeph> or <codeph>INSERT ... SELECT</codeph> statements.
+            If you accidentally end up with a table with many small data files, consider using
+            one or more of the preceding techniques and copying all the data into a new Parquet
+            table, either through <codeph>CREATE TABLE AS SELECT</codeph> or <codeph>INSERT ...
+            SELECT</codeph> statements.
           </p>
 
           <p>
-            To avoid rewriting queries to change table names, you can adopt a convention of always running
-            important queries against a view. Changing the view definition immediately switches any subsequent
-            queries to use the new underlying tables:
+            To avoid rewriting queries to change table names, you can adopt a convention of
+            always running important queries against a view. Changing the view definition
+            immediately switches any subsequent queries to use the new underlying tables:
           </p>
 <codeblock>create view production_table as select * from table_with_many_small_files;
 -- CTAS or INSERT...SELECT all the data into a more efficient layout...
@@ -986,79 +1054,85 @@ select * from production_table where c1 = 100 and c2 &lt; 50 and ...;
     <conbody>
 
       <p>
-        Schema evolution refers to using the statement <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> to change
-        the names, data type, or number of columns in a table. You can perform schema evolution for Parquet tables
-        as follows:
+        Schema evolution refers to using the statement <codeph>ALTER TABLE ... REPLACE
+        COLUMNS</codeph> to change the names, data type, or number of columns in a table. You
+        can perform schema evolution for Parquet tables as follows:
       </p>
 
       <ul>
         <li>
           <p>
-            The Impala <codeph>ALTER TABLE</codeph> statement never changes any data files in the tables. From the
-            Impala side, schema evolution involves interpreting the same data files in terms of a new table
-            definition. Some types of schema changes make sense and are represented correctly. Other types of
-            changes cannot be represented in a sensible way, and produce special result values or conversion errors
-            during queries.
+            The Impala <codeph>ALTER TABLE</codeph> statement never changes any data files in
+            the tables. From the Impala side, schema evolution involves interpreting the same
+            data files in terms of a new table definition. Some types of schema changes make
+            sense and are represented correctly. Other types of changes cannot be represented in
+            a sensible way, and produce special result values or conversion errors during
+            queries.
           </p>
         </li>
 
         <li>
           <p>
-            The <codeph>INSERT</codeph> statement always creates data using the latest table definition. You might
-            end up with data files with different numbers of columns or internal data representations if you do a
-            sequence of <codeph>INSERT</codeph> and <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> statements.
+            The <codeph>INSERT</codeph> statement always creates data using the latest table
+            definition. You might end up with data files with different numbers of columns or
+            internal data representations if you do a sequence of <codeph>INSERT</codeph> and
+            <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> statements.
           </p>
         </li>
 
         <li>
           <p>
-            If you use <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> to define additional columns at the end,
-            when the original data files are used in a query, these final columns are considered to be all
-            <codeph>NULL</codeph> values.
+            If you use <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> to define additional
+            columns at the end, when the original data files are used in a query, these final
+            columns are considered to be all <codeph>NULL</codeph> values.
           </p>
         </li>
 
         <li>
           <p>
-            If you use <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> to define fewer columns than before, when
-            the original data files are used in a query, the unused columns still present in the data file are
-            ignored.
+            If you use <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> to define fewer columns
+            than before, when the original data files are used in a query, the unused columns
+            still present in the data file are ignored.
           </p>
         </li>
 
         <li>
           <p>
-            Parquet represents the <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, and <codeph>INT</codeph>
-            types the same internally, all stored in 32-bit integers.
+            Parquet represents the <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, and
+            <codeph>INT</codeph> types the same internally, all stored in 32-bit integers.
           </p>
           <ul>
             <li>
-              That means it is easy to promote a <codeph>TINYINT</codeph> column to <codeph>SMALLINT</codeph> or
-              <codeph>INT</codeph>, or a <codeph>SMALLINT</codeph> column to <codeph>INT</codeph>. The numbers are
-              represented exactly the same in the data file, and the columns being promoted would not contain any
-              out-of-range values.
+              That means it is easy to promote a <codeph>TINYINT</codeph> column to
+              <codeph>SMALLINT</codeph> or <codeph>INT</codeph>, or a <codeph>SMALLINT</codeph>
+              column to <codeph>INT</codeph>. The numbers are represented exactly the same in
+              the data file, and the columns being promoted would not contain any out-of-range
+              values.
             </li>
 
             <li>
               <p>
-                If you change any of these column types to a smaller type, any values that are out-of-range for the
-                new type are returned incorrectly, typically as negative numbers.
+                If you change any of these column types to a smaller type, any values that are
+                out-of-range for the new type are returned incorrectly, typically as negative
+                numbers.
               </p>
             </li>
 
             <li>
               <p>
-                You cannot change a <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, or <codeph>INT</codeph>
-                column to <codeph>BIGINT</codeph>, or the other way around. Although the <codeph>ALTER
-                TABLE</codeph> succeeds, any attempt to query those columns results in conversion errors.
+                You cannot change a <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, or
+                <codeph>INT</codeph> column to <codeph>BIGINT</codeph>, or the other way around.
+                Although the <codeph>ALTER TABLE</codeph> succeeds, any attempt to query those
+                columns results in conversion errors.
               </p>
             </li>
 
             <li>
               <p>
-                Any other type conversion for columns produces a conversion error during queries. For example,
-                <codeph>INT</codeph> to <codeph>STRING</codeph>, <codeph>FLOAT</codeph> to <codeph>DOUBLE</codeph>,
-                <codeph>TIMESTAMP</codeph> to <codeph>STRING</codeph>, <codeph>DECIMAL(9,0)</codeph> to
+                Any other type conversion for columns produces a conversion error during
+                queries. For example, <codeph>INT</codeph> to <codeph>STRING</codeph>,
+                <codeph>FLOAT</codeph> to <codeph>DOUBLE</codeph>, <codeph>TIMESTAMP</codeph> to
+                <codeph>STRING</codeph>, <codeph>DECIMAL(9,0)</codeph> to
                 <codeph>DECIMAL(5,2)</codeph>, and so on.
               </p>
             </li>
@@ -1068,18 +1142,17 @@ select * from production_table where c1 = 100 and c2 &lt; 50 and ...;
 
       <p rev="2.6.0 IMPALA-2835">
         You might find that you have Parquet files where the columns do not line up in the same
-        order as in your Impala table. For example, you might have a Parquet file that was part of
-        a table with columns <codeph>C1,C2,C3,C4</codeph>, and now you want to reuse the same
-        Parquet file in a table with columns <codeph>C4,C2</codeph>. By default, Impala expects the
-        columns in the data file to appear in the same order as the columns defined for the table,
-        making it impractical to do some kinds of file reuse or schema evolution. In <keyword keyref="impala26_full"/>
-        and higher, the query option <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION=name</codeph> lets Impala
-        resolve columns by name, and therefore handle out-of-order or extra columns in the data file.
-        For example:
-
+        order as in your Impala table. For example, you might have a Parquet file that was part
+        of a table with columns <codeph>C1,C2,C3,C4</codeph>, and now you want to reuse the same
+        Parquet file in a table with columns <codeph>C4,C2</codeph>. By default, Impala expects
+        the columns in the data file to appear in the same order as the columns defined for the
+        table, making it impractical to do some kinds of file reuse or schema evolution. In
+        <keyword keyref="impala26_full"/> and higher, the query option
+        <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION=name</codeph> lets Impala resolve columns by
+        name, and therefore handle out-of-order or extra columns in the data file. For example:
 <codeblock conref="../shared/impala_common.xml#common/parquet_fallback_schema_resolution_example"/>
-
-        See <xref href="impala_parquet_fallback_schema_resolution.xml#parquet_fallback_schema_resolution"/>
+        See
+        <xref href="impala_parquet_fallback_schema_resolution.xml#parquet_fallback_schema_resolution"/>
         for more details.
       </p>
 
@@ -1094,42 +1167,181 @@ select * from production_table where c1 = 100 and c2 &lt; 50 and ...;
     <conbody>
 
       <p>
-        The Parquet format defines a set of data types whose names differ from the names of the corresponding
-        Impala data types. If you are preparing Parquet files using other Hadoop components such as Pig or
-        MapReduce, you might need to work with the type names defined by Parquet. The following figure lists the
-        Parquet-defined types and the equivalent types in Impala.
+        The Parquet format defines a set of data types whose names differ from the names of the
+        corresponding Impala data types. If you are preparing Parquet files using other Hadoop
+        components such as Pig or MapReduce, you might need to work with the type names defined
+        by Parquet. The following tables list the Parquet-defined types and the equivalent types
+        in Impala.
       </p>
 
       <p>
-        <b>Primitive types:</b>
+        <b>Primitive types</b>
       </p>
 
-<codeblock>BINARY -&gt; STRING
-BOOLEAN -&gt; BOOLEAN
-DOUBLE -&gt; DOUBLE
-FLOAT -&gt; FLOAT
-INT32 -&gt; INT
-INT64 -&gt; BIGINT
-INT96 -&gt; TIMESTAMP
-</codeblock>
+      <simpletable frame="all" id="simpletable_am3_rxn_wgb">
+
+        <sthead>
+
+          <stentry>Parquet type</stentry>
+
+          <stentry>Impala type</stentry>
+
+        </sthead>
+
+        <strow>
+
+          <stentry>BINARY</stentry>
+
+          <stentry>STRING</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>BOOLEAN</stentry>
+
+          <stentry>BOOLEAN</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>DOUBLE</stentry>
+
+          <stentry>DOUBLE</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>FLOAT</stentry>
+
+          <stentry>FLOAT</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT32</stentry>
+
+          <stentry>INT</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT64</stentry>
+
+          <stentry>BIGINT</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT96</stentry>
+
+          <stentry>TIMESTAMP</stentry>
+
+        </strow>
+
+      </simpletable>
 
       <p>
-        <b>Logical types:</b>
+        <b>Logical types</b>
       </p>
 
-<codeblock>BINARY + OriginalType UTF8 -&gt; STRING
-BINARY + OriginalType ENUM -&gt; STRING
-BINARY + OriginalType DECIMAL -&gt; DECIMAL
-</codeblock>
+      <p>
+        Parquet uses type annotations to extend the types that it can store, by specifying how
+        the primitive types should be interpreted.
+      </p>
+
+      <simpletable frame="all" id="simpletable_az3_byn_wgb">
+
+        <sthead>
+
+          <stentry>Parquet primitive type and annotation</stentry>
+
+          <stentry>Impala type</stentry>
+
+        </sthead>
+
+        <strow>
+
+          <stentry>BINARY annotated with the UTF8 OriginalType</stentry>
+
+          <stentry>STRING</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>BINARY annotated with the STRING LogicalType</stentry>
+
+          <stentry>STRING</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>BINARY annotated with the  ENUM OriginalType</stentry>
+
+          <stentry>STRING</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>BINARY annotated with the DECIMAL OriginalType</stentry>
+
+          <stentry>DECIMAL</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT64 annotated with the TIMESTAMP_MILLIS
+            OriginalType</stentry>
+
+          <stentry>TIMESTAMP (in <keyword keyref="impala32"/> or
+              higher)<p>
+              or
+            </p>BIGINT (for backward compatibility)</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT64 annotated with the TIMESTAMP_MICROS
+            OriginalType</stentry>
+
+          <stentry>TIMESTAMP (in <keyword keyref="impala32"/> or
+              higher)<p>
+              or
+            </p>BIGINT (for backward compatibility)</stentry>
+
+        </strow>
+
+        <strow>
+
+          <stentry>INT64 annotated with the  TIMESTAMP LogicalType</stentry>
+
+          <stentry>TIMESTAMP (in <keyword keyref="impala32"/> or
+              higher)<p>
+              or
+            </p>BIGINT (for backward compatibility)</stentry>
+
+        </strow>
+
+      </simpletable>
 
       <p rev="2.3.0">
         <b>Complex types:</b>
       </p>
 
       <p rev="2.3.0">
-        For the complex types (<codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph>)
-        available in <keyword keyref="impala23_full"/> and higher, Impala only supports queries
-        against those types in Parquet tables.
+        For the complex types (<codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and
+        <codeph>STRUCT</codeph>) available in <keyword keyref="impala23_full"/> and higher,
+        Impala only supports queries against those types in Parquet tables.
       </p>
 
     </conbody>
