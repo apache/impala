@@ -24,7 +24,9 @@ from tests.common.environ import build_flavor_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfIsilon
 
-WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
+# slow_build_timeout is set to 200000 to avoid failures like IMPALA-8064 where the
+# runtime filters don't arrive in time.
+WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=200000)
 
 # Some of the queries in runtime_filters consume a lot of memory, leading to
 # significant memory reservations in parallel tests.
