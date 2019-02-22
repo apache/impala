@@ -25,8 +25,10 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/bit-packing.inline.h"
 #include "util/dict-encoding.h"
+#include "util/encoding-test-util.h"
 
 #include "common/names.h"
 
@@ -333,6 +335,65 @@ TEST(DictTest, DecodeErrors) {
     EXPECT_EQ(track_decoder.consumption(), bytes_alloc);
     EXPECT_TRUE(failed) << "Should have detected out-of-range dict-encoded value in test "
         << test_case.first;
+  }
+}
+
+TEST(DictTest, TestGetNextValuesAndSkippingFuzzy) {
+  const int values_size = 8192;
+  const int rounds = 100;
+  MemTracker tracker;
+  MemTracker track_encoder;
+  MemTracker track_decoder;
+  MemPool pool(&tracker);
+  DictEncoder<int> large_dict_encoder(&pool, sizeof(int), &track_encoder);
+
+  std::default_random_engine random_eng;
+  RandTestUtil::SeedRng("DICT_TEST_SEED", &random_eng);
+
+  // Generates random number between 'bottom' and 'top' (inclusive intervals).
+  auto GetRandom = [&random_eng](int bottom, int top) {
+    std::uniform_int_distribution<int> uni_dist(bottom, top);
+    return uni_dist(random_eng);
+  };
+
+  vector<int> values = MakeRandomSequence(random_eng, values_size, 200, 10);
+  for (int val : values) {
+    large_dict_encoder.Put(val);
+  }
+
+  vector<uint8_t> data_buffer(large_dict_encoder.EstimatedDataEncodedSize() * 2);
+  int data_len = large_dict_encoder.WriteData(data_buffer.data(), data_buffer.size());
+  ASSERT_GT(data_len, 0);
+
+  vector<uint8_t> dict_buffer(large_dict_encoder.dict_encoded_size());
+  large_dict_encoder.WriteDict(dict_buffer.data());
+  large_dict_encoder.Close();
+
+  vector<int32_t> decoded_values(values.size());
+  DictDecoder<int> decoder(&track_decoder);
+  ASSERT_TRUE(decoder.template Reset<parquet::Type::INT32>(
+      dict_buffer.data(), dict_buffer.size(), sizeof(int)));
+
+  for (int round = 0; round < rounds; ++round) {
+    ASSERT_OK(decoder.SetData(data_buffer.data(), data_buffer.size()));
+    int i = 0;
+    while (i < values.size()) {
+      int length = GetRandom(1, 200);
+      if (i + length > values.size()) length = values.size() - i;
+      int skip_or_get = GetRandom(0, 1);
+      if (skip_or_get == 0) {
+        // skip values
+        ASSERT_TRUE(decoder.SkipValues(length));
+      } else {
+        // decode values
+        ASSERT_TRUE(decoder.GetNextValues(&decoded_values[i],
+                sizeof(int32_t), length));
+        for (int j = 0; j < length; ++j) {
+          EXPECT_EQ(values[i+j], decoded_values[i+j]);
+        }
+      }
+      i += length;
+    }
   }
 }
 

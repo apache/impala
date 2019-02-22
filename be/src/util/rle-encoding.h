@@ -714,8 +714,10 @@ template <typename T>
 template <typename OutType>
 inline bool RleBatchDecoder<T>::DecodeLiteralValues(int32_t num_literals_to_consume,
     OutType* dict, int64_t dict_len, StrideWriter<OutType>* RESTRICT out) {
-  DCHECK_GE(num_literals_to_consume, 0);
+  DCHECK_GT(num_literals_to_consume, 0);
   DCHECK_GE(literal_count_, num_literals_to_consume);
+
+  if (num_literals_to_consume == 0) return false;
 
   int32_t num_remaining = num_literals_to_consume;
   // Decode any buffered literals left over from previous calls.
@@ -892,8 +894,7 @@ inline int32_t RleBatchDecoder<T>::SkipValues(int32_t num_values) {
     // Skip RLE encoded values
     int32_t num_repeats = NextNumRepeats();
     if (num_repeats > 0) {
-       int32_t num_repeats_to_consume =
-           std::min(num_repeats, num_values - num_skipped);
+       int32_t num_repeats_to_consume = std::min(num_repeats, num_values - num_skipped);
        SkipRepeatedValues(num_repeats_to_consume);
        num_skipped += num_repeats_to_consume;
        continue;

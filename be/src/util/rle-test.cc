@@ -24,8 +24,10 @@
 #include <random>
 
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/bit-packing.inline.h"
 #include "util/bit-stream-utils.h"
+#include "util/encoding-test-util.h"
 #include "util/rle-encoding.h"
 
 #include "common/names.h"
@@ -172,14 +174,13 @@ class RleTest : public ::testing::Test {
   }
 
   int ValidateRleSkip(const vector<int>& values, int bit_width,
-      int min_repeated_run_length, int skip_at, int skip_count, unsigned int seed=0) {
+      int min_repeated_run_length, int skip_at, int skip_count) {
     stringstream ss;
     ss << "bit_width=" << bit_width
        << " min_repeated_run_length_=" << min_repeated_run_length
        << " skip_at=" << skip_at
        << " skip_count=" << skip_count
-       << " values.size()=" << values.size()
-       << " seed=" << seed;
+       << " values.size()=" << values.size();
     const string& description = ss.str();
     const int len = 64 * 1024;
     uint8_t buffer[len];
@@ -285,44 +286,6 @@ class RleTest : public ::testing::Test {
     return MakeSequenceBitWidth(values, intitial_literal_length, repeated_length,
         trailing_literal_length, 1);
   }
-
-  /// Generates a sequence that contains repeated and literal runs with random lengths.
-  /// Total length of the sequence is limited by 'max_run_length'. The random generation
-  /// is seeded by 'seed' to allow deterministic behavior.
-  vector<int> MakeRandomSequence(unsigned int seed, int total_length, int max_run_length,
-      int bit_width) {
-    std::default_random_engine random_eng(seed);
-    auto NextRunLength = [&]() {
-      std::uniform_int_distribution<int> uni_dist(1, max_run_length);
-      return uni_dist(random_eng);
-    };
-    auto IsNextRunRepeated = [&random_eng]() {
-      std::uniform_int_distribution<int> uni_dist(0, 1);
-      return uni_dist(random_eng) == 0;
-    };
-    auto NextVal = [bit_width](int val) {
-      if (bit_width == CHAR_BIT * sizeof(int)) return val + 1;
-      return (val + 1) % (1 << bit_width);
-    };
-
-    vector<int> ret;
-    int run_length = 0;
-    int val = 0;
-    int is_repeated = false;
-    while (ret.size() < total_length) {
-      if (run_length == 0) {
-        run_length = NextRunLength();
-        is_repeated = IsNextRunRepeated();
-        val = NextVal(val);
-      }
-      ret.push_back(val);
-      if (!is_repeated) {
-        val = NextVal(val);
-      }
-      --run_length;
-    }
-    return ret;
-  }
 };
 
 /// Basic test case for literal unpacking - two literals in a run.
@@ -376,9 +339,8 @@ TEST_F(RleTest, ValueSkippingFuzzy) {
   const int probe_iteration = 100;
   const int total_sequence_length = 2048;
 
-  std::random_device r;
-  unsigned int seed = r();
-  std::default_random_engine random_eng(seed);
+  std::default_random_engine random_eng;
+  RandTestUtil::SeedRng("RLE_TEST_SEED", &random_eng);
 
   // Generates random number between 'bottom' and 'top' (inclusive intervals).
   auto GetRandom = [&random_eng](int bottom, int top) {
@@ -390,12 +352,12 @@ TEST_F(RleTest, ValueSkippingFuzzy) {
     for (int i = 0; i < bitwidth_iteration; ++i) {
       int bit_width = GetRandom(1, 32);
       int max_run_length = GetRandom(5, 200);
-      vector<int> seq = MakeRandomSequence(seed, total_sequence_length, max_run_length,
-          bit_width);
+      vector<int> seq = MakeRandomSequence(random_eng, total_sequence_length,
+          max_run_length, bit_width);
       for (int j = 0; j < probe_iteration; ++j) {
         int skip_at = GetRandom(0, seq.size() - 1);
         int skip_count = GetRandom(1, seq.size() - skip_at);
-        ValidateRleSkip(seq, bit_width, min_run_length, skip_at, skip_count, seed);
+        ValidateRleSkip(seq, bit_width, min_run_length, skip_at, skip_count);
       }
     }
   }

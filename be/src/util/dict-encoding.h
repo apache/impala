@@ -519,7 +519,7 @@ ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValues(
         count -= num_literals;
       } else { // Case 2
         uint32_t num_to_decode = BitUtil::RoundDown(count, 32);
-        if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
+        if (num_to_decode > 0 && UNLIKELY(!data_decoder_.DecodeLiteralValues(
                 num_to_decode, dict_.data(), dict_.size(), &out))) {
           return false;
         }

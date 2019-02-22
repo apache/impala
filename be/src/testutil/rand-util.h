@@ -30,8 +30,9 @@ namespace impala {
 class RandTestUtil {
  public:
   /// Seed 'rng' with a seed either from the environment variable 'env_var' or the
-  /// current time.
-  static void SeedRng(const char* env_var, std::mt19937* rng) {
+  /// random device of the platform.
+  template <typename RandomEngine>
+  static void SeedRng(const char* env_var, RandomEngine* rng) {
     const char* seed_str = getenv(env_var);
     int64_t seed;
     if (seed_str != nullptr) {
