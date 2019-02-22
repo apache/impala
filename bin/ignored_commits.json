@@ -34,7 +34,9 @@
       { "hash": "56a740c07a6d80921e86fee769033fab5ad1ccf3",
         "comment": "Not applicable to 2.x: 3.x erasure coding"},
       { "hash": "a0257013df735141e5d36f884305af26c92b7c4b",
-        "comment": "Not applicable to 2.x: test not in 2.x"}
+        "comment": "Not applicable to 2.x: test not in 2.x"},
+      { "hash": "c8bfcbd6e826110678df4a699a9e8f05cf57b5d2",
+        "comment": "Not applicable to 2.x: Fix loading test time-zone database for 3.x"}
     ]
   }
 ]
