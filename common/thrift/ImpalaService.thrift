@@ -377,6 +377,9 @@ enum TImpalaQueryOptions {
   // debugging a testcase. Should not be set in user clusters. If set, a warning
   // is emitted in the query runtime profile.
   PLANNER_TESTCASE_MODE = 77
+
+  // Specifies the default table file format.
+  DEFAULT_FILE_FORMAT = 78
 }
 
 // The summary of a DML statement.

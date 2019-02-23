@@ -211,6 +211,8 @@ TEST(QueryOptions, SetEnumOptions) {
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
   TestEnumCase(options, CASE(compression_codec, THdfsCompression,
       (NONE, GZIP, BZIP2, DEFAULT, SNAPPY, SNAPPY_BLOCKED)), false);
+  TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,
+      (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC)), true);
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

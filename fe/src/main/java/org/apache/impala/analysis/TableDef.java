@@ -37,6 +37,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
@@ -126,22 +127,29 @@ class TableDef {
 
     Options(List<String> sortCols, String comment, RowFormat rowFormat,
         Map<String, String> serdeProperties, THdfsFileFormat fileFormat, HdfsUri location,
-        HdfsCachingOp cachingOp, Map<String, String> tblProperties) {
+        HdfsCachingOp cachingOp, Map<String, String> tblProperties,
+        TQueryOptions queryOptions) {
       this.sortCols = sortCols;
       this.comment = comment;
       this.rowFormat = rowFormat;
       Preconditions.checkNotNull(serdeProperties);
       this.serdeProperties = serdeProperties;
-      this.fileFormat = fileFormat == null ? THdfsFileFormat.TEXT : fileFormat;
+      // The file format passed via STORED AS <file format> has a higher precedence than
+      // the one set in query options.
+      this.fileFormat = (fileFormat != null) ?
+          fileFormat : queryOptions.getDefault_file_format();
       this.location = location;
       this.cachingOp = cachingOp;
       Preconditions.checkNotNull(tblProperties);
       this.tblProperties = tblProperties;
     }
 
-    public Options(String comment) {
-      this(ImmutableList.<String>of(), comment, RowFormat.DEFAULT_ROW_FORMAT,
-          new HashMap<>(), THdfsFileFormat.TEXT, null, null, new HashMap<>());
+    public Options(String comment, TQueryOptions queryOptions) {
+      // Passing null to file format so that it uses the file format from the query option
+      // if specified, otherwise it will use the default file format, which is TEXT.
+      this(ImmutableList.of(), comment, RowFormat.DEFAULT_ROW_FORMAT,
+          new HashMap<>(), /*file format*/ null, null, null, new HashMap<>(),
+          queryOptions);
     }
   }
 

@@ -765,6 +765,28 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_num_rows_produced_limit(num_rows_produced_limit);
         break;
       }
+      case TImpalaQueryOptions::DEFAULT_FILE_FORMAT: {
+        if (iequals(value, "TEXT") || iequals(value, "0")) {
+          query_options->__set_default_file_format(THdfsFileFormat::TEXT);
+        } else if (iequals(value, "RC_FILE") || iequals(value, "1")) {
+          query_options->__set_default_file_format(THdfsFileFormat::RC_FILE);
+        } else if (iequals(value, "SEQUENCE_FILE") || iequals(value, "2")) {
+          query_options->__set_default_file_format(THdfsFileFormat::SEQUENCE_FILE);
+        } else if (iequals(value, "AVRO") || iequals(value, "3")) {
+          query_options->__set_default_file_format(THdfsFileFormat::AVRO);
+        } else if (iequals(value, "PARQUET") || iequals(value, "4")) {
+          query_options->__set_default_file_format(THdfsFileFormat::PARQUET);
+        } else if (iequals(value, "KUDU") || iequals(value, "5")) {
+          query_options->__set_default_file_format(THdfsFileFormat::KUDU);
+        } else if (iequals(value, "ORC") || iequals(value, "6")) {
+          query_options->__set_default_file_format(THdfsFileFormat::ORC);
+        } else {
+          return Status(Substitute("Invalid default_file_format '$0'. Valid values are "
+                                   "TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU "
+                                   "and ORC.", value));
+        }
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

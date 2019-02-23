@@ -25,6 +25,7 @@ set all;
 'PARQUET_FILE_SIZE','0','ADVANCED'
 'REQUEST_POOL','','REGULAR'
 'SYNC_DDL','0','REGULAR'
+'DEFAULT_FILE_FORMAT','TEXT','REGULAR'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -50,6 +51,7 @@ set all;
 'PARQUET_FILE_SIZE','0','ADVANCED'
 'REQUEST_POOL','','REGULAR'
 'SYNC_DDL','0','REGULAR'
+'DEFAULT_FILE_FORMAT','TEXT','REGULAR'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -75,6 +77,7 @@ set all;
 'PARQUET_FILE_SIZE','0','ADVANCED'
 'REQUEST_POOL','','REGULAR'
 'SYNC_DDL','0','REGULAR'
+'DEFAULT_FILE_FORMAT','TEXT','REGULAR'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -227,4 +230,9 @@ set RM_INITIAL_MEM = "foo";
 set SCAN_NODE_CODEGEN_THRESHOLD = "foo";
 set max_io_buffers="foo";
 ---- RESULTS
+====
+---- QUERY
+set default_file_format=foo;
+---- CATCH
+Invalid default_file_format 'foo'. Valid values are TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU and ORC.
 ====

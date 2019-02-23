@@ -323,6 +323,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   78: optional bool planner_testcase_mode = false;
+
+  // See comment in ImpalaService.thrift.
+  79: optional CatalogObjects.THdfsFileFormat default_file_format =
+      CatalogObjects.THdfsFileFormat.TEXT;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

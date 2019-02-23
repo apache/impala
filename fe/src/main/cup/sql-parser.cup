@@ -1319,7 +1319,7 @@ create_tbl_stmt ::=
     if (tbl_def.isExternal()) {
       parser.parseError("external", SqlParserSymbols.KW_EXTERNAL);
     }
-    tbl_def.setOptions(new TableDef.Options(comment));
+    tbl_def.setOptions(new TableDef.Options(comment, parser.getQueryOptions()));
     RESULT = new CreateTableDataSrcStmt(new CreateTableStmt(tbl_def),
         data_src_name, init_string);
   :}
@@ -1400,8 +1400,9 @@ tbl_options ::=
   {:
     CreateTableStmt.unescapeProperties(serde_props);
     CreateTableStmt.unescapeProperties(tbl_props);
+
     RESULT = new TableDef.Options(sort_cols, comment, row_format, serde_props,
-        file_format, location, cache_op, tbl_props);
+        file_format, location, cache_op, tbl_props, parser.getQueryOptions());
   :}
   ;
 
