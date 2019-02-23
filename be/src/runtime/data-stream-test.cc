@@ -379,8 +379,9 @@ class DataStreamTest : public testing::Test {
     receiver_info_.emplace_back(
         make_unique<ReceiverInfo>(stream_type, num_senders, receiver_num));
     ReceiverInfo* info = receiver_info_.back().get();
-    info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
-        num_senders, buffer_size, is_merging, profile, &tracker_, &buffer_pool_client_);
+    info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, *runtime_state_.get(),
+        instance_id, DEST_NODE_ID, num_senders, buffer_size, is_merging, profile,
+        &tracker_, &buffer_pool_client_);
     if (!is_merging) {
       info->thread_handle.reset(new thread(&DataStreamTest::ReadStream, this, info));
     } else {
@@ -695,8 +696,9 @@ TEST_F(DataStreamTestShortDeserQueue, TestNoDeadlock) {
   receiver_info_.emplace_back(
       make_unique<ReceiverInfo>(TPartitionType::UNPARTITIONED, 4, 1));
   ReceiverInfo* info = receiver_info_.back().get();
-  info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
-      4, 1024 * 1024, false, profile, &tracker_, &buffer_pool_client_);
+  info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, *runtime_state_.get(),
+      instance_id, DEST_NODE_ID, 4, 1024 * 1024, false, profile, &tracker_,
+      &buffer_pool_client_);
   info->thread_handle.reset(new thread(
       &DataStreamTestShortDeserQueue_TestNoDeadlock_Test::ReadStream, this, info));
 

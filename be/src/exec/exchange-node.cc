@@ -89,7 +89,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   // TODO: figure out appropriate buffer size
   DCHECK_GT(num_senders_, 0);
   stream_recvr_ = ExecEnv::GetInstance()->stream_mgr()->CreateRecvr(
-      &input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
+      &input_row_desc_, *state, state->fragment_instance_id(), id_, num_senders_,
       FLAGS_exchg_node_buffer_size_bytes, is_merging_, runtime_profile(), mem_tracker(),
       &recvr_buffer_pool_client_);
 
@@ -178,7 +178,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
       RETURN_IF_ERROR(QueryMaintenance(state));
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !output_batch->AtCapacity()
-          && input_batch_ != NULL && next_row_idx_ < input_batch_->capacity()) {
+          && input_batch_ != NULL && next_row_idx_ < input_batch_->num_rows()) {
         TupleRow* src = input_batch_->GetRow(next_row_idx_);
         ++next_row_idx_;
         int j = output_batch->AddRow();

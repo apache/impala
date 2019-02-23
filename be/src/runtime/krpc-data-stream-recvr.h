@@ -26,6 +26,7 @@
 #include "gen-cpp/Types_types.h"   // for TUniqueId
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"
+#include "runtime/runtime-state.h"
 #include "util/tuple-row-compare.h"
 
 namespace kudu {
@@ -126,9 +127,9 @@ class KrpcDataStreamRecvr {
   class SenderQueue;
 
   KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr, MemTracker* parent_tracker,
-      const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, bool is_merging,
-      int64_t total_buffer_limit, RuntimeProfile* profile,
+      const RowDescriptor* row_desc, const RuntimeState& runtime_state,
+      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
+      bool is_merging, int64_t total_buffer_limit, RuntimeProfile* profile,
       BufferPool::ClientHandle* client);
 
   /// Adds a new row batch to the appropriate sender queue. If the row batch can be
@@ -170,6 +171,9 @@ class KrpcDataStreamRecvr {
 
   /// KrpcDataStreamMgr instance used to create this recvr. Not owned.
   KrpcDataStreamMgr* mgr_;
+
+  /// The runtime state of the fragment instance which owns this receiver. Not owned.
+  const RuntimeState& runtime_state_;
 
   /// Fragment and node id of the destination exchange node this receiver is used by.
   TUniqueId fragment_instance_id_;
