@@ -2140,3 +2140,19 @@ TINYINT, BIGINT
 2,3
 3,3
 ====
+---- QUERY
+# IMPALA-6323 Order by a constant is equivalent to no ordering.
+SELECT FIRST_VALUE(0) OVER (ORDER BY 0 ASC)
+FROM functional.alltypestiny;
+---- TYPES
+TINYINT
+---- RESULTS
+0
+0
+0
+0
+0
+0
+0
+0
+====

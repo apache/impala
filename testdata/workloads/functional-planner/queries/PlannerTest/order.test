@@ -1598,3 +1598,20 @@ PLAN-ROOT SINK
    limit: 1
    row-size=0B cardinality=1
 ====
+# Regression test for IMPALA-8069
+SELECT
+FIRST_VALUE(0) OVER (ORDER BY 0 ASC)
+FROM functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+01:ANALYTIC
+|  functions: first_value(0)
+|  order by: 0 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=1B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   row-size=0B cardinality=8
+====

@@ -324,8 +324,13 @@ public class AnalyticPlanner {
     ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
     boolean activePartition = activeExprs(partitionByExprs);
 
+    // IMPALA-8069: Ignore something like ORDER BY 0
+    boolean isConstSort = true;
+    for (OrderByElement elmt : orderByElements) {
+      isConstSort = isConstSort && elmt.getExpr().isConstant();
+    }
     // sort on partition by (pb) + order by (ob) exprs and create pb/ob predicates
-    if (activePartition || !orderByElements.isEmpty()) {
+    if (activePartition || !isConstSort) {
       // first sort on partitionExprs (direction doesn't matter)
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
       List<Boolean> isAsc =
@@ -365,10 +370,12 @@ public class AnalyticPlanner {
 
       root = sortNode;
       root.init(analyzer_);
-      sortSmap = sortNode.getOutputSmap();
+    }
+    if (activePartition || !orderByElements.isEmpty()) {
+      sortSmap = root.getOutputSmap();
 
       // create bufferedTupleDesc and bufferedSmap
-      sortTupleId = sortNode.tupleIds_.get(0);
+      sortTupleId = root.tupleIds_.get(0);
       bufferedTupleDesc =
           analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId, "buffered-tuple");
       if (LOG.isTraceEnabled()) {

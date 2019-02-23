@@ -2888,22 +2888,36 @@ PLAN-ROOT SINK
    constant-operands=3
    row-size=1B cardinality=3
 ====
-# IMPALA-6323 Order by a constant is equivalent to no ordering.
-select x, count() over(order by 1) from (VALUES((1 x), (2), (3))) T;
----- DISTRIBUTEDPLAN
+# Regression test for IMPALA-8069
+SELECT FIRST_VALUE(0) OVER (ORDER BY 0 ASC)
+FROM functional.alltypestiny
+---- PLAN
 PLAN-ROOT SINK
 |
-02:ANALYTIC
-|  functions: count()
-|  order by: 1 ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=9B cardinality=3
+01:ANALYTIC
+|  functions: first_value(0)
+|  order by: 0 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=1B cardinality=8
 |
-01:SORT
-|  order by: 1 ASC
-|  row-size=1B cardinality=3
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   row-size=0B cardinality=8
+====
+# Regression test for IMPALA-8069
+# Same case as in end-to-end test analytic-fns.test
+SELECT FIRST_VALUE(0) OVER (ORDER BY 0 ASC), row_number() over (order by 0 ASC)
+FROM functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
 |
-00:UNION
-   constant-operands=3
-   row-size=1B cardinality=3
+01:ANALYTIC
+|  functions: first_value(0), row_number()
+|  order by: 0 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=9B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   row-size=0B cardinality=8
 ====
