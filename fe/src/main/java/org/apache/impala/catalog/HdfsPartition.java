@@ -859,7 +859,10 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     // Update the serde library class based on the currently used file format.
     org.apache.hadoop.hive.metastore.api.StorageDescriptor storageDescriptor =
         new org.apache.hadoop.hive.metastore.api.StorageDescriptor(
-            table_.getNonPartitionFieldSchemas(),
+          // Make a shallow copy of the field schemas instead of passing a reference to
+          // the source list since it could potentially be modified once the current
+          // thread is out of table lock scope.
+            new ArrayList<>(table_.getNonPartitionFieldSchemas()),
             getLocation(),
             cachedMsPartitionDescriptor_.sdInputFormat,
             cachedMsPartitionDescriptor_.sdOutputFormat,
