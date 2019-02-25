@@ -171,6 +171,18 @@ class Cluster(object):
       self._init_impala()
     return self._impala
 
+  def print_version(self):
+    """
+    Print the cluster impalad version info to the console sorted by hostname.
+    """
+    def _sorter(i1, i2):
+      return cmp(i1.host_name, i2.host_name)
+
+    version_info = self.impala.get_version_info()
+    print("Cluster Impalad Version Info:")
+    for impalad in sorted(version_info.keys(), cmp=_sorter):
+      print("{0}: {1}".format(impalad.host_name, version_info[impalad]))
+
 
 class MiniCluster(Cluster):
 
