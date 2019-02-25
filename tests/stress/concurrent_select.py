@@ -63,7 +63,6 @@ import re
 import signal
 import sys
 import threading
-import traceback
 from Queue import Empty   # Must be before Queue below
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace, SUPPRESS
 from collections import defaultdict
@@ -75,7 +74,7 @@ from random import choice, random, randrange, shuffle
 from sys import exit, maxint
 from tempfile import gettempdir
 from textwrap import dedent
-from threading import current_thread, Thread
+from threading import current_thread
 from time import sleep, time
 
 import tests.comparison.cli_options as cli_options
@@ -85,30 +84,19 @@ from tests.stress.runtime_info import save_runtime_info, load_runtime_info
 from tests.stress.queries import (QueryType, generate_compute_stats_queries,
     generate_DML_queries, generate_random_queries, load_tpc_queries,
     load_queries_from_test_file, estimate_query_mem_mb_usage)
+from tests.stress.query_runner import (QueryRunner, QueryTimeout,
+    NUM_QUERIES_DEQUEUED, NUM_QUERIES_SUBMITTED, NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED,
+    NUM_QUERIES_FINISHED, NUM_QUERIES_EXCEEDED_MEM_LIMIT, NUM_QUERIES_AC_REJECTED,
+    NUM_QUERIES_AC_TIMEDOUT, NUM_QUERIES_CANCELLED, NUM_RESULT_MISMATCHES,
+    NUM_OTHER_ERRORS, RESULT_HASHES_DIR)
+from tests.stress.util import create_and_start_daemon_thread, increment, print_stacks
 from tests.util.parse_util import (
     EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
     EXPECTED_TPCH_STRESS_QUERIES_COUNT)
-from tests.util.thrift_util import op_handle_to_query_id
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 PROFILES_DIR = "profiles"
-RESULT_HASHES_DIR = "result_hashes"
-
-# Metrics collected during the stress running process.
-NUM_QUERIES_DEQUEUED = "num_queries_dequeued"
-# The number of queries that were submitted to a query runner.
-NUM_QUERIES_SUBMITTED = "num_queries_submitted"
-# The number of queries that have entered the RUNNING state (i.e. got through Impala's
-# admission control and started executing) or were cancelled or hit an error.
-NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED = "num_queries_started_running_or_cancelled"
-NUM_QUERIES_FINISHED = "num_queries_finished"
-NUM_QUERIES_EXCEEDED_MEM_LIMIT = "num_queries_exceeded_mem_limit"
-NUM_QUERIES_AC_REJECTED = "num_queries_ac_rejected"
-NUM_QUERIES_AC_TIMEDOUT = "num_queries_ac_timedout"
-NUM_QUERIES_CANCELLED = "num_queries_cancelled"
-NUM_RESULT_MISMATCHES = "num_result_mismatches"
-NUM_OTHER_ERRORS = "num_other_errors"
 
 
 class StressArgConverter(object):
@@ -188,34 +176,6 @@ class StressArgConverter(object):
     return runtime_info_path
 
 
-def create_and_start_daemon_thread(fn, name):
-  thread = Thread(target=fn, name=name)
-  thread.error = None
-  thread.daemon = True
-  thread.start()
-  return thread
-
-
-def increment(counter):
-  with counter.get_lock():
-    counter.value += 1
-
-
-def print_stacks(*_):
-  """Print the stacks of all threads from this script to stderr."""
-  thread_names = dict([(t.ident, t.name) for t in threading.enumerate()])
-  stacks = list()
-  for thread_id, stack in sys._current_frames().items():
-    stacks.append(
-        "\n# Thread: %s(%d)"
-        % (thread_names.get(thread_id, "No name"), thread_id))
-    for filename, lineno, name, line in traceback.extract_stack(stack):
-      stacks.append('File: "%s", line %d, in %s' % (filename, lineno, name))
-      if line:
-        stacks.append("  %s" % (line.strip(), ))
-  print("\n".join(stacks), file=sys.stderr)
-
-
 # To help debug hangs, the stacks of all threads can be printed by sending signal USR1
 # to each process.
 signal.signal(signal.SIGUSR1, print_stacks)
@@ -242,80 +202,6 @@ def print_crash_info_if_exists(impala, start_time):
   for message in crashed_impalads.itervalues():
     print(message, file=sys.stderr)
   return crashed_impalads
-
-
-class QueryReport(object):
-  """Holds information about a single query run."""
-
-  def __init__(self, query):
-    self.query = query
-
-    self.result_hash = None
-    self.runtime_secs = None
-    self.mem_was_spilled = False
-    # not_enough_memory includes conditions like "Memory limit exceeded", admission
-    # control rejecting because not enough memory, etc.
-    self.not_enough_memory = False
-    # ac_rejected is true if the query was rejected by admission control.
-    # It is mutually exclusive with not_enough_memory - if the query is rejected by
-    # admission control because the memory limit is too low, it is counted as
-    # not_enough_memory.
-    # TODO: reconsider whether they should be mutually exclusive
-    self.ac_rejected = False
-    self.ac_timedout = False
-    self.other_error = None
-    self.timed_out = False
-    self.was_cancelled = False
-    self.profile = None
-    self.query_id = None
-
-  def __str__(self):
-    return dedent("""
-        <QueryReport
-        result_hash: %(result_hash)s
-        runtime_secs: %(runtime_secs)s
-        mem_was_spilled: %(mem_was_spilled)s
-        not_enough_memory: %(not_enough_memory)s
-        ac_rejected: %(ac_rejected)s
-        ac_timedout: %(ac_timedout)s
-        other_error: %(other_error)s
-        timed_out: %(timed_out)s
-        was_cancelled: %(was_cancelled)s
-        query_id: %(query_id)s
-        >
-        """.strip() % self.__dict__)
-
-  def has_query_error(self):
-    """Return true if any kind of error status was returned from the query (i.e.
-    the query didn't run to completion, time out or get cancelled)."""
-    return (self.not_enough_memory or self.ac_rejected or self.ac_timedout
-            or self.other_error)
-
-  def write_query_profile(self, directory, prefix=None):
-    """
-    Write out the query profile bound to this object to a given directory.
-
-    The file name is generated and will contain the query ID. Use the optional prefix
-    parameter to set a prefix on the filename.
-
-    Example return:
-      tpcds_300_decimal_parquet_q21_00000001_a38c8331_profile.txt
-
-    Parameters:
-      directory (str): Directory to write profile.
-      prefix (str): Prefix for filename.
-    """
-    if not (self.profile and self.query_id):
-      return
-    if prefix is not None:
-      file_name = prefix + '_'
-    else:
-      file_name = ''
-    file_name += self.query.logical_query_id + '_'
-    file_name += self.query_id.replace(":", "_") + "_profile.txt"
-    profile_log_path = os.path.join(directory, file_name)
-    with open(profile_log_path, "w") as profile_log:
-      profile_log.write(self.profile)
 
 
 class MemBroker(object):
@@ -483,16 +369,16 @@ class StressRunner(object):
         metrics. Must only be called if 'query_runner' is to be removed from the list.
         MUST hold '_query_runners_lock' before calling.
     """
-    for key, synchronized_val in query_runner._metrics.iteritems():
-      self._past_runner_metrics[key] += synchronized_val.value
+    for key, val in query_runner.get_metric_vals():
+      self._past_runner_metrics[key] += val
 
   def _calc_total_runner_metrics(self):
     """ Calculate the total of metrics across past and active query runners. """
     totals = copy(self._past_runner_metrics)
     with self._query_runners_lock:
       for query_runner in self._query_runners:
-        for key, synchronized_val in query_runner._metrics.iteritems():
-          totals[key] += synchronized_val.value
+        for key, val in query_runner.get_metric_vals():
+          totals[key] += val
     return totals
 
   def _calc_total_runner_metric(self, key):
@@ -506,7 +392,7 @@ class StressRunner(object):
     """
     total = self._past_runner_metrics[key]
     for runner in self._query_runners:
-      total += runner._metrics[key].value
+      total += runner.get_metric_val(key)
     return total
 
   def _total_num_queries_submitted(self):
@@ -640,12 +526,10 @@ class StressRunner(object):
             num_coordinators = min(num_coordinators, self.max_coordinators)
           impalad = impala.impalads[len(self._query_runners) % num_coordinators]
 
-          query_runner = QueryRunner()
-          query_runner.impalad = impalad
-          query_runner.results_dir = self.results_dir
-          query_runner.use_kerberos = self.use_kerberos
-          query_runner.common_query_options = self.common_query_options
-          query_runner.test_admission_control = self.test_admission_control
+          query_runner = QueryRunner(impalad=impalad, results_dir=self.results_dir,
+              use_kerberos=self.use_kerberos,
+              common_query_options=self.common_query_options,
+              test_admission_control=self.test_admission_control)
           query_runner.proc = \
               Process(target=self._start_single_runner, args=(query_runner, ))
           query_runner.proc.daemon = True
@@ -765,7 +649,7 @@ class StressRunner(object):
       LOG.debug("Getting query_idx")
       with self._query_runners_lock:
         query_idx = self._calc_total_runner_metric_no_lock(NUM_QUERIES_DEQUEUED)
-        increment(query_runner._metrics[NUM_QUERIES_DEQUEUED])
+        query_runner.increment_metric(NUM_QUERIES_DEQUEUED)
         LOG.debug("Query_idx: {0} | PID: {1}".format(query_idx, query_runner.proc.pid))
 
       if not query.required_mem_mb_without_spilling:
@@ -790,7 +674,7 @@ class StressRunner(object):
       with self._mem_broker.reserve_mem_mb(mem_limit) as reservation_id:
         LOG.debug("Received memory reservation")
         with self._submit_query_lock:
-          increment(query_runner._metrics[NUM_QUERIES_SUBMITTED])
+          query_runner.increment_metric(NUM_QUERIES_SUBMITTED)
 
         should_cancel = self.cancel_probability > random()
         if should_cancel:
@@ -833,7 +717,7 @@ class StressRunner(object):
             self._num_successive_errors.value = 0
             continue
           increment(self._num_successive_errors)
-          increment(query_runner._metrics[NUM_OTHER_ERRORS])
+          query_runner.increment_metric(NUM_OTHER_ERRORS)
           self._write_query_profile(report, PROFILES_DIR, prefix='error')
           raise Exception("Query {query} ID {id} failed: {mesg}".format(
               query=query.logical_query_id,
@@ -853,7 +737,7 @@ class StressRunner(object):
             (self._verify_results and report.result_hash != query.result_hash)
         ):
           increment(self._num_successive_errors)
-          increment(query_runner._metrics[NUM_RESULT_MISMATCHES])
+          query_runner.increment_metric(NUM_RESULT_MISMATCHES)
           self._write_query_profile(report, PROFILES_DIR, prefix='incorrect_results')
           raise Exception(dedent("""\
                                  Result hash mismatch; expected {expected}, got {actual}
@@ -957,21 +841,21 @@ class StressRunner(object):
               # crashed impalads.
               do_check_for_impala_crashes = True
               # TODO: Handle case for num_queries_dequeued != num_queries_submitted
-              num_submitted = runner._metrics[NUM_QUERIES_SUBMITTED].value
-              num_finished = runner._metrics[NUM_QUERIES_FINISHED].value
+              num_submitted = runner.get_metric_val(NUM_QUERIES_SUBMITTED)
+              num_finished = runner.get_metric_val(NUM_QUERIES_FINISHED)
               if num_submitted != num_finished:
                 # The query runner process may have crashed before updating the number
                 # of finished queries but after it incremented the number of queries
                 # submitted.
                 assert num_submitted - num_finished == 1
-                increment(runner._metrics[NUM_QUERIES_FINISHED])
+                runner.increment_metric(NUM_QUERIES_FINISHED)
                 # Since we know that the runner crashed while trying to run a query, we
                 # count it as an 'other error'
-                increment(runner._metrics[NUM_OTHER_ERRORS])
+                runner.increment_metric(NUM_OTHER_ERRORS)
               self._check_successive_errors()
-            assert runner._metrics[NUM_QUERIES_SUBMITTED].value == \
-                    runner._metrics[NUM_QUERIES_FINISHED].value, \
-                    str([(k, v.value) for k, v in runner._metrics.iteritems()])
+            assert runner.get_metric_val(NUM_QUERIES_SUBMITTED) == \
+                    runner.get_metric_val(NUM_QUERIES_FINISHED), \
+                    str(runner.get_metric_vals())
             # Make sure to record all the metrics before removing this runner from the
             # list.
             print("Query runner ({0}) exited with exit code {1}".format(
@@ -1014,313 +898,6 @@ class StressRunner(object):
   def print_duration(self):
     duration = datetime.now() - self.start_time
     LOG.info("Test Duration: {0:.0f} seconds".format(duration.total_seconds()))
-
-
-class QueryTimeout(Exception):
-  pass
-
-
-class QueryRunner(object):
-  """Encapsulates functionality to run a query and provide a runtime report."""
-
-  SPILLED_PATTERNS = [re.compile("ExecOption:.*Spilled"), re.compile("SpilledRuns: [^0]")]
-  BATCH_SIZE = 1024
-
-  def __init__(self, stress_runner=None):
-    """Creates a new instance. The caller must fill in the below fields. stress_runner
-    must be provided if this is running in the context of a stress run, so that statistics
-    can be updated."""
-    self.stress_runner = stress_runner
-    self.impalad = None
-    self.impalad_conn = None
-    self.use_kerberos = False
-    self.results_dir = gettempdir()
-    self.check_if_mem_was_spilled = False
-    self.common_query_options = {}
-    self.proc = None
-
-    # All these values are shared values between processes. We want these to be accessible
-    # by the parent process that started this QueryRunner, for operational purposes.
-    self._metrics = {
-        NUM_QUERIES_DEQUEUED: Value("i", 0),
-        NUM_QUERIES_SUBMITTED: Value("i", 0),
-        NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED: Value("i", 0),
-        NUM_QUERIES_FINISHED: Value("i", 0),
-        NUM_QUERIES_EXCEEDED_MEM_LIMIT: Value("i", 0),
-        NUM_QUERIES_AC_REJECTED: Value("i", 0),
-        NUM_QUERIES_AC_TIMEDOUT: Value("i", 0),
-        NUM_QUERIES_CANCELLED: Value("i", 0),
-        NUM_RESULT_MISMATCHES: Value("i", 0),
-        NUM_OTHER_ERRORS: Value("i", 0)}
-
-  def connect(self):
-    self.impalad_conn = self.impalad.impala.connect(impalad=self.impalad)
-
-  def disconnect(self):
-    if self.impalad_conn:
-      self.impalad_conn.close()
-      self.impalad_conn = None
-
-  def run_query(self, query, mem_limit_mb, run_set_up=False,
-                timeout_secs=maxint, should_cancel=False, retain_profile=False):
-    """Run a query and return an execution report. If 'run_set_up' is True, set up sql
-    will be executed before the main query. This should be the case during the binary
-    search phase of the stress test.
-    If 'should_cancel' is True, don't get the query profile for timed out queries because
-    the query was purposely cancelled by setting the query timeout too short to complete,
-    rather than having some problem that needs to be investigated.
-    """
-    if not self.impalad_conn:
-      raise Exception("connect() must first be called")
-
-    timeout_unix_time = time() + timeout_secs
-    report = QueryReport(query)
-    try:
-      with self.impalad_conn.cursor() as cursor:
-        start_time = time()
-        self._set_db_and_options(cursor, query, run_set_up, mem_limit_mb, timeout_secs)
-        error = None
-        try:
-          cursor.execute_async(
-              "/* Mem: %s MB. Coordinator: %s. */\n"
-              % (mem_limit_mb, self.impalad.host_name) + query.sql)
-          report.query_id = op_handle_to_query_id(cursor._last_operation.handle if
-                                                  cursor._last_operation else None)
-          LOG.debug("Query id is %s", report.query_id)
-          if not self._wait_until_fetchable(cursor, report, timeout_unix_time,
-                                            should_cancel):
-            return report
-
-          if query.query_type == QueryType.SELECT:
-            try:
-              report.result_hash = self._hash_result(cursor, timeout_unix_time, query)
-              if retain_profile or \
-                 query.result_hash and report.result_hash != query.result_hash:
-                fetch_and_set_profile(cursor, report)
-            except QueryTimeout:
-              self._cancel(cursor, report)
-              return report
-          else:
-            # If query is in error state, this will raise an exception
-            cursor._wait_to_finish()
-        except Exception as error:
-          report.query_id = op_handle_to_query_id(cursor._last_operation.handle if
-                                                  cursor._last_operation else None)
-          LOG.debug("Error running query with id %s: %s", report.query_id, error)
-          self._check_for_memory_errors(report, cursor, error)
-        if report.has_query_error():
-          return report
-        report.runtime_secs = time() - start_time
-        if cursor.execution_failed() or self.check_if_mem_was_spilled:
-          fetch_and_set_profile(cursor, report)
-          report.mem_was_spilled = any([
-              pattern.search(report.profile) is not None
-              for pattern in QueryRunner.SPILLED_PATTERNS])
-          report.not_enough_memory = "Memory limit exceeded" in report.profile
-    except Exception as error:
-      # A mem limit error would have been caught above, no need to check for that here.
-      report.other_error = error
-    return report
-
-  def _set_db_and_options(self, cursor, query, run_set_up, mem_limit_mb, timeout_secs):
-    """Set up a new cursor for running a query by switching to the correct database and
-    setting query options."""
-    if query.db_name:
-      LOG.debug("Using %s database", query.db_name)
-      cursor.execute("USE %s" % query.db_name)
-    if run_set_up and query.set_up_sql:
-      LOG.debug("Running set up query:\n%s", query.set_up_sql)
-      cursor.execute(query.set_up_sql)
-    for query_option, value in self.common_query_options.iteritems():
-      cursor.execute(
-          "SET {query_option}={value}".format(query_option=query_option, value=value))
-    for query_option, value in query.options.iteritems():
-      cursor.execute(
-          "SET {query_option}={value}".format(query_option=query_option, value=value))
-    cursor.execute("SET ABORT_ON_ERROR=1")
-    if self.test_admission_control:
-      LOG.debug(
-          "Running query without mem limit at %s with timeout secs %s:\n%s",
-          self.impalad.host_name, timeout_secs, query.sql)
-    else:
-      LOG.debug("Setting mem limit to %s MB", mem_limit_mb)
-      cursor.execute("SET MEM_LIMIT=%sM" % mem_limit_mb)
-      LOG.debug(
-          "Running query with %s MB mem limit at %s with timeout secs %s:\n%s",
-          mem_limit_mb, self.impalad.host_name, timeout_secs, query.sql)
-
-  def _wait_until_fetchable(self, cursor, report, timeout_unix_time, should_cancel):
-    """Wait up until timeout_unix_time until the query results can be fetched (if it's
-    a SELECT query) or until it has finished executing (if it's a different query type
-    like DML). If the timeout expires we either cancel the query or report the timeout.
-    Return True in the first case or False in the second (timeout) case."""
-    # Loop until the query gets to the right state or a timeout expires.
-    sleep_secs = 0.1
-    secs_since_log = 0
-    # True if we incremented num_queries_started_running_or_cancelled for this query.
-    started_running_or_cancelled = False
-    while True:
-      query_state = cursor.status()
-      # Check if the query got past the PENDING/INITIALIZED states, either because
-      # it's executing or hit an error.
-      if (not started_running_or_cancelled and query_state not in ('PENDING_STATE',
-                                                      'INITIALIZED_STATE')):
-        started_running_or_cancelled = True
-        increment(self._metrics[NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED])
-      # Return if we're ready to fetch results (in the FINISHED state) or we are in
-      # another terminal state like EXCEPTION.
-      if query_state not in ('PENDING_STATE', 'INITIALIZED_STATE', 'RUNNING_STATE'):
-        return True
-
-      if time() > timeout_unix_time:
-        if not should_cancel:
-          fetch_and_set_profile(cursor, report)
-        self._cancel(cursor, report)
-        if not started_running_or_cancelled:
-          increment(self._metrics[NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED])
-        return False
-      if secs_since_log > 5:
-        secs_since_log = 0
-        LOG.debug("Waiting for query to execute")
-      sleep(sleep_secs)
-      secs_since_log += sleep_secs
-
-  def update_from_query_report(self, report):
-    LOG.debug("Updating runtime stats (Query Runner PID: {0})".format(self.proc.pid))
-    increment(self._metrics[NUM_QUERIES_FINISHED])
-    if report.not_enough_memory:
-      increment(self._metrics[NUM_QUERIES_EXCEEDED_MEM_LIMIT])
-    if report.ac_rejected:
-      increment(self._metrics[NUM_QUERIES_AC_REJECTED])
-    if report.ac_timedout:
-      increment(self._metrics[NUM_QUERIES_AC_TIMEDOUT])
-    if report.was_cancelled:
-      increment(self._metrics[NUM_QUERIES_CANCELLED])
-
-  def _cancel(self, cursor, report):
-    report.timed_out = True
-
-    if not report.query_id:
-      return
-
-    try:
-      LOG.debug("Attempting cancellation of query with id %s", report.query_id)
-      cursor.cancel_operation()
-      LOG.debug("Sent cancellation request for query with id %s", report.query_id)
-    except Exception as e:
-      LOG.debug("Error cancelling query with id %s: %s", report.query_id, e)
-      try:
-        LOG.debug("Attempting to cancel query through the web server.")
-        self.impalad.cancel_query(report.query_id)
-      except Exception as e:
-        LOG.debug("Error cancelling query %s through the web server: %s",
-                  report.query_id, e)
-
-  def _check_for_memory_errors(self, report, cursor, caught_exception):
-    """To be called after a query failure to check for signs of failed due to a
-    mem limit or admission control rejection/timeout. The report will be updated
-    accordingly.
-    """
-    fetch_and_set_profile(cursor, report)
-    caught_msg = str(caught_exception).lower().strip()
-    # Distinguish error conditions based on string fragments. The AC rejection and
-    # out-of-memory conditions actually overlap (since some memory checks happen in
-    # admission control) so check the out-of-memory conditions first.
-    if "memory limit exceeded" in caught_msg or \
-       "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
-       "failed to get minimum memory reservation" in caught_msg or \
-       "minimum memory reservation is greater than" in caught_msg or \
-       "minimum memory reservation needed is greater than" in caught_msg:
-      report.not_enough_memory = True
-      return
-    if "rejected query from pool" in caught_msg:
-      report.ac_rejected = True
-      return
-    if "admission for query exceeded timeout" in caught_msg:
-      report.ac_timedout = True
-      return
-
-    LOG.debug("Non-mem limit error for query with id %s: %s", report.query_id,
-              caught_exception, exc_info=True)
-    report.other_error = caught_exception
-
-  def _hash_result(self, cursor, timeout_unix_time, query):
-    """Returns a hash that is independent of row order. 'query' is only used for debug
-    logging purposes (if the result is not as expected a log file will be left for
-    investigations).
-    """
-    query_id = op_handle_to_query_id(cursor._last_operation.handle if
-                                     cursor._last_operation else None)
-
-    # A value of 1 indicates that the hash thread should continue to work.
-    should_continue = Value("i", 1)
-
-    def hash_result_impl():
-      result_log = None
-      try:
-        file_name = '_'.join([query.logical_query_id, query_id.replace(":", "_")])
-        if query.result_hash is None:
-          file_name += "_initial"
-        file_name += "_results.txt"
-        result_log = open(os.path.join(self.results_dir, RESULT_HASHES_DIR, file_name),
-                          "w")
-        result_log.write(query.sql)
-        result_log.write("\n")
-        current_thread().result = 1
-        while should_continue.value:
-          LOG.debug(
-              "Fetching result for query with id %s",
-              op_handle_to_query_id(
-                  cursor._last_operation.handle if cursor._last_operation else None))
-          rows = cursor.fetchmany(self.BATCH_SIZE)
-          if not rows:
-            LOG.debug(
-                "No more results for query with id %s",
-                op_handle_to_query_id(
-                    cursor._last_operation.handle if cursor._last_operation else None))
-            return
-          for row in rows:
-            for idx, val in enumerate(row):
-              if val is None:
-                # The hash() of None can change from run to run since it's based on
-                # a memory address. A chosen value will be used instead.
-                val = 38463209
-              elif isinstance(val, float):
-                # Floats returned by Impala may not be deterministic, the ending
-                # insignificant digits may differ. Only the first 6 digits will be used
-                # after rounding.
-                sval = "%f" % val
-                dot_idx = sval.find(".")
-                val = round(val, 6 - dot_idx)
-              current_thread().result += (idx + 1) * hash(val)
-              # Modulo the result to keep it "small" otherwise the math ops can be slow
-              # since python does infinite precision math.
-              current_thread().result %= maxint
-              if result_log:
-                result_log.write(str(val))
-                result_log.write("\t")
-                result_log.write(str(current_thread().result))
-                result_log.write("\n")
-      except Exception as e:
-        current_thread().error = e
-      finally:
-        if result_log is not None:
-          result_log.close()
-          if (
-              current_thread().error is not None and
-              current_thread().result == query.result_hash
-          ):
-            os.remove(result_log.name)
-
-    hash_thread = create_and_start_daemon_thread(
-        hash_result_impl, "Fetch Results %s" % query_id)
-    hash_thread.join(max(timeout_unix_time - time(), 0))
-    if hash_thread.is_alive():
-      should_continue.value = 0
-      raise QueryTimeout()
-    if hash_thread.error:
-      raise hash_thread.error
-    return hash_thread.result
 
 
 def load_random_queries_and_populate_runtime_info(impala, converted_args):
@@ -1381,13 +958,10 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
   results_dir = converted_args.results_dir
   mem_limit_eq_threshold_mb = converted_args.mem_limit_eq_threshold_mb
   mem_limit_eq_threshold_percent = converted_args.mem_limit_eq_threshold_percent
-  runner = QueryRunner()
-  runner.check_if_mem_was_spilled = True
-  runner.common_query_options = converted_args.common_query_options
-  runner.test_admission_control = converted_args.test_admission_control
-  runner.impalad = impala.impalads[0]
-  runner.results_dir = results_dir
-  runner.use_kerberos = converted_args.use_kerberos
+  runner = QueryRunner(impalad=impala.impalads[0], results_dir=results_dir,
+      common_query_options=converted_args.common_query_options,
+      test_admission_control=converted_args.test_admission_control,
+      use_kerberos=converted_args.use_kerberos, check_if_mem_was_spilled=True)
   runner.connect()
   limit_exceeded_mem = 0
   non_spill_mem = None
@@ -1661,18 +1235,6 @@ def populate_all_queries(
             os.path.join(converted_args.results_dir, PROFILES_DIR))
         result.append(query)
   return result
-
-
-def fetch_and_set_profile(cursor, report):
-  """Set the report's query profile using the given cursor.
-  Producing a query profile can be somewhat expensive. A v-tune profile of
-  impalad showed 10% of cpu time spent generating query profiles.
-  """
-  if not report.profile and cursor._last_operation:
-    try:
-      report.profile = cursor.get_profile()
-    except Exception as e:
-      LOG.debug("Error getting profile for query with id %s: %s", report.query_id, e)
 
 
 def main():
