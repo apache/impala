@@ -19,6 +19,7 @@
 // This file was copied from apache::thrift::server::TThreadedServer.cpp v0.9.0, with the
 // significant changes noted inline below.
 
+#include <algorithm>
 #include "rpc/TAcceptQueueServer.h"
 
 #include <thrift/concurrency/PlatformThreadFactory.h>
@@ -125,10 +126,11 @@ TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<TProcessor>& proc
     const boost::shared_ptr<TServerTransport>& serverTransport,
     const boost::shared_ptr<TTransportFactory>& transportFactory,
     const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    const boost::shared_ptr<ThreadFactory>& threadFactory,
-    int32_t maxTasks)
+    const boost::shared_ptr<ThreadFactory>& threadFactory, const string& name,
+    int32_t maxTasks, int64_t timeout_ms)
     : TServer(processor, serverTransport, transportFactory, protocolFactory),
-      threadFactory_(threadFactory), maxTasks_(maxTasks) {
+      threadFactory_(threadFactory), name_(name), maxTasks_(maxTasks),
+      queue_timeout_ms_(timeout_ms) {
   init();
 }
 
@@ -142,11 +144,27 @@ void TAcceptQueueServer::init() {
   }
 }
 
+void TAcceptQueueServer::CleanupAndClose(const string& error,
+    shared_ptr<TTransport> input, shared_ptr<TTransport> output,
+    shared_ptr<TTransport> client) {
+  if (input != nullptr) {
+    input->close();
+  }
+  if (output != nullptr) {
+    output->close();
+  }
+  if (client != nullptr) {
+    client->close();
+  }
+  GlobalOutput(error.c_str());
+}
+
 // New.
-void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
+void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
   shared_ptr<TTransport> inputTransport;
   shared_ptr<TTransport> outputTransport;
+  shared_ptr<TTransport> client = entry->client_;
   try {
     inputTransport = inputTransportFactory_->getTransport(client);
     outputTransport = outputTransportFactory_->getTransport(client);
@@ -170,8 +188,25 @@ void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
     // Insert thread into the set of threads
     {
       Synchronized s(tasksMonitor_);
+      int64_t wait_time_ms = 0;
+
       while (maxTasks_ > 0 && tasks_.size() >= maxTasks_) {
-        tasksMonitor_.wait();
+        if (entry->expiration_time_ != 0) {
+          // We don't want wait_time to 'accidentally' go non-positive,
+          // so wait for at least 1ms.
+          wait_time_ms = std::max(1L, entry->expiration_time_ - MonotonicMillis());
+        }
+        LOG_EVERY_N(INFO, 10) << name_ <<": All " << maxTasks_
+                  << " server threads are in use. "
+                  << "Waiting for " << wait_time_ms << " milliseconds.";
+        int wait_result = tasksMonitor_.waitForTimeRelative(wait_time_ms);
+        if (wait_result == THRIFT_ETIMEDOUT) {
+          if (metrics_enabled_) timedout_cnxns_metric_->Increment(1);
+          LOG(INFO) << name_ << ": Server busy. Timing out connection request.";
+          string errStr = "TAcceptQueueServer: " + name_ + " server busy";
+          CleanupAndClose(errStr, inputTransport, outputTransport, client);
+          return;
+        }
       }
       tasks_.insert(task);
     }
@@ -179,29 +214,11 @@ void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
     // Start the thread!
     thread->start();
   } catch (TException& tx) {
-    if (inputTransport != nullptr) {
-      inputTransport->close();
-    }
-    if (outputTransport != nullptr) {
-      outputTransport->close();
-    }
-    if (client != nullptr) {
-      client->close();
-    }
     string errStr = string("TAcceptQueueServer: Caught TException: ") + tx.what();
-    GlobalOutput(errStr.c_str());
+    CleanupAndClose(errStr, inputTransport, outputTransport, client);
   } catch (string s) {
-    if (inputTransport != nullptr) {
-      inputTransport->close();
-    }
-    if (outputTransport != nullptr) {
-      outputTransport->close();
-    }
-    if (client != nullptr) {
-      client->close();
-    }
     string errStr = "TAcceptQueueServer: Unknown exception: " + s;
-    GlobalOutput(errStr.c_str());
+    CleanupAndClose(errStr, inputTransport, outputTransport, client);
   }
 }
 
@@ -218,10 +235,12 @@ void TAcceptQueueServer::serve() {
     LOG(INFO) << "connection_setup_thread_pool_size is set to "
               << FLAGS_accepted_cnxn_setup_thread_pool_size;
   }
+
   // New - this is the thread pool used to process the internal accept queue.
-  ThreadPool<shared_ptr<TTransport>> connection_setup_pool("setup-server", "setup-worker",
-      FLAGS_accepted_cnxn_setup_thread_pool_size, FLAGS_accepted_cnxn_queue_depth,
-      [this](int tid, const shared_ptr<TTransport>& item) {
+  ThreadPool<shared_ptr<TAcceptQueueEntry>> connection_setup_pool("setup-server",
+      "setup-worker", FLAGS_accepted_cnxn_setup_thread_pool_size,
+      FLAGS_accepted_cnxn_queue_depth,
+      [this](int tid, const shared_ptr<TAcceptQueueEntry>& item) {
         this->SetupConnection(item);
       });
   // Initialize the thread pool
@@ -238,8 +257,15 @@ void TAcceptQueueServer::serve() {
       // Fetch client from server
       shared_ptr<TTransport> client = serverTransport_->accept();
 
-      // New - the work done to setup the connection has been moved to SetupConnection.
-      if (!connection_setup_pool.Offer(std::move(client))) {
+      shared_ptr<TAcceptQueueEntry> entry{new TAcceptQueueEntry};
+      entry->client_ = client;
+      if (queue_timeout_ms_ > 0) {
+        entry->expiration_time_ = MonotonicMillis() + queue_timeout_ms_;
+      }
+
+      // New - the work done to set up the connection has been moved to SetupConnection.
+      // Note that we move() entry so it's owned by SetupConnection thread.
+      if (!connection_setup_pool.Offer(std::move(entry))) {
         string errStr = string("TAcceptQueueServer: thread pool unexpectedly shut down.");
         GlobalOutput(errStr.c_str());
         stop_ = true;
@@ -292,6 +318,9 @@ void TAcceptQueueServer::InitMetrics(MetricGroup* metrics, const string& key_pre
   stringstream queue_size_ss;
   queue_size_ss << key_prefix << ".connection-setup-queue-size";
   queue_size_metric_ = metrics->AddGauge(queue_size_ss.str(), 0);
+  stringstream timedout_cnxns_ss;
+  timedout_cnxns_ss << key_prefix << ".timedout-cnxn-requests";
+  timedout_cnxns_metric_ = metrics->AddGauge(timedout_cnxns_ss.str(), 0);
   metrics_enabled_ = true;
 }
 

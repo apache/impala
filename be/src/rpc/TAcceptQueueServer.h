@@ -41,6 +41,11 @@ using apache::thrift::transport::TTransportFactory;
 using apache::thrift::concurrency::Monitor;
 using apache::thrift::concurrency::ThreadFactory;
 
+struct TAcceptQueueEntry {
+  boost::shared_ptr<TTransport> client_;
+  int64_t expiration_time_ = 0LL;
+};
+
 /**
  * In TAcceptQueueServer, the main server thread calls accept() and then immediately
  * places the returned TTransport on a queue to be processed by a separate thread,
@@ -57,7 +62,7 @@ class TAcceptQueueServer : public TServer {
       const boost::shared_ptr<TTransportFactory>& transportFactory,
       const boost::shared_ptr<TProtocolFactory>& protocolFactory,
       const boost::shared_ptr<ThreadFactory>& threadFactory,
-      int32_t maxTasks = 0);
+      const std::string& name, int32_t maxTasks = 0, int64_t timeout_ms = 0);
 
   ~TAcceptQueueServer() override = default;
 
@@ -78,10 +83,19 @@ class TAcceptQueueServer : public TServer {
   // This is the work function for the thread pool, which does the work of setting up the
   // connection and starting a thread to handle it. Will block if there are currently
   // maxTasks_ connections and maxTasks_ is non-zero.
-  void SetupConnection(boost::shared_ptr<TTransport> client);
+  void SetupConnection(boost::shared_ptr<TAcceptQueueEntry> entry);
+
+  // Helper function to close a client connection in case of server side errors.
+  void CleanupAndClose(const std::string& error,
+      boost::shared_ptr<TTransport> input,
+      boost::shared_ptr<TTransport> output,
+      boost::shared_ptr<TTransport> client);
 
   boost::shared_ptr<ThreadFactory> threadFactory_;
   volatile bool stop_;
+
+  /// Name of the thrift server.
+  const std::string name_;
 
   // Monitor protecting tasks_, notified on removal.
   Monitor tasksMonitor_;
@@ -95,6 +109,13 @@ class TAcceptQueueServer : public TServer {
 
   /// New - Number of connections that have been accepted and are waiting to be setup.
   impala::IntGauge* queue_size_metric_;
+
+  /// Number of connections rejected due to timeout.
+  impala::IntGauge* timedout_cnxns_metric_;
+
+  /// Amount of time in milliseconds after which a connection request will be timed out.
+  /// Default value is 0, which means no timeout.
+  int64_t queue_timeout_ms_;
 };
 
 } // namespace server

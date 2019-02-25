@@ -142,10 +142,13 @@ class ThriftServer {
   ///  - metrics: if not nullptr, the server will register metrics on this object
   ///  - max_concurrent_connections: The maximum number of concurrent connections allowed.
   ///    If 0, there will be no enforced limit on the number of concurrent connections.
+  ///  - amount of time in milliseconds an accepted client connection will be held in
+  ///    the accepted queue, after which the request will be rejected if a server
+  ///    thread can't be found. If 0, no timeout is enforced.
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
-      int max_concurrent_connections = 0);
+      int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0);
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
   /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
@@ -192,6 +195,11 @@ class ThriftServer {
   /// max_concurrent_connections_ are concurrently active). If 0, there is no enforced
   /// limit.
   int max_concurrent_connections_;
+
+  /// Amount of time in milliseconds an accepted client connection will be kept in the
+  /// accept queue before it is timed out. If 0, there is no timeout.
+  /// Used in TAcceptQueueServer.
+  int64_t queue_timeout_ms_;
 
   /// User-specified identifier that shows up in logs
   const std::string name_;
@@ -266,6 +274,11 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  ThriftServerBuilder& queue_timeout(int64_t timeout_ms) {
+    queue_timeout_ms_ = timeout_ms;
+    return *this;
+  }
+
   /// Enables SSL for this server.
   ThriftServerBuilder& ssl(
       const std::string& certificate, const std::string& private_key) {
@@ -301,7 +314,7 @@ class ThriftServerBuilder {
   /// '*server'.
   Status Build(ThriftServer** server) {
     std::unique_ptr<ThriftServer> ptr(new ThriftServer(name_, processor_, port_,
-        auth_provider_, metrics_, max_concurrent_connections_));
+        auth_provider_, metrics_, max_concurrent_connections_, queue_timeout_ms_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
@@ -311,6 +324,7 @@ class ThriftServerBuilder {
   }
 
  private:
+  int64_t queue_timeout_ms_ = 0;
   int max_concurrent_connections_ = 0;
   std::string name_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;

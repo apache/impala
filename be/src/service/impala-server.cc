@@ -236,6 +236,11 @@ DEFINE_int64(shutdown_deadline_s, 60 * 60, "Default time limit in seconds for th
       "milliseconds. Only used for testing.");
 #endif
 
+DEFINE_int64(accepted_client_cnxn_timeout, 300000,
+    "(Advanced) The amount of time in milliseconds an accepted connection will wait in "
+    "the post-accept, pre-setup connection queue before it is timed out and the "
+    "connection request is rejected. A value of 0 means there is no timeout.");
+
 DECLARE_bool(compact_catalog_topic);
 
 namespace impala {
@@ -2324,6 +2329,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
           builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
           .metrics(exec_env_->metrics())
           .max_concurrent_connections(FLAGS_fe_service_threads)
+          .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
           .Build(&server));
       beeswax_server_.reset(server);
       beeswax_server_->SetConnectionHandler(this);
@@ -2351,6 +2357,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
           builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
           .metrics(exec_env_->metrics())
           .max_concurrent_connections(FLAGS_fe_service_threads)
+          .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
           .Build(&server));
       hs2_server_.reset(server);
       hs2_server_->SetConnectionHandler(this);

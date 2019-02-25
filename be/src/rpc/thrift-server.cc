@@ -321,11 +321,12 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 
 ThriftServer::ThriftServer(const string& name,
     const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
-    MetricGroup* metrics, int max_concurrent_connections)
+    MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms)
   : started_(false),
     port_(port),
     ssl_enabled_(false),
     max_concurrent_connections_(max_concurrent_connections),
+    queue_timeout_ms_(queue_timeout_ms),
     name_(name),
     server_(NULL),
     processor_(processor),
@@ -480,8 +481,10 @@ Status ThriftServer::Start() {
   boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
+
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
-      protocol_factory, thread_factory, max_concurrent_connections_));
+      protocol_factory, thread_factory, name_, max_concurrent_connections_,
+      queue_timeout_ms_));
   if (metrics_ != NULL) {
     (static_cast<TAcceptQueueServer*>(server_.get()))->InitMetrics(metrics_,
         Substitute("impala.thrift-server.$0", name_));

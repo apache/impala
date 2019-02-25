@@ -692,6 +692,16 @@
     "key": "impala.thrift-server.CatalogService.connection-setup-queue-size"
   },
   {
+    "description": "The number of connection requests to the Catalog Service that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Service Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.CatalogService.timedout-cnxn-requests"
+  },
+  {
     "description": "The number of active connections to this StateStore's StateStore service.",
     "contexts": [
       "STATESTORE"
@@ -720,6 +730,16 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.StatestoreService.connection-setup-queue-size"
+  },
+  {
+    "description": "The number of connection requests to the Statestore Service that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Statestore Service Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreService.timedout-cnxn-requests"
   },
   {
     "description": "The number of active Impala Backend client connections to this Impala Daemon.",
@@ -752,6 +772,16 @@
     "key": "impala.thrift-server.backend.connection-setup-queue-size"
   },
   {
+    "description": "The number of connection requests to the Impala Backend Server that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Server Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.backend.timedout-cnxn-requests"
+  },
+  {
     "description": "The number of active Beeswax API connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -782,6 +812,16 @@
     "key": "impala.thrift-server.beeswax-frontend.connection-setup-queue-size"
   },
   {
+    "description": "The number of Beeswax API connection requests to this Impala Daemon that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.beeswax-frontend.timedout-cnxn-requests"
+  },
+  {
     "description": "The number of active HiveServer2 API connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -810,6 +850,16 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.hiveserver2-frontend.connection-setup-queue-size"
+  },
+  {
+    "description": "The number of HiveServer2 API connection requests to this Impala Daemon that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.hiveserver2-frontend.timedout-cnxn-requests"
   },
   {
     "description": "The amount of memory freed by the last memory tracker garbage collection.",
