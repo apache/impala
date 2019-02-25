@@ -92,6 +92,9 @@ HBaseTableFactory::~HBaseTableFactory() {
   lock_guard<mutex> lock(connection_lock_);
   if (connection_ != NULL) {
     env->CallObjectMethod(connection_, connection_close_id_);
+    Status s = JniUtil::GetJniExceptionMsg(env);
+    // Not much we can do with the error except log it.
+    if (!s.ok()) LOG(INFO) << "Exception when cleaning up HBase " << s;
     env->DeleteGlobalRef(connection_);
     connection_ = NULL;
   }

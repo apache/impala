@@ -107,19 +107,22 @@ Frontend::Frontend() {
   };
 
   JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  ABORT_IF_ERROR(jni_frame.push(jni_env));
+
   // create instance of java class JniFrontend
-  fe_class_ = jni_env->FindClass("org/apache/impala/service/JniFrontend");
+  jclass fe_class = jni_env->FindClass("org/apache/impala/service/JniFrontend");
   ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class_, &(methods[i])));
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class, &(methods[i])));
   };
 
   jbyteArray cfg_bytes;
   ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
 
-  jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, cfg_bytes);
+  jobject fe = jni_env->NewObject(fe_class, fe_ctor_, cfg_bytes);
   ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
@@ -263,6 +266,7 @@ bool Frontend::IsAuthorizationError(const Status& status) {
 void Frontend::SetCatalogIsReady() {
   JNIEnv* jni_env = getJNIEnv();
   jni_env->CallVoidMethod(fe_, set_catalog_is_ready_id_);
+  ABORT_IF_EXC(jni_env);
 }
 
 void Frontend::WaitForCatalog() {
@@ -273,6 +277,7 @@ void Frontend::WaitForCatalog() {
 #endif
   JNIEnv* jni_env = getJNIEnv();
   jni_env->CallVoidMethod(fe_, wait_for_catalog_id_);
+  ABORT_IF_EXC(jni_env);
 }
 
 Status Frontend::GetTableFiles(const TShowFilesParams& params, TResultSet* result) {

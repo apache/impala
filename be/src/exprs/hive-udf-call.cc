@@ -253,6 +253,8 @@ void HiveUdfCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
       if (jni_ctx->executor != NULL) {
         env->CallNonvirtualVoidMethodA(
             jni_ctx->executor, executor_cl_, executor_close_id_, NULL);
+        Status s = JniUtil::GetJniExceptionMsg(env);
+        if (!s.ok()) state->LogError(s.msg());
         env->DeleteGlobalRef(jni_ctx->executor);
       }
       if (jni_ctx->input_values_buffer != NULL) {

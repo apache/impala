@@ -17,6 +17,7 @@
 
 # Targeted Impala insert tests
 
+import os
 import pytest
 
 from testdata.common import widetable
@@ -81,7 +82,8 @@ class TestInsertQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
-    table_format = vector.get_value('table_format')
+    if "-Xcheck:jni" in os.environ.get("LIBHDFS_OPTS", ""):
+      pytest.skip("Test unreasonably slow with JNI checking.")
     table_name = unique_database + ".insert_largestring"
 
     file_format = vector.get_value('table_format').file_format

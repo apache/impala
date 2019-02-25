@@ -107,6 +107,7 @@ Status Catalog::GetCatalogVersion(long* version) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   *version = jni_env->CallLongMethod(catalog_, get_catalog_version_id_);
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK();
 }
 
