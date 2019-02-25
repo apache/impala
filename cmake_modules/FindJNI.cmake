@@ -94,6 +94,7 @@ set(JAVA_AWT_LIBRARY_DIRECTORIES
 java_append_library_directories(JAVA_AWT_LIBRARY_DIRECTORIES
     ${_JAVA_HOME}/jre/lib/{libarch}
     ${_JAVA_HOME}/jre/lib
+    ${_JAVA_HOME}/lib/{libarch}
     ${_JAVA_HOME}/lib
     ${_JAVA_HOME}
     /usr/lib
