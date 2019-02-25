@@ -46,12 +46,12 @@ Status JniCatalogCacheUpdateIterator::InitJNI() {
   JNIEnv* env = getJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "Lorg/apache/impala/common/Pair;", &pair_cl));
+      JniUtil::GetGlobalClassRef(env, "org/apache/impala/common/Pair", &pair_cl));
   pair_ctor = env->GetMethodID(pair_cl, "<init>",
       "(Ljava/lang/Object;Ljava/lang/Object;)V");
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "Ljava/lang/Boolean;", &boolean_cl));
+      JniUtil::GetGlobalClassRef(env, "java/lang/Boolean", &boolean_cl));
   boolean_ctor = env->GetMethodID(boolean_cl, "<init>", "(Z)V");
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();

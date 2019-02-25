@@ -109,8 +109,8 @@ Webserver::UrlCallback MakeCallback(const F& fnc, bool display_log4j_handlers) {
 
 void InitDynamicLoggingSupport() {
   JNIEnv* env = getJNIEnv();
-  log4j_logger_class_ = env->FindClass("org/apache/impala/util/GlogAppender");
-  ABORT_IF_EXC(env);
+  ABORT_IF_ERROR(JniUtil::GetGlobalClassRef(env, "org/apache/impala/util/GlogAppender",
+        &log4j_logger_class_));
   JniMethodDescriptor get_log_level_method_desc =
       {"getLogLevel", "([B)Ljava/lang/String;", &get_log_level_method};
   JniMethodDescriptor set_log_level_method_desc =
