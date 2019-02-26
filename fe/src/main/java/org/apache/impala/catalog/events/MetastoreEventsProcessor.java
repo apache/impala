@@ -368,9 +368,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
       List<NotificationEvent> events = getNextMetastoreEvents();
       processEvents(events);
-    } catch (MetastoreNotificationFetchException fetchEx) {
-      updateStatus(EventProcessorStatus.ERROR);
-      LOG.error("Unable to fetch the next batch of metastore events", fetchEx);
+    } catch (MetastoreNotificationFetchException ex) {
+      // No need to change the EventProcessor state to error since we want the
+      // EventProcessor to continue getting new events after HMS is back up.
+      LOG.error("Unable to fetch the next batch of metastore events. Hive Metastore " +
+        "may be unavailable. Will retry.", ex);
     } catch(MetastoreNotificationNeedsInvalidateException ex) {
       updateStatus(EventProcessorStatus.NEEDS_INVALIDATE);
       LOG.error("Event processing needs a invalidate command to resolve the state", ex);

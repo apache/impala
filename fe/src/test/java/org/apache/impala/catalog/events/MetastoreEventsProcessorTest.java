@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -523,6 +524,50 @@ public class MetastoreEventsProcessorTest {
         eventsProcessor_.start();
       }
     }
+  }
+
+  /**
+   * A MetastoreEventsProcessor that simulates HMS failures.
+   */
+  private static class HMSFetchNotificationsEventProcessor
+      extends MetastoreEventsProcessor {
+    HMSFetchNotificationsEventProcessor(
+        CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec) {
+      super(catalog, startSyncFromId, pollingFrequencyInSec);
+    }
+
+    @Override
+    public List<NotificationEvent> getNextMetastoreEvents()
+        throws MetastoreNotificationFetchException {
+      // Throw exception roughly half of the time
+      Random rand = new Random();
+      if (rand.nextInt(10) % 2 == 0){
+        throw new MetastoreNotificationFetchException("Fetch Exception");
+      }
+      return super.getNextMetastoreEvents();
+    }
+  }
+
+  /**
+   * Tests event processor is active after HMS restarts.
+   */
+  @Test
+  public void testEventProcessorFetchAfterHMSRestart() throws CatalogException {
+    MetastoreEventsProcessor fetchProcessor =
+        new HMSFetchNotificationsEventProcessor(
+            catalog_, eventsProcessor_.getCurrentEventId(), 2L);
+    fetchProcessor.start();
+    assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
+    // Roughly half of the time an exception is thrown. Make sure the event processor
+    // is still active.
+    while (true) {
+      try {
+        fetchProcessor.getNextMetastoreEvents();
+      } catch (MetastoreNotificationFetchException ex) {
+        break;
+      }
+    }
+    assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
   }
 
   /**
