@@ -20,6 +20,7 @@
 #include "common/names.h"
 #include "common/status.h"
 #include "runtime/io/hdfs-monitored-ops.h"
+#include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/time.h"
 
@@ -76,7 +77,7 @@ Status OpenHdfsFileOp::Execute() {
 }
 
 std::string OpenHdfsFileOp::GetDescription() {
-  return Substitute("hdfsOpenFile() for $0", fname_);
+  return Substitute("hdfsOpenFile() for $0 at backend $1", fname_, GetBackendString());
 }
 
 Status HdfsMonitor::OpenHdfsFileWithTimeout(const hdfsFS& fs, const std::string* fname,
