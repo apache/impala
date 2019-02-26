@@ -42,4 +42,4 @@ def detect_python_cmd():
         return cmd_path
   raise Exception("Could not find minimum required python version 2.6")
 
-print detect_python_cmd()
+print(detect_python_cmd())
