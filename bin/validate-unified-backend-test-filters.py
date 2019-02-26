@@ -63,5 +63,21 @@ def main():
             options.unified_binary, options.filters))
         sys.exit(1)
 
+    # Check to see if there are any filters that do not match tests in the unified
+    # test executable. This can indicate that a test file is not included appropriately
+    # in the executable. It can also indicate a bogus filter.
+    filters_without_tests = []
+    for test_filter in options.filters.split(":"):
+        if len(test_filter) == 0: continue
+        tests = get_set_of_tests(options.unified_binary, test_filter)
+        if len(tests) == 0:
+            filters_without_tests.append(test_filter)
+    if len(filters_without_tests) > 0:
+        print("FAILED: The following test filters do not match any tests in the\n"
+              "unified test executable. This can indicate that some test has not\n"
+              "been linked appropriately into the test executable:")
+        for test_filter in filters_without_tests:
+            print(test_filter)
+        sys.exit(1)
 
 if __name__ == "__main__": main()

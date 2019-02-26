@@ -100,6 +100,7 @@ add_library(UtilTests
   benchmark-test.cc
   bitmap-test.cc
   bit-packing-test.cc
+  bit-stream-utils-test.cc
   bit-util-test.cc
   blocking-queue-test.cc
   bloom-filter-test.cc
@@ -129,6 +130,7 @@ add_library(UtilTests
   string-util-test.cc
   symbols-util-test.cc
   sys-info-test.cc
+  system-state-info-test.cc
   thread-pool-test.cc
   time-test.cc
   uid-util-test.cc
@@ -187,7 +189,7 @@ ADD_UNIFIED_BE_LSAN_TEST(redactor-unconfigured-test "RedactorUnconfigTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(rle-test "BitArray.*:RleTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(runtime-profile-test "CountersTest.*:TimerCounterTest.*:TimeSeriesCounterTest.*:VariousNumbers/TimeSeriesCounterResampleTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(string-parser-test "StringToInt.*:StringToIntWithBase.*:StringToFloat.*:StringToBool.*")
-ADD_UNIFIED_BE_LSAN_TEST(string-util-test "TruncateDownTest.*:TruncateUpTest.*:CommandSeparatedContainsTest.*:CommaSeparatedContainsTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(string-util-test "TruncateDownTest.*:TruncateUpTest.*:CommaSeparatedContainsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(symbols-util-test "SymbolsUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(system-state-info-test "SystemStateInfoTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(sys-info-test "CpuInfoTest.*:DiskInfoTest.*")
