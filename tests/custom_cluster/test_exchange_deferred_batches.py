@@ -17,8 +17,10 @@
 
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfBuildType
 
 
+@SkipIfBuildType.not_dev_build
 class TestExchangeDeferredBatches(CustomClusterTestSuite):
 
     @classmethod
