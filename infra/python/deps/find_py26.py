@@ -21,6 +21,7 @@
 # system command to stdout. The script exits with a nonzero exit code if
 # Python 2.6+ is not present.
 
+from __future__ import print_function
 import os
 import subprocess
 import sys
@@ -42,4 +43,5 @@ def detect_python_cmd():
         return cmd_path
   raise Exception("Could not find minimum required python version 2.6")
 
-print detect_python_cmd()
+
+print(detect_python_cmd())

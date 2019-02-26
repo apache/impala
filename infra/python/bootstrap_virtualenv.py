@@ -34,6 +34,7 @@
 # system. If the default 'python' command refers to < 2.6, python 2.6 will be used
 # instead.
 
+from __future__ import print_function
 import glob
 import logging
 import optparse
@@ -239,7 +240,7 @@ def install_compiled_deps_if_possible():
   # problem with inline declarations in older libc headers. Setting -fgnu89-inline is a
   # workaround.
   distro_version = ''.join(exec_cmd(["lsb_release", "-irs"]).lower().split())
-  print distro_version
+  print(distro_version)
   if distro_version.startswith("centos5."):
     env["CFLAGS"] = "-fgnu89-inline"
 
@@ -381,8 +382,8 @@ if __name__ == "__main__":
 
   if options.print_ld_library_path:
     kudu_client_dir = find_kudu_client_install_dir()
-    print os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
-                                os.path.join(kudu_client_dir, 'lib64')])
+    print(os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
+                                    os.path.join(kudu_client_dir, 'lib64')]))
     sys.exit()
 
   logging.basicConfig(level=getattr(logging, options.log_level))

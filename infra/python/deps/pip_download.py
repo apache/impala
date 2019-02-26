@@ -21,6 +21,7 @@
 # over which archive type is downloaded and what post-download steps are executed.
 # This script requires Python 2.6+.
 
+from __future__ import print_function
 import hashlib
 import multiprocessing.pool
 import os
@@ -29,7 +30,13 @@ import re
 import sys
 from random import randint
 from time import sleep
-from urllib import urlopen, FancyURLopener
+# The path to import is different for libraries in Python 2 & 3 - this try/catch ensures
+# that this code runs in both
+try:
+  # This should be removed when support for Python2 is dropped
+  from urllib import urlopen, FancyURLopener
+except ImportError:
+  from urllib.request import urlopen, FancyURLopener
 
 NUM_DOWNLOAD_ATTEMPTS = 8
 
@@ -48,7 +55,7 @@ def check_digest(filename, algorithm, expected_digest):
     # Fallback to hardcoded set if hashlib.algorithms_available doesn't exist.
     supported_algorithms = set(['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'])
   if algorithm not in supported_algorithms:
-    print 'Hash algorithm {0} is not supported by hashlib'.format(algorithm)
+    print('Hash algorithm {0} is not supported by hashlib'.format(algorithm))
     return False
   h = hashlib.new(algorithm)
   h.update(open(filename).read())
@@ -60,18 +67,18 @@ def retry(func):
   '''Retry decorator.'''
 
   def wrapper(*args, **kwargs):
-    for try_num in xrange(NUM_DOWNLOAD_ATTEMPTS):
+    for try_num in range(NUM_DOWNLOAD_ATTEMPTS):
       if try_num > 0:
         sleep_len = randint(5, 10 * 2 ** try_num)
-        print 'Sleeping for {0} seconds before retrying'.format(sleep_len)
+        print('Sleeping for {0} seconds before retrying'.format(sleep_len))
         sleep(sleep_len)
       try:
         result = func(*args, **kwargs)
         if result:
           return result
       except Exception as e:
-        print e
-    print 'Download failed after several attempts.'
+        print(e)
+    print('Download failed after several attempts.')
     sys.exit(1)
 
   return wrapper
@@ -83,7 +90,7 @@ def get_package_info(pkg_name, pkg_version):
   # same result is always returned even if the ordering changed on the server.
   candidates = []
   url = '{0}/simple/{1}/'.format(PYPI_MIRROR, pkg_name)
-  print 'Getting package info from {0}'.format(url)
+  print('Getting package info from {0}'.format(url))
   # The web page should be in PEP 503 format (https://www.python.org/dev/peps/pep-0503/).
   # We parse the page with regex instead of an html parser because that requires
   # downloading an extra package before running this script. Since the HTML is guaranteed
@@ -101,7 +108,7 @@ def get_package_info(pkg_name, pkg_version):
         file_name.endswith('-{0}.zip'.format(pkg_version))):
       candidates.append((file_name, path, hash_algorithm, digest))
   if not candidates:
-    print 'Could not find archive to download for {0} {1}'.format(pkg_name, pkg_version)
+    print('Could not find archive to download for {0} {1}'.format(pkg_name, pkg_version))
     return (None, None, None, None)
   return sorted(candidates)[0]
 
@@ -113,16 +120,16 @@ def download_package(pkg_name, pkg_version):
     return False
   if os.path.isfile(file_name) and check_digest(file_name, hash_algorithm,
       expected_digest):
-    print 'File with matching digest already exists, skipping {0}'.format(file_name)
+    print('File with matching digest already exists, skipping {0}'.format(file_name))
     return True
   downloader = FancyURLopener()
   pkg_url = '{0}/packages/{1}'.format(PYPI_MIRROR, path)
-  print 'Downloading {0} from {1}'.format(file_name, pkg_url)
+  print('Downloading {0} from {1}'.format(file_name, pkg_url))
   downloader.retrieve(pkg_url, file_name)
   if check_digest(file_name, hash_algorithm, expected_digest):
     return True
   else:
-    print 'Hash digest check failed in file {0}.'.format(file_name)
+    print('Hash digest check failed in file {0}.'.format(file_name))
     return False
 
 def main():
