@@ -18,6 +18,7 @@
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.test_result_verifier import create_query_result
+from tests.common.test_result_verifier import compute_aggregation
 
 # Unittest class for the test_result_verifier module.
 class TestResultVerifier(ImpalaTestSuite):
@@ -55,3 +56,17 @@ class TestResultVerifier(ImpalaTestSuite):
       assert False, 'Expected error due to column position not existing'
     except IndexError, e:
       assert 'list index out of range' in e.message
+
+  def test_compute_aggregation(self, vector):
+    profile = '''
+      FieldA: 5 (5)
+      FieldB: bla bla
+      FieldA: 5.10K (5101)
+      FieldA: 1.11M (1110555)
+      FieldC: 1.23K (1234)
+      FieldA: 2.99B (2990111111)
+      FieldK: 7 (7)
+    '''
+    assert compute_aggregation('SUM', 'FieldA', profile) == 2991226772
+    assert compute_aggregation('SUM', 'FieldK', profile) == 7
+    assert compute_aggregation('SUM', 'FieldX', profile) == 0

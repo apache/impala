@@ -519,10 +519,18 @@ def compute_aggregation(function, field, runtime_profile):
   """
   Evaluate an aggregation function over a field on the runtime_profile. This skips
   the averaged fragment and returns the aggregate value. It currently supports only
-  integer values and the SUM function.
+  TUnit::UNIT types and the SUM function. It expects the profile to write counters
+  in verbose mode.
   """
   start_avg_fragment_re = re.compile('[ ]*Averaged Fragment')
-  field_regex = "{0}: (\d+)".format(field)
+  # 'field_regex' matches a TUnit::UNIT field from the runtime profile.
+  # For example, it matches the following line if 'field' is 'RowsReturned':
+  # RowsReturned: 2.14M (2142543)
+  #
+  # These lines are printed by 'be/src/util/pretty-printer.h' with verbose=true.
+  # 'field_regex' also captures the accurate value of the field which is the number
+  # in parenthesis. It means we can retrieve this value with 're.findall()'.
+  field_regex = "{0}: \d+(?:\.\d+[KMB])? \((\d+)\)".format(field)
   field_regex_re = re.compile(field_regex)
   inside_avg_fragment = False
   avg_fragment_indent = None
