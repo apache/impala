@@ -45,42 +45,24 @@
     } \
   } while (false)
 
+#define RETURN_ERROR_IF_EXC(env) \
+  do { \
+    jthrowable exc = (env)->ExceptionOccurred(); \
+    if (exc != nullptr) return JniUtil::GetJniExceptionMsg(env);\
+  } while (false)
+
 // If there's an exception in 'env', log the backtrace at FATAL level and abort the
 // process. This will generate a core dump if core dumps are enabled, so this should
 // generally only be called for internal errors where the coredump is useful for
 // diagnostics.
-#define ABORT_IF_EXC(env) \
-  do { \
-    jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != nullptr) { \
-      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_stack_trace_id()), exc); \
-      jboolean is_copy; \
-      const char* c_stack = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      LOG(FATAL) << string(c_stack); \
-    } \
-  } while (false)
+#define ABORT_IF_EXC(env) do { ABORT_IF_ERROR(JniUtil::GetJniExceptionMsg(env)); } while (false)
 
 // If there's an exception in 'env', log the backtrace at ERROR level and exit the process
 // cleanly with status 1.
 #define CLEAN_EXIT_IF_EXC(env) \
   do { \
-    jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != nullptr) { \
-      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_stack_trace_id()), exc); \
-      jboolean is_copy; \
-      const char* c_stack = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      CLEAN_EXIT_WITH_ERROR(c_stack); \
-    } \
-  } while (false)
-
-#define RETURN_ERROR_IF_EXC(env) \
-  do { \
-    jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != nullptr) return JniUtil::GetJniExceptionMsg(env);\
+    Status s = JniUtil::GetJniExceptionMsg(env); \
+    if (!s.ok()) CLEAN_EXIT_WITH_ERROR(s.GetDetail()); \
   } while (false)
 
 /// C linkage for helper functions in hdfsJniHelper.h
