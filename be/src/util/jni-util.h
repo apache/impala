@@ -27,17 +27,6 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gutil/macros.h"
 
-#define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
-  do { \
-    const Status& _status = (stmt); \
-    if (!_status.ok()) { \
-      (adaptor)->WriteErrorLog(); \
-      (adaptor)->WriteFileErrors(); \
-      (env)->ThrowNew((adaptor)->impala_exc_cl(), _status.GetDetail().c_str()); \
-      return; \
-    } \
-  } while (false)
-
 #define THROW_IF_ERROR(stmt, env, impala_exc_cl) \
   do { \
     const Status& _status = (stmt); \
@@ -53,36 +42,6 @@
     if (!_status.ok()) { \
       (env)->ThrowNew((impala_exc_cl), _status.GetDetail().c_str()); \
       return (ret); \
-    } \
-  } while (false)
-
-#define THROW_IF_EXC(env, exc_class) \
-  do { \
-    jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != nullptr) { \
-      DCHECK((throwable_to_string_id_) != nullptr); \
-      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_stack_trace_id()), exc); \
-      jboolean is_copy; \
-      const char* c_stack = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      (env)->ExceptionClear(); \
-      (env)->ThrowNew((exc_class), c_stack); \
-      return; \
-    } \
-  } while (false)
-
-#define RETURN_IF_EXC(env) \
-  do { \
-    jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != nullptr) { \
-      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
-          (JniUtil::throwable_to_stack_trace_id()), exc); \
-      jboolean is_copy; \
-      const char* c_stack = \
-          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      VLOG(1) << string(c_stack); \
-      return; \
     } \
   } while (false)
 
