@@ -937,7 +937,11 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   // Set the required metadata field to the plan node ID for compatibility with any tools
   // that rely on the plan node id being set there.
   node.metadata = metadata_.__isset.plan_node_id ? metadata_.plan_node_id : -1;
-  node.__set_node_metadata(metadata_);
+  // Thrift requires exactly one field of a union to be set so we only mark node_metadata
+  // as set if that is the case.
+  if (metadata_.__isset.plan_node_id || metadata_.__isset.data_sink_id) {
+    node.__set_node_metadata(metadata_);
+  }
   node.indent = true;
 
   CounterMap counter_map;

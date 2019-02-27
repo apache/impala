@@ -1141,5 +1141,22 @@ INSTANTIATE_TEST_CASE_P(VariousNumbers, TimeSeriesCounterResampleTest,
     "120, 123, 126 (Showing 43 of 129 values from Thrift Profile)"})
     ));
 
+// Tests that the __isset field for TRuntimeProfileNode.node_metadata is set correctly
+// (IMPALA-8252).
+TEST(ToThrift, NodeMetadataIsSetCorrectly) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  TRuntimeProfileTree thrift_profile;
+  profile->ToThrift(&thrift_profile);
+  // Profile is empty, expect 0 nodes
+  EXPECT_EQ(thrift_profile.nodes.size(), 1);
+  EXPECT_FALSE(thrift_profile.nodes[0].__isset.node_metadata);
+
+  // Set the plan node ID and make sure that the field is marked correctly
+  profile->SetPlanNodeId(1);
+  profile->ToThrift(&thrift_profile);
+  EXPECT_TRUE(thrift_profile.nodes[0].__isset.node_metadata);
+}
+
 } // namespace impala
 
