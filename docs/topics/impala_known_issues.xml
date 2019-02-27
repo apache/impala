@@ -547,6 +547,25 @@ explain SELECT 1 FROM alltypestiny a1
       </p>
 
     </conbody>
+    <concept id="hadoop-15720">
+      <title>Queries Stuck on Failed HDFS Calls and not Timing out</title>
+      <conbody>
+        <p>If the following error appears multiple times in a short duration
+          while running a query, it would mean that the connection between the
+            <codeph>impalad</codeph> and the HDFS NameNode is in a bad state and
+          hence the <codeph>impalad</codeph> would have to be restarted:</p>
+        <codeblock>"hdfsOpenFile() for &lt;filename> at backend &lt;hostname:port> failed to finish before the &lt;hdfs_operation_timeout_sec> second timeout " </codeblock>
+        <p>
+          <b>Bug:</b>
+          <xref href="https://issues.apache.org/jira/browse/HADOOP-15720"
+            format="html" scope="external">HADOOP-15720</xref>
+        </p>
+        <p><b>Affected Versions:</b> All versions of Impala</p>
+        <p>
+          <b>Workaround:</b> Restart the <codeph>impalad</codeph> in the bad
+          state.</p>
+      </conbody>
+    </concept>
 
     <concept id="describe_formatted_avro">
 
