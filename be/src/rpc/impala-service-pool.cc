@@ -37,6 +37,7 @@
 #include "kudu/util/trace.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 #include "common/status.h"
@@ -54,7 +55,7 @@ namespace impala {
 const string RPC_QUEUE_OVERFLOW_METRIC_KEY = "rpc.$0.rpcs_queue_overflow";
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
-    size_t service_queue_length, kudu::rpc::GeneratedServiceIf* service,
+    int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
     MemTracker* service_mem_tracker)
   : service_mem_tracker_(service_mem_tracker),
     service_(service),
@@ -115,11 +116,14 @@ void ImpalaServicePool::Shutdown() {
 void ImpalaServicePool::RejectTooBusy(kudu::rpc::InboundCall* c) {
   string err_msg =
       Substitute("$0 request on $1 from $2 dropped due to backpressure. "
-                 "The service queue is full; it has $3 items.",
+                 "The service queue contains $3 items out of a maximum of $4; "
+                 "memory consumption is $5.",
                  c->remote_method().method_name(),
                  service_->service_name(),
                  c->remote_address().ToString(),
-                 service_queue_.max_size());
+                 service_queue_.estimated_queue_length(),
+                 service_queue_.max_size(),
+                 PrettyPrinter::Print(service_mem_tracker_->consumption(), TUnit::BYTES));
   rpcs_queue_overflow_->Increment(1);
   FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
                     kudu::Status::ServiceUnavailable(err_msg), c);

@@ -46,7 +46,7 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// 'service_mem_tracker' is the MemTracker for tracking the memory usage of RPC
   /// payloads in the service queue.
   ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
-      size_t service_queue_length, kudu::rpc::GeneratedServiceIf* service,
+      int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
       MemTracker* service_mem_tracker);
 
   virtual ~ImpalaServicePool();
