@@ -606,7 +606,7 @@ FUNCTION(ADD_UNIFIED_BE_TEST TEST_NAME TEST_FILTER_PATTERN)
     COMMAND "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}"
     -log_dir=$ENV{IMPALA_BE_TEST_LOGS_DIR})
   ADD_DEPENDENCIES(unified-be-test ${TEST_NAME})
-  ADD_DEPENDENCIES(${TEST_NAME} unified-be-test-executable)
+  ADD_DEPENDENCIES(${TEST_NAME} unified-be-test-validated-executable)
 ENDFUNCTION()
 
 FUNCTION(ENABLE_LSAN_FOR_TEST TEST_NAME)
@@ -713,14 +713,14 @@ link_directories(
 # patterns. At this point, all filter patterns have been aggregated from the individual
 # ADD_UNIFIED_BE_TEST calls into AGG_UNIFIED_FILTER_PATTERN.
 get_property(TOTAL_UNIFIED_FILTER_PATTERN GLOBAL PROPERTY AGG_UNIFIED_FILTER_PATTERN)
-add_custom_target(unified-be-test-validate
+add_custom_target(unified-be-test-validated-executable
   "${CMAKE_CURRENT_SOURCE_DIR}/../bin/validate-unified-backend-test-filters.py"
   "-f" "${TOTAL_UNIFIED_FILTER_PATTERN}"
   "-b" "${BUILD_OUTPUT_ROOT_DIRECTORY}/service/unifiedbetests")
 
 ADD_DEPENDENCIES(be-test unified-be-test)
-ADD_DEPENDENCIES(unified-be-test unified-be-test-executable unified-be-test-validate)
-ADD_DEPENDENCIES(unified-be-test-validate unified-be-test-executable)
+ADD_DEPENDENCIES(unified-be-test unified-be-test-validated-executable)
+ADD_DEPENDENCIES(unified-be-test-validated-executable unified-be-test-executable)
 
 # only generate statically linked libs and executables
 set(BUILD_SHARED_LIBS OFF)

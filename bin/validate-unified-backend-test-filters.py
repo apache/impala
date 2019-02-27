@@ -56,7 +56,10 @@ def main():
     assert with_filter.issubset(without_filter)
     if without_filter != with_filter:
         print("FAILED: The unified backend test executable contains tests that are\n"
-              "missing from the CMake test filters:")
+              "        missing from the CMake test filters specified via the\n"
+              "        ADD_UNIFIED_BE_TEST/ADD_UNIFIED_BE_LSAN_TEST macros in\n"
+              "        CMakeLists.txt. To fix this, add a pattern in the appropriate\n"
+              "        CMakeLists.txt to match the following tests:")
         for tests in without_filter - with_filter:
             print(tests)
         print("Unified test executable: {0}\nFilters: {1}".format(
@@ -73,9 +76,13 @@ def main():
         if len(tests) == 0:
             filters_without_tests.append(test_filter)
     if len(filters_without_tests) > 0:
-        print("FAILED: The following test filters do not match any tests in the\n"
-              "unified test executable. This can indicate that some test has not\n"
-              "been linked appropriately into the test executable:")
+        print("FAILED: Some test filters specified by\n"
+              "        ADD_UNIFIED_BE_TEST/ADD_UNIFIED_BE_LSAN_TEST macros in\n"
+              "        CMakeLists.txt do not match any tests in the unified backend\n"
+              "        test executable. This can happen if there is a bogus filter or\n"
+              "        if some tests are not being included in the test executable\n"
+              "        (e.g. if a new test file is missing from the test library).\n"
+              "        The invalid test filters are:")
         for test_filter in filters_without_tests:
             print(test_filter)
         sys.exit(1)
