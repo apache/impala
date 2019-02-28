@@ -1,0 +1,5 @@
+{
+  "name" : "${USER}",
+  "password" : "password123",
+  "userRoleList" : [ "ROLE_USER" ]
+}

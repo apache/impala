@@ -38,6 +38,7 @@ under the License.
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
     <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
+    <ranger.version>${env.IMPALA_RANGER_VERSION}</ranger.version>
     <sentry.version>${env.IMPALA_SENTRY_VERSION}</sentry.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>

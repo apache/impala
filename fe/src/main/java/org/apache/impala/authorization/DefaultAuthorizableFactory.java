@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
  * A default implementation of {@link AuthorizableFactory}.
  */
 public class DefaultAuthorizableFactory implements AuthorizableFactory {
-  private static final String ALL = "*";
+  public static final String ALL = "*";
 
   @Override
   public Authorizable newServer(String serverName) {

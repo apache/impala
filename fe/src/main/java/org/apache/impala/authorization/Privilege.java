@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import com.google.common.base.Preconditions;
+
 import java.util.EnumSet;
 
 /**
@@ -40,6 +42,7 @@ public enum Privilege {
   static {
     ALL.implied_ = EnumSet.of(ALL);
     OWNER.implied_ = EnumSet.of(OWNER);
+    ALTER.implied_ = EnumSet.of(ALTER);
     DROP.implied_ = EnumSet.of(DROP);
     CREATE.implied_ = EnumSet.of(CREATE);
     INSERT.implied_ = EnumSet.of(INSERT);
@@ -48,6 +51,10 @@ public enum Privilege {
     VIEW_METADATA.implied_ = EnumSet.of(INSERT, SELECT, REFRESH);
     ANY.implied_ = EnumSet.of(ALL, OWNER, ALTER, DROP, CREATE, INSERT, SELECT,
         REFRESH);
+
+    for (Privilege privilege: values()) {
+      Preconditions.checkNotNull(privilege.implied_);
+    }
   }
 
   private EnumSet<Privilege> implied_;
@@ -69,7 +76,7 @@ public enum Privilege {
    * actions list or whether to check if the user has ALL of the privileges in the
    * actions list.
    */
-  public boolean getAnyOf() { return anyOf_; }
+  public boolean hasAnyOf() { return anyOf_; }
 
   /**
    * Gets list of implied privileges for this privilege.

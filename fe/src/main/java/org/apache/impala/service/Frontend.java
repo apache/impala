@@ -536,8 +536,8 @@ public class Frontend {
       ShowRolesStmt showRolesStmt = (ShowRolesStmt) analysis.getStmt();
       ddl.setShow_roles_params(showRolesStmt.toThrift());
       Preconditions.checkState(getAuthzChecker() instanceof SentryAuthorizationChecker);
-      Set<String> groupNames = ((SentryAuthorizationChecker) getAuthzChecker())
-          .getUserGroups(analysis.getAnalyzer().getUser());
+      Set<String> groupNames = getAuthzChecker().getUserGroups(
+          analysis.getAnalyzer().getUser());
       // Check if the user is part of the group (case-sensitive) this SHOW ROLE
       // statement is targeting. If they are already a member of the group,
       // the admin requirement can be removed.
@@ -553,8 +553,8 @@ public class Frontend {
       ShowGrantPrincipalStmt showGrantPrincipalStmt =
           (ShowGrantPrincipalStmt) analysis.getStmt();
       ddl.setShow_grant_principal_params(showGrantPrincipalStmt.toThrift());
-      Set<String> groupNames = ((SentryAuthorizationChecker) getAuthzChecker())
-          .getUserGroups(analysis.getAnalyzer().getUser());
+      Set<String> groupNames = getAuthzChecker().getUserGroups(
+          analysis.getAnalyzer().getUser());
       // User must be an admin to execute this operation if they have not been granted
       // this principal, or the same user as the request.
       boolean requiresAdmin;

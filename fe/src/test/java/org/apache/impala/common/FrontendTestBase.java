@@ -20,6 +20,8 @@ package org.apache.impala.common;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -30,14 +32,20 @@ import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
+import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TQueryOptions;
@@ -191,17 +199,17 @@ public class FrontendTestBase extends AbstractFrontendTest {
   }
 
   protected AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
-      AuthorizationConfig authzConfig) {
-    return feFixture_.createAnalysisCtx(queryOptions, authzConfig);
+      AuthorizationFactory authzFactory) {
+    return feFixture_.createAnalysisCtx(queryOptions, authzFactory);
   }
 
-  protected AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig) {
-    return feFixture_.createAnalysisCtx(authzConfig);
+  protected AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory) {
+    return feFixture_.createAnalysisCtx(authzFactory);
   }
 
-  protected AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig,
+  protected AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory,
       String user) {
-    return feFixture_.createAnalysisCtx(authzConfig, user);
+    return feFixture_.createAnalysisCtx(authzFactory, user);
   }
 
   protected AnalysisContext createAnalysisCtxUsingHiveColLabels() {
@@ -289,13 +297,47 @@ public class FrontendTestBase extends AbstractFrontendTest {
   }
 
   /**
-   * Creates an authorization config for creating an AnalysisContext with
-   * authorization enabled.
+   * Creates a dummy {@link AuthorizationFactory} with authorization enabled, but does
+   * not do the actual authorization.
    */
-  protected SentryAuthorizationConfig createAuthorizationConfig() {
-    SentryAuthorizationConfig authzConfig =
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
-            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    return authzConfig;
+  protected AuthorizationFactory createAuthorizationFactory() {
+    return new AuthorizationFactory() {
+      @Override
+      public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
+        return new AuthorizationConfig() {
+          @Override
+          public boolean isEnabled() { return true; }
+          @Override
+          public AuthorizationProvider getProvider() {
+            return AuthorizationProvider.NONE;
+          }
+          @Override
+          public String getServerName() { return "server1"; }
+        };
+      }
+
+      @Override
+      public AuthorizationConfig getAuthorizationConfig() {
+        return newAuthorizationConfig(null);
+      }
+
+      @Override
+      public AuthorizationChecker newAuthorizationChecker(
+          AuthorizationPolicy authzPolicy) {
+        AuthorizationConfig authzConfig = newAuthorizationConfig(null);
+        return new AuthorizationChecker(authzConfig) {
+          @Override
+          protected boolean authorize(User user, PrivilegeRequest request)
+              throws InternalException {
+            return true;
+          }
+
+          @Override
+          public Set<String> getUserGroups(User user) throws InternalException {
+            return Collections.emptySet();
+          }
+        };
+      }
+    };
   }
 }

@@ -110,6 +110,7 @@ testdata/AllTypesErrorNoNulls/*.txt
 testdata/cluster/node_templates/cdh5/etc/hadoop/conf/*.xml.tmpl
 testdata/cluster/node_templates/common/etc/kudu/*.conf.tmpl
 testdata/cluster/node_templates/common/etc/hadoop/conf/*.xml.tmpl
+testdata/cluster/ranger/setup/*.json.template
 testdata/data/chars-formats.txt
 testdata/data/chars-tiny.txt
 testdata/data/decimal-tiny.txt

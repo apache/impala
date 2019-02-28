@@ -22,7 +22,6 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
@@ -58,8 +57,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
     super("127.0.0.1");
     CatalogServiceCatalog catalogServerCatalog = authzConfig.isEnabled() ?
-        CatalogServiceTestCatalog.createWithAuth(
-            ((SentryAuthorizationConfig) authzConfig).getSentryConfig()) :
+        CatalogServiceTestCatalog.createWithAuth(authzConfig) :
         CatalogServiceTestCatalog.create();
     authPolicy_ = catalogServerCatalog.getAuthPolicy();
     srcCatalog_ = catalogServerCatalog;

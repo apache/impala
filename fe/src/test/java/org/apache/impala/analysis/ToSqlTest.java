@@ -1473,7 +1473,7 @@ public class ToSqlTest extends FrontendTestBase {
   @Test
   public void testCreateDropRole() {
     String testRole = "test_role";
-    AnalysisContext ctx = createAnalysisCtx(createAuthorizationConfig());
+    AnalysisContext ctx = createAnalysisCtx(createAuthorizationFactory());
 
     testToSql(ctx, String.format("CREATE ROLE %s", testRole));
     try {
@@ -1501,7 +1501,7 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("REFRESH functional.alltypes");
     testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)");
     testToSql("REFRESH FUNCTIONS functional");
-    testToSql(createAnalysisCtx(createAuthorizationConfig()), "REFRESH AUTHORIZATION");
+    testToSql(createAnalysisCtx(createAuthorizationFactory()), "REFRESH AUTHORIZATION");
   }
 
   /**

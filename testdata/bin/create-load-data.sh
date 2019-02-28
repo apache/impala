@@ -300,6 +300,31 @@ function copy-auth-policy {
       ${FILESYSTEM_PREFIX}/test-warehouse/
 }
 
+function setup-ranger {
+  echo "SETTING UP RANGER"
+
+  RANGER_SETUP_DIR="${IMPALA_HOME}/testdata/cluster/ranger/setup"
+
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    "${RANGER_SETUP_DIR}/impala_user.json.template" > \
+    "${RANGER_SETUP_DIR}/impala_user.json"
+
+  if grep "\${[A-Z_]*}" "${RANGER_SETUP_DIR}/impala_user.json"; then
+    echo "Found undefined variables in ${RANGER_SETUP_DIR}/impala_user.json."
+    exit 1
+  fi
+
+  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+    --post-file="${RANGER_SETUP_DIR}/impala_user.json" \
+    --header="Content-Type:application/json" \
+    http://localhost:6080/service/xusers/secure/users
+
+  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+    --post-file="${RANGER_SETUP_DIR}/impala_service.json" \
+    --header="Content-Type:application/json" \
+    http://localhost:6080/service/public/v2/api/service
+}
+
 function copy-and-load-dependent-tables {
   # COPY
   # TODO: The multi-format table will move these files. So we need to copy them to a
@@ -634,3 +659,5 @@ run-step "Creating tpcds testcase data" create-tpcds-testcase-data.log \
     ${IMPALA_HOME}/testdata/bin/create-tpcds-testcase-files.sh
 
 run-step "Copying auth policy file" copy-auth-policy.log copy-auth-policy
+
+run-step "Setting up Ranger" setup-ranger.log setup-ranger

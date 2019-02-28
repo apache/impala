@@ -15,14 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+package org.apache.impala.authorization.ranger;
 
-package org.apache.impala.authorization;
+import org.apache.ranger.plugin.service.RangerBasePlugin;
 
 /**
- * This enum contains the list of authorization providers supported in Impala.
+ * An implementation of Ranger Impala plugin.
  */
-public enum AuthorizationProvider {
-  SENTRY,
-  RANGER,
-  NONE
+public class RangerImpalaPlugin extends RangerBasePlugin {
+  public RangerImpalaPlugin(String serviceType, String appId) {
+    super(serviceType, appId);
+  }
 }

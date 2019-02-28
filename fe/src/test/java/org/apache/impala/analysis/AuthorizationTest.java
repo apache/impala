@@ -175,8 +175,10 @@ public class AuthorizationTest extends FrontendTestBase {
 
   public AuthorizationTest(TestContext ctx) throws Exception {
     ctx_ = ctx;
-    analysisContext_ = createAnalysisCtx(ctx_.authzConfig, USER.getName());
-    fe_ = new Frontend(new SentryAuthorizationFactory(ctx_.authzConfig), ctx_.catalog);
+    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
+        ctx_.authzConfig);
+    analysisContext_ = createAnalysisCtx(authzFactory, USER.getName());
+    fe_ = new Frontend(authzFactory, ctx_.catalog);
   }
 
   public static SentryAuthorizationConfig createPolicyFileAuthzConfig() {
@@ -817,7 +819,8 @@ public class AuthorizationTest extends FrontendTestBase {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      AnalysisContext ctx = createAnalysisCtx(ctx_.authzConfig, user.getName());
+      AnalysisContext ctx = createAnalysisCtx(
+          new SentryAuthorizationFactory(ctx_.authzConfig), user.getName());
 
       // Can select from table that user has privileges on.
       AuthzOk(ctx, "select * from functional.alltypesagg");
@@ -857,8 +860,10 @@ public class AuthorizationTest extends FrontendTestBase {
       User.setRulesForTesting(
           new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
       User user = new User("authtest/hostname@REALM.COM");
-      AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
-      Frontend fe = new Frontend(new SentryAuthorizationFactory(authzConfig), catalog);
+      SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
+          authzConfig);
+      AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
+      Frontend fe = new Frontend(authzFactory, catalog);
 
       // Can select from table that user has privileges on.
       AuthzOk(fe, ctx, "select * from tpcds.customer");
@@ -1037,7 +1042,7 @@ public class AuthorizationTest extends FrontendTestBase {
       // Create an analysis context + FE with the test user
       // (as defined in the policy file)
       User user = new User("test_user");
-      AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
+      AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
       Frontend fe = new Frontend(authzFactory, catalog);
 
       // Can select from table that user has privileges on.
@@ -1049,7 +1054,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
       // Verify with the admin user
       user = new User("admin_user");
-      ctx = createAnalysisCtx(authzConfig, user.getName());
+      ctx = createAnalysisCtx(authzFactory, user.getName());
       fe = new Frontend(authzFactory, catalog);
 
       // Admin user should have privileges to do anything
@@ -1063,9 +1068,9 @@ public class AuthorizationTest extends FrontendTestBase {
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws ImpalaException {
-    Frontend fe = new Frontend(new SentryAuthorizationFactory(authzConfig),
-        ctx_.catalog);
-    AnalysisContext ctx = createAnalysisCtx(authzConfig, user.getName());
+    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
+    Frontend fe = new Frontend(authzFactory, ctx_.catalog);
+    AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
     AuthzError(fe, ctx, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypesagg");

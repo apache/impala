@@ -115,8 +115,15 @@ public class DescribeTableStmt extends StatementBase {
     table_ = path_.getRootTable();
 
     // Register authorization and audit events.
+    // The ANY privilege here is used as a first-level check to see if there exists any
+    // privilege in the table or columns of the given table. A further check for
+    // column-level filtering will be done in Frontend.doDescribeTable() to filter out
+    // unauthorized columns against the actual required privileges.
+    // What this essentially means is if we have DROP a privilege on a particular table,
+    // this check will succeed, but the column-level filtering logic will filter out
+    // all columns returning an empty result due to insufficient VIEW_METADATA privilege.
     analyzer.getTable(table_.getTableName(), /* add column-level privilege */ true,
-        Privilege.VIEW_METADATA);
+        Privilege.ANY);
 
     // Describing a table.
     if (path_.destTable() != null) return;

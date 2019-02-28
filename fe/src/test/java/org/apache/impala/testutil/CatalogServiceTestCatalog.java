@@ -50,26 +50,25 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   }
 
   public static CatalogServiceCatalog create() {
-    return createWithAuth(new SentryConfig(null));
+    return createWithAuth(new SentryAuthorizationConfig(new SentryConfig(null)));
   }
 
   /**
    * Creates a catalog server that reads authorization policy metadata from the
-   * Sentry Policy Service.
+   * authorization config.
    */
-  public static CatalogServiceCatalog createWithAuth(SentryConfig config) {
+  public static CatalogServiceCatalog createWithAuth(AuthorizationConfig config) {
     FeSupport.loadLibrary();
     CatalogServiceCatalog cs;
     try {
-      cs = new CatalogServiceTestCatalog(false, 16, new SentryAuthorizationConfig(config),
-          new TUniqueId(), new MetaStoreClientPool(0, 0));
+      cs = new CatalogServiceTestCatalog(false, 16, config, new TUniqueId(),
+          new MetaStoreClientPool(0, 0));
       cs.reset();
     } catch (ImpalaException e) {
       throw new IllegalStateException(e.getMessage(), e);
     }
     return cs;
   }
-
 
   /**
    * Creates a transient test catalog instance backed by an embedded HMS derby database on

@@ -22,6 +22,9 @@ import com.google.common.base.Preconditions;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 
+import java.util.Collections;
+import java.util.Set;
+
 /**
  * An implementation of {@link AuthorizationFactory} that does not do any
  * authorization. This is the default implementation when authorization is disabled.
@@ -68,6 +71,11 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
       protected boolean authorize(User user, PrivilegeRequest request)
           throws InternalException {
         return true;
+      }
+
+      @Override
+      public Set<String> getUserGroups(User user) throws InternalException {
+        return Collections.emptySet();
       }
     };
   }

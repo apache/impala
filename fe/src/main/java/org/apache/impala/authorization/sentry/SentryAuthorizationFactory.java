@@ -28,7 +28,7 @@ import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.service.BackendConfig;
 
 /**
- * An implementation of  {@link AuthorizationFactory} that uses Sentry.
+ * An implementation of {@link AuthorizationFactory} that uses Sentry.
  */
 public class SentryAuthorizationFactory implements AuthorizationFactory {
   private static final SentryAuthorizableFactory AUTHORIZABLE_FACTORY =

@@ -368,7 +368,7 @@ public class AnalyzerTest extends FrontendTestBase {
         "refresh functional.alltypessmall partition (year=2009, month=NULL)"),
         ResetMetadataStmt.Action.REFRESH_PARTITION);
     assertAction.accept(AnalyzesOk(
-        "refresh authorization", createAnalysisCtx(createAuthorizationConfig())),
+        "refresh authorization", createAnalysisCtx(createAuthorizationFactory())),
         ResetMetadataStmt.Action.REFRESH_AUTHORIZATION);
 
     // invalidate metadata <table name> checks the Hive Metastore for table existence

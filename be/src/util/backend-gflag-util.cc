@@ -74,6 +74,8 @@ DECLARE_int32(kudu_error_buffer_size);
 DECLARE_int32(hms_event_polling_interval_s);
 DECLARE_string(authorization_factory_class);
 DECLARE_bool(unlock_mt_dop);
+DECLARE_string(ranger_service_type);
+DECLARE_string(ranger_app_id);
 
 namespace impala {
 
@@ -147,6 +149,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_impala_build_version(::GetDaemonBuildVersion());
   cfg.__set_authorization_factory_class(FLAGS_authorization_factory_class);
   cfg.__set_unlock_mt_dop(FLAGS_unlock_mt_dop);
+  cfg.__set_ranger_service_type(FLAGS_ranger_service_type);
+  cfg.__set_ranger_app_id(FLAGS_ranger_app_id);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

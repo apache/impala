@@ -36,10 +36,8 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoneAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
@@ -301,34 +299,27 @@ public class FrontendFixture {
   }
 
   public AnalysisContext createAnalysisCtx(TQueryOptions queryOptions) {
-    return createAnalysisCtx(queryOptions,
-        new NoneAuthorizationFactory().getAuthorizationConfig());
+    return createAnalysisCtx(queryOptions, new NoneAuthorizationFactory());
   }
 
   public AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
-      AuthorizationConfig authzConfig) {
+      AuthorizationFactory authzFactory) {
     TQueryCtx queryCtx = TestUtils.createQueryContext();
     queryCtx.client_request.query_options = queryOptions;
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
-    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        authzConfig.getProvider() == AuthorizationProvider.SENTRY ?
-            new SentryAuthorizationFactory(authzConfig) : new NoneAuthorizationFactory(),
-        timeline);
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory, timeline);
     return analysisCtx;
   }
 
-  public AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig) {
-    return createAnalysisCtx(authzConfig, System.getProperty("user.name"));
+  public AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory) {
+    return createAnalysisCtx(authzFactory, System.getProperty("user.name"));
   }
 
-  public AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig,
+  public AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory,
       String user) {
     TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB, user);
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
-    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        authzConfig.getProvider() == AuthorizationProvider.SENTRY ?
-        new SentryAuthorizationFactory(authzConfig) : new NoneAuthorizationFactory(),
-        timeline);
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory, timeline);
     return analysisCtx;
   }
 

@@ -23,15 +23,26 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.ranger.RangerAuthorizationChecker;
+import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
+import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
+import org.apache.impala.authorization.ranger.RangerImpalaPlugin;
+import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.authorization.sentry.SentryPolicyService;
@@ -55,6 +66,8 @@ import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
+import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
+import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -63,25 +76,64 @@ import org.junit.Test;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /**
  * This class contains authorization tests for SQL statements.
  */
+@RunWith(Parameterized.class)
 public class AuthorizationStmtTest extends FrontendTestBase {
-  private static final String SENTRY_SERVER = "server1";
+  private static final String SERVER_NAME = "server1";
   private static final User USER = new User(System.getProperty("user.name"));
-  private final AnalysisContext analysisContext_;
+  private static final String RANGER_SERVICE_TYPE = "hive";
+  private static final String RANGER_APP_ID = "impala";
+  private static final String RANGER_ADMIN = "admin";
+
+  private final AuthorizationConfig authzConfig_;
+  private final AuthorizationFactory authzFactory_;
+  private final AuthorizationProvider authzProvider_;
+  private final AnalysisContext authzCtx_;
   private final SentryPolicyService sentryService_;
   private final ImpaladTestCatalog authzCatalog_;
   private final Frontend authzFrontend_;
+  private final RangerImpalaPlugin rangerImpalaPlugin_;
+  private final RangerDefaultAuditHandler rangerAuditHandler_;
 
-  public AuthorizationStmtTest() {
-    SentryAuthorizationConfig authzConfig = createAuthorizationConfig();
-    analysisContext_ = createAnalysisCtx(authzConfig, USER.getName());
-    authzCatalog_ = new ImpaladTestCatalog(authzConfig);
-    authzFrontend_ = new Frontend(new SentryAuthorizationFactory(authzConfig),
-        authzCatalog_);
-    sentryService_ = new SentryPolicyService(authzConfig.getSentryConfig());
+  public AuthorizationStmtTest(AuthorizationProvider authzProvider) {
+    authzProvider_ = authzProvider;
+    switch (authzProvider) {
+      case SENTRY:
+        authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
+            "server1", null,
+            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+        authzFactory_ = new SentryAuthorizationFactory(authzConfig_);
+        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCatalog_ = new ImpaladTestCatalog(authzConfig_);
+        authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
+        sentryService_ = new SentryPolicyService(
+            ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
+        rangerImpalaPlugin_ = null;
+        rangerAuditHandler_ = null;
+        break;
+      case RANGER:
+        authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
+            SERVER_NAME);
+        authzFactory_ = new RangerAuthorizationFactory(authzConfig_);
+        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCatalog_ = new ImpaladTestCatalog(authzConfig_);
+        authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
+        rangerImpalaPlugin_ =
+            ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
+                .getRangerImpalaPlugin();
+        rangerAuditHandler_ = new RangerDefaultAuditHandler();
+        sentryService_ = null;
+        break;
+      default:
+        throw new IllegalArgumentException(String.format(
+            "Unsupported authorization provider: %s", authzProvider));
+    }
   }
 
   @BeforeClass
@@ -96,10 +148,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   @Before
   public void before() throws ImpalaException {
-    // Remove existing roles in order to not interfere with these tests.
-    for (TSentryRole role: sentryService_.listAllRoles(USER)) {
-      authzCatalog_.removeRole(role.getRoleName());
+    if (authzProvider_ == AuthorizationProvider.SENTRY) {
+      // Remove existing roles in order to not interfere with these tests.
+      for (TSentryRole role : sentryService_.listAllRoles(USER)) {
+        authzCatalog_.removeRole(role.getRoleName());
+      }
     }
+  }
+
+  @Parameters
+  public static Collection<AuthorizationProvider> data() {
+    return Arrays.asList(AuthorizationProvider.SENTRY, AuthorizationProvider.RANGER);
   }
 
   private static final String[] ALLTYPES_COLUMNS_WITHOUT_ID = new String[]{"bool_col",
@@ -193,7 +252,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     verifyPrivilegeReqs("truncate table functional.alltypes", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
         "truncate table alltypes", expectedAuthorizables);
-
 
     // Load
     expectedAuthorizables = Sets.newHashSet(
@@ -464,7 +522,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
               TPrivilegeLevel.SELECT)));
     }
-
 
     // Select without referencing a column.
     authorize("select 1 from functional.alltypes")
@@ -1323,13 +1380,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .okDescribe(tableName, describeOutput(style).includeStrings(new String[]{"id"})
             .excludeStrings(ALLTYPES_COLUMNS_WITHOUT_ID), onColumn("functional",
             "alltypes", "id", TPrivilegeLevel.SELECT))
-        .error(accessError("functional.alltypes"))
-        .error(accessError("functional.alltypes"),
+        // If there exists a privilege in the given table/column with incorrect
+        // privilege type, we return an empty result instead of an error.
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onServer(allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes"),
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onDatabase("functional", allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes"),
-            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())));
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"));
 
     // Describe table extended.
     tableName = new TTableName("functional", "alltypes");
@@ -1352,13 +1411,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             .excludeStrings((String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS_WITHOUT_ID,
                 new String[]{"Location:"})), onColumn("functional", "alltypes", "id",
             TPrivilegeLevel.SELECT))
-        .error(accessError("functional.alltypes"))
-        .error(accessError("functional.alltypes"),
+        // If there exists a privilege in the given table/column with incorrect
+        // privilege type, we return an empty result instead of an error.
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onServer(allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes"),
-            onDatabase("functional.alltypes", allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes"),
-            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())));
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional", allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"));
 
     // Describe view.
     tableName = new TTableName("functional", "alltypes_view");
@@ -1374,13 +1435,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               onTable("functional", "alltypes_view", privilege));
     }
     authzTest
-        .error(accessError("functional.alltypes_view"))
-        .error(accessError("functional.alltypes_view"),
+        // If there exists a privilege in the given table/column with incorrect
+        // privilege type, we return an empty result instead of an error.
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onServer(allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"),
-            onDatabase("functional",allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"),
-            onTable("functional", "alltypes_view", allExcept(viewMetadataPrivileges())));
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional", allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onTable("functional", "alltypes_view", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes_view"));
 
     // Describe view extended.
     tableName = new TTableName("functional", "alltypes_view");
@@ -1399,13 +1462,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               onTable("functional", "alltypes_view", privilege));
     }
     authzTest
-        .error(accessError("functional.alltypes_view"))
-        .error(accessError("functional.alltypes_view"), onServer(
-            allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"), onDatabase("functional",
-            allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"), onTable("functional", "alltypes",
-            allExcept(viewMetadataPrivileges())));
+        // If there exists a privilege in the given table/column with incorrect
+        // privilege type, we return an empty result instead of an error.
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional", allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onTable("functional", "alltypes_view", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes_view"));
 
     // Describe specific column on a table.
     authzTest = authorize("describe functional.allcomplextypes.int_struct_col");
@@ -2084,7 +2149,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       // We cannot set an owner to a role that doesn't exist
       authzCatalog_.addRole("foo_owner");
       // Alter table set owner.
-      for (AuthzTest test: new AuthzTest[]{
+      for (AuthzTest test : new AuthzTest[]{
           authorize("alter table functional.alltypes set owner user foo_owner"),
           authorize("alter table functional.alltypes set owner role foo_owner")}) {
         test.ok(onServer(true, TPrivilegeLevel.ALL))
@@ -2093,12 +2158,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
             .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.ALL))
             .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional.alltypes"), onServer(
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes"), onDatabase("functional",
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes"), onTable("functional",
-                "alltypes", TPrivilegeLevel.values()))
             .error(accessError(true, "functional.alltypes"))
             .error(accessError(true, "functional.alltypes"), onServer(true, allExcept(
                 TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
@@ -2106,7 +2165,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
                 "functional", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
             .error(accessError(true, "functional.alltypes"),
                 onTable(true, "functional", "alltypes", allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+                    TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+        // TODO: Checking if a request is allowed by checking if grant option flag is set
+        // is to Sentry.
+        if (authzProvider_ == AuthorizationProvider.SENTRY) {
+          test.error(accessError(true, "functional.alltypes"), onServer(
+              TPrivilegeLevel.values()))
+              .error(accessError(true, "functional.alltypes"), onDatabase("functional",
+                  TPrivilegeLevel.values()))
+              .error(accessError(true, "functional.alltypes"), onTable("functional",
+                  "alltypes", TPrivilegeLevel.values()));
+        }
       }
     } finally {
       authzCatalog_.removeRole("foo_owner");
@@ -2115,7 +2184,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     boolean exceptionThrown = false;
     try {
       parseAndAnalyze("alter table functional.alltypes set owner role foo_owner",
-          analysisContext_ , frontend_);
+          authzCtx_, frontend_);
     } catch (AnalysisException e) {
       exceptionThrown = true;
       assertEquals("Role 'foo_owner' does not exist.", e.getLocalizedMessage());
@@ -2324,12 +2393,11 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.ALTER)));
 
-
     try {
       // We cannot set an owner to a role that doesn't exist
       authzCatalog_.addRole("foo_owner");
       // Alter view set owner.
-      for (AuthzTest test: new AuthzTest[]{
+      for (AuthzTest test : new AuthzTest[]{
           authorize("alter view functional.alltypes_view set owner user foo_owner"),
           authorize("alter view functional.alltypes_view set owner role foo_owner")}) {
         test.ok(onServer(true, TPrivilegeLevel.ALL))
@@ -2338,19 +2406,24 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
             .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.ALL))
             .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional.alltypes_view"), onServer(
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes_view"), onTable("functional",
-                "alltypes_view", TPrivilegeLevel.values()))
             .error(accessError(true, "functional.alltypes_view"))
             .error(accessError(true, "functional.alltypes_view"), onServer(allExcept(
                 TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
-                allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+            .error(accessError(true, "functional.alltypes_view"), onDatabase(
+                "functional", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
             .error(accessError(true, "functional.alltypes_view"), onTable("functional",
-                "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+                "alltypes_view", allExcept(TPrivilegeLevel.ALL,
+                    TPrivilegeLevel.OWNER)));
+        // TODO: Checking if a request is allowed by checking if grant option flag is set
+        // is to Sentry.
+        if (authzProvider_ == AuthorizationProvider.SENTRY) {
+          test.error(accessError(true, "functional.alltypes_view"), onServer(
+              TPrivilegeLevel.values()))
+              .error(accessError(true, "functional.alltypes_view"), onDatabase(
+                  "functional", TPrivilegeLevel.values()))
+              .error(accessError(true, "functional.alltypes_view"), onTable("functional",
+                  "alltypes_view", TPrivilegeLevel.values()));
+        }
       }
     } finally {
       authzCatalog_.removeRole("foo_owner");
@@ -2377,20 +2450,28 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       // We cannot set an owner to a role that doesn't exist
       authzCatalog_.addRole("foo");
       // Alter database set owner.
-      for (String ownerType: new String[]{"user", "role"}) {
-        authorize(String.format("alter database functional set owner %s foo", ownerType))
+      for (String ownerType : new String[]{"user", "role"}) {
+        authorize(String.format("alter database functional set owner %s foo",
+            ownerType))
             .ok(onServer(true, TPrivilegeLevel.ALL))
             .ok(onServer(true, TPrivilegeLevel.OWNER))
             .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
             .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
-            .error(accessError(true, "functional"), onDatabase("functional",
-                TPrivilegeLevel.values()))
+
             .error(accessError(true, "functional"))
             .error(accessError(true, "functional"), onServer(true, allExcept(
                 TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
             .error(accessError(true, "functional"), onDatabase(true, "functional",
                 allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+        // TODO: Checking if a request is allowed by checking if grant option flag is set
+        // is to Sentry.
+        if (authzProvider_ == AuthorizationProvider.SENTRY) {
+          authorize(String.format("alter database functional set owner %s foo",
+              ownerType))
+              .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
+              .error(accessError(true, "functional"), onDatabase("functional",
+                  TPrivilegeLevel.values()));
+        }
 
         // Database does not exist.
         authorize(String.format("alter database nodb set owner %s foo", ownerType))
@@ -2404,13 +2485,12 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     boolean exceptionThrown = false;
     try {
       parseAndAnalyze("alter database functional set owner role foo",
-          analysisContext_ , frontend_);
+          authzCtx_, frontend_);
     } catch (AnalysisException e) {
       exceptionThrown = true;
       assertEquals("Role 'foo' does not exist.", e.getLocalizedMessage());
     }
     assertTrue(exceptionThrown);
-
   }
 
   @Test
@@ -2709,7 +2789,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       for (AuthzTest test: new AuthzTest[] {
           authorize("select functional.to_lower('ABCDEF')"),
           // Also test with expression rewrite enabled.
-          authorize(createAnalysisCtx(options, createAuthorizationConfig()),
+          authorize(createAnalysisCtx(options, authzFactory_),
               "select functional.to_lower('ABCDEF')")}) {
         test.ok(onServer(TPrivilegeLevel.SELECT))
             .ok(onDatabase("functional", TPrivilegeLevel.ALL))
@@ -2844,46 +2924,213 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     return privLevels.toArray(new TPrivilegeLevel[0]);
   }
 
-  private static abstract class WithPrincipal {
-    protected final AuthzTest test_;
-
-    public WithPrincipal(AuthzTest test) { test_ = test; }
-
-    public abstract void create(TPrivilege[]... privileges) throws ImpalaException;
-    public abstract void drop() throws ImpalaException;
-    public abstract String getName();
+  private interface WithPrincipal {
+    void init(TPrivilege[]... privileges) throws ImpalaException;
+    void cleanUp() throws ImpalaException;
+    String getName();
   }
 
-  private static class WithUser extends WithPrincipal {
-    public WithUser(AuthzTest test) { super(test); }
+  private abstract class WithSentryPrincipal implements WithPrincipal {
+    protected final String role_ = "authz_test_role";
+    protected final String user_ = USER.getName();
 
+    protected void createRole(TPrivilege[]... privileges) throws ImpalaException {
+      Role role = authzCatalog_.addRole(role_);
+      authzCatalog_.addRoleGrantGroup(role_, USER.getName());
+      for (TPrivilege[] privs: privileges) {
+        for (TPrivilege privilege: privs) {
+          privilege.setPrincipal_id(role.getId());
+          privilege.setPrincipal_type(TPrincipalType.ROLE);
+          authzCatalog_.addRolePrivilege(role_, privilege);
+        }
+      }
+    }
+
+    protected void createUser(TPrivilege[]... privileges) throws ImpalaException {
+      org.apache.impala.catalog.User user = authzCatalog_.addUser(user_);
+      for (TPrivilege[] privs: privileges) {
+        for (TPrivilege privilege: privs) {
+          privilege.setPrincipal_id(user.getId());
+          privilege.setPrincipal_type(TPrincipalType.USER);
+          authzCatalog_.addUserPrivilege(user_, privilege);
+        }
+      }
+    }
+
+    protected void dropRole() throws ImpalaException {
+      authzCatalog_.removeRole(role_);
+    }
+
+    protected void dropUser() throws ImpalaException {
+      authzCatalog_.removeUser(user_);
+    }
+  }
+
+  private class WithSentryUser extends WithSentryPrincipal {
     @Override
-    public void create(TPrivilege[]... privileges) throws ImpalaException {
-      test_.createUser(privileges);
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      createUser(privileges);
     }
 
     @Override
-    public void drop() throws ImpalaException { test_.dropUser(); }
+    public void cleanUp() throws ImpalaException { dropUser(); }
 
     @Override
-    public String getName() { return test_.user_; }
+    public String getName() { return user_; }
   }
 
-  private static class WithRole extends WithPrincipal {
-    public WithRole(AuthzTest test) { super(test); }
-
+  private class WithSentryRole extends WithSentryPrincipal {
     @Override
-    public void create(TPrivilege[]... privileges) throws ImpalaException {
-      test_.createRole(privileges);
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      createRole(privileges);
     }
 
     @Override
-    public void drop() throws ImpalaException { test_.dropRole(); }
+    public void cleanUp() throws ImpalaException { dropRole(); }
 
     @Override
-    public String getName() { return test_.role_; }
+    public String getName() { return role_; }
   }
 
+  private class WithRangerUser implements WithPrincipal {
+    private final List<GrantRevokeRequest> requests = new ArrayList<>();
+
+    @Override
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      for (TPrivilege[] privilege: privileges) {
+        for (TPrivilege p: privilege) {
+          // Ranger Impala service definition defines 3 resources:
+          // [Server -> DB -> Table -> Column]
+          // [Server -> DB -> Function]
+          // [Server -> URI]
+          // What it means is if we grant a particular privilege on a resource that
+          // is common to other resources, we need to grant that privilege to those
+          // resources.
+          if (p.getColumn_name() != null || p.getTable_name() != null) {
+            requests.add(createGrantRevokeRequestColumn(p));
+          } else if (p.getUri() != null) {
+            requests.add(createGrantRevokeRequestUri(p));
+          } else if (p.getDb_name() != null) {
+            // DB is used by column and function resources.
+            requests.add(createGrantRevokeRequestColumn(p));
+            requests.add(createGrantRevokeRequestFunction(p));
+          } else {
+            // Server is used by column, function, and URI resources.
+            requests.add(createGrantRevokeRequestColumn(p));
+            requests.add(createGrantRevokeRequestFunction(p));
+            requests.add(createGrantRevokeRequestUri(p));
+          }
+        }
+      }
+
+      try {
+        for (GrantRevokeRequest request : requests) {
+          rangerImpalaPlugin_.grantAccess(request, rangerAuditHandler_);
+        }
+        // Re-initialize the plugin to force Ranger cache refresh.
+        // TODO: replace with the new API in RANGER-2349.
+        rangerImpalaPlugin_.init();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public void cleanUp() throws ImpalaException {
+      for (GrantRevokeRequest request: requests) {
+        try {
+          rangerImpalaPlugin_.revokeAccess(request, rangerAuditHandler_);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }
+
+    @Override
+    public String getName() { return USER.getName(); }
+
+    private GrantRevokeRequest createGrantRevokeRequest() {
+      GrantRevokeRequest request = new GrantRevokeRequest();
+      request.setGrantor(RANGER_ADMIN);
+      request.getUsers().add(USER.getName());
+      request.setDelegateAdmin(Boolean.FALSE);
+      request.setEnableAudit(Boolean.TRUE);
+      request.setReplaceExistingPermissions(Boolean.FALSE);
+      request.setClusterName(rangerImpalaPlugin_.getClusterName());
+      return request;
+    }
+
+    private GrantRevokeRequest createGrantRevokeRequestColumn(TPrivilege privilege) {
+      GrantRevokeRequest request = createGrantRevokeRequest();
+      Map<String, String> resource = new HashMap<>();
+      resource.put(RangerImpalaResourceBuilder.DATABASE,
+          privilege.getDb_name() == null ? "*" : privilege.getDb_name());
+      resource.put(RangerImpalaResourceBuilder.TABLE,
+          privilege.getTable_name() == null ? "*" : privilege.getTable_name());
+      resource.put(RangerImpalaResourceBuilder.COLUMN,
+          privilege.getColumn_name() == null ? "*" : privilege.getColumn_name());
+      request.setResource(resource);
+
+      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
+        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
+      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
+        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
+        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
+        // service definition.
+        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
+      } else {
+        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
+      }
+      return request;
+    }
+
+    private GrantRevokeRequest createGrantRevokeRequestUri(TPrivilege privilege) {
+      GrantRevokeRequest request = createGrantRevokeRequest();
+      Map<String, String> resource = new HashMap<>();
+      String uri = privilege.getUri();
+      if (uri != null && uri.startsWith("/")) {
+        uri = "hdfs://localhost:20500" + uri;
+      }
+      resource.put(RangerImpalaResourceBuilder.URL, uri == null ? "*" : uri);
+      request.setResource(resource);
+
+      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
+        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
+      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
+        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
+        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
+        // service definition.
+        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
+      } else {
+        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
+      }
+      return request;
+    }
+
+    private GrantRevokeRequest createGrantRevokeRequestFunction(TPrivilege privilege) {
+      GrantRevokeRequest request = createGrantRevokeRequest();
+      Map<String, String> resource = new HashMap<>();
+      resource.put(RangerImpalaResourceBuilder.DATABASE,
+          privilege.getDb_name() == null ? "*" : privilege.getDb_name());
+      resource.put(RangerImpalaResourceBuilder.UDF, "*");
+      request.setResource(resource);
+
+      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
+        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
+      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
+        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
+        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
+        // service definition.
+        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
+      } else {
+        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
+      }
+      return request;
+    }
+  }
 
   private class DescribeOutput {
     private String[] excludedStrings_ = new String[0];
@@ -2944,8 +3191,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private class AuthzTest {
     private final AnalysisContext context_;
     private final String stmt_;
-    private final String role_ = "authz_test_role";
-    private final String user_ = USER.getName();
 
     public AuthzTest(String stmt) {
       this(null, stmt);
@@ -2957,75 +3202,50 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       stmt_ = stmt;
     }
 
-    private void createRole(TPrivilege[]... privileges) throws ImpalaException {
-      Role role = authzCatalog_.addRole(role_);
-      authzCatalog_.addRoleGrantGroup(role_, USER.getName());
-      for (TPrivilege[] privs: privileges) {
-        for (TPrivilege privilege: privs) {
-          privilege.setPrincipal_id(role.getId());
-          privilege.setPrincipal_type(TPrincipalType.ROLE);
-          authzCatalog_.addRolePrivilege(role_, privilege);
-        }
+    private List<WithPrincipal> buildWithPrincipals() {
+      List<WithPrincipal> withPrincipals = new ArrayList<>();
+      switch (authzProvider_) {
+        case SENTRY:
+          withPrincipals.add(new WithSentryRole());
+          withPrincipals.add(new WithSentryUser());
+          break;
+        case RANGER:
+          withPrincipals.add(new WithRangerUser());
+          break;
+        default:
+          throw new IllegalArgumentException(String.format(
+              "Unsupported authorization provider: %s", authzProvider_));
       }
-    }
-
-    private void createUser(TPrivilege[]... privileges) throws ImpalaException {
-      org.apache.impala.catalog.User user = authzCatalog_.addUser(user_);
-      for (TPrivilege[] privs: privileges) {
-        for (TPrivilege privilege: privs) {
-          privilege.setPrincipal_id(user.getId());
-          privilege.setPrincipal_type(TPrincipalType.USER);
-          authzCatalog_.addUserPrivilege(user_, privilege);
-        }
-      }
-    }
-
-    private void dropRole() throws ImpalaException {
-      authzCatalog_.removeRole(role_);
-    }
-
-    private void dropUser() throws ImpalaException {
-      authzCatalog_.removeUser(user_);
+      return withPrincipals;
     }
 
     /**
-     * This method runs with the specified privileges for the role and then for the user.
-     *
-     * A new temporary role/user will be created and assigned to the specified privileges
-     * into the new role/user. The new role/user will be dropped once this method
-     * finishes.
+     * This method runs with the specified privileges.
      */
     public AuthzTest ok(TPrivilege[]... privileges) throws ImpalaException {
-      for (WithPrincipal withPrincipal: new WithPrincipal[]{
-          new WithRole(this), new WithUser(this)}) {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
         try {
-          withPrincipal.create(privileges);
+          withPrincipal.init(privileges);
           if (context_ != null) {
             authzOk(context_, stmt_, withPrincipal);
           } else {
             authzOk(stmt_, withPrincipal);
           }
         } finally {
-          withPrincipal.drop();
+          withPrincipal.cleanUp();
         }
       }
       return this;
     }
 
     /**
-     * This method runs with the specified privileges and checks describe output for the
-     * role and then the user.
-     *
-     * A new temporary role/user will be created and assigned to the specified privileges
-     * into the new role/user. The new role/user will be dropped once this method
-     * finishes.
+     * This method runs with the specified privileges.
      */
     public AuthzTest okDescribe(TTableName table, DescribeOutput output,
         TPrivilege[]... privileges) throws ImpalaException {
-      for (WithPrincipal withPrincipal: new WithPrincipal[]{
-          new WithRole(this), new WithUser(this)}) {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
         try {
-          withPrincipal.create(privileges);
+          withPrincipal.init(privileges);
           if (context_ != null) {
             authzOk(context_, stmt_, withPrincipal);
           } else {
@@ -3033,32 +3253,27 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           }
           output.validate(table);
         } finally {
-          withPrincipal.drop();
+          withPrincipal.cleanUp();
         }
       }
       return this;
     }
 
     /**
-     * This method runs with the specified privileges for the user and then the role.
-     *
-     * A new temporary role/user will be created and assigned to the specified privileges
-     * into the new role/user. The new role/user will be dropped once this method
-     * finishes.
+     * This method runs with the specified privileges.
      */
     public AuthzTest error(String expectedError, TPrivilege[]... privileges)
         throws ImpalaException {
-      for (WithPrincipal withPrincipal: new WithPrincipal[]{
-          new WithRole(this), new WithUser(this)}) {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
         try {
-          withPrincipal.create(privileges);
+          withPrincipal.init(privileges);
           if (context_ != null) {
             authzError(context_, stmt_, expectedError, withPrincipal);
           } else {
             authzError(stmt_, expectedError, withPrincipal);
           }
         } finally {
-          withPrincipal.drop();
+          withPrincipal.cleanUp();
         }
       }
       return this;
@@ -3081,7 +3296,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.SERVER, false);
-      privileges[i].setServer_name(SENTRY_SERVER);
+      privileges[i].setServer_name(SERVER_NAME);
       privileges[i].setHas_grant_opt(grantOption);
     }
     return privileges;
@@ -3096,7 +3311,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.DATABASE, false);
-      privileges[i].setServer_name(SENTRY_SERVER);
+      privileges[i].setServer_name(SERVER_NAME);
       privileges[i].setDb_name(db);
       privileges[i].setHas_grant_opt(grantOption);
     }
@@ -3112,7 +3327,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.TABLE, false);
-      privileges[i].setServer_name(SENTRY_SERVER);
+      privileges[i].setServer_name(SERVER_NAME);
       privileges[i].setDb_name(db);
       privileges[i].setTable_name(table);
       privileges[i].setHas_grant_opt(grantOption);
@@ -3143,7 +3358,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     for (int i = 0; i < levels.length; i++) {
       for (String column: columns) {
         privileges[idx] = new TPrivilege(levels[i], TPrivilegeScope.COLUMN, false);
-        privileges[idx].setServer_name(SENTRY_SERVER);
+        privileges[idx].setServer_name(SERVER_NAME);
         privileges[idx].setDb_name(db);
         privileges[idx].setTable_name(table);
         privileges[idx].setColumn_name(column);
@@ -3162,7 +3377,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.URI, false);
-      privileges[i].setServer_name(SENTRY_SERVER);
+      privileges[i].setServer_name(SERVER_NAME);
       privileges[i].setUri(uri);
       privileges[i].setHas_grant_opt(grantOption);
     }
@@ -3170,7 +3385,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
-    authzOk(analysisContext_, stmt, withPrincipal);
+    authzOk(authzCtx_, stmt, withPrincipal);
   }
 
   private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal)
@@ -3197,12 +3412,12 @@ public class AuthorizationStmtTest extends FrontendTestBase {
    */
   private void authzError(String stmt, String expectedError, Matcher matcher,
       WithPrincipal withPrincipal) throws ImpalaException {
-    authzError(analysisContext_, stmt, expectedError, matcher, withPrincipal);
+    authzError(authzCtx_, stmt, expectedError, matcher, withPrincipal);
   }
 
   private void authzError(String stmt, String expectedError, WithPrincipal withPrincipal)
       throws ImpalaException {
-    authzError(analysisContext_, stmt, expectedError, startsWith(), withPrincipal);
+    authzError(authzCtx_, stmt, expectedError, startsWith(), withPrincipal);
   }
 
   private void authzError(AnalysisContext ctx, String stmt, String expectedError,
@@ -3258,8 +3473,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   private void verifyPrivilegeReqs(String stmt, Set<String> expectedPrivilegeNames)
       throws ImpalaException {
-    verifyPrivilegeReqs(createAnalysisCtx(createAuthorizationConfig()), stmt,
-        expectedPrivilegeNames);
+    verifyPrivilegeReqs(createAnalysisCtx(authzFactory_), stmt, expectedPrivilegeNames);
   }
 
   private void verifyPrivilegeReqs(AnalysisContext ctx, String stmt,

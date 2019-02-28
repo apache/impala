@@ -320,20 +320,20 @@ public class AuditingTest extends FrontendTestBase {
     Set<TAccessEvent> accessEvents =
         AnalyzeAccessEvents("describe functional.alltypesagg");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.alltypesagg", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+        "functional.alltypesagg", TCatalogObjectType.TABLE, "ANY")));
 
     accessEvents = AnalyzeAccessEvents("describe formatted functional.alltypesagg");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.alltypesagg", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+        "functional.alltypesagg", TCatalogObjectType.TABLE, "ANY")));
 
     accessEvents = AnalyzeAccessEvents("describe functional.complex_view");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.complex_view", TCatalogObjectType.VIEW, "VIEW_METADATA")));
+        "functional.complex_view", TCatalogObjectType.VIEW, "ANY")));
 
     accessEvents = AnalyzeAccessEvents(
         "describe functional.allcomplextypes.int_array_col");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.allcomplextypes", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+        "functional.allcomplextypes", TCatalogObjectType.TABLE, "ANY")));
   }
 
   @Test
@@ -373,8 +373,9 @@ public class AuditingTest extends FrontendTestBase {
             "/does/not/exist", System.getenv("IMPALA_HOME") +
             "/fe/src/test/resources/sentry-site.xml");
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
-      Frontend fe = new Frontend(new SentryAuthorizationFactory(config), catalog);
-      AnalysisContext analysisCtx = createAnalysisCtx(config);
+      SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(config);
+      Frontend fe = new Frontend(authzFactory, catalog);
+      AnalysisContext analysisCtx = createAnalysisCtx(authzFactory);
       // We should get an audit event even when an authorization failure occurs.
       try {
         parseAndAnalyze("create table foo_does_not_exist(i int)", analysisCtx, fe);
@@ -462,12 +463,12 @@ public class AuditingTest extends FrontendTestBase {
     // Describe
     accessEvents = AnalyzeAccessEvents("describe functional_kudu.testtbl");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
 
     // Describe formatted
     accessEvents = AnalyzeAccessEvents("describe formatted functional_kudu.testtbl");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
   }
 
   /**

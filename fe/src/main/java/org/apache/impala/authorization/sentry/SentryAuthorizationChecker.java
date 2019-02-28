@@ -19,13 +19,14 @@ package org.apache.impala.authorization.sentry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
@@ -96,7 +97,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
 
     // The Hive Access API does not currently provide a way to check if the user
     // has any privileges on a given resource.
-    if (request.getPrivilege().getAnyOf()) {
+    if (request.getPrivilege().hasAnyOf()) {
       for (ImpalaAction action: actions) {
         if (provider_.hasAccess(new Subject(user.getShortName()), authorizables,
             EnumSet.of(action), request.hasGrantOption(), ActiveRoleSet.ALL)) {
@@ -109,7 +110,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
       // an AuthorizableFn only contains the server and database, but not the function
       // itself. So there is no need to remove the last authorizable here.
     } else if (request.getPrivilege() == Privilege.CREATE && authorizables.size() > 1 &&
-        !(request.getAuthorizable() instanceof SentryAuthorizableFn)) {
+        !(request.getAuthorizable().getType() == Type.FUNCTION)) {
       // CREATE on an object requires CREATE on the parent,
       // so don't check access on the object we're creating.
       authorizables.remove(authorizables.size() - 1);

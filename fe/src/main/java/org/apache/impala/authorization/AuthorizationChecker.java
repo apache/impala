@@ -18,11 +18,12 @@
 package org.apache.impala.authorization;
 
 import java.util.EnumSet;
+import java.util.Set;
 
 import org.apache.impala.authorization.Authorizable.Type;
-import org.apache.impala.common.InternalException;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.common.InternalException;
 
 /**
  * A base class used to check whether a user has access to a given resource.
@@ -110,4 +111,9 @@ public abstract class AuthorizationChecker {
    */
   protected abstract boolean authorize(User user, PrivilegeRequest request)
       throws InternalException;
+
+  /**
+   * Returns a set of groups for a given user.
+   */
+  public abstract Set<String> getUserGroups(User user) throws InternalException;
 }

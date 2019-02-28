@@ -1,0 +1,13 @@
+{
+  "description": "Impala test service",
+  "isEnabled": true,
+  "name": "test_impala",
+  "type": "hive",
+  "version": 1,
+  "configs": {
+    "username": "admin",
+    "password": "admin",
+    "jdbc.driverClassName": "test",
+    "jdbc.url": "test"
+  }
+}

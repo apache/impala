@@ -40,10 +40,13 @@ using namespace impala;
 DEFINE_string(authorization_factory_class,
     "org.apache.impala.authorization.sentry.SentryAuthorizationFactory",
     "Specifies the class name that implements the authorization provider.");
+DEFINE_string(ranger_service_type, "hive", "Specifies the Ranger service type.");
+DEFINE_string(ranger_app_id, "",
+    "Specifies the Ranger application ID. Ranger application ID is an ID to "
+    "uniquely identify the application that communicates with Ranger. This flag is "
+    "required when authorization with Ranger is enabled.");
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
-    "server during authorization. Set to enable authorization. By default, the "
-    "authorization policy will be loaded from the catalog server (via the statestore)."
-    "To use a file based authorization policy, set --authorization_policy_file.");
+    "server during authorization. Set to enable authorization.");
 DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
     "file. If set, authorization will be enabled and the authorization policy will be "
     "read from a file.");

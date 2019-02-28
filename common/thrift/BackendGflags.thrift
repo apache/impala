@@ -121,4 +121,8 @@ struct TBackendGflags {
   47: required string authorization_factory_class
 
   48: required bool unlock_mt_dop
+
+  49: required string ranger_service_type
+
+  50: required string ranger_app_id
 }
