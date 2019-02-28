@@ -89,8 +89,8 @@ void SystemStateInfo::ComputeCpuRatios() {
   const CpuValues& old = cpu_values_[1 - cur_val_idx_];
 
   // Sum up all counters
-  int64_t cur_sum = accumulate(cur.begin(), cur.end(), 0);
-  int64_t old_sum = accumulate(old.begin(), old.end(), 0);
+  int64_t cur_sum = accumulate(cur.begin(), cur.end(), 0L);
+  int64_t old_sum = accumulate(old.begin(), old.end(), 0L);
 
   int64_t total_tics = cur_sum - old_sum;
   // If less than 1/USER_HZ time has time has passed for any of the counters, the ratio is

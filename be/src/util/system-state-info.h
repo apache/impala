@@ -87,6 +87,7 @@ class SystemStateInfo {
   CpuUsageRatios cpu_ratios_;
 
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatios);
+  FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatiosIntOverflow);
   FRIEND_TEST(SystemStateInfoTest, ParseProcStat);
   FRIEND_TEST(SystemStateInfoTest, ReadProcStat);
 };

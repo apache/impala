@@ -60,6 +60,19 @@ TEST_F(SystemStateInfoTest, ParseProcStat) {
   EXPECT_EQ(changed_state[SystemStateInfo::CPU_USER], 3000000000);
 }
 
+// Tests that computing CPU ratios doesn't overflow
+TEST_F(SystemStateInfoTest, ComputeCpuRatiosIntOverflow) {
+  // Load old and new values for CPU counters. These values are from a system where we
+  // have seen this code overflow before.
+  info.ReadProcStatString("cpu  100952877 534 18552749 6318822633 4119619 0 0 0 0 0");
+  info.ReadProcStatString("cpu  100953598 534 18552882 6318826150 4119619 0 0 0 0 0");
+  info.ComputeCpuRatios();
+  const SystemStateInfo::CpuUsageRatios& r = info.GetCpuUsageRatios();
+  EXPECT_EQ(r.user, 1649);
+  EXPECT_EQ(r.system, 304);
+  EXPECT_EQ(r.iowait, 0);
+}
+
 // Smoke test for the public interface.
 TEST_F(SystemStateInfoTest, GetCpuUsageRatios) {
   AtomicBool running(true);
