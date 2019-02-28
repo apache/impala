@@ -210,7 +210,8 @@ TEST(QueryOptions, SetEnumOptions) {
   TestEnumCase(options, CASE(parquet_array_resolution, TParquetArrayResolution,
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
   TestEnumCase(options, CASE(compression_codec, THdfsCompression,
-      (NONE, GZIP, BZIP2, DEFAULT, SNAPPY, SNAPPY_BLOCKED)), false);
+      (NONE, DEFAULT, GZIP, DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB,
+          ZSTD)), true);
   TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,
       (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC)), true);
 #undef CASE

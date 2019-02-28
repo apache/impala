@@ -171,6 +171,35 @@ static bool IsRemovedQueryOption(const string& key) {
   return false;
 }
 
+// Return all enum values in a string format, e.g. FOO(1), BAR(2), BAZ(3).
+static string GetThriftEnumValues(const map<int, const char*>& enum_values_to_names) {
+  bool first = true;
+  stringstream ss;
+  for (const auto& e : enum_values_to_names) {
+    if (!first) {
+      ss << ", ";
+    } else {
+      first = false;
+    }
+    ss << e.second << "(" << e.first << ")";
+  }
+  return ss.str();
+}
+
+// Return false for an invalid Thrift enum value.
+template<typename ENUM_TYPE>
+static Status GetThriftEnum(const string& value, const string& key,
+    const map<int, const char*>& enum_values_to_names, ENUM_TYPE* enum_value) {
+  for (const auto& e : enum_values_to_names) {
+    if (iequals(value, to_string(e.first)) || iequals(value, e.second)) {
+      *enum_value = static_cast<ENUM_TYPE>(e.first);
+      return Status::OK();
+    }
+  }
+  return Status(Substitute("Invalid $0: '$1'. Valid values are $2.", key, value,
+      GetThriftEnumValues(enum_values_to_names)));
+}
+
 // Note that we allow numerical values for boolean and enum options. This is because
 // TQueryOptionsToMap() will output the numerical values, and we need to parse its output
 // configuration.
@@ -232,23 +261,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_debug_action(value.c_str());
         break;
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
-        if (iequals(value, "none")) {
-          query_options->__set_compression_codec(THdfsCompression::NONE);
-        } else if (iequals(value, "gzip")) {
-          query_options->__set_compression_codec(THdfsCompression::GZIP);
-        } else if (iequals(value, "bzip2")) {
-          query_options->__set_compression_codec(THdfsCompression::BZIP2);
-        } else if (iequals(value, "default")) {
-          query_options->__set_compression_codec(THdfsCompression::DEFAULT);
-        } else if (iequals(value, "snappy")) {
-          query_options->__set_compression_codec(THdfsCompression::SNAPPY);
-        } else if (iequals(value, "snappy_blocked")) {
-          query_options->__set_compression_codec(THdfsCompression::SNAPPY_BLOCKED);
-        } else {
-          stringstream ss;
-          ss << "Invalid compression codec: " << value;
-          return Status(ss.str());
-        }
+        THdfsCompression::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum<THdfsCompression::type>(value,
+            "compression codec", _THdfsCompression_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_compression_codec(enum_type);
         break;
       }
       case TImpalaQueryOptions::HBASE_CACHING:

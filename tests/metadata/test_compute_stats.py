@@ -25,6 +25,8 @@ from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+from CatalogObjects.ttypes import THdfsCompression
+
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 class TestComputeStats(ImpalaTestSuite):
@@ -73,6 +75,19 @@ class TestComputeStats(ImpalaTestSuite):
       self.run_test_case('QueryTest/compute-stats-keywords', vector)
     finally:
       self.cleanup_db("parquet")
+
+  @SkipIfS3.eventually_consistent
+  def test_compute_stats_compression_codec(self, vector, unique_database):
+    """IMPALA-8254: Tests that running compute stats with compression_codec set
+    should not throw an error."""
+    table = "{0}.codec_tbl".format(unique_database)
+    self.execute_query_expect_success(self.client, "create table {0}(i int)"
+                                      .format(table))
+    for codec in THdfsCompression._NAMES_TO_VALUES.keys():
+      for c in [codec.lower(), codec.upper()]:
+        self.execute_query_expect_success(self.client, "compute stats {0}".format(table),
+                                          {"compression_codec": c})
+        self.execute_query_expect_success(self.client, "drop stats {0}".format(table))
 
   @SkipIfS3.hive
   @SkipIfABFS.hive
