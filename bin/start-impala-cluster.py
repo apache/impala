@@ -126,6 +126,7 @@ parser.add_option("--per_impalad_args", dest="per_impalad_args", type="string"
 options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
+CORE_SITE_PATH = os.path.join(IMPALA_HOME, "fe/src/test/resources/core-site.xml")
 KNOWN_BUILD_TYPES = ["debug", "release", "latest"]
 
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
@@ -617,6 +618,12 @@ if __name__ == "__main__":
     # We use some functions in the docker code that don't exist in Python 2.6.
     from subprocess import check_output
     cluster_ops = DockerMiniClusterOperations(options.docker_network)
+
+  # If core-site.xml is missing, it likely means that we are missing config
+  # files and should try regenerating them.
+  if not os.path.exists(CORE_SITE_PATH):
+    LOG.info("{0} is missing, regenerating cluster configs".format(CORE_SITE_PATH))
+    check_call(os.path.join(IMPALA_HOME, "bin/create-test-configuration.sh"))
 
   # Kill existing cluster processes based on the current configuration.
   if options.restart_impalad_only:
