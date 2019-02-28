@@ -80,3 +80,12 @@ join test_insert_huge_vals t2 on t1.s = t2.s
 ---- RESULTS
 1500002
 ====
+---- QUERY
+# IMPALA-8257: Test that we can write multiple pages of empty strings.
+create table if not exists test_insert_empty_strings stored as parquet
+  location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/test_insert_empty_strings'
+  as select "" from tpch_parquet.lineitem;
+select count(*) from test_insert_empty_strings
+---- RESULTS
+6001215
+====

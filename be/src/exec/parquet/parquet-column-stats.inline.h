@@ -208,11 +208,16 @@ inline void ColumnStats<StringValue>::Merge(const ColumnStatsBase& other) {
       const ColumnStats<StringValue>*>(&other);
   if (cs->has_min_max_values_) {
     if (has_min_max_values_) {
-      // Make sure that we copied the previous page's min/max values to their own buffer.
-      DCHECK_NE(static_cast<void*>(prev_page_min_value_.ptr),
-                static_cast<void*>(cs->min_value_.ptr));
-      DCHECK_NE(static_cast<void*>(prev_page_max_value_.ptr),
-                static_cast<void*>(cs->max_value_.ptr));
+      // Make sure that we copied the previous page's min/max values
+      // to their own buffer.
+      if (prev_page_min_value_.ptr != nullptr) {
+        DCHECK_NE(static_cast<void*>(prev_page_min_value_.ptr),
+                  static_cast<void*>(cs->min_value_.ptr));
+      }
+      if (prev_page_max_value_.ptr != nullptr) {
+        DCHECK_NE(static_cast<void*>(prev_page_max_value_.ptr),
+                  static_cast<void*>(cs->max_value_.ptr));
+      }
       if (ascending_boundary_order_) {
         if (prev_page_max_value_ > cs->max_value_ ||
             prev_page_min_value_ > cs->min_value_) {
