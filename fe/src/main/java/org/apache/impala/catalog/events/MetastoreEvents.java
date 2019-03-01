@@ -173,22 +173,23 @@ public class MetastoreEvents {
       }
       Iterator<MetastoreEvent> it = metastoreEvents.iterator();
       // filter out the create events which has a corresponding drop event later
-      int fromIndex = 0;
+      int sizeBefore = metastoreEvents.size();
       int numFilteredEvents = 0;
-      int inputSize = metastoreEvents.size();
-      while (it.hasNext()) {
-        MetastoreEvent current = it.next();
-        if (fromIndex < metastoreEvents.size() && current.isRemovedAfter(
-            metastoreEvents.subList(fromIndex + 1, metastoreEvents.size()))) {
-          LOG.info(current.debugString("Filtering out this event since the object is "
+      int i = 0;
+      while (i < metastoreEvents.size()) {
+        MetastoreEvent currentEvent = metastoreEvents.get(i);
+        if (currentEvent.isRemovedAfter(metastoreEvents.subList(i + 1,
+            metastoreEvents.size()))) {
+          LOG.info(currentEvent.debugString("Filtering out this event since the object is "
               + "either removed or renamed later in the event stream"));
-          it.remove();
+          metastoreEvents.remove(i);
           numFilteredEvents++;
+        } else {
+          i++;
         }
-        fromIndex++;
       }
       LOG.info(String.format("Total number of events received: %d Total number of events "
-          + "filtered out: %d", inputSize, numFilteredEvents));
+          + "filtered out: %d", sizeBefore, numFilteredEvents));
       return metastoreEvents;
     }
   }

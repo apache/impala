@@ -17,6 +17,11 @@
 
 package org.apache.impala.catalog.events;
 
+import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.ALTER_TABLE;
+import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_DATABASE;
+import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_TABLE;
+import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_DATABASE;
+import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_TABLE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -595,13 +600,13 @@ public class MetastoreEventsProcessorTest {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     createDatabase();
     eventsProcessor_.processEvents();
-    createTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
     assertNotNull("Table should have been found after create table statement",
         catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
     loadTable(TEST_TABLE_NAME_NONPARTITIONED);
     dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
     // now catalogD does not have the table entry, create the table again
-    createTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
     assertNotNull("Table should have been found after create table statement",
         catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
     loadTable(TEST_TABLE_NAME_NONPARTITIONED);
@@ -644,7 +649,7 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testTableEventsFromImpala() throws ImpalaException {
     createDatabaseFromImpala(TEST_DB_NAME, "created from Impala");
-    createTableFromImpala(TEST_TABLE_NAME_PARTITIONED, true);
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, true);
     loadTable(TEST_TABLE_NAME_PARTITIONED);
     List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
     assertEquals(2, events.size());
@@ -671,32 +676,63 @@ public class MetastoreEventsProcessorTest {
    * table should not create a in
    */
   @Test
-  public void testEventFiltering() throws ImpalaException {
+  public void testEventFiltering() throws Exception {
     createDatabaseFromImpala(TEST_DB_NAME, "");
-    createTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
     loadTable(TEST_TABLE_NAME_NONPARTITIONED);
     assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
     dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
     // the create table event should be filtered out
-    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
-    assertEquals(3, events.size());
-    List<MetastoreEvent> filteredEvents =
-        eventsProcessor_.getMetastoreEventFactory().getFilteredEvents(events);
-    assertEquals(2, filteredEvents.size());
-    assertEquals(MetastoreEventType.CREATE_DATABASE, filteredEvents.get(0).eventType_);
-    assertEquals(MetastoreEventType.DROP_TABLE, filteredEvents.get(1).eventType_);
-    eventsProcessor_.processEvents();
-    assertNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+    verifyFilterEvents(3, 2, Arrays.asList(CREATE_DATABASE, DROP_TABLE));
 
     // test the table rename case
-    createTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
     renameTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, "new_name");
-    events = eventsProcessor_.getNextMetastoreEvents();
-    assertEquals(2, events.size());
-    filteredEvents =
+    // create table gets filtered out since it was renamed immediated after
+    verifyFilterEvents(2, 1, Arrays.asList(ALTER_TABLE));
+
+    //cleanup
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
+    eventsProcessor_.processEvents();
+
+    // test when multiple events can be filtered out
+    // create_db, create_tbl, drop_tbl, drop_db
+    createDatabaseFromImpala(TEST_DB_NAME, "desc");
+    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
+    loadTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED);
+    assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+    dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
+    verifyFilterEvents(4, 2, Arrays.asList(DROP_TABLE, DROP_DATABASE));
+
+    // create event stream s.t inverse events have gaps from their counterparts
+    createDatabase();
+    // unrelated event
+    createTable("dummy", false);
+    createTable(TEST_TABLE_NAME_NONPARTITIONED, false);
+    // dummy events
+    alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED, "paramkey", "paramVal");
+    alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED, "paramkey1", "paramVal2");
+    dropTable(TEST_TABLE_NAME_NONPARTITIONED);
+    // this would generate drop_table for dummy table as well
+    dropDatabaseCascade(TEST_DB_NAME);
+    verifyFilterEvents(8, 5, Arrays.asList(ALTER_TABLE, ALTER_TABLE, DROP_TABLE,
+        DROP_TABLE, DROP_DATABASE));
+  }
+
+  private void verifyFilterEvents(int total, int numFiltered,
+      List<MetastoreEventType> expectedFilteredEventTypes) throws ImpalaException {
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(total, events.size());
+    List<MetastoreEvent> filteredEvents =
         eventsProcessor_.getMetastoreEventFactory().getFilteredEvents(events);
-    assertEquals(1, filteredEvents.size());
-    assertEquals(MetastoreEventType.ALTER_TABLE, filteredEvents.get(0).eventType_);
+    assertEquals(numFiltered, filteredEvents.size());
+    int i = 0;
+    for (MetastoreEvent e : filteredEvents) {
+      assertEquals(expectedFilteredEventTypes.get(i++), e.eventType_);
+    }
+    eventsProcessor_.processEvents();
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
   }
 
   /**
@@ -712,7 +748,7 @@ public class MetastoreEventsProcessorTest {
     createDatabaseFromImpala(TEST_DB_NAME, "first");
     assertNotNull("Db should have been found after create database statement",
         catalog_.getDb(TEST_DB_NAME));
-    dropDatabaseFromImpala(TEST_DB_NAME);
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
     assertNull(catalog_.getDb(TEST_DB_NAME));
     createDatabaseFromImpala(TEST_DB_NAME, "second");
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
@@ -1112,7 +1148,7 @@ public class MetastoreEventsProcessorTest {
     }
 
     testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams,
-        tblParams, MetastoreEventType.CREATE_DATABASE, shouldEventGetProcessed);
+        tblParams, CREATE_DATABASE, shouldEventGetProcessed);
     testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams,
         tblParams, MetastoreEventType.ALTER_DATABASE, shouldEventGetProcessed);
 
@@ -1427,18 +1463,19 @@ public class MetastoreEventsProcessorTest {
   /**
    * Drops db from Impala
    */
-  private void dropDatabaseFromImpala(String dbName) throws ImpalaException {
+  private void dropDatabaseCascadeFromImpala(String dbName) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
     req.setDdl_type(TDdlType.DROP_DATABASE);
     TDropDbParams dropDbParams = new TDropDbParams();
     dropDbParams.setDb(dbName);
+    dropDbParams.setCascade(true);
     req.setDrop_db_params(dropDbParams);
     catalogOpExecutor_.execDdlRequest(req);
   }
 
-  private void createTableFromImpala(String tblName, boolean isPartitioned)
+  private void createTableFromImpala(String dbName, String tblName, boolean isPartitioned)
       throws ImpalaException {
-    createTableFromImpala(TEST_DB_NAME, tblName, null, isPartitioned);
+    createTableFromImpala(dbName, tblName, null, isPartitioned);
   }
   /**
    * Creates a table using CatalogOpExecutor to simulate a DDL operation from Impala
