@@ -555,7 +555,8 @@ class DockerMiniClusterOperations(object):
   def __stop_container__(self, daemon, instance=None):
     """Stop a container that was created by __run_container__()."""
     container_name = self.__gen_container_name__(daemon, instance)
-    check_call(["docker", "stop", container_name])
+    if call(["docker", "stop", container_name]) == 0:
+      LOG.info("Stopped container {0}".format(container_name))
 
   def __destroy_container__(self, daemon, instance=None):
     """Destroy a container that was created by __run_container__()."""
