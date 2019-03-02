@@ -302,15 +302,13 @@ class TestWebPage(ImpalaTestSuite):
 
   def __test_catalog_tablesfilesusage(self, db_name, tbl_name, numfiles):
     """Test the list of tables with  most number of files in the catalog page.
-    Make sure the loaded table is in the list and with correct file number."""
+    Make sure the loaded table has correct file count."""
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))
     response = self.get_and_check_status(self.CATALOG_URL,
       "Tables with Most Number of Files", ports_to_test=self.CATALOG_TEST_PORT)
     list_file_str = re.search('<table id="high-file-count-tables"( .*?)</table>',
       response[0].text, re.MULTILINE | re.DOTALL)
     target_metric = "%s.%s-metric" % (db_name, tbl_name)
-    # Check the db table is in the list
-    assert target_metric in list_file_str.group(0)
     list_files = re.findall('<tr>(.*?)</tr>', list_file_str.group(0),
       re.MULTILINE | re.DOTALL)
     for trow in list_files:
@@ -324,13 +322,13 @@ class TestWebPage(ImpalaTestSuite):
     response_json = json.loads(response[0].text)
     high_filecount_tbls = response_json["high_file_count_tables"]
     tbl_fname = "%s.%s" % (db_name, tbl_name)
-    hasTbl = 0
     assert len(high_filecount_tbls) > 0
+    # The expected table might not be in the Top-N list, we may not find it
+    # in the list. Just make sure the file count is right if it is in the
+    # list.
     for tblinfo in high_filecount_tbls:
       if tblinfo["name"] == tbl_fname:
         assert tblinfo["num_files"] == int(numfiles)
-        hasTbl = 1
-    assert hasTbl == 1
 
   def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
                                      expected_state=None):
