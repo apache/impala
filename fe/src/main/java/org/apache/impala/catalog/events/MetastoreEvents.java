@@ -251,6 +251,7 @@ public class MetastoreEvents {
     public void processIfEnabled()
         throws CatalogException, MetastoreNotificationException {
       if (isEventProcessingDisabled()) {
+        LOG.info(debugString("Skipping this event because of flag evaluation"));
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         return;
       }
@@ -402,7 +403,7 @@ public class MetastoreEvents {
       Preconditions.checkNotNull(msTbl_);
       Boolean tblProperty = getHmsSyncProperty(msTbl_);
       if (tblProperty != null) {
-        debugLog("Found table level flag {} is set to {}",
+        infoLog("Found table level flag {} is set to {}",
             DISABLE_EVENT_HMS_SYNC_KEY, tblProperty.toString());
         return tblProperty;
       }
@@ -411,7 +412,7 @@ public class MetastoreEvents {
       if (dbFlagVal != null) {
         // no need to spew unnecessary logs. Most tables/databases are expected to not
         // have this flag set when event based HMS polling is enabled
-        debugLog("Table level flag is not set. Db level flag {} at Db level is {}",
+        infoLog("Table level flag is not set. Db level flag {} at Db level is {}",
                 DISABLE_EVENT_HMS_SYNC_KEY, dbFlagVal);
       }
       // flag value of null also returns false
@@ -693,7 +694,11 @@ public class MetastoreEvents {
     @Override
     protected boolean isEventProcessingDisabled() {
       // if the event sync flag was changed then we always process this event
-      if (!Objects.equals(eventSyncBeforeFlag_, eventSyncAfterFlag_)) return false;
+      if (!Objects.equals(eventSyncBeforeFlag_, eventSyncAfterFlag_)) {
+        infoLog("Before flag value {} after flag value {} changed",
+            eventSyncBeforeFlag_, eventSyncAfterFlag_);
+        return false;
+      }
       // flag is unchanged, use the default impl from base class
       return super.isEventProcessingDisabled();
     }

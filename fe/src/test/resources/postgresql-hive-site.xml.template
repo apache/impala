@@ -237,4 +237,10 @@ See IMPALA-7954 for details -->
   <name>hive.metastore.alter.notifications.basic</name>
   <value>false</value>
 </property>
+<!-- This property is required so that table parameters do not exclude keys which certain features
+ like event processing depend on. See IMPALA-8273 for details -->
+<property>
+  <name>hive.metastore.notification.parameters.exclude.patterns</name>
+  <value></value>
+</property>
 </configuration>
