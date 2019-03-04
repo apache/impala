@@ -52,7 +52,6 @@ import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryConfig;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -114,9 +113,7 @@ import org.slf4j.LoggerFactory;
  * thrift objects enabled in the event messages.
  */
 public class MetastoreEventsProcessorTest {
-  private static final String TEST_TABLE_NAME_PARTITIONED = "test_partitioned_tbl";
   private static final String TEST_DB_NAME = "events_test_db";
-  private static final String TEST_TABLE_NAME_NONPARTITIONED = "test_nonpartitioned_tbl";
 
   private static CatalogServiceCatalog catalog_;
   private static CatalogOpExecutor catalogOpExecutor_;
@@ -146,6 +143,10 @@ public class MetastoreEventsProcessorTest {
       catalog_.removeDb(TEST_DB_NAME);
     } catch (Exception ex) {
       // ignored
+    } finally {
+      if (eventsProcessor_ != null) {
+        eventsProcessor_.shutdown();
+      }
     }
   }
 
@@ -170,7 +171,7 @@ public class MetastoreEventsProcessorTest {
     }
     catalog_.removeDb(TEST_DB_NAME);
     // reset the event processor to the current eventId
-    eventsProcessor_.stop();
+    eventsProcessor_.pause();
     eventsProcessor_.start(eventsProcessor_.getCurrentEventId());
     eventsProcessor_.processEvents();
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
@@ -191,7 +192,7 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testCreateDatabaseEvent() throws TException, ImpalaException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
     eventsProcessor_.processEvents();
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
   }
@@ -222,7 +223,7 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testdropDatabaseEvent() throws TException, ImpalaException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
     String tblToBeDropped = "tbl_to_be_dropped";
     createTable(tblToBeDropped, true);
     createTable("tbl_to_be_dropped_unpartitioned", false);
@@ -251,7 +252,7 @@ public class MetastoreEventsProcessorTest {
   @Ignore("Disabled until we fix Hive bug to deserialize alter_database event messages")
   @Test
   public void testAlterDatabaseEvents() throws TException, ImpalaException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
     String testDbParamKey = "testKey";
     String testDbParamVal = "testVal";
     eventsProcessor_.processEvents();
@@ -302,27 +303,29 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testCreateTableEvent() throws TException, ImpalaException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testCreateTableEvent";
     eventsProcessor_.processEvents();
-    assertNull(TEST_TABLE_NAME_NONPARTITIONED + " is not expected to exist",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+    assertNull(testTblName + " is not expected to exist",
+        catalog_.getTable(TEST_DB_NAME, testTblName));
     // create a non-partitioned table
-    createTable(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTable(testTblName, false);
     eventsProcessor_.processEvents();
     assertNotNull("Catalog should have a incomplete instance of table after CREATE_TABLE "
             + "event is received",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+        catalog_.getTable(TEST_DB_NAME, testTblName));
     assertTrue("Newly created table from events should be a IncompleteTable",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
     // test partitioned table case
-    createTable(TEST_TABLE_NAME_PARTITIONED, true);
+    final String testPartitionedTbl = "testCreateTableEventPartitioned";
+    createTable(testPartitionedTbl, true);
     eventsProcessor_.processEvents();
     assertNotNull("Catalog should have create a incomplete table after receiving "
             + "CREATE_TABLE event",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED));
+        catalog_.getTable(TEST_DB_NAME, testPartitionedTbl));
     assertTrue("Newly created table should be instance of IncompleteTable",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testPartitionedTbl)
                 instanceof IncompleteTable);
   }
 
@@ -336,13 +339,14 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testPartitionEvents() throws TException, ImpalaException {
-    createDatabase();
-    createTable(TEST_TABLE_NAME_PARTITIONED, true);
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testPartitionEvents";
+    createTable(testTblName, true);
     // sync to latest event id
     eventsProcessor_.processEvents();
 
     // simulate the table being loaded by explicitly calling load table
-    loadTable(TEST_TABLE_NAME_PARTITIONED);
+    loadTable(testTblName);
     List<List<String>> partVals = new ArrayList<>();
 
     // create 4 partitions
@@ -350,17 +354,17 @@ public class MetastoreEventsProcessorTest {
     partVals.add(Arrays.asList("2"));
     partVals.add(Arrays.asList("3"));
     partVals.add(Arrays.asList("4"));
-    addPartitions(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, partVals);
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
 
     eventsProcessor_.processEvents();
     // after ADD_PARTITION event is received currently we just invalidate the table
     assertTrue("Table should have been invalidated after add partition event",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
 
-    loadTable(TEST_TABLE_NAME_PARTITIONED);
+    loadTable(testTblName);
     assertEquals("Unexpected number of partitions fetched for the loaded table", 4,
-        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED))
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName))
             .getPartitions()
             .size());
 
@@ -369,15 +373,15 @@ public class MetastoreEventsProcessorTest {
     partVals.add(Arrays.asList("1"));
     partVals.add(Arrays.asList("2"));
     partVals.add(Arrays.asList("3"));
-    dropPartitions(TEST_TABLE_NAME_PARTITIONED, partVals);
+    dropPartitions(testTblName, partVals);
     eventsProcessor_.processEvents();
 
     assertTrue("Table should have been invalidated after drop partition event",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
             instanceof IncompleteTable);
-    loadTable(TEST_TABLE_NAME_PARTITIONED);
+    loadTable(testTblName);
     assertEquals("Unexpected number of partitions fetched for the loaded table", 1,
-        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED))
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName))
             .getPartitions().size());
 
     // issue alter partition ops
@@ -385,10 +389,10 @@ public class MetastoreEventsProcessorTest {
     partVals.add(Arrays.asList("4"));
     Map<String, String> newParams = new HashMap<>(2);
     newParams.put("alterKey1", "alterVal1");
-    alterPartitions(TEST_TABLE_NAME_PARTITIONED, partVals, newParams);
+    alterPartitions(testTblName, partVals, newParams);
     eventsProcessor_.processEvents();
     assertTrue("Table should have been invalidated after alter partition event",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
             instanceof IncompleteTable);
   }
 
@@ -399,7 +403,8 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testAlterTableEvent() throws TException, ImpalaException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testAlterTableEvent";
     createTable("old_name", false);
     // sync to latest events
     eventsProcessor_.processEvents();
@@ -407,47 +412,47 @@ public class MetastoreEventsProcessorTest {
     loadTable("old_name");
 
     // test renaming a table from outside aka metastore client
-    alterTableRename("old_name", TEST_TABLE_NAME_NONPARTITIONED);
+    alterTableRename("old_name", testTblName);
     eventsProcessor_.processEvents();
     // table with the old name should not be present anymore
     assertNull(
         "Old named table still exists", catalog_.getTable(TEST_DB_NAME, "old_name"));
     // table with the new name should be present in Incomplete state
-    Table newTable = catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED);
+    Table newTable = catalog_.getTable(TEST_DB_NAME, testTblName);
     assertNotNull("Table with the new name is not found", newTable);
     assertTrue("Table with the new name should be incomplete",
         newTable instanceof IncompleteTable);
 
     // check invalidate after alter table add parameter
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED, "somekey", "someval");
+    loadTable(testTblName);
+    alterTableAddParameter(testTblName, "somekey", "someval");
     eventsProcessor_.processEvents();
     assertTrue("Table should be incomplete after alter table add parameter",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
 
     // check invalidate after alter table add col
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    alterTableAddCol(TEST_TABLE_NAME_NONPARTITIONED, "newCol", "int", "null");
+    loadTable(testTblName);
+    alterTableAddCol(testTblName, "newCol", "int", "null");
     eventsProcessor_.processEvents();
     assertTrue("Table should have been invalidated after alter table add column",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
 
     // check invalidate after alter table change column type
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    altertableChangeCol(TEST_TABLE_NAME_NONPARTITIONED, "newCol", "string", null);
+    loadTable(testTblName);
+    altertableChangeCol(testTblName, "newCol", "string", null);
     eventsProcessor_.processEvents();
     assertTrue("Table should have been invalidated after changing column type",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
 
     // check invalidate after alter table remove column
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    alterTableRemoveCol(TEST_TABLE_NAME_NONPARTITIONED, "newCol");
+    loadTable(testTblName);
+    alterTableRemoveCol(testTblName, "newCol");
     eventsProcessor_.processEvents();
     assertTrue("Table should have been invalidated after removing a column",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED)
+        catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
   }
 
@@ -458,46 +463,46 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testDropTableEvent() throws TException, ImpalaException {
-    createDatabase();
-    final String TBL_TO_BE_DROPPED = "tbl_to_be_dropped";
-    createTable(TBL_TO_BE_DROPPED, false);
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "tbl_to_be_dropped";
+    createTable(testTblName, false);
     eventsProcessor_.processEvents();
-    loadTable(TBL_TO_BE_DROPPED);
+    loadTable(testTblName);
     // issue drop table and make sure it doesn't exist after processing the events
-    dropTable(TBL_TO_BE_DROPPED);
+    dropTable(testTblName);
     eventsProcessor_.processEvents();
     assertTrue("Table should not be found after processing drop_table event",
-        catalog_.getTable(TEST_DB_NAME, TBL_TO_BE_DROPPED) == null);
+        catalog_.getTable(TEST_DB_NAME, testTblName) == null);
 
     // test partitioned table drop
-    createTable(TBL_TO_BE_DROPPED, true);
+    createTable(testTblName, true);
 
     eventsProcessor_.processEvents();
-    loadTable(TBL_TO_BE_DROPPED);
+    loadTable(testTblName);
     // create 2 partitions
     List<List<String>> partVals = new ArrayList<>(2);
     partVals.add(Arrays.asList("1"));
     partVals.add(Arrays.asList("2"));
-    addPartitions(TEST_DB_NAME, TBL_TO_BE_DROPPED, partVals);
-    dropTable(TBL_TO_BE_DROPPED);
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+    dropTable(testTblName);
     eventsProcessor_.processEvents();
     assertTrue("Partitioned table should not be found after processing drop_table event",
-        catalog_.getTable(TEST_DB_NAME, TBL_TO_BE_DROPPED) == null);
+        catalog_.getTable(TEST_DB_NAME, testTblName) == null);
   }
 
   /**
    * Test makes sure that the events are not processed when the event processor is in
-   * STOPPED state
+   * PAUSED state
    * @throws TException
    */
   @Test
-  public void testStopEventProcessing() throws TException {
+  public void testPauseEventProcessing() throws TException {
     try {
       assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
-      eventsProcessor_.stop();
-      createDatabase();
+      eventsProcessor_.pause();
+      createDatabase(TEST_DB_NAME, null);
       eventsProcessor_.processEvents();
-      assertEquals(EventProcessorStatus.STOPPED, eventsProcessor_.getStatus());
+      assertEquals(EventProcessorStatus.PAUSED, eventsProcessor_.getStatus());
       assertNull(
           "Test database should not be in catalog when event processing is stopped",
           catalog_.getDb(TEST_DB_NAME));
@@ -515,10 +520,10 @@ public class MetastoreEventsProcessorTest {
     try {
       assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
       long syncedIdBefore = eventsProcessor_.getLastSyncedEventId();
-      eventsProcessor_.stop();
-      createDatabase();
+      eventsProcessor_.pause();
+      createDatabase(TEST_DB_NAME, null);
       eventsProcessor_.processEvents();
-      assertEquals(EventProcessorStatus.STOPPED, eventsProcessor_.getStatus());
+      assertEquals(EventProcessorStatus.PAUSED, eventsProcessor_.getStatus());
       assertNull(
           "Test database should not be in catalog when event processing is stopped",
           catalog_.getDb(TEST_DB_NAME));
@@ -563,20 +568,24 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testEventProcessorFetchAfterHMSRestart() throws CatalogException {
     MetastoreEventsProcessor fetchProcessor =
-        new HMSFetchNotificationsEventProcessor(
-            catalog_, eventsProcessor_.getCurrentEventId(), 2L);
+        new HMSFetchNotificationsEventProcessor(CatalogServiceTestCatalog.create(),
+            eventsProcessor_.getCurrentEventId(), 2L);
     fetchProcessor.start();
-    assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
-    // Roughly half of the time an exception is thrown. Make sure the event processor
-    // is still active.
-    while (true) {
-      try {
-        fetchProcessor.getNextMetastoreEvents();
-      } catch (MetastoreNotificationFetchException ex) {
-        break;
+    try {
+      assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
+      // Roughly half of the time an exception is thrown. Make sure the event processor
+      // is still active.
+      while (true) {
+        try {
+          fetchProcessor.getNextMetastoreEvents();
+        } catch (MetastoreNotificationFetchException ex) {
+          break;
+        }
       }
+      assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
+    } finally {
+      fetchProcessor.shutdown();
     }
-    assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
   }
 
   /**
@@ -602,46 +611,47 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testCreateDropCreateTableFromImpala() throws ImpalaException, TException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testCreateDropCreateTableFromImpala";
     eventsProcessor_.processEvents();
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, testTblName, false);
     assertNotNull("Table should have been found after create table statement",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
+        catalog_.getTable(TEST_DB_NAME, testTblName));
+    loadTable(testTblName);
+    dropTableFromImpala(testTblName);
     // now catalogD does not have the table entry, create the table again
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTableFromImpala(TEST_DB_NAME, testTblName, false);
     assertNotNull("Table should have been found after create table statement",
-        catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
+        catalog_.getTable(TEST_DB_NAME, testTblName));
+    loadTable(testTblName);
     List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
     // the first create table event should not change anything to the catalogd's
     // created table
     assertEquals(3, events.size());
-    Table existingTable = catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED);
+    Table existingTable = catalog_.getTable(TEST_DB_NAME, testTblName);
     int creationTime = existingTable.getMetaStoreTable().getCreateTime();
     assertEquals("CREATE_TABLE", events.get(0).getEventType());
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(0)));
     // after processing the create_table the original table should still remain the same
     assertEquals(creationTime, catalog_.getTable(TEST_DB_NAME,
-        TEST_TABLE_NAME_NONPARTITIONED).getMetaStoreTable().getCreateTime());
+        testTblName).getMetaStoreTable().getCreateTime());
     //second event should be drop_table. This event should also be skipped since
     // catalog state is more recent than the event
     assertEquals("DROP_TABLE", events.get(1).getEventType());
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(1)));
     // even after drop table event, the table should still exist
     assertNotNull("Table should have existed since catalog state is current and event "
-        + "is stale", catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+        + "is stale", catalog_.getTable(TEST_DB_NAME, testTblName));
     // the final create table event should also be ignored since its a self-event
     assertEquals("CREATE_TABLE", events.get(2).getEventType());
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(2)));
     assertFalse(
         "Table should have been loaded since the create_table should be " + "ignored",
         catalog_.getTable(TEST_DB_NAME,
-            TEST_TABLE_NAME_NONPARTITIONED) instanceof IncompleteTable);
+            testTblName) instanceof IncompleteTable);
     //finally make sure the table is still the same
     assertEquals(creationTime, catalog_.getTable(TEST_DB_NAME,
-        TEST_TABLE_NAME_NONPARTITIONED).getMetaStoreTable().getCreateTime());
+        testTblName).getMetaStoreTable().getCreateTime());
   }
 
   /**
@@ -653,26 +663,27 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testTableEventsFromImpala() throws ImpalaException {
     createDatabaseFromImpala(TEST_DB_NAME, "created from Impala");
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, true);
-    loadTable(TEST_TABLE_NAME_PARTITIONED);
+    final String testTblName = "testTableEventsFromImpala";
+    createTableFromImpala(TEST_DB_NAME, testTblName, true);
+    loadTable(testTblName);
     List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
     assertEquals(2, events.size());
 
     eventsProcessor_.processEvents(events);
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
-    assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED));
+    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
     assertFalse("Table should have been loaded since it was already latest", catalog_
-        .getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED) instanceof IncompleteTable);
+        .getTable(TEST_DB_NAME, testTblName) instanceof IncompleteTable);
 
-    dropTableFromImpala(TEST_TABLE_NAME_PARTITIONED);
-    assertNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED));
+    dropTableFromImpala(testTblName);
+    assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
     events = eventsProcessor_.getNextMetastoreEvents();
     // should have 1 drop_table event
     assertEquals(1, events.size());
     eventsProcessor_.processEvents(events);
     // dropping a non-existant table should cause event processor to go into error state
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
-    assertNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED));
+    assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
   }
 
   /**
@@ -682,16 +693,17 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testEventFiltering() throws Exception {
     createDatabaseFromImpala(TEST_DB_NAME, "");
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
-    loadTable(TEST_TABLE_NAME_NONPARTITIONED);
-    assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
-    dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
+    final String testTblName = "testEventFiltering";
+    createTableFromImpala(TEST_DB_NAME, testTblName, false);
+    loadTable(testTblName);
+    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
+    dropTableFromImpala(testTblName);
     // the create table event should be filtered out
     verifyFilterEvents(3, 2, Arrays.asList(CREATE_DATABASE, DROP_TABLE));
 
     // test the table rename case
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
-    renameTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED, "new_name");
+    createTableFromImpala(TEST_DB_NAME, testTblName, false);
+    renameTableFromImpala(testTblName, "new_name");
     // create table gets filtered out since it was renamed immediated after
     verifyFilterEvents(2, 1, Arrays.asList(ALTER_TABLE));
 
@@ -702,22 +714,22 @@ public class MetastoreEventsProcessorTest {
     // test when multiple events can be filtered out
     // create_db, create_tbl, drop_tbl, drop_db
     createDatabaseFromImpala(TEST_DB_NAME, "desc");
-    createTableFromImpala(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, false);
-    loadTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED);
-    assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
-    dropTableFromImpala(TEST_TABLE_NAME_NONPARTITIONED);
+    createTableFromImpala(TEST_DB_NAME, testTblName, false);
+    loadTable(TEST_DB_NAME, testTblName);
+    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
+    dropTableFromImpala(testTblName);
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
     verifyFilterEvents(4, 2, Arrays.asList(DROP_TABLE, DROP_DATABASE));
 
     // create event stream s.t inverse events have gaps from their counterparts
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
     // unrelated event
     createTable("dummy", false);
-    createTable(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTable(testTblName, false);
     // dummy events
-    alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED, "paramkey", "paramVal");
-    alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED, "paramkey1", "paramVal2");
-    dropTable(TEST_TABLE_NAME_NONPARTITIONED);
+    alterTableAddParameter(testTblName, "paramkey", "paramVal");
+    alterTableAddParameter(testTblName, "paramkey1", "paramVal2");
+    dropTable(testTblName);
     // this would generate drop_table for dummy table as well
     dropDatabaseCascade(TEST_DB_NAME);
     verifyFilterEvents(8, 5, Arrays.asList(ALTER_TABLE, ALTER_TABLE, DROP_TABLE,
@@ -814,13 +826,14 @@ public class MetastoreEventsProcessorTest {
     List<String> dbFlagVals = Arrays.asList(null, "true", "false");
     // dbFlag transition is not tested here since ALTER_DATABASE events are ignored
     // currently. dbFlags do not change in the following loop
+    final String testTblName = "testEventSyncFlagTransitions";
     for (String dbFlag : dbFlagVals) {
       for (Pair<String, String> tblTransition : allTblTransitions) {
         // subsequent event is skipped based on the new value of tblTransition flag or
         // the dbFlag if the new value unsets it
         boolean shouldSubsequentEventsBeSkipped = tblTransition.second == null ?
             Boolean.valueOf(dbFlag) : Boolean.valueOf(tblTransition.second);
-        runDDLTestForFlagTransitionWithMock(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED,
+        runDDLTestForFlagTransitionWithMock(TEST_DB_NAME, testTblName,
             dbFlag, tblTransition, shouldSubsequentEventsBeSkipped);
       }
     }
@@ -843,6 +856,7 @@ public class MetastoreEventsProcessorTest {
     List<Pair<String, String>> tblFlagTransitions = Arrays.asList(trueToFalse,
         trueToUnset);
     List<String> dbFlagVals = Arrays.asList(null, "false");
+    final String testTblName = "testEventSyncFlagTurnedOnErrorCase";
     for (String dbFlag : dbFlagVals) {
       for (Pair<String, String> tblTransition : tblFlagTransitions) {
         Map<String, String> dbParams = new HashMap<>(1);
@@ -854,19 +868,18 @@ public class MetastoreEventsProcessorTest {
           tblParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblTransition.first);
         }
         createDatabase(TEST_DB_NAME, dbParams);
-        createTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED, tblParams, false);
+        createTable(TEST_DB_NAME, testTblName, tblParams, false);
         eventsProcessor_.processEvents();
         // table creation is skipped since the flag says so
-        assertNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
+        assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
         // now turn on the flag
-        alterTableAddParameter(TEST_TABLE_NAME_NONPARTITIONED,
+        alterTableAddParameter(testTblName,
             MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblTransition.second);
         eventsProcessor_.processEvents();
         assertEquals(EventProcessorStatus.NEEDS_INVALIDATE, eventsProcessor_.getStatus());
         // issue a catalog reset to make sure that table comes back again and event
         // processing is active
         catalog_.reset();
-        assertNotNull(catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
         assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
         dropDatabaseCascade(TEST_DB_NAME);
       }
@@ -1031,14 +1044,15 @@ public class MetastoreEventsProcessorTest {
     TEventProcessorMetrics responseBefore = eventsProcessor_.getEventProcessorMetrics();
     long numEventsReceivedBefore = responseBefore.getEvents_received();
     long numEventsSkippedBefore = responseBefore.getEvents_skipped();
+    final String testTblName = "testEventProcessorMetrics";
     // event 1
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
     Map<String, String> tblParams = new HashMap<>(1);
     tblParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, "true");
     // event 2
     createTable(TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
     // event 3
-    createTable(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, null, true);
+    createTable(TEST_DB_NAME, testTblName, null, true);
     List<List<String>> partitionVals = new ArrayList<>();
     partitionVals.add(Arrays.asList("1"));
     partitionVals.add(Arrays.asList("2"));
@@ -1046,7 +1060,7 @@ public class MetastoreEventsProcessorTest {
     // event 4
     addPartitions(TEST_DB_NAME, "tbl_should_skipped", partitionVals);
     // event 5
-    addPartitions(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, partitionVals);
+    addPartitions(TEST_DB_NAME, testTblName, partitionVals);
     eventsProcessor_.processEvents();
     TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
     assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
@@ -1068,11 +1082,11 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testEventProcessorWhenNotActive() throws TException {
     try {
-      eventsProcessor_.stop();
-      assertEquals(EventProcessorStatus.STOPPED, eventsProcessor_.getStatus());
+      eventsProcessor_.pause();
+      assertEquals(EventProcessorStatus.PAUSED, eventsProcessor_.getStatus());
       TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
       assertNotNull(response);
-      assertEquals(EventProcessorStatus.STOPPED.toString(), response.getStatus());
+      assertEquals(EventProcessorStatus.PAUSED.toString(), response.getStatus());
       assertFalse(response.isSetEvents_fetch_duration_mean());
       assertFalse(response.isSetEvents_process_duration_mean());
       assertFalse(response.isSetEvents_received());
@@ -1100,7 +1114,7 @@ public class MetastoreEventsProcessorTest {
         testCatalog.getMetastoreEventProcessor() instanceof NoOpEventProcessor);
     TEventProcessorMetrics response = testCatalog.getEventProcessorMetrics();
     assertNotNull(response);
-    assertEquals(EventProcessorStatus.STOPPED.toString(), response.getStatus());
+    assertEquals(EventProcessorStatus.DISABLED.toString(), response.getStatus());
     TEventProcessorMetricsSummaryResponse summaryResponse =
         testCatalog.getEventProcessorSummary();
     assertNotNull(summaryResponse);
@@ -1151,26 +1165,27 @@ public class MetastoreEventsProcessorTest {
           .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, String.valueOf(tblFlag));
     }
 
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams,
-        tblParams, CREATE_DATABASE, shouldEventGetProcessed);
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams,
+    final String testTblName = "runDDLTestsWithFlags";
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams,
+        tblParams, MetastoreEventType.CREATE_DATABASE, shouldEventGetProcessed);
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams,
         tblParams, MetastoreEventType.ALTER_DATABASE, shouldEventGetProcessed);
 
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.CREATE_TABLE, shouldEventGetProcessed);
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.ALTER_TABLE, shouldEventGetProcessed);
 
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.ADD_PARTITION, shouldEventGetProcessed);
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.ALTER_PARTITION, shouldEventGetProcessed);
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.DROP_PARTITION, shouldEventGetProcessed);
 
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams, tblParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams, tblParams,
         MetastoreEventType.DROP_TABLE, shouldEventGetProcessed);
-    testDDLOpUsingEvent(TEST_DB_NAME, TEST_TABLE_NAME_PARTITIONED, dbParams,
+    testDDLOpUsingEvent(TEST_DB_NAME, testTblName, dbParams,
         tblParams, MetastoreEventType.DROP_DATABASE, shouldEventGetProcessed);
   }
 
@@ -1350,21 +1365,18 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testAlterDisableFlagFromDb()
       throws TException, CatalogException, MetastoreNotificationFetchException {
-    createDatabase();
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testAlterDisableFlagFromDb";
     eventsProcessor_.processEvents();
     Database alteredDb = catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().deepCopy();
     alteredDb.putToParameters(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, "true");
     alterDatabase(alteredDb);
 
-    createTable(TEST_TABLE_NAME_NONPARTITIONED, false);
+    createTable(testTblName, false);
     assertEquals(1, eventsProcessor_.getNextMetastoreEvents().size());
     eventsProcessor_.processEvents();
     assertNull("Table creation should be skipped when database level event sync flag is"
-        + " disabled", catalog_.getTable(TEST_DB_NAME, TEST_TABLE_NAME_NONPARTITIONED));
-  }
-
-  private void createDatabase() throws TException {
-    createDatabase(TEST_DB_NAME, null);
+        + " disabled", catalog_.getTable(TEST_DB_NAME, testTblName));
   }
 
   private void createDatabase(String dbName, Map<String, String> params)

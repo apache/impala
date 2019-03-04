@@ -128,7 +128,7 @@ import org.slf4j.LoggerFactory;
  * update operation is being performed. Since the events are generated post-metastore
  * operations, such catalog updates do not need to update the state in Hive Metastore.
  *
- * Error Handling: The event processor could be in ACTIVE, STOPPED, ERROR states. In case
+ * Error Handling: The event processor could be in ACTIVE, PAUSED, ERROR states. In case
  * of any errors while processing the events the state of event processor changes to ERROR
  * and no subsequent events are polled. In such a case a invalidate metadata command
  * restarts the event polling which updates the lastSyncedEventId to the latest from
@@ -154,6 +154,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // maximum number of events to poll in each RPC
   private static final int EVENTS_BATCH_SIZE_PER_RPC = 1000;
 
+  // maximum time to wait for a clean shutdown of scheduler in seconds
+  private static final int SCHEDULER_SHUTDOWN_TIMEOUT = 10;
+
   // time taken to fetch events during each poll
   public static final String EVENTS_FETCH_DURATION_METRIC = "events-fetch-duration";
   // time taken to apply all the events received duration each poll
@@ -170,11 +173,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   // possible status of event processor
   public enum EventProcessorStatus {
-    STOPPED, // event processor is instantiated but not yet scheduled
+    PAUSED, // event processor is paused because catalog is being reset concurrently
     ACTIVE, // event processor is scheduled at a given frequency
     ERROR, // event processor is in error state and event processing has stopped
-    NEEDS_INVALIDATE // event processor could not resolve certain events and needs a
+    NEEDS_INVALIDATE, // event processor could not resolve certain events and needs a
     // manual invalidate command to reset the state (See AlterEvent for a example)
+    STOPPED, // event processor is shutdown. No events will be processed
+    DISABLED // event processor is not configured to run
   }
 
   // current status of this event processor
@@ -236,7 +241,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public synchronized void start() {
     Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.ACTIVE);
     startScheduler();
-    eventProcessorStatus_ = EventProcessorStatus.ACTIVE;
+    updateStatus(EventProcessorStatus.ACTIVE);
     LOG.info(String.format("Successfully started metastore event processing."
         + " Polling interval: %d seconds.", pollingFrequencyInSec_));
   }
@@ -269,15 +274,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   /**
    * Stops the event processing and changes the status of event processor to
-   * <code>EventProcessorStatus.STOPPED</code>. No new events will be processed as long
+   * <code>EventProcessorStatus.PAUSED</code>. No new events will be processed as long
    * the status is stopped. If this event processor is actively processing events when
    * stop is called, this method blocks until the current processing is complete
    */
   @Override
-  public synchronized void stop() {
-    Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.STOPPED);
-    eventProcessorStatus_ = EventProcessorStatus.STOPPED;
-    LOG.info(String.format("Event processing is stopped. Last synced event id is %d",
+  public synchronized void pause() {
+    Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.PAUSED);
+    updateStatus(EventProcessorStatus.PAUSED);
+    LOG.info(String.format("Event processing is paused. Last synced event id is %d",
         lastSyncedEventId_.get()));
   }
 
@@ -304,10 +309,49 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         "Event processing start called when it is already active");
     long prevLastSyncedEventId = lastSyncedEventId_.get();
     lastSyncedEventId_.set(fromEventId);
-    eventProcessorStatus_ = EventProcessorStatus.ACTIVE;
+    updateStatus(EventProcessorStatus.ACTIVE);
     LOG.info(String.format(
         "Metastore event processing restarted. Last synced event id was updated "
             + "from %d to %d", prevLastSyncedEventId, lastSyncedEventId_.get()));
+  }
+
+  /**
+   * Stops the event processing and shuts down the scheduler. In case there is a batch of
+   * events which is being processed currently, the
+   * <code>processEvents</code> method releases lock after every event is processed.
+   * Hence, it is possible that at-least 1 event from the batch be
+   * processed while shutdown() waits to acquire lock on this object.
+   */
+  @Override
+  public synchronized void shutdown() {
+    Preconditions.checkNotNull(scheduler_);
+    Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.STOPPED,
+        "Event processing is already stopped");
+    shutdownAndAwaitTermination();
+    updateStatus(EventProcessorStatus.STOPPED);
+    LOG.info("Metastore event processing stopped.");
+  }
+
+  /**
+   * Attempts to cleanly shutdown the scheduler pool. If the pool does not shutdown
+   * within timeout, does a force shutdown which might interrupt currently running tasks.
+   */
+  private synchronized void shutdownAndAwaitTermination() {
+    scheduler_.shutdown(); // disable new tasks from being submitted
+    try {
+      // wait for 10 secs for scheduler to complete currently running tasks
+      if (!scheduler_.awaitTermination(SCHEDULER_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS)) {
+        // executor couldn't terminate and timed-out, force the termination
+        LOG.info(String.format("Scheduler pool did not terminate within %d seconds. "
+            + "Attempting to stop currently running tasks", SCHEDULER_SHUTDOWN_TIMEOUT));
+        scheduler_.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      // current thread interrupted while pool was waiting for termination
+      // issue a shutdownNow before returning to cancel currently running tasks
+      LOG.info("Received interruptedException. Terminating currently running tasks.", e);
+      scheduler_.shutdownNow();
+    }
   }
 
   /**
@@ -335,9 +379,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
       NotificationEventResponse response = msClient.getHiveClient()
           .getNextNotification(lastSyncedEventId, EVENTS_BATCH_SIZE_PER_RPC, null);
-      LOG.info(String
-          .format("Received %d events. Start event id : %d", response.getEvents().size(),
-              lastSyncedEventId));
+      LOG.info(String.format("Received %d events. Start event id : %d",
+          response.getEvents().size(), lastSyncedEventId));
       return response.getEvents();
     } catch (TException e) {
       throw new MetastoreNotificationFetchException(

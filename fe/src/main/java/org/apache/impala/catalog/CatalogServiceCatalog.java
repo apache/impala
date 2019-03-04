@@ -1290,8 +1290,8 @@ public class CatalogServiceCatalog extends Catalog {
     // invalidated. That would happen when during reset, there were external alter events
     // and by the time we processed them, Catalog had already loaded them.
     long currentEventId = metastoreEventProcessor_.getCurrentEventId();
-    // stop the event processing since the cache is anyways being cleared
-    metastoreEventProcessor_.stop();
+    // pause the event processing since the cache is anyways being cleared
+    metastoreEventProcessor_.pause();
     // Update the HDFS cache pools
     CachePoolReader reader = new CachePoolReader(true);
     reader.run();

@@ -42,7 +42,7 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
 
   private NoOpEventProcessor() {
     // prevents instantiation
-    DEFAULT_METRICS_RESPONSE.setStatus(EventProcessorStatus.STOPPED.toString());
+    DEFAULT_METRICS_RESPONSE.setStatus(EventProcessorStatus.DISABLED.toString());
     DEFAULT_SUMMARY_RESPONSE.setSummary("");
   }
 
@@ -58,12 +58,17 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   }
 
   @Override
-  public void stop() {
+  public void pause() {
     // no-op
   }
 
   @Override
   public void start(long fromEventId) {
+    // no-op
+  }
+
+  @Override
+  public void shutdown() {
     // no-op
   }
 

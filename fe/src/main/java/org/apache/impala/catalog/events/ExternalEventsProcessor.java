@@ -38,9 +38,10 @@ public interface ExternalEventsProcessor {
   long getCurrentEventId() throws CatalogException;
 
   /**
-   * Stop the event processing
+   * Pauses the event processing. Use <code>start(fromEventId)</code> method below to
+   * restart the event processing
    */
-  void stop();
+  void pause();
 
   /**
    * Starts the event processing from the given eventId. This method can be used to jump
@@ -48,6 +49,11 @@ public interface ExternalEventsProcessor {
    * events
    */
   void start(long fromEventId);
+
+  /**
+   * Shutdown the events processor. Cannot be restarted again.
+   */
+  void shutdown();
 
   /**
    * Implements the core logic of processing external events
