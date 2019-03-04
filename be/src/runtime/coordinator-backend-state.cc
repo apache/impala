@@ -310,11 +310,23 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   // If this backend completed previously, don't apply the update.
   if (IsDoneLocked(lock)) return false;
 
-  int idx = 0;
-  const bool has_profile = thrift_profiles.profile_trees.size() > 0;
-  TRuntimeProfileTree empty_profile;
-  for (const FragmentInstanceExecStatusPB& instance_exec_status :
-           backend_exec_status.instance_exec_status()) {
+  // Use empty profile in case profile serialization/deserialization failed.
+  // 'thrift_profiles' and 'instance_exec_status' vectors have one-to-one correspondance.
+  vector<TRuntimeProfileTree> empty_profiles;
+  vector<TRuntimeProfileTree>::const_iterator profile_iter;
+  if (UNLIKELY(thrift_profiles.profile_trees.size() == 0)) {
+    empty_profiles.resize(backend_exec_status.instance_exec_status().size());
+    profile_iter = empty_profiles.begin();
+  } else {
+    DCHECK_EQ(thrift_profiles.profile_trees.size(),
+        backend_exec_status.instance_exec_status().size());
+    profile_iter = thrift_profiles.profile_trees.begin();
+  }
+
+  for (auto status_iter = backend_exec_status.instance_exec_status().begin();
+       status_iter != backend_exec_status.instance_exec_status().end();
+       ++status_iter, ++profile_iter) {
+    const FragmentInstanceExecStatusPB& instance_exec_status = *status_iter;
     int64_t report_seq_no = instance_exec_status.report_seq_no();
     int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id());
     DCHECK_EQ(instance_stats_map_.count(instance_idx), 1);
@@ -330,10 +342,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     }
 
     DCHECK(!instance_stats->done_);
-    DCHECK(!has_profile || idx < thrift_profiles.profile_trees.size());
-    const TRuntimeProfileTree& profile =
-        has_profile ? thrift_profiles.profile_trees[idx++] : empty_profile;
-    instance_stats->Update(instance_exec_status, profile, exec_summary,
+    instance_stats->Update(instance_exec_status, *profile_iter, exec_summary,
         scan_range_progress);
 
     // Update DML stats
@@ -566,13 +575,14 @@ void Coordinator::BackendState::InstanceStats::Update(
       exec_summary_idx =
           exec_summary->data_sink_id_to_idx_map[child->metadata().data_sink_id];
     }
-    TPlanNodeExecSummary& exec_summary = thrift_exec_summary.nodes[exec_summary_idx];
+    TPlanNodeExecSummary& node_exec_summary = thrift_exec_summary.nodes[exec_summary_idx];
+    DCHECK_EQ(node_exec_summary.fragment_idx, exec_params_.fragment().idx);
     int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx;
-    DCHECK_LT(per_fragment_instance_idx, exec_summary.exec_stats.size())
+    DCHECK_LT(per_fragment_instance_idx, node_exec_summary.exec_stats.size())
         << " name=" << child->name()
         << " instance_id=" << PrintId(exec_params_.instance_id)
         << " fragment_idx=" << exec_params_.fragment().idx;
-    TExecStats& instance_stats = exec_summary.exec_stats[per_fragment_instance_idx];
+    TExecStats& instance_stats = node_exec_summary.exec_stats[per_fragment_instance_idx];
 
     RuntimeProfile::Counter* rows_counter = child->GetCounter("RowsReturned");
     RuntimeProfile::Counter* mem_counter = child->GetCounter("PeakMemoryUsage");
@@ -580,7 +590,7 @@ void Coordinator::BackendState::InstanceStats::Update(
     if (mem_counter != nullptr) instance_stats.__set_memory_used(mem_counter->value());
     instance_stats.__set_latency_ns(child->local_time());
     // TODO: track interesting per-node metrics
-    exec_summary.__isset.exec_stats = true;
+    node_exec_summary.__isset.exec_stats = true;
   }
 
   // determine newly-completed scan ranges and update scan_range_progress

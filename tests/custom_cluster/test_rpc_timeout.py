@@ -127,12 +127,18 @@ class TestRPCTimeout(CustomClusterTestSuite):
     self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
 
   # Inject jitter into the RPC handler of ReportExecStatus() to trigger RPC timeout.
+  # Useful for triggering IMPALA-8274.
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--status_report_interval_ms=100"
-      " --backend_client_rpc_timeout_ms=1000")
-  def test_reportexecstatus_timeout(self, vector):
-    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:JITTER@1500@0.5'}
-    self.execute_query_verify_metrics(self.TEST_QUERY, query_options, 10)
+      " --backend_client_rpc_timeout_ms=100")
+  def test_reportexecstatus_jitter(self, vector):
+    LONG_RUNNING_QUERY = "with v as (select t1.ss_hdemo_sk as xk " +\
+       "from tpcds_parquet.store_sales t1, tpcds_parquet.store_sales t2 " +\
+       "where t1.ss_hdemo_sk = t2.ss_hdemo_sk) " +\
+       "select count(*) from v, tpcds_parquet.household_demographics t3 " +\
+       "where v.xk = t3.hd_demo_sk"
+    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:JITTER@110@0.7'}
+    self.execute_query_verify_metrics(LONG_RUNNING_QUERY, query_options, 1)
 
   # Use a small service queue memory limit and a single service thread to exercise
   # the retry paths in the ReportExecStatus() RPC
