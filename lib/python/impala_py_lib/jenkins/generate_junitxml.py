@@ -22,6 +22,7 @@ These files will be consumed by jenkins.impala.io to generate reports for
 easier triaging of build and setup errors.
 """
 import argparse
+import codecs
 import errno
 import os
 import textwrap
@@ -163,8 +164,8 @@ class JunitReport(object):
     )
     junit_log_file = os.path.join(junitxml_logdir, filename)
 
-    with open(junit_log_file, 'w') as f:
-      f.write(str(self))
+    with codecs.open(junit_log_file, encoding="UTF-8", mode='w') as f:
+      f.write(unicode(self))
 
     return junit_log_file
 
@@ -175,29 +176,34 @@ class JunitReport(object):
 
     If the supplied parameter is the path to a file, the contents will be inserted
     into the XML report. If the parameter is just plain string, use that as the
-    content for the report.
+    content for the report. For a file or a string passed in on the commandline,
+    this assumes it could contain Unicode content and converts it to a Unicode
+    object.
 
     Args:
       file_or_string: a path to a file, or a plain string
 
     Returns:
-      content as a string
+      content as a unicode object
     """
     if file_or_string is None:
-      content = ''
+      content = u''
     elif os.path.exists(file_or_string):
-      with open(file_or_string, 'r') as f:
+      with codecs.open(file_or_string, encoding="UTF-8", mode='r') as f:
         content = f.read()
     else:
-      content = file_or_string
+      # This is a string passed in on the command line. Make sure to return it as
+      # a unicode string.
+      content = unicode(file_or_string, encoding="UTF-8")
     return content
 
-  def __str__(self):
+  def __unicode__(self):
     """
-    Generate and return a pretty-printable XML string.
+    Generate and return a pretty-printable XML unicode string
     """
-    root_node_str = minidom.parseString(ET.tostring(self.root_element))
-    return root_node_str.toprettyxml(indent=' ' * 4)
+    root_node_unicode = ET.tostring(self.root_element)
+    root_node_dom = minidom.parseString(root_node_unicode)
+    return root_node_dom.toprettyxml(indent=' ' * 4)
 
 
 def get_options():
@@ -221,7 +227,7 @@ def get_options():
   parser.add_argument("--stdout",
                       help=textwrap.dedent(
                           """Standard output to include in the XML report. Can be
-                          either a string or the path to a file..""")
+                          either a string or the path to a file.""")
                       )
   parser.add_argument("--stderr",
                       help=textwrap.dedent(
