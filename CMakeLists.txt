@@ -405,6 +405,22 @@ endif()
 find_package(kuduClient REQUIRED NO_DEFAULT_PATH)
 include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
 
+# Run all commands with a wrapper that generates JUnitXML if the command fails.
+# Disabled if the DISABLE_CMAKE_JUNITXML environment variable is set
+# Note: There are known limitations for junitxml_command_wrapper.sh. The most
+# notable is that commands should not do "cd directory && do_something". Use
+# WORKING_DIRECTORY for add_custom_command/add_custom_target instead. See
+# junitxml_command_wrapper.sh for more details.
+if(NOT $ENV{DISABLE_CMAKE_JUNITXML} EQUAL "")
+  message(STATUS "DISABLE_CMAKE_JUNITXML is set, disabling JUnitXML Command Wrapper")
+else()
+  message(STATUS "Using JUnitXML Command Wrapper")
+  SET(JUNITXML_WRAPPER "$ENV{IMPALA_HOME}/bin/junitxml_command_wrapper.sh")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${JUNITXML_WRAPPER})
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${JUNITXML_WRAPPER})
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${JUNITXML_WRAPPER})
+endif()
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)

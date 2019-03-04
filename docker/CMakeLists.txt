@@ -57,10 +57,10 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # Run docker build inside the build context directory so that all dependencies are
       # sent to the docker daemon. This allows the Dockerfile built to copy all necessary
       # dependencies.
-      COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type} &&
-              tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
+      COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
               docker build -t impala_base_${build_type}
                   --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
+      WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
       DEPENDS ${CMAKE_SOURCE_DIR}/bin/graceful_shutdown_backends.sh
@@ -87,10 +87,10 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # Supply the appropriate base image as an argument for the Dockerfile. The same
       # build context used for the base image is used for each daemon image. This allows
       # each daemon image to only copy in the dependencies it requires.
-      COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type} &&
-              tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/${daemon_name}/ . |
+      COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/${daemon_name}/ . |
               docker build --build-arg BASE_IMAGE=impala_base_${build_type}
                   -t ${image_name} -
+      WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_image_${build_type} ${build_dir}/Dockerfile
       COMMENT "Building ${image_name} docker image."
       VERBATIM
