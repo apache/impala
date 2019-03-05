@@ -81,3 +81,18 @@ done
 if [[ -f ${LOGS_DIR}/be_tests/LastTest.log ]]; then
   check_for_asan_error ${LOGS_DIR}/be_tests/LastTest.log
 fi
+
+# Check for DCHECK messages. DCHECKs translate into CHECKs, which log at FATAL level
+# and start the message with "Check failed:".
+# Some backend tests do death tests that are designed to trigger DCHECKs. Ignore
+# the be_tests directory to avoid flagging these as errors.
+for fatal_log in $(find $LOGS_DIR -name "*FATAL*" ! -path "*/be_tests/*"); do
+  if grep -q "Check failed:" "${fatal_log}"; then
+    # Generate JUnitXML with the entire FATAL log included. It should be small.
+    base=$(basename ${fatal_log})
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize \
+      --step "dcheck_${base}" \
+      --error "DCHECK found in log file: ${fatal_log}" \
+      --stderr "${fatal_log}"
+  fi
+done
