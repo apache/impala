@@ -54,3 +54,30 @@ if [[ $(find $LOGS_DIR -path "*minidumps*" -name "*dmp") ]]; then
   done
   rm -rf $SYM_DIR
 fi
+
+function check_for_asan_error {
+  ERROR_LOG=${1}
+  if grep -q "ERROR: AddressSanitizer:" ${ERROR_LOG} ; then
+    # Extract out the ASAN message from the log file into a temp file.
+    tmp_asan_output=$(mktemp)
+    sed -n '/AddressSanitizer:/,/ABORTING/p' ${ERROR_LOG} > "${tmp_asan_output}"
+    # Make each ASAN issue use its own JUnitXML file by including the log filename
+    # in the step.
+    base=$(basename ${ERROR_LOG})
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize \
+      --step "asan_error_${base}" \
+      --error "Address Sanitizer message detected in ${ERROR_LOG}" \
+      --stderr "$(cat ${tmp_asan_output})"
+    rm "${tmp_asan_output}"
+  fi
+}
+
+# Check for AddressSanitizer messages. ASAN errors can show up in ERROR logs
+# (particularly for impalad). Some backend tests generate ERROR logs.
+for error_log in $(find $LOGS_DIR -name "*ERROR*"); do
+  check_for_asan_error ${error_log}
+done
+# Backend tests can also generate output in logs/be_tests/LastTest.log
+if [[ -f ${LOGS_DIR}/be_tests/LastTest.log ]]; then
+  check_for_asan_error ${LOGS_DIR}/be_tests/LastTest.log
+fi
