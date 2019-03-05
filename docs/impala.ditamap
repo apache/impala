@@ -180,6 +180,7 @@ under the License.
           <topicref href="topics/impala_compute_stats_min_sample_size.xml"/>
           <topicref href="topics/impala_debug_action.xml"/>
           <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
+          <topicref rev="3.2.0" href="topics/impala_default_file_format.xml"/>
           <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>

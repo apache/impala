@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="default_file_format">
+
+  <title>DEFAULT_FILE_FORMAT Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DEFAULT_FILE_FORMAT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Use the <codeph>DEFAULT_FILE_FORMAT</codeph> query option to set the default table file
+      format. The following values are supported:
+    </p>
+
+    <p>
+      <ul>
+        <li>
+          <codeph>TEXT</codeph> (<codeph>0</codeph>)
+        </li>
+
+        <li>
+          <codeph>RC_FILE</codeph> (<codeph>1</codeph>)
+        </li>
+
+        <li>
+          <codeph>SEQUENCE_FILE</codeph> (<codeph>2</codeph>)
+        </li>
+
+        <li>
+          <codeph>AVRO</codeph> (<codeph>3</codeph>)
+        </li>
+
+        <li>
+          <codeph>PARQUET</codeph> (<codeph>4</codeph>)
+        </li>
+
+        <li>
+          <codeph>KUDU</codeph> (<codeph>5</codeph>)
+        </li>
+
+        <li>
+          <codeph>ORC</codeph> (<codeph>6</codeph>)
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      In impala-shell or Hue, the <codeph>SET DEFAULT_FILE_FORMAT</codeph> statement will not
+      return an error when the option was set to an unsupported value. Impala validates the
+      value and returns an error when you submitted the next query.
+    </p>
+
+    <p>
+      <b>Type:</b> Enum as specified above
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>TEXT</codeph> (<codeph>0</codeph>)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala32"/>
+    </p>
+
+  </conbody>
+
+</concept>
