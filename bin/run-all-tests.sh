@@ -81,7 +81,8 @@ fi
 : ${CODE_COVERAGE:=false}
 
 # parse command line options
-while getopts "e:n:c:t:" OPTION
+# Note: The ":"'s indicate that an option needs an argument.
+while getopts "e:n:ct:" OPTION
 do
   case "$OPTION" in
     e)
