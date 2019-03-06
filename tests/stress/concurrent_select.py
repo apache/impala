@@ -88,7 +88,7 @@ from tests.stress.query_runner import (QueryRunner, QueryTimeout,
     NUM_QUERIES_DEQUEUED, NUM_QUERIES_SUBMITTED, NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED,
     NUM_QUERIES_FINISHED, NUM_QUERIES_EXCEEDED_MEM_LIMIT, NUM_QUERIES_AC_REJECTED,
     NUM_QUERIES_AC_TIMEDOUT, NUM_QUERIES_CANCELLED, NUM_RESULT_MISMATCHES,
-    NUM_OTHER_ERRORS, RESULT_HASHES_DIR)
+    NUM_OTHER_ERRORS, RESULT_HASHES_DIR, CancelMechanism)
 from tests.stress.util import create_and_start_daemon_thread, increment, print_stacks
 from tests.util.parse_util import (
     EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
@@ -581,17 +581,22 @@ class StressRunner(object):
         with self._submit_query_lock:
           query_runner.increment_metric(NUM_QUERIES_SUBMITTED)
 
-        should_cancel = self.cancel_probability > random()
-        if should_cancel:
+        cancel_mech = None
+        if self.cancel_probability > random():
+          # Exercise both timeout mechanisms.
+          if random() > 0.5:
+            cancel_mech = CancelMechanism.VIA_CLIENT
+          else:
+            cancel_mech = CancelMechanism.VIA_OPTION
           timeout = randrange(1, max(int(solo_runtime), 2))
         else:
           # Let the query run as long as necessary - it is nearly impossible to pick a
           # good value that won't have false positives under load - see IMPALA-8222.
           timeout = maxint
         report = query_runner.run_query(query, mem_limit, timeout_secs=timeout,
-            should_cancel=should_cancel)
+            cancel_mech=cancel_mech)
         LOG.debug("Got execution report for query")
-        if report.timed_out and should_cancel:
+        if report.timed_out and cancel_mech:
           report.was_cancelled = True
         query_runner.update_from_query_report(report)
         if report.other_error:
@@ -651,7 +656,7 @@ class StressRunner(object):
                                                           actual=report.result_hash,
                                                           id=report.query_id,
                                                           query=query.logical_query_id)))
-        if report.timed_out and not should_cancel:
+        if report.timed_out and not cancel_mech:
           self._write_query_profile(report, PROFILES_DIR, prefix='timed_out')
           raise Exception(
               "Query {query} unexpectedly timed out. Query ID: {id}".format(

@@ -22,7 +22,6 @@ from multiprocessing import Value
 import os
 import re
 from textwrap import dedent
-from threading import current_thread
 from time import sleep, time
 from sys import maxint
 
@@ -46,6 +45,16 @@ NUM_QUERIES_AC_TIMEDOUT = "num_queries_ac_timedout"
 NUM_QUERIES_CANCELLED = "num_queries_cancelled"
 NUM_RESULT_MISMATCHES = "num_result_mismatches"
 NUM_OTHER_ERRORS = "num_other_errors"
+
+
+class CancelMechanism:
+  """Pseudo-enum to specify how a query should be cancelled."""
+  # Cancel via the stress test client issuing an RPC to the server.
+  VIA_CLIENT = "CANCEL_VIA_CLIENT"
+  # Cancel by setting the EXEC_TIME_LIMIT_S query option.
+  VIA_OPTION = "CANCEL_VIA_OPTION"
+
+  ALL_MECHS = [VIA_CLIENT, VIA_OPTION]
 
 RESULT_HASHES_DIR = "result_hashes"
 
@@ -93,23 +102,25 @@ class QueryRunner(object):
     self.impalad_conn = self.impalad.impala.connect(impalad=self.impalad)
 
   def run_query(self, query, mem_limit_mb, run_set_up=False,
-                timeout_secs=maxint, should_cancel=False, retain_profile=False):
+                timeout_secs=maxint, cancel_mech=None, retain_profile=False):
     """Run a query and return an execution report. If 'run_set_up' is True, set up sql
     will be executed before the main query. This should be the case during the binary
-    search phase of the stress test.
-    If 'should_cancel' is True, don't get the query profile for timed out queries because
-    the query was purposely cancelled by setting the query timeout too short to complete,
-    rather than having some problem that needs to be investigated.
+    search phase of the stress test. 'cancel_mech' is optionally a CancelMechanism
+    value that should be used to cancel the query after timeout_secs.
+    If 'cancel_mech' is provided, don't get the query profile for timed out queries
+    because the query was purposely cancelled, rather than having some problem that needs
+    investigation.
     """
-    if not self.impalad_conn:
-      raise Exception("connect() must first be called")
+    assert self.impalad_conn, "connect() must be called before run_query()"
+    assert cancel_mech is None or cancel_mech in CancelMechanism.ALL_MECHS
 
     timeout_unix_time = time() + timeout_secs
     report = QueryReport(query)
     try:
       with self.impalad_conn.cursor() as cursor:
         start_time = time()
-        self._set_db_and_options(cursor, query, run_set_up, mem_limit_mb, timeout_secs)
+        self._set_db_and_options(cursor, query, run_set_up, mem_limit_mb, timeout_secs,
+            cancel_mech)
         error = None
         try:
           cursor.execute_async(
@@ -118,30 +129,38 @@ class QueryRunner(object):
           report.query_id = op_handle_to_query_id(cursor._last_operation.handle if
                                                   cursor._last_operation else None)
           LOG.debug("Query id is %s", report.query_id)
-          if not self._wait_until_fetchable(cursor, report, timeout_unix_time,
-                                            should_cancel):
-            return report
-
+          self._wait_until_fetchable(cursor, report, timeout_unix_time)
           if query.query_type == QueryType.SELECT:
-            try:
-              report.result_hash = self._fetch_and_hash_result(cursor, timeout_unix_time,
-                                                               query)
-              if retain_profile or \
-                 query.result_hash and report.result_hash != query.result_hash:
-                fetch_and_set_profile(cursor, report)
-            except QueryTimeout:
-              # TODO: IMPALA-6326: remove this cancel, which can race with the thread
-              # in _fetch_and_hash_result() and cause crashes and other errors.
-              self._cancel(cursor, report)
-              return report
+            report.result_hash = self._fetch_and_hash_result(cursor, timeout_unix_time,
+                                                             query)
           else:
             # If query is in error state, this will raise an exception
             cursor._wait_to_finish()
+          if (retain_profile or
+             query.result_hash and report.result_hash != query.result_hash):
+            fetch_and_set_profile(cursor, report)
+        except QueryTimeout:
+          if not cancel_mech:
+            fetch_and_set_profile(cursor, report)
+          # Cancel from this client if a) we hit the timeout unexpectedly or b) we're
+          # deliberately cancelling the query via the client.
+          if not cancel_mech or cancel_mech == CancelMechanism.VIA_CLIENT:
+            self._cancel(cursor, report)
+          else:
+            # Wait until the query is cancelled by a different mechanism.
+            self._wait_until_cancelled(cursor, report.query_id)
+          report.timed_out = True
+          return report
         except Exception as error:
           report.query_id = op_handle_to_query_id(cursor._last_operation.handle if
                                                   cursor._last_operation else None)
           LOG.debug("Error running query with id %s: %s", report.query_id, error)
-          self._check_for_memory_errors(report, cursor, error)
+          if (cancel_mech == CancelMechanism.VIA_OPTION and
+                is_exec_time_limit_error(error)):
+            # Timeout via query option counts as a timeout.
+            report.timed_out = True
+          else:
+            self._check_for_memory_errors(report, cursor, error)
         if report.has_query_error():
           return report
         report.runtime_secs = time() - start_time
@@ -150,13 +169,16 @@ class QueryRunner(object):
           report.mem_was_spilled = any([
               pattern.search(report.profile) is not None
               for pattern in QueryRunner.SPILLED_PATTERNS])
+          # TODO: is this needed? Memory errors are generally caught by the try/except.
           report.not_enough_memory = "Memory limit exceeded" in report.profile
     except Exception as error:
       # A mem limit error would have been caught above, no need to check for that here.
+      LOG.debug("Caught error", error)
       report.other_error = error
     return report
 
-  def _set_db_and_options(self, cursor, query, run_set_up, mem_limit_mb, timeout_secs):
+  def _set_db_and_options(self, cursor, query, run_set_up, mem_limit_mb, timeout_secs,
+      cancel_mech):
     """Set up a new cursor for running a query by switching to the correct database and
     setting query options."""
     if query.db_name:
@@ -171,6 +193,13 @@ class QueryRunner(object):
     for query_option, value in query.options.iteritems():
       cursor.execute(
           "SET {query_option}={value}".format(query_option=query_option, value=value))
+    # Set a time limit if it is the expected method of cancellation, or as an additional
+    # method of cancellation if the query runs for too long. This is useful if, e.g.
+    # if the client is blocked in a fetch() call and can't initiate the cancellation.
+    if not cancel_mech or cancel_mech == CancelMechanism.VIA_OPTION:
+      # EXEC_TIME_LIMIT_S is an int32, so we need to cap the value.
+      cursor.execute("SET EXEC_TIME_LIMIT_S={timeout_secs}".format(
+          timeout_secs=min(timeout_secs, 2**31 - 1)))
     cursor.execute("SET ABORT_ON_ERROR=1")
     if self.test_admission_control:
       LOG.debug(
@@ -183,11 +212,10 @@ class QueryRunner(object):
           "Running query with %s MB mem limit at %s with timeout secs %s:\n%s",
           mem_limit_mb, self.impalad.host_name, timeout_secs, query.sql)
 
-  def _wait_until_fetchable(self, cursor, report, timeout_unix_time, should_cancel):
+  def _wait_until_fetchable(self, cursor, report, timeout_unix_time):
     """Wait up until timeout_unix_time until the query results can be fetched (if it's
     a SELECT query) or until it has finished executing (if it's a different query type
-    like DML). If the timeout expires we either cancel the query or report the timeout.
-    Return True in the first case or False in the second (timeout) case."""
+    like DML). If the timeout expires raises a QueryTimeout exception."""
     # Loop until the query gets to the right state or a timeout expires.
     sleep_secs = 0.1
     secs_since_log = 0
@@ -204,20 +232,33 @@ class QueryRunner(object):
       # Return if we're ready to fetch results (in the FINISHED state) or we are in
       # another terminal state like EXCEPTION.
       if query_state not in ('PENDING_STATE', 'INITIALIZED_STATE', 'RUNNING_STATE'):
-        return True
+        return
 
       if time() > timeout_unix_time:
-        if not should_cancel:
-          fetch_and_set_profile(cursor, report)
-        self._cancel(cursor, report)
         if not started_running_or_cancelled:
           increment(self._metrics[NUM_QUERIES_STARTED_RUNNING_OR_CANCELLED])
-        return False
+        raise QueryTimeout()
       if secs_since_log > 5:
         secs_since_log = 0
         LOG.debug("Waiting for query to execute")
       sleep(sleep_secs)
       secs_since_log += sleep_secs
+
+  def _wait_until_cancelled(self, cursor, query_id):
+    """Wait until 'cursor' is in a CANCELED or ERROR status."""
+    last_log_time = 0
+    status = cursor.status()
+    while status not in ["CANCELED_STATE", "ERROR_STATE"]:
+      # Work around IMPALA-7561: queries don't transition out of FINISHED state once they
+      # hit eos.
+      if status == "FINISHED_STATE" and "Last row fetched" in cursor.get_profile():
+        return
+      if time() - last_log_time > 5:
+        LOG.debug("Waiting for query with id {query_id} to be cancelled".format(
+                  query_id=query_id))
+        last_log_time = time()
+      sleep(0.1)
+      status = cursor.status()
 
   def update_from_query_report(self, report):
     LOG.debug("Updating runtime stats (Query Runner PID: {0})".format(self.proc.pid))
@@ -232,8 +273,6 @@ class QueryRunner(object):
       increment(self._metrics[NUM_QUERIES_CANCELLED])
 
   def _cancel(self, cursor, report):
-    report.timed_out = True
-
     if not report.query_id:
       return
 
@@ -288,55 +327,44 @@ class QueryRunner(object):
     query_id = op_handle_to_query_id(cursor._last_operation.handle if
                                      cursor._last_operation else None)
 
-    # A value of 1 indicates that the hash thread should continue to work.
-    should_continue = Value("i", 1)
+    result_log_filename = None
+    curr_hash = 1
+    try:
+      with self._open_result_file(query, query_id) as result_log:
+        result_log.write(query.sql)
+        result_log.write("\n")
+        result_log_filename = result_log.name
+        while True:
+          # Check for timeout before each fetch call. Fetching can block indefinitely,
+          # e.g. if the query is a selective scan, so we may miss the timeout, but we
+          # will live with that limitation for now.
+          # TODO: IMPALA-8289: use a non-blocking fetch when support is added
+          if time() >= timeout_unix_time:
+            LOG.debug("Hit timeout before fetch for query with id {0} {1} >= {2}".format(
+                query_id, time(), timeout_unix_time))
+            raise QueryTimeout()
+          LOG.debug("Fetching result for query with id {0}".format(query_id))
+          rows = cursor.fetchmany(self.BATCH_SIZE)
+          if not rows:
+            LOG.debug("No more results for query with id {0}".format(query_id))
+            break
+          for row in rows:
+            curr_hash = _add_row_to_hash(row, curr_hash)
+            if result_log:
+              result_log.write(",".join([str(val) for val in row]))
+              result_log.write("\thash=")
+              result_log.write(str(curr_hash))
+              result_log.write("\n")
+    except Exception:
+      # Don't retain result files for failed queries.
+      if result_log_filename is not None:
+        os.remove(result_log_filename)
+      raise
 
-    def hash_result_impl():
-      result_log_filename = None
-      try:
-        with self._open_result_file(query, query_id) as result_log:
-          result_log.write(query.sql)
-          result_log.write("\n")
-          result_log_filename = result_log.name
-          current_thread().result = 1
-          while should_continue.value:
-            LOG.debug(
-                "Fetching result for query with id %s",
-                op_handle_to_query_id(
-                    cursor._last_operation.handle if cursor._last_operation else None))
-            rows = cursor.fetchmany(self.BATCH_SIZE)
-            if not rows:
-              LOG.debug(
-                  "No more results for query with id %s",
-                  op_handle_to_query_id(
-                      cursor._last_operation.handle if cursor._last_operation else None))
-              return
-            for row in rows:
-              current_thread().result = _add_row_to_hash(row, current_thread().result)
-              if result_log:
-                result_log.write(",".join([str(val) for val in row]))
-                result_log.write("\thash=")
-                result_log.write(str(current_thread().result))
-                result_log.write("\n")
-      except Exception as e:
-        current_thread().error = e
-      finally:
-        # Only retain result files with incorrect results.
-        if (result_log_filename is not None and
-            current_thread().error is not None and
-            current_thread().result == query.result_hash):
-          os.remove(result_log_filename)
-
-    # TODO: IMPALA-6326: don't fork a thread here
-    hash_thread = create_and_start_daemon_thread(
-        hash_result_impl, "Fetch Results %s" % query_id)
-    hash_thread.join(max(timeout_unix_time - time(), 0))
-    if hash_thread.is_alive():
-      should_continue.value = 0
-      raise QueryTimeout()
-    if hash_thread.error:
-      raise hash_thread.error
-    return hash_thread.result
+    # Only retain result files with incorrect results.
+    if result_log_filename is not None and curr_hash == query.result_hash:
+      os.remove(result_log_filename)
+    return curr_hash
 
   def _open_result_file(self, query, query_id):
     """Opens and returns a file under RESULT_HASHES_DIR to write query results to."""
@@ -473,3 +501,8 @@ def fetch_and_set_profile(cursor, report):
       report.profile = cursor.get_profile()
     except Exception as e:
       LOG.debug("Error getting profile for query with id %s: %s", report.query_id, e)
+
+
+def is_exec_time_limit_error(error):
+  """Return true if this is an error hit as a result of hitting EXEC_TIME_LIMIT_S."""
+  return "expired due to execution time limit" in str(error)
