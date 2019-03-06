@@ -200,6 +200,11 @@ static Status GetThriftEnum(const string& value, const string& key,
       GetThriftEnumValues(enum_values_to_names)));
 }
 
+// Return true if the given value is true (case-insensitive) or 1.
+static bool IsTrue(const string& value) {
+  return iequals(value, "true") || iequals(value, "1");
+}
+
 // Note that we allow numerical values for boolean and enum options. This is because
 // TQueryOptionsToMap() will output the numerical values, and we need to parse its output
 // configuration.
@@ -217,15 +222,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
   } else {
     switch (option) {
       case TImpalaQueryOptions::ABORT_ON_ERROR:
-        query_options->__set_abort_on_error(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_abort_on_error(IsTrue(value));
         break;
       case TImpalaQueryOptions::MAX_ERRORS:
         query_options->__set_max_errors(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::DISABLE_CODEGEN:
-        query_options->__set_disable_codegen(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_disable_codegen(IsTrue(value));
         break;
       case TImpalaQueryOptions::BATCH_SIZE: {
         StringParser::ParseResult status;
@@ -262,8 +265,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
         THdfsCompression::type enum_type;
-        RETURN_IF_ERROR(GetThriftEnum<THdfsCompression::type>(value,
-            "compression codec", _THdfsCompression_VALUES_TO_NAMES, &enum_type));
+        RETURN_IF_ERROR(GetThriftEnum(value, "compression codec",
+            _THdfsCompression_VALUES_TO_NAMES, &enum_type));
         query_options->__set_compression_codec(enum_type);
         break;
       }
@@ -271,8 +274,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_hbase_caching(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::HBASE_CACHE_BLOCKS:
-        query_options->__set_hbase_cache_blocks(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_hbase_cache_blocks(IsTrue(value));
         break;
       case TImpalaQueryOptions::PARQUET_FILE_SIZE: {
         int64_t file_size;
@@ -288,29 +290,21 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
-      case TImpalaQueryOptions::EXPLAIN_LEVEL:
-        if (iequals(value, "minimal") || iequals(value, "0")) {
-          query_options->__set_explain_level(TExplainLevel::MINIMAL);
-        } else if (iequals(value, "standard") || iequals(value, "1")) {
-          query_options->__set_explain_level(TExplainLevel::STANDARD);
-        } else if (iequals(value, "extended") || iequals(value, "2")) {
-          query_options->__set_explain_level(TExplainLevel::EXTENDED);
-        } else if (iequals(value, "verbose") || iequals(value, "3")) {
-          query_options->__set_explain_level(TExplainLevel::VERBOSE);
-        } else {
-          return Status(Substitute("Invalid explain level '$0'. Valid levels are"
-              " MINIMAL(0), STANDARD(1), EXTENDED(2) and VERBOSE(3).", value));
-        }
+      case TImpalaQueryOptions::EXPLAIN_LEVEL: {
+        TExplainLevel::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "explain level",
+            _TExplainLevel_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_explain_level(enum_type);
         break;
+      }
       case TImpalaQueryOptions::SYNC_DDL:
-        query_options->__set_sync_ddl(iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_sync_ddl(IsTrue(value));
         break;
       case TImpalaQueryOptions::REQUEST_POOL:
         query_options->__set_request_pool(value);
         break;
       case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
-        query_options->__set_disable_outermost_topn(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_disable_outermost_topn(IsTrue(value));
         break;
       case TImpalaQueryOptions::QUERY_TIMEOUT_S: {
         StringParser::ParseResult result;
@@ -331,54 +325,44 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::APPX_COUNT_DISTINCT: {
-        query_options->__set_appx_count_distinct(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_appx_count_distinct(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS: {
-        query_options->__set_disable_unsafe_spills(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_disable_unsafe_spills(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::EXEC_SINGLE_NODE_ROWS_THRESHOLD:
         query_options->__set_exec_single_node_rows_threshold(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
-        query_options->__set_optimize_partition_key_scans(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_optimize_partition_key_scans(IsTrue(value));
         break;
-      case TImpalaQueryOptions::REPLICA_PREFERENCE:
-        if (iequals(value, "cache_local") || iequals(value, "0")) {
-          query_options->__set_replica_preference(TReplicaPreference::CACHE_LOCAL);
-        } else if (iequals(value, "disk_local") || iequals(value, "2")) {
-          query_options->__set_replica_preference(TReplicaPreference::DISK_LOCAL);
-        } else if (iequals(value, "remote") || iequals(value, "4")) {
-          query_options->__set_replica_preference(TReplicaPreference::REMOTE);
-        } else {
-          return Status(Substitute("Invalid replica memory distance preference '$0'."
-              "Valid values are CACHE_LOCAL(0), DISK_LOCAL(2), REMOTE(4)", value));
-        }
+      case TImpalaQueryOptions::REPLICA_PREFERENCE: {
+        map<int, const char *> valid_enums_values = {
+            {0, "CACHE_LOCAL"},
+            {2, "DISK_LOCAL"},
+            {4, "REMOTE"}
+        };
+        TReplicaPreference::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "replica memory distance preference",
+            valid_enums_values, &enum_type));
+        query_options->__set_replica_preference(enum_type);
         break;
+      }
       case TImpalaQueryOptions::SCHEDULE_RANDOM_REPLICA:
-        query_options->__set_schedule_random_replica(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_schedule_random_replica(IsTrue(value));
         break;
       case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
-        query_options->__set_disable_streaming_preaggregations(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_disable_streaming_preaggregations(IsTrue(value));
         break;
-      case TImpalaQueryOptions::RUNTIME_FILTER_MODE:
-        if (iequals(value, "off") || iequals(value, "0")) {
-          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::OFF);
-        } else if (iequals(value, "local") || iequals(value, "1")) {
-          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::LOCAL);
-        } else if (iequals(value, "global") || iequals(value, "2")) {
-          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::GLOBAL);
-        } else {
-          return Status(Substitute("Invalid runtime filter mode '$0'. Valid modes are"
-              " OFF(0), LOCAL(1) or GLOBAL(2).", value));
-        }
+      case TImpalaQueryOptions::RUNTIME_FILTER_MODE: {
+        TRuntimeFilterMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "runtime filter mode",
+            _TRuntimeFilterMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_runtime_filter_mode(enum_type);
         break;
+      }
       case TImpalaQueryOptions::RUNTIME_FILTER_MAX_SIZE:
       case TImpalaQueryOptions::RUNTIME_FILTER_MIN_SIZE:
       case TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE: {
@@ -441,43 +425,21 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::PARQUET_ANNOTATE_STRINGS_UTF8: {
-        query_options->__set_parquet_annotate_strings_utf8(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_parquet_annotate_strings_utf8(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PARQUET_FALLBACK_SCHEMA_RESOLUTION: {
-        if (iequals(value, "position") ||
-            iequals(value, to_string(TParquetFallbackSchemaResolution::POSITION))) {
-          query_options->__set_parquet_fallback_schema_resolution(
-              TParquetFallbackSchemaResolution::POSITION);
-        } else if (iequals(value, "name") ||
-                   iequals(value, to_string(TParquetFallbackSchemaResolution::NAME))) {
-          query_options->__set_parquet_fallback_schema_resolution(
-              TParquetFallbackSchemaResolution::NAME);
-        } else {
-          return Status(Substitute("Invalid PARQUET_FALLBACK_SCHEMA_RESOLUTION option: "
-              "'$0'. Valid options are 'POSITION' and 'NAME'.", value));
-        }
+        TParquetFallbackSchemaResolution::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "parquet fallback schema resolution",
+            _TParquetFallbackSchemaResolution_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_parquet_fallback_schema_resolution(enum_type);
         break;
       }
       case TImpalaQueryOptions::PARQUET_ARRAY_RESOLUTION: {
-        if (iequals(value, "three_level") ||
-            value == to_string(TParquetArrayResolution::THREE_LEVEL)) {
-          query_options->__set_parquet_array_resolution(
-              TParquetArrayResolution::THREE_LEVEL);
-        } else if (iequals(value, "two_level") ||
-            value == to_string(TParquetArrayResolution::TWO_LEVEL)) {
-          query_options->__set_parquet_array_resolution(
-              TParquetArrayResolution::TWO_LEVEL);
-        } else if (iequals(value, "two_level_then_three_level") ||
-            value == to_string(TParquetArrayResolution::TWO_LEVEL_THEN_THREE_LEVEL)) {
-          query_options->__set_parquet_array_resolution(
-              TParquetArrayResolution::TWO_LEVEL_THEN_THREE_LEVEL);
-        } else {
-          return Status(Substitute("Invalid PARQUET_ARRAY_RESOLUTION option: '$0'. "
-              "Valid options are 'THREE_LEVEL', 'TWO_LEVEL' and "
-              "'TWO_LEVEL_THEN_THREE_LEVEL'.", value));
-        }
+        TParquetArrayResolution::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "parquet array resolution",
+            _TParquetArrayResolution_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_parquet_array_resolution(enum_type);
         break;
       }
       case TImpalaQueryOptions::MT_DOP: {
@@ -493,24 +455,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::S3_SKIP_INSERT_STAGING: {
-        query_options->__set_s3_skip_insert_staging(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_s3_skip_insert_staging(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PREFETCH_MODE: {
-        if (iequals(value, "NONE") || iequals(value, "0")) {
-          query_options->__set_prefetch_mode(TPrefetchMode::NONE);
-        } else if (iequals(value, "HT_BUCKET") || iequals(value, "1")) {
-          query_options->__set_prefetch_mode(TPrefetchMode::HT_BUCKET);
-        } else {
-          return Status(Substitute("Invalid prefetch mode '$0'. Valid modes are "
-              "NONE(0) or HT_BUCKET(1)", value));
-        }
+        TPrefetchMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "prefetch mode",
+            _TPrefetchMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_prefetch_mode(enum_type);
         break;
       }
       case TImpalaQueryOptions::STRICT_MODE: {
-        query_options->__set_strict_mode(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_strict_mode(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::SCRATCH_LIMIT: {
@@ -526,35 +482,26 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::ENABLE_EXPR_REWRITES: {
-        query_options->__set_enable_expr_rewrites(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_enable_expr_rewrites(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::DECIMAL_V2: {
-        query_options->__set_decimal_v2(iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_decimal_v2(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PARQUET_DICTIONARY_FILTERING: {
-        query_options->__set_parquet_dictionary_filtering(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_parquet_dictionary_filtering(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PARQUET_READ_STATISTICS: {
-        query_options->__set_parquet_read_statistics(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_parquet_read_statistics(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::DEFAULT_JOIN_DISTRIBUTION_MODE: {
-        if (iequals(value, "BROADCAST") || iequals(value, "0")) {
-          query_options->__set_default_join_distribution_mode(
-              TJoinDistributionMode::BROADCAST);
-        } else if (iequals(value, "SHUFFLE") || iequals(value, "1")) {
-          query_options->__set_default_join_distribution_mode(
-              TJoinDistributionMode::SHUFFLE);
-        } else {
-          return Status(Substitute("Invalid default_join_distribution_mode '$0'. "
-              "Valid values are BROADCAST or SHUFFLE", value));
-        }
+        TJoinDistributionMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "default join distribution mode",
+            _TJoinDistributionMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_default_join_distribution_mode(enum_type);
         break;
       }
       case TImpalaQueryOptions::DISABLE_CODEGEN_ROWS_THRESHOLD: {
@@ -650,8 +597,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::SHUFFLE_DISTINCT_EXPRS: {
-        query_options->__set_shuffle_distinct_exprs(
-                iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_shuffle_distinct_exprs(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::MAX_MEM_ESTIMATE_FOR_ADMISSION: {
@@ -682,22 +628,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::KUDU_READ_MODE: {
-        if (iequals(value, "DEFAULT") || iequals(value, "0")) {
-          query_options->__set_kudu_read_mode(TKuduReadMode::DEFAULT);
-        } else if (iequals(value, "READ_LATEST") || iequals(value, "1")) {
-          query_options->__set_kudu_read_mode(TKuduReadMode::READ_LATEST);
-        } else if (iequals(value, "READ_AT_SNAPSHOT") || iequals(value, "2")) {
-          query_options->__set_kudu_read_mode(TKuduReadMode::READ_AT_SNAPSHOT);
-        } else {
-          return Status(Substitute("Invalid kudu_read_mode '$0'. Valid values are "
-                                   "DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.",
-              value));
-        }
+        TKuduReadMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Kudu read mode",
+            _TKuduReadMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_kudu_read_mode(enum_type);
         break;
       }
       case TImpalaQueryOptions::ALLOW_ERASURE_CODED_FILES: {
-        query_options->__set_allow_erasure_coded_files(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_allow_erasure_coded_files(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::TIMEZONE: {
@@ -752,8 +690,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_resource_trace_ratio(val);
       }
       case TImpalaQueryOptions::PLANNER_TESTCASE_MODE: {
-        query_options->__set_planner_testcase_mode(
-            iequals(value, "true") || iequals(value, "1"));
+        query_options->__set_planner_testcase_mode(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::NUM_REMOTE_EXECUTOR_CANDIDATES: {
@@ -782,25 +719,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::DEFAULT_FILE_FORMAT: {
-        if (iequals(value, "TEXT") || iequals(value, "0")) {
-          query_options->__set_default_file_format(THdfsFileFormat::TEXT);
-        } else if (iequals(value, "RC_FILE") || iequals(value, "1")) {
-          query_options->__set_default_file_format(THdfsFileFormat::RC_FILE);
-        } else if (iequals(value, "SEQUENCE_FILE") || iequals(value, "2")) {
-          query_options->__set_default_file_format(THdfsFileFormat::SEQUENCE_FILE);
-        } else if (iequals(value, "AVRO") || iequals(value, "3")) {
-          query_options->__set_default_file_format(THdfsFileFormat::AVRO);
-        } else if (iequals(value, "PARQUET") || iequals(value, "4")) {
-          query_options->__set_default_file_format(THdfsFileFormat::PARQUET);
-        } else if (iequals(value, "KUDU") || iequals(value, "5")) {
-          query_options->__set_default_file_format(THdfsFileFormat::KUDU);
-        } else if (iequals(value, "ORC") || iequals(value, "6")) {
-          query_options->__set_default_file_format(THdfsFileFormat::ORC);
-        } else {
-          return Status(Substitute("Invalid default_file_format '$0'. Valid values are "
-                                   "TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU "
-                                   "and ORC.", value));
-        }
+        THdfsFileFormat::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "default file format",
+            _THdfsFileFormat_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_default_file_format(enum_type);
         break;
       }
       default:

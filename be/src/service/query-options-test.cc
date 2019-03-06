@@ -214,6 +214,10 @@ TEST(QueryOptions, SetEnumOptions) {
           ZSTD)), true);
   TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,
       (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC)), true);
+  TestEnumCase(options, CASE(runtime_filter_mode, TRuntimeFilterMode,
+      (OFF, LOCAL, GLOBAL)), true);
+  TestEnumCase(options, CASE(kudu_read_mode, TKuduReadMode,
+      (DEFAULT, READ_LATEST, READ_AT_SNAPSHOT)), true);
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

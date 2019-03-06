@@ -90,7 +90,7 @@ int,int,int,int
 set parquet_array_resolution=bad_value;
 select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
 ---- CATCH
-Invalid PARQUET_ARRAY_RESOLUTION option: 'bad_value'. Valid options are 'THREE_LEVEL', 'TWO_LEVEL' and 'TWO_LEVEL_THEN_THREE_LEVEL'.
+Invalid parquet array resolution: 'bad_value'. Valid values are THREE_LEVEL(0), TWO_LEVEL(1), TWO_LEVEL_THEN_THREE_LEVEL(2).
 ---- TYPES
 int,int,int,int
 ====
