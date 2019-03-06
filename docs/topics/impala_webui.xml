@@ -156,9 +156,10 @@ under the License.
           <li>Running queries submitted to this coordinator</li>
           <li>Pool stats<ul>
               <li>Average of time in queue<p>This is an exponential moving
-                  average with the factor of 0.2, which factors in close to past
-                  10 queries. If a query is admitted immediately, the wait time
-                  of 0 is used in calculating this average wait time.</p></li>
+                  average with the factor of 0.2, which considers approximately
+                  past 10 queries. If a query is admitted immediately, the wait
+                  time of 0 is used in calculating this average wait
+                time.</p></li>
             </ul></li>
           <li>Histogram of the distribution of peak memory used by queries
             admitted to the pool<p>Use the histogram to figure out the minimum
