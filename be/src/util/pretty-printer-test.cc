@@ -92,6 +92,11 @@ TEST(PrettyPrinterTest, BytesPerSecond) {
 }
 
 TEST(PrettyPrinterTest, Seconds) {
+  EXPECT_EQ(PrettyPrinter::Print(0.00001, TUnit::TIME_S), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.0001, TUnit::TIME_S), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.021, TUnit::TIME_S), "21ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.31, TUnit::TIME_S), "310ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.1, TUnit::TIME_S), "100ms");
   EXPECT_EQ(PrettyPrinter::Print(1.5, TUnit::TIME_S), "1s500ms");
 
   EXPECT_EQ(PrettyPrinter::Print(60, TUnit::TIME_S), "1m");
@@ -102,9 +107,23 @@ TEST(PrettyPrinterTest, Seconds) {
 
   // Only three decimal places of precision are supported for seconds.
   EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_S), "1s500ms");
+
+  EXPECT_EQ(PrettyPrinter::Print(12345, TUnit::TIME_S), "3h25m");
+  EXPECT_EQ(PrettyPrinter::Print(1.23456789123, TUnit::TIME_S), "1s234ms");
+  EXPECT_EQ(PrettyPrinter::Print(12345.67, TUnit::TIME_S), "3h25m");
+  EXPECT_EQ(PrettyPrinter::Print(1234567, TUnit::TIME_S), "342h56m");
+  EXPECT_EQ(PrettyPrinter::Print(1234567.8989, TUnit::TIME_S), "342h56m");
+  EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_S), "34293h33m");
+  EXPECT_EQ(PrettyPrinter::Print(2147483647, TUnit::TIME_S), "596523h14m");
+  EXPECT_EQ(PrettyPrinter::Print(123823456789, TUnit::TIME_S), "34395404h39m");
 }
 
 TEST(PrettyPrinterTest, NanoSeconds) {
+  EXPECT_EQ(PrettyPrinter::Print(0.00001, TUnit::TIME_NS), "0.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.0001, TUnit::TIME_NS), "0.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.021, TUnit::TIME_NS), "0.021ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.31, TUnit::TIME_NS), "0.310ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.1, TUnit::TIME_NS), "0.100ns");
   EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_NS), "1.000ns");
   EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_NS), "123.400ns");
   EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_NS), "1.234us");
@@ -118,6 +137,51 @@ TEST(PrettyPrinterTest, NanoSeconds) {
   EXPECT_EQ(PrettyPrinter::Print(123, TUnit::TIME_NS), "123.000ns");
   EXPECT_EQ(PrettyPrinter::Print(123400, TUnit::TIME_NS), "123.400us");
   EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_NS), "123.456ms");
+  EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_NS), "123.456ms");
+}
+
+TEST(PrettyPrinterTest, MillisSeconds) {
+  EXPECT_EQ(PrettyPrinter::Print(0.00001, TUnit::TIME_MS), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.0001, TUnit::TIME_MS), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.021, TUnit::TIME_MS), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.31, TUnit::TIME_MS), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(0.1, TUnit::TIME_MS), "0ms");
+  EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_MS), "1ms");
+  EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_MS), "123ms");
+  EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_MS), "1s234ms");
+  EXPECT_EQ(PrettyPrinter::Print(12345.6789, TUnit::TIME_MS), "12s345ms");
+  EXPECT_EQ(PrettyPrinter::Print(1234567.890, TUnit::TIME_MS), "20m34s");
+  EXPECT_EQ(PrettyPrinter::Print(123456789.0, TUnit::TIME_MS), "34h17m");
+  EXPECT_EQ(PrettyPrinter::Print(123823456789.9, TUnit::TIME_MS), "34395h24m");
+  EXPECT_EQ(PrettyPrinter::Print(12123456789.9, TUnit::TIME_MS), "3367h37m");
+  EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_MS), "1ms");
+  EXPECT_EQ(PrettyPrinter::Print(1000 * 1000 * 1000, TUnit::TIME_MS), "277h46m");
+  EXPECT_EQ(PrettyPrinter::Print(123, TUnit::TIME_MS), "123ms");
+  EXPECT_EQ(PrettyPrinter::Print(123400, TUnit::TIME_MS), "2m3s");
+  EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_MS), "34h17m");
+  EXPECT_EQ(PrettyPrinter::Print(2147483647, TUnit::TIME_MS), "596h31m");
+}
+
+TEST(PrettyPrinterTest, MicroSeconds) {
+  EXPECT_EQ(PrettyPrinter::Print(0.00001, TUnit::TIME_US), "0.010ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.0001, TUnit::TIME_US), "0.100ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.021, TUnit::TIME_US), "21.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.31, TUnit::TIME_US), "310.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(0.1, TUnit::TIME_US), "100.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_US), "1000.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_US), "123.400us");
+  EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_US), "1.234ms");
+  EXPECT_EQ(PrettyPrinter::Print(12345.6789, TUnit::TIME_US), "12.345ms");
+  EXPECT_EQ(PrettyPrinter::Print(1234567.890, TUnit::TIME_US), "1s234ms");
+  EXPECT_EQ(PrettyPrinter::Print(123456789.0, TUnit::TIME_US), "2m3s");
+  EXPECT_EQ(PrettyPrinter::Print(123823456789.9, TUnit::TIME_US), "34h23m");
+  EXPECT_EQ(PrettyPrinter::Print(12123456789.9, TUnit::TIME_US), "3h22m");
+  EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_US), "1.500us");
+  EXPECT_EQ(PrettyPrinter::Print(1000 * 1000 * 1000, TUnit::TIME_US), "16m40s");
+  EXPECT_EQ(PrettyPrinter::Print(123, TUnit::TIME_US), "123.000us");
+  EXPECT_EQ(PrettyPrinter::Print(123400, TUnit::TIME_US), "123.400ms");
+  EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_US), "2m3s");
+  EXPECT_EQ(PrettyPrinter::Print(2147483647, TUnit::TIME_US), "35m47s");
 }
 
 TEST(PrettyPrinterTest, DoubleValue) {

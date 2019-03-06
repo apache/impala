@@ -107,7 +107,7 @@ class PrettyPrinter {
       }
 
       case TUnit::TIME_S: {
-        PrintTimeMs(value * 1000, &ss);
+        PrintTimeMs(value * THOUSAND, &ss);
         break;
       }
 
