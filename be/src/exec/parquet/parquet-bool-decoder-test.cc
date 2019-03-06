@@ -36,7 +36,7 @@ void EncodeData(const vector<bool>& data, parquet::Encoding::type encoding,
     DCHECK(encoding == parquet::Encoding::RLE);
     // We need to pass 'buffer + 4' because the ParquetBoolDecoder ignores the first 4
     // bytes (in Parquet RLE, the first 4 bytes are used to encode the data size).
-    RleEncoder encoder(buffer + 4, buffer_len - 4, 1, 8);
+    RleEncoder encoder(buffer + 4, buffer_len - 4, 1);
     for (int b : data) {
       ASSERT_TRUE(encoder.Put(b));
     }

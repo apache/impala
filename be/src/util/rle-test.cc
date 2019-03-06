@@ -38,17 +38,6 @@ const int MAX_WIDTH = BatchedBitReader::MAX_BITWIDTH;
 
 class RleTest : public ::testing::Test {
  protected:
-  /// All the legal values for min_repeated_run_length to pass to RleEncoder() in tests.
-  std::vector<int> legal_min_run_lengths_;
-
-  virtual void SetUp() {
-    for (int run_length = 0; run_length < RleEncoder::MAX_RUN_LENGTH_BUFFER;
-         run_length += 8) {
-      legal_min_run_lengths_.push_back(run_length);
-    }
-  }
-
-  virtual void TearDown() {}
 
   /// Get many values from a batch RLE decoder using its low level functions.
   template <typename T>
@@ -113,16 +102,15 @@ class RleTest : public ::testing::Test {
   // if expected_len is not -1, validates that is is the same as the encoded size (in
   // bytes).
   int ValidateRle(const vector<int>& values, int bit_width, uint8_t* expected_encoding,
-      int expected_len, int min_repeated_run_length) {
+      int expected_len) {
     stringstream ss;
-    ss << "bit_width=" << bit_width
-       << " min_repeated_run_length_=" << min_repeated_run_length;
+    ss << "bit_width=" << bit_width;
     const string& description = ss.str();
     const int len = 64 * 1024;
     uint8_t buffer[len];
     EXPECT_LE(expected_len, len);
 
-    RleEncoder encoder(buffer, len, bit_width, min_repeated_run_length);
+    RleEncoder encoder(buffer, len, bit_width);
 
     int encoded_len = 0;
     for (int clear_count = 0; clear_count < 2; clear_count++) {
@@ -173,11 +161,10 @@ class RleTest : public ::testing::Test {
     return encoded_len;
   }
 
-  int ValidateRleSkip(const vector<int>& values, int bit_width,
-      int min_repeated_run_length, int skip_at, int skip_count) {
+  int ValidateRleSkip(
+      const vector<int>& values, int bit_width, int skip_at, int skip_count) {
     stringstream ss;
     ss << "bit_width=" << bit_width
-       << " min_repeated_run_length_=" << min_repeated_run_length
        << " skip_at=" << skip_at
        << " skip_count=" << skip_count
        << " values.size()=" << values.size();
@@ -185,7 +172,7 @@ class RleTest : public ::testing::Test {
     const int len = 64 * 1024;
     uint8_t buffer[len];
 
-    RleEncoder encoder(buffer, len, bit_width, min_repeated_run_length);
+    RleEncoder encoder(buffer, len, bit_width);
     int encoded_len = 0;
 
     for (int i = 0; i < values.size(); ++i) {
@@ -246,17 +233,12 @@ class RleTest : public ::testing::Test {
     for (int v = 0; v < num_vals; ++v) {
       values.push_back((value != -1) ? value : (v % mod));
     }
-    for (auto min_run_length : legal_min_run_lengths_) {
-      ValidateRle(values, bit_width, NULL, -1, min_run_length);
-    }
-    for (auto min_run_length : legal_min_run_lengths_) {
-      ValidateRle(values, bit_width, NULL, -1, min_run_length);
-    }
+    ValidateRle(values, bit_width, NULL, -1);
   }
 
   /// Returns the total number of bytes written when encoding the boolean values passed.
-  int RleBooleanLength(const vector<int>& values, int min_repeated_run_length) {
-    return ValidateRle(values, 1, nullptr, -1, min_repeated_run_length);
+  int RleBooleanLength(const vector<int>& values) {
+    return ValidateRle(values, 1, nullptr, -1);
   }
 
   /// Make a sequence of values.
@@ -291,44 +273,40 @@ class RleTest : public ::testing::Test {
 /// Basic test case for literal unpacking - two literals in a run.
 TEST_F(RleTest, TwoLiteralRun) {
   vector<int> values{1, 0};
-  for (auto min_run_length : legal_min_run_lengths_) {
-    ValidateRle(values, 1, nullptr, -1, min_run_length);
-    for (int width = 1; width <= MAX_WIDTH; ++width) {
-      ValidateRle(values, width, nullptr, -1, min_run_length);
+  ValidateRle(values, 1, nullptr, -1);
+  for (int width = 1; width <= MAX_WIDTH; ++width) {
+    ValidateRle(values, width, nullptr, -1);
     }
-  }
 }
 
 TEST_F(RleTest, ValueSkipping) {
   vector<int> seq;
-  for (int min_run_length : legal_min_run_lengths_) {
     for (int bit_width : {1, 3, 7, 8, 20, 32}) {
       MakeSequenceBitWidth(seq, 100, 100, 100, bit_width);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 7);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 64);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 75);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 100);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 105);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 155);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 200);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 213);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 267);
-      ValidateRleSkip(seq, bit_width, min_run_length, 0, 300);
-      ValidateRleSkip(seq, bit_width, min_run_length, 7, 7);
-      ValidateRleSkip(seq, bit_width, min_run_length, 35, 64);
-      ValidateRleSkip(seq, bit_width, min_run_length, 55, 75);
-      ValidateRleSkip(seq, bit_width, min_run_length, 99, 100);
-      ValidateRleSkip(seq, bit_width, min_run_length, 100, 11);
-      ValidateRleSkip(seq, bit_width, min_run_length, 101, 55);
-      ValidateRleSkip(seq, bit_width, min_run_length, 102, 155);
-      ValidateRleSkip(seq, bit_width, min_run_length, 104, 17);
-      ValidateRleSkip(seq, bit_width, min_run_length, 122, 178);
-      ValidateRleSkip(seq, bit_width, min_run_length, 200, 3);
-      ValidateRleSkip(seq, bit_width, min_run_length, 200, 65);
-      ValidateRleSkip(seq, bit_width, min_run_length, 203, 17);
-      ValidateRleSkip(seq, bit_width, min_run_length, 215, 70);
-      ValidateRleSkip(seq, bit_width, min_run_length, 217, 83);
-    }
+      ValidateRleSkip(seq, bit_width, 0, 7);
+      ValidateRleSkip(seq, bit_width, 0, 64);
+      ValidateRleSkip(seq, bit_width, 0, 75);
+      ValidateRleSkip(seq, bit_width, 0, 100);
+      ValidateRleSkip(seq, bit_width, 0, 105);
+      ValidateRleSkip(seq, bit_width, 0, 155);
+      ValidateRleSkip(seq, bit_width, 0, 200);
+      ValidateRleSkip(seq, bit_width, 0, 213);
+      ValidateRleSkip(seq, bit_width, 0, 267);
+      ValidateRleSkip(seq, bit_width, 0, 300);
+      ValidateRleSkip(seq, bit_width, 7, 7);
+      ValidateRleSkip(seq, bit_width, 35, 64);
+      ValidateRleSkip(seq, bit_width, 55, 75);
+      ValidateRleSkip(seq, bit_width, 99, 100);
+      ValidateRleSkip(seq, bit_width, 100, 11);
+      ValidateRleSkip(seq, bit_width, 101, 55);
+      ValidateRleSkip(seq, bit_width, 102, 155);
+      ValidateRleSkip(seq, bit_width, 104, 17);
+      ValidateRleSkip(seq, bit_width, 122, 178);
+      ValidateRleSkip(seq, bit_width, 200, 3);
+      ValidateRleSkip(seq, bit_width, 200, 65);
+      ValidateRleSkip(seq, bit_width, 203, 17);
+      ValidateRleSkip(seq, bit_width, 215, 70);
+      ValidateRleSkip(seq, bit_width, 217, 83);
   }
 }
 
@@ -348,7 +326,6 @@ TEST_F(RleTest, ValueSkippingFuzzy) {
     return uni_dist(random_eng);
   };
 
-  for (int min_run_length : legal_min_run_lengths_) {
     for (int i = 0; i < bitwidth_iteration; ++i) {
       int bit_width = GetRandom(1, 32);
       int max_run_length = GetRandom(5, 200);
@@ -357,9 +334,8 @@ TEST_F(RleTest, ValueSkippingFuzzy) {
       for (int j = 0; j < probe_iteration; ++j) {
         int skip_at = GetRandom(0, seq.size() - 1);
         int skip_count = GetRandom(1, seq.size() - skip_at);
-        ValidateRleSkip(seq, bit_width, min_run_length, skip_at, skip_count);
+        ValidateRleSkip(seq, bit_width, skip_at, skip_count);
       }
-    }
   }
 }
 
@@ -382,15 +358,13 @@ TEST_F(RleTest, SpecificSequences) {
   expected_buffer[1] = 0;
   expected_buffer[2] = (50 << 1);
   expected_buffer[3] = 1;
-  for (auto min_run_length : legal_min_run_lengths_) {
     for (int width = 1; width <= 8; ++width) {
-      ValidateRle(values, width, expected_buffer, 4, min_run_length);
+      ValidateRle(values, width, expected_buffer, 4);
     }
 
     for (int width = 9; width <= MAX_WIDTH; ++width) {
-      ValidateRle(values, width, NULL, 2 * (1 + BitUtil::Ceil(width, 8)), min_run_length);
+      ValidateRle(values, width, NULL, 2 * (1 + BitUtil::Ceil(width, 8)));
     }
-  }
 
   // Test 100 0's and 1's alternating
   for (int i = 0; i < 100; ++i) {
@@ -405,68 +379,13 @@ TEST_F(RleTest, SpecificSequences) {
   expected_buffer[100/8 + 1] = BOOST_BINARY(0 0 0 0 1 0 1 0);
 
   // num_groups and expected_buffer only valid for bit width = 1
-  for (auto min_run_length : legal_min_run_lengths_) {
-    ValidateRle(values, 1, expected_buffer, 1 + num_groups, min_run_length);
-    for (int width = 2; width <= MAX_WIDTH; ++width) {
-      int num_values = BitUtil::Ceil(100, 8) * 8;
-      ValidateRle(
-          values, width, NULL, 1 + BitUtil::Ceil(width * num_values, 8), min_run_length);
-    }
+  ValidateRle(values, 1, expected_buffer, 1 + num_groups);
+  for (int width = 2; width <= MAX_WIDTH; ++width) {
+    int num_values = BitUtil::Ceil(100, 8) * 8;
+    ValidateRle(values, width, NULL, 1 + BitUtil::Ceil(width * num_values, 8));
   }
 
-  for (auto min_run_length : legal_min_run_lengths_) {
-    if (min_run_length == 0) continue; // Does not work with test logic.
-    // A run of min_run_length 0's then a similar run of 1's then 0's then 1's.
-    values.resize(static_cast<unsigned long>(4 * min_run_length));
-    for (int i = 0; i < min_run_length; ++i) {
-      values[i] = 0;
-    }
-    for (int i = min_run_length; i < 2 * min_run_length; ++i) {
-      values[i] = 1;
-    }
-    for (int i = 2 * min_run_length; i < 3 * min_run_length; ++i) {
-      values[i] = 0;
-    }
-    for (int i = 3 * min_run_length; i < 4 * min_run_length; ++i) {
-      values[i] = 1;
-    }
-    // Expected_buffer valid for bit width <= 1 byte, and all values of min_run_length.
-    expected_buffer[0] = (min_run_length << 1);
-    expected_buffer[1] = 0;
-    expected_buffer[2] = (min_run_length << 1);
-    expected_buffer[3] = 1;
-    expected_buffer[4] = (min_run_length << 1);
-    expected_buffer[5] = 0;
-    expected_buffer[6] = (min_run_length << 1);
-    expected_buffer[7] = 1;
 
-    for (int width = 1; width <= 8; ++width) {
-      ValidateRle(values, width, expected_buffer, 8, min_run_length);
-    }
-  }
-
-  // With min_run_length = 16 we will not encode a run of 8.
-  values.clear();
-  for (int i = 0; i < 32; ++i) {
-    values.push_back(i % 2);
-  }
-  for (int i = 0; i < 8; ++i) {
-    values.push_back(1);
-  }
-  for (int i = 0; i < 32; ++i) {
-    values.push_back(i % 2);
-  }
-  expected_buffer[0] = (9 << 1 | 1); // 0x15;
-  expected_buffer[1] = 0b10101010; // first bit is lsb, i.e. 0
-  expected_buffer[2] = 0b10101010;
-  expected_buffer[3] = 0b10101010;
-  expected_buffer[4] = 0b10101010;
-  expected_buffer[5] = 0b11111111;
-  expected_buffer[6] = 0b10101010;
-  expected_buffer[7] = 0b10101010;
-  expected_buffer[8] = 0b10101010;
-  expected_buffer[9] = 0b10101010;
-  ValidateRle(values, 1, expected_buffer, 10, 16);
 }
 
 TEST_F(RleTest, TestValues) {
@@ -530,17 +449,13 @@ TEST_F(RleTest, BitWidthZeroLiteral) {
 // Test that writes out a repeated group and then a literal
 // group but flush before finishing.
 TEST_F(RleTest, Flush) {
-  for (auto min_run_length : legal_min_run_lengths_) {
     vector<int> values;
     for (int i = 0; i < 16; ++i) values.push_back(1);
     values.push_back(0);
-    ValidateRle(values, 1, NULL, -1, min_run_length);
+    ValidateRle(values, 1, NULL, -1);
 
-    for (int i = 0; i < min_run_length; ++i) {
-      values.push_back(1);
-      ValidateRle(values, 1, NULL, -1, min_run_length);
-    }
-  }
+    values.push_back(1);
+    ValidateRle(values, 1, NULL, -1);
 }
 
 // Test some random sequences.
@@ -561,9 +476,7 @@ TEST_F(RleTest, Random) {
       }
       parity = !parity;
     }
-    for (auto min_run_length : legal_min_run_lengths_) {
-      ValidateRle(values, (iters % MAX_WIDTH) + 1, NULL, -1, min_run_length);
-    }
+    ValidateRle(values, (iters % MAX_WIDTH) + 1, NULL, -1);
   }
 }
 
@@ -588,13 +501,10 @@ TEST_F(RleTest, RepeatedPattern) {
       values.push_back(v);
     }
   }
-  for (auto min_run_length : legal_min_run_lengths_) {
-    ValidateRle(values, 1, NULL, -1, min_run_length);
-  }
+  ValidateRle(values, 1, NULL, -1);
 }
 
 TEST_F(RleTest, Overflow) {
-  for (auto min_run_length : legal_min_run_lengths_) {
     for (int bit_width = 1; bit_width < 32; bit_width += 1) {
       for (int pad_buffer = 0; pad_buffer < 64; pad_buffer++) {
         const int len = RleEncoder::MinBufferSize(bit_width) + pad_buffer;
@@ -602,7 +512,7 @@ TEST_F(RleTest, Overflow) {
         int num_added = 0;
         bool parity = true;
 
-        RleEncoder encoder(buffer, len, bit_width, min_run_length);
+        RleEncoder encoder(buffer, len, bit_width);
         // Insert alternating true/false until there is no space left.
         while (true) {
           bool result = encoder.Put(static_cast<uint64_t>(parity));
@@ -637,7 +547,6 @@ TEST_F(RleTest, Overflow) {
 
           decoder.Reset(buffer, bytes_written, bit_width);
         }
-      }
     }
   }
 }
@@ -676,39 +585,6 @@ void AddPathologicalValues(vector<int>& values, int bit_width) {
       // A literal sequence.
       values.push_back(i % 2);
     }
-  }
-}
-
-/// Test that MaxBufferSize is accurate at low bit widths.
-TEST_F(RleTest, MaxBufferSize) {
-  const int bit_widths[] = {1, 2};
-  for (auto bit_width : bit_widths) {
-    vector<int> values;
-    AddPathologicalValues(values, bit_width);
-    const int expected_max_buffer_len =
-        RleEncoder::MaxBufferSize(bit_width, values.size());
-
-    // For the test to work we want enough values such that MaxBufferSize is not dominated
-    // by MinBufferSize, check that this is true.
-    EXPECT_GT(expected_max_buffer_len, RleEncoder::MinBufferSize(bit_width));
-
-    // Allocate a buffer big enough that we won't hit buffer full.
-    int big_buffer_len = expected_max_buffer_len * 10;
-    uint8_t buffer[big_buffer_len];
-
-    RleEncoder encoder(buffer, big_buffer_len, bit_width);
-
-    int num_added = 0;
-    for (int i = 0; i < values.size(); ++i) {
-      bool result = encoder.Put(values[i]);
-      EXPECT_TRUE(result) << "Failed to write after " << i << " values.";
-      num_added++;
-    }
-    EXPECT_EQ(values.size(), num_added);
-
-    int encoded_len = encoder.Flush();
-    EXPECT_LE(encoded_len, expected_max_buffer_len)
-        << "Encoded length was greater than MaxBufferSize for bit_width=" << bit_width;
   }
 }
 
@@ -777,16 +653,10 @@ TEST_F(RleTest, RepeatCountOverflow) {
 TEST_F(RleTest, MeasureOutputLengths) {
   vector<int> values;
   // With min_repeated_run_length = 8, a sequence of 8 is inefficient.
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 8, 32), 8));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 16, 32), 8));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 24, 32), 8));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 32, 32), 8));
-
-  // With min_repeated_run_length = 16, a sequence of 16 is inefficient.
-  EXPECT_EQ(10, RleBooleanLength(MakeSequence(values, 32, 8, 32), 16));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 16, 32), 16));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 24, 32), 16));
-  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 32, 32), 16));
+  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 8, 32)));
+  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 16, 32)));
+  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 24, 32)));
+  EXPECT_EQ(12, RleBooleanLength(MakeSequence(values, 32, 32, 32)));
 }
 }
 
