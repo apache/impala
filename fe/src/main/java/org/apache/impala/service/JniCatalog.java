@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.authorization.User;
@@ -139,7 +140,7 @@ public class JniCatalog {
     } catch (CatalogException e) {
       LOG.error("Error initializing Catalog. Please run 'invalidate metadata'", e);
     }
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_);
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzFactory);
   }
 
   public static TUniqueId getServiceId() { return catalogServiceId_; }
@@ -297,16 +298,20 @@ public class JniCatalog {
   }
 
   /**
-   * Verifies whether the user is configured as an admin on the Sentry Service. Throws
-   * an AuthorizationException if the user does not have admin privileges or if there
-   * were errors communicating with the Sentry Service.
+   * Verifies whether the user is configured as an admin. Throws an AuthorizationException
+   * if the user does not have admin privileges.
+   *
+   * TODO: rename this method name.
    */
   public void checkUserSentryAdmin(byte[] thriftReq) throws ImpalaException,
       TException  {
     TSentryAdminCheckRequest request = new TSentryAdminCheckRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftReq);
-    catalog_.getSentryProxy().checkUserSentryAdmin(
-        new User(request.getHeader().getRequesting_user()));
+    User user = new User(request.getHeader().getRequesting_user());
+    if (!catalogOpExecutor_.getAuthzManager().isAdmin(user)) {
+      throw new AuthorizationException(String.format("User '%s' does not have " +
+          "privileges to access the requested policy metadata.", user.getName()));
+    }
   }
 
   /**

@@ -19,12 +19,18 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.authorization.NoneAuthorizationFactory.NoneAuthorizationManager;
+import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.service.BackendConfig;
-import org.apache.parquet.Strings;
+import org.apache.impala.service.FeCatalogManager;
+
+import java.util.function.Supplier;
 
 /**
  * An implementation of {@link AuthorizationFactory} that uses Ranger.
@@ -69,5 +75,18 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
   @Override
   public AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy) {
     return new RangerAuthorizationChecker(authzConfig_);
+  }
+
+  @Override
+  public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
+      Supplier<? extends AuthorizationChecker> authzChecker) {
+    // TODO: return an actual implementation of AuthorizationManager for Ranger.
+    return new NoneAuthorizationManager();
+  }
+
+  @Override
+  public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
+    // TODO: return an actual implementation of AuthorizationManager for Ranger.
+    return new NoneAuthorizationManager();
   }
 }

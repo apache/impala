@@ -65,6 +65,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -226,6 +227,7 @@ public class Frontend {
 
   private final FeCatalogManager catalogManager_;
   private final AuthorizationFactory authzFactory_;
+  private final AuthorizationManager authzManager_;
   /**
    * Authorization checker. Initialized and periodically loaded by a task
    * running on the {@link #policyReader_} thread.
@@ -277,6 +279,8 @@ public class Frontend {
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
     }
+    authzManager_ = authzFactory.newAuthorizationManager(catalogManager_,
+        () -> authzChecker_.get());
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
   }
@@ -306,6 +310,8 @@ public class Frontend {
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
 
   public AuthorizationChecker getAuthzChecker() { return authzChecker_.get(); }
+
+  public AuthorizationManager getAuthzManager() { return authzManager_; }
 
   public ImpaladTableUsageTracker getImpaladTableUsageTracker() {
     return impaladTableUsageTracker_;

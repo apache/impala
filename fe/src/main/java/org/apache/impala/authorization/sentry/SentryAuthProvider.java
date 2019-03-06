@@ -19,7 +19,6 @@ package org.apache.impala.authorization.sentry;
 
 import org.apache.commons.lang.reflect.ConstructorUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.sentry.policy.engine.common.CommonPolicyEngine;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 import org.apache.sentry.provider.cache.SimpleCacheProviderBackend;
@@ -38,7 +37,7 @@ class SentryAuthProvider {
    * Creates a new ResourceAuthorizationProvider based on the given configuration.
    */
   static ResourceAuthorizationProvider createProvider(AuthorizationConfig config,
-      AuthorizationPolicy policy) {
+      SentryAuthorizationPolicy policy) {
     Preconditions.checkArgument(policy instanceof PrivilegeCache);
     Preconditions.checkArgument(config instanceof SentryAuthorizationConfig);
     SentryAuthorizationConfig sentryAuthzConfig = (SentryAuthorizationConfig) config;

@@ -64,7 +64,7 @@ public abstract class FeCatalogManager {
    * on the catalog implementation this may either be a reused instance or a
    * fresh one for each query.
    */
-  abstract FeCatalog getOrCreateCatalog();
+  public abstract FeCatalog getOrCreateCatalog();
 
   /**
    * Update the Catalog based on an update from the state store.
@@ -94,7 +94,7 @@ public abstract class FeCatalogManager {
     }
 
     @Override
-    FeCatalog getOrCreateCatalog() {
+    public FeCatalog getOrCreateCatalog() {
       return catalog_.get();
     }
 
@@ -132,7 +132,7 @@ public abstract class FeCatalogManager {
         BackendConfig.INSTANCE.getBackendCfg());
 
     @Override
-    FeCatalog getOrCreateCatalog() {
+    public FeCatalog getOrCreateCatalog() {
       return new LocalCatalog(PROVIDER, DEFAULT_KUDU_MASTER_HOSTS);
     }
 
@@ -154,7 +154,7 @@ public abstract class FeCatalogManager {
     }
 
     @Override
-    FeCatalog getOrCreateCatalog() {
+    public FeCatalog getOrCreateCatalog() {
       return catalog_;
     }
 

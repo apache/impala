@@ -17,14 +17,16 @@
 
 package org.apache.impala.authorization.sentry;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
-import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Set;
@@ -36,9 +38,16 @@ import java.util.Set;
  * TODO: Instead of calling into Sentry to perform final authorization checks, we
  * should parse/validate the privileges in Impala.
  */
-public class SentryAuthorizationPolicy extends AuthorizationPolicy
-    implements PrivilegeCache {
-  private static final Logger LOG = Logger.getLogger(SentryAuthorizationPolicy.class);
+public class SentryAuthorizationPolicy implements PrivilegeCache {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      SentryAuthorizationPolicy.class);
+
+  private final AuthorizationPolicy authzPolicy_;
+
+  public SentryAuthorizationPolicy(AuthorizationPolicy authzPolicy) {
+    Preconditions.checkNotNull(authzPolicy);
+    authzPolicy_ = authzPolicy;
+  }
 
   /**
    * Returns a set of privilege strings in Sentry format.
@@ -53,7 +62,7 @@ public class SentryAuthorizationPolicy extends AuthorizationPolicy
 
     // Collect all privileges granted to all roles.
     for (String groupName: groups) {
-      List<Role> grantedRoles = getGrantedRoles(groupName);
+      List<Role> grantedRoles = authzPolicy_.getGrantedRoles(groupName);
       for (Role role: grantedRoles) {
         for (PrincipalPrivilege privilege: role.getPrivileges()) {
           String authorizable = privilege.getName();
@@ -78,7 +87,7 @@ public class SentryAuthorizationPolicy extends AuthorizationPolicy
       ActiveRoleSet roleSet) {
     Set<String> privileges = listPrivileges(groups, roleSet);
     for (String userName: users) {
-      User user = getUser(userName);
+      User user = authzPolicy_.getUser(userName);
       if (user != null) {
         for (PrincipalPrivilege privilege: user.getPrivileges()) {
           String authorizable = privilege.getName();

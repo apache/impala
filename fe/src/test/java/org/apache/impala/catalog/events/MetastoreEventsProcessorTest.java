@@ -53,6 +53,7 @@ import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -142,7 +143,7 @@ public class MetastoreEventsProcessorTest {
   @BeforeClass
   public static void setUpTestEnvironment() throws TException {
     catalog_ = CatalogServiceTestCatalog.create();
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_);
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, new NoneAuthorizationFactory());
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();

@@ -22,6 +22,7 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -35,17 +36,20 @@ import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TQueryOptions;
@@ -337,6 +341,17 @@ public class FrontendTestBase extends AbstractFrontendTest {
             return Collections.emptySet();
           }
         };
+      }
+
+      @Override
+      public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
+          Supplier<? extends AuthorizationChecker> authzChecker) {
+        return null;
+      }
+
+      @Override
+      public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
+        return null;
       }
     };
   }

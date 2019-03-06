@@ -33,8 +33,6 @@ import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.InternalException;
-import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrincipalType;
@@ -482,7 +480,7 @@ public class AuthorizationPolicy {
    * granted to the user. Used by the SHOW GRANT USER statement.
    */
   public synchronized TResultSet getUserPrivileges(String principalName,
-      TPrivilege filter, Frontend fe) throws InternalException, AnalysisException {
+      Set<String> groupNames, TPrivilege filter) throws AnalysisException {
     TResultSet result = new TResultSet();
     result.setSchema(new TResultSetMetadata());
 
@@ -494,8 +492,6 @@ public class AuthorizationPolicy {
     result.setRows(new ArrayList<>());
 
     // A user should be considered to not exist if they do not have any groups.
-    Set<String> groupNames = fe.getAuthzChecker().getUserGroups(
-        new org.apache.impala.authorization.User(principalName));
     if (groupNames.isEmpty()) {
       throw new AnalysisException(String.format("User '%s' does not exist.",
           principalName));
@@ -510,7 +506,7 @@ public class AuthorizationPolicy {
     // return those privileges as well.
     List<Role> roles = new ArrayList<>();
     for (String groupName: groupNames) {
-      roles.addAll(fe.getCatalog().getAuthPolicy().getGrantedRoles(groupName));
+      roles.addAll(getGrantedRoles(groupName));
     }
     for (Role role: roles) {
       Principal rolePrincipal = getRole(role.getName());

@@ -19,11 +19,25 @@ package org.apache.impala.authorization;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.thrift.TCreateDropRoleParams;
+import org.apache.impala.thrift.TDdlExecResponse;
+import org.apache.impala.thrift.TGrantRevokePrivParams;
+import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TShowGrantPrincipalParams;
+import org.apache.impala.thrift.TShowRolesParams;
+import org.apache.impala.thrift.TShowRolesResult;
+import org.apache.impala.util.ClassUtil;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * An implementation of {@link AuthorizationFactory} that does not do any
@@ -56,6 +70,84 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
     };
   }
 
+  public static class NoneAuthorizationManager implements AuthorizationManager {
+    @Override
+    public boolean isAdmin(User user) throws ImpalaException {
+      return false;
+    }
+
+    @Override
+    public void createRole(User requestingUser, TCreateDropRoleParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void dropRole(User requestingUser, TCreateDropRoleParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void grantRoleToGroup(User requestingUser, TGrantRevokeRoleParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void revokeRoleFromGroup(User requestingUser, TGrantRevokeRoleParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void revokePrivilegeFromRole(User requestingUser,
+        TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public TResultSet getPrivileges(TShowGrantPrincipalParams params)
+        throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void updateDatabaseOwnerPrivilege(String serverName, String databaseName,
+        String oldOwner, PrincipalType oldOwnerType, String newOwner,
+        PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void updateTableOwnerPrivilege(String serverName, String databaseName,
+        String tableName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
+        PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+  }
+
   @Override
   public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
     return disabledAuthorizationConfig();
@@ -78,5 +170,16 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
         return Collections.emptySet();
       }
     };
+  }
+
+  @Override
+  public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
+      Supplier<? extends AuthorizationChecker> authzChecker) {
+    return new NoneAuthorizationManager();
+  }
+
+  @Override
+  public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
+    return new NoneAuthorizationManager();
   }
 }

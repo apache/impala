@@ -57,7 +57,8 @@ public class PlannerTestCaseLoader implements AutoCloseable {
     catalog_ = new ImpaladTestCatalog(
         CatalogServiceTestCatalog.createTransientTestCatalog());
     frontend_ = new Frontend(new NoneAuthorizationFactory(), catalog_);
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_.getSrcCatalog());
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_.getSrcCatalog(),
+        new NoneAuthorizationFactory());
   }
 
   public Catalog getSrcCatalog() { return catalog_.getSrcCatalog(); }

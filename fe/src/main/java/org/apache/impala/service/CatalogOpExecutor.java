@@ -53,6 +53,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -75,9 +78,6 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
-import org.apache.impala.catalog.Principal;
-import org.apache.impala.catalog.PrincipalPrivilege;
-import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
@@ -147,10 +147,6 @@ import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
-import org.apache.impala.thrift.TPrincipalType;
-import org.apache.impala.thrift.TPrivilege;
-import org.apache.impala.thrift.TPrivilegeLevel;
-import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TRangePartitionOperationType;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TResetMetadataResponse;
@@ -230,7 +226,7 @@ import org.slf4j.LoggerFactory;
  * 2. Update the Hive Metastore
  * 3. Increment and get a new catalog version
  * 4. Update the catalog
- * 5. Make Sentry cache changes if ownership is enabled.
+ * 5. Grant/revoke owner privilege if authorization with ownership is enabled.
  * 6. Release the metastoreDdlLock_
  *
  * It is imperative that other operations that need to hold both the catalog lock and
@@ -263,14 +259,25 @@ public class CatalogOpExecutor {
   public final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
 
   private final CatalogServiceCatalog catalog_;
+  private final AuthorizationConfig authzConfig_;
+  private final AuthorizationManager authzManager_;
 
   // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
   // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
   private final Object metastoreDdlLock_ = new Object();
 
-  public CatalogOpExecutor(CatalogServiceCatalog catalog) {
+  public CatalogOpExecutor(CatalogServiceCatalog catalog,
+      AuthorizationFactory authzFactory) {
+    Preconditions.checkNotNull(catalog);
+    Preconditions.checkNotNull(authzFactory);
     catalog_ = catalog;
+    authzConfig_ = authzFactory.getAuthorizationConfig();
+    authzManager_ = authzFactory.newAuthorizationManager(catalog);
   }
+
+  public CatalogServiceCatalog getCatalog() { return catalog_; }
+
+  public AuthorizationManager getAuthzManager() { return authzManager_; }
 
   public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest)
       throws ImpalaException {
@@ -335,19 +342,26 @@ public class CatalogOpExecutor {
         dropDataSource(ddlRequest.getDrop_data_source_params(), response);
         break;
       case CREATE_ROLE:
+        createRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
+        break;
       case DROP_ROLE:
-        createDropRole(requestingUser, ddlRequest.getCreate_drop_role_params(),
-            response);
+        dropRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
         break;
       case GRANT_ROLE:
+        grantRoleToGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
+            response);
+        break;
       case REVOKE_ROLE:
-        grantRevokeRoleGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
+        revokeRoleFromGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
             response);
         break;
       case GRANT_PRIVILEGE:
+        grantPrivilegeToRole(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+            response);
+        break;
       case REVOKE_PRIVILEGE:
-        grantRevokeRolePrivilege(requestingUser,
-            ddlRequest.getGrant_revoke_priv_params(), response);
+        revokePrivilegeFromRole(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+            response);
         break;
       case COMMENT_ON:
         alterCommentOn(ddlRequest.getComment_on_params(), response);
@@ -470,7 +484,7 @@ public class CatalogOpExecutor {
   /**
    * Create result set from string 'summary', and attach it to 'response'.
    */
-  private void addSummary(TDdlExecResponse response, String summary) {
+  private static void addSummary(TDdlExecResponse response, String summary) {
     TColumnValue resultColVal = new TColumnValue();
     resultColVal.setString_val(summary);
     TResultSet resultSet = new TResultSet();
@@ -1133,52 +1147,14 @@ public class CatalogOpExecutor {
       Preconditions.checkNotNull(newDb);
       // TODO(todd): if client is a 'v2' impalad, only send back invalidation
       resp.result.addToUpdated_catalog_objects(newDb.toTCatalogObject());
-      updateOwnerPrivileges(newDb.getName(), /* tableName */ null, params.server_name,
-          /* oldOwner */ null, /* oldOwnerType */ null,
-          newDb.getMetaStoreDb().getOwnerName(), newDb.getMetaStoreDb().getOwnerType(),
-          resp);
+      if (authzConfig_.isEnabled()) {
+        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, newDb.getName(),
+            /* oldOwner */ null, /* oldOwnerType */ null,
+            newDb.getMetaStoreDb().getOwnerName(), newDb.getMetaStoreDb().getOwnerType(),
+            resp);
+      }
     }
     resp.result.setVersion(newDb.getCatalogVersion());
-  }
-
-  /**
-   * Update the owner privileges for an object.
-   * If object ownership is enabled in Sentry, we need to update the owner privilege
-   * in the catalog so that any subsequent statements that rely on that privilege, or
-   * the absence, will function correctly without waiting for the next refresh.
-   * If oldOwner is not null, the privilege will be removed. If newOwner is not null,
-   * the privilege will be added.
-   * The catalog will correctly reflect the owner in HMS, however because the owner
-   * privileges are created by HMS in Sentry, Impala does not have visibility on
-   * whether or not that create was successful. If Sentry failed to properly update the
-   * owner privilege, Impala will have a different view of privileges until the next
-   * Sentry refresh.
-   * e.g. For create, the privileges should be available to immediately create a table.
-   * Additionally, if the metadata operation is successful, but sentry fails to add
-   * the privilege, it will be removed on the next refresh. ALTER DATABASE SET OWNER
-   * can be used to try adding the owner privilege again.
-   * This method should be called from within a DDLLock or table lock (in the case of
-   * alter table statements.) to ensure that the privileges are in sync with the metadata
-   * operations.
-   */
-  private void updateOwnerPrivileges(String databaseName, String tableName,
-      String serverName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
-      PrincipalType newOwnerType, TDdlExecResponse resp) throws ImpalaException {
-    if (catalog_.getSentryProxy() == null || !catalog_.getSentryProxy()
-        .isObjectOwnershipEnabled()) return;
-    Preconditions.checkNotNull(serverName);
-    TPrivilege filter;
-    if (tableName == null) {
-      filter = createDatabaseOwnerPrivilegeFilter(databaseName, serverName);
-    } else {
-      filter = createTableOwnerPrivilegeFilter(databaseName, tableName, serverName);
-    }
-    if (oldOwner != null && !oldOwner.isEmpty()) {
-      removePrivilegeFromCatalog(oldOwner, oldOwnerType, filter, resp);
-    }
-    if (newOwner != null && !newOwner.isEmpty()) {
-      addPrivilegeToCatalog(newOwner, newOwnerType, filter, resp);
-    }
   }
 
   private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
@@ -1472,9 +1448,11 @@ public class CatalogOpExecutor {
         uncacheTable(removedDb.getTable(tableName));
       }
       removedObject = removedDb.toTCatalogObject();
-      updateOwnerPrivileges(db.getName(), /* tableName */ null, params.server_name,
-          db.getMetaStoreDb().getOwnerName(), db.getMetaStoreDb().getOwnerType(),
-          /* newOwner */ null, /* newOwnerType */ null, resp);
+      if (authzConfig_.isEnabled()) {
+        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, db.getName(),
+            db.getMetaStoreDb().getOwnerName(), db.getMetaStoreDb().getOwnerType(),
+            /* newOwner */ null, /* newOwnerType */ null, resp);
+      }
     }
 
     Preconditions.checkNotNull(removedObject);
@@ -1625,10 +1603,13 @@ public class CatalogOpExecutor {
       resp.result.setVersion(table.getCatalogVersion());
       uncacheTable(table);
       if (table.getMetaStoreTable() != null) {
-        updateOwnerPrivileges(table.getDb().getName(), table.getName(),
-            params.server_name, table.getMetaStoreTable().getOwner(),
-            table.getMetaStoreTable().getOwnerType(), /* newOwner */ null,
-            /* newOwnerType */ null, resp);
+        if (authzConfig_.isEnabled()) {
+          authzManager_.updateTableOwnerPrivilege(params.server_name,
+              table.getDb().getName(), table.getName(),
+              table.getMetaStoreTable().getOwner(),
+              table.getMetaStoreTable().getOwnerType(), /* newOwner */ null,
+              /* newOwnerType */ null, resp);
+        }
       }
     }
     removedObject.setType(TCatalogObjectType.TABLE);
@@ -1991,35 +1972,14 @@ public class CatalogOpExecutor {
       }
       Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
       addTableToCatalogUpdate(newTbl, response.result);
-      updateOwnerPrivileges(newTable.getDbName(), newTable.getTableName(),
-          serverName, /* oldOwner */ null, /* oldOwnerType */ null, newTable.getOwner(),
-          newTable.getOwnerType(), response);
+      if (authzConfig_.isEnabled()) {
+        authzManager_.updateTableOwnerPrivilege(serverName, newTable.getDbName(),
+            newTable.getTableName(), /* oldOwner */ null,
+            /* oldOwnerType */ null, newTable.getOwner(), newTable.getOwnerType(),
+            response);
+      }
     }
     return true;
-  }
-
-  /**
-   * Create a TPrivilege for an owner of a table for use as a filter.
-   */
-  private TPrivilege createTableOwnerPrivilegeFilter(String databaseName,
-      String tableName, String serverName) throws ImpalaException {
-    TPrivilege privilege = createDatabaseOwnerPrivilegeFilter(databaseName, serverName);
-    privilege.setScope(TPrivilegeScope.TABLE);
-    privilege.setTable_name(tableName);
-    return privilege;
-  }
-
-  /**
-   * Create a TPrivilege for an owner of a database for use as a filter.
-   */
-  private TPrivilege createDatabaseOwnerPrivilegeFilter(String databaseName,
-      String serverName) throws ImpalaException {
-    TPrivilege privilege = new TPrivilege();
-    privilege.setScope(TPrivilegeScope.DATABASE).setServer_name(serverName)
-        .setPrivilege_level(TPrivilegeLevel.OWNER)
-        .setDb_name(databaseName).setCreate_time_ms(-1)
-        .setHas_grant_opt(isObjectOwnershipGrantEnabled());
-    return privilege;
   }
 
   /**
@@ -3043,91 +3003,10 @@ public class CatalogOpExecutor {
     msTbl.setOwner(params.owner_name);
     msTbl.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
     applyAlterTable(msTbl, true);
-
-    updateOwnerPrivileges(msTbl.getDbName(), msTbl.getTableName(), params.server_name,
-        oldOwner, oldOwnerType, msTbl.getOwner(), msTbl.getOwnerType(), response);
-
-  }
-
-  /**
-   * This is a helper method to take care of catalog related updates when removing
-   * a privilege.
-   */
-  private void removePrivilegeFromCatalog(String ownerString, PrincipalType ownerType,
-    TPrivilege filter, TDdlExecResponse response) {
-    Preconditions.checkNotNull(ownerString);
-    Preconditions.checkNotNull(ownerType);
-    Preconditions.checkNotNull(filter);
-    try {
-      PrincipalPrivilege removedPrivilege = null;
-      switch (ownerType) {
-        case ROLE:
-          removedPrivilege = catalog_.removeRolePrivilege(ownerString,
-              PrincipalPrivilege.buildPrivilegeName(filter));
-          break;
-        case USER:
-          removedPrivilege = catalog_.removeUserPrivilege(ownerString,
-              PrincipalPrivilege.buildPrivilegeName(filter));
-          break;
-        default:
-          Preconditions.checkArgument(false,
-              "Unexpected PrincipalType: " + ownerType.name());
-      }
-      if (removedPrivilege != null) {
-          response.result.addToRemoved_catalog_objects(removedPrivilege
-              .toTCatalogObject());
-      }
-    } catch (CatalogException e) {
-      // Failure removing an owner privilege is not an issue because it could be
-      // that Sentry refresh occurred while executing this method and this method
-      // is used as a a best-effort to do what Sentry refresh does to make the
-      // owner privilege available right away without having to wait for a Sentry
-      // refresh.
-      LOG.warn("Unable to remove owner privilege: " +
-          PrincipalPrivilege.buildPrivilegeName(filter), e);
-    }
-  }
-
-  /**
-   * This is a helper method to take care of catalog related updates when adding
-   * a privilege. This will also add a user to the catalog if it doesn't exist.
-   */
-  private void addPrivilegeToCatalog(String ownerString, PrincipalType ownerType,
-    TPrivilege filter, TDdlExecResponse response) {
-    Preconditions.checkNotNull(ownerString);
-    Preconditions.checkNotNull(ownerType);
-    Preconditions.checkNotNull(filter);
-    try {
-      Principal owner;
-      PrincipalPrivilege cPrivilege = null;
-      if (ownerType == PrincipalType.USER) {
-        Reference<Boolean> existingUser = new Reference<>();
-        owner = catalog_.addUserIfNotExists(ownerString, existingUser);
-        filter.setPrincipal_id(owner.getId());
-        filter.setPrincipal_type(TPrincipalType.USER);
-        cPrivilege = catalog_.addUserPrivilege(ownerString, filter);
-        if (!existingUser.getRef()) {
-          response.result.addToUpdated_catalog_objects(owner.toTCatalogObject());
-        }
-      } else if (ownerType == PrincipalType.ROLE) {
-        owner = catalog_.getAuthPolicy().getRole(ownerString);
-        Preconditions.checkNotNull(owner);
-        filter.setPrincipal_id(owner.getId());
-        filter.setPrincipal_type(TPrincipalType.ROLE);
-        cPrivilege = catalog_.addRolePrivilege(ownerString, filter);
-      } else {
-        Preconditions.checkArgument(false, "Unexpected PrincipalType: " +
-            ownerType.name());
-      }
-      response.result.addToUpdated_catalog_objects(cPrivilege.toTCatalogObject());
-    } catch (CatalogException e) {
-      // Failure adding an owner privilege is not an issue because it could be
-      // that Sentry refresh occurred while executing this method and this method
-      // is used as a a best-effort to do what Sentry refresh does to make the
-      // owner privilege available right away without having to wait for a Sentry
-      // refresh.
-      LOG.warn("Unable to add owner privilege: " +
-          PrincipalPrivilege.buildPrivilegeName(filter), e);
+    if (authzConfig_.isEnabled()) {
+      authzManager_.updateTableOwnerPrivilege(params.server_name, msTbl.getDbName(),
+          msTbl.getTableName(), oldOwner, oldOwnerType, msTbl.getOwner(),
+          msTbl.getOwnerType(), response);
     }
   }
 
@@ -3310,184 +3189,87 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Creates or drops a Sentry role on behalf of the requestingUser.
+   * Creates a role on behalf of the requestingUser.
    */
-  private void createDropRole(User requestingUser,
+  private void createRole(User requestingUser,
       TCreateDropRoleParams createDropRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
-    verifySentryServiceEnabled();
-
-    Role role;
-    if (createDropRoleParams.isIs_drop()) {
-      role = catalog_.getSentryProxy().dropRole(requestingUser,
-          createDropRoleParams.getRole_name());
-      if (role == null) {
-        // Nothing was removed from the catalogd's cache.
-        resp.result.setVersion(catalog_.getCatalogVersion());
-        addSummary(resp, "No such role.");
-        return;
-      }
-    } else {
-      role = catalog_.getSentryProxy().createRole(requestingUser,
-          createDropRoleParams.getRole_name());
-    }
-    Preconditions.checkNotNull(role);
-
-    TCatalogObject catalogObject = new TCatalogObject();
-    catalogObject.setType(role.getCatalogObjectType());
-    catalogObject.setPrincipal(role.toThrift());
-    catalogObject.setCatalog_version(role.getCatalogVersion());
-    if (createDropRoleParams.isIs_drop()) {
-      resp.result.addToRemoved_catalog_objects(catalogObject);
-      addSummary(resp, "Role has been dropped.");
-    } else {
-      resp.result.addToUpdated_catalog_objects(catalogObject);
-      addSummary(resp, "Role has been created.");
-    }
-    resp.result.setVersion(role.getCatalogVersion());
+    Preconditions.checkNotNull(createDropRoleParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(!createDropRoleParams.isIs_drop());
+    authzManager_.createRole(requestingUser, createDropRoleParams, resp);
+    addSummary(resp, "Role has been created.");
   }
 
   /**
-   * Grants or revokes a Sentry role to/from the given group on behalf of the
-   * requestingUser.
+   * Drops a role on behalf of the requestingUser.
    */
-  private void grantRevokeRoleGroup(User requestingUser,
+  private void dropRole(User requestingUser,
+      TCreateDropRoleParams createDropRoleParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    Preconditions.checkNotNull(createDropRoleParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(createDropRoleParams.isIs_drop());
+    authzManager_.dropRole(requestingUser, createDropRoleParams, resp);
+    addSummary(resp, "Role has been dropped.");
+  }
+
+  /**
+   * Grants a role to the given group on behalf of the requestingUser.
+   */
+  private void grantRoleToGroup(User requestingUser,
       TGrantRevokeRoleParams grantRevokeRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
-    verifySentryServiceEnabled();
-
-    String roleName = grantRevokeRoleParams.getRole_names().get(0);
-    String groupName = grantRevokeRoleParams.getGroup_names().get(0);
-    Role role = null;
-    if (grantRevokeRoleParams.isIs_grant()) {
-      role = catalog_.getSentryProxy().grantRoleGroup(requestingUser, roleName,
-          groupName);
-    } else {
-      role = catalog_.getSentryProxy().revokeRoleGroup(requestingUser, roleName,
-          groupName);
-    }
-    Preconditions.checkNotNull(role);
-    TCatalogObject catalogObject = new TCatalogObject();
-    catalogObject.setType(role.getCatalogObjectType());
-    catalogObject.setPrincipal(role.toThrift());
-    catalogObject.setCatalog_version(role.getCatalogVersion());
-    resp.result.addToUpdated_catalog_objects(catalogObject);
-    if (grantRevokeRoleParams.isIs_grant()) {
-      addSummary(resp, "Role has been granted.");
-    } else {
-      addSummary(resp, "Role has been revoked.");
-    }
-    resp.result.setVersion(role.getCatalogVersion());
+    Preconditions.checkNotNull(grantRevokeRoleParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(grantRevokeRoleParams.isIs_grant());
+    authzManager_.grantRoleToGroup(requestingUser, grantRevokeRoleParams, resp);
+    addSummary(resp, "Role has been granted.");
   }
 
   /**
-   * Grants or revokes one or more privileges to/from a Sentry role on behalf of the
-   * requestingUser.
+   * Revokes a role from the given group on behalf of the requestingUser.
    */
-  private void grantRevokeRolePrivilege(User requestingUser,
+  private void revokeRoleFromGroup(User requestingUser,
+      TGrantRevokeRoleParams grantRevokeRoleParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    Preconditions.checkNotNull(grantRevokeRoleParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(!grantRevokeRoleParams.isIs_grant());
+    authzManager_.revokeRoleFromGroup(requestingUser, grantRevokeRoleParams, resp);
+    addSummary(resp, "Role has been revoked.");
+  }
+
+  /**
+   * Grants one or more privileges to role on behalf of the requestingUser.
+   */
+  private void grantPrivilegeToRole(User requestingUser,
       TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
-    verifySentryServiceEnabled();
-    String roleName = grantRevokePrivParams.getRole_name();
-    List<TPrivilege> privileges = grantRevokePrivParams.getPrivileges();
-    List<PrincipalPrivilege> addedRolePrivileges = null;
-    List<PrincipalPrivilege> removedGrantOptPrivileges =
-        Lists.newArrayListWithExpectedSize(privileges.size());
-    if (grantRevokePrivParams.isIs_grant()) {
-      addedRolePrivileges = catalog_.getSentryProxy().grantRolePrivileges(requestingUser,
-          roleName, privileges, grantRevokePrivParams.isHas_grant_opt(),
-          removedGrantOptPrivileges);
-      addSummary(resp, "Privilege(s) have been granted.");
-    } else {
-      // If this is a revoke of a privilege that contains the grant option, the privileges
-      // with the grant option will be revoked and new privileges without the grant option
-      // will be added.  The privilege in the catalog cannot simply be updated since the
-      // name of the catalog object now contains the grantoption.
-
-      // If privileges contain the grant option and are revoked, this api will return a
-      // list of the revoked privileges that contain the grant option. The
-      // addedRolePrivileges parameter will contain a list of new privileges without the
-      // grant option that are granted. If this is simply a revoke of a privilege without
-      // grant options, the api will still return revoked privileges, but the
-      // addedRolePrivileges will be empty since there will be no newly granted
-      // privileges.
-      addedRolePrivileges = Lists.newArrayListWithExpectedSize(privileges.size());
-      removedGrantOptPrivileges = catalog_.getSentryProxy()
-          .revokeRolePrivileges(requestingUser, roleName, privileges,
-          grantRevokePrivParams.isHas_grant_opt(), addedRolePrivileges);
-      addSummary(resp, "Privilege(s) have been revoked.");
-    }
-    Preconditions.checkNotNull(addedRolePrivileges);
-    List<TCatalogObject> updatedPrivs =
-        Lists.newArrayListWithExpectedSize(addedRolePrivileges.size());
-    for (PrincipalPrivilege rolePriv: addedRolePrivileges) {
-      updatedPrivs.add(rolePriv.toTCatalogObject());
-    }
-
-    List<TCatalogObject> removedPrivs =
-        Lists.newArrayListWithExpectedSize(removedGrantOptPrivileges.size());
-    for (PrincipalPrivilege rolePriv: removedGrantOptPrivileges) {
-      removedPrivs.add(rolePriv.toTCatalogObject());
-    }
-
-    // If this is a REVOKE statement with hasGrantOpt, only the GRANT OPTION is removed
-    // from the privileges. Otherwise the privileges are removed from the catalog.
-    if (grantRevokePrivParams.isIs_grant()) {
-      if (!updatedPrivs.isEmpty()) {
-        resp.result.setUpdated_catalog_objects(updatedPrivs);
-        resp.result.setVersion(
-            updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());
-        if (!removedPrivs.isEmpty()) {
-          resp.result.setRemoved_catalog_objects(removedPrivs);
-          resp.result.setVersion(
-              Math.max(getLastItemVersion(updatedPrivs),
-                  getLastItemVersion(removedPrivs)));
-        }
-      }
-    } else if (privileges.get(0).isHas_grant_opt()) {
-      if (!updatedPrivs.isEmpty() && !removedPrivs.isEmpty()) {
-        resp.result.setUpdated_catalog_objects(updatedPrivs);
-        resp.result.setRemoved_catalog_objects(removedPrivs);
-        resp.result.setVersion(
-            Math.max(getLastItemVersion(updatedPrivs), getLastItemVersion(removedPrivs)));
-      }
-    } else {
-      if (!removedPrivs.isEmpty()) {
-        resp.result.setRemoved_catalog_objects(removedPrivs);
-        resp.result.setVersion(
-            removedPrivs.get(removedPrivs.size() - 1).getCatalog_version());
-      }
-    }
+    Preconditions.checkNotNull(grantRevokePrivParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(grantRevokePrivParams.isIs_grant());
+    authzManager_.grantPrivilegeToRole(requestingUser, grantRevokePrivParams, resp);
+    addSummary(resp, "Privilege(s) have been granted.");
   }
 
   /**
-   * Returns the version from the last item in the list.  This assumes that the items
-   * are added in version order.
+   * Revokes one or more privileges to role on behalf of the requestingUser.
    */
-  private long getLastItemVersion(List<TCatalogObject> items) {
-    Preconditions.checkState(items != null && !items.isEmpty());
-    return items.get(items.size() - 1).getCatalog_version();
-  }
-
-  /**
-   * Throws a CatalogException if the Sentry Service is not enabled.
-   */
-  private void verifySentryServiceEnabled() throws CatalogException {
-    if (catalog_.getSentryProxy() == null) {
-      throw new CatalogException("Sentry Service is not enabled on the " +
-          "CatalogServer.");
-    }
-  }
-
-  /**
-   * Checks if with grant is enabled for object ownership in Sentry.
-   */
-  private boolean isObjectOwnershipGrantEnabled() throws ImpalaException {
-    return catalog_.getSentryProxy() == null ? false :
-        catalog_.getSentryProxy().isObjectOwnershipGrantEnabled();
+  private void revokePrivilegeFromRole(User requestingUser,
+      TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    Preconditions.checkNotNull(grantRevokePrivParams);
+    Preconditions.checkNotNull(resp);
+    Preconditions.checkArgument(!grantRevokePrivParams.isIs_grant());
+    authzManager_.revokePrivilegeFromRole(requestingUser, grantRevokePrivParams, resp);
+    addSummary(resp, "Privilege(s) have been revoked.");
   }
 
   /**
@@ -3992,9 +3774,11 @@ public class CatalogOpExecutor {
         msDb.setOwnerType(originalOwnerType);
         throw e;
       }
-      updateOwnerPrivileges(db.getName(), /* tableName */ null, params.server_name,
-          originalOwnerName, originalOwnerType, db.getMetaStoreDb().getOwnerName(),
-          db.getMetaStoreDb().getOwnerType(), response);
+      if (authzConfig_.isEnabled()) {
+        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, db.getName(),
+            originalOwnerName, originalOwnerType, db.getMetaStoreDb().getOwnerName(),
+            db.getMetaStoreDb().getOwnerType(), response);
+      }
     }
     addDbToCatalogUpdate(db, response.result);
     addSummary(response, "Updated database.");

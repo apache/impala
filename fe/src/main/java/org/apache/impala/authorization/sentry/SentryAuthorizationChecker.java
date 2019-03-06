@@ -50,7 +50,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
     super(config);
     if (config.isEnabled()) {
       server_ = new SentryAuthorizableServer(config.getServerName());
-      provider_ = createProvider(config, policy);
+      provider_ = createProvider(config, new SentryAuthorizationPolicy(policy));
       Preconditions.checkNotNull(provider_);
     } else {
       provider_ = null;
@@ -78,7 +78,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
    * Creates a new ResourceAuthorizationProvider based on the given configuration.
    */
   private static ResourceAuthorizationProvider createProvider(AuthorizationConfig config,
-      AuthorizationPolicy policy) {
+      SentryAuthorizationPolicy policy) {
     return SentryAuthProvider.createProvider(config, policy);
   }
 

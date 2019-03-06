@@ -375,12 +375,9 @@ public class SentryProxy {
   }
 
   /**
-   * Checks whether this user is an admin on the Sentry Service. Throws an
-   * AuthorizationException if the user does not have admin privileges or if there are
-   * any issues communicating with the Sentry Service..
-   * @param requestingUser - The requesting user.
+   * Checks whether this user is an admin on the Sentry Service.
    */
-  public void checkUserSentryAdmin(User requestingUser)
+  public boolean isSentryAdmin(User requestingUser)
       throws AuthorizationException {
     // Check if the user has access by issuing a read-only RPC.
     // TODO: This is not an elegant way to verify whether the user has privileges to
@@ -389,10 +386,9 @@ public class SentryProxy {
     try {
       sentryPolicyService_.listAllRoles(requestingUser);
     } catch (ImpalaException e) {
-      throw new AuthorizationException(String.format("User '%s' does not have " +
-          "privileges to access the requested policy metadata or Sentry Service is " +
-          "unavailable.", requestingUser.getName()));
+      return false;
     }
+    return true;
   }
 
   /**

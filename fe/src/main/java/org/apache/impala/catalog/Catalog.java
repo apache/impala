@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.authorization.sentry.SentryAuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
@@ -69,7 +68,7 @@ public abstract class Catalog implements AutoCloseable {
 
   // Cache of authorization policy metadata. Populated from data retried from the
   // Sentry Service, if configured.
-  protected AuthorizationPolicy authPolicy_ = new SentryAuthorizationPolicy();
+  protected AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
 
   // Thread safe cache of database metadata. Uses an AtomicReference so reset()
   // operations can atomically swap dbCache_ references.
