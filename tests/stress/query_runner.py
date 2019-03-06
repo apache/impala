@@ -124,11 +124,14 @@ class QueryRunner(object):
 
           if query.query_type == QueryType.SELECT:
             try:
-              report.result_hash = self._hash_result(cursor, timeout_unix_time, query)
+              report.result_hash = self._fetch_and_hash_result(cursor, timeout_unix_time,
+                                                               query)
               if retain_profile or \
                  query.result_hash and report.result_hash != query.result_hash:
                 fetch_and_set_profile(cursor, report)
             except QueryTimeout:
+              # TODO: IMPALA-6326: remove this cancel, which can race with the thread
+              # in _fetch_and_hash_result() and cause crashes and other errors.
               self._cancel(cursor, report)
               return report
           else:
@@ -275,10 +278,12 @@ class QueryRunner(object):
               caught_exception, exc_info=True)
     report.other_error = caught_exception
 
-  def _hash_result(self, cursor, timeout_unix_time, query):
-    """Returns a hash that is independent of row order. 'query' is only used for debug
-    logging purposes (if the result is not as expected a log file will be left for
-    investigations).
+  def _fetch_and_hash_result(self, cursor, timeout_unix_time, query):
+    """Fetches results from 'cursor' and returns a hash that is independent of row order.
+    Raises QueryTimeout() if we couldn't fetch all rows from the query before time()
+    reaches 'timeout_unix_time'.
+    'query' is only used for debug logging purposes (if the result is not as expected a
+    log file will be left in RESULTS_DIR for investigation).
     """
     query_id = op_handle_to_query_id(cursor._last_operation.handle if
                                      cursor._last_operation else None)
@@ -287,62 +292,42 @@ class QueryRunner(object):
     should_continue = Value("i", 1)
 
     def hash_result_impl():
-      result_log = None
+      result_log_filename = None
       try:
-        file_name = '_'.join([query.logical_query_id, query_id.replace(":", "_")])
-        if query.result_hash is None:
-          file_name += "_initial"
-        file_name += "_results.txt"
-        result_log = open(os.path.join(self.results_dir, RESULT_HASHES_DIR, file_name),
-                          "w")
-        result_log.write(query.sql)
-        result_log.write("\n")
-        current_thread().result = 1
-        while should_continue.value:
-          LOG.debug(
-              "Fetching result for query with id %s",
-              op_handle_to_query_id(
-                  cursor._last_operation.handle if cursor._last_operation else None))
-          rows = cursor.fetchmany(self.BATCH_SIZE)
-          if not rows:
+        with self._open_result_file(query, query_id) as result_log:
+          result_log.write(query.sql)
+          result_log.write("\n")
+          result_log_filename = result_log.name
+          current_thread().result = 1
+          while should_continue.value:
             LOG.debug(
-                "No more results for query with id %s",
+                "Fetching result for query with id %s",
                 op_handle_to_query_id(
                     cursor._last_operation.handle if cursor._last_operation else None))
-            return
-          for row in rows:
-            for idx, val in enumerate(row):
-              if val is None:
-                # The hash() of None can change from run to run since it's based on
-                # a memory address. A chosen value will be used instead.
-                val = 38463209
-              elif isinstance(val, float):
-                # Floats returned by Impala may not be deterministic, the ending
-                # insignificant digits may differ. Only the first 6 digits will be used
-                # after rounding.
-                sval = "%f" % val
-                dot_idx = sval.find(".")
-                val = round(val, 6 - dot_idx)
-              current_thread().result += (idx + 1) * hash(val)
-              # Modulo the result to keep it "small" otherwise the math ops can be slow
-              # since python does infinite precision math.
-              current_thread().result %= maxint
+            rows = cursor.fetchmany(self.BATCH_SIZE)
+            if not rows:
+              LOG.debug(
+                  "No more results for query with id %s",
+                  op_handle_to_query_id(
+                      cursor._last_operation.handle if cursor._last_operation else None))
+              return
+            for row in rows:
+              current_thread().result = _add_row_to_hash(row, current_thread().result)
               if result_log:
-                result_log.write(str(val))
-                result_log.write("\t")
+                result_log.write(",".join([str(val) for val in row]))
+                result_log.write("\thash=")
                 result_log.write(str(current_thread().result))
                 result_log.write("\n")
       except Exception as e:
         current_thread().error = e
       finally:
-        if result_log is not None:
-          result_log.close()
-          if (
-              current_thread().error is not None and
-              current_thread().result == query.result_hash
-          ):
-            os.remove(result_log.name)
+        # Only retain result files with incorrect results.
+        if (result_log_filename is not None and
+            current_thread().error is not None and
+            current_thread().result == query.result_hash):
+          os.remove(result_log_filename)
 
+    # TODO: IMPALA-6326: don't fork a thread here
     hash_thread = create_and_start_daemon_thread(
         hash_result_impl, "Fetch Results %s" % query_id)
     hash_thread.join(max(timeout_unix_time - time(), 0))
@@ -352,6 +337,16 @@ class QueryRunner(object):
     if hash_thread.error:
       raise hash_thread.error
     return hash_thread.result
+
+  def _open_result_file(self, query, query_id):
+    """Opens and returns a file under RESULT_HASHES_DIR to write query results to."""
+    file_name = '_'.join([query.logical_query_id, query_id.replace(":", "_")])
+    if query.result_hash is None:
+      file_name += "_initial"
+    file_name += "_results.txt"
+    result_log = open(os.path.join(self.results_dir, RESULT_HASHES_DIR, file_name),
+                      "w")
+    return result_log
 
   def get_metric_val(self, name):
     """Get the current value of the metric called 'name'."""
@@ -438,6 +433,34 @@ class QueryReport(object):
     profile_log_path = os.path.join(directory, file_name)
     with open(profile_log_path, "w") as profile_log:
       profile_log.write(self.profile)
+
+
+def _add_row_to_hash(row, curr_hash):
+  """Hashes row and accumulates it with 'curr_hash'. The hash is invariant of the
+  order in which rows are added to the hash, since many queries we run through
+  the stress test do not have a canonical order in which they return rows."""
+  for idx, val in enumerate(row):
+    curr_hash += _hash_val(idx, val)
+    # Modulo the result to keep it "small" otherwise the math ops can be slow
+    # since python does infinite precision math.
+    curr_hash %= maxint
+  return curr_hash
+
+
+def _hash_val(col_idx, val):
+  """Compute a numeric hash of 'val', which is at column index 'col_idx'."""
+  if val is None:
+    # The hash() of None can change from run to run since it's based on
+    # a memory address. A chosen value will be used instead.
+    val = 38463209
+  elif isinstance(val, float):
+    # Floats returned by Impala may not be deterministic, the ending
+    # insignificant digits may differ. Only the first 6 digits will be used
+    # after rounding.
+    sval = "%f" % val
+    dot_idx = sval.find(".")
+    val = round(val, 6 - dot_idx)
+  return (col_idx + 1) * hash(val)
 
 
 def fetch_and_set_profile(cursor, report):
