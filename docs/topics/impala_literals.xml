@@ -297,11 +297,11 @@ select case bool_col when true then 'yes' when false 'no' else 'null' end from t
 
       <p conref="../shared/impala_common.xml#common/timestamp_conversions"
         conrefend="../shared/impala_common.xml#common/cast_string_to_timestamp"/>
-      <p>
-        You can also use <codeph>INTERVAL</codeph> expressions to add or subtract from timestamp literal values,
-        such as <codeph>CAST('1966-07-30' AS TIMESTAMP) + INTERVAL 5 YEARS + INTERVAL 3 DAYS</codeph>. See
-        <xref href="impala_timestamp.xml#timestamp"/> for details.
-      </p>
+      <p> You can also use <codeph>INTERVAL</codeph> expressions to add or
+        subtract from timestamp literal values, such as
+          <codeph>CAST('1966‑07‑30' AS
+          TIMESTAMP) + INTERVAL 5 YEARS + INTERVAL 3 DAYS</codeph>. See <xref
+          href="impala_timestamp.xml#timestamp"/> for details. </p>
 
       <p>
         Depending on your data pipeline, you might receive date and time data as text, in notation that does not
