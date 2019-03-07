@@ -24,6 +24,8 @@ import static org.junit.Assert.assertTrue;
 import org.apache.impala.common.PrintUtils;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableList;
+
 /**
  * Unit tests for PrintUtils functions.
  */
@@ -147,5 +149,12 @@ public class PrintUtilsTest {
    */
   private void assertNoBlankLines(String s) {
     assertFalse("output contains blank line " + s, s.contains("\n\n"));
+  }
+
+  @Test
+  public void testJoinQuoted() {
+    assertEquals("", PrintUtils.joinQuoted(ImmutableList.of()));
+    assertEquals("'a'", PrintUtils.joinQuoted(ImmutableList.of("a")));
+    assertEquals("'a', 'b'", PrintUtils.joinQuoted(ImmutableList.of("a", "b")));
   }
 }

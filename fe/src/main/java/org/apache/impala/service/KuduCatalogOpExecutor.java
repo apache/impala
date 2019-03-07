@@ -19,7 +19,6 @@ package org.apache.impala.service;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +32,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
@@ -54,6 +54,8 @@ import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -137,11 +139,26 @@ public class KuduCatalogOpExecutor {
    */
   private static Schema createTableSchema(TCreateTableParams params)
       throws ImpalaRuntimeException {
-    Set<String> keyColNames = new HashSet<>(params.getPrimary_key_column_names());
+    List<String> keyColNames = params.getPrimary_key_column_names();
     Preconditions.checkState(!keyColNames.isEmpty());
+
+    // Check that the key columns are listed first in the Kudu schema and in the
+    // same order as in the PRIMARY KEY definition.
+    List<String> colNames = ImmutableList.copyOf(Iterables.transform(params.getColumns(),
+        TColumn::getColumnName));
+    List<String> leadingColNames = colNames.subList(0, keyColNames.size());
+
+    if (!leadingColNames.equals(keyColNames)) {
+      throw new ImpalaRuntimeException(String.format(
+          "Kudu PRIMARY KEY columns must be specified as the first columns " +
+          "in the table (expected leading columns (%s) but found (%s))",
+          PrintUtils.joinQuoted(keyColNames),
+          PrintUtils.joinQuoted(leadingColNames)));
+    }
+
     List<ColumnSchema> colSchemas = new ArrayList<>(params.getColumnsSize());
     for (TColumn column: params.getColumns()) {
-      boolean isKey = keyColNames.contains(column.getColumnName());
+      boolean isKey = colSchemas.size() < keyColNames.size();
       colSchemas.add(createColumnSchema(column, isKey));
     }
     return new Schema(colSchemas);

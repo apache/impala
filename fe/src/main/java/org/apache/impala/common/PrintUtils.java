@@ -24,11 +24,14 @@ import static org.apache.impala.common.ByteUnits.PETABYTE;
 import static org.apache.impala.common.ByteUnits.TERABYTE;
 
 import java.text.DecimalFormat;
+import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.WordUtils;
+
+import com.google.common.base.Joiner;
 
 /**
  * Utility functions for pretty printing.
@@ -197,5 +200,15 @@ public class PrintUtils {
     // Remove any trailing blanks from a line.
     wrapped = wrapped.replaceAll(" +$", "");
     return wrapped;
+  }
+
+  /**
+   * Join the objects in 'objects' in a human-readable form, such as
+   * "'obj 1', 'obj 2', 'obj 3'". No escaping of quotes is performed.
+   */
+  public static String joinQuoted(Iterable<?> objs) {
+    Iterator<?> it = objs.iterator();
+    if (!it.hasNext()) return "";
+    return "'" + Joiner.on("', '").join(it) + "'";
   }
 }
