@@ -95,6 +95,12 @@ class KuduTableSink : public DataSink {
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
   kudu::client::sp::shared_ptr<kudu::client::KuduSession> session_;
 
+  /// A cache of the nullability of each Kudu column. The Kudu schema accessor
+  /// is not inlined and actually creates a copy (see IMPALA-8284).
+  ///
+  /// Initialized in Open().
+  std::vector<bool> kudu_column_nullabilities_;
+
   /// Used to specify the type of write operation (INSERT/UPDATE/DELETE).
   TSinkAction::type sink_action_;
 

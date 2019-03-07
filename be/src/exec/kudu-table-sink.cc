@@ -146,6 +146,12 @@ Status KuduTableSink::Open(RuntimeState* state) {
     }
   }
 
+  // Cache Kudu column nullabilities to avoid non-inlined slow calls to the Kudu client
+  // Schema accessor.
+  for (int i = 0; i < table_->schema().num_columns(); i++) {
+    kudu_column_nullabilities_.push_back(table_->schema().Column(i).is_nullable());
+  }
+
   session_ = client_->NewSession();
   session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
@@ -208,7 +214,6 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
   expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
-  const KuduSchema& table_schema = table_->schema();
 
   // Collect all write operations and apply them together so the time in Apply() can be
   // easily timed.
@@ -233,7 +238,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
       void* value = output_expr_evals_[j]->GetValue(current_row);
       if (value == nullptr) {
-        if (table_schema.Column(col).is_nullable()) {
+        if (kudu_column_nullabilities_[col]) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
               "Could not add Kudu WriteOp.");
           continue;
@@ -253,8 +258,9 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
       Status s = WriteKuduValue(col, type, value, true, write->mutable_row());
       // This can only fail if we set a col to an incorrect type, which would be a bug in
       // planning, so we can DCHECK.
-      DCHECK(s.ok()) << "WriteKuduValue failed for col = "
-                     << table_schema.Column(col).name() << " and type = " << type << ": "
+      DCHECK(s.ok()) << "WriteKuduValue failed for col '"
+                     << table_->schema().Column(col).name()
+                     << "' of type '" << type << "': "
                      << s.GetDetail();
       RETURN_IF_ERROR(s);
     }
