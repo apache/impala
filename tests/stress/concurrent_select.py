@@ -66,7 +66,6 @@ import threading
 from Queue import Empty   # Must be before Queue below
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace, SUPPRESS
 from collections import defaultdict
-from contextlib import contextmanager
 from copy import copy
 from datetime import datetime
 from multiprocessing import Lock, Process, Queue, Value
@@ -80,6 +79,7 @@ from time import sleep, time
 import tests.comparison.cli_options as cli_options
 from tests.comparison.cluster import Timeout
 from tests.comparison.db_types import Int, TinyInt, SmallInt, BigInt
+from tests.stress.mem_broker import MemBroker
 from tests.stress.runtime_info import save_runtime_info, load_runtime_info
 from tests.stress.queries import (QueryType, generate_compute_stats_queries,
     generate_DML_queries, generate_random_queries, load_tpc_queries,
@@ -202,101 +202,6 @@ def print_crash_info_if_exists(impala, start_time):
   for message in crashed_impalads.itervalues():
     print(message, file=sys.stderr)
   return crashed_impalads
-
-
-class MemBroker(object):
-  """Provides memory usage coordination for clients running in different processes.
-  The broker fulfills reservation requests by blocking as needed so total memory
-  used by clients never exceeds the total available memory (including an
-  'overcommitable' amount).
-
-  The lock built in to _available is also used to protect access to other members.
-
-  The state stored in this class is actually an encapsulation of part of the state
-  of the StressRunner class below. The state here is separated for clarity.
-  """
-
-  def __init__(self, real_mem_mb, overcommitable_mem_mb):
-    """'real_mem_mb' memory should be the amount of memory that each impalad is able
-    to use. 'overcommitable_mem_mb' is the amount of memory that will be dispensed
-    over the 'real' amount.
-    """
-    self._total_mem_mb = real_mem_mb + overcommitable_mem_mb
-    self._available = Value("i", self._total_mem_mb)
-    self._max_overcommitment = overcommitable_mem_mb
-
-    # Each reservation will be assigned an id. Ids are monotonically increasing. When
-    # a reservation crosses the overcommitment threshold, the corresponding reservation
-    # id will be stored in '_last_overcommitted_reservation_id' so clients can check
-    # to see if memory was overcommitted since their reservation was made (this is a race
-    # but an incorrect result will be on the conservative side).
-    self._next_reservation_id = Value("L", 0)
-    self._last_overcommitted_reservation_id = Value("L", 0)
-
-  @property
-  def total_mem_mb(self):
-    return self._total_mem_mb
-
-  @property
-  def overcommitted_mem_mb(self):
-    return max(self._max_overcommitment - self._available.value, 0)
-
-  @property
-  def available_mem_mb(self):
-    return self._available.value
-
-  @property
-  def last_overcommitted_reservation_id(self):
-    return self._last_overcommitted_reservation_id.value
-
-  @contextmanager
-  def reserve_mem_mb(self, mem_mb):
-    """Blocks until the requested amount of memory is available and taken for the caller.
-    This function should be used in a 'with' block. The taken memory will
-    automatically be released when the 'with' context exits. A numeric id is returned
-    so clients can compare against 'last_overcommitted_reservation_id' to see if
-    memory was overcommitted since the reservation was obtained.
-
-    with broker.reserve_mem_mb(100) as reservation_id:
-      # Run query using 100 MB of memory
-      if <query failed>:
-        # Immediately check broker.was_overcommitted(reservation_id) to see if
-        # memory was overcommitted.
-    """
-    reservation_id = self._wait_until_reserved(mem_mb)
-    try:
-      yield reservation_id
-    finally:
-      self._release(mem_mb)
-
-  def _wait_until_reserved(self, req):
-    while True:
-      with self._available.get_lock():
-        if req <= self._available.value:
-          self._available.value -= req
-          LOG.debug(
-              "Reserved %s MB; %s MB available; %s MB overcommitted",
-              req, self._available.value, self.overcommitted_mem_mb)
-          reservation_id = self._next_reservation_id.value
-          increment(self._next_reservation_id)
-          if self.overcommitted_mem_mb > 0:
-            self._last_overcommitted_reservation_id.value = reservation_id
-          return reservation_id
-      sleep(0.1)
-
-  def _release(self, req):
-    with self._available.get_lock():
-      self._available.value += req
-      LOG.debug(
-          "Released %s MB; %s MB available; %s MB overcommitted",
-          req, self._available.value, self.overcommitted_mem_mb)
-
-  def was_overcommitted(self, reservation_id):
-    """Returns True if memory was overcommitted since the given reservation was made.
-    For an accurate return value, this should be called just after the query ends
-    or while the query is still running.
-    """
-    return reservation_id <= self._last_overcommitted_reservation_id.value
 
 
 class StressRunner(object):
