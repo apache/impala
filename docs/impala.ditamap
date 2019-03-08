@@ -297,6 +297,7 @@ under the License.
   </topicref>
   <topicref href="topics/impala_scalability.xml">
     <topicref href="topics/impala_dedicated_coordinator.xml"/>
+    <topicref href="topics/impala_metadata.xml"/>
   </topicref>
   <topicref href="topics/impala_resource_management.xml">
     <topicref href="topics/impala_admission.xml"/>
