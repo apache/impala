@@ -26,6 +26,7 @@
 #include <string>
 
 #include "common/status.h"
+#include "kudu/util/web_callback_registry.h"
 #include "thirdparty/squeasel/squeasel.h"
 #include "util/network-util.h"
 
@@ -48,10 +49,12 @@ enum ContentType {
 /// HTML or text.
 class Webserver {
  public:
-  typedef std::map<std::string, std::string> ArgumentMap;
-  typedef boost::function<void (const ArgumentMap& args, rapidjson::Document* json)>
+  using ArgumentMap = kudu::WebCallbackRegistry::ArgumentMap;
+  using WebRequest = kudu::WebCallbackRegistry::WebRequest;
+
+  typedef boost::function<void (const WebRequest& req, rapidjson::Document* json)>
       UrlCallback;
-  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
+  typedef boost::function<void (const WebRequest& req, std::stringstream* output)>
       RawUrlCallback;
 
   /// Any callback may add a member to their Json output with key ENABLE_RAW_HTML_KEY;
@@ -166,11 +169,11 @@ class Webserver {
   /// - Argument 'raw' renders the page with PLAIN ContentType.
   /// - Argument 'json' renders the page with JSON ContentType. The underlying JSON is
   ///   pretty-printed.
-  void RenderUrlWithTemplate(const ArgumentMap& arguments, const UrlHandler& url_handler,
+  void RenderUrlWithTemplate(const WebRequest& arguments, const UrlHandler& url_handler,
       std::stringstream* output, ContentType* content_type);
 
   /// Called when an error is encountered, e.g. when a handler for a URI cannot be found.
-  void ErrorHandler(const ArgumentMap& args, rapidjson::Document* document);
+  void ErrorHandler(const WebRequest& req, rapidjson::Document* document);
 
   /// Builds a map of argument name to argument value from a typical URL argument
   /// string (that is, "key1=value1&key2=value2.."). If no value is given for a

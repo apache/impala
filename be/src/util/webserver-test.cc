@@ -105,8 +105,9 @@ TEST(Webserver, SmokeTest) {
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents));
 }
 
-void AssertArgsCallback(bool* success, const Webserver::ArgumentMap& args,
+void AssertArgsCallback(bool* success, const Webserver::WebRequest& req,
     Document* document) {
+  const auto& args = req.parsed_args;
   *success = args.find(TEST_ARG) != args.end();
 }
 
@@ -128,7 +129,7 @@ TEST(Webserver, ArgsTest) {
   ASSERT_TRUE(success) << "Did not find " << TEST_ARG;
 }
 
-void JsonCallback(bool always_text, const Webserver::ArgumentMap& args,
+void JsonCallback(bool always_text, const Webserver::WebRequest& req,
     Document* document) {
   document->AddMember(rapidjson::StringRef(SALUTATION_KEY.c_str()),
       StringRef(SALUTATION_VALUE.c_str()), document->GetAllocator());
@@ -353,7 +354,7 @@ TEST(Webserver, DirectoryListingDisabledTest) {
   ASSERT_TRUE(contents.str().find("Directory listing denied") != string::npos);
 }
 
-void FrameCallback(const Webserver::ArgumentMap& args, Document* document) {
+void FrameCallback(const Webserver::WebRequest& req, Document* document) {
   const string contents = "<frameset cols='50%,50%'><frame src='/metrics'></frameset>";
   Value value(contents.c_str(), document->GetAllocator());
   document->AddMember("contents", value, document->GetAllocator());
@@ -390,7 +391,7 @@ TEST(Webserver, FrameAllowEmbeddingTest) {
 
 const string STRING_WITH_NULL = "123456789\0ABCDE";
 
-void NullCharCallback(const Webserver::ArgumentMap& args, stringstream* out) {
+void NullCharCallback(const Webserver::WebRequest& req, stringstream* out) {
   (*out) << STRING_WITH_NULL;
 }
 

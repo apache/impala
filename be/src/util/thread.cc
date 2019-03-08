@@ -78,10 +78,10 @@ namespace {
 //   },
 //   { ... }
 // ]
-void JvmThreadsUrlCallback(const Webserver::ArgumentMap& args, Document* doc);
+void JvmThreadsUrlCallback(const Webserver::WebRequest& req, Document* doc);
 
 void ThreadOverviewUrlCallback(bool include_jvm_threads,
-    const Webserver::ArgumentMap& args, Document* document);
+    const Webserver::WebRequest& req, Document* document);
 
 }
 
@@ -141,7 +141,7 @@ class ThreadMgr {
   //             "iowait_ns": 0
   //             }
   //        ]
-  void ThreadGroupUrlCallback(const Webserver::ArgumentMap& args, Document* output);
+  void ThreadGroupUrlCallback(const Webserver::WebRequest& req, Document* output);
 
  private:
   // Container class for any details we want to capture about a thread
@@ -241,10 +241,11 @@ void ThreadMgr::GetThreadOverview(Document* document) {
   document->AddMember("thread-groups", lst, document->GetAllocator());
 }
 
-void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
+void ThreadMgr::ThreadGroupUrlCallback(const Webserver::WebRequest& req,
     Document* document) {
   lock_guard<mutex> l(lock_);
   vector<const ThreadCategory*> categories_to_print;
+  const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator category_it = args.find("group");
   string category_name = (category_it == args.end()) ? "all" : category_it->second;
   if (category_name != "all") {
@@ -377,21 +378,21 @@ namespace {
 void RegisterUrlCallbacks(bool include_jvm_threads, Webserver* webserver) {
   DCHECK(webserver != nullptr);
   auto overview_callback = [include_jvm_threads]
-      (const Webserver::ArgumentMap& args, Document* doc) {
-    ThreadOverviewUrlCallback(include_jvm_threads, args, doc);
+      (const Webserver::WebRequest& req, Document* doc) {
+    ThreadOverviewUrlCallback(include_jvm_threads, req, doc);
   };
   webserver->RegisterUrlCallback(
       THREADS_WEB_PAGE, THREADS_TEMPLATE, overview_callback, true);
 
-  auto group_callback = [] (const Webserver::ArgumentMap& args, Document* doc) {
-    thread_manager->ThreadGroupUrlCallback(args, doc);
+  auto group_callback = [] (const Webserver::WebRequest& req, Document* doc) {
+    thread_manager->ThreadGroupUrlCallback(req, doc);
   };
   webserver->RegisterUrlCallback(THREAD_GROUP_WEB_PAGE, THREAD_GROUP_TEMPLATE,
       group_callback, false);
 
   if (include_jvm_threads) {
-    auto jvm_threads_callback = [] (const Webserver::ArgumentMap& args, Document* doc) {
-      JvmThreadsUrlCallback(args, doc);
+    auto jvm_threads_callback = [] (const Webserver::WebRequest& req, Document* doc) {
+      JvmThreadsUrlCallback(req, doc);
     };
     webserver->RegisterUrlCallback(JVM_THREADS_WEB_PAGE, JVM_THREADS_TEMPLATE,
         jvm_threads_callback, false);
@@ -399,7 +400,7 @@ void RegisterUrlCallbacks(bool include_jvm_threads, Webserver* webserver) {
 }
 
 void ThreadOverviewUrlCallback(bool include_jvm_threads,
-    const Webserver::ArgumentMap& args, Document* document) {
+    const Webserver::WebRequest& req, Document* document) {
   thread_manager->GetThreadOverview(document);
   if (!include_jvm_threads) return;
 
@@ -423,7 +424,7 @@ void ThreadOverviewUrlCallback(bool include_jvm_threads,
   document->AddMember("jvm-threads", jvm_threads_val, document->GetAllocator());
 }
 
-void JvmThreadsUrlCallback(const Webserver::ArgumentMap& args, Document* doc) {
+void JvmThreadsUrlCallback(const Webserver::WebRequest& req, Document* doc) {
   DCHECK(doc != NULL);
   TGetJvmThreadsInfoRequest request;
   request.get_complete_info = true;

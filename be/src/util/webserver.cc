@@ -62,6 +62,7 @@ using boost::algorithm::trim_right;
 using boost::algorithm::to_lower;
 using boost::filesystem::exists;
 using boost::upgrade_to_unique_lock;
+using kudu::HttpStatusCode;
 using namespace google;
 using namespace strings;
 using namespace rapidjson;
@@ -99,6 +100,9 @@ DEFINE_string(webserver_password_file, "",
 
 DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
+DEFINE_int32(webserver_max_post_length_bytes, 1024 * 1024,
+             "The maximum length of a POST request that will be accepted by "
+             "the embedded web server.");
 
 DECLARE_bool(is_coordinator);
 DECLARE_string(ssl_minimum_version);
@@ -141,21 +145,38 @@ const char* Webserver::ENABLE_RAW_HTML_KEY = "__raw__";
 
 const char* Webserver::ENABLE_PLAIN_JSON_KEY = "__json__";
 
-// Supported HTTP response codes
-enum ResponseCode {
-  OK = 200,
-  NOT_FOUND = 404
-};
+namespace {
+string HttpStatusCodeToString(HttpStatusCode code) {
+  switch (code) {
+    case HttpStatusCode::Ok:
+      return "200 OK";
+    case HttpStatusCode::BadRequest:
+      return "400 Bad Request";
+    case HttpStatusCode::NotFound:
+      return "404 Not Found";
+    case HttpStatusCode::LengthRequired:
+      return "411 Length Required";
+    case HttpStatusCode::RequestEntityTooLarge:
+      return "413 Request Entity Too Large";
+    case HttpStatusCode::InternalServerError:
+      return "500 Internal Server Error";
+    case HttpStatusCode::ServiceUnavailable:
+      return "503 Service Unavailable";
+  }
+  LOG(FATAL) << "Unexpected HTTP response code";
+  return "";
+}
+} // anonymous namespace
 
 // Builds a valid HTTP header given the response code and a content type.
-string BuildHeaderString(ResponseCode response, ContentType content_type) {
-  static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0 $1\r\n"
-      "Content-Type: $2\r\n"
+string BuildHeaderString(HttpStatusCode response, ContentType content_type) {
+  static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0\r\n"
+      "Content-Type: $1\r\n"
       "Content-Length: %d\r\n"
-      "X-Frame-Options: $3\r\n"
+      "X-Frame-Options: $2\r\n"
       "\r\n";
 
-  return Substitute(RESPONSE_TEMPLATE, response, response == OK ? "OK" : "Not found",
+  return Substitute(RESPONSE_TEMPLATE, HttpStatusCodeToString(response),
       Webserver::GetMimeType(content_type), FLAGS_webserver_x_frame_options.c_str());
 }
 
@@ -179,9 +200,9 @@ Webserver::~Webserver() {
   Stop();
 }
 
-void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {
-  ArgumentMap::const_iterator it = args.find(ERROR_KEY);
-  if (it == args.end()) return;
+void Webserver::ErrorHandler(const WebRequest& req, Document* document) {
+  ArgumentMap::const_iterator it = req.parsed_args.find(ERROR_KEY);
+  if (it == req.parsed_args.end()) return;
 
   Value error(it->second.c_str(), document->GetAllocator());
   document->AddMember("error", error, document->GetAllocator());
@@ -389,34 +410,78 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
     }
   }
 
-  map<string, string> arguments;
+  WebRequest req;
   if (request_info->query_string != nullptr) {
-    BuildArgumentMap(request_info->query_string, &arguments);
+    req.query_string = request_info->query_string;
+    BuildArgumentMap(request_info->query_string, &req.parsed_args);
   }
 
-  shared_lock<shared_mutex> lock(url_handlers_lock_);
-  UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
-  ResponseCode response = OK;
+  HttpStatusCode response = HttpStatusCode::Ok;
   ContentType content_type = HTML;
   const UrlHandler* url_handler = nullptr;
-  if (it == url_handlers_.end()) {
-    response = NOT_FOUND;
-    arguments[ERROR_KEY] = Substitute("No URI handler for '$0'", request_info->uri);
-    url_handler = &error_handler_;
-  } else {
-    url_handler = &it->second;
+  {
+    shared_lock<shared_mutex> lock(url_handlers_lock_);
+    UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
+    if (it == url_handlers_.end()) {
+      response = HttpStatusCode::NotFound;
+      req.parsed_args[ERROR_KEY] = Substitute("No URI handler for '$0'",
+          request_info->uri);
+      url_handler = &error_handler_;
+    } else {
+      url_handler = &it->second;
+    }
   }
 
   MonotonicStopWatch sw;
   sw.Start();
 
+  req.request_method = request_info->request_method;
+  if (req.request_method == "POST") {
+    const char* content_len_str = sq_get_header(connection, "Content-Length");
+    int32_t content_len = 0;
+    if (content_len_str == nullptr ||
+        !safe_strto32(content_len_str, &content_len)) {
+      sq_printf(connection,
+                "HTTP/1.1 %s\r\n",
+                HttpStatusCodeToString(HttpStatusCode::LengthRequired).c_str());
+      return 1;
+    }
+    if (content_len > FLAGS_webserver_max_post_length_bytes) {
+      // TODO: for this and other HTTP requests, we should log the
+      // remote IP, etc.
+      LOG(WARNING) << "Rejected POST with content length " << content_len;
+      sq_printf(connection,
+                "HTTP/1.1 %s\r\n",
+                HttpStatusCodeToString(HttpStatusCode::RequestEntityTooLarge).c_str());
+      return 1;
+    }
+
+    char buf[8192];
+    int rem = content_len;
+    while (rem > 0) {
+      int n = sq_read(connection, buf, std::min<int>(sizeof(buf), rem));
+      if (n <= 0) {
+        LOG(WARNING) << "error reading POST data: expected "
+                     << content_len << " bytes but only read "
+                     << req.post_data.size();
+        sq_printf(connection,
+                  "HTTP/1.1 %s\r\n",
+                  HttpStatusCodeToString(HttpStatusCode::InternalServerError).c_str());
+        return 1;
+      }
+
+      req.post_data.append(buf, n);
+      rem -= n;
+    }
+  }
+
   // The output of this page is accumulated into this stringstream.
   stringstream output;
   if (!url_handler->use_templates()) {
     content_type = PLAIN;
-    url_handler->raw_callback()(arguments, &output);
+    url_handler->raw_callback()(req, &output);
   } else {
-    RenderUrlWithTemplate(arguments, *url_handler, &output, &content_type);
+    RenderUrlWithTemplate(req, *url_handler, &output, &content_type);
   }
 
   VLOG(3) << "Rendering page " << request_info->uri << " took "
@@ -438,13 +503,14 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   return PROCESSING_COMPLETE;
 }
 
-void Webserver::RenderUrlWithTemplate(const ArgumentMap& arguments,
+void Webserver::RenderUrlWithTemplate(const WebRequest& req,
     const UrlHandler& url_handler, stringstream* output, ContentType* content_type) {
   Document document;
   document.SetObject();
   GetCommonJson(&document);
 
-  url_handler.callback()(arguments, &document);
+  const auto& arguments = req.parsed_args;
+  url_handler.callback()(req, &document);
   bool plain_json = (arguments.find("json") != arguments.end())
       || document.HasMember(ENABLE_PLAIN_JSON_KEY);
   if (plain_json) {

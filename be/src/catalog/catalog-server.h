@@ -170,7 +170,7 @@ class CatalogServer {
   ///             ]
   ///         }
   ///     ]
-  void CatalogUrlCallback(const Webserver::ArgumentMap& args,
+  void CatalogUrlCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Debug webpage handler that is used to dump the internal state of catalog objects.
@@ -178,7 +178,7 @@ class CatalogServer {
   /// will get the matching TCatalogObject struct, if one exists.
   /// For example, to dump table "bar" in database "foo":
   /// <host>:25020/catalog_objects?object_type=TABLE&object_name=foo.bar
-  void CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+  void CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Retrieves from the FE information about the current catalog usage and populates
@@ -214,13 +214,13 @@ class CatalogServer {
   /// table. For example, to get the table metrics of table "bar" in database
   /// "foo":
   /// <host>:25020/table_metrics?name=foo.bar
-  void TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
+  void TableMetricsUrlCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   // url handler for the metastore events page. It calls into JniCatalog to get the latest
   // metastore event processor metrics and adds it to the document
   void EventMetricsUrlCallback(
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 };
 
 }

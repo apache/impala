@@ -699,7 +699,7 @@ class Statestore : public CacheLineAligned {
   ///   "value_size": "9.54 MB",
   ///   "total_size": "9.58 MB"
   /// }, ]
-  void TopicsHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+  void TopicsHandler(const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// Webpage handler: upon return 'document' will contain a list of subscribers as
   /// follows:
@@ -712,7 +712,7 @@ class Statestore : public CacheLineAligned {
   ///   "registration_id": "414d28c84930d987:abcffd70b3346fb7"
   ///   }
   /// ]
-  void SubscribersHandler(const Webserver::ArgumentMap& args,
+  void SubscribersHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Monitors the heartbeats of all subscribers every

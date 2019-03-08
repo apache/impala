@@ -405,13 +405,13 @@ class MetricGroup {
   /// metric group, and each including a list of metrics, and a list of immediate
   /// children.  If args contains a paramater 'metric', only the json for that metric is
   /// returned.
-  void TemplateCallback(const Webserver::ArgumentMap& args,
+  void TemplateCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Legacy webpage callback for CM 5.0 and earlier. Produces a flattened map of (key,
   /// value) pairs for all metrics in this hierarchy.
   /// If args contains a paramater 'metric', only the json for that metric is returned.
-  void CMCompatibleCallback(const Webserver::ArgumentMap& args,
+  void CMCompatibleCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 };
 

@@ -54,7 +54,7 @@ DEFINE_int64(web_log_bytes, 1024 * 1024,
 
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
 // Note to get best performance, set GLOG_logbuflevel=-1 to prevent log buffering
-void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
+void LogsHandler(const Webserver::WebRequest& req, Document* document) {
   string logfile;
   impala::GetFullLogFilename(google::INFO, &logfile);
   Value log_path(logfile.c_str(), document->GetAllocator());
@@ -94,7 +94,7 @@ void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
 //       "current": "26000"
 //     },
 // .. etc
-void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
+void FlagsHandler(const Webserver::WebRequest& req, Document* document) {
   vector<CommandLineFlagInfo> flag_info;
   GetAllFlags(&flag_info, true);
   Value flag_arr(kArrayType);
@@ -129,7 +129,7 @@ void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
 
 // Registered to handle "/memz"
 void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
-    const Webserver::ArgumentMap& args, Document* document) {
+    const Webserver::WebRequest& req, Document* document) {
   DCHECK(mem_tracker != NULL);
   Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TUnit::BYTES).c_str(),
       document->GetAllocator());
@@ -197,7 +197,7 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   }
 }
 
-void JmxHandler(const Webserver::ArgumentMap& args, Document* document) {
+void JmxHandler(const Webserver::WebRequest& req, Document* document) {
   document->AddMember(rapidjson::StringRef(Webserver::ENABLE_PLAIN_JSON_KEY), true,
       document->GetAllocator());
   TGetJMXJsonResponse result;
@@ -241,7 +241,7 @@ void AddBuildFlag(const std::string& flag_name, const std::string& flag_value,
 
 namespace impala {
 
-void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
+void RootHandler(const Webserver::WebRequest& req, Document* document) {
   Value version(GetVersionString().c_str(), document->GetAllocator());
   document->AddMember("version", version, document->GetAllocator());
 
@@ -312,8 +312,8 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracke
   }
   if (process_mem_tracker != NULL) {
     auto callback = [process_mem_tracker, metric_group]
-        (const Webserver::ArgumentMap& args, Document* doc) {
-      MemUsageHandler(process_mem_tracker, metric_group, args, doc);
+        (const Webserver::WebRequest& req, Document* doc) {
+      MemUsageHandler(process_mem_tracker, metric_group, req, doc);
     };
     webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback, true);
   }
@@ -326,8 +326,8 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracke
 #endif
 
   auto root_handler =
-    [](const Webserver::ArgumentMap& args, Document* doc) {
-      RootHandler(args, doc);
+    [](const Webserver::WebRequest& req, Document* doc) {
+      RootHandler(req, doc);
     };
   webserver->RegisterUrlCallback("/", "root.tmpl", root_handler, true);
 }

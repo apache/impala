@@ -38,3 +38,20 @@ class TestWebPage(CustomClusterTestSuite):
     assert flag[0]["default"] == "false"
     assert flag[0]["current"] == "true"
     assert flag[0]["experimental"]
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--webserver_max_post_length_bytes=100"
+  )
+  def test_max_post_length(self):
+    """Tests that the maximum length of a POST request that will be accepted"""
+    too_big_post_content = "c" * 10000
+    # POST that exceeds the limit
+    response = requests.post("http://localhost:25000/", too_big_post_content)
+    assert response.status_code == requests.codes.request_entity_too_large
+
+    # POST within the limit
+    # This is on a URI that does not understand POST and treats it like a GET.
+    ok_post_content = "c" * 100
+    response = requests.post("http://localhost:25000/", ok_post_content)
+    assert response.status_code == requests.codes.ok

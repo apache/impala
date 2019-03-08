@@ -497,7 +497,7 @@ void Statestore::RegisterWebpages(Webserver* webserver) {
   RegisterLogLevelCallbacks(webserver, false);
 }
 
-void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
+void Statestore::TopicsHandler(const Webserver::WebRequest& req,
     Document* document) {
   lock_guard<mutex> l(subscribers_lock_);
   shared_lock<shared_mutex> t(topics_map_lock_);
@@ -519,7 +519,7 @@ void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
   document->AddMember("topics", topics, document->GetAllocator());
 }
 
-void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
+void Statestore::SubscribersHandler(const Webserver::WebRequest& req,
     Document* document) {
   lock_guard<mutex> l(subscribers_lock_);
   Value subscribers(kArrayType);

@@ -401,7 +401,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
   }
 }
 
-void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
+void CatalogServer::CatalogUrlCallback(const Webserver::WebRequest& req,
     Document* document) {
   GetCatalogUsage(document);
   TGetDbsResult get_dbs_result;
@@ -540,7 +540,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
 }
 
 void CatalogServer::EventMetricsUrlCallback(
-    const Webserver::ArgumentMap& args, Document* document) {
+    const Webserver::WebRequest& req, Document* document) {
   TEventProcessorMetricsSummaryResponse event_processor_summary_response;
   Status status = catalog_->GetEventProcessorSummary(&event_processor_summary_response);
   if (!status.ok()) {
@@ -555,8 +555,9 @@ void CatalogServer::EventMetricsUrlCallback(
       "event_processor_metrics", event_processor_summary, document->GetAllocator());
 }
 
-void CatalogServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
     Document* document) {
+  const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
   Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
   if (object_type_arg != args.end() && object_name_arg != args.end()) {
@@ -585,8 +586,9 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args
   }
 }
 
-void CatalogServer::TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
+void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,
     Document* document) {
+  const auto& args = req.parsed_args;
   // TODO: Enable json view of table metrics
   Webserver::ArgumentMap::const_iterator object_name_arg = args.find("name");
   if (object_name_arg != args.end()) {

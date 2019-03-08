@@ -39,7 +39,7 @@ static const int PPROF_DEFAULT_SAMPLE_SECS = 30; // pprof default sample time in
 
 // pprof asks for the url /pprof/cmdline to figure out what application it's profiling.
 // The server should respond by reading the contents of /proc/self/cmdline.
-void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void PprofCmdLineHandler(const Webserver::WebRequest& req, stringstream* output) {
   ifstream cmd_line_file("/proc/self/cmdline", ios::in);
   if (!cmd_line_file.is_open()) {
     (*output) << "Unable to open file: /proc/self/cmdline";
@@ -53,11 +53,12 @@ void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* outpu
 // pprof asks for the url /pprof/heap to get heap information. This should be implemented
 // by calling HeapProfileStart(filename), continue to do work, and then, some number of
 // seconds later, call GetHeapProfile() followed by HeapProfilerStop().
-void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void PprofHeapHandler(const Webserver::WebRequest& req, stringstream* output) {
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
   (void)PPROF_DEFAULT_SAMPLE_SECS; // Avoid unused variable warning.
   (*output) << "Heap profiling is not available with address/thread sanitizer builds.";
 #else
+  const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
   if (it != args.end()) {
@@ -77,10 +78,11 @@ void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) 
 // pprof asks for the url /pprof/profile?seconds=XX to get cpu-profiling information.
 // The server should respond by calling ProfilerStart(), continuing to do its work,
 // and then, XX seconds later, calling ProfilerStop().
-void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void PprofCpuProfileHandler(const Webserver::WebRequest& req, stringstream* output) {
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
   (*output) << "CPU profiling is not available with address/thread sanitizer builds.";
 #else
+  const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
   if (it != args.end()) {
@@ -105,7 +107,7 @@ void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* ou
 // pprof asks for the url /pprof/growth to get heap-profiling delta (growth) information.
 // The server should respond by calling:
 // MallocExtension::instance()->GetHeapGrowthStacks(&output);
-void PprofGrowthHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void PprofGrowthHandler(const Webserver::WebRequest& req, stringstream* output) {
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
   (*output) << "Growth profiling is not available with address/thread sanitizer builds.";
 #else
@@ -132,7 +134,7 @@ void PprofGrowthHandler(const Webserver::ArgumentMap& args, stringstream* output
 // <hex address><tab><function name>
 // For instance:
 // 0x08b2dabd    _Update
-void PprofSymbolHandler(const Webserver::ArgumentMap& args, stringstream* output) {
+void PprofSymbolHandler(const Webserver::WebRequest& req, stringstream* output) {
   // TODO: Implement symbol resolution. Without this, the binary needs to be passed
   // to pprof to resolve all symbols.
   (*output) << "num_symbols: 0";

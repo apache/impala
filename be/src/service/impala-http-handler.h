@@ -40,7 +40,7 @@ class ImpalaHttpHandler {
 
   /// Json callback for /hadoop-varz. Produces Json with a list, 'configs', of (key,
   /// value) pairs, one for each Hadoop configuration value.
-  void HadoopVarzHandler(const Webserver::ArgumentMap& args,
+  void HadoopVarzHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Returns two sorted lists of queries, one in-flight and one completed, as well as a
@@ -69,12 +69,12 @@ class ImpalaHttpHandler {
   ///        "count": 0
   ///     }
   /// ]
-  void QueryStateHandler(const Webserver::ArgumentMap& args,
+  void QueryStateHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Json callback for /query_profile. Expects query_id as an argument, produces Json
   /// with 'profile' set to the profile string, and 'query_id' set to the query ID.
-  void QueryProfileHandler(const Webserver::ArgumentMap& args,
+  void QueryProfileHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Webserver callback. Produces a Json structure with query summary information.
@@ -89,33 +89,33 @@ class ImpalaHttpHandler {
   /// the query plan. If include_summary is true, 'summary' will be a text rendering of
   /// the query summary.
   void QuerySummaryHandler(bool include_plan_json, bool include_summary,
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// If 'args' contains a query id, serializes all backend states for that query to
   /// 'document'.
   void QueryBackendsHandler(
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// If 'args' contains a query id, serializes all fragment instance states for all
   /// backends for that query to 'document'.
   void QueryFInstancesHandler(
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// Cancels an in-flight query and writes the result to 'contents'.
-  void CancelQueryHandler(const Webserver::ArgumentMap& args,
+  void CancelQueryHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Closes an active session with a client.
-  void CloseSessionHandler(const Webserver::ArgumentMap& args,
+  void CloseSessionHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Upon return, 'document' will contain the query profile as a base64 encoded object in
   /// 'contents'.
-  void QueryProfileEncodedHandler(const Webserver::ArgumentMap& args,
+  void QueryProfileEncodedHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Produces a list of inflight query IDs printed as text in 'contents'.
-  void InflightQueryIdsHandler(const Webserver::ArgumentMap& args,
+  void InflightQueryIdsHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Json callback for /sessions, which prints a table of active client sessions.
@@ -136,18 +136,18 @@ class ImpalaHttpHandler {
   ///     }
   /// ],
   /// "num_sessions": 1
-  void SessionsHandler(const Webserver::ArgumentMap& args,
+  void SessionsHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Returns a list of all known databases and tables
-  void CatalogHandler(const Webserver::ArgumentMap& args, rapidjson::Document* output);
+  void CatalogHandler(const Webserver::WebRequest& req, rapidjson::Document* output);
 
   /// Returns information on objects in the catalog.
-  void CatalogObjectsHandler(const Webserver::ArgumentMap& args,
+  void CatalogObjectsHandler(const Webserver::WebRequest& req,
       rapidjson::Document* output);
 
   // Returns memory usage for queries in flight.
-  void QueryMemoryHandler(const Webserver::ArgumentMap& args,
+  void QueryMemoryHandler(const Webserver::WebRequest& req,
       rapidjson::Document* output);
 
   /// Helper method to render a single QueryStateRecord as a Json object Used by
@@ -163,7 +163,7 @@ class ImpalaHttpHandler {
   ///   "is_executor": false
   ///   }
   /// ]
-  void BackendsHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+  void BackendsHandler(const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// Json callback for /admission_controller, which prints relevant details for all
   /// resource pools.
@@ -217,14 +217,14 @@ class ImpalaHttpHandler {
   ///  }
   ///]
   void AdmissionStateHandler(
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 
   /// Resets resource pool informational statistics. Takes an optional argument:
   /// 'pool_name'. If its not specified, all resource pool's informational statistics are
   /// reset otherwise it resets the statistics for a single pool identified by the
   /// supplied argument. Produces no JSON output.
   void ResetResourcePoolStatsHandler(
-      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+      const Webserver::WebRequest& req, rapidjson::Document* document);
 };
 
 }

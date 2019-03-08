@@ -36,7 +36,7 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracke
 
 /// Registered to handle "/"
 /// Populates document with various system-wide information.
-void RootHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+void RootHandler(const Webserver::WebRequest& req, rapidjson::Document* document);
 }
 
 #endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

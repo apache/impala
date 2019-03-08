@@ -96,8 +96,9 @@ Status MetricGroup::Init(Webserver* webserver) {
   return Status::OK();
 }
 
-void MetricGroup::CMCompatibleCallback(const Webserver::ArgumentMap& args,
+void MetricGroup::CMCompatibleCallback(const Webserver::WebRequest& req,
     Document* document) {
+  const auto& args = req.parsed_args;
   // If the request has a 'metric' argument, search all top-level metrics for that metric
   // only. Otherwise, return document with list of all metrics at the top level.
   Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
@@ -127,8 +128,9 @@ void MetricGroup::CMCompatibleCallback(const Webserver::ArgumentMap& args,
   } while (!groups.empty());
 }
 
-void MetricGroup::TemplateCallback(const Webserver::ArgumentMap& args,
+void MetricGroup::TemplateCallback(const Webserver::WebRequest& req,
     Document* document) {
+  const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator metric_group = args.find("metric_group");
 
   lock_guard<SpinLock> l(lock_);
@@ -212,10 +214,10 @@ MetricGroup* MetricGroup::FindChildGroup(const string& name) {
 }
 
 string MetricGroup::DebugString() {
-  Webserver::ArgumentMap empty_map;
+  Webserver::WebRequest empty_req;
   Document document;
   document.SetObject();
-  TemplateCallback(empty_map, &document);
+  TemplateCallback(empty_req, &document);
   StringBuffer strbuf;
   PrettyWriter<StringBuffer> writer(strbuf);
   document.Accept(writer);
