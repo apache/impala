@@ -744,32 +744,6 @@ show column stats year_month_day;
               <codeph>--inc_stats_size_limit_bytes</codeph>. </p>
         </conbody>
       </concept>
-      <concept id="pull_incremental_statistics">
-        <title>Loading Incremental Statistics from Catalogd</title>
-        <conbody>
-          <p>
-            Starting in Impala 3.1, a new configuration setting,
-              <codeph>--pull_incremental_statistics</codeph>, was added and set
-            to <codeph>true</codeph> by default. When you start Impala catalogd
-            and impalad coordinators with this setting enabled:
-          </p>
-          <ul>
-            <li> Newly created incremental stats will be smaller in size thus
-              reducing memory pressure on the catalogd daemon. Your users can
-              keep more tables and partitions in the same catalog and have lower
-              chances of crashing catalogd due to out-of-memory issues. </li>
-            <li>
-              Incremental stats will not be replicated to impalad and will be
-              accessed on demand from catalogd, resulting in a reduced memory
-              footprint of impalad.
-            </li>
-          </ul>
-          <p>
-            We do not recommend you change the default setting of
-              <codeph>--pull_incremental_statistics</codeph>.
-          </p>
-        </conbody>
-      </concept>
 
     </concept>
 

@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_metadata">
+
+  <title>Metadata Management</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      This topic describes various knobs in Impala to tune how Impala manages its metadata.
+      Before you use the features in this topic, you need to turn on Metadata V2 in your
+      cluster.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="auto_invalidate_metadata">
+
+    <title>Startup Options for Automatic Invalidation of Metadata</title>
+
+    <conbody>
+
+      <p>
+        To keep the size of metadata bounded, <codeph>catalogd</codeph> periodically scans all
+        the tables and invalidates those not recently used. There are two types of
+        configurations in <codeph>catalogd</codeph>.
+      </p>
+
+      <ul>
+        <li>
+          Time-based invalidation with the <codeph>--invalidate_tables_timeout_s</codeph> flag:
+          <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
+          specified time period (in seconds). This flag needs to be applied to both
+          <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
+        </li>
+
+        <li>
+          Memory-based invalidation with the
+          <codeph>--invalidate_tables_on_memory_pressure</codeph> flag: When the memory pressure
+          reaches 60% of JVM heap size after a Java garbage collection in
+          <codeph>catalogd</codeph>, Impala invalidates 10% of the least recently used tables.
+          This flag needs to be applied to both <codeph>impalad</codeph> and
+          <codeph>catalogd</codeph>.
+        </li>
+      </ul>
+
+      <p>
+        Automatic invalidation of metadata provides more stability with lower chances of running
+        out of memory, but the feature could potentially cause performance issues and may
+        require tuning.
+      </p>
+
+      <note>
+        This is a preview feature in Impala 3.1 and not generally available.
+      </note>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="pull_incremental_statistics">
+
+    <title>Loading Incremental Statistics from Catalog Server</title>
+
+    <conbody>
+
+      <p>
+        Starting in Impala 3.1, a new configuration setting,
+        <codeph>--pull_incremental_statistics</codeph>, was added and set to
+        <codeph>true</codeph> by default. When you start Impala <codeph>catalogd</codeph> and
+        <codeph>impalad</codeph> coordinators with this setting enabled:
+      </p>
+
+      <ul>
+        <li>
+          Newly created incremental stats will be smaller in size thus reducing memory pressure
+          on the <codeph>catalogd</codeph> daemon. Your users can keep more tables and
+          partitions in the same catalog and have lower chances of crashing
+          <codeph>catalogd</codeph> due to out-of-memory issues.
+        </li>
+
+        <li>
+          Incremental stats will not be replicated to <codeph>impalad</codeph> and will be
+          accessed on demand from <codeph>catalogd</codeph>, resulting in a reduced memory
+          footprint of impalad.
+        </li>
+      </ul>
+
+      <p>
+        We do not recommend you change the default setting of
+        <codeph>--pull_incremental_statistics</codeph>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="auto_poll_hms_notification">
+
+    <title>Automatic Metadata Sync using Hive Metastore Notification Events</title>
+
+    <conbody>
+
+      <p>
+        When this feature is enabled, <codeph>catalogd</codeph> polls Hive Metastore (HMS)
+        notifications events at a configurable interval and processes the following changes:
+      </p>
+
+      <note>
+        This is a preview feature in <keyword keyref="impala32_full"/> and not generally
+        available.
+      </note>
+
+      <ul>
+        <li>
+          Invalidates the tables when it receives the <codeph>ALTER TABLE</codeph> events or the
+          <codeph>ALTER</codeph>, <codeph>ADD</codeph>, or <codeph>DROP</codeph> their
+          partitions.
+        </li>
+
+        <li>
+          Adds the tables or databases when it receives the <codeph>CREATE TABLE</codeph> or
+          <codeph>CREATE DATABASE</codeph> events.
+        </li>
+
+        <li>
+          Removes the tables from <codeph>catalogd</codeph> when it receives the <codeph>DROP
+          TABLE</codeph> or <codeph>DROP DATABASE</codeph> events.
+        </li>
+      </ul>
+
+      <p>
+        This feature is controlled by the <codeph>hms_event_polling_interval_s</codeph> flag.
+        Start the <codeph>catalogd</codeph> with the
+        <codeph>hms_event_polling_interval_s</codeph> flag set to a non-zero value to enable the
+        feature and set the polling frequency in seconds. We recommend the value to be less than
+        5 seconds.
+      </p>
+
+      <p>
+        The following use cases are not supported:
+      </p>
+
+      <ul>
+        <li>
+          The operations that do not generate events in HMS, such as adding new data to existing
+          tables/partitions from Spark are not supported.
+        </li>
+
+        <li>
+          Adding data from one Impala cluster to existing tables/partitions will not synced to
+          another Impala cluster.
+          <p>
+            Only new tables and partitions are synced.
+          </p>
+        </li>
+
+        <li>
+          The <codeph>ALTER DATABASE</codeph> events are not supported and currently ignored.
+        </li>
+      </ul>
+
+      <p>
+        This feature is turned off by default with the
+        <codeph>hms_event_polling_interval_s</codeph> flag set to <codeph>0</codeph>.
+      </p>
+
+    </conbody>
+
+    <concept id="disable_event_based_metadata_sync">
+
+      <title>Disable Event Based Automatic Metadata Sync</title>
+
+      <conbody>
+
+        <p>
+          When the <codeph>hms_event_polling_interval_s</codeph> flag is set to a non-zero value
+          for your <codeph>catalogd</codeph>, the event-based automatic invalidation is enabled
+          for all databases and tables. If you wish to have the fine-grained control on which
+          tables or databases need to be synced using events, you can use the
+          <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
+          table or database level.
+        </p>
+
+        <p>
+          When you add the <codeph>DBPROPERTIES</codeph> or <codeph>TBLPROPERTIES</codeph> with
+          the <codeph>impala.disableHmsSync</codeph> key, the HMS event based sync is turned on
+          or off. The value of the <codeph>impala.disableHmsSync</codeph> property determines if
+          the event processing needs to be disabled for a particular table or database.
+        </p>
+
+        <ul>
+          <li>
+            If <codeph>'impala.disableHmsSync'='true'</codeph>, the events for that table or
+            database are ignored and not synced with HMS.
+          </li>
+
+          <li>
+            If <codeph>'impala.disableHmsSync'='false'</codeph> or if
+            <codeph>impala.disableHmsSync</codeph> is not set, the automatic sync with HMS is
+            enabled if the <codeph>hms_event_polling_interval_s</codeph> global flag is set to
+            non-zero.
+          </li>
+        </ul>
+
+        <ul>
+          <li>
+            To disable the event based HMS sync for a new database, set the
+            <codeph>impala.disableHmsSync</codeph> database properties in Hive as currently,
+            Impala does not support setting database properties:
+<codeblock>CREATE DATABASE &lt;name> WITH DBPROPERTIES ('impala.disableHmsSync'='true');</codeblock>
+          </li>
+
+          <li>
+            To enable or disable the event based HMS sync for a table:
+<codeblock>CREATE TABLE &lt;name> WITH TBLPROPERTIES ('impala.disableHmsSync'='true' | 'false');</codeblock>
+          </li>
+
+          <li>
+            To change the event based HMS sync at the table level:
+<codeblock>ALTER TABLE &lt;name> WITH TBLPROPERTIES ('impala.disableHmsSync'='true' | 'false');</codeblock>
+          </li>
+        </ul>
+
+        <p>
+          When both table and database level properties are set, the table level property takes
+          precedence. If the table level property is not set, then the database level property
+          is used to evaluate if the event needs to be processed or not.
+        </p>
+
+        <p>
+          If the property is changed from <codeph>true</codeph> (meaning events are skipped) to
+          <codeph>false</codeph> (meaning events are not skipped), you need to issue a manual
+          <codeph>INVALIDATE METADATA</codeph> command to reset event processor because it
+          doesn't know how many events have been skipped in the past and cannot know if the
+          object in the event is the latest. In such a case, the status of the event processor
+          changes to <codeph>NEEDS_INVALIDATE</codeph>.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="event_processor_metrics">
+
+      <title>Metrics for Event Based Automatic Metadata Sync</title>
+
+      <conbody>
+
+        <p>
+          You can use the web UI of the <codeph>catalogd</codeph> to check the state of the
+          automatic invalidate event processor.
+        </p>
+
+        <p>
+          By default, the debug web UI of <codeph>catalogd</codeph> is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020</codeph> (non-secure
+          cluster) or <codeph>https://<varname>impala-server-hostname</varname>:25020</codeph>
+          (secure cluster).
+        </p>
+
+        <p>
+          Under the web UI, there are two pages that presents the metrics for HMS event
+          processor that is responsible for the event based automatic metadata sync.
+          <ul>
+            <li>
+              <b>/metrics#events</b>
+            </li>
+
+            <li>
+              <b>/events</b>
+              <p>
+                This provides a detailed view of the metrics of the event processor, including
+                min, max, mean, median, of the durations and rate metrics for all the counters
+                listed on the <b>/metrics#events</b> page.
+              </p>
+            </li>
+          </ul>
+        </p>
+
+      </conbody>
+
+      <concept id="concept_gch_xzm_1hb">
+
+        <title>/metrics#events Page</title>
+
+        <conbody>
+
+          <p>
+            The <b>/metrics#events</b> page provides the following metrics about the HMS event
+            processor.
+          </p>
+
+          <table id="events-tbl">
+            <tgroup cols="2">
+              <colspec colnum="1" colname="col1" colwidth="1*"/>
+              <colspec colnum="2" colname="col3" colwidth="2.58*"/>
+              <thead>
+                <row>
+                  <entry>
+                    Name
+                  </entry>
+                  <entry>
+                    Description
+                  </entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry>
+                    events-processor.avg-events-fetch-duration
+                  </entry>
+                  <entry>
+                    Average duration to fetch a batch of events and process it.
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.avg-events-process-duration
+                  </entry>
+                  <entry>
+                    Average time taken to process a batch of events received from metastore.
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.events-received
+                  </entry>
+                  <entry>
+                    Total number of metastore events received.
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.events-received-15min-rate
+                  </entry>
+                  <entry>
+                    Exponentially weighted moving average (EWMA) of number of events received in
+                    last 15 min.
+
+                    <p>
+                      This rate of events can be used to determine if there are spikes in event
+                      processor activity during certain hours of the day.
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.events-received-1min-rate
+                  </entry>
+                  <entry>
+                    Exponentially weighted moving average (EWMA) of number of events received in
+                    last 1 min.
+
+                    <p>
+                      This rate of events can be used to determine if there are spikes in event
+                      processor activity during certain hours of the day.
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.events-received-5min-rate
+                  </entry>
+                  <entry>
+                    Exponentially weighted moving average (EWMA) of number of events received in
+                    last 5 min.
+
+                    <p>
+                      This rate of events can be used to determine if there are spikes in event
+                      processor activity during certain hours of the day.
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.events-skipped
+                  </entry>
+                  <entry>
+                    Total number of metastore events skipped.
+
+                    <p>
+                      Events can be skipped based on certain flags are table and database level.
+                      You can use this metric to make decisions, such as:
+                      <ul>
+                        <li>
+                          If most of the events are being skipped, see if you might just turn
+                          off the event processing.
+                        </li>
+
+                        <li>
+                          If most of the events are not skipped, see if you need to add flags on
+                          certain databases.
+                        </li>
+                      </ul>
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    events-processor.status
+                  </entry>
+                  <entry>
+                    Metastore event processor status to see if there are events being received
+                    or not. Possible states are:
+
+                    <ul>
+                      <li>
+                        <codeph>PAUSED</codeph>
+                        <p>
+                          The event processor is paused because catalog is being reset
+                          concurrently.
+                        </p>
+                      </li>
+
+                      <li>
+                        <codeph>ACTIVE</codeph>
+                        <p>
+                          The event processor is scheduled at a given frequency.
+                        </p>
+                      </li>
+
+                      <li>
+                        <codeph>ERROR</codeph>
+                      </li>
+
+                      <li>
+                        The event processor is in error state and event processing has stopped.
+                      </li>
+
+                      <li>
+                        <codeph>NEEDS_INVALIDATE</codeph>
+                        <p>
+                          The event processor could not resolve certain events and needs a
+                          manual <codeph>INVALIDATE</codeph> command to reset the state.
+                        </p>
+                      </li>
+
+                      <li>
+                        <codeph>STOPPED</codeph>
+                        <p>
+                          The event processing has been shutdown. No events will be processed.
+                        </p>
+                      </li>
+
+                      <li>
+                        <codeph>DISABLED</codeph>
+                        <p>
+                          The event processor is not configured to run.
+                        </p>
+                      </li>
+                    </ul>
+                  </entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+
+        </conbody>
+
+      </concept>
+
+    </concept>
+
+  </concept>
+
+</concept>

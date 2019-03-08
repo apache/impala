@@ -349,33 +349,5 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
     </conbody>
 
   </concept>
-  <concept id="auto_invalidate_metadata">
-    <title>Startup Options for Automatic Invalidation of Metadata</title>
-    <conbody>
-      <p>To keep the size of metadata bounded, <codeph>catalogd</codeph>
-        periodically scans all the tables and invalidates those not recently
-        used. There are two types of configurations in
-        <codeph>catalogd</codeph>.</p>
-      <ul>
-        <li>Time-based invalidation with the
-            <codeph>--invalidate_tables_timeout_s</codeph> flag:
-            <codeph>Catalogd</codeph> invalidates tables that are not recently
-          used in the specified time period (in seconds). This flag needs to be
-          applied to both <codeph>impalad</codeph> and
-          <codeph>catalogd</codeph>.</li>
-        <li>Memory-based invalidation with the
-            <codeph>--invalidate_tables_on_memory_pressure</codeph> flag: When
-          the memory pressure reaches 60% of JVM heap size after a Java garbage
-          collection in <codeph>catalogd</codeph>, Impala invalidates 10% of the
-          least recently used tables. This flag needs to be applied to both
-            <codeph>impalad</codeph> and <codeph>catalogd</codeph>.</li>
-      </ul>
-      <p>Automatic invalidation of metadata provides more stability with lower
-        chances of running out of memory, but the feature could potentially
-        cause performance issues and may require tuning.</p>
-      <note>This is a preview feature in Impala 3.1 and not generally
-        available.</note>
-    </conbody>
-  </concept>
 
 </concept>
