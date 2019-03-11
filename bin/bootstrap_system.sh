@@ -299,8 +299,8 @@ if ! [[ -f ~/.ssh/id_rsa ]]
 then
   ssh-keygen -t rsa -N '' -q -f ~/.ssh/id_rsa
 fi
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 0600 ~/.ssh/authorized_keys
+echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config && chmod 0600 ~/.ssh/config
 ssh localhost whoami
 
 # Workarounds for HDFS networking issues: On the minicluster, tests that rely
