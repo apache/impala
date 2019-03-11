@@ -35,7 +35,7 @@ from tests.common.skip import (
     SkipIfNotHdfsMinicluster
     )
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
 
 class TestNestedTypes(ImpalaTestSuite):
   @classmethod
@@ -608,6 +608,9 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     """Tests that Impala can scan Parquet and ORC files having complex types of
     the maximum nesting depth."""
     file_format = vector.get_value('table_format').file_format
+    if file_format == 'orc' and not IS_HDFS:
+      pytest.skip('Orc table loading needs Hive and thus only works with HDFS.')
+
     if file_format == 'parquet':
       self.__create_parquet_tables(unique_database)
     elif file_format == 'orc':
