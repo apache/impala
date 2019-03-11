@@ -63,8 +63,6 @@ then
       exit 1
     fi
   done
-else
-  export DEBIAN_FRONTEND=noninteractive
 fi
 
 set -x
@@ -94,13 +92,13 @@ else
     echo "This script only supports Ubuntu or RedHat" >&2
     exit 1
   fi
-
   if ! [[ $DISTRIB_RELEASE = 16.04 ]]
   then
     echo "This script only supports 16.04 of Ubuntu" >&2
     exit 1
   fi
   UBUNTU=true
+  export DEBIAN_FRONTEND=noninteractive
 fi
 if grep docker /proc/1/cgroup; then
   IN_DOCKER=true
