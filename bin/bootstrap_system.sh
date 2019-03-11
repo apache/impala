@@ -278,7 +278,7 @@ redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
 
 ubuntu sudo service postgresql start
 redhat6 sudo service postgresql start
-redhat7 notindocker service postgresql start
+redhat7 notindocker sudo service postgresql start
 # Important to redirect pg_ctl to a logfile, lest it keep the stdout
 # file descriptor open, preventing the shell from exiting.
 redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
