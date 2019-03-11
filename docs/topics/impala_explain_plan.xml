@@ -218,17 +218,27 @@ under the License.
         <xref href="impala_explain_level.xml#explain_level">EXPLAIN_LEVEL</xref> query option also controls the
         verbosity of the <codeph>EXPLAIN</codeph> output printed by the <codeph>PROFILE</codeph> command.
       </p>
+      <p>In <keyword keyref="impala32_full"/>, a new <codeph>Per Node
+          Profiles</codeph> section was added to the profile output. The new
+        section includes the following metrics that can be controlled by the
+            <codeph><xref
+            href="impala_resource_trace_ratio.xml#resource_trace_ratio"
+            >RESOURCE_TRACE_RATIO</xref></codeph> query option. The host CPU
+        usage metrics (user, system, and IO wait time) are already in the
+        section.</p>
+      <ul>
+        <li><codeph>CpuIoWaitPercentage</codeph>
+        </li>
+        <li><codeph>CpuSysPercentage</codeph></li>
+        <li><codeph>CpuUserPercentage</codeph></li>
+      </ul>
+      <!--AR 3/11/2019 The below example is out dated and does not add much value. Hiding it until this doc gets refactored.-->
 
-      <!-- To do:
-        This is a good place to have a few more examples.
-      -->
+      <p audience="hidden"> Here is an example of a query profile, from a
+        relatively straightforward query on a single-node pseudo-distributed
+        cluster to keep the output relatively brief. </p>
 
-      <p>
-        Here is an example of a query profile, from a relatively straightforward query on a single-node
-        pseudo-distributed cluster to keep the output relatively brief.
-      </p>
-
-<codeblock>[localhost:21000] &gt; profile;
+<codeblock audience="hidden">[localhost:21000] &gt; profile;
 Query Runtime Profile:
 Query (id=6540a03d4bee0691:4963d6269b210ebd):
   Summary:
