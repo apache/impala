@@ -237,11 +237,11 @@ redhat6 sudo service ntpd stop
 redhat7 notindocker sudo service ntpd stop
 sudo ntpdate us.pool.ntp.org
 # If on EC2, use Amazon's ntp servers
-if which dmidecode && { sudo dmidecode -s bios-version | grep amazon; }
+# EC2 nodes expose this IP address internally as a way to gather instance metadata.
+# The assumption is that only AWS nodes do this
+if wget -q -T 1 -t 1 -o /dev/null http://169.254.169.254/latest/dynamic/instance-identity
 then
   sudo sed -i 's/ubuntu\.pool/amazon\.pool/' /etc/ntp.conf
-  grep amazon /etc/ntp.conf
-  grep ubuntu /etc/ntp.conf
 fi
 # While it is nice to have ntpd running to keep the clock in sync, that does not work in a
 # --privileged docker container, and a non-privileged container cannot run ntpdate, which
