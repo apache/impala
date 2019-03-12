@@ -196,6 +196,30 @@ under the License.
 
     </conbody>
 
+    <concept id="configure_event_based_metadata_sync">
+
+      <title>Configure HMS for Event Based Automatic Metadata Sync</title>
+
+      <conbody>
+
+        <p>
+          As the first step to use the HMS event based metadata sync, add the following entry to
+          the <codeph>hive-site.xml</codeph> of Hive metastore service.
+        </p>
+
+<codeblock> &lt;property>
+    &lt;name>hive.metastore.transactional.event.listeners&lt;/name>
+    &lt;value>org.apache.hive.hcatalog.listener.DbNotificationListener&lt;/value>
+  &lt;/property></codeblock>
+
+        <p>
+          Save <codeph>hive-site.xml</codeph> and restart Hive.
+        </p>
+
+      </conbody>
+
+    </concept>
+
     <concept id="disable_event_based_metadata_sync">
 
       <title>Disable Event Based Automatic Metadata Sync</title>
