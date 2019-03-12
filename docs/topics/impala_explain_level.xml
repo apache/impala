@@ -38,14 +38,14 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">EXPLAIN_LEVEL query option</indexterm>
-      Controls the amount of detail provided in the output of the <codeph>EXPLAIN</codeph> statement. The basic
-      output can help you identify high-level performance issues such as scanning a higher volume of data or more
-      partitions than you expect. The higher levels of detail show how intermediate results flow between nodes and
-      how different SQL operations such as <codeph>ORDER BY</codeph>, <codeph>GROUP BY</codeph>, joins, and
-      <codeph>WHERE</codeph> clauses are implemented within a distributed query.
-    </p>
+    <p> Controls the amount of detail provided in the output of the
+        <codeph>EXPLAIN</codeph> statement. The basic output can help you
+      identify high-level performance issues such as scanning a higher volume of
+      data or more partitions than you expect. The higher levels of detail show
+      how intermediate results flow between nodes and how different SQL
+      operations such as <codeph>ORDER BY</codeph>, <codeph>GROUP BY</codeph>,
+      joins, and <codeph>WHERE</codeph> clauses are implemented within a
+      distributed query. </p>
 
     <p>
       <b>Type:</b> <codeph>STRING</codeph> or <codeph>INT</codeph>
@@ -76,10 +76,13 @@ under the License.
       </li>
 
       <li>
-        <codeph>2</codeph> or <codeph>EXTENDED</codeph>: Includes additional detail about how the query planner
-        uses statistics in its decision-making process, to understand how a query could be tuned by gathering
-        statistics, using query hints, adding or removing predicates, and so on.
-      </li>
+        <codeph>2</codeph> or <codeph>EXTENDED</codeph>: Includes additional
+        detail about how the query planner uses statistics in its
+        decision-making process, to understand how a query could be tuned by
+        gathering statistics, using query hints, adding or removing predicates,
+        and so on. In <keyword keyref="impala32_full"/> and higher, the output
+        also includes the analyzed query with the cast information in the output
+        header, and the implicit cast info in the Predicate section.</li>
 
       <li>
         <codeph>3</codeph> or <codeph>VERBOSE</codeph>: The maximum level of detail, showing how work is split up
