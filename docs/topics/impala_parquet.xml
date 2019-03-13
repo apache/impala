@@ -700,13 +700,7 @@ Returned 1 row(s) in 13.35s
 
     <conbody>
 
-      <p>
-        In <keyword keyref="impala23_full"/> and higher, Impala supports the complex types
-        <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> See
-        <xref href="impala_complex_types.xml#complex_types"/> for details. Because these data
-        types are currently supported only for the Parquet file format, if you plan to use them,
-        become familiar with the performance and storage aspects of Parquet first.
-      </p>
+      <p conref="../shared/impala_common.xml#common/complex_types_short_intro"/>
 
     </conbody>
 

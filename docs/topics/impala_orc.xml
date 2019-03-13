@@ -274,40 +274,8 @@ DATE (not supported)
       <p>
         <b>Complex types:</b>
       </p>
-      <p>
-        Complex types are currently not supported on ORC. However, queries materializing only scalar type
-        columns are allowed:
-      </p>
 
-<codeblock>$ hive
-hive&gt; CREATE TABLE orc_nested_table (id INT, a ARRAY&lt;INT&gt;) STORED AS ORC;
-hive&gt; INSERT INTO TABLE orc_nested_table SELECT 1, ARRAY(1,2,3);
-OK
-Time taken: 2.629 seconds
-hive&gt; quit;
-
-$ impala-shell -i localhost
-[localhost:21000] default&gt; INVALIDATE METADATA orc_nested_table;
-[localhost:21000] default&gt; SELECT 1 FROM orc_nested_table t, t.a;
-ERROR: NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 'a' with a complex type 'ARRAY&lt;INT&gt;'.
-Complex types are supported for these file formats: PARQUET.
-
-[localhost:21000] default&gt; SELECT COUNT(*) FROM orc_nested_table;
-+----------+
-| count(*) |
-+----------+
-| 1        |
-+----------+
-Fetched 1 row(s) in 0.12s
-
-[localhost:21000] default&gt; SELECT id FROM orc_nested_table;
-+----+
-| id |
-+----+
-| 1  |
-+----+
-Fetched 1 row(s) in 0.12s
-</codeblock>
+      <p conref="../shared/impala_common.xml#common/complex_types_short_intro"/>
 
     </conbody>
   </concept>

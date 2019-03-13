@@ -2174,10 +2174,21 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
         background information and usage examples.
       </p>
 
+      <p id="complex_types_short_intro"> In <keyword keyref="impala23_full"/>
+        and higher, Impala supports the complex types <codeph>ARRAY</codeph>,
+          <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>. In <keyword
+          keyref="impala32_full"/> and higher, Impala also supports these
+        complex types in ORC. See <xref
+          href="../topics/impala_complex_types.xml#complex_types"/> for details.
+        These Complex types are currently supported only for the Parquet or ORC
+        file formats. Because Impala has better performance on Parquet than ORC,
+        if you plan to use complex types, become familiar with the performance
+        and storage aspects of Parquet first. </p>
+
       <ul id="complex_types_restrictions">
         <li>
           <p>
-            Columns with this data type can only be used in tables or partitions with the Parquet file format.
+            Columns with this data type can only be used in tables or partitions with the Parquet or ORC file format.
           </p>
         </li>
         <li>

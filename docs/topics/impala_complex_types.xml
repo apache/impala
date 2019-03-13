@@ -281,7 +281,7 @@ under the License.
 
     <concept id="complex_types_physical">
 
-      <title>Physical Storage for Complex Types</title>
+      <title>Physical Storage for Complex Types in Parquet</title>
 
       <conbody>
 
@@ -343,10 +343,10 @@ under the License.
 
       <conbody>
 
-        <p>
-          Currently, Impala queries support complex type data only in the Parquet file format. See <xref href="impala_parquet.xml#parquet"/>
-          for details about the performance benefits and physical layout of this file format.
-        </p>
+        <p> Currently, Impala queries support complex type data in the Parquet
+          and ORC file formats. See <xref href="impala_parquet.xml#parquet"/>
+          for details about the performance benefits and physical layout of
+          Parquet file format. </p>
 
         <p>
           Because Impala does not parse the data structures containing nested types for unsupported formats such as text, Avro,
@@ -363,17 +363,18 @@ under the License.
 
         <p>
           You can perform DDL operations for tables involving complex types in
-          most file formats other than Parquet. You cannot create tables in
-          Impala with complex types using text files.
+          most file formats other than Parquet or ORC. You cannot create tables
+          in Impala with complex types using text files.
         </p>
 
         <p>
           You can have a partitioned table with complex type columns that uses
-          a non-Parquet format, and use <codeph>ALTER TABLE</codeph> to change
-          the file format to Parquet for individual partitions. When you put
-          Parquet data files into those partitions, Impala can execute queries
-          against that data as long as the query does not involve any of the
-          non-Parquet partitions.
+          a format other than Parquet or ORC, and use
+          <codeph>ALTER TABLE</codeph> to change the file format to Parquet/ORC
+          for individual partitions. When you put Parquet/ORC files into those
+          partitions, Impala can execute queries against that data as long as
+          the query does not involve any of the non-Parquet and non-ORC
+          partitions.
         </p>
 
         <p>
@@ -443,7 +444,7 @@ under the License.
             <ul>
               <li>
                 <p>
-                  In Parquet tables, Impala can skip columns that are not referenced in a query, avoiding the I/O penalty of reading the
+                  In Parquet or ORC tables, Impala can skip columns that are not referenced in a query, avoiding the I/O penalty of reading the
                   embedded data. When complex types are nested within a column, the data is physically divided at a very granular level; for
                   example, a query referring to data nested multiple levels deep in a complex type column does not have to read all the data
                   from that column, only the data for the relevant parts of the column type hierarchy.
@@ -486,7 +487,7 @@ under the License.
       <conbody>
 
         <p>
-          Impala can query Parquet tables containing <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> columns
+          Impala can query Parquet and ORC tables containing <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> columns
           produced by Hive. There are some differences to be aware of between the Impala SQL and HiveQL syntax for complex types, primarily
           for queries.
         </p>
@@ -564,7 +565,7 @@ under the License.
       <conbody>
 
         <p>
-          Complex type columns can only be used in tables or partitions with the Parquet file format.
+          Complex type columns can only be used in tables or partitions with the Parquet or ORC file format.
         </p>
 
         <p>
@@ -612,10 +613,10 @@ under the License.
         <p conref="../shared/impala_common.xml#common/complex_types_read_only"/>
 
         <p>
-          Currently, Impala can query complex type columns only from Parquet tables or Parquet partitions within partitioned tables.
+          Currently, Impala can query complex type columns only from Parquet/ORC tables or Parquet/ORC partitions within partitioned tables.
           Although you can use complex types in tables with Avro, text, and other file formats as part of your ETL pipeline, for example as
-          intermediate tables populated through Hive, doing analytics through Impala requires that the data eventually ends up in a Parquet
-          table. The requirement for Parquet data files means that you can use complex types with Impala tables hosted on other kinds of
+          intermediate tables populated through Hive, doing analytics through Impala requires that the data eventually ends up in a Parquet/ORC
+          table. The requirement for Parquet/ORC data files means that you can use complex types with Impala tables hosted on other kinds of
           file storage systems such as Isilon and Amazon S3, but you cannot use Impala to query complex types from HBase tables. See
           <xref href="impala_complex_types.xml#complex_types_file_formats"/> for more details.
         </p>
@@ -670,9 +671,9 @@ under the License.
           the type of complex columns through the <codeph>ALTER TABLE</codeph>
           statement. </p>
         <p> Currently, Impala queries allow complex types only in tables that
-          use the Parquet format. If an Impala query encounters complex types in
-          a table or partition using another file format, the query returns a
-          runtime error. </p>
+          use the Parquet or ORC format. If an Impala query encounters complex
+          types in a table or partition using other file formats, the query
+          returns a runtime error. </p>
         <p> You can use <codeph>ALTER TABLE ... SET FILEFORMAT PARQUET</codeph>
           to change the file format of an existing table containing complex
           types to Parquet, after which Impala can query it. Make sure to load
@@ -683,7 +684,7 @@ under the License.
         <p conref="../shared/impala_common.xml#common/complex_types_partitioning"/>
 
         <p>
-          Because use cases for Impala complex types require that you already have Parquet data files produced outside of Impala, you can
+          Because use cases for Impala complex types require that you already have Parquet/ORC data files produced outside of Impala, you can
           use the Impala <codeph>CREATE TABLE LIKE PARQUET</codeph> syntax to produce a table with columns that match the structure of an
           existing Parquet file, including complex type columns for nested data structures. Remember to include the <codeph>STORED AS
           PARQUET</codeph> clause in this case, because even with <codeph>CREATE TABLE LIKE PARQUET</codeph>, the default file format of the
@@ -899,7 +900,7 @@ CREATE TABLE contacts_detailed_phones
           <codeph><xref href="impala_load_data.xml#load_data">LOAD DATA</xref></codeph>, and
           <codeph><xref href="impala_select.xml#select">SELECT</xref></codeph>. That is, currently Impala can create or alter tables
           containing complex type columns, examine the structure of a table containing complex type columns, import existing data files
-          containing complex type columns into a table, and query Parquet tables containing complex types.
+          containing complex type columns into a table, and query Parquet/ORC tables containing complex types.
         </p>
 
         <p conref="../shared/impala_common.xml#common/complex_types_read_only"/>
@@ -1655,34 +1656,40 @@ WHERE
 
         <p>
           Because the Impala <codeph>INSERT</codeph> statement does not currently support creating new data with complex type columns, or
-          copying existing complex type values from one table to another, you primarily use Impala to query Parquet tables with complex
-          types where the data was inserted through Hive, or create tables with complex types where you already have existing Parquet data
-          files.
+          copying existing complex type values from one table to another, you primarily use Impala to query Parquet/ORC tables with complex
+          types where the data was inserted through Hive, or create tables with complex types where you already have existing Parquet/ORC
+          data files.
         </p>
 
         <p>
-          If you have created a Hive table with the Parquet file format and containing complex types, use the same table for Impala queries
+          If you have created a Hive table with the Parquet/ORC file format and containing complex types, use the same table for Impala queries
           with no changes. If you have such a Hive table in some other format, use a Hive <codeph>CREATE TABLE AS SELECT ... STORED AS
           PARQUET</codeph> or <codeph>INSERT ... SELECT</codeph> statement to produce an equivalent Parquet table that Impala can query.
         </p>
 
-        <p>
-          If you have existing Parquet data files containing complex types, located outside of any Impala or Hive table, such as data files
-          created by Spark jobs, you can use an Impala <codeph>CREATE TABLE ... STORED AS PARQUET</codeph> statement, followed by an Impala
-          <codeph>LOAD DATA</codeph> statement to move the data files into the table. As an alternative, you can use an Impala
-          <codeph>CREATE EXTERNAL TABLE</codeph> statement to create a table pointing to the HDFS directory that already contains the data
-          files.
-        </p>
+        <p> If you have existing Parquet data files containing complex types,
+          located outside of any Impala or Hive table, such as data files
+          created by Spark jobs, you can use an Impala <codeph>CREATE TABLE ...
+            STORED AS PARQUET</codeph> statement, followed by an Impala
+            <codeph>LOAD DATA</codeph> statement to move the data files into the
+          table. As an alternative, you can use an Impala <codeph>CREATE
+            EXTERNAL TABLE</codeph> statement to create a table pointing to the
+          HDFS directory that already contains the Parquet or ORC data
+          files.</p>
 
-        <p>
-          Perhaps the simplest way to get started with complex type data is to take a denormalized table containing duplicated values, and
-          use an <codeph>INSERT ... SELECT</codeph> statement to copy the data into a Parquet table and condense the repeated values into
-          complex types. With the Hive <codeph>INSERT</codeph> statement, you use the <codeph>COLLECT_LIST()</codeph>,
-          <codeph>NAMED_STRUCT()</codeph>, and <codeph>MAP()</codeph> constructor functions within a <codeph>GROUP BY</codeph> query to
-          produce the complex type values. <codeph>COLLECT_LIST()</codeph> turns a sequence of values into an <codeph>ARRAY</codeph>.
-          <codeph>NAMED_STRUCT()</codeph> uses the first, third, and so on arguments as the field names for a <codeph>STRUCT</codeph>, to
-          match the field names from the <codeph>CREATE TABLE</codeph> statement.
-        </p>
+        <p>The simplest way to get started with complex type data is to take a
+          denormalized table containing duplicated values, and use an
+            <codeph>INSERT ... SELECT</codeph> statement to copy the data into a
+          Parquet table and condense the repeated values into complex types.
+          With the Hive <codeph>INSERT</codeph> statement, you use the
+            <codeph>COLLECT_LIST()</codeph>, <codeph>NAMED_STRUCT()</codeph>,
+          and <codeph>MAP()</codeph> constructor functions within a
+            <codeph>GROUP BY</codeph> query to produce the complex type values.
+            <codeph>COLLECT_LIST()</codeph> turns a sequence of values into an
+            <codeph>ARRAY</codeph>. <codeph>NAMED_STRUCT()</codeph> uses the
+          first, third, and so on arguments as the field names for a
+            <codeph>STRUCT</codeph>, to match the field names from the
+            <codeph>CREATE TABLE</codeph> statement. </p>
 
         <note>
           Because Hive currently cannot construct individual rows using complex types through the <codeph>INSERT ... VALUES</codeph> syntax,
@@ -2313,15 +2320,15 @@ SELECT count(*) FROM supplier;
 
     <concept id="complex_types_ex_hive_etl">
 
-      <title>Constructing Parquet Files with Complex Columns Using Hive</title>
+      <title>Constructing Parquet/ORC Files with Complex Columns Using Hive</title>
 
       <conbody>
 
         <p>
-          The following examples demonstrate the Hive syntax to transform flat data (tables with all scalar columns) into Parquet tables
+          The following examples demonstrate the Hive syntax to transform flat data (tables with all scalar columns) into Parquet/ORC tables
           where Impala can query the complex type columns. Each example shows the full sequence of steps, including switching back and forth
-          between Impala and Hive. Although the source table can use any file format, the destination table must use the Parquet file
-          format.
+          between Impala and Hive. Although the source table can use any file format, the destination table must use the Parquet/ORC file
+          format. We take Parquet in the following examples. You can replace Parquet with ORC to do the same things in ORC file format.
         </p>
 
         <p>
