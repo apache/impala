@@ -346,6 +346,8 @@ class GroupingAggregator : public Aggregator {
 
     /// Initializes the hash table. 'aggregated_row_stream' must be non-NULL.
     /// Sets 'got_memory' to true if the hash table was initialised or false on OOM.
+    /// After returning, 'hash_tbl' will be non-null iff 'got_memory' is true and the
+    /// returned status is OK.
     Status InitHashTable(bool* got_memory) WARN_UNUSED_RESULT;
 
     /// Called in case we need to serialize aggregated rows. This step effectively does
