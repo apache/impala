@@ -431,25 +431,29 @@ class TestObservability(ImpalaTestSuite):
     expected_str = "Per Node Profiles:"
     assert any(expected_str in line for line in profile.splitlines())
 
-  def test_query_profile_host_cpu_usage_off(self):
-    """Tests that the query profile does not contain CPU metrics by default or when
-    disabled explicitly."""
+  def test_query_profile_host_resource_metrics_off(self):
+    """Tests that the query profile does not contain resource usage metrics by default or
+       when disabled explicitly."""
     query = "select count(*), sleep(1000) from functional.alltypes"
     for query_opts in [None, {'resource_trace_ratio': 0.0}]:
       profile = self.execute_query(query, query_opts).runtime_profile
-      # Assert that no CPU counters exist in the profile
+      # Assert that no host resource counters exist in the profile
       for line in profile.splitlines():
         assert not re.search("HostCpu.*Percentage", line)
+        assert not re.search("HostNetworkRx", line)
 
-  def test_query_profile_contains_host_cpu_usage(self):
-    """Tests that the query profile contains various CPU metrics."""
+  def test_query_profile_contains_host_resource_metrics(self):
+    """Tests that the query profile contains various CPU and network metrics."""
     query_opts = {'resource_trace_ratio': 1.0}
     query = "select count(*), sleep(1000) from functional.alltypes"
     profile = self.execute_query(query, query_opts).runtime_profile
-    # We check for 500ms because a query with 1s duration won't hit the 64 values limit.
+    # We check for 500ms because a query with 1s duration won't hit the 64 values limit
+    # that would trigger resampling.
     expected_strs = ["HostCpuIoWaitPercentage (500.000ms):",
                      "HostCpuSysPercentage (500.000ms):",
-                     "HostCpuUserPercentage (500.000ms):"]
+                     "HostCpuUserPercentage (500.000ms):",
+                     "HostNetworkRx (500.000ms):",
+                     "HostNetworkTx (500.000ms):"]
 
     # Assert that all expected counters exist in the profile.
     for expected_str in expected_strs:
@@ -482,19 +486,20 @@ class TestObservability(ImpalaTestSuite):
     return thrift_profile
 
   @pytest.mark.execute_serially
-  def test_thrift_profile_contains_cpu_usage(self):
-    """Tests that the thrift profile contains a time series counter for CPU resource
-       usage."""
+  def test_thrift_profile_contains_host_resource_metrics(self):
+    """Tests that the thrift profile contains time series counters for CPU and network
+       resource usage."""
     query_opts = {'resource_trace_ratio': 1.0}
     result = self.execute_query("select sleep(2000)", query_opts)
     thrift_profile = self._get_thrift_profile(result.query_id)
 
-    cpu_key = "HostCpuUserPercentage"
-    cpu_counters = self._find_ts_counters_in_thrift_profile(thrift_profile, cpu_key)
-    # The query will run on a single node, we will only find the counter once.
-    assert len(cpu_counters) == 1
-    cpu_counter = cpu_counters[0]
-    assert len(cpu_counter.values) > 0
+    expected_keys = ["HostCpuUserPercentage", "HostNetworkRx"]
+    for key in expected_keys:
+      counters = self._find_ts_counters_in_thrift_profile(thrift_profile, key)
+      # The query will run on a single node, we will only find the counter once.
+      assert len(counters) == 1
+      counter = counters[0]
+      assert len(counter.values) > 0
 
   @pytest.mark.execute_serially
   def test_query_profile_thrift_timestamps(self):

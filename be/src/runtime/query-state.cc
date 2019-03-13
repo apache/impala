@@ -161,6 +161,15 @@ Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
         "HostCpuIoWaitPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
         return system_state_info->GetCpuUsageRatios().iowait;
         });
+    // Add network usage
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostNetworkRx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
+        return system_state_info->GetNetworkUsage().rx_rate;
+        });
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostNetworkTx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
+        return system_state_info->GetNetworkUsage().tx_rate;
+        });
   }
 
   // Starting a new query creates threads and consumes a non-trivial amount of memory.

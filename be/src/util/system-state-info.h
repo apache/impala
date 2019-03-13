@@ -46,19 +46,29 @@ class SystemStateInfo {
     int32_t system;
     int32_t iowait;
   };
+
   /// Returns a struct containing the CPU usage ratios for the interval between the last
   /// two calls to CaptureSystemStateSnapshot().
   const CpuUsageRatios& GetCpuUsageRatios() { return cpu_ratios_; }
 
+  /// Network usage rates in bytes per second.
+  struct NetworkUsage {
+    int64_t rx_rate;
+    int64_t tx_rate;
+  };
+
+  /// Returns a struct containing the network usage for the interval between the last two
+  /// calls to CaptureSystemStateSnapshot().
+  const NetworkUsage& GetNetworkUsage() { return network_usage_; }
+
  private:
   int64_t ParseInt64(const std::string& val) const;
-  void ReadFirstLineFromFile(const char* path, std::string* out) const;
 
-  /// Rotates 'cur_val_idx_' and reads the current CPU usage values from /proc/stat into
+  /// Rotates 'cpu_val_idx_' and reads the current CPU usage values from /proc/stat into
   /// the current set of values.
   void ReadCurrentProcStat();
 
-  /// Rotates 'cur_val_idx_' and reads the CPU usage values from 'stat_string' into the
+  /// Rotates 'cpu_val_idx_' and reads the CPU usage values from 'stat_string' into the
   /// current set of values.
   void ReadProcStatString(const string& stat_string);
 
@@ -66,6 +76,7 @@ class SystemStateInfo {
   /// CaptureSystemStateSnapshot() and stores the result in 'cpu_ratios_'.
   void ComputeCpuRatios();
 
+  /// The enum names correspond to the fields of /proc/stat.
   enum PROC_STAT_CPU_VALUES {
     CPU_USER = 0,
     CPU_NICE,
@@ -80,15 +91,77 @@ class SystemStateInfo {
   typedef std::array<int64_t, NUM_CPU_VALUES> CpuValues;
   /// Two buffers to keep the current and previous set of CPU usage values.
   CpuValues cpu_values_[2];
-  int cur_val_idx_ = 0;
+  /// Index into cpu_values_ that points to the current set of values. We maintain a
+  /// separate index for CPU and network to be able to update them independently, e.g. in
+  /// tests.
+  int cpu_val_idx_ = 0;
 
   /// The computed CPU usage ratio between the current and previous snapshots in
   /// cpu_values_. Updated in ComputeCpuRatios().
   CpuUsageRatios cpu_ratios_;
 
+  /// The enum names correspond to the fields of /proc/net/dev
+  enum PROC_NET_DEV_VALUES {
+    NET_RX_BYTES = 0,
+    NET_RX_PACKETS,
+    NET_RX_ERRS,
+    NET_RX_DROP,
+    NET_RX_FIFO,
+    NET_RX_FRAME,
+    NET_RX_COMPRESSED,
+    NET_RX_MULTICAST,
+    NET_TX_BYTES,
+    NET_TX_PACKETS,
+    NET_TX_ERRS,
+    NET_TX_DROP,
+    NET_TX_COLLS,
+    NET_TX_CARRIER,
+    NET_TX_COMPRESSED,
+    NUM_NET_VALUES
+  };
+
+  /// We store these values in an array so that we can iterate over them, e.g. when
+  /// reading them from a file or summing them up.
+  typedef std::array<int64_t, NUM_NET_VALUES> NetworkValues;
+  /// Two buffers to keep the current and previous set of network counter values.
+  NetworkValues network_values_[2];
+  /// Index into network_values_ that points to the current set of values. We maintain a
+  /// separate index for CPU and network to be able to update them independently, e.g. in
+  /// tests.
+  int net_val_idx_ = 0;
+
+  /// Rotates net_val_idx_ and reads the current set of values from /proc/net/dev into
+  /// network_values_.
+  void ReadCurrentProcNetDev();
+
+  /// Rotates net_val_idx_ and parses the content of 'dev_string' into network_values_.
+  /// dev_string must be in the format of /proc/net/dev.
+  void ReadProcNetDevString(const string& dev_string);
+
+  /// Parses a single line as they appear in /proc/net/dev into 'result'. Entries are set
+  /// to 0 for the local loopback interface and for invalid entries.
+  void ReadProcNetDevLine(const string& dev_string, NetworkValues* result);
+
+  /// Computes b = b + a.
+  void AddNetworkValues(const NetworkValues& a, NetworkValues* b);
+
+  /// Compute the network usage.
+  void ComputeNetworkUsage(int64_t period_ms);
+
+  /// The compute network usage between the current and previous snapshots in
+  /// network_values_. Updated in ComputeNetworkUsage().
+  NetworkUsage network_usage_;
+
+  /// The last time of reading network usage values from /proc/net/dev. Used by
+  /// CaptureSystemStateSnapshot().
+  int64_t last_net_update_ms_;
+
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatios);
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatiosIntOverflow);
+  FRIEND_TEST(SystemStateInfoTest, ComputeNetworkUsage);
+  FRIEND_TEST(SystemStateInfoTest, ParseProcNetDevString);
   FRIEND_TEST(SystemStateInfoTest, ParseProcStat);
+  FRIEND_TEST(SystemStateInfoTest, ReadProcNetDev);
   FRIEND_TEST(SystemStateInfoTest, ReadProcStat);
 };
 
