@@ -34,9 +34,8 @@ under the License.
   <conbody>
 
     <p>
-      This topic describes various knobs in Impala to tune how Impala manages its metadata.
-      Before you use the features in this topic, you need to turn on Metadata V2 in your
-      cluster.
+      This topic describes various knobs for controlling how Impala manages its metadata to
+      improve overall performance and scalability.
     </p>
 
     <p outputclass="toc inpage"/>
@@ -111,7 +110,7 @@ under the License.
         <li>
           Incremental stats will not be replicated to <codeph>impalad</codeph> and will be
           accessed on demand from <codeph>catalogd</codeph>, resulting in a reduced memory
-          footprint of impalad.
+          footprint of <codeph>impalad</codeph>.
         </li>
       </ul>
 
