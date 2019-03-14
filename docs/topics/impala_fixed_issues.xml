@@ -45,6 +45,15 @@ under the License.
 
     <p outputclass="toc inpage"/>
   </conbody>
+  <!-- All 3.2.x subsections go under here -->
+  <concept rev="3.2.0" id="fixed_issues_3_2_0">
+    <title>Issues Fixed in <keyword keyref="impala32"/></title>
+    <conbody>
+      <p> For the full list of issues closed in this release, including bug
+        fixes, see the <xref keyref="changelog_32">changelog for <keyword
+            keyref="impala32"/></xref>. </p>
+    </conbody>
+  </concept>
   <!-- All 3.1.x subsections go under here -->
   <concept rev="3.1.0" id="fixed_issues_3_1_0">
     <title>Issues Fixed in <keyword keyref="impala31"/></title>
