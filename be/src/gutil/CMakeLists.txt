@@ -71,3 +71,9 @@ ADD_EXPORTABLE_LIBRARY(gutil
   COMPILE_FLAGS "-funsigned-char -Wno-deprecated -Wno-char-subscripts")
 
 add_kudu_test(strings/string_util-test)
+
+add_library(GUtilTests
+  sysinfo-test.cc
+)
+add_dependencies(GUtilTests gen-deps gen_ir_descriptions)
+ADD_UNIFIED_BE_LSAN_TEST(sysinfo-test "SysInfoTest.*")

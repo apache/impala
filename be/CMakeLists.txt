@@ -439,6 +439,7 @@ set (IMPALA_LINK_LIBS
 set(WL_WHOLE_ARCHIVE "-Wl,--whole-archive")
 set(WL_NO_WHOLE_ARCHIVE "-Wl,--no-whole-archive")
 set (UNIFIED_TEST_LIBS
+  GUtilTests
   UtilTests
 )
 set (UNIFIED_TEST_LINK_LIBS
