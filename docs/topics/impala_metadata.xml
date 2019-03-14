@@ -34,8 +34,8 @@ under the License.
   <conbody>
 
     <p>
-      This topic describes various knobs for controlling how Impala manages its metadata to
-      improve overall performance and scalability.
+      This topic describes various knobs you can use to control how Impala manages its metadata
+      in order to improve performance and scalability.
     </p>
 
     <p outputclass="toc inpage"/>
@@ -56,16 +56,16 @@ under the License.
 
       <ul>
         <li>
-          Time-based invalidation with the <codeph>--invalidate_tables_timeout_s</codeph> flag:
-          <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
+          Time-based invalidation with the <codeph>‑‑invalidate_tables_timeout_s</codeph>
+          flag: <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
           specified time period (in seconds). This flag needs to be applied to both
           <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
         </li>
 
         <li>
           Memory-based invalidation with the
-          <codeph>--invalidate_tables_on_memory_pressure</codeph> flag: When the memory pressure
-          reaches 60% of JVM heap size after a Java garbage collection in
+          <codeph>‑‑invalidate_tables_on_memory_pressure</codeph> flag: When the memory
+          pressure reaches 60% of JVM heap size after a Java garbage collection in
           <codeph>catalogd</codeph>, Impala invalidates 10% of the least recently used tables.
           This flag needs to be applied to both <codeph>impalad</codeph> and
           <codeph>catalogd</codeph>.
@@ -94,7 +94,7 @@ under the License.
 
       <p>
         Starting in Impala 3.1, a new configuration setting,
-        <codeph>--pull_incremental_statistics</codeph>, was added and set to
+        <codeph>‑‑pull_incremental_statistics</codeph>, was added and set to
         <codeph>true</codeph> by default. When you start Impala <codeph>catalogd</codeph> and
         <codeph>impalad</codeph> coordinators with this setting enabled:
       </p>
@@ -116,7 +116,7 @@ under the License.
 
       <p>
         We do not recommend you change the default setting of
-        <codeph>--pull_incremental_statistics</codeph>.
+        <codeph>‑‑pull_incremental_statistics</codeph>.
       </p>
 
     </conbody>
@@ -158,11 +158,11 @@ under the License.
       </ul>
 
       <p>
-        This feature is controlled by the <codeph>hms_event_polling_interval_s</codeph> flag.
-        Start the <codeph>catalogd</codeph> with the
-        <codeph>hms_event_polling_interval_s</codeph> flag set to a non-zero value to enable the
-        feature and set the polling frequency in seconds. We recommend the value to be less than
-        5 seconds.
+        This feature is controlled by the <codeph>‑‑hms_event_polling_interval_s</codeph>
+        flag. Start the <codeph>catalogd</codeph> with the
+        <codeph>‑‑hms_event_polling_interval_s</codeph> flag set to a non-zero value to
+        enable the feature and set the polling frequency in seconds. We recommend the value to
+        be less than 5 seconds.
       </p>
 
       <p>
@@ -172,7 +172,7 @@ under the License.
       <ul>
         <li>
           The operations that do not generate events in HMS, such as adding new data to existing
-          tables/partitions from Spark are not supported.
+          tables/partitions from Spark, are not supported.
         </li>
 
         <li>
@@ -190,7 +190,7 @@ under the License.
 
       <p>
         This feature is turned off by default with the
-        <codeph>hms_event_polling_interval_s</codeph> flag set to <codeph>0</codeph>.
+        <codeph>‑‑hms_event_polling_interval_s</codeph> flag set to <codeph>0</codeph>.
       </p>
 
     </conbody>
@@ -226,10 +226,10 @@ under the License.
       <conbody>
 
         <p>
-          When the <codeph>hms_event_polling_interval_s</codeph> flag is set to a non-zero value
-          for your <codeph>catalogd</codeph>, the event-based automatic invalidation is enabled
-          for all databases and tables. If you wish to have the fine-grained control on which
-          tables or databases need to be synced using events, you can use the
+          When the <codeph>‑‑hms_event_polling_interval_s</codeph> flag is set to a non-zero
+          value for your <codeph>catalogd</codeph>, the event-based automatic invalidation is
+          enabled for all databases and tables. If you wish to have the fine-grained control on
+          which tables or databases need to be synced using events, you can use the
           <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
           table or database level.
         </p>
@@ -250,8 +250,8 @@ under the License.
           <li>
             If <codeph>'impala.disableHmsSync'='false'</codeph> or if
             <codeph>impala.disableHmsSync</codeph> is not set, the automatic sync with HMS is
-            enabled if the <codeph>hms_event_polling_interval_s</codeph> global flag is set to
-            non-zero.
+            enabled if the <codeph>‑‑hms_event_polling_interval_s</codeph> global flag is
+            set to non-zero.
           </li>
         </ul>
 
