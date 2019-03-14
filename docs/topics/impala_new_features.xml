@@ -45,6 +45,16 @@ under the License.
     <p outputclass="toc inpage"/>
 
   </conbody>
+  <!-- All 3.2.x new features go under here -->
+  <concept rev="3.1.0" id="concept_ob2_klx_bhb">
+    <title>New Features in <keyword keyref="impala32"/></title>
+    <conbody>
+      <p> For the full list of issues closed in this release, including the
+        issues marked as <q>new features</q> or <q>improvements</q>, see the
+          <xref keyref="changelog_32">changelog for <keyword keyref="impala32"
+          /></xref>. </p>
+    </conbody>
+  </concept>
   <!-- All 3.1.x new features go under here -->
   <concept rev="3.1.0" id="new_features_31">
     <title>New Features in <keyword keyref="impala31"/></title>
