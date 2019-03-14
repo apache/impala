@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.analysis.TableName;
@@ -972,6 +973,32 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Updates the Db with the given metastore database object. Useful to doing in-place
+   * updates to the HMS db like in case of changing owner, adding comment or setting
+   * certain properties
+   * @param msDb The HMS database object to be used to update
+   * @return The updated Db object
+   * @throws DatabaseNotFoundException if Db with the name provided by given Database
+   * is not found in Catalog
+   */
+  public Db updateDb(Database msDb) throws DatabaseNotFoundException {
+    Preconditions.checkNotNull(msDb);
+    Preconditions.checkNotNull(msDb.getName());
+    versionLock_.writeLock().lock();
+    try {
+      Db db = getDb(msDb.getName());
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database " + msDb.getName() + " not found");
+      }
+      db.setMetastoreDb(msDb.getName(), msDb);
+      db.setCatalogVersion(incrementAndGetCatalogVersion());
+      return db;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
    * Adds a table in the topic update if its version is in the range
    * ('ctx.fromVersion', 'ctx.toVersion']. If the table's version is larger than
    * 'ctx.toVersion' and the table has skipped a topic update
@@ -1219,7 +1246,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Contains native functions in it's params map.
       org.apache.hadoop.hive.metastore.api.Database msDb =
           msClient.getHiveClient().getDatabase(dbName);
-      tmpDb = new Db(dbName, null);
+      tmpDb = new Db(dbName, msDb);
       // Load native UDFs into the temporary db.
       loadFunctionsFromDbParams(tmpDb, msDb);
       // Load Java UDFs from HMS into the temporary db.

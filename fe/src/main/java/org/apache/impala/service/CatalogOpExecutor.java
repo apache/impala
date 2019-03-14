@@ -1212,7 +1212,7 @@ public class CatalogOpExecutor {
       } else {
         if (catalog_.addFunction(fn)) {
           // Flush DB changes to metastore
-          applyAlterDatabase(catalog_.getDb(fn.dbName()));
+          applyAlterDatabase(db.getMetaStoreDb());
           addedFunctions.add(fn.toTCatalogObject());
         }
       }
@@ -1745,7 +1745,7 @@ public class CatalogOpExecutor {
           }
         } else {
           // Flush DB changes to metastore
-          applyAlterDatabase(catalog_.getDb(fn.dbName()));
+          applyAlterDatabase(db.getMetaStoreDb());
           removedFunctions.add(fn.toTCatalogObject());
         }
       }
@@ -3122,10 +3122,10 @@ public class CatalogOpExecutor {
   /**
    * Updates the database object in the metastore.
    */
-  private void applyAlterDatabase(Db db)
+  private void applyAlterDatabase(Database msDb)
       throws ImpalaRuntimeException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      msClient.getHiveClient().alterDatabase(db.getName(), db.getMetaStoreDb());
+      msClient.getHiveClient().alterDatabase(msDb.getName(), msDb);
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alterDatabase"), e);
@@ -3753,17 +3753,16 @@ public class CatalogOpExecutor {
       throw new CatalogException("Database: " + dbName + " does not exist.");
     }
     synchronized (metastoreDdlLock_) {
-      Database msDb = db.getMetaStoreDb();
-      String originalComment = msDb.getDescription();
+      Database msDb = db.getMetaStoreDb().deepCopy();
       msDb.setDescription(comment);
       try {
-        applyAlterDatabase(db);
+        applyAlterDatabase(msDb);
       } catch (ImpalaRuntimeException e) {
-        msDb.setDescription(originalComment);
         throw e;
       }
+      Db updatedDb = catalog_.updateDb(msDb);
+      addDbToCatalogUpdate(updatedDb, response.result);
     }
-    addDbToCatalogUpdate(db, response.result);
     addSummary(response, "Updated database.");
   }
 
@@ -3788,45 +3787,34 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(params.owner_name);
     Preconditions.checkNotNull(params.owner_type);
     synchronized (metastoreDdlLock_) {
-      Database msDb = db.getMetaStoreDb();
+      Database msDb = db.getMetaStoreDb().deepCopy();
       String originalOwnerName = msDb.getOwnerName();
       PrincipalType originalOwnerType = msDb.getOwnerType();
       msDb.setOwnerName(params.owner_name);
       msDb.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
       try {
-        applyAlterDatabase(db);
+        applyAlterDatabase(msDb);
       } catch (ImpalaRuntimeException e) {
-        msDb.setOwnerName(originalOwnerName);
-        msDb.setOwnerType(originalOwnerType);
         throw e;
       }
       if (authzConfig_.isEnabled()) {
         authzManager_.updateDatabaseOwnerPrivilege(params.server_name, db.getName(),
-            originalOwnerName, originalOwnerType, db.getMetaStoreDb().getOwnerName(),
-            db.getMetaStoreDb().getOwnerType(), response);
+            originalOwnerName, originalOwnerType, msDb.getOwnerName(),
+            msDb.getOwnerType(), response);
       }
+      Db updatedDb = catalog_.updateDb(msDb);
+      addDbToCatalogUpdate(updatedDb, response.result);
     }
-    addDbToCatalogUpdate(db, response.result);
     addSummary(response, "Updated database.");
   }
 
   private void addDbToCatalogUpdate(Db db, TCatalogUpdateResult result) {
     Preconditions.checkNotNull(db);
-    // Updating the new catalog version and setting it to the DB catalog version while
-    // holding the catalog version lock for an atomic operation. Most DB operations are
-    // short-lived. It is unnecessary to have a fine-grained DB lock.
-    catalog_.getLock().writeLock().lock();
-    try {
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      db.setCatalogVersion(newCatalogVersion);
-      TCatalogObject updatedCatalogObject = db.toTCatalogObject();
-      updatedCatalogObject.setCatalog_version(newCatalogVersion);
-      // TODO(todd): if client is a 'v2' impalad, only send back invalidation
-      result.addToUpdated_catalog_objects(updatedCatalogObject);
-      result.setVersion(updatedCatalogObject.getCatalog_version());
-    } finally {
-      catalog_.getLock().writeLock().unlock();
-    }
+    TCatalogObject updatedCatalogObject = db.toTCatalogObject();
+    updatedCatalogObject.setCatalog_version(updatedCatalogObject.getCatalog_version());
+    // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+    result.addToUpdated_catalog_objects(updatedCatalogObject);
+    result.setVersion(updatedCatalogObject.getCatalog_version());
   }
 
   private void alterCommentOnTableOrView(TableName tableName, String comment,

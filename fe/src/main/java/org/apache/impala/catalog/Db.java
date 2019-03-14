@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaException;
@@ -66,7 +68,10 @@ import com.google.common.collect.Lists;
  */
 public class Db extends CatalogObjectImpl implements FeDb {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
-  private final TDatabase thriftDb_;
+  // TODO: We should have a consistent synchronization model for Db and Table
+  // Right now, we synchronize functions and thriftDb_ object in-place and do
+  // not take read lock on catalogVersion. See IMPALA-8366 for details
+  private final AtomicReference<TDatabase> thriftDb_ = new AtomicReference<>();
 
   public static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
 
@@ -91,9 +96,8 @@ public class Db extends CatalogObjectImpl implements FeDb {
   private boolean isSystemDb_ = false;
 
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
-    thriftDb_ = new TDatabase(name.toLowerCase());
-    thriftDb_.setMetastore_db(msDb);
-    tableCache_ = new CatalogObjectCache<Table>();
+    setMetastoreDb(name, msDb);
+    tableCache_ = new CatalogObjectCache<>();
     functions_ = new HashMap<>();
   }
 
@@ -110,7 +114,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * Updates the hms parameters map by adding the input <k,v> pair.
    */
   private void putToHmsParameters(String k, String v) {
-    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.metastore_db;
+    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.get().metastore_db;
     Preconditions.checkNotNull(msDb);
     Map<String, String> hmsParams = msDb.getParameters();
     if (hmsParams == null) hmsParams = new HashMap<>();
@@ -124,7 +128,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * corresponding to input k and it is removed, false otherwise.
    */
   private boolean removeFromHmsParameters(String k) {
-    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.metastore_db;
+    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.get().metastore_db;
     Preconditions.checkNotNull(msDb);
     if (msDb.getParameters() == null) return false;
     return msDb.getParameters().remove(k) != null;
@@ -133,9 +137,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
   @Override // FeDb
   public boolean isSystemDb() { return isSystemDb_; }
   @Override // FeDb
-  public TDatabase toThrift() { return thriftDb_; }
+  public TDatabase toThrift() { return thriftDb_.get(); }
   @Override // FeDb
-  public String getName() { return thriftDb_.getDb_name(); }
+  public String getName() { return thriftDb_.get().getDb_name(); }
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.DATABASE; }
 
@@ -193,7 +197,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
 
   @Override // FeDb
   public org.apache.hadoop.hive.metastore.api.Database getMetaStoreDb() {
-    return thriftDb_.getMetastore_db();
+    return thriftDb_.get().getMetastore_db();
   }
 
   @Override // FeDb
@@ -464,5 +468,18 @@ public class Db extends CatalogObjectImpl implements FeDb {
       resp.db_info.function_names = ImmutableList.copyOf(functions_.keySet());
     }
     return resp;
+  }
+
+  /**
+   * Replaces the metastore db object of this Db with the given Metastore Database object
+   * @param msDb
+   */
+  public void setMetastoreDb(String name, Database msDb) {
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(msDb);
+    // create the TDatabase first before atomically replacing setting it in the thriftDb_
+    TDatabase tDatabase = new TDatabase(name.toLowerCase());
+    tDatabase.setMetastore_db(msDb);
+    thriftDb_.set(tDatabase);
   }
 }
