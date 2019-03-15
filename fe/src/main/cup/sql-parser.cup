@@ -986,16 +986,38 @@ revoke_role_stmt ::=
   {: RESULT = new GrantRevokeRoleStmt(role, group, false); :}
   ;
 
+// For backwards compatibility, a grant without the principal type will default to
+// TPrincipalType.ROLE
 grant_privilege_stmt ::=
-  KW_GRANT privilege_spec:priv KW_TO opt_kw_role:opt_role ident_or_default:role
+  KW_GRANT privilege_spec:priv KW_TO KW_ROLE ident_or_default:role
   opt_with_grantopt:grant_opt
-  {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt); :}
+  {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt, TPrincipalType.ROLE); :}
+  | KW_GRANT privilege_spec:priv KW_TO ident_or_default:role
+    opt_with_grantopt:grant_opt
+  {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt, TPrincipalType.ROLE); :}
+  | KW_GRANT privilege_spec:priv KW_TO IDENT:user_id ident_or_default:role
+    opt_with_grantopt:grant_opt
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt, TPrincipalType.USER);
+  :}
   ;
 
+// For backwards compatibility, a revoke without the principal type will default to
+// TPrincipalType.ROLE
 revoke_privilege_stmt ::=
   KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-  opt_kw_role:opt_role ident_or_default:role
-  {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt); :}
+  KW_ROLE ident_or_default:role
+  {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt, TPrincipalType.ROLE); :}
+  | KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
+    ident_or_default:role
+  {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt, TPrincipalType.ROLE); :}
+  | KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
+    IDENT:user_id ident_or_default:role
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt, TPrincipalType.USER);
+  :}
   ;
 
 privilege_spec ::=

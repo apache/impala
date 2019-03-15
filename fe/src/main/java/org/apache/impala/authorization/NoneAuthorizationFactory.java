@@ -125,6 +125,20 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
     }
 
     @Override
+    public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
+        TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void revokePrivilegeFromUser(User requestingUser,
+        TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
     public TResultSet getPrivileges(TShowGrantPrincipalParams params)
         throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",

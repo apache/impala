@@ -356,11 +356,11 @@ public class CatalogOpExecutor {
             response);
         break;
       case GRANT_PRIVILEGE:
-        grantPrivilegeToRole(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+        grantPrivilege(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
             response);
         break;
       case REVOKE_PRIVILEGE:
-        revokePrivilegeFromRole(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+        revokePrivilege(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
             response);
         break;
       case COMMENT_ON:
@@ -3247,28 +3247,54 @@ public class CatalogOpExecutor {
   /**
    * Grants one or more privileges to role on behalf of the requestingUser.
    */
-  private void grantPrivilegeToRole(User requestingUser,
+  private void grantPrivilege(User requestingUser,
       TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(grantRevokePrivParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(grantRevokePrivParams.isIs_grant());
-    authzManager_.grantPrivilegeToRole(requestingUser, grantRevokePrivParams, resp);
+
+    switch (grantRevokePrivParams.principal_type) {
+      case ROLE:
+        authzManager_.grantPrivilegeToRole(requestingUser, grantRevokePrivParams, resp);
+        break;
+      case USER:
+        authzManager_.grantPrivilegeToUser(requestingUser, grantRevokePrivParams, resp);
+        break;
+      default:
+        throw new IllegalArgumentException("Unexpected principal type: " +
+            grantRevokePrivParams.principal_type);
+    }
+
     addSummary(resp, "Privilege(s) have been granted.");
   }
 
   /**
    * Revokes one or more privileges to role on behalf of the requestingUser.
    */
-  private void revokePrivilegeFromRole(User requestingUser,
+  private void revokePrivilege(User requestingUser,
       TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(grantRevokePrivParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(!grantRevokePrivParams.isIs_grant());
-    authzManager_.revokePrivilegeFromRole(requestingUser, grantRevokePrivParams, resp);
+
+    switch (grantRevokePrivParams.principal_type) {
+      case ROLE:
+        authzManager_.revokePrivilegeFromRole(requestingUser, grantRevokePrivParams,
+            resp);
+        break;
+      case USER:
+        authzManager_.revokePrivilegeFromUser(requestingUser, grantRevokePrivParams,
+            resp);
+        break;
+      default:
+        throw new IllegalArgumentException("Unexpected principal type: " +
+            grantRevokePrivParams.principal_type);
+    }
+
     addSummary(resp, "Privilege(s) have been revoked.");
   }
 

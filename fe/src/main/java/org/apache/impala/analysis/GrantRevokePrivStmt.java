@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 
 import com.google.common.base.Preconditions;
@@ -37,33 +38,39 @@ import com.google.common.base.Strings;
  */
 public class GrantRevokePrivStmt extends AuthorizationStmt {
   private final PrivilegeSpec privilegeSpec_;
-  private final String roleName_;
+  private final String principalName_;
   private final boolean isGrantPrivStmt_;
   private final boolean hasGrantOpt_;
+  private final TPrincipalType principalType_;
 
   // Set/modified during analysis
+  // TODO: This will need to be cleaned up when Ranger supports RBAC
   private Role role_;
 
   public GrantRevokePrivStmt(String roleName, PrivilegeSpec privilegeSpec,
-      boolean isGrantPrivStmt, boolean hasGrantOpt) {
+      boolean isGrantPrivStmt, boolean hasGrantOpt, TPrincipalType principalType) {
     Preconditions.checkNotNull(privilegeSpec);
     Preconditions.checkNotNull(roleName);
     privilegeSpec_ = privilegeSpec;
-    roleName_ = roleName;
+    principalName_ = roleName;
     isGrantPrivStmt_ = isGrantPrivStmt;
     hasGrantOpt_ = hasGrantOpt;
+    principalType_ = principalType;
   }
 
   public TGrantRevokePrivParams toThrift() {
     TGrantRevokePrivParams params = new TGrantRevokePrivParams();
-    params.setRole_name(roleName_);
+    params.setPrincipal_name(principalName_);
     params.setIs_grant(isGrantPrivStmt_);
     List<TPrivilege> privileges = privilegeSpec_.toThrift();
     for (TPrivilege privilege: privileges) {
-      privilege.setPrincipal_id(role_.getId());
-      privilege.setPrincipal_type(role_.getPrincipalType());
+      if (principalType_ == TPrincipalType.ROLE && role_ != null) {
+        privilege.setPrincipal_id(role_.getId());
+      }
+      privilege.setPrincipal_type(principalType_);
       privilege.setHas_grant_opt(hasGrantOpt_);
     }
+    params.setPrincipal_type(principalType_);
     params.setHas_grant_opt(hasGrantOpt_);
     params.setPrivileges(privileges);
     return params;
@@ -75,7 +82,9 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     if (!isGrantPrivStmt_ && hasGrantOpt_) sb.append("GRANT OPTION FOR ");
     sb.append(privilegeSpec_.toSql(options));
     sb.append(isGrantPrivStmt_ ? " TO " : " FROM ");
-    sb.append(roleName_);
+    sb.append(principalType_);
+    sb.append(" ");
+    sb.append(principalName_);
     if (isGrantPrivStmt_ && hasGrantOpt_) sb.append(" WITH GRANT OPTION");
     return sb.toString();
   }
@@ -88,13 +97,13 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (Strings.isNullOrEmpty(roleName_)) {
-      throw new AnalysisException("Role name in GRANT/REVOKE privilege cannot be " +
+    if (Strings.isNullOrEmpty(principalName_)) {
+      throw new AnalysisException("Principal name in GRANT/REVOKE privilege cannot be " +
           "empty.");
     }
-    role_ = analyzer.getCatalog().getAuthPolicy().getRole(roleName_);
-    if (role_ == null) {
-      throw new AnalysisException(String.format("Role '%s' does not exist.", roleName_));
+
+    if (principalType_ == TPrincipalType.ROLE) {
+      role_ = analyzer.getCatalog().getAuthPolicy().getRole(principalName_);
     }
     privilegeSpec_.analyze(analyzer);
   }

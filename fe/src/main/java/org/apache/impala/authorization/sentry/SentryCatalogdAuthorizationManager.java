@@ -28,6 +28,7 @@ import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -164,7 +165,13 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
-    String roleName = params.getRole_name();
+    String roleName = params.getPrincipal_name();
+    Role role = catalog_.getAuthPolicy().getRole(roleName);
+    if (role == null) {
+      throw new InternalException(String.format("Role '%s' does not exists.",
+          roleName));
+    }
+
     List<TPrivilege> privileges = params.getPrivileges();
     List<PrincipalPrivilege> removedGrantOptPrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
@@ -203,7 +210,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     verifySentryServiceEnabled();
     Preconditions.checkArgument(!params.getPrivileges().isEmpty());
 
-    String roleName = params.getRole_name();
+    String roleName = params.getPrincipal_name();
     List<TPrivilege> privileges = params.getPrivileges();
     // If this is a revoke of a privilege that contains the grant option, the privileges
     // with the grant option will be revoked and new privileges without the grant option
@@ -250,6 +257,20 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       response.result.setVersion(
           removedPrivs.get(removedPrivs.size() - 1).getCatalog_version());
     }
+  }
+
+  @Override
+  public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+  }
+
+  @Override
+  public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
   @Override

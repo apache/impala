@@ -1492,85 +1492,100 @@ public class ToSqlTest extends FrontendTestBase {
   @Test
   public void testGrantRevokePrivStmt() {
     AnalysisContext ctx = createAnalysisCtx(createAuthorizationFactory());
-    String testRole = "test_role";
+    List<String> principalTypes = Arrays.asList("USER", "ROLE");
+    String testRole = System.getProperty("user.name");
     String testUri = "hdfs://localhost:20500/test-warehouse";
 
-    try {
-      catalog_.addRole(testRole);
-      List<Privilege> privileges = Arrays.stream(Privilege.values())
-          .filter(p -> p != Privilege.OWNER &&
-              p != Privilege.VIEW_METADATA &&
-              p != Privilege.ANY)
-          .collect(Collectors.toList());
+    for (String pt : principalTypes) {
+      try {
+        catalog_.addRole(testRole);
+        List<Privilege> privileges = Arrays.stream(Privilege.values())
+            .filter(p -> p != Privilege.OWNER &&
+                p != Privilege.VIEW_METADATA &&
+                p != Privilege.ANY)
+            .collect(Collectors.toList());
 
-      for (Privilege p : privileges) {
-        // Server
-        testToSql(ctx, String.format("GRANT %s ON SERVER server1 TO %s", p, testRole));
-        testToSql(ctx, String.format("GRANT %s ON SERVER TO %s", p, testRole),
-            String.format("GRANT %s ON SERVER server1 TO %s", p, testRole));
-        testToSql(ctx, String.format(
-            "GRANT %s ON SERVER server1 TO %s WITH GRANT OPTION", p, testRole));
-        testToSql(ctx, String.format("REVOKE %s ON SERVER server1 FROM %s", p, testRole));
-        testToSql(ctx, String.format("REVOKE %s ON SERVER FROM %s", p, testRole),
-            String.format("REVOKE %s ON SERVER server1 FROM %s", p, testRole));
-        testToSql(ctx, String.format(
-            "REVOKE GRANT OPTION FOR %s ON SERVER server1 FROM %s", p, testRole));
+        for (Privilege p : privileges) {
+          // Server
+          testToSql(ctx, String.format("GRANT %s ON SERVER server1 TO %s %s", p,
+              pt, testRole));
+          testToSql(ctx, String.format("GRANT %s ON SERVER TO %s", p, testRole),
+              String.format("GRANT %s ON SERVER server1 TO ROLE %s", p, testRole));
+          testToSql(ctx, String.format(
+              "GRANT %s ON SERVER server1 TO %s %s WITH GRANT OPTION", p, pt,
+              testRole));
+          testToSql(ctx, String.format("REVOKE %s ON SERVER server1 FROM %s %s", p,
+              pt, testRole));
+          testToSql(ctx, String.format("REVOKE %s ON SERVER FROM %s %s", p, pt,
+              testRole),
+              String.format("REVOKE %s ON SERVER server1 FROM %s %s", p, pt,
+                  testRole));
+          testToSql(ctx, String.format(
+              "REVOKE GRANT OPTION FOR %s ON SERVER server1 FROM %s %s", p, pt,
+              testRole));
 
-        // Database
-        testToSql(ctx, String.format("GRANT %s ON DATABASE functional TO %s",
-            p, testRole));
-        testToSql(ctx, String.format(
-            "GRANT %s ON DATABASE functional TO %s WITH GRANT OPTION", p, testRole));
-        testToSql(ctx, String.format("REVOKE %s ON DATABASE functional FROM %s",
-            p, testRole));
-        testToSql(ctx, String.format(
-            "REVOKE GRANT OPTION FOR %s ON DATABASE functional FROM %s", p, testRole));
+          // Database
+          testToSql(ctx, String.format("GRANT %s ON DATABASE functional TO %s %s",
+              p, pt, testRole));
+          testToSql(ctx, String.format(
+              "GRANT %s ON DATABASE functional TO %s %s WITH GRANT OPTION", p, pt,
+              testRole));
+          testToSql(ctx, String.format("REVOKE %s ON DATABASE functional FROM %s %s",
+              p, pt, testRole));
+          testToSql(ctx, String.format(
+              "REVOKE GRANT OPTION FOR %s ON DATABASE functional FROM %s %s", p, pt,
+              testRole));
 
+        }
+
+        privileges = Arrays.stream(Privilege.values())
+            .filter(p -> p != Privilege.OWNER &&
+                p != Privilege.CREATE &&
+                p != Privilege.VIEW_METADATA &&
+                p != Privilege.ANY)
+            .collect(Collectors.toList());
+
+        for (Privilege p : privileges) {
+          // Table
+          testToSql(ctx, String.format("GRANT %s ON TABLE functional.alltypes TO %s %s",
+              p, pt, testRole));
+          testToSql(ctx, String.format(
+              "GRANT %s ON TABLE functional.alltypes TO %s %s WITH GRANT OPTION", p,
+              pt, testRole));
+          testToSql(ctx, String.format(
+              "REVOKE %s ON TABLE functional.alltypes FROM %s %s", p, pt,
+              testRole));
+          testToSql(ctx, String.format(
+              "REVOKE GRANT OPTION FOR %s ON TABLE functional.alltypes FROM %s %s", p,
+              pt, testRole));
+        }
+
+        // Uri (Only ALL is supported)
+        testToSql(ctx, String.format("GRANT ALL ON URI '%s' TO %s %s", testUri, pt,
+            testRole));
+        testToSql(ctx, String.format("GRANT ALL ON URI '%s' TO %s %s WITH GRANT OPTION",
+            testUri, pt, testRole));
+        testToSql(ctx, String.format("REVOKE ALL ON URI '%s' FROM %s %s", testUri,
+            pt, testRole));
+        testToSql(ctx, String.format("REVOKE GRANT OPTION FOR ALL ON URI '%s' FROM %s %s",
+            testUri, pt, testRole));
+
+        // Column (Only SELECT is supported)
+        testToSql(ctx, String.format(
+            "GRANT SELECT (id) ON TABLE functional.alltypes TO %s %s", pt,
+            testRole));
+        testToSql(ctx, String.format(
+            "GRANT SELECT (id) ON TABLE functional.alltypes TO %s %s WITH GRANT OPTION",
+            pt, testRole));
+        testToSql(ctx, String.format(
+            "REVOKE SELECT (id) ON TABLE functional.alltypes FROM %s %s", pt,
+            testRole));
+        testToSql(ctx, String.format(
+            "REVOKE GRANT OPTION FOR SELECT (id) ON TABLE functional.alltypes FROM %s %s",
+            pt, testRole));
+      } finally {
+        catalog_.removeRole(testRole);
       }
-
-      privileges = Arrays.stream(Privilege.values())
-          .filter(p -> p != Privilege.OWNER &&
-              p != Privilege.CREATE &&
-              p != Privilege.VIEW_METADATA &&
-              p != Privilege.ANY)
-          .collect(Collectors.toList());
-
-      for (Privilege p : privileges) {
-        // Table
-        testToSql(ctx, String.format("GRANT %s ON TABLE functional.alltypes TO %s",
-            p, testRole));
-        testToSql(ctx, String.format(
-            "GRANT %s ON TABLE functional.alltypes TO %s WITH GRANT OPTION",
-            p, testRole));
-        testToSql(ctx, String.format("REVOKE %s ON TABLE functional.alltypes FROM %s",
-            p, testRole));
-        testToSql(ctx, String.format(
-            "REVOKE GRANT OPTION FOR %s ON TABLE functional.alltypes FROM %s",
-            p, testRole));
-      }
-
-      // Uri (Only ALL is supported)
-      testToSql(ctx, String.format("GRANT ALL ON URI '%s' TO %s", testUri, testRole));
-      testToSql(ctx, String.format("GRANT ALL ON URI '%s' TO %s WITH GRANT OPTION",
-          testUri, testRole));
-      testToSql(ctx, String.format("REVOKE ALL ON URI '%s' FROM %s", testUri, testRole));
-      testToSql(ctx, String.format("REVOKE GRANT OPTION FOR ALL ON URI '%s' FROM %s",
-          testUri, testRole));
-
-      // Column (Only SELECT is supported)
-      testToSql(ctx, String.format("GRANT SELECT (id) ON TABLE functional.alltypes TO %s",
-          testRole));
-      testToSql(ctx, String.format(
-          "GRANT SELECT (id) ON TABLE functional.alltypes TO %s WITH GRANT OPTION",
-          testRole));
-      testToSql(ctx, String.format(
-          "REVOKE SELECT (id) ON TABLE functional.alltypes FROM %s",
-          testRole));
-      testToSql(ctx, String.format(
-          "REVOKE GRANT OPTION FOR SELECT (id) ON TABLE functional.alltypes FROM %s",
-          testRole));
-    } finally {
-      catalog_.removeRole(testRole);
     }
   }
 

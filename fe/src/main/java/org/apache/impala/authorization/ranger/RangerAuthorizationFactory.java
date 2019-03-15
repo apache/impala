@@ -25,7 +25,6 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.authorization.NoneAuthorizationFactory.NoneAuthorizationManager;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeCatalogManager;
@@ -80,13 +79,18 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
   @Override
   public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
       Supplier<? extends AuthorizationChecker> authzChecker) {
-    // TODO: return an actual implementation of AuthorizationManager for Ranger.
-    return new NoneAuthorizationManager();
+    Preconditions.checkArgument(authzChecker.get() instanceof RangerAuthorizationChecker);
+
+    return new RangerCatalogdAuthorizationManager(() ->
+        ((RangerAuthorizationChecker) authzChecker.get()).getRangerImpalaPlugin());
   }
 
   @Override
   public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
-    // TODO: return an actual implementation of AuthorizationManager for Ranger.
-    return new NoneAuthorizationManager();
+    RangerAuthorizationConfig config = (RangerAuthorizationConfig) authzConfig_;
+    RangerImpalaPlugin plugin = new RangerImpalaPlugin(config.getServiceType(),
+        config.getAppId());
+    plugin.init();
+    return new RangerCatalogdAuthorizationManager(() -> plugin);
   }
 }

@@ -24,11 +24,11 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -41,6 +41,7 @@ import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.ranger.RangerAuthorizationChecker;
 import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
 import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
+import org.apache.impala.authorization.ranger.RangerCatalogdAuthorizationManager;
 import org.apache.impala.authorization.ranger.RangerImpalaPlugin;
 import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
@@ -89,7 +90,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private static final User USER = new User(System.getProperty("user.name"));
   private static final String RANGER_SERVICE_TYPE = "hive";
   private static final String RANGER_APP_ID = "impala";
-  private static final String RANGER_ADMIN = "admin";
+  private static final User RANGER_ADMIN = new User("admin");
 
   private final AuthorizationConfig authzConfig_;
   private final AuthorizationFactory authzFactory_;
@@ -2994,141 +2995,49 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   private class WithRangerUser implements WithPrincipal {
     private final List<GrantRevokeRequest> requests = new ArrayList<>();
+    private final RangerCatalogdAuthorizationManager authzManager =
+        new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_);
 
     @Override
     public void init(TPrivilege[]... privileges) throws ImpalaException {
-      for (TPrivilege[] privilege: privileges) {
-        for (TPrivilege p: privilege) {
-          // Ranger Impala service definition defines 3 resources:
-          // [Server -> DB -> Table -> Column]
-          // [Server -> DB -> Function]
-          // [Server -> URI]
-          // What it means is if we grant a particular privilege on a resource that
-          // is common to other resources, we need to grant that privilege to those
-          // resources.
-          if (p.getColumn_name() != null || p.getTable_name() != null) {
-            requests.add(createGrantRevokeRequestColumn(p));
-          } else if (p.getUri() != null) {
-            requests.add(createGrantRevokeRequestUri(p));
-          } else if (p.getDb_name() != null) {
-            // DB is used by column and function resources.
-            requests.add(createGrantRevokeRequestColumn(p));
-            requests.add(createGrantRevokeRequestFunction(p));
-          } else {
-            // Server is used by column, function, and URI resources.
-            requests.add(createGrantRevokeRequestColumn(p));
-            requests.add(createGrantRevokeRequestFunction(p));
-            requests.add(createGrantRevokeRequestUri(p));
-          }
-        }
+      for (TPrivilege[] privilege : privileges) {
+        List<GrantRevokeRequest> request =
+            RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
+                RANGER_ADMIN.getName(), USER.getName(),
+                rangerImpalaPlugin_.getClusterName(), Arrays.asList(privilege))
+            .stream()
+            .peek(r -> {
+              r.setResource(updateUri(r.getResource()));
+              if (r.getAccessTypes().contains("owner")) {
+                r.getAccessTypes().remove("owner");
+                r.getAccessTypes().add("all");
+              }
+            }).collect(Collectors.toList());
+
+        requests.addAll(request);
       }
 
-      try {
-        for (GrantRevokeRequest request : requests) {
-          rangerImpalaPlugin_.grantAccess(request, rangerAuditHandler_);
-        }
-        // Re-initialize the plugin to force Ranger cache refresh.
-        // TODO: replace with the new API in RANGER-2349.
-        rangerImpalaPlugin_.init();
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+      authzManager.grantPrivilegeToUser(RANGER_ADMIN, requests, null);
+      // TODO: replace with the new API in RANGER-2349.
+      rangerImpalaPlugin_.init();
     }
 
     @Override
     public void cleanUp() throws ImpalaException {
-      for (GrantRevokeRequest request: requests) {
-        try {
-          rangerImpalaPlugin_.revokeAccess(request, rangerAuditHandler_);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }
+      authzManager.revokePrivilegeFromUser(RANGER_ADMIN, requests, null);
     }
 
     @Override
     public String getName() { return USER.getName(); }
 
-    private GrantRevokeRequest createGrantRevokeRequest() {
-      GrantRevokeRequest request = new GrantRevokeRequest();
-      request.setGrantor(RANGER_ADMIN);
-      request.getUsers().add(USER.getName());
-      request.setDelegateAdmin(Boolean.FALSE);
-      request.setEnableAudit(Boolean.TRUE);
-      request.setReplaceExistingPermissions(Boolean.FALSE);
-      request.setClusterName(rangerImpalaPlugin_.getClusterName());
-      return request;
-    }
-
-    private GrantRevokeRequest createGrantRevokeRequestColumn(TPrivilege privilege) {
-      GrantRevokeRequest request = createGrantRevokeRequest();
-      Map<String, String> resource = new HashMap<>();
-      resource.put(RangerImpalaResourceBuilder.DATABASE,
-          privilege.getDb_name() == null ? "*" : privilege.getDb_name());
-      resource.put(RangerImpalaResourceBuilder.TABLE,
-          privilege.getTable_name() == null ? "*" : privilege.getTable_name());
-      resource.put(RangerImpalaResourceBuilder.COLUMN,
-          privilege.getColumn_name() == null ? "*" : privilege.getColumn_name());
-      request.setResource(resource);
-
-      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
-        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
-      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
-        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
-      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
-        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
-        // service definition.
-        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
-      } else {
-        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
-      }
-      return request;
-    }
-
-    private GrantRevokeRequest createGrantRevokeRequestUri(TPrivilege privilege) {
-      GrantRevokeRequest request = createGrantRevokeRequest();
-      Map<String, String> resource = new HashMap<>();
-      String uri = privilege.getUri();
+    private Map<String, String> updateUri(Map<String, String> resources) {
+      String uri = resources.get(RangerImpalaResourceBuilder.URL);
       if (uri != null && uri.startsWith("/")) {
         uri = "hdfs://localhost:20500" + uri;
       }
-      resource.put(RangerImpalaResourceBuilder.URL, uri == null ? "*" : uri);
-      request.setResource(resource);
+      resources.put(RangerImpalaResourceBuilder.URL, uri);
 
-      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
-        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
-      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
-        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
-      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
-        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
-        // service definition.
-        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
-      } else {
-        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
-      }
-      return request;
-    }
-
-    private GrantRevokeRequest createGrantRevokeRequestFunction(TPrivilege privilege) {
-      GrantRevokeRequest request = createGrantRevokeRequest();
-      Map<String, String> resource = new HashMap<>();
-      resource.put(RangerImpalaResourceBuilder.DATABASE,
-          privilege.getDb_name() == null ? "*" : privilege.getDb_name());
-      resource.put(RangerImpalaResourceBuilder.UDF, "*");
-      request.setResource(resource);
-
-      if (privilege.privilege_level == TPrivilegeLevel.OWNER) {
-        request.getAccessTypes().add(TPrivilegeLevel.ALL.name().toLowerCase());
-      } else if (privilege.privilege_level == TPrivilegeLevel.INSERT) {
-        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
-      } else if (privilege.privilege_level == TPrivilegeLevel.REFRESH) {
-        // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
-        // service definition.
-        request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
-      } else {
-        request.getAccessTypes().add(privilege.privilege_level.name().toLowerCase());
-      }
-      return request;
+      return resources;
     }
   }
 

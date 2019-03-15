@@ -620,20 +620,23 @@ struct TGrantRevokeRoleParams {
   3: required bool is_grant
 }
 
-// Parameters for GRANT/REVOKE privilege TO/FROM role.
+// Parameters for GRANT/REVOKE privilege TO/FROM user/role.
 struct TGrantRevokePrivParams {
   // List of privileges being granted or revoked. The 'has_grant_opt' for each
   // TPrivilege is inherited from the 'has_grant_opt' of this object.
   1: required list<CatalogObjects.TPrivilege> privileges
 
-  // The role name this change should apply to.
-  2: required string role_name
+  // The principal name this change should apply to.
+  2: required string principal_name
 
   // True if this is a GRANT statement false if this is a REVOKE statement.
   3: required bool is_grant
 
   // True if WITH GRANT OPTION is set.
   4: required bool has_grant_opt
+
+  // The type of principal
+  5: required CatalogObjects.TPrincipalType principal_type
 }
 
 // Parameters of DROP DATABASE commands
