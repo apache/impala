@@ -153,30 +153,6 @@ under the License.
       </conbody>
 
     </concept>
-    <concept id="impala-988">
-      <title>Performance issue in queries with a result set larger than
-        available memory </title>
-      <conbody>
-        <p> If you run a join query whose result set is larger than the
-          available memory, without specifying the <codeph>MEM_LIMIT</codeph>
-          option, the query might run very slowly.</p>
-        <p>If the Impala planner is aware of the memory limit, i.e. the
-            <codeph>MEM_LIMIT</codeph> option is set, it takes memory into
-          consideration when choosing the right join strategy. In particular, it
-          will not broadcast if the result set exceeds the memory limit. A
-          broadcast join requires sufficient memory on all nodes to hold the
-          entire data set. If memory is not available, then the receiving
-          operator will spill to disk to relieve memory pressure, thus causing a
-          slow performance.</p>
-        <p>
-          <b>Workaround:</b> Set the memory limit via the
-            <codeph>MEM_LIMIT</codeph> option so that Impala can plan the query
-          accordingly.</p>
-        <p><b>Apache Issue:</b>
-          <xref keyref="IMPALA-988">IMPALA-988</xref></p>
-        <p><b>Affected Versions:</b> Impala 1.2 and higher</p>
-      </conbody>
-    </concept>
 
   </concept>
 
