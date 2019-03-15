@@ -41,7 +41,7 @@ namespace impala {
 /// generated instructions perform the integer manipulation equivalent to setting the
 /// fields of the original struct type.
 //
-/// Lowered types:
+/// Lowered types (in x86-64 ABI):
 /// TYPE_BOOLEAN/BooleanVal: i16
 /// TYPE_TINYINT/TinyIntVal: i16
 /// TYPE_SMALLINT/SmallIntVal: i32
@@ -50,6 +50,7 @@ namespace impala {
 /// TYPE_FLOAT/FloatVal: i64
 /// TYPE_DOUBLE/DoubleVal: { i8, double }
 /// TYPE_STRING,TYPE_VARCHAR,TYPE_CHAR,TYPE_FIXED_UDA_INTERMEDIATE/StringVal: { i64, i8* }
+/// TYPE_ARRAY/TYPE_MAP/CollectionVal: { i64, i8* }
 /// TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
 /// TYPE_DECIMAL/DecimalVal (isn't lowered):
 /// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
@@ -70,6 +71,7 @@ class CodegenAnyVal {
   static const char* LLVM_TIMESTAMPVAL_NAME;
   static const char* LLVM_DECIMALVAL_NAME;
   static const char* LLVM_DATEVAL_NAME;
+  static const char* LLVM_COLLECTIONVAL_NAME;
 
   /// Creates a call to 'fn', which should return a (lowered) *Val, and returns the result.
   /// This abstracts over the x64 calling convention, in particular for functions returning
@@ -168,11 +170,11 @@ class CodegenAnyVal {
   void SetVal(float val);
   void SetVal(double val);
 
-  /// Getters for StringVals.
+  /// Getters for StringVals and CollectionVals.
   llvm::Value* GetPtr();
   llvm::Value *GetLen();
 
-  /// Setters for StringVals.
+  /// Setters for StringVals and CollectionVals.
   void SetPtr(llvm::Value* ptr);
   void SetLen(llvm::Value* len);
 

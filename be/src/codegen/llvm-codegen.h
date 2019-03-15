@@ -869,6 +869,7 @@ class LlvmCodeGen {
   llvm::Type* void_type_;                   // void
   llvm::Type* string_value_type_;           // StringValue
   llvm::Type* timestamp_value_type_;        // TimestampValue
+  llvm::Type* collection_value_type_;       // CollectionValue
 
   /// llvm constants to help with code gen verbosity
   llvm::Constant* true_value_;

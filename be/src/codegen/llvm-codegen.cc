@@ -65,6 +65,7 @@
 #include "common/logging.h"
 #include "exprs/anyval-util.h"
 #include "impala-ir/impala-ir-names.h"
+#include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
@@ -181,7 +182,9 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
     DCHECK_EQ(FN_MAPPINGS[i].fn, i);
     const string& fn_name = FN_MAPPINGS[i].fn_name;
     if (init_codegen->module_->getFunction(fn_name) == nullptr) {
-      return Status(Substitute("Failed to find function $0", fn_name));
+      const string& err_msg = Substitute("Failed to find function $0", fn_name);
+      LOG(ERROR) << err_msg;
+      return Status(err_msg);
     }
   }
 
@@ -385,6 +388,9 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   // Get type for TimestampValue
   codegen->timestamp_value_type_ = codegen->GetStructType<TimestampValue>();
 
+  // Get type for CollectionValue
+  codegen->collection_value_type_ = codegen->GetStructType<CollectionValue>();
+
   // Verify size is correct
   const llvm::DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
   const llvm::StructLayout* layout = data_layout.getStructLayout(
@@ -532,20 +538,19 @@ llvm::Type* LlvmCodeGen::GetSlotType(const ColumnType& type) {
     case TYPE_STRING:
     case TYPE_VARCHAR:
       return string_value_type_;
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
       // Represent this as an array of bytes.
       return llvm::ArrayType::get(i8_type(), type.len);
-    case TYPE_CHAR:
-      // IMPALA-3207: Codegen for CHAR is not yet implemented, this should not
-      // be called for TYPE_CHAR.
-      DCHECK(false) << "NYI";
-      return NULL;
     case TYPE_TIMESTAMP:
       return timestamp_value_type_;
     case TYPE_DECIMAL:
       return llvm::Type::getIntNTy(context(), type.GetByteSize() * 8);
     case TYPE_DATE:
       return i32_type();
+    case TYPE_ARRAY:
+    case TYPE_MAP:
+      return collection_value_type_;
     default:
       DCHECK(false) << "Invalid type: " << type;
       return NULL;

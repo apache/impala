@@ -322,7 +322,7 @@ Status Aggregator::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
   for (int i = 0; i < num_inputs; ++i) {
     ScalarExpr* input_expr = agg_fn->GetChild(i);
     llvm::Function* input_expr_fn;
-    RETURN_IF_ERROR(input_expr->GetCodegendComputeFn(codegen, &input_expr_fn));
+    RETURN_IF_ERROR(input_expr->GetCodegendComputeFn(codegen, false, &input_expr_fn));
     DCHECK(input_expr_fn != nullptr);
 
     // Call input expr function with the matching evaluator to get src slot value.

@@ -58,17 +58,38 @@ class TestCodegen(ImpalaTestSuite):
 
   def test_codegen_failure_for_char_type(self, vector):
     """IMPALA-7288: Regression tests for the codegen failure path when working with a
-    CHAR column type"""
-    # Test failure path in HashTableCtx::CodegenEquals().
+    CHAR column type. Until IMPALA-3207 is completely fixed there are various paths where
+    we need to bail out of codegen."""
+    # Previously codegen for this join failed in HashTableCtx::CodegenEquals() because of
+    # missing ScalarFnCall codegen support, which was added in IMPALA-7331.
     result = self.execute_query("select 1 from functional.chars_tiny t1, "
                                 "functional.chars_tiny t2 "
-                                "where t1.cs = cast(t2.cs as string)");
-    assert "Codegen Disabled: Problem with HashTableCtx::CodegenEquals: ScalarFnCall" \
-           " Codegen not supported for CHAR" in str(result.runtime_profile)
+                                "where t1.cs = cast(t2.cs as string)")
+    profile_str = str(result.runtime_profile)
+    assert "Probe Side Codegen Enabled" in profile_str, profile_str
+    assert "Build Side Codegen Enabled" in profile_str, profile_str
+    assert ("TextConverter::CodegenWriteSlot(): Char isn't supported for CodegenWriteSlot"
+            in profile_str), profile_str
 
-    # Test failure path in HashTableCtx::CodegenEvalRow().
+    # Codegen for this join fails because it is joining two CHAR exprs.
+    result = self.execute_query("select 1 from functional.chars_tiny t1, "
+                                "functional.chars_tiny t2 "
+                                "where t1.cs = t2.cs")
+    profile_str = str(result.runtime_profile)
+    assert ("Probe Side Codegen Disabled: HashTableCtx::CodegenHashRow(): CHAR NYI"
+            in profile_str), profile_str
+    assert ("Build Side Codegen Disabled: HashTableCtx::CodegenHashRow(): CHAR NYI"
+            in profile_str), profile_str
+    assert ("TextConverter::CodegenWriteSlot(): Char isn't supported for CodegenWriteSlot"
+            in profile_str), profile_str
+
+    # Previously codegen for this join failed in HashTableCtx::CodegenEvalRow() because of
+    # missing ScalarFnCall codegen support, which was added in IMPALA-7331.
     result = self.execute_query("select 1 from functional.chars_tiny t1, "
                                 "functional.chars_tiny t2 where t1.cs = "
-                                "FROM_TIMESTAMP(cast(t2.cs as string), 'yyyyMMdd')");
-    assert "Codegen Disabled: Problem with HashTableCtx::CodegenEvalRow(): ScalarFnCall" \
-           " Codegen not supported for CHAR" in str(result.runtime_profile)
+                                "FROM_TIMESTAMP(cast(t2.cs as string), 'yyyyMMdd')")
+    profile_str = str(result.runtime_profile)
+    assert "Probe Side Codegen Enabled" in profile_str, profile_str
+    assert "Build Side Codegen Enabled" in profile_str, profile_str
+    assert ("TextConverter::CodegenWriteSlot(): Char isn't supported for CodegenWriteSlot"
+            in profile_str), profile_str

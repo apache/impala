@@ -85,8 +85,10 @@ class TupleRow;
 /// necessary on the arguments to generate the result. These compute functions have
 /// signature Get*Val(ScalarExprEvaluator*, const TupleRow*). One is implemented for each
 /// possible return type it supports (e.g. GetBooleanVal(), GetStringVal(), etc). The
-/// return type is a subclass of AnyVal (e.g. StringVal). One or more of these compute
-/// functions must be overridden by subclasses of ScalarExpr.
+/// return type is a subclass of AnyVal (e.g. StringVal). Get*Val() dispatches to either
+/// a codegen'd function pointer or to an interpreted implementation Get*ValInterpreted()
+/// These interpreted functions must be overridden by subclasses of ScalarExpr for every
+/// type that they may return.
 ///
 /// ScalarExpr contains query compile-time information about an expression (e.g.
 /// sub-expressions implicitly encoded in the tree structure) and the LLVM IR compute
@@ -96,14 +98,25 @@ class TupleRow;
 /// ScalarExpr's compute functions are codegend to replace calls to the generic compute
 /// function of child expressions with the exact compute functions based on the return
 /// types of the child expressions known at runtime. Subclasses should override
-/// GetCodegendComputeFn() to either generate custom IR compute functions using IRBuilder,
-/// which inline calls to child expressions' compute functions, or simply call
+/// GetCodegendComputeFnImpl() to either generate custom IR compute functions using
+/// IRBuilder, which inlines calls to child expressions' compute functions, or simply call
 /// GetCodegendComputeFnWrapper() to generate a wrapper function to call the interpreted
 /// compute function. Note that we do not need a separate GetCodegendComputeFn() for each
 /// type.
 ///
-/// TODO: Fix subclasses which call GetCodegendComputeFnWrapper() to not call interpreted
-/// functions.
+/// The two main usage patterns for ScalarExpr are:
+/// * The codegen'd expressions are called from other codegen'd functions, e.g. from a
+///   codegen'd join implementation
+/// * Get*Val() is called on the root of each expression subtree by interpreted code
+///   (e.g. an operator which doesn't support codegen yet).
+/// We can optimize for the second usage pattern by filling in the codegen'd function
+/// pointer (codegend_compute_fn_) in root of each ScalarExpr tree. Individual callsites
+/// can disable this optimisation if it's not needed. Expr subtrees can be evaluated
+/// (e.g. by ScalarExprEvaluator::GetConstValue()) but may fail back to a slower
+/// interpreted implementation.
+///
+/// TODO: remove GetCodegendComputeFnWrapper(), which is a hack to enable "codegen"
+/// by generating LLVM functions that actually call into the interpreted path.
 ///
 class ScalarExpr : public Expr {
  public:
@@ -148,11 +161,21 @@ class ScalarExpr : public Expr {
 
   /// Returns an llvm::Function* with signature:
   /// <subclass of AnyVal> ComputeFn(ScalarExprEvaluator*, const TupleRow*)
-  //
+  ///
   /// The function should evaluate this expr over 'row' and return the result as the
-  /// appropriate type of AnyVal. Returns error status on failure.
-  virtual Status GetCodegendComputeFn(
-      LlvmCodeGen* codegen, llvm::Function** fn) WARN_UNUSED_RESULT = 0;
+  /// appropriate type of AnyVal. If 'is_codegen_entry_point' is true, then the
+  /// appropriate setup is performed to make the Get*Val() method on this expr call into
+  /// a codegen'd implementation of the expression tree. If this expr is only called from
+  /// codegen'd code via 'fn', 'is_codegen_entry_point' should be false to reduce the
+  /// number of entry points into codegen'd code and therefore the overhead of
+  /// compilation. Returns error status on failure.
+  ///
+  /// This function is invoked either by other codegen functions (e.g. the codegen code
+  /// of a join) or by RuntimeState::CodegenScalarExprs() which is called from
+  /// FragmentInstanceState::Open() before LLVM compilation. These two call sites
+  /// correspond to the two usage patterns in the class comment.
+  Status GetCodegendComputeFn(LlvmCodeGen* codegen, bool is_codegen_entry_point,
+      llvm::Function** fn);
 
   /// Simple debug string that provides no expr subclass-specific information
   virtual std::string DebugString() const;
@@ -210,9 +233,6 @@ class ScalarExpr : public Expr {
   friend class ExprCodegenTest;
   friend class HashTableTest;
 
-  /// Cached LLVM IR for the compute function. Set this in GetCodegendComputeFn().
-  llvm::Function* ir_compute_fn_ = nullptr;
-
   /// Assigns indices into the FunctionContext vector 'fn_ctxs_' in an evaluator to
   /// nodes which need FunctionContext in the tree. 'next_fn_ctx_idx' is the index
   /// of the next available entry in the vector. It's updated as this function is
@@ -229,28 +249,58 @@ class ScalarExpr : public Expr {
   ScalarExpr(const ColumnType& type, bool is_constant);
   ScalarExpr(const TExprNode& node);
 
+  /// Implementation of GetCodegendComputeFn() to be overridden by each subclass of
+  /// ScalarExpr.
+  virtual Status GetCodegendComputeFnImpl(
+      LlvmCodeGen* codegen, llvm::Function** fn) WARN_UNUSED_RESULT = 0;
+
+  /// Entry points for ScalarExprEvaluator when interpreting this ScalarExpr. These
+  /// dispatch to the codegen'd function pointer if present, or otherwise use the
+  /// Get*ValInterpreted() implementation.
+  /// These functions should be called by other ScalarExprs and ScalarExprEvaluator only.
+  BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
+  TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const;
+  SmallIntVal GetSmallIntVal(ScalarExprEvaluator*, const TupleRow*) const;
+  IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const;
+  BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const;
+  FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const;
+  DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const;
+  StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const;
+  CollectionVal GetCollectionVal(ScalarExprEvaluator*, const TupleRow*) const;
+  TimestampVal GetTimestampVal(ScalarExprEvaluator*, const TupleRow*) const;
+  DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const;
+  DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const;
+
   /// Virtual compute functions for each return type. Each subclass should override
   /// the functions for the return type(s) it supports. For example, a boolean function
-  /// will only override GetBooleanVal(). Some Exprs, like Literal, have many possible
-  /// return types and will override multiple Get*Val() functions. These functions should
-  /// be called by other ScalarExpr and ScalarExprEvaluator only.
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual SmallIntVal GetSmallIntVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual CollectionVal GetCollectionVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual TimestampVal GetTimestampVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const;
-  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const;
+  /// will only override GetBooleanValInterpreted(). Some Exprs, like Literal, have many
+  /// possible return types and will override multiple Get*ValInterpreted() functions.
+  virtual BooleanVal GetBooleanValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual TinyIntVal GetTinyIntValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual SmallIntVal GetSmallIntValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual IntVal GetIntValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual BigIntVal GetBigIntValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual FloatVal GetFloatValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual DoubleVal GetDoubleValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual StringVal GetStringValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual CollectionVal GetCollectionValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual TimestampVal GetTimestampValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual DecimalVal GetDecimalValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual DateVal GetDateValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
 
-  /// Initializes all nodes in the expr tree. Subclasses overriding this function should
-  /// call ScalarExpr::Init() to recursively call Init() on the expr tree.
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state)
-      WARN_UNUSED_RESULT;
+  /// Initializes all nodes in the expr tree. Subclasses overriding this function must
+  /// call ScalarExpr::Init(). If 'is_entry_point' is true, this indicates that Get*Val()
+  /// may be called directly from interpreted code and that we should generate an entry
+  /// point into the codegen'd code. Currently we assume all roots of ScalarExpr subtrees
+  /// exprs are potential entry points.
+  virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
+      RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Initializes 'eval' for execution. If scope if FRAGMENT_LOCAL, both
   /// fragment-local and thread-local states should be initialized. If scope is
@@ -298,8 +348,20 @@ class ScalarExpr : public Expr {
       WARN_UNUSED_RESULT;
 
   /// Helper function for GetCodegendComputeFnWrapper(). Returns the cross-compiled IR
-  /// function of the static Get*Val wrapper function for return type 'type'.
+  /// function of the static Get*Val wrapper function for return type 'type'. Must not
+  /// be called for a type that doesn't have a wrapper function in the built-in
+  /// IR module. Never returns NULL.
   llvm::Function* GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen);
+
+ protected:
+  /// Return true if we should codegen this expression node, based on query options
+  /// and the properties of this ScalarExpr node.
+  bool ShouldCodegen(const RuntimeState* state) const;
+
+  /// Return true if it is possible to evaluate this expression node without codegen.
+  /// The vast majority of exprs support interpretation, so default to true. Scalars
+  /// that are not always interpretable must override this function.
+  virtual bool IsInterpretable() const { return true; }
 
  private:
   /// 'fn_ctx_idx_' is the index into the FunctionContext vector in ScalarExprEvaluator
@@ -318,22 +380,74 @@ class ScalarExpr : public Expr {
   /// * This expr is a constant literal created in the backend.
   const bool is_constant_;
 
+  /// Cached LLVM IR for the compute function. Set in GetCodegendComputeFn().
+  llvm::Function* ir_compute_fn_ = nullptr;
+
+  /// Function pointer to the JIT'd function produced by GetCodegendComputeFn().
+  /// Has signature *Val (ScalarExprEvaluator*, const TupleRow*), and calls the scalar
+  /// function with signature like *Val (FunctionContext*, const *Val& arg1, ...)
+  /// Non-NULL if this expr is codegen'd and the constructor of this Expr requested
+  /// that this expr should be an entry point from interpreted to codegen'd code.
+  /// (see class comment for explanation of usage patterns and motivation).
+  void* codegend_compute_fn_ = nullptr;
+
+  /// True if 'codegend_compute_fn_' is registered with LlvmCodeGen as an entry point
+  /// to codegen to fill in . If this is true, then 'codegend_compute_fn_' will be set
+  /// to the JIT'd function produced by GetCodegendComputeFn() after LLVM compilation.
+  /// Set in GetCodegendComputeFn().
+  bool added_to_jit_ = false;
+
   /// Static wrappers which call the compute function of the given ScalarExpr, passing
   /// it the ScalarExprEvaluator and TupleRow. These are cross-compiled and called by
-  /// the IR wrapper functions generated by GetCodegendComputeFnWrapper().
-  static BooleanVal GetBooleanVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static TinyIntVal GetTinyIntVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static SmallIntVal GetSmallIntVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static IntVal GetIntVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static BigIntVal GetBigIntVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static FloatVal GetFloatVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static DoubleVal GetDoubleVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static StringVal GetStringVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static TimestampVal GetTimestampVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static DecimalVal GetDecimalVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
-  static DateVal GetDateVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  /// the IR wrapper functions generated by GetCodegendComputeFnWrapper(). The wrapper
+  /// functions avoid the need for codegen'd callers to do a virtual function call on
+  /// the ScalarExpr.
+  /// Note: the ScalarExpr subclass is known at codegen time, so codegen *could* replace
+  /// the virtual function call with a direct function call. However, it would be better
+  /// to focus on removing GetCodegendComputeFnWrapper() instead of micro-optimising this
+  /// inefficient mechanism.
+  static BooleanVal GetBooleanValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static TinyIntVal GetTinyIntValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static SmallIntVal GetSmallIntValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static IntVal GetIntValInterpreted(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static BigIntVal GetBigIntValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static FloatVal GetFloatValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static DoubleVal GetDoubleValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static StringVal GetStringValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static TimestampVal GetTimestampValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static DecimalVal GetDecimalValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static DateVal GetDateValInterpreted(
+      ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
 };
 
-}
+// Helper to generate the declaration for an override of Get*ValInterpreted()
+#define GET_VAL_INTERPRETED_OVERRIDE(val_type)                                       \
+  virtual val_type Get##val_type##Interpreted(ScalarExprEvaluator*, const TupleRow*) \
+      const override;
+
+// Helper to stamp out Get*ValInterpreted() declarations for all scalar types.
+#define GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES \
+  GET_VAL_INTERPRETED_OVERRIDE(BooleanVal)                          \
+  GET_VAL_INTERPRETED_OVERRIDE(TinyIntVal)                          \
+  GET_VAL_INTERPRETED_OVERRIDE(SmallIntVal)                         \
+  GET_VAL_INTERPRETED_OVERRIDE(IntVal)                              \
+  GET_VAL_INTERPRETED_OVERRIDE(BigIntVal)                           \
+  GET_VAL_INTERPRETED_OVERRIDE(FloatVal)                            \
+  GET_VAL_INTERPRETED_OVERRIDE(DoubleVal)                           \
+  GET_VAL_INTERPRETED_OVERRIDE(StringVal)                           \
+  GET_VAL_INTERPRETED_OVERRIDE(TimestampVal)                        \
+  GET_VAL_INTERPRETED_OVERRIDE(DecimalVal)                          \
+  GET_VAL_INTERPRETED_OVERRIDE(DateVal)
+
+} // namespace impala
 
 #endif

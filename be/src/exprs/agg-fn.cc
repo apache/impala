@@ -63,7 +63,7 @@ AggFn::AggFn(const TExprNode& tnode, const SlotDescriptor& intermediate_slot_des
 Status AggFn::Init(const RowDescriptor& row_desc, RuntimeState* state) {
   // Initialize all children (i.e. input exprs to this aggregate expr).
   for (ScalarExpr* input_expr : children()) {
-    RETURN_IF_ERROR(input_expr->Init(row_desc, state));
+    RETURN_IF_ERROR(input_expr->Init(row_desc, /*is_entry_point*/ false, state));
   }
 
   // Initialize the aggregate expressions' internals.

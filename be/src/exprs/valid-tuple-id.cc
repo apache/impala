@@ -31,8 +31,9 @@ const char* ValidTupleIdExpr::LLVM_CLASS_NAME = "class.impala::ValidTupleIdExpr"
 
 ValidTupleIdExpr::ValidTupleIdExpr(const TExprNode& node) : ScalarExpr(node) {}
 
-Status ValidTupleIdExpr::Init(const RowDescriptor& row_desc, RuntimeState* state) {
-  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
+Status ValidTupleIdExpr::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(0, children_.size());
   tuple_ids_.reserve(row_desc.tuple_descriptors().size());
   for (TupleDescriptor* tuple_desc : row_desc.tuple_descriptors()) {
@@ -47,7 +48,8 @@ int ValidTupleIdExpr::ComputeNonNullCount(const TupleRow* row, int num_tuples) {
   return non_null_count;
 }
 
-IntVal ValidTupleIdExpr::GetIntVal(ScalarExprEvaluator* eval, const TupleRow* row) const {
+IntVal ValidTupleIdExpr::GetIntValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   // Validate that exactly one tuple is non-NULL.
   int num_tuples = tuple_ids_.size();
   DCHECK_EQ(1, ComputeNonNullCount(row, num_tuples));
@@ -113,12 +115,8 @@ IntVal ValidTupleIdExpr::GetIntVal(ScalarExprEvaluator* eval, const TupleRow* ro
 //   ret i64 %ret17
 // }
 //
-Status ValidTupleIdExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != nullptr) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
+Status ValidTupleIdExpr::GetCodegendComputeFnImpl(
+    LlvmCodeGen* codegen, llvm::Function** fn) {
   // Create a method with the expected signature.
   llvm::Value* args[2];
   llvm::Function* new_fn = CreateIrFunctionPrototype("ValidTupleId", codegen, &args);
@@ -165,9 +163,6 @@ Status ValidTupleIdExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Functi
   if (UNLIKELY(*fn == nullptr)) {
     return Status(TErrorCode::IR_VERIFY_FAILED, "ValidTupleId");
   }
-
-  ir_compute_fn_ = *fn;
-
   return Status::OK();
 }
 

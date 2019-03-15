@@ -27,7 +27,7 @@
 
 namespace impala {
 
-BooleanVal TupleIsNullPredicate::GetBooleanVal(
+BooleanVal TupleIsNullPredicate::GetBooleanValInterpreted(
     ScalarExprEvaluator* evaluator, const TupleRow* row) const {
   int count = 0;
   for (int i = 0; i < tuple_idxs_.size(); ++i) {
@@ -41,11 +41,11 @@ BooleanVal TupleIsNullPredicate::GetBooleanVal(
 TupleIsNullPredicate::TupleIsNullPredicate(const TExprNode& node)
   : Predicate(node),
     tuple_ids_(node.tuple_is_null_pred.tuple_ids.begin(),
-               node.tuple_is_null_pred.tuple_ids.end()) {
-}
+        node.tuple_is_null_pred.tuple_ids.end()) {}
 
-Status TupleIsNullPredicate::Init(const RowDescriptor& row_desc, RuntimeState* state) {
-  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
+Status TupleIsNullPredicate::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(0, children_.size());
   // Resolve tuple ids to tuple indexes.
   for (int i = 0; i < tuple_ids_.size(); ++i) {
@@ -61,7 +61,7 @@ Status TupleIsNullPredicate::Init(const RowDescriptor& row_desc, RuntimeState* s
   return Status::OK();
 }
 
-Status TupleIsNullPredicate::GetCodegendComputeFn(LlvmCodeGen* codegen,
+Status TupleIsNullPredicate::GetCodegendComputeFnImpl(LlvmCodeGen* codegen,
     llvm::Function** fn) {
   return GetCodegendComputeFnWrapper(codegen, fn);
 }

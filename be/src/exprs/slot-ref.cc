@@ -69,11 +69,12 @@ SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = fa
     tuple_idx_(0),
     slot_offset_(offset),
     null_indicator_offset_(0, nullable ? offset : -1),
-    slot_id_(-1) {
-}
+    slot_id_(-1) {}
 
-Status SlotRef::Init(const RowDescriptor& row_desc, RuntimeState* state) {
+Status SlotRef::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
   DCHECK_EQ(children_.size(), 0);
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   if (slot_id_ != -1) {
     const SlotDescriptor* slot_desc = state->desc_tbl().GetSlotDescriptor(slot_id_);
     if (slot_desc == NULL) {
@@ -158,16 +159,7 @@ string SlotRef::DebugString() const {
 //
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
 // the types from the TupleDesc.  It will likely make this code simpler to reason about.
-Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (type_.type == TYPE_CHAR) {
-    *fn = NULL;
-    return Status("Codegen for Char not supported.");
-  }
-  if (ir_compute_fn_ != NULL) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
+Status SlotRef::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
   DCHECK_EQ(GetNumChildren(), 0);
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
   // query-wide unique id. We also need to combine whether the tuple is nullable. For
@@ -250,12 +242,12 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   llvm::Value* len = NULL;
   llvm::Value* time_of_day = NULL;
   llvm::Value* date = NULL;
-  if (type_.IsStringType()) {
+  if (type_.IsVarLenStringType() || type_.IsCollectionType()) {
     llvm::Value* ptr_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "ptr_ptr");
     ptr = builder.CreateLoad(ptr_ptr, "ptr");
     llvm::Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
     len = builder.CreateLoad(len_ptr, "len");
-  } else if (type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+  } else if (type_.type == TYPE_CHAR || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     // ptr and len are the slot and its fixed length.
     ptr = builder.CreateBitCast(val_ptr, codegen->ptr_type());
     len = codegen->GetI32Constant(type_.len);
@@ -291,7 +283,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having get_slot_block generate an AnyVal and having a single phi node over that.
   // TODO: revisit this code, can possibly be simplified
-  if (type_.IsVarLenStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+  if (type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type_.IsCollectionType()) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
     llvm::PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
@@ -371,13 +364,12 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
 
   *fn = codegen->FinalizeFunction(*fn);
   if (UNLIKELY(*fn == NULL)) return Status(TErrorCode::IR_VERIFY_FAILED, "SlotRef");
-  ir_compute_fn_ = *fn;
   codegen->RegisterExprFn(unique_slot_id, *fn);
   return Status::OK();
 }
 
 #define SLOT_REF_GET_FUNCTION(type_lit, type_val, type_c) \
-    type_val SlotRef::Get##type_val( \
+    type_val SlotRef::Get##type_val##Interpreted( \
         ScalarExprEvaluator* eval, const TupleRow* row) const { \
       DCHECK_EQ(type_.type, type_lit); \
       Tuple* t = row->GetTuple(tuple_idx_); \
@@ -393,7 +385,7 @@ SLOT_REF_GET_FUNCTION(TYPE_BIGINT, BigIntVal, int64_t);
 SLOT_REF_GET_FUNCTION(TYPE_FLOAT, FloatVal, float);
 SLOT_REF_GET_FUNCTION(TYPE_DOUBLE, DoubleVal, double);
 
-StringVal SlotRef::GetStringVal(
+StringVal SlotRef::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
   Tuple* t = row->GetTuple(tuple_idx_);
@@ -409,7 +401,7 @@ StringVal SlotRef::GetStringVal(
   return result;
 }
 
-TimestampVal SlotRef::GetTimestampVal(
+TimestampVal SlotRef::GetTimestampValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   Tuple* t = row->GetTuple(tuple_idx_);
@@ -420,7 +412,7 @@ TimestampVal SlotRef::GetTimestampVal(
   return result;
 }
 
-DecimalVal SlotRef::GetDecimalVal(
+DecimalVal SlotRef::GetDecimalValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   Tuple* t = row->GetTuple(tuple_idx_);
@@ -438,13 +430,23 @@ DecimalVal SlotRef::GetDecimalVal(
   }
 }
 
-DateVal SlotRef::GetDateVal(
+DateVal SlotRef::GetDateValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DATE);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == nullptr || t->IsNull(null_indicator_offset_)) return DateVal::null();
   const DateValue dv(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
   return dv.ToDateVal();
+}
+
+CollectionVal SlotRef::GetCollectionValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(type_.IsCollectionType());
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == nullptr || t->IsNull(null_indicator_offset_)) return CollectionVal::null();
+  CollectionValue* coll_value =
+      reinterpret_cast<CollectionValue*>(t->GetSlot(slot_offset_));
+  return CollectionVal(coll_value->ptr, coll_value->num_tuples);
 }
 
 } // namespace impala

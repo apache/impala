@@ -328,7 +328,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   llvm::Function* materialize_expr_fns[slot_materialize_exprs.size()];
   for (int i = 0; i < slot_materialize_exprs.size(); ++i) {
     Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(
-        codegen, &materialize_expr_fns[i]);
+        codegen, false, &materialize_expr_fns[i]);
     if (!status.ok()) {
       return Status::Expected(Substitute("Could not codegen CodegenMaterializeExprs: $0",
             status.GetDetail()));

@@ -48,13 +48,11 @@ add_library(Exprs
   literal.cc
   math-functions-ir.cc
   null-literal.cc
-  null-literal-ir.cc
   operators-ir.cc
   scalar-expr.cc
   scalar-expr-evaluator.cc
   scalar-expr-ir.cc
   slot-ref.cc
-  slot-ref-ir.cc
   string-functions.cc
   string-functions-ir.cc
   timestamp-functions.cc

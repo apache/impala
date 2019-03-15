@@ -31,70 +31,76 @@ namespace impala {
 
 const char* NullLiteral::LLVM_CLASS_NAME = "class.impala::NullLiteral";
 
-BooleanVal NullLiteral::GetBooleanVal(
+BooleanVal NullLiteral::GetBooleanValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
   return BooleanVal::null();
 }
 
-TinyIntVal NullLiteral::GetTinyIntVal(
+TinyIntVal NullLiteral::GetTinyIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT) << type_;
   return TinyIntVal::null();
 }
 
-SmallIntVal NullLiteral::GetSmallIntVal(
+SmallIntVal NullLiteral::GetSmallIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT) << type_;
   return SmallIntVal::null();
 }
 
-IntVal NullLiteral::GetIntVal(
+IntVal NullLiteral::GetIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT) << type_;
   return IntVal::null();
 }
 
-BigIntVal NullLiteral::GetBigIntVal(
+BigIntVal NullLiteral::GetBigIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT) << type_;
   return BigIntVal::null();
 }
 
-FloatVal NullLiteral::GetFloatVal(
+FloatVal NullLiteral::GetFloatValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT) << type_;
   return FloatVal::null();
 }
 
-DoubleVal NullLiteral::GetDoubleVal(
+DoubleVal NullLiteral::GetDoubleValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE) << type_;
   return DoubleVal::null();
 }
 
-StringVal NullLiteral::GetStringVal(
+StringVal NullLiteral::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsStringType()) << type_;
   return StringVal::null();
 }
 
-TimestampVal NullLiteral::GetTimestampVal(
+TimestampVal NullLiteral::GetTimestampValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP) << type_;
   return TimestampVal::null();
 }
 
-DecimalVal NullLiteral::GetDecimalVal(
+DecimalVal NullLiteral::GetDecimalValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   return DecimalVal::null();
 }
 
-DateVal NullLiteral::GetDateVal(
+DateVal NullLiteral::GetDateValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DATE) << type_;
   return DateVal::null();
+}
+
+CollectionVal NullLiteral::GetCollectionValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(type_.IsCollectionType());
+  return CollectionVal::null();
 }
 
 // Generated IR for a bigint NULL literal:
@@ -104,16 +110,7 @@ DateVal NullLiteral::GetDateVal(
 // entry:
 //   ret { i8, i64 } { i8 1, i64 0 }
 // }
-Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != nullptr) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
-  if (type_.type == TYPE_CHAR) {
-    return Status::Expected("Codegen not supported for CHAR");
-  }
-
+Status NullLiteral::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
   DCHECK_EQ(GetNumChildren(), 0);
   llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("NullLiteral", codegen, &args);
@@ -127,7 +124,6 @@ Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** 
   if (UNLIKELY(*fn == nullptr)) {
     return Status(TErrorCode::IR_VERIFY_FAILED, "NullLiteral");
   }
-  ir_compute_fn_ = *fn;
   return Status::OK();
 }
 

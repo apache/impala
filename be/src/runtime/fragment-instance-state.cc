@@ -331,7 +331,7 @@ Status FragmentInstanceState::Open() {
       // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
       // ScalarFnCall has no fall back to interpretation when codegen fails so propagates
       // the error status for now.
-      RETURN_IF_ERROR(runtime_state_->CodegenScalarFns());
+      RETURN_IF_ERROR(runtime_state_->CodegenScalarExprs());
     }
 
     LlvmCodeGen* codegen = runtime_state_->codegen();

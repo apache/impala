@@ -17,9 +17,10 @@
 
 #include <sstream>
 
-#include "exprs/compound-predicates.h"
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "exprs/compound-predicates.h"
+#include "exprs/scalar-expr.inline.h"
 #include "runtime/runtime-state.h"
 
 #include "common/names.h"
@@ -27,8 +28,8 @@
 using namespace impala;
 
 // (<> && false) is false, (true && NULL) is NULL
-BooleanVal AndPredicate::GetBooleanVal(ScalarExprEvaluator* eval,
-    const TupleRow* row) const {
+BooleanVal AndPredicate::GetBooleanValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(children_.size(), 2);
   BooleanVal val1 = children_[0]->GetBooleanVal(eval, row);
   if (!val1.is_null && !val1.val) return BooleanVal(false); // short-circuit
@@ -47,8 +48,8 @@ string AndPredicate::DebugString() const {
 }
 
 // (<> || true) is true, (false || NULL) is NULL
-BooleanVal OrPredicate::GetBooleanVal(ScalarExprEvaluator* eval,
-    const TupleRow* row) const {
+BooleanVal OrPredicate::GetBooleanValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(children_.size(), 2);
   BooleanVal val1 = children_[0]->GetBooleanVal(eval, row);
   if (!val1.is_null && val1.val) return BooleanVal(true); // short-circuit
@@ -121,16 +122,11 @@ string OrPredicate::DebugString() const {
 // }
 Status CompoundPredicate::CodegenComputeFn(
     bool and_fn, LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != NULL) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
   DCHECK_EQ(GetNumChildren(), 2);
   llvm::Function* lhs_function;
-  RETURN_IF_ERROR(children()[0]->GetCodegendComputeFn(codegen, &lhs_function));
+  RETURN_IF_ERROR(children()[0]->GetCodegendComputeFn(codegen, false, &lhs_function));
   llvm::Function* rhs_function;
-  RETURN_IF_ERROR(children()[1]->GetCodegendComputeFn(codegen, &rhs_function));
+  RETURN_IF_ERROR(children()[1]->GetCodegendComputeFn(codegen, false, &rhs_function));
 
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
@@ -242,6 +238,5 @@ Status CompoundPredicate::CodegenComputeFn(
 
   *fn = codegen->FinalizeFunction(function);
   DCHECK(*fn != NULL);
-  ir_compute_fn_ = *fn;
   return Status::OK();
 }

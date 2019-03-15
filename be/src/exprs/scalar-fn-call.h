@@ -43,13 +43,11 @@ using impala_udf::DateVal;
 class ScalarExprEvaluator;
 class TExprNode;
 
-///
 /// Expr for evaluating a pre-compiled native or LLVM IR function that uses the UDF
-/// interface (i.e. a scalar function). This class overrides GetCodegendComputeFn() to
-/// return a function that calls any child exprs and passes the results as arguments to the
-/// specified scalar function. If codegen is enabled, ScalarFnCall's Get*Val() compute
-/// functions are wrappers around this codegen'd function.
-//
+/// interface (i.e. a scalar function). This class overrides GetCodegendComputeFnImpl() to
+/// return a function that calls any child exprs and passes the results as arguments to
+/// the specified scalar function.
+///
 /// If codegen is disabled, some native functions can be called without codegen, depending
 /// on the native function's signature. However, since we can't write static code to call
 /// every possible function signature, codegen may be required to generate the call to the
@@ -69,7 +67,7 @@ class TExprNode;
 ///    - Allow more functions to be NULL in UDA test harness
 class ScalarFnCall : public ScalarExpr {
  public:
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+  virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn)
       override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
 
@@ -80,28 +78,17 @@ class ScalarFnCall : public ScalarExpr {
   virtual bool HasFnCtx() const override { return true; }
 
   ScalarFnCall(const TExprNode& node);
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state)
-      override WARN_UNUSED_RESULT;
+  virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
+      RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual Status OpenEvaluator(FunctionContext::FunctionStateScope scope,
-      RuntimeState* state, ScalarExprEvaluator* eval) const override
-      WARN_UNUSED_RESULT;
+      RuntimeState* state, ScalarExprEvaluator* eval) const override WARN_UNUSED_RESULT;
   virtual void CloseEvaluator(FunctionContext::FunctionStateScope scope,
       RuntimeState* state, ScalarExprEvaluator* eval) const override;
   virtual int ComputeVarArgsBufferSize() const override;
+  /// Not all scalars functions are interpretable - see class comment.
+  virtual bool IsInterpretable() const override;
 
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual SmallIntVal GetSmallIntVal(
-      ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual TimestampVal GetTimestampVal(
-      ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES
 
  private:
   /// If this function has var args, children()[vararg_start_idx_] is the first vararg
@@ -114,11 +101,6 @@ class ScalarFnCall : public ScalarExpr {
   /// second element in the value it must be evaluated into.
   std::vector<std::pair<Expr*, impala_udf::AnyVal*>> non_constant_children_;
 
-  /// Function pointer to the JIT'd function produced by GetCodegendComputeFn().
-  /// Has signature *Val (ScalarExprEvaluator*, const TupleRow*), and calls the scalar
-  /// function with signature like *Val (FunctionContext*, const *Val& arg1, ...)
-  void* scalar_fn_wrapper_;
-
   /// The UDF's prepare function, if specified. This is initialized in Prepare() and
   /// called in Open() (since we may have needed to codegen the function if it's from an
   /// IR module).
@@ -128,8 +110,8 @@ class ScalarFnCall : public ScalarExpr {
   /// in Close().
   impala_udf::UdfClose close_fn_;
 
-  /// If running with codegen disabled, scalar_fn_ will be a pointer to the non-JIT'd
-  /// scalar function.
+  /// A pointer to the function implementation, used by the interpreted code path. Set in
+  /// Init() for BUILTIN and NATIVE functions. Not set for IR UDFs.
   void* scalar_fn_;
 
   /// Returns the number of non-vararg arguments
@@ -146,9 +128,9 @@ class ScalarFnCall : public ScalarExpr {
 
   /// Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
   /// If the function is loaded from an IR module, it cannot be called until the module
-  /// has been JIT'd (i.e. after GetCodegendComputeFn() has been called).
-  Status GetFunction(LlvmCodeGen* codegen, const std::string& symbol, void** fn)
-      WARN_UNUSED_RESULT;
+  /// has been JIT'd (i.e. after GetCodegendComputeFnImpl() has been called).
+  Status GetFunction(
+      LlvmCodeGen* codegen, const std::string& symbol, void** fn) WARN_UNUSED_RESULT;
 
   /// Loads the Prepare() and Close() functions for this ScalarFnCall. They could be
   /// native or IR functions. To load IR functions, the codegen object must have

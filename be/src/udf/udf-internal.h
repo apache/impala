@@ -296,13 +296,16 @@ namespace impala_udf {
 /// ready for public consumption because users must have access to our internal tuple
 /// layout.
 struct CollectionVal : public AnyVal {
-  uint8_t* ptr;
+  // Put num_tuples before ptr so that 'AnyVal::is_null', 'num_tuples' and 'ptr' can be
+  // packed into 16 bytes. This matches the memory layout of StringVal, which allows
+  // sharing of support in CodegenAnyval.
   int num_tuples;
+  uint8_t* ptr;
 
   /// Construct an CollectionVal from ptr/num_tuples. Note: this does not make a copy of
   /// ptr so the buffer must exist as long as this CollectionVal does.
   CollectionVal(uint8_t* ptr = NULL, int num_tuples = 0)
-      : ptr(ptr), num_tuples(num_tuples) {}
+      : num_tuples(num_tuples), ptr(ptr) {}
 
   static CollectionVal null() {
     CollectionVal cv;
@@ -311,6 +314,11 @@ struct CollectionVal : public AnyVal {
   }
 };
 
-}
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+static_assert(sizeof(CollectionVal) == sizeof(StringVal), "Wrong size.");
+static_assert(
+    offsetof(CollectionVal, num_tuples) == offsetof(StringVal, len), "Wrong offset.");
+static_assert(offsetof(CollectionVal, ptr) == offsetof(StringVal, ptr), "Wrong offset.");
+} // namespace impala_udf
 
 #endif

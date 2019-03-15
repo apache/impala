@@ -722,7 +722,8 @@ Status KrpcDataStreamSender::CodegenHashRow(LlvmCodeGen* codegen, llvm::Function
   // Unroll the loop and codegen each of the partition expressions
   for (int i = 0; i < partition_exprs_.size(); ++i) {
     llvm::Function* compute_fn;
-    RETURN_IF_ERROR(partition_exprs_[i]->GetCodegendComputeFn(codegen, &compute_fn));
+    RETURN_IF_ERROR(
+        partition_exprs_[i]->GetCodegendComputeFn(codegen, false, &compute_fn));
 
     // Load the expression evaluator for the i-th partition expression
     llvm::Function* get_expr_eval_fn =

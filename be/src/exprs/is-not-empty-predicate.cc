@@ -26,6 +26,7 @@
 
 #include "common/names.h"
 #include "exprs/null-literal.h"
+#include "exprs/scalar-expr.inline.h"
 #include "exprs/slot-ref.h"
 
 namespace impala {
@@ -34,64 +35,50 @@ const char* IsNotEmptyPredicate::LLVM_CLASS_NAME = "class.impala::IsNotEmptyPred
 
 IsNotEmptyPredicate::IsNotEmptyPredicate(const TExprNode& node) : Predicate(node) {}
 
-BooleanVal IsNotEmptyPredicate::GetBooleanVal(
+BooleanVal IsNotEmptyPredicate::GetBooleanValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   CollectionVal coll = children_[0]->GetCollectionVal(eval, row);
   if (coll.is_null) return BooleanVal::null();
   return BooleanVal(coll.num_tuples != 0);
 }
 
-Status IsNotEmptyPredicate::Init(const RowDescriptor& row_desc, RuntimeState* state) {
-  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
+Status IsNotEmptyPredicate::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(children_.size(), 1);
   return Status::OK();
 }
 
-// Sample IR output (when child is a SlotRef): // FIXME needs review
-//
-//   define i16 @IsNotEmptyPredicate(%"class.impala::ScalarExprEvaluator"* %eval,
-//     %"class.impala::TupleRow"* %row) #38 {
-//   entry:
+// Sample IR output (when child is a SlotRef):
+// define i16 @IsNotEmptyPredicate(%"class.impala::ScalarExprEvaluator"* %eval,
+//                                 %"class.impala::TupleRow"* %row) #37 {
+// entry:
 //   %0 = alloca i16
 //   %1 = alloca i16
-//   %collection_val = alloca %"struct.impala_udf::CollectionVal"
-//   call void @_ZNK6impala7SlotRef16GetCollectionValEPNS_
-//     19ScalarExprEvaluatorEPKNS_8TupleRowE(%"struct.impala_udf::CollectionVal"*
-//     %collection_val, %"class.impala::SlotRef"* inttoptr (i64 140731643050560
-//     to %"class.impala::SlotRef"*),
-//     %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
-//   %anyval_ptr = getelementptr inbounds %"struct.impala_udf::CollectionVal",
-//     %"struct.impala_udf::CollectionVal"* %collection_val, i32 0, i32 0
-//   %is_null_ptr = getelementptr inbounds %"struct.impala_udf::AnyVal",
-//     %"struct.impala_udf::AnyVal"* %anyval_ptr, i32 0, i32 0
-//   %is_null = load i8, i8* %is_null_ptr
-//   %is_null_bool = icmp ne i8 %is_null, 0
-//   %num_tuples_ptr = getelementptr inbounds %"struct.impala_udf::CollectionVal",
-//     %"struct.impala_udf::CollectionVal"* %collection_val, i32 0, i32 3
-//   %num_tuples = load i32, i32* %num_tuples_ptr
-//   br i1 %is_null_bool, label %ret_null, label %check_count
+//   %coll_val = call { i64, i8* } @GetSlotRef(
+//      %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
+//   %2 = extractvalue { i64, i8* } %coll_val, 0
+//   %coll_is_null = trunc i64 %2 to i1
+//   br i1 %coll_is_null, label %ret_null, label %check_count
 //
 // check_count:                                      ; preds = %entry
-//   %4 = icmp ne i32 %num_tuples, 0
-//   %ret2 = load i16, i16* %0
-//   %5 = zext i1 %4 to i16
-//   %6 = shl i16 %5, 8
-//   %7 = and i16 %ret2, 255
-//   %ret21 = or i16 %7, %6
-//   ret i16 %ret21
+//   %3 = extractvalue { i64, i8* } %coll_val, 0
+//   %4 = ashr i64 %3, 32
+//   %5 = trunc i64 %4 to i32
+//   %6 = icmp ne i32 %5, 0
+//   %has_values_result = load i16, i16* %0
+//   %7 = zext i1 %6 to i16
+//   %8 = shl i16 %7, 8
+//   %9 = and i16 %has_values_result, 255
+//   %has_values_result1 = or i16 %9, %8
+//   ret i16 %has_values_result1
 //
 // ret_null:                                         ; preds = %entry
-//   %ret = load i16, i16* %1
+//   %null_result = load i16, i16* %1
 //   ret i16 1
 // }
-//
-Status IsNotEmptyPredicate::GetCodegendComputeFn(
+Status IsNotEmptyPredicate::GetCodegendComputeFnImpl(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != nullptr) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
   // Create a method with the expected signature.
   llvm::LLVMContext& context = codegen->context();
   llvm::Value* args[2];
@@ -101,64 +88,25 @@ Status IsNotEmptyPredicate::GetCodegendComputeFn(
   LlvmBuilder builder(entry_block);
 
   ScalarExpr* child = children_[0]; // The child node, on which to call GetCollectionVal.
-  llvm::Value* child_expr; //  a Value for 'child' with the correct subtype of ScalarExpr.
-  llvm::Function* get_collection_val_fn; // a type specific GetCollectionVal method
-
-  //  To save a virtual method call, find the type of child and lookup the non-virtual
-  //  GetCollection method to call.
-  if (dynamic_cast<SlotRef*>(child)) {
-    // Lookup SlotRef::GetCollectionVal().
-    get_collection_val_fn =
-        codegen->GetFunction(IRFunction::SCALAR_EXPR_SLOT_REF_GET_COLLECTION_VAL, false);
-    child_expr = codegen->CastPtrToLlvmPtr(
-        codegen->GetNamedPtrType(SlotRef::LLVM_CLASS_NAME), child);
-  } else if (dynamic_cast<NullLiteral*>(child)) {
-    // Lookup NullLiteral::GetCollectionVal().
-    get_collection_val_fn = codegen->GetFunction(
-        IRFunction::SCALAR_EXPR_NULL_LITERAL_GET_COLLECTION_VAL, false);
-    child_expr = codegen->CastPtrToLlvmPtr(
-        codegen->GetNamedPtrType(NullLiteral::LLVM_CLASS_NAME), child);
-  } else {
-    // This may mean someone implemented GetCollectionVal in a new subclass of ScalarExpr.
-    DCHECK(false) << "Unknown GetCollectionVal implementation: " << typeid(*child).name();
-    return Status("Codegen'd IsNotEmptyPredicate function found unknown GetCollectionVal,"
-                  " see log.");
-  }
+  llvm::Function* get_collection_val_fn;
+  RETURN_IF_ERROR(child->GetCodegendComputeFn(codegen, false, &get_collection_val_fn));
   DCHECK(get_collection_val_fn != nullptr);
-  DCHECK(child_expr != nullptr);
 
   // Find type for the CollectionVal struct.
   llvm::Type* collection_type = codegen->GetNamedType("struct.impala_udf::CollectionVal");
   DCHECK(collection_type->isStructTy());
 
-  // Allocate space for the CollectionVal on the stack
-  llvm::Value* collection_val_ptr =
-      codegen->CreateEntryBlockAlloca(builder, collection_type, "collection_val");
-
-  // The get_collection_val_fn returns a CollectionVal by value. In llvm we have to pass a
-  // pointer as the first argument. The second argument is the object on which the call is
-  // made.
-  llvm::Value* get_coll_call_args[] = {collection_val_ptr, child_expr, args[0], args[1]};
-
   // Construct the call to the evaluation method, and return the result.
-  llvm::Value* collection = builder.CreateCall(get_collection_val_fn, get_coll_call_args);
-  DCHECK(collection != nullptr);
+  CodegenAnyVal coll_val = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
+      child->type(), get_collection_val_fn, args, "coll_val");
 
   // Find the 'is_null' field of the CollectionVal.
-  llvm::Value* anyval_ptr =
-      builder.CreateStructGEP(nullptr, collection_val_ptr, 0, "anyval_ptr");
-  llvm::Value* is_null_ptr =
-      builder.CreateStructGEP(nullptr, anyval_ptr, 0, "is_null_ptr");
-  llvm::Value* is_null = builder.CreateLoad(is_null_ptr, "is_null");
-
-  // Check if 'is_null' is true.
-  llvm::Value* is_null_bool =
-      builder.CreateICmpNE(is_null, codegen->GetI8Constant(0), "is_null_bool");
+  llvm::Value* is_null = coll_val.GetIsNull("coll_is_null");
 
   llvm::BasicBlock* check_count =
       llvm::BasicBlock::Create(context, "check_count", new_fn);
   llvm::BasicBlock* ret_null = llvm::BasicBlock::Create(context, "ret_null", new_fn);
-  builder.CreateCondBr(is_null_bool, ret_null, check_count);
+  builder.CreateCondBr(is_null, ret_null, check_count);
 
   // Add code to the block that is executed if is_null was true.
   builder.SetInsertPoint(ret_null);
@@ -168,10 +116,8 @@ Status IsNotEmptyPredicate::GetCodegendComputeFn(
 
   // Back to the branch where 'is_null' is false.
   builder.SetInsertPoint(check_count);
-  // Load the value of 'num_tuples'
-  llvm::Value* num_tuples_ptr =
-      builder.CreateStructGEP(nullptr, collection_val_ptr, 3, "num_tuples_ptr");
-  llvm::Value* num_tuples = builder.CreateLoad(num_tuples_ptr, "num_tuples");
+  // Load the value of 'num_tuples'.
+  llvm::Value* num_tuples = coll_val.GetLen();
 
   llvm::Value* has_values = builder.CreateICmpNE(num_tuples, codegen->GetI32Constant(0));
   CodegenAnyVal has_values_result(
@@ -183,9 +129,6 @@ Status IsNotEmptyPredicate::GetCodegendComputeFn(
   if (UNLIKELY(*fn == nullptr)) {
     return Status(TErrorCode::IR_VERIFY_FAILED, "IsNotEmptyPredicate");
   }
-
-  ir_compute_fn_ = *fn;
-
   return Status::OK();
 }
 

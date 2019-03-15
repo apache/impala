@@ -33,8 +33,9 @@ namespace impala {
 KuduPartitionExpr::KuduPartitionExpr(const TExprNode& node)
   : ScalarExpr(node), tkudu_partition_expr_(node.kudu_partition_expr) {}
 
-Status KuduPartitionExpr::Init(const RowDescriptor& row_desc, RuntimeState* state) {
-  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
+Status KuduPartitionExpr::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(tkudu_partition_expr_.referenced_columns.size(), children_.size());
 
   // Create the KuduPartitioner we'll use to get the partition index for each row.
@@ -59,8 +60,8 @@ Status KuduPartitionExpr::Init(const RowDescriptor& row_desc, RuntimeState* stat
   return Status::OK();
 }
 
-IntVal KuduPartitionExpr::GetIntVal(ScalarExprEvaluator* eval,
-    const TupleRow* row) const {
+IntVal KuduPartitionExpr::GetIntValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   for (int i = 0; i < children_.size(); ++i) {
     void* val = eval->GetValue(*GetChild(i), row);
     if (val == NULL) {
@@ -88,9 +89,9 @@ IntVal KuduPartitionExpr::GetIntVal(ScalarExprEvaluator* eval,
   return IntVal(kudu_partition);
 }
 
-Status KuduPartitionExpr::GetCodegendComputeFn(
+Status KuduPartitionExpr::GetCodegendComputeFnImpl(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  return Status("Error: KuduPartitionExpr::GetCodegendComputeFn not implemented.");
+  return GetCodegendComputeFnWrapper(codegen, fn);
 }
 
 } // namespace impala

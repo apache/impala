@@ -22,6 +22,7 @@
 #include "exprs/anyval-util.h"
 #include "exprs/conditional-functions.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.inline.h"
 #include "runtime/runtime-state.h"
 
 #include "gen-cpp/Exprs_types.h"
@@ -175,16 +176,11 @@ string CaseExpr::DebugString() const {
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %else_val
 // }
-Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != nullptr) {
-    *fn = ir_compute_fn_;
-    return Status::OK();
-  }
-
+Status CaseExpr::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
   const int num_children = GetNumChildren();
   llvm::Function* child_fns[num_children];
   for (int i = 0; i < num_children; ++i) {
-    RETURN_IF_ERROR(GetChild(i)->GetCodegendComputeFn(codegen, &child_fns[i]));
+    RETURN_IF_ERROR(GetChild(i)->GetCodegendComputeFn(codegen, false, &child_fns[i]));
   }
 
   llvm::LLVMContext& context = codegen->context();
@@ -279,7 +275,6 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
   }
   *fn = codegen->FinalizeFunction(function);
   if (UNLIKELY(*fn == nullptr)) return Status(TErrorCode::IR_VERIFY_FAILED, "CaseExpr");
-  ir_compute_fn_ = *fn;
   return Status::OK();
 }
 
@@ -368,7 +363,7 @@ bool CaseExpr::AnyValEq(
 }
 
 #define CASE_COMPUTE_FN(THEN_TYPE) \
-  THEN_TYPE CaseExpr::Get##THEN_TYPE( \
+  THEN_TYPE CaseExpr::Get##THEN_TYPE##Interpreted(            \
       ScalarExprEvaluator* eval, const TupleRow* row) const { \
     DCHECK(eval->opened()); \
     FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_); \

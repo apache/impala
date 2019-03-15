@@ -29,8 +29,7 @@ bigint
 row_regex: .*Codegen Disabled: disabled due to optimization hints.*
 ====
 ---- QUERY
-# IMPALA-6435: We do not codegen char columns. This fix checks for a
-# CHAR type literal in the expr and disables codegen. This query will crash
+# IMPALA-6435: codegen for NULL CHAR literals was broken. This query crashed
 # impala without the fix.
 set disable_codegen_rows_threshold=0;
 select count(*) from (

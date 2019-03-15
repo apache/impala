@@ -39,12 +39,14 @@ class TupleIsNullPredicate: public Predicate {
 
   TupleIsNullPredicate(const TExprNode& node);
 
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state) override;
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
-      override WARN_UNUSED_RESULT;
+  virtual Status Init(
+      const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) override;
+  virtual Status GetCodegendComputeFnImpl(
+      LlvmCodeGen* codegen, llvm::Function** fn) override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
 
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual BooleanVal GetBooleanValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   /// Tuple ids to check for NULL. May contain ids of nullable and non-nullable tuples.

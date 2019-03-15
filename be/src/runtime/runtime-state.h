@@ -20,6 +20,7 @@
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
 #include <boost/scoped_ptr.hpp>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -43,7 +44,7 @@ class MemTracker;
 class ObjectPool;
 class ReservationTracker;
 class RuntimeFilterBank;
-class ScalarFnCall;
+class ScalarExpr;
 class Status;
 class TimestampValue;
 class ThreadResourcePool;
@@ -135,15 +136,20 @@ class RuntimeState {
 
   const std::string& GetEffectiveUser() const;
 
-  /// Add ScalarFnCall expression 'udf' to be codegen'd later if it's not disabled by
-  /// query option. This is for cases in which the UDF cannot be interpreted or if the
-  /// plan fragment doesn't contain any codegen enabled operator.
-  void AddScalarFnToCodegen(ScalarFnCall* udf) { scalar_fns_to_codegen_.push_back(udf); }
+  /// Add ScalarExpr expression 'expr' to be codegen'd later if it's not disabled by
+  /// query option. If 'is_codegen_entry_point' is true, 'expr' will be an entry
+  /// point into codegen'd evaluation (i.e. it will have a function pointer populated).
+  /// Adding an expr here ensures that it will be codegen'd (i.e. fragment execution
+  /// will fail with an error if the expr cannot be codegen'd).
+  void AddScalarExprToCodegen(ScalarExpr* expr, bool is_codegen_entry_point) {
+    scalar_exprs_to_codegen_.push_back({expr, is_codegen_entry_point});
+  }
 
-  /// Returns true if there are ScalarFnCall expressions in the fragments which can't be
-  /// interpreted. This should only be used after the Prepare() phase in which all
-  /// expressions' Prepare() are invoked.
-  bool ScalarFnNeedsCodegen() const { return !scalar_fns_to_codegen_.empty(); }
+  /// Returns true if there are ScalarExpr expressions in the fragments that we want
+  /// to codegen (because they can't be interpreted or based on options/hints).
+  /// This should only be used after the Prepare() phase in which all expressions'
+  /// Prepare() are invoked.
+  bool ScalarExprNeedsCodegen() const { return !scalar_exprs_to_codegen_.empty(); }
 
   /// Check if codegen was disabled and if so, add a message to the runtime profile.
   void CheckAndAddCodegenDisabledMessage(RuntimeProfile* profile) {
@@ -157,7 +163,7 @@ class RuntimeState {
   /// Returns true if there is a hint to disable codegen. This can be true for single node
   /// optimization or expression evaluation request from FE to BE (see fe-support.cc).
   /// Note that this internal flag is advisory and it may be ignored if the fragment has
-  /// any UDF which cannot be interpreted. See ScalarFnCall::Prepare() for details.
+  /// any UDF which cannot be interpreted. See ScalarExpr::Prepare() for details.
   inline bool CodegenHasDisableHint() const {
     return query_ctx().disable_codegen_hint;
   }
@@ -166,7 +172,7 @@ class RuntimeState {
   /// fragment can be interpreted. This should only be used after the Prepare() phase
   /// in which all expressions' Prepare() are invoked.
   inline bool CodegenDisabledByHint() const {
-    return CodegenHasDisableHint() && !ScalarFnNeedsCodegen();
+    return CodegenHasDisableHint() && !ScalarExprNeedsCodegen();
   }
 
   /// Returns true if codegen is disabled by query option.
@@ -283,11 +289,11 @@ class RuntimeState {
   /// Create a codegen object accessible via codegen() if it doesn't exist already.
   Status CreateCodegen();
 
-  /// Codegen all ScalarFnCall expressions in 'scalar_fns_to_codegen_'. If codegen fails
+  /// Codegen all ScalarExpr expressions in 'scalar_exprs_to_codegen_'. If codegen fails
   /// for any expressions, return immediately with the error status. Once IMPALA-4233 is
   /// fixed, it's not fatal to fail codegen if the expression can be interpreted.
   /// TODO: Fix IMPALA-4233
-  Status CodegenScalarFns();
+  Status CodegenScalarExprs();
 
   /// Helper to call QueryState::StartSpilling().
   Status StartSpilling(MemTracker* mem_tracker);
@@ -334,8 +340,9 @@ class RuntimeState {
 
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 
-  /// Contains all ScalarFnCall expressions which need to be codegen'd.
-  vector<ScalarFnCall*> scalar_fns_to_codegen_;
+  /// Contains all ScalarExpr expressions which need to be codegen'd. The second element
+  /// is true if we want to generate a codegen entry point for this expr.
+  std::vector<std::pair<ScalarExpr*, bool>> scalar_exprs_to_codegen_;
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.

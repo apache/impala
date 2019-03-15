@@ -716,8 +716,6 @@ llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   vector<llvm::Type*> struct_fields;
   int curr_struct_offset = 0;
   for (SlotDescriptor* slot: sorted_slots) {
-    // IMPALA-3207: Codegen for CHAR is not yet implemented: bail out of codegen here.
-    if (slot->type().type == TYPE_CHAR) return nullptr;
     DCHECK_EQ(curr_struct_offset, slot->tuple_offset());
     slot->llvm_field_idx_ = struct_fields.size();
     struct_fields.push_back(codegen->GetSlotType(slot->type()));

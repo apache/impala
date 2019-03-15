@@ -114,7 +114,9 @@ Status GroupingAggregator::Init(const TAggregator& taggregator, RuntimeState* st
         pool_->Add(desc->type().type != TYPE_NULL ? new SlotRef(desc) :
                                                     new SlotRef(desc, TYPE_BOOLEAN));
     build_exprs_.push_back(build_expr);
-    RETURN_IF_ERROR(build_expr->Init(intermediate_row_desc_, state));
+    // Not an entry point because all hash table callers support codegen.
+    RETURN_IF_ERROR(
+        build_expr->Init(intermediate_row_desc_, /* is_entry_point */ false, state));
     if (build_expr->type().IsVarLenStringType()) string_grouping_exprs_.push_back(i);
   }
 

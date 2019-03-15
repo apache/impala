@@ -77,7 +77,7 @@ class HiveUdfCall : public ScalarExpr {
   /// startup time.
   static Status InitEnv() WARN_UNUSED_RESULT;
 
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+  virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn)
       override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
 
@@ -90,27 +90,14 @@ class HiveUdfCall : public ScalarExpr {
 
   HiveUdfCall(const TExprNode& node);
 
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state)
-      override WARN_UNUSED_RESULT;
+  virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
+      RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual Status OpenEvaluator(FunctionContext::FunctionStateScope scope,
-      RuntimeState* state, ScalarExprEvaluator* eval) const override
-      WARN_UNUSED_RESULT;
+      RuntimeState* state, ScalarExprEvaluator* eval) const override WARN_UNUSED_RESULT;
   virtual void CloseEvaluator(FunctionContext::FunctionStateScope scope,
       RuntimeState* state, ScalarExprEvaluator* eval) const override;
 
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual SmallIntVal GetSmallIntVal(
-      ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual TimestampVal GetTimestampVal(
-      ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
-  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES
 
  private:
   /// Evalutes the UDF over row. Returns the result as an AnyVal. This function

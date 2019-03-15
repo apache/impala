@@ -41,9 +41,10 @@ class CompoundPredicate: public Predicate {
 /// Expr for evaluating and (&&) operators
 class AndPredicate: public CompoundPredicate {
  public:
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual BooleanVal GetBooleanValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
 
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+  virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
     return CompoundPredicate::CodegenComputeFn(true, codegen, fn);
   }
 
@@ -60,9 +61,10 @@ class AndPredicate: public CompoundPredicate {
 /// Expr for evaluating or (||) operators
 class OrPredicate: public CompoundPredicate {
  public:
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual BooleanVal GetBooleanValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
 
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+  virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
     return CompoundPredicate::CodegenComputeFn(false, codegen, fn);
   }
 

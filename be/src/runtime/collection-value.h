@@ -41,6 +41,9 @@ struct __attribute__((__packed__)) CollectionValue {
   inline int64_t ByteSize(const TupleDescriptor& item_tuple_desc) const {
     return static_cast<int64_t>(num_tuples) * item_tuple_desc.byte_size();
   }
+
+  /// For C++/IR interop, we need to be able to look up types by name.
+  static const char* LLVM_CLASS_NAME;
 };
 
 }

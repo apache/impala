@@ -520,6 +520,9 @@ class TestTpcdsInsert(ImpalaTestSuite):
   def test_tpcds_partitioned_insert(self, vector):
     self.run_test_case('partitioned-insert', vector)
 
+  def test_expr_insert(self, vector):
+    self.run_test_case('expr-insert', vector)
+
 
 class TestTpcdsUnmodified(ImpalaTestSuite):
   @classmethod

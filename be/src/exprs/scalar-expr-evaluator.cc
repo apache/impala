@@ -21,9 +21,8 @@
 
 #include "common/object-pool.h"
 #include "common/status.h"
-#include "exprs/anyval-util.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/aggregate-functions.h"
+#include "exprs/anyval-util.h"
 #include "exprs/bit-byte-functions.h"
 #include "exprs/case-expr.h"
 #include "exprs/cast-functions.h"
@@ -41,6 +40,7 @@
 #include "exprs/null-literal.h"
 #include "exprs/operators.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.inline.h"
 #include "exprs/scalar-fn-call.h"
 #include "exprs/slot-ref.h"
 #include "exprs/string-functions.h"

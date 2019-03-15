@@ -15,15 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "null-literal.h"
-#include "udf/udf.h"
+#include "runtime/collection-value.h"
 
 namespace impala {
 
-CollectionVal NullLiteral::GetCollectionVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsCollectionType());
-  return CollectionVal::null();
-}
+const char* CollectionValue::LLVM_CLASS_NAME = "struct.impala::CollectionValue";
 
-} // namespace impala
+}

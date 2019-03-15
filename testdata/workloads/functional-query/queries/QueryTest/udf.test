@@ -111,6 +111,9 @@ date
 2013-10-09
 ====
 ---- QUERY
+# This provides coverage for ScalarExprEvaluator::GetConstValue(), which will interpret
+# constant_timestamp(). This means that for both native and IR UDFs, constant_timestamp()
+# needs to support evaluation from interpreted code.
 select from_utc_timestamp(constant_timestamp(), "UTC");
 ---- TYPES
 timestamp

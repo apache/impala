@@ -36,6 +36,8 @@ select count(*) from chars_tiny t1
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-# Verify that codegen was disabled
-row_regex: .*Hash Partitioned Sender Codegen Disabled: Codegen for Char not supported.*
+# Verify that CHAR codegen was enabled for hash partitioning even though CHAR
+# codegen isn't supported everywhere.
+row_regex: .*Hash Partitioned Sender Codegen Enabled.*
+row_regex: .*Char isn't supported for CodegenWriteSlot.*
 ====

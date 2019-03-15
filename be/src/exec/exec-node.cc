@@ -505,7 +505,7 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
     const vector<ScalarExpr*>& conjuncts, llvm::Function** fn, const char* name) {
   llvm::Function* conjunct_fns[conjuncts.size()];
   for (int i = 0; i < conjuncts.size(); ++i) {
-    RETURN_IF_ERROR(conjuncts[i]->GetCodegendComputeFn(codegen, &conjunct_fns[i]));
+    RETURN_IF_ERROR(conjuncts[i]->GetCodegendComputeFn(codegen, false, &conjunct_fns[i]));
     if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
       // Avoid bloating EvalConjuncts by inlining everything into it.
       codegen->SetNoInline(conjunct_fns[i]);

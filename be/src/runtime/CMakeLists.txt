@@ -30,6 +30,7 @@ set_source_files_properties(${ROW_BATCH_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(Runtime
   buffered-tuple-stream.cc
   client-cache.cc
+  collection-value.cc
   coordinator.cc
   coordinator-backend-state.cc
   datetime-parse-util.cc

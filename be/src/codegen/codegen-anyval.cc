@@ -31,13 +31,14 @@ const char* CodegenAnyVal::LLVM_INTVAL_NAME       = "struct.impala_udf::IntVal";
 const char* CodegenAnyVal::LLVM_BIGINTVAL_NAME    = "struct.impala_udf::BigIntVal";
 const char* CodegenAnyVal::LLVM_FLOATVAL_NAME     = "struct.impala_udf::FloatVal";
 const char* CodegenAnyVal::LLVM_DOUBLEVAL_NAME    = "struct.impala_udf::DoubleVal";
-const char* CodegenAnyVal::LLVM_STRINGVAL_NAME    = "struct.impala_udf::StringVal";
+const char* CodegenAnyVal::LLVM_STRINGVAL_NAME = "struct.impala_udf::StringVal";
 const char* CodegenAnyVal::LLVM_TIMESTAMPVAL_NAME = "struct.impala_udf::TimestampVal";
 const char* CodegenAnyVal::LLVM_DECIMALVAL_NAME   = "struct.impala_udf::DecimalVal";
 const char* CodegenAnyVal::LLVM_DATEVAL_NAME      = "struct.impala_udf::DateVal";
+const char* CodegenAnyVal::LLVM_COLLECTIONVAL_NAME = "struct.impala_udf::CollectionVal";
 
 llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
-  switch(type.type) {
+  switch (type.type) {
     case TYPE_BOOLEAN: // i16
       return cg->i16_type();
     case TYPE_TINYINT: // i16
@@ -54,11 +55,11 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
       return llvm::StructType::get(cg->i8_type(), cg->double_type());
     case TYPE_STRING: // { i64, i8* }
     case TYPE_VARCHAR: // { i64, i8* }
+    case TYPE_CHAR: // Uses StringVal, so same as STRING/VARCHAR.
     case TYPE_FIXED_UDA_INTERMEDIATE: // { i64, i8* }
+    case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
+    case TYPE_MAP: // CollectionVal has same memory layout as StringVal.
       return llvm::StructType::get(cg->i64_type(), cg->ptr_type());
-    case TYPE_CHAR:
-      DCHECK(false) << "NYI:" << type.DebugString();
-      return NULL;
     case TYPE_TIMESTAMP: // { i64, i64 }
       return llvm::StructType::get(cg->i64_type(), cg->i64_type());
     case TYPE_DECIMAL: // %"struct.impala_udf::DecimalVal" (isn't lowered)
@@ -103,12 +104,10 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
       break;
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
       result = cg->GetNamedType(LLVM_STRINGVAL_NAME);
       break;
-    case TYPE_CHAR:
-      DCHECK(false) << "NYI:" << type.DebugString();
-      return NULL;
     case TYPE_TIMESTAMP:
       result = cg->GetNamedType(LLVM_TIMESTAMPVAL_NAME);
       break;
@@ -117,6 +116,10 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
       break;
     case TYPE_DATE:
       result = cg->GetNamedType(LLVM_DATEVAL_NAME);
+      break;
+    case TYPE_ARRAY:
+    case TYPE_MAP:
+      result = cg->GetNamedType(LLVM_COLLECTIONVAL_NAME);
       break;
     default:
       DCHECK(false) << "Unsupported type: " << type;
@@ -207,16 +210,16 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
-    case TYPE_TIMESTAMP: {
+    case TYPE_TIMESTAMP:
+    case TYPE_ARRAY:
+    case TYPE_MAP: {
       // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
       llvm::Value* v = builder_->CreateExtractValue(value_, 0);
       DCHECK(v->getType() == codegen_->i64_type());
       return builder_->CreateTrunc(v, codegen_->bool_type(), name);
     }
-    case TYPE_CHAR:
-      DCHECK(false) << "NYI:" << type_.DebugString();
-      return NULL;
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
@@ -253,8 +256,11 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
-    case TYPE_TIMESTAMP: {
+    case TYPE_TIMESTAMP:
+    case TYPE_ARRAY:
+    case TYPE_MAP: {
       // Lowered type is of the form { i64, * }. Set the first byte of the i64 value to
       // 'is_null'
       llvm::Value* v = builder_->CreateExtractValue(value_, 0);
@@ -265,9 +271,6 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
       value_ = builder_->CreateInsertValue(value_, v, 0, name_);
       break;
     }
-    case TYPE_CHAR:
-      DCHECK(false) << "NYI:" << type_.DebugString();
-      break;
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
@@ -344,6 +347,7 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
       << "Use SetPtr and SetLen for FixedUdaIntermediate";
   DCHECK(type_.type != TYPE_TIMESTAMP)
       << "Use SetDate and SetTimeOfDay for TimestampVals";
+  DCHECK(!type_.IsCollectionType()) << "Use SetPtr and SetLen for CollectionVal";
   switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -424,26 +428,28 @@ void CodegenAnyVal::SetVal(double val) {
 
 llvm::Value* CodegenAnyVal::GetPtr() {
   // Set the second pointer value to 'ptr'.
-  DCHECK(type_.IsStringType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType());
   return builder_->CreateExtractValue(value_, 1, name_);
 }
 
 llvm::Value* CodegenAnyVal::GetLen() {
   // Get the high bytes of the first value.
-  DCHECK(type_.IsStringType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   return GetHighBits(32, v);
 }
 
 void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
   // Set the second pointer value to 'ptr'.
-  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
+  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type_.IsCollectionType());
   value_ = builder_->CreateInsertValue(value_, ptr, 1, name_);
 }
 
 void CodegenAnyVal::SetLen(llvm::Value* len) {
   // Set the high bytes of the first value to 'len'.
-  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
+  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type_.IsCollectionType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -533,15 +539,13 @@ void CodegenAnyVal::LoadFromNativePtr(llvm::Value* raw_val_ptr) {
       SetLen(builder_->CreateExtractValue(string_value, 1, "len"));
       break;
     }
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {
       // Convert fixed-size slot to StringVal.
       SetPtr(builder_->CreateBitCast(raw_val_ptr, codegen_->ptr_type()));
       SetLen(codegen_->GetI32Constant(type_.len));
       break;
     }
-    case TYPE_CHAR:
-      DCHECK(false) << "NYI:" << type_.DebugString();
-      break;
     case TYPE_TIMESTAMP: {
       // Convert TimestampValue to TimestampVal
       // TimestampValue has type
@@ -601,6 +605,9 @@ void CodegenAnyVal::StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool
       builder_->CreateStore(string_value, raw_val_ptr);
       break;
     }
+    case TYPE_CHAR:
+      codegen_->CodegenMemcpy(builder_, raw_val_ptr, GetPtr(), type_.len);
+      break;
     case TYPE_FIXED_UDA_INTERMEDIATE:
       DCHECK(false) << "FIXED_UDA_INTERMEDIATE does not need to be copied: the "
                     << "StringVal must be set up to point to the output slot";
@@ -771,6 +778,7 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ, false);

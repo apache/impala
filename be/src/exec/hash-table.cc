@@ -760,7 +760,7 @@ Status HashTableCtx::CodegenEvalRow(
 
     // Call expr
     llvm::Function* expr_fn;
-    Status status = exprs[i]->GetCodegendComputeFn(codegen, &expr_fn);
+    Status status = exprs[i]->GetCodegendComputeFn(codegen, false, &expr_fn);
     if (!status.ok()) {
       *fn = NULL;
       return Status(Substitute(
@@ -1112,7 +1112,7 @@ Status HashTableCtx::CodegenEquals(
 
     // call GetValue on build_exprs[i]
     llvm::Function* expr_fn;
-    Status status = build_exprs_[i]->GetCodegendComputeFn(codegen, &expr_fn);
+    Status status = build_exprs_[i]->GetCodegendComputeFn(codegen, false, &expr_fn);
     if (!status.ok()) {
       *fn = NULL;
       return Status(

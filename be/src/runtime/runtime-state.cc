@@ -174,10 +174,10 @@ Status RuntimeState::CreateCodegen() {
   return Status::OK();
 }
 
-Status RuntimeState::CodegenScalarFns() {
-  for (ScalarFnCall* scalar_fn : scalar_fns_to_codegen_) {
+Status RuntimeState::CodegenScalarExprs() {
+  for (auto& item : scalar_exprs_to_codegen_) {
     llvm::Function* fn;
-    RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
+    RETURN_IF_ERROR(item.first->GetCodegendComputeFn(codegen_.get(), item.second, &fn));
   }
   return Status::OK();
 }

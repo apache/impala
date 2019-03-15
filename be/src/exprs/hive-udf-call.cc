@@ -173,9 +173,10 @@ Status HiveUdfCall::InitEnv() {
   return Status::OK();
 }
 
-Status HiveUdfCall::Init(const RowDescriptor& row_desc, RuntimeState* state) {
+Status HiveUdfCall::Init(
+    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
   // Initialize children first.
-  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
 
   // Initialize input_byte_offsets_ and input_buffer_size_
   for (int i = 0; i < GetNumChildren(); ++i) {
@@ -278,7 +279,7 @@ void HiveUdfCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
   ScalarExpr::CloseEvaluator(scope, state, eval);
 }
 
-Status HiveUdfCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+Status HiveUdfCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
   return GetCodegendComputeFnWrapper(codegen, fn);
 }
 
@@ -290,49 +291,49 @@ string HiveUdfCall::DebugString() const {
   return out.str();
 }
 
-BooleanVal HiveUdfCall::GetBooleanVal(
+BooleanVal HiveUdfCall::GetBooleanValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN);
   return *reinterpret_cast<BooleanVal*>(Evaluate(eval, row));
 }
 
-TinyIntVal HiveUdfCall::GetTinyIntVal(
+TinyIntVal HiveUdfCall::GetTinyIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT);
   return *reinterpret_cast<TinyIntVal*>(Evaluate(eval, row));
 }
 
-SmallIntVal HiveUdfCall::GetSmallIntVal(
+SmallIntVal HiveUdfCall::GetSmallIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT);
   return * reinterpret_cast<SmallIntVal*>(Evaluate(eval, row));
 }
 
-IntVal HiveUdfCall::GetIntVal(
+IntVal HiveUdfCall::GetIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT);
   return *reinterpret_cast<IntVal*>(Evaluate(eval, row));
 }
 
-BigIntVal HiveUdfCall::GetBigIntVal(
+BigIntVal HiveUdfCall::GetBigIntValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT);
   return *reinterpret_cast<BigIntVal*>(Evaluate(eval, row));
 }
 
-FloatVal HiveUdfCall::GetFloatVal(
+FloatVal HiveUdfCall::GetFloatValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT);
   return *reinterpret_cast<FloatVal*>(Evaluate(eval, row));
 }
 
-DoubleVal HiveUdfCall::GetDoubleVal(
+DoubleVal HiveUdfCall::GetDoubleValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE);
   return *reinterpret_cast<DoubleVal*>(Evaluate(eval, row));
 }
 
-StringVal HiveUdfCall::GetStringVal(
+StringVal HiveUdfCall::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_STRING);
   StringVal result = *reinterpret_cast<StringVal*>(Evaluate(eval, row));
@@ -344,19 +345,19 @@ StringVal HiveUdfCall::GetStringVal(
   return StringVal::CopyFrom(fn_ctx, result.ptr, result.len);
 }
 
-TimestampVal HiveUdfCall::GetTimestampVal(
+TimestampVal HiveUdfCall::GetTimestampValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   return *reinterpret_cast<TimestampVal*>(Evaluate(eval, row));
 }
 
-DecimalVal HiveUdfCall::GetDecimalVal(
+DecimalVal HiveUdfCall::GetDecimalValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   return *reinterpret_cast<DecimalVal*>(Evaluate(eval, row));
 }
 
-DateVal HiveUdfCall::GetDateVal(
+DateVal HiveUdfCall::GetDateValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DATE);
   return *reinterpret_cast<DateVal*>(Evaluate(eval, row));

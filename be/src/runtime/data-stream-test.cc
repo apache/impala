@@ -338,7 +338,7 @@ class DataStreamTest : public testing::Test {
   // Create a tuple comparator to sort in ascending order on the single bigint column.
   void CreateTupleComparator() {
     SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    ASSERT_OK(lhs_slot->Init(RowDescriptor(), runtime_state_.get()));
+    ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
     ordering_exprs_.push_back(lhs_slot);
     less_than_ = obj_pool_.Add(new TupleRowComparator(ordering_exprs_,
         is_asc_, nulls_first_));

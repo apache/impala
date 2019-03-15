@@ -31,14 +31,17 @@ class TExprNode;
 class IsNotEmptyPredicate : public Predicate {
  public:
   static const char* LLVM_CLASS_NAME;
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) override;
-  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual Status GetCodegendComputeFnImpl(
+      LlvmCodeGen* codegen, llvm::Function** fn) override;
+  virtual BooleanVal GetBooleanValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
   virtual std::string DebugString() const override;
 
  protected:
   friend class ScalarExpr;
 
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state) override;
+  virtual Status Init(
+      const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) override;
   explicit IsNotEmptyPredicate(const TExprNode& node);
 };
 

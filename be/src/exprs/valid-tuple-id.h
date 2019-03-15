@@ -35,12 +35,14 @@ class ValidTupleIdExpr : public ScalarExpr {
 
   explicit ValidTupleIdExpr(const TExprNode& node);
 
-  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state) override;
-  virtual Status GetCodegendComputeFn(
+  virtual Status Init(
+      const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) override;
+  virtual Status GetCodegendComputeFnImpl(
       LlvmCodeGen* codegen, llvm::Function** fn) override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
 
-  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual IntVal GetIntValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   /// Maps from tuple index in the row to its corresponding tuple id.

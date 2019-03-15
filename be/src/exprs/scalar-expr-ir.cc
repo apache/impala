@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exprs/scalar-expr.h"
-#include "udf/udf.h"
+#include "exprs/scalar-expr.inline.h"
+#include "udf/udf-internal.h"
 
 #ifdef IR_COMPILE
 
@@ -30,7 +30,7 @@ void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::Ti
     impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
     impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
     impala_udf::TimestampVal*, impala_udf::DecimalVal*, impala_udf::DateVal*,
-    impala::ScalarExprEvaluator*) { }
+    impala_udf::CollectionVal*, impala::ScalarExprEvaluator*) { }
 #endif
 
 /// The following are compute functions that are cross-compiled to both native and IR
@@ -41,59 +41,59 @@ void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::Ti
 using namespace impala;
 using namespace impala_udf;
 
-/// Static wrappers around Get*Val() functions. We'd like to be able to call these from
-/// directly from native code as well as from generated IR functions.
-BooleanVal ScalarExpr::GetBooleanVal(
+/// Static wrappers around Get*ValInterpreted() functions. We'd like to be able to call
+/// these from directly from native code as well as from generated IR functions.
+BooleanVal ScalarExpr::GetBooleanValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetBooleanVal(eval, row);
+  return expr->GetBooleanValInterpreted(eval, row);
 }
 
-TinyIntVal ScalarExpr::GetTinyIntVal(
+TinyIntVal ScalarExpr::GetTinyIntValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetTinyIntVal(eval, row);
+  return expr->GetTinyIntValInterpreted(eval, row);
 }
 
-SmallIntVal ScalarExpr::GetSmallIntVal(
+SmallIntVal ScalarExpr::GetSmallIntValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetSmallIntVal(eval, row);
+  return expr->GetSmallIntValInterpreted(eval, row);
 }
 
-IntVal ScalarExpr::GetIntVal(
+IntVal ScalarExpr::GetIntValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetIntVal(eval, row);
+  return expr->GetIntValInterpreted(eval, row);
 }
 
-BigIntVal ScalarExpr::GetBigIntVal(
+BigIntVal ScalarExpr::GetBigIntValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetBigIntVal(eval, row);
+  return expr->GetBigIntValInterpreted(eval, row);
 }
 
-FloatVal ScalarExpr::GetFloatVal(
+FloatVal ScalarExpr::GetFloatValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetFloatVal(eval, row);
+  return expr->GetFloatValInterpreted(eval, row);
 }
 
-DoubleVal ScalarExpr::GetDoubleVal(
+DoubleVal ScalarExpr::GetDoubleValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetDoubleVal(eval, row);
+  return expr->GetDoubleValInterpreted(eval, row);
 }
 
-StringVal ScalarExpr::GetStringVal(
+StringVal ScalarExpr::GetStringValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetStringVal(eval, row);
+  return expr->GetStringValInterpreted(eval, row);
 }
 
-TimestampVal ScalarExpr::GetTimestampVal(
+TimestampVal ScalarExpr::GetTimestampValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetTimestampVal(eval, row);
+  return expr->GetTimestampValInterpreted(eval, row);
 }
 
-DecimalVal ScalarExpr::GetDecimalVal(
+DecimalVal ScalarExpr::GetDecimalValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetDecimalVal(eval, row);
+  return expr->GetDecimalValInterpreted(eval, row);
 }
 
-DateVal ScalarExpr::GetDateVal(
+DateVal ScalarExpr::GetDateValInterpreted(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
-  return expr->GetDateVal(eval, row);
+  return expr->GetDateValInterpreted(eval, row);
 }

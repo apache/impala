@@ -1,0 +1,21 @@
+====
+---- QUERY: TPDCS-STR-INSERT-DROP
+DROP TABLE IF EXISTS str_insert
+====
+---- QUERY: TPDCS-STR-INSERT-SETUP
+CREATE TABLE str_insert (s string) STORED AS PARQUET
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY: TPDCS-STR-INSERT-CASE
+INSERT INTO str_insert
+SELECT case when ss_promo_sk % 2 = 0 then 'even' else 'odd' end
+FROM store_sales
+---- RESULTS
+: 2880404
+====
+---- QUERY: TPCDS-STR-INSERT-CASE
+SELECT COUNT(*) FROM str_insert
+---- RESULTS
+2880404
+====

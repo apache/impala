@@ -486,7 +486,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
       parse_block = llvm::BasicBlock::Create(context, "parse", fn, eval_fail_block);
       llvm::Function* conjunct_fn;
       Status status =
-          conjuncts[conjunct_idx]->GetCodegendComputeFn(codegen, &conjunct_fn);
+          conjuncts[conjunct_idx]->GetCodegendComputeFn(codegen, false, &conjunct_fn);
       if (!status.ok()) {
         stringstream ss;
         ss << "Failed to codegen conjunct: " << status.GetDetail();

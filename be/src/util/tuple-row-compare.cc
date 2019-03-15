@@ -207,7 +207,7 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function**
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
   llvm::Function* key_fns[ordering_exprs.size()];
   for (int i = 0; i < ordering_exprs.size(); ++i) {
-    Status status = ordering_exprs[i]->GetCodegendComputeFn(codegen, &key_fns[i]);
+    Status status = ordering_exprs[i]->GetCodegendComputeFn(codegen, false, &key_fns[i]);
     if (!status.ok()) {
       return Status::Expected(Substitute(
             "Could not codegen TupleRowComparator::Compare(): $0", status.GetDetail()));

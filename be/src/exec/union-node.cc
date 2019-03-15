@@ -111,8 +111,8 @@ void UnionNode::Codegen(RuntimeState* state) {
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false, *tuple_desc_,
         child_exprs_lists_[i], true, &tuple_materialize_exprs_fn);
     if (!codegen_status.ok()) {
-      // Codegen may fail in some corner cases (e.g. we don't handle TYPE_CHAR). If this
-      // happens, abort codegen for this and the remaining children.
+      // Codegen may fail in some corner cases. If this happens, abort codegen for this
+      // and the remaining children.
       codegen_message << "Codegen failed for child: " << children_[i]->id();
       break;
     }
