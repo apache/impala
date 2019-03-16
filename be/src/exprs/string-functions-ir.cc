@@ -664,7 +664,7 @@ bool StringFunctions::SetRE2Options(const StringVal& match_parameter,
 
 void StringFunctions::RegexpPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  if (scope != FunctionContext::THREAD_LOCAL) return;
   if (!context->IsArgConstant(1)) return;
   DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
   StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
@@ -681,7 +681,7 @@ void StringFunctions::RegexpPrepare(
 
 void StringFunctions::RegexpClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  if (scope != FunctionContext::THREAD_LOCAL) return;
   re2::RE2* re = reinterpret_cast<re2::RE2*>(context->GetFunctionState(scope));
   delete re;
   context->SetFunctionState(scope, nullptr);
@@ -715,7 +715,7 @@ StringVal StringFunctions::RegexpExtract(FunctionContext* context, const StringV
   if (index.val < 0) return StringVal();
 
   re2::RE2* re = reinterpret_cast<re2::RE2*>(
-      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   scoped_ptr<re2::RE2> scoped_re; // destroys re if we have to locally compile it
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
@@ -747,7 +747,7 @@ StringVal StringFunctions::RegexpReplace(FunctionContext* context, const StringV
   if (str.is_null || pattern.is_null || replace.is_null) return StringVal::null();
 
   re2::RE2* re = reinterpret_cast<re2::RE2*>(
-      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   scoped_ptr<re2::RE2> scoped_re; // destroys re if state->re is NULL
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
@@ -769,7 +769,7 @@ StringVal StringFunctions::RegexpReplace(FunctionContext* context, const StringV
 
 void StringFunctions::RegexpMatchCountPrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  if (scope != FunctionContext::THREAD_LOCAL) return;
   int num_args = context->GetNumArgs();
   DCHECK(num_args == 2 || num_args == 4);
   if (!context->IsArgConstant(1) || (num_args == 4 && !context->IsArgConstant(3))) return;
@@ -816,7 +816,7 @@ IntVal StringFunctions::RegexpMatchCount4Args(FunctionContext* context,
   }
 
   re2::RE2* re = reinterpret_cast<re2::RE2*>(
-      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   // Destroys re if we have to locally compile it.
   scoped_ptr<re2::RE2> scoped_re;
   if (re == NULL) {
