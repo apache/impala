@@ -31,6 +31,7 @@ import ConfigParser
 import sys
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser
+from collections import OrderedDict
 
 
 class ConfigFileFormatError(Exception):
@@ -64,18 +65,33 @@ def parse_shell_options(options, defaults, option_list):
      Returns a dictionary with option names as keys and option values as values.
   """
   result = {}
-  option_dests = set(opt.dest for opt in option_list)
+  option_dests = dict((opt.dest, opt) for opt in option_list)
   for option, value in options:
-    if option not in option_dests:
+    opt = option_dests.get(option)
+    if opt is None:
         print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
           "Ignoring unrecognized config option: '%s'\n" % option
-    elif isinstance(defaults.get(option), bool):
+    elif isinstance(defaults.get(option), bool) or \
+        opt.action == "store_true" or opt.action == "store_false":
       result[option] = parse_bool_option(value)
+    elif opt.action == "append":
+      result[option] = value.split('\n')
     elif value.lower() == "none":
       result[option] = None
     else:
       result[option] = value
   return result
+
+
+class MultiOrderedDict(OrderedDict):
+  """
+  This custom collection is used to customize ConfigParser to allow duplicate keys.
+  """
+  def __setitem__(self, key, value):
+    if isinstance(value, list) and key in self:
+      self[key].extend(value)
+    else:
+      super(MultiOrderedDict, self).__setitem__(key, value)
 
 
 def get_config_from_file(config_filename, option_list):
@@ -97,11 +113,13 @@ def get_config_from_file(config_filename, option_list):
   Returns a pair of dictionaries (shell_options, query_options), with option names
   as keys and option values as values.
   """
-  config = ConfigParser.ConfigParser()
+  # Customize the ConfigParser to allow duplicate keys. Values from duplicate keys will
+  # be appended with new lines.
+  config = ConfigParser.RawConfigParser(dict_type=MultiOrderedDict)
   try:
     config.read(config_filename)
   except Exception, e:
-    raise ConfigFileFormatError( \
+    raise ConfigFileFormatError(
       "Unable to read configuration file correctly. Check formatting: %s" % e)
 
   shell_options = {}
@@ -112,13 +130,21 @@ def get_config_from_file(config_filename, option_list):
       print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
       shell_options["config_file"] = config_filename
 
+  # For query options, we use a standard config parser since we don't want to allow
+  # duplicate options.
+  config = ConfigParser.ConfigParser()
+  try:
+    config.read(config_filename)
+  except Exception, e:
+    raise ConfigFileFormatError(
+      "Unable to read configuration file correctly. Check formatting: %s" % e)
+
   query_options = {}
   if config.has_section("impala.query_options"):
     # Query option keys must be "normalized" to upper case before updating with
     # options coming from command line.
-    query_options = dict( \
-      [ (k.upper(), v) for k, v in config.items("impala.query_options") ])
-
+    query_options = dict(
+      [(k.upper(), v) for k, v in config.items("impala.query_options")])
   return shell_options, query_options
 
 

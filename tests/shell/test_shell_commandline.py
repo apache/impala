@@ -479,6 +479,23 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(args)
     assert 'Query: select 2' in result.stderr
 
+    # IMPALA-8317: Add support for list-type, i.e. action=append in config file.
+    args = '--config_file=%s/good_impalarc ' \
+           '--query="select \'${VAR:msg1}\'; select \'${VAR:msg2}\'; set"' % \
+           QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args)
+    assert 'Query: select \'hello\'' in result.stderr
+    assert 'Query: select \'world\'' in result.stderr
+    assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
+
+    # Override the variables in the config file with the ones passed via --var.
+    args = '--config_file=%s/good_impalarc --var=msg1=foo --var=msg2=bar ' \
+           '--query="select \'${VAR:msg1}\'; select \'${VAR:msg2}\'"' % \
+           QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args)
+    assert 'Query: select \'foo\'' in result.stderr
+    assert 'Query: select \'bar\'' in result.stderr
+
     # Negative Tests
     # specified config file does not exist
     args = '--config_file=%s/does_not_exist' % QUERY_FILE_PATH

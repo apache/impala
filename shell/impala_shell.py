@@ -1638,6 +1638,7 @@ if __name__ == "__main__":
     print_to_stderr(e)
     sys.exit(1)
 
+  # TODO: IMPALA-8330: Use flag names instead of dest names.
   parser = get_option_parser(impala_shell_defaults)
   options, args = parser.parse_args()
 

@@ -397,8 +397,8 @@ class TestImpalaShellInteractive(object):
     assert "\tMT_DOP: 1" in result.stdout
     assert "\tMAX_ERRORS: 200" in result.stdout
     assert "\tEXPLAIN_LEVEL: 2" in result.stdout
-    assert "INVALID_QUERY_OPTION is not supported for the impalad being "
-    "connected to, ignoring." in result.stdout
+    assert "INVALID_QUERY_OPTION is not supported for the impalad being connected to, "\
+           "ignoring." in result.stdout
 
   def test_source_file(self):
     cwd = os.getcwd()
