@@ -44,6 +44,7 @@ import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THBaseFilter;
 import org.apache.impala.thrift.THBaseKeyRange;
@@ -236,8 +237,8 @@ public class HBaseScanNode extends ScanNode {
         Preconditions.checkState(rowRange.getLowerBound().isConstant());
         Preconditions.checkState(
             rowRange.getLowerBound().getType().equals(Type.STRING));
-        LiteralExpr val = LiteralExpr.create(rowRange.getLowerBound(),
-            analyzer.getQueryCtx());
+        LiteralExpr val = LiteralExpr.createBounded(rowRange.getLowerBound(),
+            analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);
         // TODO: Make this a Preconditions.checkState(). If we get here,
         // and the value is not a string literal, then we've got a predicate
         // that we removed from the conjunct list, but which we won't evaluate
@@ -256,8 +257,8 @@ public class HBaseScanNode extends ScanNode {
         Preconditions.checkState(rowRange.getUpperBound().isConstant());
         Preconditions.checkState(
             rowRange.getUpperBound().getType().equals(Type.STRING));
-        LiteralExpr val = LiteralExpr.create(rowRange.getUpperBound(),
-            analyzer.getQueryCtx());
+        LiteralExpr val = LiteralExpr.createBounded(rowRange.getUpperBound(),
+            analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);
         if (val instanceof StringLiteral) {
           StringLiteral litVal = (StringLiteral) val;
           stopKey_ = convertToBytes(litVal.getUnescapedValue(),

@@ -167,11 +167,13 @@ static void SetTColumnValue(
 // a predicate evaluation. It requires JniUtil::Init() to have been
 // called. Throws a Java exception if an error or warning is encountered during
 // the expr evaluation.
+// We also reject the expression rewrite if the size of the returned rewritten result
+// is too large.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
-    JNIEnv* env, jclass fe_support_class, jbyteArray thrift_expr_batch,
-    jbyteArray thrift_query_ctx_bytes) {
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
+    jbyteArray thrift_query_ctx_bytes, jlong max_result_size) {
   Status status;
   jbyteArray result_bytes = NULL;
   TQueryCtx query_ctx;
@@ -244,9 +246,22 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     void* result = eval->GetValue(nullptr);
     status = eval->GetError();
     if (!status.ok()) goto error;
+
+    const ColumnType& type = eval->root().type();
+    // reject the expression rewrite if the returned string greater than
+    if (type.IsVarLenStringType()) {
+      const StringValue* string_val = reinterpret_cast<const StringValue*>(result);
+      if (string_val != nullptr) {
+        if (string_val->len > max_result_size) {
+          status = Status(TErrorCode::EXPR_REWRITE_RESULT_LIMIT_EXCEEDED,
+              string_val->len, max_result_size);
+          goto error;
+        }
+      }
+    }
+
     // 'output_scale' should only be set for MathFunctions::RoundUpTo()
     // with return type double.
-    const ColumnType& type = eval->root().type();
     DCHECK(eval->output_scale() == -1 || type.type == TYPE_DOUBLE);
     TColumnValue val;
     SetTColumnValue(result, type, &val);
@@ -699,7 +714,7 @@ static JNINativeMethod native_methods[] = {
       (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
   },
   {
-      const_cast<char*>("NativeEvalExprsWithoutRow"), const_cast<char*>("([B[B)[B"),
+      const_cast<char*>("NativeEvalExprsWithoutRow"), const_cast<char*>("([B[BJ)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow
   },
   {

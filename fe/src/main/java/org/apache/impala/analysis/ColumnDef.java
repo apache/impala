@@ -30,6 +30,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
@@ -251,8 +252,8 @@ public class ColumnDef {
         throw new AnalysisException(String.format("Only constant values are allowed " +
             "for default values: %s", defaultValue_.toSql()));
       }
-      LiteralExpr defaultValLiteral = LiteralExpr.create(defaultValue_,
-          analyzer.getQueryCtx());
+      LiteralExpr defaultValLiteral = LiteralExpr.createBounded(defaultValue_,
+          analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);
       if (defaultValLiteral == null) {
         throw new AnalysisException(String.format("Only constant values are allowed " +
             "for default values: %s", defaultValue_.toSql()));
@@ -285,7 +286,8 @@ public class ColumnDef {
       if (!defaultValLiteral.getType().equals(type_)) {
         Expr castLiteral = defaultValLiteral.uncheckedCastTo(type_);
         Preconditions.checkNotNull(castLiteral);
-        defaultValLiteral = LiteralExpr.create(castLiteral, analyzer.getQueryCtx());
+        defaultValLiteral = LiteralExpr.createBounded(castLiteral,
+            analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);
       }
       Preconditions.checkNotNull(defaultValLiteral);
       outputDefaultValue_ = defaultValLiteral;

@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.service.FeSupport;
 
 import com.google.common.base.Preconditions;
 
@@ -50,7 +51,8 @@ public class PartitionKeyValue {
               "as static partition-key values in '%s'.", toString()));
     }
     value_.analyze(analyzer);
-    literalValue_ = LiteralExpr.create(value_, analyzer.getQueryCtx());
+    literalValue_ = LiteralExpr.createBounded(value_, analyzer.getQueryCtx(),
+        StringLiteral.MAX_STRING_LEN);
   }
 
   public String getColName() { return colName_; }

@@ -92,6 +92,8 @@ gdb.txt
 .project
 .classpath
 .settings
+eclipse-classes/
+.pydevproject
 
 # Debugging
 ad-hoc.test

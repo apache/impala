@@ -18,10 +18,9 @@
 package org.apache.impala.rewrite;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.CastExpr;
-
 import org.apache.impala.common.AnalysisException;
 
 /**
@@ -64,7 +63,9 @@ public class FoldConstantsRule implements ExprRewriteRule {
       expr.analyze(analyzer);
       if (!expr.isConstant()) return expr;
     }
-    Expr result = LiteralExpr.create(expr, analyzer.getQueryCtx());
+    Expr result = LiteralExpr.createBounded(expr, analyzer.getQueryCtx(),
+      LiteralExpr.MAX_STRING_LITERAL_SIZE);
+
     // Preserve original type so parent Exprs do not need to be re-analyzed.
     if (result != null) return result.castTo(expr.getType());
     return expr;

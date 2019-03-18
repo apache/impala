@@ -397,6 +397,9 @@ error_codes = (
   ("ROWS_PRODUCED_LIMIT_EXCEEDED", 131,
    "Query $0 terminated due to rows produced limit of $1. "
    "Unset or increase NUM_ROWS_PRODUCED_LIMIT query option to produce more rows."),
+
+  ("EXPR_REWRITE_RESULT_LIMIT_EXCEEDED", 132,
+   "Expression rewrite rejected due to result size ($0) exceeding the limit ($1).")
 )
 
 import sys

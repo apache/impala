@@ -76,7 +76,7 @@ public class FeSupport {
 
   // Returns a serialized TResultRow
   public native static byte[] NativeEvalExprsWithoutRow(
-      byte[] thriftExprBatch, byte[] thriftQueryGlobals);
+      byte[] thriftExprBatch, byte[] thriftQueryGlobals, long maxResultSize);
 
   // Returns a serialized TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
@@ -172,16 +172,27 @@ public class FeSupport {
     return NativeCacheJar(thriftParams);
   }
 
+  /**
+   * If it is known that the size of the evaluated expression is fixed, e.g.,
+   * the size of an integer, then this method will be called to perform the evaluation.
+   * Otherwise, the method EvalExprWithoutRowBounded that takes an additional argument
+   * specifying the upper bound on the size of evaluated expression should be invoked.
+   */
   public static TColumnValue EvalExprWithoutRow(Expr expr, TQueryCtx queryCtx)
-      throws InternalException {
+    throws InternalException {
+    return EvalExprWithoutRowBounded(expr, queryCtx, 0);
+  }
+
+  public static TColumnValue EvalExprWithoutRowBounded(Expr expr, TQueryCtx queryCtx,
+    int maxResultSize) throws InternalException {
     Preconditions.checkState(!expr.contains(SlotRef.class));
     TExprBatch exprBatch = new TExprBatch();
     exprBatch.addToExprs(expr.treeToThrift());
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     byte[] result;
     try {
-      result = EvalExprsWithoutRow(
-          serializer.serialize(exprBatch), serializer.serialize(queryCtx));
+      result = EvalExprsWithoutRowBounded(
+          serializer.serialize(exprBatch), serializer.serialize(queryCtx), maxResultSize);
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();
@@ -222,14 +233,26 @@ public class FeSupport {
     }
   }
 
+  /**
+   * If it is known that the size of the evaluated expression is fixed, e.g.,
+   * the size of an integer, then this method will be called to perform the evaluation.
+   * Otherwise, the method EvalExprsWithoutRowBounded that takes an additional argument
+   * specifying the upper bound on the size of rewritten expression should be invoked.
+   */
   private static byte[] EvalExprsWithoutRow(
       byte[] thriftExprBatch, byte[] thriftQueryContext) {
+    return EvalExprsWithoutRowBounded(thriftExprBatch, thriftQueryContext, 0);
+  }
+
+  private static byte[] EvalExprsWithoutRowBounded(
+      byte[] thriftExprBatch, byte[] thriftQueryContext, int maxResultSize) {
     try {
-      return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext);
+      return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext,
+        maxResultSize);
     } catch (UnsatisfiedLinkError e) {
       loadLibrary();
     }
-    return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext);
+    return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext, maxResultSize);
   }
 
   public static boolean EvalPredicate(Expr pred, TQueryCtx queryCtx)

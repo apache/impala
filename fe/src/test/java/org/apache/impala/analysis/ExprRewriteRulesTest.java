@@ -205,6 +205,17 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     return qf.verifyWhereRewrite(rules, expectedExprStr);
   }
 
+  public String repeat(String givenStr, long numberOfRepetitions) {
+    StringBuilder resultStr = new StringBuilder();
+    resultStr.append("'");
+    for (long i = 0; i < numberOfRepetitions; i = i + 1) {
+      resultStr.append(givenStr);
+    }
+    resultStr.append("'");
+    System.out.println("resultStr.length(): " + resultStr.length());
+    return resultStr.toString();
+  }
+
   @Test
   public void testBetweenToCompoundRule() throws ImpalaException {
     ExprRewriteRule rule = BetweenToCompoundRule.INSTANCE;
@@ -370,6 +381,13 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("null + 1", rule, "NULL");
     RewritesOk("(1 + 1) is null", rule, "FALSE");
     RewritesOk("(null + 1) is null", rule, "TRUE");
+
+    // Test if the rewrite would be rejected if the result size is larger than
+    // the predefined threshold, i.e., 65_536
+    RewritesOk("repeat('AZ', 2)", rule, "'AZAZ'");
+    RewritesOk("repeat('A', 65536)", rule, repeat("A", 65_536));
+    RewritesOk("repeat('A', 4294967296)", rule, null);
+
   }
 
   @Test

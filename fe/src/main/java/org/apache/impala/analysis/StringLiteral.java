@@ -36,6 +36,7 @@ import java_cup.runtime.Symbol;
 
 public class StringLiteral extends LiteralExpr {
   private final String value_;
+  public static int MAX_STRING_LEN = Integer.MAX_VALUE;
 
   // Indicates whether this value needs to be unescaped in toThrift().
   private final boolean needsUnescaping_;

@@ -43,6 +43,7 @@ import com.google.common.base.Preconditions;
  */
 public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr> {
   private final static Logger LOG = LoggerFactory.getLogger(LiteralExpr.class);
+  public static final int MAX_STRING_LITERAL_SIZE = 64 * 1024;
 
   public LiteralExpr() {
     // Literals start analyzed: there is nothing more to check.
@@ -177,6 +178,17 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   }
 
   /**
+   * If it is known that the size of the rewritten expression is fixed, e.g.,
+   * the size of an integer, then this method will be called to perform the rewrite.
+   * Otherwise, the method createBounded that takes an additional argument specifying
+   * the upper bound on the size of rewritten expression should be invoked.
+   */
+  public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
+    throws AnalysisException {
+    return createBounded(constExpr, queryCtx, 0);
+  }
+
+  /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
    * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP, or
@@ -185,15 +197,15 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    * or warnings in the BE.
    * TODO: Support non-scalar types.
    */
-  public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
-      throws AnalysisException {
+  public static LiteralExpr createBounded(Expr constExpr, TQueryCtx queryCtx,
+    int maxResultSize) throws AnalysisException {
     Preconditions.checkState(constExpr.isConstant());
     Preconditions.checkState(constExpr.getType().isValid());
     if (constExpr instanceof LiteralExpr) return (LiteralExpr) constExpr;
 
     TColumnValue val = null;
     try {
-      val = FeSupport.EvalExprWithoutRow(constExpr, queryCtx);
+      val = FeSupport.EvalExprWithoutRowBounded(constExpr, queryCtx, maxResultSize);
     } catch (InternalException e) {
       LOG.error(String.format("Failed to evaluate expr '%s': %s",
           constExpr.toSql(), e.getMessage()));

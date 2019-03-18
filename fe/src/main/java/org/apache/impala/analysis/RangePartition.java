@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 import java.math.BigInteger;
 import java.util.List;
 
@@ -24,13 +26,12 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.KuduUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
-import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Represents a range partition of a Kudu table.
@@ -164,7 +165,8 @@ public class RangePartition extends StmtNode {
       throw new AnalysisException(String.format("Only constant values are allowed " +
           "for range-partition bounds: %s", value.toSql()));
     }
-    LiteralExpr literal = LiteralExpr.create(value, analyzer.getQueryCtx());
+    LiteralExpr literal = LiteralExpr.createBounded(value, analyzer.getQueryCtx(),
+        StringLiteral.MAX_STRING_LEN);
     if (literal == null) {
       throw new AnalysisException(String.format("Only constant values are allowed " +
           "for range-partition bounds: %s", value.toSql()));
@@ -181,7 +183,8 @@ public class RangePartition extends StmtNode {
       // Add an explicit cast to TIMESTAMP
       Expr e = new CastExpr(new TypeDef(Type.TIMESTAMP), literal);
       e.analyze(analyzer);
-      literal = LiteralExpr.create(e, analyzer.getQueryCtx());
+      literal = LiteralExpr.createBounded(e, analyzer.getQueryCtx(),
+        StringLiteral.MAX_STRING_LEN);
       Preconditions.checkNotNull(literal);
       if (Expr.IS_NULL_VALUE.apply(literal)) {
         throw new AnalysisException(String.format("Range partition value %s cannot be " +
@@ -199,7 +202,8 @@ public class RangePartition extends StmtNode {
     if (!literalType.equals(colType)) {
       Expr castLiteral = literal.uncheckedCastTo(colType);
       Preconditions.checkNotNull(castLiteral);
-      literal = LiteralExpr.create(castLiteral, analyzer.getQueryCtx());
+      literal = LiteralExpr.createBounded(castLiteral, analyzer.getQueryCtx(),
+        StringLiteral.MAX_STRING_LEN);
     }
     Preconditions.checkNotNull(literal);
 
