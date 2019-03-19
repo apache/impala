@@ -206,7 +206,13 @@ class ImpalaCluster(object):
       # empty for a brief moment, before it gets reaped by its parent (see man proc). We
       # copy the cmdline to prevent it from changing between the following checks and
       # the construction of the *Process objects.
-      cmdline = process.cmdline
+      cmdline = ''
+      try:
+        cmdline = process.cmdline
+      except psutil.NoSuchProcess:
+        # IMPALA-8320: psutil.Process.cmdline is a property and the process could have
+        # disappeared between the time we built the process list and now.
+        continue
       if len(cmdline) == 0:
         continue
       if process.name == 'impalad':
