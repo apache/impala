@@ -88,7 +88,25 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
     StringBuilder sb = new StringBuilder(String.format("SHOW GRANT %s ",
         Principal.toString(principalType_).toUpperCase()));
     sb.append(name_);
-    if (privilegeSpec_ != null) sb.append(" " + privilegeSpec_.toSql(options));
+    if (privilegeSpec_ != null) {
+      sb.append(String.format(" ON %s", privilegeSpec_.getScope().name()));
+      switch (privilegeSpec_.getScope()) {
+        case SERVER:
+          break;
+        case DATABASE:
+          sb.append(String.format(" %s", privilegeSpec_.getDbName()));
+          break;
+        case TABLE:
+          sb.append(String.format(" %s", privilegeSpec_.getTableName()));
+          break;
+        case URI:
+          sb.append(String.format(" '%s'", privilegeSpec_.getUri()));
+          break;
+        default:
+          throw new IllegalStateException("Unexpected privilege spec scope: " +
+              privilegeSpec_.getScope());
+      }
+    }
     return sb.toString();
   }
 

@@ -157,8 +157,10 @@ public class PrivilegeSpec extends StmtNode {
   @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder(privilegeLevel_.toString());
-    sb.append(" ON ");
-    sb.append(scope_.toString());
+    if (scope_ != TPrivilegeScope.COLUMN) {
+      sb.append(" ON ");
+      sb.append(scope_.toString());
+    }
     if (scope_ == TPrivilegeScope.SERVER && serverName_ != null) {
       sb.append(" " + serverName_);
     } else if (scope_ == TPrivilegeScope.DATABASE) {
@@ -166,10 +168,10 @@ public class PrivilegeSpec extends StmtNode {
     } else if (scope_ == TPrivilegeScope.TABLE) {
       sb.append(" " + tableName_.toString());
     } else if (scope_ == TPrivilegeScope.COLUMN) {
-      sb.append("(");
+      sb.append(" (");
       sb.append(Joiner.on(",").join(columnNames_));
       sb.append(")");
-      sb.append(" " + tableName_.toString());
+      sb.append(" ON TABLE " + tableName_.toString());
     } else if (scope_ == TPrivilegeScope.URI) {
       sb.append(" '" + uri_.getLocation() + "'");
     }
@@ -293,4 +295,14 @@ public class PrivilegeSpec extends StmtNode {
     Preconditions.checkNotNull(table);
     return table;
   }
+
+  public TPrivilegeScope getScope() { return scope_; }
+
+  public TableName getTableName() { return tableName_; }
+
+  public HdfsUri getUri() { return uri_; }
+
+  public String getDbName() { return dbName_; }
+
+  public String getServerName() { return serverName_; }
 }

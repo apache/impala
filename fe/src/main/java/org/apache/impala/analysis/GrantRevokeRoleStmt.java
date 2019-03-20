@@ -41,11 +41,9 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    if (isGrantStmt_) {
-      return String.format("GRANT ROLE %s TO %s", roleName_, groupName_);
-    } else {
-      return String.format("REVOKE ROLE %s FROM %s", roleName_, groupName_);
-    }
+    return String.format("%s ROLE %s %s GROUP %s",
+        isGrantStmt_ ? "GRANT" : "REVOKE", roleName_,
+        isGrantStmt_ ? "TO" : "FROM", groupName_);
   }
 
   public TGrantRevokeRoleParams toThrift() {
