@@ -538,7 +538,12 @@ class TestImpalaShellInteractive(object):
       result = run_impala_shell_interactive('-- comment\n'
                                             'select * from leading_comment;')
       assert 'Fetched 1 row(s)' in result.stderr
-
+      result = run_impala_shell_interactive('--한글\n'
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+      result = run_impala_shell_interactive('/* 한글 */\n'
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
       result = run_impala_shell_interactive('/* comment */\n'
                                             'select * from leading_comment;')
       assert 'Fetched 1 row(s)' in result.stderr

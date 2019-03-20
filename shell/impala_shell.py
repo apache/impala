@@ -1336,6 +1336,8 @@ class ImpalaShell(object, cmd.Cmd):
     """
     leading_comment, line = ImpalaShell.strip_leading_comment(line.strip())
     line = line.encode('utf-8')
+    if leading_comment:
+      leading_comment = leading_comment.encode('utf-8')
     if line and line[0] == '@':
       line = 'rerun ' + line[1:]
     return super(ImpalaShell, self).parseline(line) + (leading_comment,)
