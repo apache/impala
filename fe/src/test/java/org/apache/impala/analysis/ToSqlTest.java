@@ -1470,6 +1470,20 @@ public class ToSqlTest extends FrontendTestBase {
         "SELECT * FROM t");
   }
 
+  @Test
+  public void testCreateDropRole() {
+    String testRole = "test_role";
+    AnalysisContext ctx = createAnalysisCtx(createAuthorizationConfig());
+
+    testToSql(ctx, String.format("CREATE ROLE %s", testRole));
+    try {
+      catalog_.addRole(testRole);
+      testToSql(ctx, String.format("DROP ROLE %s", testRole));
+    } finally {
+      catalog_.removeRole(testRole);
+    }
+  }
+
   /**
    * Tests invalidate statements are output correctly.
    */

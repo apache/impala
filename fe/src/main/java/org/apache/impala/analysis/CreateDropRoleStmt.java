@@ -38,7 +38,7 @@ public class CreateDropRoleStmt extends AuthorizationStmt {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    return String.format("%s ROLE %s", roleName_, isDropRole_ ? "DROP" : "CREATE");
+    return String.format("%s ROLE %s", isDropRole_ ? "DROP" : "CREATE", roleName_);
   }
 
   public TCreateDropRoleParams toThrift() {
