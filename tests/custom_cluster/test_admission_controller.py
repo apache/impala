@@ -1208,13 +1208,15 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             self.query_state = 'REJECTED'
             self.query_handle = None
             return
-          elif "timeout" in admission_result:
+          elif "Timed out" in admission_result:
             LOG.info("Query %s timed out", self.query_num)
             self.query_state = 'TIMED OUT'
             self.query_handle = None
             return
+          LOG.info("Admission result for query %s : %s", self.query_num, admission_result)
         except ImpalaBeeswaxException as e:
-            raise e
+          LOG.exception(e)
+          raise e
         finally:
           self.lock.release()
         LOG.info("Admitted query %s", self.query_num)
