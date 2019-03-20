@@ -42,7 +42,9 @@ class TSSLSocketWithWildcardSAN(TSSLSocket.TSSLSocket):
       validate=True,
       ca_certs=None,
       unix_socket=None):
-    TSSLSocket.TSSLSocket.__init__(self, host, port, validate, ca_certs, unix_socket)
+    cert_reqs = ssl.CERT_REQUIRED if validate else ssl.CERT_NONE
+    TSSLSocket.TSSLSocket.__init__(self, host=host, port=port, cert_reqs=cert_reqs,
+                                   ca_certs=ca_certs, unix_socket=unix_socket)
     # Set client protocol choice to be very permissive, as we rely on servers to enforce
     # good protocol selection. This value is forwarded to the ssl.wrap_socket() API during
     # open(). See https://docs.python.org/2/library/ssl.html#socket-creation for a table
