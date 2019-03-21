@@ -281,12 +281,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     assert not partitioned_by, "Kudu table shouldn't have partition cols defined"
     partitioned_by = "partition by hash partitions 3"
 
-    # Fetch KUDU host and port from environment
-    kudu_master = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
-    kudu_master_port = os.getenv("KUDU_MASTER_PORT", "7051")
     row_format_stmt = str()
-    tblproperties["kudu.master_addresses"] = \
-      "{0}:{1}".format(kudu_master, kudu_master_port)
     primary_keys_clause = ", PRIMARY KEY (%s)" % columns.split("\n")[0].split(" ")[0]
     # Kudu's test tables are managed.
     external = ""
