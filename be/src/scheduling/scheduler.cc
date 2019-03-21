@@ -844,13 +844,19 @@ void Scheduler::ComputeBackendExecParams(
   schedule->set_largest_min_reservation(largest_min_reservation);
 
   stringstream min_mem_reservation_ss;
+  stringstream num_fragment_instances_ss;
   for (const auto& e: per_backend_params) {
     min_mem_reservation_ss << TNetworkAddressToString(e.first) << "("
          << PrettyPrinter::Print(e.second.min_mem_reservation_bytes, TUnit::BYTES)
          << ") ";
+    num_fragment_instances_ss << TNetworkAddressToString(e.first) << "("
+         << PrettyPrinter::Print(e.second.instance_params.size(), TUnit::UNIT)
+         << ") ";
   }
   schedule->summary_profile()->AddInfoString("Per Host Min Memory Reservation",
       min_mem_reservation_ss.str());
+  schedule->summary_profile()->AddInfoString("Per Host Number of Fragment Instances",
+      num_fragment_instances_ss.str());
 }
 
 Scheduler::AssignmentCtx::AssignmentCtx(const BackendConfig& executor_config,

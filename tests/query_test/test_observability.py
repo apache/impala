@@ -551,3 +551,11 @@ class TestObservability(ImpalaTestSuite):
     tree = self._get_thrift_profile(query_id)
     end_time = tree.nodes[1].info_strings["End Time"]
     assert end_time is not None
+
+  def test_query_profile_contains_number_of_fragment_instance(self):
+    """Test that the expected section for number of fragment instance in
+    a query profile."""
+    event_regexes = [r'Per Host Number of Fragment Instances']
+    query = "select count (*) from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
