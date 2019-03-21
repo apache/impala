@@ -170,6 +170,15 @@ Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
         "HostNetworkTx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
         return system_state_info->GetNetworkUsage().tx_rate;
         });
+    // Add disk stats
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostDiskReadThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
+        return system_state_info->GetDiskStats().read_rate;
+        });
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostDiskWriteThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
+        return system_state_info->GetDiskStats().write_rate;
+        });
   }
 
   // Starting a new query creates threads and consumes a non-trivial amount of memory.

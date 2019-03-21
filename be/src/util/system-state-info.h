@@ -20,10 +20,15 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <sstream>
 
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/names.h"
+#include "common/logging.h"
+
+class StringPiece;
+
 namespace impala {
 
 /// Utility class to track and compute system resource consumption.
@@ -61,9 +66,17 @@ class SystemStateInfo {
   /// calls to CaptureSystemStateSnapshot().
   const NetworkUsage& GetNetworkUsage() { return network_usage_; }
 
- private:
-  int64_t ParseInt64(const std::string& val) const;
+  /// Disk statistics rates in bytes per second
+  struct DiskStats {
+    int64_t read_rate;
+    int64_t write_rate;
+  };
 
+  /// Returns a struct containing the disk throughput for the interval between the last
+  /// two calls to CaptureSystemStateSnapshot().
+  const DiskStats& GetDiskStats() { return disk_stats_; }
+
+ private:
   /// Rotates 'cpu_val_idx_' and reads the current CPU usage values from /proc/stat into
   /// the current set of values.
   void ReadCurrentProcStat();
@@ -126,7 +139,7 @@ class SystemStateInfo {
   /// Two buffers to keep the current and previous set of network counter values.
   NetworkValues network_values_[2];
   /// Index into network_values_ that points to the current set of values. We maintain a
-  /// separate index for CPU and network to be able to update them independently, e.g. in
+  /// separate index for network values to be able to update them independently, e.g. in
   /// tests.
   int net_val_idx_ = 0;
 
@@ -140,7 +153,7 @@ class SystemStateInfo {
 
   /// Parses a single line as they appear in /proc/net/dev into 'result'. Entries are set
   /// to 0 for the local loopback interface and for invalid entries.
-  void ReadProcNetDevLine(const string& dev_string, NetworkValues* result);
+  void ReadProcNetDevLine(const StringPiece& dev_string, NetworkValues* result);
 
   /// Computes b = b + a.
   void AddNetworkValues(const NetworkValues& a, NetworkValues* b);
@@ -148,7 +161,7 @@ class SystemStateInfo {
   /// Compute the network usage.
   void ComputeNetworkUsage(int64_t period_ms);
 
-  /// The compute network usage between the current and previous snapshots in
+  /// The network usage between the current and previous snapshots in
   /// network_values_. Updated in ComputeNetworkUsage().
   NetworkUsage network_usage_;
 
@@ -156,12 +169,71 @@ class SystemStateInfo {
   /// CaptureSystemStateSnapshot().
   int64_t last_net_update_ms_;
 
+  /// The enum names correspond to the fields of /proc/diskstats
+  /// https://www.kernel.org/doc/Documentation/iostats.txt
+  enum PROC_DISK_STAT_VALUES {
+    DISK_READS_COMPLETED,
+    DISK_READS_MERGED,
+    DISK_SECTORS_READ,
+    DISK_TIME_READING_MS,
+    DISK_WRITES_COMPLETED,
+    DISK_WRITES_MERGED,
+    DISK_SECTORS_WRITTEN,
+    DISK_TIME_WRITING_MS,
+    DISK_IO_IN_PROGRESS,
+    DISK_TIME_IN_IO_MS,
+    DISK_WEIGHTED_TIME_IN_IO_MS,
+    NUM_DISK_VALUES
+  };
+
+  /// Number of bytes per disk sector.
+  static const int BYTES_PER_SECTOR = 512;
+
+  /// We store these values in an array so that we can iterate over them, e.g. when
+  /// reading them from a file or summing them up.
+  typedef std::array<int64_t, NUM_DISK_VALUES> DiskValues;
+  /// Two buffers to keep the current and previous set of disk counter values.
+  DiskValues disk_values_[2];
+  /// Index into disk_values_ that points to the current set of values. We maintain a
+  /// separate index for disk values to be able to update them independently, e.g. in
+  /// tests.
+  int disk_val_idx_ = 0;
+
+  /// Rotates disk_val_idx_ and reads the current set of values from /proc/diskstats into
+  /// disk_values_.
+  void ReadCurrentProcDiskStats();
+
+  /// Rotates disk_val_idx_ and parses the content of 'disk_stats' into disk_values_.
+  /// disk_stats must be in the format of /proc/diskstats.
+  void ReadProcDiskStatsString(const string& disk_stats);
+
+  /// Parses a single line as they appear in /proc/diskstats into 'result'. Invalid
+  /// entries are set to 0.
+  void ReadProcDiskStatsLine(const string& disk_stats, DiskValues* result);
+
+  /// Computes b = b + a.
+  void AddDiskValues(const DiskValues& a, DiskValues* b);
+
+  /// Computes the read and write rate for the most recent period.
+  void ComputeDiskStats(int64_t period_ms);
+
+  /// The disk statistics between the current and previous snapshots in
+  /// disk_values_. Updated in ComputeDiskStats().
+  DiskStats disk_stats_;
+
+  /// The last time of reading disk stats values from /proc/diskstats. Used by
+  /// CaptureSystemStateSnapshot().
+  int64_t last_disk_update_ms_;
+
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatios);
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatiosIntOverflow);
+  FRIEND_TEST(SystemStateInfoTest, ComputeDiskStats);
   FRIEND_TEST(SystemStateInfoTest, ComputeNetworkUsage);
+  FRIEND_TEST(SystemStateInfoTest, ParseProcDiskStatsString);
   FRIEND_TEST(SystemStateInfoTest, ParseProcNetDevString);
   FRIEND_TEST(SystemStateInfoTest, ParseProcNetDevStringCentos6);
   FRIEND_TEST(SystemStateInfoTest, ParseProcStat);
+  FRIEND_TEST(SystemStateInfoTest, ReadProcDiskStats);
   FRIEND_TEST(SystemStateInfoTest, ReadProcNetDev);
   FRIEND_TEST(SystemStateInfoTest, ReadProcStat);
 };

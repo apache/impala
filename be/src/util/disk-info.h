@@ -64,6 +64,12 @@ class DiskInfo {
     return disks_[disk_id].is_rotational;
   }
 
+  /// Returns true if the disk with name 'device_name' is known to the DiskInfo class,
+  /// i.e. we consider it to be useful to include in metrics and such.
+  static bool is_known_disk(const std::string& device_name) {
+    return disk_name_to_disk_id_.find(device_name) != disk_name_to_disk_id_.end();
+  }
+
   static std::string DebugString();
 
  private:

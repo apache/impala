@@ -17,6 +17,7 @@
 
 #include "common/atomic.h"
 #include "testutil/gtest-util.h"
+#include "util/disk-info.h"
 #include "util/system-state-info.h"
 #include "util/time.h"
 
@@ -55,6 +56,16 @@ TEST_F(SystemStateInfoTest, ReadProcNetDev) {
   EXPECT_GT(state[SystemStateInfo::NET_RX_PACKETS], 0);
   EXPECT_GT(state[SystemStateInfo::NET_TX_BYTES], 0);
   EXPECT_GT(state[SystemStateInfo::NET_TX_PACKETS], 0);
+}
+
+// Smoke test to make sure that we read non-zero values from /proc/diskstats.
+TEST_F(SystemStateInfoTest, ReadProcDiskStats) {
+  info.ReadCurrentProcDiskStats();
+  const SystemStateInfo::DiskValues& state = info.disk_values_[info.disk_val_idx_];
+  EXPECT_GT(state[SystemStateInfo::DISK_READS_COMPLETED], 0);
+  EXPECT_GT(state[SystemStateInfo::DISK_SECTORS_READ], 0);
+  EXPECT_GT(state[SystemStateInfo::DISK_WRITES_COMPLETED], 0);
+  EXPECT_GT(state[SystemStateInfo::DISK_SECTORS_WRITTEN], 0);
 }
 
 // Tests parsing a line similar to the first line of /proc/stat.
@@ -103,6 +114,24 @@ TEST_F(SystemStateInfoTest, ParseProcNetDevStringCentos6) {
   EXPECT_EQ(state[SystemStateInfo::NET_RX_PACKETS], 212208);
   EXPECT_EQ(state[SystemStateInfo::NET_TX_BYTES], 9137793);
   EXPECT_EQ(state[SystemStateInfo::NET_TX_PACKETS], 84770);
+}
+
+// Tests parsing a string similar to the contents of /proc/diskstats. This test also makes
+// sure that values of a partition are not accounted towards the disk it is on.
+TEST_F(SystemStateInfoTest, ParseProcDiskStatsString) {
+  // We cannot hard-code the device name since our Jenkins workers might see different
+  // device names in their virtual environments.
+  string disk_stats =
+    R"(   8       0 $0 17124835 222797 716029974 8414920 43758807 38432095 7867287712 630179264 0 32547524 638999340
+       8       1 $01 17124482 222797 716027002 8414892 43546943 38432095 7867287712 629089180 0 31590972 637917344)";
+  string device = DiskInfo::device_name(0);
+  cout << Substitute(disk_stats, device);
+  info.ReadProcDiskStatsString(Substitute(disk_stats, device));
+  const SystemStateInfo::DiskValues& state = info.disk_values_[info.disk_val_idx_];
+  EXPECT_EQ(state[SystemStateInfo::DISK_SECTORS_READ], 716029974);
+  EXPECT_EQ(state[SystemStateInfo::DISK_READS_COMPLETED], 17124835);
+  EXPECT_EQ(state[SystemStateInfo::DISK_SECTORS_WRITTEN], 7867287712);
+  EXPECT_EQ(state[SystemStateInfo::DISK_WRITES_COMPLETED], 43758807);
 }
 
 // Tests that computing CPU ratios doesn't overflow
@@ -165,6 +194,28 @@ TEST_F(SystemStateInfoTest, ComputeNetworkUsage) {
   const SystemStateInfo::NetworkUsage& n = info.GetNetworkUsage();
   EXPECT_EQ(n.rx_rate, 8000);
   EXPECT_EQ(n.tx_rate, 12000);
+}
+
+// Tests the computation logic for disk statistics.
+TEST_F(SystemStateInfoTest, ComputeDiskStats) {
+  // Two sets of values in the format of /proc/diskstats. We cannot hard-code the device
+  // name since our Jenkins workers might see different device names in their virtual
+  // environments.
+  string disk_stats_1 = R"(   1      15 ram15 0 0 0 0 0 0 0 0 0 0 0
+     7       0 loop0 0 0 0 0 0 0 0 0 0 0 0
+     8       0 $0 0 0 1000 0 0 0 2000 0 0 0 0
+     8       1 $01 0 0 1000 0 0 0 2000 0 0 0 0)";
+  string disk_stats_2 = R"(   8       0 $0 0 0 2000 0 0 0 4000 0 0 0 0
+     8       1 $01 0 0 2000 0 0 0 4000 0 0 0 0)";
+
+  string device = DiskInfo::device_name(0);
+  info.ReadProcDiskStatsString(Substitute(disk_stats_1, device));
+  info.ReadProcDiskStatsString(Substitute(disk_stats_2, device));
+  int period_ms = 500;
+  info.ComputeDiskStats(period_ms);
+  const SystemStateInfo::DiskStats& ds = info.GetDiskStats();
+  EXPECT_EQ(ds.read_rate, 2 * 1000 * SystemStateInfo::BYTES_PER_SECTOR);
+  EXPECT_EQ(ds.write_rate, 2 * 2000 * SystemStateInfo::BYTES_PER_SECTOR);
 }
 
 } // namespace impala

@@ -441,6 +441,7 @@ class TestObservability(ImpalaTestSuite):
       for line in profile.splitlines():
         assert not re.search("HostCpu.*Percentage", line)
         assert not re.search("HostNetworkRx", line)
+        assert not re.search("HostDiskReadThroughput", line)
 
   def test_query_profile_contains_host_resource_metrics(self):
     """Tests that the query profile contains various CPU and network metrics."""
@@ -453,7 +454,9 @@ class TestObservability(ImpalaTestSuite):
                      "HostCpuSysPercentage (500.000ms):",
                      "HostCpuUserPercentage (500.000ms):",
                      "HostNetworkRx (500.000ms):",
-                     "HostNetworkTx (500.000ms):"]
+                     "HostNetworkTx (500.000ms):",
+                     "HostDiskReadThroughput (500.000ms):",
+                     "HostDiskWriteThroughput (500.000ms):"]
 
     # Assert that all expected counters exist in the profile.
     for expected_str in expected_strs:
@@ -493,7 +496,7 @@ class TestObservability(ImpalaTestSuite):
     result = self.execute_query("select sleep(2000)", query_opts)
     thrift_profile = self._get_thrift_profile(result.query_id)
 
-    expected_keys = ["HostCpuUserPercentage", "HostNetworkRx"]
+    expected_keys = ["HostCpuUserPercentage", "HostNetworkRx", "HostDiskReadThroughput"]
     for key in expected_keys:
       counters = self._find_ts_counters_in_thrift_profile(thrift_profile, key)
       # The query will run on a single node, we will only find the counter once.
