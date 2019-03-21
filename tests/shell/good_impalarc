@@ -1,6 +1,8 @@
 [impala]
 query=select 1
-creds_ok_in_clear=true
+auth_creds_ok_in_clear=true
+# An old format using optparse dest name for backward compatibility.
 keyval=msg1=hello,keyval=msg2=world
+var=msg3=foo,var=msg4=bar
 verbose=true
-query_options=DEFAULT_FILE_FORMAT=parquet
+Q=DEFAULT_FILE_FORMAT=parquet

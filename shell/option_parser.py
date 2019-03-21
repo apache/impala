@@ -63,8 +63,18 @@ def parse_shell_options(options, defaults, option_list):
 
      Returns a dictionary with option names as keys and option values as values.
   """
+  # Build a dictionary that maps short and long option name to option for a quick lookup.
+  option_dests = dict()
+  for option in option_list:
+    if len(option._short_opts) > 0:
+      option_dests[option._short_opts[0][1:]] = option
+    if len(option._long_opts) > 0:
+      option_dests[option._long_opts[0][2:]] = option
+    if option.dest not in option_dests:
+      # Allowing dest name for backward compatibility.
+      option_dests[option.dest] = option
+
   result = {}
-  option_dests = dict((opt.dest, opt) for opt in option_list)
   for option, value in options:
     opt = option_dests.get(option)
     if opt is None:
@@ -106,6 +116,8 @@ def get_config_from_file(config_filename, option_list):
   as keys and option values as values.
   """
   config = ConfigParser.ConfigParser()
+  # Preserve case-sensitivity since flag names are case sensitive.
+  config.optionxform = str
   try:
     config.read(config_filename)
   except Exception, e:
@@ -120,6 +132,7 @@ def get_config_from_file(config_filename, option_list):
       print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
       shell_options["config_file"] = config_filename
 
+  config = ConfigParser.ConfigParser()
   try:
     config.read(config_filename)
   except Exception, e:
@@ -142,8 +155,6 @@ def get_option_parser(defaults):
   """
 
   parser = OptionParser()
-  parser.set_defaults(**defaults)
-
   parser.add_option("-i", "--impalad", dest="impalad",
                     help="<host:port> of impalad to connect to \t\t")
   parser.add_option("-b", "--kerberos_host_fqdn", dest="kerberos_host_fqdn",
@@ -246,8 +257,29 @@ def get_option_parser(defaults):
                     help="Timeout in milliseconds after which impala-shell will time out"
                     " if it fails to connect to Impala server. Set to 0 to disable any"
                     " timeout.")
+
   # add default values to the help text
   for option in parser.option_list:
+    if option.dest is not None:
+      # option._short_opts returns a list of short options, e.g. ["-Q"].
+      # option._long_opts returns a list of long options, e.g. ["--query_option"].
+      # The code below removes the - from the short option and -- from the long option.
+      short_opt = option._short_opts[0][1:] if len(option._short_opts) > 0 else None
+      long_opt = option._long_opts[0][2:] if len(option._long_opts) > 0 else None
+      # In order to set the default flag values, optparse requires the keys to be the
+      # dest names. The default flag values are set in impala_shell_config_defaults.py and
+      # the default flag values may contain default values that are not for flags.
+      if short_opt in defaults:
+        if option.dest not in defaults:
+          defaults[option.dest] = defaults[short_opt]
+        elif type(defaults[option.dest]) == list:
+          defaults[option.dest].extend(defaults[short_opt])
+      elif long_opt in defaults:
+        if option.dest not in defaults:
+          defaults[option.dest] = defaults[long_opt]
+        elif type(defaults[option.dest]) == list:
+          defaults[option.dest].extend(defaults[long_opt])
+
     # since the quiet flag is the same as the verbose flag
     # we need to make sure to print the opposite value for it
     # (print quiet is false since verbose is true)
@@ -256,5 +288,7 @@ def get_option_parser(defaults):
     elif option != parser.get_option('--help'):
       # don't want to print default value for help
       option.help += " [default: %default]"
+
+  parser.set_defaults(**defaults)
 
   return parser
