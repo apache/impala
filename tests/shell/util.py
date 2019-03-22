@@ -25,10 +25,7 @@ import shlex
 import time
 from subprocess import Popen, PIPE
 
-IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
-assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
-IMPALAD = IMPALAD_HOST_PORT_LIST[0]
-SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
+from tests.common.impala_test_suite import IMPALAD_BEESWAX_HOST_PORT
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 
 def assert_var_substitution(result):
@@ -86,14 +83,14 @@ def assert_pattern(pattern, result, text, message):
   assert m and m.group(0) == result, message
 
 
-def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None,
+def run_impala_shell_cmd(vector, shell_args, expect_success=True, stdin_input=None,
                          wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
-  result = run_impala_shell_cmd_no_expect(shell_args, stdin_input,
+  result = run_impala_shell_cmd_no_expect(vector, shell_args, stdin_input,
                                           expect_success and wait_until_connected)
   if expect_success:
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (shell_args,
@@ -103,7 +100,7 @@ def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None,
   return result
 
 
-def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None,
+def run_impala_shell_cmd_no_expect(vector, shell_args, stdin_input=None,
                                    wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
@@ -112,10 +109,35 @@ def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None,
 
   Does not assert based on success or failure of command.
   """
-  p = ImpalaShell(shell_args, wait_until_connected=wait_until_connected)
+  p = ImpalaShell(vector, shell_args, wait_until_connected=wait_until_connected)
   result = p.get_result(stdin_input)
   return result
 
+
+def get_impalad_host_port(vector):
+  """Get host and port to connect to based on test vector provided."""
+  protocol = vector.get_value("protocol")
+  assert protocol == 'beeswax', protocol
+  return IMPALAD_BEESWAX_HOST_PORT
+
+
+def get_impalad_port(vector):
+  """Get integer port to connect to based on test vector provided."""
+  return int(get_impalad_host_port(vector).split(":")[1])
+
+
+def get_shell_cmd(vector):
+  """Get the basic shell command to start the shell, given the provided test vector.
+  Returns the command as a list of string arguments."""
+  return [os.path.join(os.environ['IMPALA_HOME'], "bin/impala-shell.sh"),
+          "-i{0}".format(get_impalad_host_port(vector))]
+
+
+def get_open_sessions_metric(vector):
+  """Get the name of the vector that tracks open sessions for the protocol in vector."""
+  protocol = vector.get_value("protocol")
+  assert protocol == 'beeswax', protocol
+  return 'impala-server.num-open-beeswax-sessions'
 
 class ImpalaShellResult(object):
   def __init__(self):
@@ -128,10 +150,10 @@ class ImpalaShell(object):
   """A single instance of the Impala shell. The proces is started when this object is
      constructed, and then users should repeatedly call send_cmd(), followed eventually by
      get_result() to retrieve the process output. This constructor will wait until
-     Impala shell is connected for the specified timeout unless wait_util_connected is
-     set to False or --quiet is passed into the args"""
-  def __init__(self, args=None, env=None, wait_until_connected=True, timeout=60):
-    self.shell_process = self._start_new_shell_process(args, env=env)
+     Impala shell is connected for the specified timeout unless wait_until_connected is
+     set to False or --quiet is passed into the args."""
+  def __init__(self, vector, args=None, env=None, wait_until_connected=True, timeout=60):
+    self.shell_process = self._start_new_shell_process(vector, args, env=env)
     # When --quiet option is passed to Impala shell, we should not wait until we see
     # "Connected to" because it will never be printed to stderr.
     if wait_until_connected and (args is None or "--quiet" not in args):
@@ -179,11 +201,10 @@ class ImpalaShell(object):
     result.rc = self.shell_process.returncode
     return result
 
-  def _start_new_shell_process(self, args=None, env=None):
+  def _start_new_shell_process(self, vector, args=None, env=None):
     """Starts a shell process and returns the process handle"""
-    shell_args = SHELL_CMD
-    if args is not None: shell_args = "%s %s" % (SHELL_CMD, args)
-    lex = shlex.split(shell_args)
+    cmd = get_shell_cmd(vector)
+    if args is not None: cmd += args
     if not env: env = os.environ
-    return Popen(lex, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
+    return Popen(cmd, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
                  env=env)

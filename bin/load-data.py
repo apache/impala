@@ -55,7 +55,7 @@ parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
                   help="An optional scale factor to generate the schema for")
 parser.add_option("-f", "--force_reload", dest="force_reload", action="store_true",
                   default=False, help='Skips HDFS exists check and reloads all tables')
-parser.add_option("--impalad", dest="impalad", default="localhost:21000",
+parser.add_option("--impalad", dest="impalad", default="localhost",
                   help="Impala daemon to connect to")
 parser.add_option("--hive_hs2_hostport", dest="hive_hs2_hostport",
                   default="localhost:11050",
@@ -191,7 +191,8 @@ def exec_impala_query_from_file(file_name):
     LOG.info("Error: File {0} not found".format(file_name))
     return False
 
-  LOG.info("Beginning execution of impala SQL: {0}".format(file_name))
+  LOG.info("Beginning execution of impala SQL on {0}: {1}".format(
+           options.impalad, file_name))
   is_success = True
   impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
   output_file = file_name + ".log"

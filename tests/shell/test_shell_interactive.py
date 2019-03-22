@@ -35,14 +35,16 @@ from shell.impala_shell import ImpalaShell as ImpalaShellClass
 
 from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from util import assert_var_substitution, ImpalaShell
+from tests.common.test_dimensions import create_beeswax_dimension
+from util import (assert_var_substitution, ImpalaShell, get_impalad_port,
+                  get_shell_cmd, get_open_sessions_metric)
 
-SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 # Regex to match the interactive shell prompt that is expected after each command.
-PROMPT_REGEX = r'\[[^:]+:2100[0-9]\]'
+PROMPT_REGEX = r'\[[^:]+:210[0-9][0-9]\]'
 
 
 @pytest.fixture
@@ -65,40 +67,55 @@ def tmp_history_file(request):
   return tmp.name
 
 
-class TestImpalaShellInteractive(object):
+class TestImpalaShellInteractive(ImpalaTestSuite):
   """Test the impala shell interactively"""
 
-  def _expect_with_cmd(self, proc, cmd, expectations=(), db="default"):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_dimension())
+
+  def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
     assertions defined by the expectations."""
     proc.sendline(cmd + ";")
-    proc.expect(":21000] {db}>".format(db=db))
+    proc.expect(":{0}] {1}>".format(get_impalad_port(vector), db))
     if not expectations: return
     for e in expectations:
       assert e in proc.before
 
-  def test_local_shell_options(self):
+  def test_local_shell_options(self, vector):
     """Test that setting the local shell options works"""
-    proc = pexpect.spawn(SHELL_CMD)
-    proc.expect(":21000] default>")
-    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
-    self._expect_with_cmd(proc, "set live_progress=true")
-    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
-    self._expect_with_cmd(proc, "set live_summary=1")
-    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
-    self._expect_with_cmd(proc, "set", ("WRITE_DELIMITED: False", "VERBOSE: True"))
-    self._expect_with_cmd(proc, "set", ("DELIMITER: \\t", "OUTPUT_FILE: None"))
-    self._expect_with_cmd(proc, "set write_delimited=true")
-    self._expect_with_cmd(proc, "set", ("WRITE_DELIMITED: True", "VERBOSE: True"))
-    self._expect_with_cmd(proc, "set DELIMITER=,")
-    self._expect_with_cmd(proc, "set", ("DELIMITER: ,", "OUTPUT_FILE: None"))
-    self._expect_with_cmd(proc, "set output_file=/tmp/clmn.txt")
-    self._expect_with_cmd(proc, "set", ("DELIMITER: ,", "OUTPUT_FILE: /tmp/clmn.txt"))
+    shell_cmd = get_shell_cmd(vector)
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    proc.expect(":{0}] default>".format(get_impalad_port(vector)))
+    self._expect_with_cmd(proc, "set", vector,
+        ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+    self._expect_with_cmd(proc, "set live_progress=true", vector)
+    self._expect_with_cmd(proc, "set", vector,
+        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
+    self._expect_with_cmd(proc, "set live_summary=1", vector)
+    self._expect_with_cmd(proc, "set", vector,
+        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
+    self._expect_with_cmd(proc, "set", vector,
+        ("WRITE_DELIMITED: False", "VERBOSE: True"))
+    self._expect_with_cmd(proc, "set", vector,
+        ("DELIMITER: \\t", "OUTPUT_FILE: None"))
+    self._expect_with_cmd(proc, "set write_delimited=true", vector)
+    self._expect_with_cmd(proc, "set", vector, ("WRITE_DELIMITED: True", "VERBOSE: True"))
+    self._expect_with_cmd(proc, "set DELIMITER=,", vector)
+    self._expect_with_cmd(proc, "set", vector, ("DELIMITER: ,", "OUTPUT_FILE: None"))
+    self._expect_with_cmd(proc, "set output_file=/tmp/clmn.txt", vector)
+    self._expect_with_cmd(proc, "set", vector,
+        ("DELIMITER: ,", "OUTPUT_FILE: /tmp/clmn.txt"))
 
   @pytest.mark.execute_serially
-  def test_write_delimited(self):
+  def test_write_delimited(self, vector):
     """Test output rows in delimited mode"""
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd("use tpch")
     p.send_cmd("set write_delimited=true")
     p.send_cmd("select * from nation")
@@ -107,9 +124,9 @@ class TestImpalaShellInteractive(object):
     assert "21\tVIETNAM\t2" in result.stdout
 
   @pytest.mark.execute_serially
-  def test_change_delimiter(self):
+  def test_change_delimiter(self, vector):
     """Test change output delimiter if delimited mode is enabled"""
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd("use tpch")
     p.send_cmd("set write_delimited=true")
     p.send_cmd("set delimiter=,")
@@ -118,10 +135,10 @@ class TestImpalaShellInteractive(object):
     assert "21,VIETNAM,2" in result.stdout
 
   @pytest.mark.execute_serially
-  def test_print_to_file(self):
+  def test_print_to_file(self, vector):
     """Test print to output file and unset"""
     # test print to file
-    p1 = ImpalaShell()
+    p1 = ImpalaShell(vector)
     p1.send_cmd("use tpch")
     local_file = NamedTemporaryFile(delete=True)
     p1.send_cmd("set output_file=%s" % local_file.name)
@@ -133,7 +150,7 @@ class TestImpalaShellInteractive(object):
       result = fi.read()
       assert "VIETNAM" in result
     # test unset to print back to stdout
-    p2 = ImpalaShell()
+    p2 = ImpalaShell(vector)
     p2.send_cmd("use tpch")
     p2.send_cmd("set output_file=%s" % local_file.name)
     p2.send_cmd("unset output_file")
@@ -141,38 +158,39 @@ class TestImpalaShellInteractive(object):
     result = p2.get_result()
     assert "VIETNAM" in result.stdout
 
-  def test_compute_stats_with_live_progress_options(self):
+  def test_compute_stats_with_live_progress_options(self, vector, unique_database):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd("set live_progress=True")
     p.send_cmd("set live_summary=True")
-    p.send_cmd('create table test_live_progress_option(col int);')
+    table = "{0}.live_progress_option".format(unique_database)
+    p.send_cmd('create table {0}(col int);'.format(table))
     try:
-      p.send_cmd('compute stats test_live_progress_option;')
+      p.send_cmd('compute stats {0};'.format(table))
     finally:
-      p.send_cmd('drop table if exists test_live_progress_option;')
+      p.send_cmd('drop table if exists {0};'.format(table))
     result = p.get_result()
     assert "Updated 1 partition(s) and 1 column(s)" in result.stdout
 
-  def test_escaped_quotes(self):
+  def test_escaped_quotes(self, vector):
     """Test escaping quotes"""
     # test escaped quotes outside of quotes
-    result = run_impala_shell_interactive("select \\'bc';")
+    result = run_impala_shell_interactive(vector, "select \\'bc';")
     assert "Unexpected character" in result.stderr
-    result = run_impala_shell_interactive("select \\\"bc\";")
+    result = run_impala_shell_interactive(vector, "select \\\"bc\";")
     assert "Unexpected character" in result.stderr
     # test escaped quotes within quotes
-    result = run_impala_shell_interactive("select 'ab\\'c';")
+    result = run_impala_shell_interactive(vector, "select 'ab\\'c';")
     assert "Fetched 1 row(s)" in result.stderr
-    result = run_impala_shell_interactive("select \"ab\\\"c\";")
+    result = run_impala_shell_interactive(vector, "select \"ab\\\"c\";")
     assert "Fetched 1 row(s)" in result.stderr
 
   @pytest.mark.execute_serially
-  def test_cancellation(self):
+  def test_cancellation(self, vector):
     impalad = ImpaladService(socket.getfqdn())
     assert impalad.wait_for_num_in_flight_queries(0)
     command = "select sleep(10000);"
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd(command)
     sleep(3)
     os.kill(p.pid(), signal.SIGINT)
@@ -180,85 +198,93 @@ class TestImpalaShellInteractive(object):
     assert "Cancelled" not in result.stderr
     assert impalad.wait_for_num_in_flight_queries(0)
 
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     sleep(3)
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
     assert "^C" in result.stderr
 
-  def test_unicode_input(self):
+  def test_unicode_input(self, vector):
     "Test queries containing non-ascii input"
     # test a unicode query spanning multiple lines
     unicode_text = u'\ufffd'
     args = "select '%s'\n;" % unicode_text.encode('utf-8')
-    result = run_impala_shell_interactive(args)
+    result = run_impala_shell_interactive(vector, args)
     assert "Fetched 1 row(s)" in result.stderr
 
-  def test_welcome_string(self):
+  def test_welcome_string(self, vector):
     """Test that the shell's welcome message is only printed once
     when the shell is started. Ensure it is not reprinted on errors.
     Regression test for IMPALA-1153
     """
-    result = run_impala_shell_interactive('asdf;')
+    result = run_impala_shell_interactive(vector, 'asdf;')
     assert result.stdout.count("Welcome to the Impala shell") == 1
-    result = run_impala_shell_interactive('select * from non_existent_table;')
+    result = run_impala_shell_interactive(vector, 'select * from non_existent_table;')
     assert result.stdout.count("Welcome to the Impala shell") == 1
 
-  def test_disconnected_shell(self):
+  def test_disconnected_shell(self, vector):
     """Test that the shell presents a disconnected prompt if it can't connect
     """
-    result = run_impala_shell_interactive('asdf;', shell_args='-i foo',
+    result = run_impala_shell_interactive(vector, 'asdf;', shell_args=['-ifoo'],
                                           wait_until_connected=False)
-    assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout
+    assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout, result.stderr
 
-  def test_bash_cmd_timing(self):
+  def test_bash_cmd_timing(self, vector):
     """Test existence of time output in bash commands run from shell"""
-    args = "! ls;"
-    result = run_impala_shell_interactive(args)
+    args = ["! ls;"]
+    result = run_impala_shell_interactive(vector, args)
     assert "Executed in" in result.stderr
 
   @SkipIfLocal.multiple_impalad
   @pytest.mark.execute_serially
-  def test_reconnect(self):
+  def test_reconnect(self, vector):
     """Regression Test for IMPALA-1235
 
     Verifies that a connect command by the user is honoured.
     """
+    # Disconnect existing clients so there are no open sessions.
+    self.client.close()
+    self.hs2_client.close()
 
     def wait_for_num_open_sessions(impala_service, num, err):
       """Helper method to wait for the number of open sessions to reach 'num'."""
-      assert impala_service.wait_for_metric_value(
-          'impala-server.num-open-beeswax-sessions', num) == num, err
+      metric_name = get_open_sessions_metric(vector)
+      assert impala_service.wait_for_metric_value(metric_name, num) == num, err
 
     hostname = socket.getfqdn()
     initial_impala_service = ImpaladService(hostname)
     target_impala_service = ImpaladService(hostname, webserver_port=25001,
-        beeswax_port=21001, be_port=22001)
+        beeswax_port=21001, be_port=22001, hs2_port=21051)
+    if vector.get_value("protocol") == "hs2":
+      target_port = 21051
+    else:
+      target_port = 21001
     # This test is running serially, so there shouldn't be any open sessions, but wait
     # here in case a session from a previous test hasn't been fully closed yet.
-    wait_for_num_open_sessions(
-        initial_impala_service, 0, "21000 should not have any remaining open sessions.")
-    wait_for_num_open_sessions(
-        target_impala_service, 0, "21001 should not have any remaining open sessions.")
-    # Connect to localhost:21000 (default)
-    p = ImpalaShell()
+    wait_for_num_open_sessions(initial_impala_service, 0,
+        "first impalad should not have any remaining open sessions.")
+    wait_for_num_open_sessions(target_impala_service, 0,
+        "second impalad should not have any remaining open sessions.")
+    # Connect to the first impalad
+    p = ImpalaShell(vector)
 
-    # Make sure we're connected <hostname>:21000
-    wait_for_num_open_sessions(
-        initial_impala_service, 1, "Not connected to %s:21000" % hostname)
-    p.send_cmd("connect %s:21001" % hostname)
+    # Make sure we're connected <hostname>:<port>
+    wait_for_num_open_sessions(initial_impala_service, 1,
+        "Not connected to %s:%d" % (hostname, get_impalad_port(vector)))
+    p.send_cmd("connect %s:%d" % (hostname, target_port))
 
     # The number of sessions on the target impalad should have been incremented.
     wait_for_num_open_sessions(
-        target_impala_service, 1, "Not connected to %s:21001" % hostname)
-    assert "[%s:21001] default>" % hostname in p.get_result().stdout
+        target_impala_service, 1, "Not connected to %s:%d" % (hostname, target_port))
+    assert "[%s:%d] default>" % (hostname, target_port) in p.get_result().stdout
 
     # The number of sessions on the initial impalad should have been decremented.
     wait_for_num_open_sessions(initial_impala_service, 0,
-        "Connection to %s:21000 should have been closed" % hostname)
+        "Connection to %s:%d should have been closed" % (
+          hostname, get_impalad_port(vector)))
 
   @pytest.mark.execute_serially
-  def test_ddl_queries_are_closed(self):
+  def test_ddl_queries_are_closed(self, vector):
     """Regression test for IMPALA-1317
 
     The shell does not call close() for alter, use and drop queries, leaving them in
@@ -273,7 +299,7 @@ class TestImpalaShellInteractive(object):
     NUM_QUERIES = 'impala-server.num-queries'
 
     impalad = ImpaladService(socket.getfqdn())
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     try:
       start_num_queries = impalad.get_metric_value(NUM_QUERIES)
       p.send_cmd('create database if not exists %s' % TMP_DB)
@@ -288,17 +314,19 @@ class TestImpalaShellInteractive(object):
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 5)
       assert impalad.wait_for_num_in_flight_queries(0), MSG % 'drop'
     finally:
-      run_impala_shell_interactive("drop table if exists %s.%s;" % (TMP_DB, TMP_TBL))
-      run_impala_shell_interactive("drop database if exists foo;")
+      run_impala_shell_interactive(vector, "drop table if exists %s.%s;" % (
+          TMP_DB, TMP_TBL))
+      run_impala_shell_interactive(vector, "drop database if exists foo;")
 
-  def test_multiline_queries_in_history(self, tmp_history_file):
+  def test_multiline_queries_in_history(self, vector, tmp_history_file):
     """Test to ensure that multiline queries with comments are preserved in history
 
     Ensure that multiline queries are preserved when they're read back from history.
     Additionally, also test that comments are preserved.
     """
     # readline gets its input from tty, so using stdin does not work.
-    child_proc = pexpect.spawn(SHELL_CMD)
+    shell_cmd = get_shell_cmd(vector)
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
     # List of (input query, expected text in output).
     # The expected output is usually the same as the input with a number prefix, except
     # where the shell strips newlines before a semicolon.
@@ -314,14 +342,14 @@ class TestImpalaShellInteractive(object):
       child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd('history')
     result = p.get_result()
     for _, history_entry in queries:
       assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry,
                                                                    result.stderr)
 
-  def test_history_file_option(self, tmp_history_file):
+  def test_history_file_option(self, vector, tmp_history_file):
     """
     Setting the 'tmp_history_file' fixture above means that the IMPALA_HISTFILE
     environment will be overridden. Here we override that environment by passing
@@ -329,48 +357,51 @@ class TestImpalaShellInteractive(object):
     in the appropriate spot.
     """
     with NamedTemporaryFile() as new_hist:
-      child_proc = pexpect.spawn(
-          SHELL_CMD,
-          args=["--history_file=%s" % new_hist.name])
-      child_proc.expect(":21000] default>")
-      self._expect_with_cmd(child_proc, "select 'hi'", ('hi'))
+      shell_cmd = get_shell_cmd(vector) + ["--history_file=%s" % new_hist.name]
+      child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+      child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
+      self._expect_with_cmd(child_proc, "select 'hi'", vector, ('hi'))
       child_proc.sendline('exit;')
       child_proc.expect(pexpect.EOF)
       history_contents = file(new_hist.name).read()
       assert "select 'hi'" in history_contents
 
-  def test_rerun(self, tmp_history_file):
+  def test_rerun(self, vector, tmp_history_file):
     """Smoke test for the 'rerun' command"""
-    child_proc = pexpect.spawn(SHELL_CMD)
-    child_proc.expect(":21000] default>")
-    self._expect_with_cmd(child_proc, "@1", ("Command index out of range"))
-    self._expect_with_cmd(child_proc, "rerun -1", ("Command index out of range"))
-    self._expect_with_cmd(child_proc, "select 'first_command'", ("first_command"))
-    self._expect_with_cmd(child_proc, "rerun 1", ("first_command"))
-    self._expect_with_cmd(child_proc, "@ -1", ("first_command"))
-    self._expect_with_cmd(child_proc, "select 'second_command'", ("second_command"))
+    shell_cmd = get_shell_cmd(vector)
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
+    self._expect_with_cmd(child_proc, "@1", vector, ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "rerun -1", vector,
+        ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "select 'first_command'", vector,
+        ("first_command"))
+    self._expect_with_cmd(child_proc, "rerun 1", vector, ("first_command"))
+    self._expect_with_cmd(child_proc, "@ -1", vector, ("first_command"))
+    self._expect_with_cmd(child_proc, "select 'second_command'", vector,
+        ("second_command"))
     child_proc.sendline('history;')
-    child_proc.expect(":21000] default>")
+    child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     assert '[1]: select \'first_command\';' in child_proc.before
     assert '[2]: select \'second_command\';' in child_proc.before
     assert '[3]: history;' in child_proc.before
     # Rerunning command should not add an entry into history.
     assert '[4]' not in child_proc.before
-    self._expect_with_cmd(child_proc, "@0", ("Command index out of range"))
-    self._expect_with_cmd(child_proc, "rerun   4", ("Command index out of range"))
-    self._expect_with_cmd(child_proc, "@-4", ("Command index out of range"))
-    self._expect_with_cmd(child_proc, " @ 3 ", ("second_command"))
-    self._expect_with_cmd(child_proc, "@-3", ("first_command"))
-    self._expect_with_cmd(child_proc, "@",
+    self._expect_with_cmd(child_proc, "@0", vector, ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "rerun   4", vector, ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "@-4", vector, ("Command index out of range"))
+    self._expect_with_cmd(child_proc, " @ 3 ", vector, ("second_command"))
+    self._expect_with_cmd(child_proc, "@-3", vector, ("first_command"))
+    self._expect_with_cmd(child_proc, "@", vector,
                           ("Command index to be rerun must be an integer."))
-    self._expect_with_cmd(child_proc, "@1foo",
+    self._expect_with_cmd(child_proc, "@1foo", vector,
                           ("Command index to be rerun must be an integer."))
-    self._expect_with_cmd(child_proc, "@1 2",
+    self._expect_with_cmd(child_proc, "@1 2", vector,
                           ("Command index to be rerun must be an integer."))
-    self._expect_with_cmd(child_proc, "rerun1", ("Syntax error"))
+    self._expect_with_cmd(child_proc, "rerun1", vector, ("Syntax error"))
     child_proc.sendline('quit;')
 
-  def test_tip(self):
+  def test_tip(self, vector):
     """Smoke test for the TIP command"""
     # Temporarily add impala_shell module to path to get at TIPS list for verification
     sys.path.append("%s/shell/" % os.environ['IMPALA_HOME'])
@@ -378,35 +409,36 @@ class TestImpalaShellInteractive(object):
       import impala_shell
     finally:
       sys.path = sys.path[:-1]
-    result = run_impala_shell_interactive("tip;")
+    result = run_impala_shell_interactive(vector, "tip;")
     for t in impala_shell.TIPS:
       if t in result.stderr: return
     assert False, "No tip found in output %s" % result.stderr
 
-  def test_var_substitution(self):
+  def test_var_substitution(self, vector):
     cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read()
-    args = '''--var=foo=123 --var=BAR=456 --delimited "--output_delimiter= " '''
-    result = run_impala_shell_interactive(cmds, shell_args=args)
+    args = ["--var=foo=123", "--var=BAR=456", "--delimited", "--output_delimiter= "]
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
     assert_var_substitution(result)
 
-  def test_query_option_configuration(self):
+  def test_query_option_configuration(self, vector):
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'impalarc_with_query_options')
-    args = '-Q MT_dop=1 --query_option=MAX_ERRORS=200 --config_file="%s"' % rcfile_path
+    args = ['-Q', 'MT_dop=1', '--query_option=MAX_ERRORS=200',
+            '--config_file=%s' % rcfile_path]
     cmds = "set all;"
-    result = run_impala_shell_interactive(cmds, shell_args=args)
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
     assert "\tMT_DOP: 1" in result.stdout
     assert "\tMAX_ERRORS: 200" in result.stdout
     assert "\tEXPLAIN_LEVEL: 2" in result.stdout
     assert "INVALID_QUERY_OPTION is not supported for the impalad being connected to, "\
            "ignoring." in result.stdout
 
-  def test_source_file(self):
+  def test_source_file(self, vector):
     cwd = os.getcwd()
     try:
       # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
       # IMPALA-5416: Test that a command following 'source' won't be run twice.
-      result = run_impala_shell_interactive("source shell.cmds;select \"second "
+      result = run_impala_shell_interactive(vector, "source shell.cmds;select \"second "
                                             "command\";")
       assert "Query: USE FUNCTIONAL" in result.stderr
       assert "Query: SHOW TABLES" in result.stderr
@@ -416,57 +448,60 @@ class TestImpalaShellInteractive(object):
       assert "version()" in result.stdout
       assert len(re.findall("'second command'", result.stdout)) == 1
       # IMPALA-5416: Test that two source commands on a line won't crash the shell.
-      result = run_impala_shell_interactive("source shell.cmds;source shell.cmds;")
+      result = run_impala_shell_interactive(
+          vector, "source shell.cmds;source shell.cmds;")
       assert len(re.findall("version\(\)", result.stdout)) == 2
     finally:
       os.chdir(cwd)
 
-  def test_source_file_with_errors(self):
+  def test_source_file_with_errors(self, vector):
     full_path = "%s/tests/shell/shell_error.cmds" % os.environ['IMPALA_HOME']
-    result = run_impala_shell_interactive("source %s;" % full_path)
+    result = run_impala_shell_interactive(vector, "source %s;" % full_path)
     assert "Could not execute command: USE UNKNOWN_DATABASE" in result.stderr
     assert "Query: USE FUNCTIONAL" not in result.stderr
 
-    result = run_impala_shell_interactive("source %s;" % full_path, '-c')
-    assert "Could not execute command: USE UNKNOWN_DATABASE" in result.stderr
-    assert "Query: USE FUNCTIONAL" in result.stderr
-    assert "Query: SHOW TABLES" in result.stderr
-    assert "alltypes" in result.stdout
+    result = run_impala_shell_interactive(vector, "source %s;" % full_path, ['-c'])
+    assert "Could not execute command: USE UNKNOWN_DATABASE" in result.stderr,\
+        result.stderr
+    assert "Query: USE FUNCTIONAL" in result.stderr, result.stderr
+    assert "Query: SHOW TABLES" in result.stderr, result.stderr
+    assert "alltypes" in result.stdout, result.stdout
 
-  def test_source_missing_file(self):
+  def test_source_missing_file(self, vector):
     full_path = "%s/tests/shell/doesntexist.cmds" % os.environ['IMPALA_HOME']
-    result = run_impala_shell_interactive("source %s;" % full_path)
+    result = run_impala_shell_interactive(vector, "source %s;" % full_path)
     assert "No such file or directory" in result.stderr
 
-  def test_zero_row_fetch(self):
+  def test_zero_row_fetch(self, vector):
     # IMPALA-4418: DROP and USE are generally exceptional statements where
     # the client does not fetch. For statements returning 0 rows we do not
     # want an empty line in stdout.
-    result = run_impala_shell_interactive("-- foo \n use default;")
+    result = run_impala_shell_interactive(vector, "-- foo \n use default;")
     assert re.search('> \[', result.stdout)
-    result = run_impala_shell_interactive("select * from functional.alltypes limit 0;")
+    result = run_impala_shell_interactive(vector,
+        "select * from functional.alltypes limit 0;")
     assert "Fetched 0 row(s)" in result.stderr
     assert re.search('> \[', result.stdout)
 
-  def test_set_and_set_all(self):
+  def test_set_and_set_all(self, vector):
     """IMPALA-2181. Tests the outputs of SET and SET ALL commands. SET should contain the
     REGULAR and ADVANCED options only. SET ALL should contain all the options grouped by
     display level."""
-    shell1 = ImpalaShell()
+    shell1 = ImpalaShell(vector)
     shell1.send_cmd("set")
     result = shell1.get_result()
     assert "Query options (defaults shown in []):" in result.stdout
     assert "ABORT_ON_ERROR" in result.stdout
     assert "Advanced Query Options:" in result.stdout
     assert "APPX_COUNT_DISTINCT" in result.stdout
-    assert "SUPPORT_START_OVER" in result.stdout
+    assert vector.get_value("protocol") == "hs2" or "SUPPORT_START_OVER" in result.stdout
     # Development, deprecated and removed options should not be shown.
     # Note: there are currently no deprecated options
     assert "Development Query Options:" not in result.stdout
     assert "DEBUG_ACTION" not in result.stdout  # Development option.
     assert "MAX_IO_BUFFERS" not in result.stdout  # Removed option.
 
-    shell2 = ImpalaShell()
+    shell2 = ImpalaShell(vector)
     shell2.send_cmd("set all")
     result = shell2.get_result()
     assert "Query options (defaults shown in []):" in result.stdout
@@ -480,41 +515,41 @@ class TestImpalaShellInteractive(object):
     development_part = result.stdout[development_part_start_idx:deprecated_part_start_idx]
     assert "ABORT_ON_ERROR" in result.stdout[:advanced_part_start_idx]
     assert "APPX_COUNT_DISTINCT" in advanced_part
-    assert "SUPPORT_START_OVER" in advanced_part
+    assert vector.get_value("protocol") == "hs2" or "SUPPORT_START_OVER" in advanced_part
     assert "DEBUG_ACTION" in development_part
     # Removed options should not be shown.
     assert "MAX_IO_BUFFERS" not in result.stdout
 
-  def check_command_case_sensitivity(self, command, expected):
-    shell = ImpalaShell()
+  def check_command_case_sensitivity(self, vector, command, expected):
+    shell = ImpalaShell(vector)
     shell.send_cmd(command)
     assert expected in shell.get_result().stderr
 
-  def test_unexpected_conversion_for_literal_string_to_lowercase(self):
+  def test_unexpected_conversion_for_literal_string_to_lowercase(self, vector):
     # IMPALA-4664: Impala shell can accidentally convert certain literal
     # strings to lowercase. Impala shell splits each command into tokens
     # and then converts the first token to lowercase to figure out how it
     # should execute the command. The splitting is done by spaces only.
     # Thus, if the user types a TAB after the SELECT, the first token after
     # the split becomes the SELECT plus whatever comes after it.
-    result = run_impala_shell_interactive("select'MUST_HAVE_UPPER_STRING'")
+    result = run_impala_shell_interactive(vector, "select'MUST_HAVE_UPPER_STRING'")
     assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
-    result = run_impala_shell_interactive("select\t'MUST_HAVE_UPPER_STRING'")
+    result = run_impala_shell_interactive(vector, "select\t'MUST_HAVE_UPPER_STRING'")
     assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
-    result = run_impala_shell_interactive("select\n'MUST_HAVE_UPPER_STRING'")
+    result = run_impala_shell_interactive(vector, "select\n'MUST_HAVE_UPPER_STRING'")
     assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
 
-  def test_case_sensitive_command(self):
+  def test_case_sensitive_command(self, vector):
     # IMPALA-2640: Make a given command case-sensitive
     cwd = os.getcwd()
     try:
-      self.check_command_case_sensitivity("sElEcT VERSION()", "Query: sElEcT")
-      self.check_command_case_sensitivity("sEt VaR:FoO=bOo", "Variable FOO")
-      self.check_command_case_sensitivity("sHoW tables", "Query: sHoW")
+      self.check_command_case_sensitivity(vector, "sElEcT VERSION()", "Query: sElEcT")
+      self.check_command_case_sensitivity(vector, "sEt VaR:FoO=bOo", "Variable FOO")
+      self.check_command_case_sensitivity(vector, "sHoW tables", "Query: sHoW")
       # Change working dir so that SOURCE command in shell_case_sensitive.cmds can
       # find shell_case_sensitive2.cmds.
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
-      result = run_impala_shell_interactive(
+      result = run_impala_shell_interactive(vector,
         "sOuRcE shell_case_sensitive.cmds; SeLeCt 'second command'")
       print result.stderr
       assert "Query: uSe FUNCTIONAL" in result.stderr
@@ -527,72 +562,69 @@ class TestImpalaShellInteractive(object):
     finally:
       os.chdir(cwd)
 
-  def test_line_with_leading_comment(self):
+  def test_line_with_leading_comment(self, vector, unique_database):
     # IMPALA-2195: A line with a comment produces incorrect command.
-    try:
-      run_impala_shell_interactive('drop table if exists leading_comment;')
-      run_impala_shell_interactive('create table leading_comment (i int);')
-      result = run_impala_shell_interactive('-- comment\n'
-                                            'insert into leading_comment values(1);')
-      assert 'Modified 1 row(s)' in result.stderr
-      result = run_impala_shell_interactive('-- comment\n'
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
-      result = run_impala_shell_interactive('--한글\n'
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
-      result = run_impala_shell_interactive('/* 한글 */\n'
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
-      result = run_impala_shell_interactive('/* comment */\n'
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
+    table = "{0}.leading_comment".format(unique_database)
+    run_impala_shell_interactive(vector, 'create table {0} (i int);'.format(table))
+    result = run_impala_shell_interactive(vector, '-- comment\n'
+                                          'insert into {0} values(1);'.format(table))
+    assert 'Modified 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '-- comment\n'
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '--한글\n'
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* 한글 */\n'
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* comment */\n'
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
 
-      result = run_impala_shell_interactive('/* comment1 */\n'
-                                            '-- comment2\n'
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* comment1 */\n'
+                                          '-- comment2\n'
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
 
-      result = run_impala_shell_interactive('/* comment1\n'
-                                            'comment2 */ select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* comment1\n'
+                                          'comment2 */ select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
 
-      result = run_impala_shell_interactive('/* select * from leading_comment */ '
-                                            'select * from leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* select * from {0} */ '
+                                          'select * from {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
 
-      result = run_impala_shell_interactive('/* comment */ help use')
-      assert 'Executes a USE... query' in result.stdout
+    result = run_impala_shell_interactive(vector, '/* comment */ help use')
+    assert 'Executes a USE... query' in result.stdout
 
-      result = run_impala_shell_interactive('-- comment\n'
-                                            ' help use;')
-      assert 'Executes a USE... query' in result.stdout
+    result = run_impala_shell_interactive(vector, '-- comment\n'
+                                          ' help use;')
+    assert 'Executes a USE... query' in result.stdout
 
-      result = run_impala_shell_interactive('/* comment1 */\n'
-                                            '-- comment2\n'
-                                            'desc leading_comment;')
-      assert 'Fetched 1 row(s)' in result.stderr
+    result = run_impala_shell_interactive(vector, '/* comment1 */\n'
+                                          '-- comment2\n'
+                                          'desc {0};'.format(table))
+    assert 'Fetched 1 row(s)' in result.stderr
 
-      result = run_impala_shell_interactive('/* comment1 */\n'
-                                            '-- comment2\n'
-                                            'help use;')
-      assert 'Executes a USE... query' in result.stdout
-    finally:
-      run_impala_shell_interactive('drop table if exists leading_comment;')
+    result = run_impala_shell_interactive(vector, '/* comment1 */\n'
+                                          '-- comment2\n'
+                                          'help use;')
+    assert 'Executes a USE... query' in result.stdout
 
-  def test_line_ends_with_comment(self):
+  def test_line_ends_with_comment(self, vector):
     # IMPALA-5269: Test lines that end with a comment.
     queries = ['select 1 + 1; --comment',
                'select 1 + 1 --comment\n;']
     for query in queries:
-      result = run_impala_shell_interactive(query)
+      result = run_impala_shell_interactive(vector, query)
       assert '| 1 + 1 |' in result.stdout
       assert '| 2     |' in result.stdout
 
     queries = ['select \'some string\'; --comment',
                'select \'some string\' --comment\n;']
     for query in queries:
-      result = run_impala_shell_interactive(query)
+      result = run_impala_shell_interactive(vector, query)
       assert '| \'some string\' |' in result.stdout
       assert '| some string   |' in result.stdout
 
@@ -601,37 +633,37 @@ class TestImpalaShellInteractive(object):
                'select "--" -- "--"\n;',
                'select \'--\' -- "--"\n;']
     for query in queries:
-      result = run_impala_shell_interactive(query)
+      result = run_impala_shell_interactive(vector, query)
       assert '| \'--\' |' in result.stdout
       assert '| --   |' in result.stdout
 
     query = ('select * from (\n' +
              'select count(*) from functional.alltypes\n' +
              ') v; -- Incomplete SQL statement in this line')
-    result = run_impala_shell_interactive(query)
+    result = run_impala_shell_interactive(vector, query)
     assert '| count(*) |' in result.stdout
 
     query = ('select id from functional.alltypes\n' +
              'order by id; /*\n' +
              '* Multi-line comment\n' +
              '*/')
-    result = run_impala_shell_interactive(query)
+    result = run_impala_shell_interactive(vector, query)
     assert '| id   |' in result.stdout
 
-  def test_fix_infinite_loop(self):
+  def test_fix_infinite_loop(self, vector):
     # IMPALA-6337: Fix infinite loop.
-    result = run_impala_shell_interactive("select 1 + 1; \"\n;\";")
+    result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\";")
     assert '| 2     |' in result.stdout
-    result = run_impala_shell_interactive("select '1234'\";\n;\n\";")
+    result = run_impala_shell_interactive(vector, "select '1234'\";\n;\n\";")
     assert '| 1234 |' in result.stdout
-    result = run_impala_shell_interactive("select 1 + 1; \"\n;\"\n;")
+    result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\"\n;")
     assert '| 2     |' in result.stdout
-    result = run_impala_shell_interactive("select '1\\'23\\'4'\";\n;\n\";")
+    result = run_impala_shell_interactive(vector, "select '1\\'23\\'4'\";\n;\n\";")
     assert '| 1\'23\'4 |' in result.stdout
-    result = run_impala_shell_interactive("select '1\"23\"4'\";\n;\n\";")
+    result = run_impala_shell_interactive(vector, "select '1\"23\"4'\";\n;\n\";")
     assert '| 1"23"4 |' in result.stdout
 
-  def test_comment_with_quotes(self):
+  def test_comment_with_quotes(self, vector):
     # IMPALA-2751: Comment does not need to have matching quotes
     queries = [
       "select -- '\n1;",
@@ -645,38 +677,39 @@ class TestImpalaShellInteractive(object):
       "with a as (\nselect 1\n-- '\"\n) select * from a",
     ]
     for query in queries:
-      result = run_impala_shell_interactive(query)
+      result = run_impala_shell_interactive(vector, query)
       assert '| 1 |' in result.stdout
 
-  def test_shell_prompt(self):
-    proc = pexpect.spawn(SHELL_CMD)
-    proc.expect(":21000] default>")
-    self._expect_with_cmd(proc, "use foo", (), 'default')
-    self._expect_with_cmd(proc, "use functional", (), 'functional')
-    self._expect_with_cmd(proc, "use foo", (), 'functional')
-    self._expect_with_cmd(proc, 'use `tpch`', (), 'tpch')
-    self._expect_with_cmd(proc, 'use ` tpch `', (), 'tpch')
+  def test_shell_prompt(self, vector):
+    shell_cmd = get_shell_cmd(vector)
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    proc.expect(":{0}] default>".format(get_impalad_port(vector)))
+    self._expect_with_cmd(proc, "use foo", vector, (), 'default')
+    self._expect_with_cmd(proc, "use functional", vector, (), 'functional')
+    self._expect_with_cmd(proc, "use foo", vector, (), 'functional')
+    self._expect_with_cmd(proc, 'use `tpch`', vector, (), 'tpch')
+    self._expect_with_cmd(proc, 'use ` tpch `', vector, (), 'tpch')
 
-    proc = pexpect.spawn(SHELL_CMD, ['-d', 'functional'])
-    proc.expect(":21000] functional>")
-    self._expect_with_cmd(proc, "use foo", (), 'functional')
-    self._expect_with_cmd(proc, "use tpch", (), 'tpch')
-    self._expect_with_cmd(proc, "use foo", (), 'tpch')
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', 'functional'])
+    proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
+    self._expect_with_cmd(proc, "use foo", vector, (), 'functional')
+    self._expect_with_cmd(proc, "use tpch", vector, (), 'tpch')
+    self._expect_with_cmd(proc, "use foo", vector, (), 'tpch')
 
-    proc = pexpect.spawn(SHELL_CMD, ['-d', ' functional '])
-    proc.expect(":21000] functional>")
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', ' functional '])
+    proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
 
-    proc = pexpect.spawn(SHELL_CMD, ['-d', '` functional `'])
-    proc.expect(":21000] functional>")
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', '` functional `'])
+    proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
 
     # Start an Impala shell with an invalid DB.
-    proc = pexpect.spawn(SHELL_CMD, ['-d', 'foo'])
-    proc.expect(":21000] default>")
-    self._expect_with_cmd(proc, "use foo", (), 'default')
-    self._expect_with_cmd(proc, "use functional", (), 'functional')
-    self._expect_with_cmd(proc, "use foo", (), 'functional')
+    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', 'foo'])
+    proc.expect(":{0}] default>".format(get_impalad_port(vector)))
+    self._expect_with_cmd(proc, "use foo", vector, (), 'default')
+    self._expect_with_cmd(proc, "use functional", vector, (), 'functional')
+    self._expect_with_cmd(proc, "use foo", vector, (), 'functional')
 
-  def test_strip_leading_comment(self):
+  def test_strip_leading_comment(self, vector):
     """Test stripping leading comments from SQL statements"""
     assert ('--delete\n', 'select 1') == \
         ImpalaShellClass.strip_leading_comment('--delete\nselect 1')
@@ -724,34 +757,35 @@ class TestImpalaShellInteractive(object):
     assert (None, 'select 1') == \
         ImpalaShellClass.strip_leading_comment('select 1')
 
-  def test_malformed_query(self):
+  def test_malformed_query(self, vector):
     """Test the handling of malformed query without closing quotation"""
-    shell = ImpalaShell()
+    shell = ImpalaShell(vector)
     query = "with v as (select 1) \nselect foo('\\\\'), ('bar \n;"
     shell.send_cmd(query)
     result = shell.get_result()
-    assert "ERROR: ParseException: Unmatched string literal" in result.stderr
+    assert "ERROR: ParseException: Unmatched string literal" in result.stderr,\
+           result.stderr
 
-  def test_timezone_validation(self):
+  def test_timezone_validation(self, vector):
     """Test that query option TIMEZONE is validated when executing a query.
 
        Query options are not sent to the coordinator immediately, so the error checking
        will only happen when running a query.
     """
-    p = ImpalaShell()
+    p = ImpalaShell(vector)
     p.send_cmd('set timezone=BLA;')
     p.send_cmd('select 1;')
     results = p.get_result()
     assert "Fetched 1 row" not in results.stderr
-    assert "ERROR: Errors parsing query options" in results.stderr
-    assert "Invalid timezone name 'BLA'" in results.stderr
+    # assert "ERROR: Errors parsing query options" in results.stderr, results.stderr
+    assert "Invalid timezone name 'BLA'" in results.stderr, results.stderr
 
-  def test_with_clause(self):
+  def test_with_clause(self, vector):
     # IMPALA-7939: Fix issue where CTE that contains "insert", "upsert", "update", or
     # "delete" is categorized as a DML statement.
     for keyword in ["insert", "upsert", "update", "delete", "\\'insert\\'",
                     "\\'upsert\\'", "\\'update\\'", "\\'delete\\'"]:
-      p = ImpalaShell()
+      p = ImpalaShell(vector)
       p.send_cmd("with foo as "
                  "(select * from functional.alltypestiny where string_col='%s') "
                  "select * from foo limit 1" % keyword)
@@ -759,7 +793,8 @@ class TestImpalaShellInteractive(object):
       assert "Fetched 0 row" in result.stderr
 
 
-def run_impala_shell_interactive(input_lines, shell_args=None, wait_until_connected=True):
+def run_impala_shell_interactive(vector, input_lines, shell_args=None,
+                                 wait_until_connected=True):
   """Runs a command in the Impala shell interactively."""
   # if argument "input_lines" is a string, makes it into a list
   if type(input_lines) is str:
@@ -768,7 +803,8 @@ def run_impala_shell_interactive(input_lines, shell_args=None, wait_until_connec
   # since piping defaults to ascii
   my_env = os.environ
   my_env['PYTHONIOENCODING'] = 'utf-8'
-  p = ImpalaShell(args=shell_args, env=my_env, wait_until_connected=wait_until_connected)
+  p = ImpalaShell(vector, args=shell_args, env=my_env,
+      wait_until_connected=wait_until_connected)
   for line in input_lines:
     p.send_cmd(line)
   return p.get_result()

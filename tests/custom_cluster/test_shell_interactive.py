@@ -20,8 +20,9 @@ import pexpect
 import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-
-SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
+from tests.common.test_vector import ImpalaTestVector
+from tests.common.test_dimensions import create_beeswax_dimension
+from tests.shell.util import get_shell_cmd, get_impalad_port
 
 
 class TestShellInteractive(CustomClusterTestSuite):
@@ -36,16 +37,20 @@ class TestShellInteractive(CustomClusterTestSuite):
     # Start a long running query so that the next one gets queued.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
     self.client.wait_for_admission_control(sleep_query_handle)
-    proc = pexpect.spawn(' '.join([SHELL_CMD, "-i localhost:21000"]))
-    # Check with only live_summary set to true.
-    proc.expect("21000] default>")
-    proc.sendline("set live_summary=true;")
-    proc.sendline("select 1;")
-    proc.expect(expected_admission_status)
-    proc.sendcontrol('c')
-    proc.expect("Cancelling Query")
-    # Check with only live_progress set to true.
-    proc.sendline("set live_summary=false;")
-    proc.sendline("set live_progress=true;")
-    proc.sendline("select 1;")
-    proc.expect(expected_admission_status)
+
+    # Iterate over test vector within test function to avoid restarting cluster.
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+      cmd = get_shell_cmd(vector)
+      proc = pexpect.spawn(cmd[0], cmd[1:])
+      # Check with only live_summary set to true.
+      proc.expect("{0}] default>".format(get_impalad_port(vector)))
+      proc.sendline("set live_summary=true;")
+      proc.sendline("select 1;")
+      proc.expect(expected_admission_status)
+      proc.sendcontrol('c')
+      proc.expect("Cancelling Query")
+      # Check with only live_progress set to true.
+      proc.sendline("set live_summary=false;")
+      proc.sendline("set live_progress=true;")
+      proc.sendline("select 1;")
+      proc.expect(expected_admission_status)

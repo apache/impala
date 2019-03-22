@@ -110,7 +110,12 @@ class ImpalaBeeswaxClient(object):
   def __init__(self, impalad, use_kerberos=False, user=None, password=None,
                use_ssl=False):
     self.connected = False
-    self.impalad = impalad
+    split_impalad = impalad.split(":")
+    assert len(split_impalad) in [1, 2]
+    self.impalad_host = split_impalad[0]
+    self.impalad_port = 21000  # Default beeswax port
+    if len(split_impalad) == 2:
+      self.impalad_port = int(split_impalad[1])
     self.imp_service = None
     self.transport = None
     self.use_kerberos = use_kerberos
@@ -148,7 +153,6 @@ class ImpalaBeeswaxClient(object):
     Raises an exception if the connection is unsuccesful.
     """
     try:
-      self.impalad = self.impalad.split(':')
       self.transport = self.__get_transport()
       self.transport.open()
       protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
@@ -170,7 +174,7 @@ class ImpalaBeeswaxClient(object):
       trans_type = 'kerberos'
     elif self.use_ldap:
       trans_type = 'plain_sasl'
-    return create_transport(host=self.impalad[0], port=int(self.impalad[1]),
+    return create_transport(host=self.impalad_host, port=self.impalad_port,
                             service='impala', transport_type=trans_type, user=self.user,
                             password=self.password, use_ssl=self.use_ssl)
 

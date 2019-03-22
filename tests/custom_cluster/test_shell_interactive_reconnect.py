@@ -23,11 +23,12 @@ import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
-from tests.shell.util import ImpalaShell
+from tests.common.test_vector import ImpalaTestVector
+from tests.common.test_dimensions import create_beeswax_dimension
+from tests.shell.util import ImpalaShell, get_shell_cmd, get_impalad_port
 # Follow tests/shell/test_shell_interactive.py naming.
 from shell.impala_shell import ImpalaShell as ImpalaShellClass
 
-SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 NUM_QUERIES = 'impala-server.num-queries'
 
 class TestShellInteractiveReconnect(CustomClusterTestSuite):
@@ -38,31 +39,39 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_manual_reconnect(self):
-    p = ImpalaShell()
-    p.send_cmd("USE functional")
-    p.send_cmd("CONNECT")
-    p.send_cmd("SHOW TABLES")
+    # Iterate over test vector within test function to avoid restarting cluster.
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+      p = ImpalaShell(vector)
+      p.send_cmd("USE functional")
+      # Connect without arguments works because the custom cluster will have the default
+      # HS2 and Beeswax ports.
+      p.send_cmd("CONNECT")
+      p.send_cmd("SHOW TABLES")
 
-    result = p.get_result()
-    assert "alltypesaggmultifilesnopart" in result.stdout
+      result = p.get_result()
+      assert "alltypesaggmultifilesnopart" in result.stdout, result.stdout
 
   @pytest.mark.execute_serially
   def test_auto_reconnect(self):
     impalad = ImpaladService(socket.getfqdn())
-    start_num_queries = impalad.get_metric_value(NUM_QUERIES)
 
-    p = ImpalaShell()
-    p.send_cmd("USE functional")
+    # Iterate over test vector within test function to avoid restarting cluster.
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+      p = ImpalaShell(vector)
+      # ImpalaShell startup may issue query to get server info - get num queries after
+      # starting shell.
+      start_num_queries = impalad.get_metric_value(NUM_QUERIES)
+      p.send_cmd("USE functional")
 
-    # wait for the USE command to finish
-    impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
-    assert impalad.wait_for_num_in_flight_queries(0)
+      # wait for the USE command to finish
+      impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
+      assert impalad.wait_for_num_in_flight_queries(0)
 
-    self._start_impala_cluster([])
+      self._start_impala_cluster([])
 
-    p.send_cmd("SHOW TABLES")
-    result = p.get_result()
-    assert "alltypesaggmultifilesnopart" in result.stdout
+      p.send_cmd("SHOW TABLES")
+      result = p.get_result()
+      assert "alltypesaggmultifilesnopart" in result.stdout, result.stdout
 
   @pytest.mark.execute_serially
   def test_auto_reconnect_after_impalad_died(self):
@@ -71,24 +80,29 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
     # to check Disconnect, send_cmd() will no longer have any effect so we can not check
     # reconnect.
     impalad = ImpaladService(socket.getfqdn())
-    start_num_queries = impalad.get_metric_value(NUM_QUERIES)
 
-    proc = pexpect.spawn(' '.join([SHELL_CMD, "-i localhost:21000"]))
-    proc.expect("21000] default>")
-    proc.sendline("use tpch;")
+    # Iterate over test vector within test function to avoid restarting cluster.
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+      cmd = get_shell_cmd(vector)
+      proc = pexpect.spawn(cmd[0], cmd[1:])
+      proc.expect("{0}] default>".format(get_impalad_port(vector)))
+      # ImpalaShell startup may issue query to get server info - get num queries after
+      # starting shell.
+      start_num_queries = impalad.get_metric_value(NUM_QUERIES)
+      proc.sendline("use tpch;")
 
-    # wait for the USE command to finish
-    impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
-    assert impalad.wait_for_num_in_flight_queries(0)
+      # wait for the USE command to finish
+      impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
+      assert impalad.wait_for_num_in_flight_queries(0)
 
-    # Disconnect
-    self.cluster.impalads[0].kill()
-    proc.sendline("show tables;")
-    # Search from [1:] since the square brackets "[]" are special characters in regex
-    proc.expect(ImpalaShellClass.DISCONNECTED_PROMPT[1:])
-    # Restarting Impalad
-    self.cluster.impalads[0].start()
-    # Check reconnect
-    proc.sendline("show tables;")
-    proc.expect("nation")
-    proc.expect("21000] tpch>")
+      # Disconnect
+      self.cluster.impalads[0].kill()
+      proc.sendline("show tables;")
+      # Search from [1:] since the square brackets "[]" are special characters in regex
+      proc.expect(ImpalaShellClass.DISCONNECTED_PROMPT[1:])
+      # Restarting Impalad
+      self.cluster.impalads[0].start()
+      # Check reconnect
+      proc.sendline("show tables;")
+      proc.expect("nation")
+      proc.expect("{0}] tpch>".format(get_impalad_port(vector)))

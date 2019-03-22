@@ -39,7 +39,7 @@ setup_report_build_error
 # TODO: We need a better way of managing how these get set. See IMPALA-4346
 : ${HS2_HOST_PORT=localhost:11050}
 : ${HDFS_NN=${INTERNAL_LISTEN_HOST}:20500}
-: ${IMPALAD=localhost:21000}
+: ${IMPALAD=localhost}
 : ${REMOTE_LOAD=}
 : ${CM_HOST=}
 : ${IMPALA_SERIAL_DATALOAD=}

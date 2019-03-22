@@ -27,7 +27,7 @@ setup_report_build_error
 set -x
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
-IMPALAD=${IMPALAD:-localhost:21000}
+IMPALAD=${IMPALAD:-localhost}
 
 TPCDS_QUERY_HOME=$IMPALA_HOME/testdata/workloads/tpcds/queries/raw
 # Target directory containing the testcase data.

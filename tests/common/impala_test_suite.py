@@ -96,6 +96,7 @@ if IS_ADLS:
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
+IMPALAD_BEESWAX_HOST_PORT = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_HS2_HOST_PORT =\
     IMPALAD.split(':')[0] + ":" + pytest.config.option.impalad_hs2_port
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2

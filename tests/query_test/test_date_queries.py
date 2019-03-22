@@ -103,12 +103,3 @@ class TestDateQueries(ImpalaTestSuite):
     self.client.execute(SET_PART_FF_SQL)
     # Test scanning/writing tables with different fileformats.
     self.run_test_case('QueryTest/date-text-only-support', vector, use_db=unique_database)
-
-  def test_impala_shell(self):
-    """ Test that query returns DATE values through impala-shell. """
-    p = ImpalaShell()
-    p.send_cmd("set write_delimited=true")
-    p.send_cmd('select id_col, date_part, date_col from functional.date_tbl '
-        'order by 1 limit 1')
-    result = p.get_result()
-    assert '0\t0001-01-01\t0001-01-01' in result.stdout
