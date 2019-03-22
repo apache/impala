@@ -27,7 +27,8 @@ from subprocess import Popen, PIPE
 
 from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
                                   IMPALA_TEST_CLUSTER_PROPERTIES)
-from tests.common.impala_test_suite import IMPALAD_BEESWAX_HOST_PORT
+from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
+                                            IMPALAD_HS2_HOST_PORT)
 
 
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
@@ -132,8 +133,11 @@ def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=Non
 def get_impalad_host_port(vector):
   """Get host and port to connect to based on test vector provided."""
   protocol = vector.get_value("protocol")
-  assert protocol == 'beeswax', protocol
-  return IMPALAD_BEESWAX_HOST_PORT
+  if protocol == 'hs2':
+    return IMPALAD_HS2_HOST_PORT
+  else:
+    assert protocol == 'beeswax', protocol
+    return IMPALAD_BEESWAX_HOST_PORT
 
 
 def get_impalad_port(vector):
@@ -144,17 +148,18 @@ def get_impalad_port(vector):
 def get_shell_cmd(vector):
   """Get the basic shell command to start the shell, given the provided test vector.
   Returns the command as a list of string arguments."""
-  # Use impala-shell build instead of bin/impala-shell.sh so that we test with the
-  # system python, not the toolchain python and in a configuration close to what
-  # we will distribute.
-  return [IMPALA_SHELL_EXECUTABLE, "-i{0}".format(get_impalad_host_port(vector))]
+  return [IMPALA_SHELL_EXECUTABLE, "--protocol={0}".format(vector.get_value("protocol")),
+          "-i{0}".format(get_impalad_host_port(vector))]
 
 
 def get_open_sessions_metric(vector):
   """Get the name of the vector that tracks open sessions for the protocol in vector."""
   protocol = vector.get_value("protocol")
-  assert protocol == 'beeswax', protocol
-  return 'impala-server.num-open-beeswax-sessions'
+  if protocol == 'hs2':
+    return 'impala-server.num-open-hiveserver2-sessions'
+  else:
+    assert protocol == 'beeswax', protocol
+    return 'impala-server.num-open-beeswax-sessions'
 
 class ImpalaShellResult(object):
   def __init__(self):

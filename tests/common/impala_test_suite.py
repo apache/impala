@@ -192,10 +192,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # Cleanup the Impala and Hive Metastore client connections
     if cls.hive_transport:
       cls.hive_transport.close()
-    if cls.client:
-      cls.client.close()
-    if cls.hs2_client:
-      cls.hs2_client.close()
+    cls.close_impala_clients()
 
   @classmethod
   def create_impala_client(cls, host_port=None, protocol='beeswax',
@@ -207,6 +204,14 @@ class ImpalaTestSuite(BaseTestSuite):
         is_hive=is_hive)
     client.connect()
     return client
+
+  @classmethod
+  def close_impala_clients(cls):
+    """Close Impala clients created by setup_class()."""
+    if cls.client:
+      cls.client.close()
+    if cls.hs2_client:
+      cls.hs2_client.close()
 
   @classmethod
   def __get_default_host_port(cls, protocol):

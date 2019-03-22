@@ -21,7 +21,7 @@ import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_vector import ImpalaTestVector
-from tests.common.test_dimensions import create_beeswax_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_dimension
 from tests.shell.util import get_shell_cmd, get_impalad_port
 
 
@@ -39,7 +39,7 @@ class TestShellInteractive(CustomClusterTestSuite):
     self.client.wait_for_admission_control(sleep_query_handle)
 
     # Iterate over test vector within test function to avoid restarting cluster.
-    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_hs2_dimension()]:
       cmd = get_shell_cmd(vector)
       proc = pexpect.spawn(cmd[0], cmd[1:])
       # Check with only live_summary set to true.

@@ -24,10 +24,11 @@ import os
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
 from tests.common.test_vector import ImpalaTestVector
-from tests.common.test_dimensions import create_beeswax_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_dimension
 from tests.shell.util import ImpalaShell, get_shell_cmd, get_impalad_port
 # Follow tests/shell/test_shell_interactive.py naming.
 from shell.impala_shell import ImpalaShell as ImpalaShellClass
+from tests.verifiers.metric_verifier import MetricVerifier
 
 NUM_QUERIES = 'impala-server.num-queries'
 
@@ -40,7 +41,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_manual_reconnect(self):
     # Iterate over test vector within test function to avoid restarting cluster.
-    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_hs2_dimension()]:
       p = ImpalaShell(vector)
       p.send_cmd("USE functional")
       # Connect without arguments works because the custom cluster will have the default
@@ -56,7 +57,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
     impalad = ImpaladService(socket.getfqdn())
 
     # Iterate over test vector within test function to avoid restarting cluster.
-    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_hs2_dimension()]:
       p = ImpalaShell(vector)
       # ImpalaShell startup may issue query to get server info - get num queries after
       # starting shell.
@@ -82,7 +83,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
     impalad = ImpaladService(socket.getfqdn())
 
     # Iterate over test vector within test function to avoid restarting cluster.
-    for vector in [ImpalaTestVector([value]) for value in create_beeswax_dimension()]:
+    for vector in [ImpalaTestVector([value]) for value in create_beeswax_hs2_dimension()]:
       cmd = get_shell_cmd(vector)
       proc = pexpect.spawn(cmd[0], cmd[1:])
       proc.expect("{0}] default>".format(get_impalad_port(vector)))
@@ -106,3 +107,9 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
       proc.sendline("show tables;")
       proc.expect("nation")
       proc.expect("{0}] tpch>".format(get_impalad_port(vector)))
+      proc.sendeof()
+      proc.wait()
+
+      # Ensure no sessions or queries are left dangling.
+      verifier = MetricVerifier(self.impalad_test_service)
+      verifier.verify_metrics_are_zero()

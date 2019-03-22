@@ -412,18 +412,18 @@ void DmlExecState::ToProto(DmlExecStatusPB* dml_status) {
   }
 }
 
-void DmlExecState::ToTInsertResult(TInsertResult* insert_result) {
+void DmlExecState::ToTDmlResult(TDmlResult* dml_result) {
   lock_guard<mutex> l(lock_);
   int64_t num_row_errors = 0;
   bool has_kudu_stats = false;
   for (const PartitionStatusMap::value_type& v: per_partition_status_) {
-    insert_result->rows_modified[v.first] = v.second.num_modified_rows();
+    dml_result->rows_modified[v.first] = v.second.num_modified_rows();
     if (v.second.has_stats() && v.second.stats().has_kudu_stats()) {
       has_kudu_stats = true;
     }
     num_row_errors += v.second.stats().kudu_stats().num_row_errors();
   }
-  if (has_kudu_stats) insert_result->__set_num_row_errors(num_row_errors);
+  if (has_kudu_stats) dml_result->__set_num_row_errors(num_row_errors);
 }
 
 void DmlExecState::AddPartition(

@@ -399,6 +399,7 @@ www/DataTables* and www/datatables*: MIT license
 shell/pkg_resources.py: Python Software License V2
 Parts of be/src/runtime/string-search.h: Python Software License V2
 Parts of shell/impala_shell.py: Python Software License V2
+shell/ext-py/bit-array*: Python Software License V2
 
   Copyright (c) 2001 - 2016 Python Software Foundation; All Rights Reserved
 

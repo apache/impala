@@ -41,6 +41,7 @@ tests/comparison/leopard/static/js/bootstrap*
 shell/ext-py/prettytable-0.7.1/*
 shell/ext-py/sqlparse-0.1.19/*
 shell/ext-py/sasl-0.1.1/*
+shell/ext-py/bitarray-0.9.0/*
 www/d3.v3.min.js
 www/jquery/jquery-1.12.4.min.js
 tests/comparison/leopard/static/css/hljs.css

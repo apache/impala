@@ -190,18 +190,28 @@ class TestObservability(ImpalaTestSuite):
     assert "CLIENT_IDENTIFIER=" + \
         "query_test/test_observability.py::TestObservability::()::test_query_options" \
         in profile
+    # Get the TIMEZONE value.
+    server_timezone = None
+    for row in self.execute_query("set", query_opts).data:
+      name, val, _ = row.split("\t")
+      if name == "TIMEZONE":
+        server_timezone = val
+        break
+    assert server_timezone is not None
+
     # For this query, the planner sets NUM_NODES=1, NUM_SCANNER_THREADS=1,
     # RUNTIME_FILTER_MODE=0 and MT_DOP=0
     expected_str = ("Query Options (set by configuration and planner): "
         "MEM_LIMIT=8589934592,"
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
-        "RUNTIME_FILTER_MODE=0,MT_DOP=0,{erasure_coding}"
+        "RUNTIME_FILTER_MODE=0,MT_DOP=0,TIMEZONE={timezone},{erasure_coding}"
         "CLIENT_IDENTIFIER="
         "query_test/test_observability.py::TestObservability::()::test_query_options"
         "\n")
     expected_str = expected_str.format(
-        erasure_coding="ALLOW_ERASURE_CODED_FILES=1," if IS_EC else "")
-    assert expected_str in profile
+        erasure_coding="ALLOW_ERASURE_CODED_FILES=1," if IS_EC else "",
+        timezone=server_timezone)
+    assert expected_str in profile, profile
 
   def test_exec_summary(self):
     """Test that the exec summary is populated correctly in every query state"""

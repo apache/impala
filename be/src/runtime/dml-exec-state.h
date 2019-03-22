@@ -32,7 +32,7 @@ namespace impala {
 class DmlExecStatusPB;
 class DmlPartitionStatusPB;
 class DmlStatsPB;
-class TInsertResult;
+class TDmlResult;
 class TFinalizeParams;
 class TUpdateCatalogRequest;
 class RuntimeProfile;
@@ -105,9 +105,9 @@ class DmlExecState {
   /// Serialize to protobuf and stores the result in 'dml_status'.
   void ToProto(DmlExecStatusPB* dml_status);
 
-  /// Populates 'insert_result' with PartitionStatusMap data, for Impala's extension of
+  /// Populates 'dml_result' with PartitionStatusMap data, for Impala's extension of
   /// Beeswax.
-  void ToTInsertResult(TInsertResult* insert_result);
+  void ToTDmlResult(TDmlResult* dml_result);
 
  private:
   /// protects all fields below

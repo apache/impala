@@ -114,7 +114,7 @@ class TestHS2(HS2TestSuite):
     # Verify that 'DEVELOPMENT' options are not returned.
     assert "DEBUG_ACTION" not in vals2
 
-    # Removed options should not be returned.
+    # Removed options are not returned.
     assert "MAX_IO_BUFFERS" not in vals2
 
   @needs_session()
@@ -133,9 +133,8 @@ class TestHS2(HS2TestSuite):
     assert levels["SYNC_DDL"] == "REGULAR"
     assert levels["MAX_ERRORS"] == "ADVANCED"
     assert levels["DEBUG_ACTION"] == "DEVELOPMENT"
-
-    # Removed options should not be returned.
-    assert "MAX_IO_BUFFERS" not in vals
+    # Removed options are returned by "SET ALL" for the benefit of impala-shell.
+    assert levels["MAX_IO_BUFFERS"] == "REMOVED"
 
   @SkipIfDockerizedCluster.internal_hostname
   def test_open_session_http_addr(self):

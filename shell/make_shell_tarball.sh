@@ -94,7 +94,12 @@ for MODULE in ${SHELL_HOME}/ext-py/*; do
   rm -rf dist 2>&1 > /dev/null
   rm -rf build 2>&1 > /dev/null
   echo "Creating an egg for ${MODULE}"
-  python setup.py -q bdist_egg clean
+  if [[ "$MODULE" == *"/bitarray"* ]]; then
+    # Need to use setuptools to build egg for bitarray module
+    python -c "import setuptools; execfile('setup.py')" -q bdist_egg clean
+  else
+    python setup.py -q bdist_egg clean
+  fi
   cp dist/*.egg ${TARBALL_ROOT}/ext-py
   popd 2>&1 > /dev/null
 done

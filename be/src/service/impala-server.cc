@@ -1091,8 +1091,12 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   query_ctx->__set_pid(getpid());
   int64_t now_us = UnixMicros();
   const Timezone& utc_tz = TimezoneDatabase::GetUtcTimezone();
+  // Fill in query options with default timezone so it is visible in "SET" command,
+  // profiles, etc.
+  if (query_ctx->client_request.query_options.timezone.empty()) {
+    query_ctx->client_request.query_options.timezone = TimezoneDatabase::LocalZoneName();
+  }
   string local_tz_name = query_ctx->client_request.query_options.timezone;
-  if (local_tz_name.empty()) local_tz_name = TimezoneDatabase::LocalZoneName();
   const Timezone* local_tz = TimezoneDatabase::FindTimezone(local_tz_name);
   if (local_tz != nullptr) {
     LOG(INFO) << "Found local timezone \"" << local_tz_name << "\".";

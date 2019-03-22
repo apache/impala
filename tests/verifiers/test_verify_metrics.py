@@ -28,6 +28,12 @@ class TestValidateMetrics(ImpalaTestSuite):
   TODO: Add a test for local assignments.
   """
 
+  @classmethod
+  def setup_class(cls):
+    super(TestValidateMetrics, cls).setup_class()
+    # Close clients to make sure no sessions are held open by this test.
+    cls.close_impala_clients()
+
   def test_metrics_are_zero(self):
     """Test that all the metric in METRIC_LIST are 0"""
     verifier = MetricVerifier(self.impalad_test_service)

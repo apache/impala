@@ -267,15 +267,15 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
 
 void ClientRequestState::PopulateResultForSet(bool is_set_all) {
   map<string, string> config;
-  TQueryOptionsToMap(session_->QueryOptions(), &config);
+  TQueryOptionsToMap(query_options(), &config);
   vector<string> keys, values, levels;
   map<string, string>::const_iterator itr = config.begin();
   for (; itr != config.end(); ++itr) {
     const auto opt_level_id =
         parent_server_->query_option_levels_[itr->first];
-    if (opt_level_id == TQueryOptionLevel::REMOVED) continue;
     if (!is_set_all && (opt_level_id == TQueryOptionLevel::DEVELOPMENT ||
-                        opt_level_id == TQueryOptionLevel::DEPRECATED)) {
+                        opt_level_id == TQueryOptionLevel::DEPRECATED ||
+                        opt_level_id == TQueryOptionLevel::REMOVED)) {
       continue;
     }
     keys.push_back(itr->first);
@@ -1292,6 +1292,20 @@ Status ClientRequestState::UpdateBackendExecStatus(
 void ClientRequestState::UpdateFilter(const TUpdateFilterParams& params) {
   DCHECK(coord_.get());
   coord_->UpdateFilter(params);
+}
+
+bool ClientRequestState::GetDmlStats(TDmlResult* dml_result, Status* query_status) {
+  lock_guard<mutex> l(lock_);
+  *query_status = query_status_;
+  if (!query_status->ok()) return false;
+  // Coord may be NULL for a SELECT with LIMIT 0.
+  // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
+  // need to revisit this, since that might lead us to insert a row without a
+  // coordinator, depending on how we choose to drive the table sink.
+  Coordinator* coord = GetCoordinator();
+  if (coord == nullptr) return false;
+  coord->dml_exec_state()->ToTDmlResult(dml_result);
+  return true;
 }
 
 void ClientRequestState::UpdateEndTime() {

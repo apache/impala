@@ -33,7 +33,7 @@ impala_shell_defaults = {
             'history_file': _histfile_from_env,
             'history_max': 1000,
             'ignore_query_failure': False,
-            'impalad': socket.getfqdn() + ':21000',
+            'impalad': socket.getfqdn(),
             'kerberos_host_fqdn': None,
             'kerberos_service_name': 'impala',
             'output_delimiter': '\\t',

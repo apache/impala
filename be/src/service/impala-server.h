@@ -59,7 +59,7 @@ class RowDescriptor;
 class TCatalogUpdate;
 class TPlanExecRequest;
 class TPlanExecParams;
-class TInsertResult;
+class TDmlResult;
 class TReportExecStatusArgs;
 class TReportExecStatusResult;
 class TNetworkAddress;
@@ -241,7 +241,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// ImpalaService rpcs: extensions over Beeswax (implemented in
   /// impala-beeswax-server.cc)
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
-  virtual void CloseInsert(impala::TInsertResult& insert_result,
+  virtual void CloseInsert(impala::TDmlResult& dml_result,
       const beeswax::QueryHandle& query_handle);
 
   /// Pings the Impala service and gets the server version string.
@@ -326,6 +326,17 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void RenewDelegationToken(
       apache::hive::service::cli::thrift::TRenewDelegationTokenResp& return_val,
       const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
+
+  // Extensions to HS2 implemented by ImpalaHiveServer2Service.
+
+  /// Pings the Impala service and gets the server version string.
+  virtual void PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
+      const TPingImpalaHS2ServiceReq& req);
+
+  /// Closes an Impala operation and returns additional information about the closed
+  /// operation.
+  virtual void CloseImpalaOperation(
+      TCloseImpalaOperationResp& return_val, const TCloseImpalaOperationReq& request);
 
   /// ImpalaInternalService rpcs
   void UpdateFilter(TUpdateFilterResult& return_val, const TUpdateFilterParams& params);
@@ -875,12 +886,12 @@ class ImpalaServer : public ImpalaServiceIf,
   Status FetchInternal(ClientRequestState* request_state, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results) WARN_UNUSED_RESULT;
 
-  /// Populate insert_result and clean up exec state. If the query
-  /// status is an error, insert_result is not populated and the status is returned.
-  /// 'session' is RPC client's session, used to check whether the insert can
+  /// Populate dml_result and clean up exec state. If the query
+  /// status is an error, dml_result is not populated and the status is returned.
+  /// 'session' is RPC client's session, used to check whether the DML can
   /// be closed via that session.
   Status CloseInsertInternal(SessionState* session, const TUniqueId& query_id,
-      TInsertResult* insert_result) WARN_UNUSED_RESULT;
+      TDmlResult* dml_result) WARN_UNUSED_RESULT;
 
   /// HiveServer2 private methods (implemented in impala-hs2-server.cc)
 

@@ -164,6 +164,12 @@ class ClientRequestState {
       const TRuntimeProfileForest& thrift_profiles) WARN_UNUSED_RESULT;
   void UpdateFilter(const TUpdateFilterParams& params);
 
+  /// Populate DML stats in 'dml_result' if this request succeeded.
+  /// Sets 'query_status' to the overall query status.
+  /// Return true if the result was set, otherwise return false.
+  /// Caller must not hold 'lock()'.
+  bool GetDmlStats(TDmlResult* dml_result, Status* query_status);
+
   ImpalaServer::SessionState* session() const { return session_.get(); }
 
   /// Queries are run and authorized on behalf of the effective_user.
@@ -523,9 +529,9 @@ protected:
   void UpdateOperationState(
       apache::hive::service::cli::thrift::TOperationState::type operation_state);
 
-  /// Gets the query options, their values and levels and populates the result set
-  /// with them. It covers the subset of options for 'SET' and all of them for
-  /// 'SET ALL'
+  /// Gets the query options, their levels and the values for this client request
+  /// and populates the result set with them. It covers the subset of options for
+  /// 'SET' and all of them for 'SET ALL'
   void PopulateResultForSet(bool is_set_all);
 };
 

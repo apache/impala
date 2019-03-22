@@ -30,7 +30,7 @@ from subprocess import call, Popen
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
-from tests.common.test_dimensions import create_beeswax_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE)
@@ -117,7 +117,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_dimension())
+    # Run with both beeswax and HS2 to ensure that behaviour is the same.
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
 
   def test_no_args(self, vector):
     args = ['-q', DEFAULT_QUERY]
@@ -336,7 +337,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
     args = ['-q', 'summary;']
     result_set = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert "Could not retrieve summary for query" in result_set.stderr
+    assert "Could not retrieve summary: no previous query" in result_set.stderr
 
     args = ['-q', 'show tables; summary;']
     result_set = run_impala_shell_cmd(vector, args)
@@ -472,7 +473,13 @@ class TestImpalaShell(ImpalaTestSuite):
     output when pretty-printing falls back to delimited output."""
     args = ['-q', "select '{0}\\t'".format(RUSSIAN_CHARS.encode('utf-8'))]
     result = run_impala_shell_cmd(vector, args)
-    assert 'Reverting to tab delimited text' in result.stderr
+    protocol = vector.get_value('protocol')
+    if protocol == 'beeswax':
+      assert 'Reverting to tab delimited text' in result.stderr
+    else:
+      # HS2 does not need to fall back, but should behave appropriately.
+      assert protocol == 'hs2', protocol
+      assert 'Reverting to tab delimited text' not in result.stderr
     assert 'UnicodeDecodeError' not in result.stderr
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
@@ -743,8 +750,12 @@ class TestImpalaShell(ImpalaTestSuite):
   def _validate_expected_socket_connected(self, vector, args, sock):
     # Building an one-off shell command instead of using Util::ImpalaShell since we need
     # to customize the impala daemon socket.
-    shell_cmd = [IMPALA_SHELL_EXECUTABLE]
-    expected_output = "PingImpalaService"
+    protocol = vector.get_value("protocol")
+    shell_cmd = [IMPALA_SHELL_EXECUTABLE, "--protocol={0}".format(protocol)]
+    if protocol == 'beeswax':
+      expected_output = "get_default_configuration"
+    else:
+      expected_output = "OpenSession"
     with open(os.devnull, 'w') as devnull:
       try:
         connection = None
@@ -908,8 +919,13 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, ['-q', query, '-B'])
     # Note that Beeswax formats results differently (i.e. the "fix" for IMPALA-266 stopped
     # working for Beeswax at some point.
-    assert ("DOUBLE\t0.5\t8.071999999999999\t8\t8.071999999999999\t8\t8.072"
-            in result.stdout)
+    protocol = vector.get_value("protocol")
+    if protocol == 'hs2':
+      assert "DOUBLE\t0.5\t8.072\t8.0\t8.072\t8.0\t8.072" in result.stdout
+    else:
+      assert protocol == 'beeswax'
+      assert ("DOUBLE\t0.5\t8.071999999999999\t8\t8.071999999999999\t8\t8.072"
+              in result.stdout)
 
   def test_bool_display(self, vector):
     """Test that boolean values are displayed correctly."""

@@ -382,7 +382,7 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
   tstatus.status_code = TErrorCode::OK;
 }
 
-void ImpalaServer::CloseInsert(TInsertResult& insert_result,
+void ImpalaServer::CloseInsert(TDmlResult& dml_result,
     const QueryHandle& query_handle) {
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
@@ -393,7 +393,7 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
   VLOG_QUERY << "CloseInsert(): query_id=" << PrintId(query_id);
 
   // CloseInsertInternal() will validates that 'session' has access to 'query_id'.
-  Status status = CloseInsertInternal(session.get(), query_id, &insert_result);
+  Status status = CloseInsertInternal(session.get(), query_id, &dml_result);
   if (!status.ok()) {
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
@@ -586,7 +586,7 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
 }
 
 Status ImpalaServer::CloseInsertInternal(SessionState* session, const TUniqueId& query_id,
-    TInsertResult* insert_result) {
+    TDmlResult* dml_result) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
     string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
@@ -598,19 +598,7 @@ Status ImpalaServer::CloseInsertInternal(SessionState* session, const TUniqueId&
       CheckClientRequestSession(session, request_state->effective_user(), query_id));
 
   Status query_status;
-  {
-    lock_guard<mutex> l(*request_state->lock());
-    query_status = request_state->query_status();
-    if (query_status.ok()) {
-      // Coord may be NULL for a SELECT with LIMIT 0.
-      // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
-      // need to revisit this, since that might lead us to insert a row without a
-      // coordinator, depending on how we choose to drive the table sink.
-      if (request_state->GetCoordinator() != nullptr) {
-        request_state->GetCoordinator()->dml_exec_state()->ToTInsertResult(insert_result);
-      }
-    }
-  }
+  request_state->GetDmlStats(dml_result, &query_status);
   RETURN_IF_ERROR(UnregisterQuery(query_id, true));
   return query_status;
 }

@@ -399,8 +399,7 @@ enum TImpalaQueryOptions {
 }
 
 // The summary of a DML statement.
-// TODO: Rename to reflect that this is for all DML.
-struct TInsertResult {
+struct TDmlResult {
   // Number of modified rows per partition. Only applies to HDFS and Kudu tables.
   // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with
   // the root in an unpartitioned table being the empty string.
@@ -433,6 +432,40 @@ struct TResetTableReq {
   2: required string table_name
 }
 
+// PingImpalaHS2Service() - ImpalaHiveServer2Service version.
+// Pings the Impala server to confirm that the server is alive and the session identified
+// by 'sessionHandle' is open. Returns metadata about the server. This exists separate
+// from the base HS2 GetInfo() methods because not all relevant metadata is accessible
+// through GetInfo().
+struct TPingImpalaHS2ServiceReq {
+  1: required TCLIService.TSessionHandle sessionHandle
+}
+
+struct TPingImpalaHS2ServiceResp {
+  1: required TCLIService.TStatus status
+
+  // The Impala service's version string.
+  2: optional string version
+
+  // The Impalad's webserver address.
+  3: optional string webserver_address
+}
+
+// CloseImpalaOperation()
+//
+// Extended version of CloseOperation() that, if the operation was a DML
+// operation, returns statistics about the operation.
+struct TCloseImpalaOperationReq {
+  1: required TCLIService.TOperationHandle operationHandle
+}
+
+struct TCloseImpalaOperationResp {
+  1: required TCLIService.TStatus status
+
+  // Populated if the operation was a DML operation.
+  2: optional TDmlResult dml_result
+}
+
 // For all rpc that return a TStatus as part of their result type,
 // if the status_code field is set to anything other than OK, the contents
 // of the remainder of the result type is undefined (typically not set)
@@ -459,7 +492,7 @@ service ImpalaService extends beeswax.BeeswaxService {
       throws(1:beeswax.BeeswaxException error);
 
   // Closes the query handle and return the result summary of the insert.
-  TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
+  TDmlResult CloseInsert(1:beeswax.QueryHandle handle)
       throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
 
   // Client calls this RPC to verify that the server is an ImpalaService. Returns the
@@ -510,4 +543,11 @@ service ImpalaHiveServer2Service extends TCLIService.TCLIService {
 
   // Returns the runtime profile string for the given query
   TGetRuntimeProfileResp GetRuntimeProfile(1:TGetRuntimeProfileReq req);
+
+  // Client calls this RPC to verify that the server is an ImpalaService. Returns the
+  // server version.
+  TPingImpalaHS2ServiceResp PingImpalaHS2Service(1:TPingImpalaHS2ServiceReq req);
+
+  // Same as HS2 CloseOperation but can return additional information.
+  TCloseImpalaOperationResp CloseImpalaOperation(1:TCloseImpalaOperationReq req);
 }

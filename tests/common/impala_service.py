@@ -104,11 +104,13 @@ class BaseImpalaService(object):
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
     assert 0, 'Metric value %s did not reach value %s in %ss\nDumping impalad debug ' \
-              'pages:\nmemz: %s\nmetrics: %s\nqueries: %s\nthreadz: %s\nrpcz: %s' % \
+              'pages:\nmemz: %s\nmetrics: %s\nqueries: %s\nsessions: %s\nthreadz: %s\n '\
+              'rpcz: %s' % \
               (metric_name, expected_value, timeout,
                json.dumps(self.read_debug_webpage('memz?json')),
                json.dumps(self.read_debug_webpage('metrics?json')),
                json.dumps(self.read_debug_webpage('queries?json')),
+               json.dumps(self.read_debug_webpage('sessions?json')),
                json.dumps(self.read_debug_webpage('threadz?json')),
                json.dumps(self.read_debug_webpage('rpcz?json')))
 

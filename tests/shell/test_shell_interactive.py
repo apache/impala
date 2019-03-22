@@ -37,9 +37,9 @@ from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.common.test_dimensions import create_beeswax_dimension
-from util import (assert_var_substitution, ImpalaShell, get_impalad_port,
-                  get_shell_cmd, get_open_sessions_metric)
+from tests.common.test_dimensions import create_beeswax_hs2_dimension
+from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
+                  get_open_sessions_metric)
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -76,7 +76,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_dimension())
+    # Run with both beeswax and HS2 to ensure that behaviour is the same.
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -86,6 +87,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     if not expectations: return
     for e in expectations:
       assert e in proc.before
+
+  def _wait_for_num_open_sessions(self, vector, impala_service, num, err):
+    """Helper method to wait for the number of open sessions to reach 'num'."""
+    metric_name = get_open_sessions_metric(vector)
+    assert impala_service.wait_for_metric_value(metric_name, num) == num, err
 
   def test_local_shell_options(self, vector):
     """Test that setting the local shell options works"""
@@ -111,6 +117,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     self._expect_with_cmd(proc, "set output_file=/tmp/clmn.txt", vector)
     self._expect_with_cmd(proc, "set", vector,
         ("DELIMITER: ,", "OUTPUT_FILE: /tmp/clmn.txt"))
+    proc.sendeof()
+    proc.wait()
 
   @pytest.mark.execute_serially
   def test_write_delimited(self, vector):
@@ -246,11 +254,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     self.client.close()
     self.hs2_client.close()
 
-    def wait_for_num_open_sessions(impala_service, num, err):
-      """Helper method to wait for the number of open sessions to reach 'num'."""
-      metric_name = get_open_sessions_metric(vector)
-      assert impala_service.wait_for_metric_value(metric_name, num) == num, err
-
     hostname = socket.getfqdn()
     initial_impala_service = ImpaladService(hostname)
     target_impala_service = ImpaladService(hostname, webserver_port=25001,
@@ -261,25 +264,25 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       target_port = 21001
     # This test is running serially, so there shouldn't be any open sessions, but wait
     # here in case a session from a previous test hasn't been fully closed yet.
-    wait_for_num_open_sessions(initial_impala_service, 0,
+    self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
         "first impalad should not have any remaining open sessions.")
-    wait_for_num_open_sessions(target_impala_service, 0,
+    self._wait_for_num_open_sessions(vector, target_impala_service, 0,
         "second impalad should not have any remaining open sessions.")
     # Connect to the first impalad
     p = ImpalaShell(vector)
 
     # Make sure we're connected <hostname>:<port>
-    wait_for_num_open_sessions(initial_impala_service, 1,
+    self._wait_for_num_open_sessions(vector, initial_impala_service, 1,
         "Not connected to %s:%d" % (hostname, get_impalad_port(vector)))
     p.send_cmd("connect %s:%d" % (hostname, target_port))
 
     # The number of sessions on the target impalad should have been incremented.
-    wait_for_num_open_sessions(
+    self._wait_for_num_open_sessions(vector,
         target_impala_service, 1, "Not connected to %s:%d" % (hostname, target_port))
     assert "[%s:%d] default>" % (hostname, target_port) in p.get_result().stdout
 
     # The number of sessions on the initial impalad should have been decremented.
-    wait_for_num_open_sessions(initial_impala_service, 0,
+    self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
         "Connection to %s:%d should have been closed" % (
           hostname, get_impalad_port(vector)))
 
@@ -314,6 +317,10 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 5)
       assert impalad.wait_for_num_in_flight_queries(0), MSG % 'drop'
     finally:
+      # get_result() must be called to exit the shell.
+      p.get_result()
+      self._wait_for_num_open_sessions(vector, impalad, 0,
+          "shell should close sessions.")
       run_impala_shell_interactive(vector, "drop table if exists %s.%s;" % (
           TMP_DB, TMP_TBL))
       run_impala_shell_interactive(vector, "drop database if exists foo;")
@@ -342,6 +349,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
+    child_proc.wait()
     p = ImpalaShell(vector)
     p.send_cmd('history')
     result = p.get_result()
@@ -400,6 +408,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
                           ("Command index to be rerun must be an integer."))
     self._expect_with_cmd(child_proc, "rerun1", vector, ("Syntax error"))
     child_proc.sendline('quit;')
+    child_proc.wait()
 
   def test_tip(self, vector):
     """Smoke test for the TIP command"""
@@ -710,6 +719,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     self._expect_with_cmd(proc, "use foo", vector, (), 'default')
     self._expect_with_cmd(proc, "use functional", vector, (), 'functional')
     self._expect_with_cmd(proc, "use foo", vector, (), 'functional')
+    proc.sendeof()
+    proc.wait()
 
   def test_strip_leading_comment(self, vector):
     """Test stripping leading comments from SQL statements"""

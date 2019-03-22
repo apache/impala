@@ -30,8 +30,9 @@ METRIC_LIST = [
                # Buffer pool pages belong to specific queries. Therefore there should be
                # no clean pages if there are no queries running.
                "buffer-pool.clean-pages",
-               "buffer-pool.clean-page-bytes"
-               ]
+               "buffer-pool.clean-page-bytes",
+               "impala-server.num-open-beeswax-sessions",
+               "impala-server.num-open-hiveserver2-sessions"]
 
 class MetricVerifier(object):
   """Reuseable class that can verify common metrics"""

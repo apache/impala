@@ -710,6 +710,15 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
 
 void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
     const TCloseOperationReq& request) {
+  TCloseImpalaOperationReq request2;
+  request2.operationHandle = request.operationHandle;
+  TCloseImpalaOperationResp tmp_resp;
+  CloseImpalaOperation(tmp_resp, request2);
+  return_val.status = tmp_resp.status;
+}
+
+void ImpalaServer::CloseImpalaOperation(TCloseImpalaOperationResp& return_val,
+    const TCloseImpalaOperationReq& request) {
   TUniqueId query_id;
   TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
@@ -728,6 +737,12 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
+  if (request_state->stmt_type() == TStmtType::DML) {
+    Status query_status;
+    if (request_state->GetDmlStats(&return_val.dml_result, &query_status)) {
+      return_val.__isset.dml_result = true;
+    }
+  }
 
   // TODO: use timeout to get rid of unwanted request_state.
   HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
@@ -863,6 +878,18 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
     // Report progress
     ss << coord->progress().ToString() << "\n";
   }
+  // Report the query status, if the query failed.
+  {
+    // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
+    // guaranteed to see the error query_status.
+    lock_guard<mutex> l(*request_state->lock());
+    Status query_status = request_state->query_status();
+    DCHECK_EQ(request_state->operation_state() == TOperationState::ERROR_STATE,
+        !query_status.ok());
+    // If the query status is !ok, include the status error message at the top of the log.
+    if (!query_status.ok()) ss << query_status.GetDetail();
+  }
+
   // Report analysis errors
   ss << join(request_state->GetAnalysisWarnings(), "\n");
   // Report queuing reason if the admission controller queued the query.
@@ -990,5 +1017,29 @@ void ImpalaServer::AddSessionToConnection(
     UnregisterSessionTimeout(FLAGS_disconnected_session_timeout);
   }
   session->connections.insert(connection_id);
+}
+
+void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
+    const TPingImpalaHS2ServiceReq& req) {
+  VLOG_QUERY << "PingImpalaHS2Service(): request=" << ThriftDebugString(req);
+  TUniqueId session_id;
+  TUniqueId secret;
+  HS2_RETURN_IF_ERROR(return_val,
+      THandleIdentifierToTUniqueId(req.sessionHandle.sessionId, &session_id, &secret),
+      SQLSTATE_GENERAL_ERROR);
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Session(secret), &session),
+      SQLSTATE_GENERAL_ERROR);
+  if (session == NULL) {
+    HS2_RETURN_ERROR(return_val,
+        Substitute("Invalid session id: $0", PrintId(session_id)),
+        SQLSTATE_GENERAL_ERROR);
+  }
+
+  return_val.__set_version(GetVersionString(true));
+  return_val.__set_webserver_address(ExecEnv::GetInstance()->webserver()->Url());
+  VLOG_RPC << "PingImpalaHS2Service(): return_val=" << ThriftDebugString(return_val);
 }
 }
