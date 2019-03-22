@@ -176,7 +176,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # Copy all of the local files and directories to hdfs.
     to_copy = ["%s/%s" % (tmp_table_dir, file_or_dir)
                for file_or_dir in os.listdir(tmp_table_dir)]
-    check_call(['hdfs', 'dfs', '-copyFromLocal'] + to_copy + [fuzz_table_location])
+    check_call(['hdfs', 'dfs', '-copyFromLocal', '-d'] + to_copy + [fuzz_table_location])
 
     if "SCANNER_FUZZ_KEEP_FILES" not in os.environ:
       shutil.rmtree(tmp_table_dir)

@@ -23,6 +23,7 @@
 # multiple times (though maybe they could be).
 
 allpairs == 2.0.1
+# TODO: boto3 is now unused, it can be removed.
 boto3 == 1.2.3
   simplejson == 3.3.0 # For python version 2.6
   botocore == 1.3.30

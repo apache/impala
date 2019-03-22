@@ -284,6 +284,9 @@ export TARGET_FILESYSTEM="${TARGET_FILESYSTEM-hdfs}"
 export ERASURE_CODING="${ERASURE_CODING-false}"
 export FILESYSTEM_PREFIX="${FILESYSTEM_PREFIX-}"
 export S3_BUCKET="${S3_BUCKET-}"
+export S3GUARD_ENABLED="${S3GUARD_ENABLED-false}"
+export S3GUARD_DYNAMODB_TABLE="${S3GUARD_DYNAMODB_TABLE-}"
+export S3GUARD_DYNAMODB_REGION="${S3GUARD_DYNAMODB_REGION-}"
 export azure_tenant_id="${azure_tenant_id-DummyAdlsTenantId}"
 export azure_client_id="${azure_client_id-DummyAdlsClientId}"
 export azure_client_secret="${azure_client_secret-DummyAdlsClientSecret}"
@@ -400,6 +403,16 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     fi
   else
     echo "S3 access already validated"
+  fi
+  # If using s3guard, verify that the dynamodb table and region are set
+  if [[ "${S3GUARD_ENABLED}" = "true" ]]; then
+    if [[ -z "${S3GUARD_DYNAMODB_TABLE}" || -z "${S3GUARD_DYNAMODB_REGION}" ]]; then
+      echo "When S3GUARD_ENABLED=true, S3GUARD_DYNAMODB_TABLE and
+        S3GUARD_DYNAMODB_REGION must be set"
+      echo "S3GUARD_DYNAMODB_TABLE: ${S3GUARD_DYNAMODB_TABLE}"
+      echo "S3GUARD_DYNAMODB_REGION: ${S3GUARD_DYNAMODB_REGION}"
+      return 1
+    fi
   fi
 elif [ "${TARGET_FILESYSTEM}" = "adls" ]; then
   # Basic error checking

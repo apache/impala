@@ -44,6 +44,7 @@ ISILON_WEBHDFS_PORT = 8082
 
 # S3 specific values
 S3_BUCKET_NAME = os.getenv("S3_BUCKET")
+S3GUARD_ENABLED = os.getenv("S3GUARD_ENABLED") == "true"
 
 # ADLS / ABFS specific values
 ABFS_ACCOUNT_NAME = os.getenv("azure_storage_account_name")

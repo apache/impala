@@ -59,6 +59,14 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
       echo "Deleting pre-existing data in s3 failed, aborting."
       exit 1
     fi
+    if [[ "${S3GUARD_ENABLED}" = "true" ]]; then
+      # Initialize the s3guard dynamodb table and clear it out. This is valid even if
+      # the table already exists.
+      hadoop s3guard init -meta "dynamodb://${S3GUARD_DYNAMODB_TABLE}" \
+        -region "${S3GUARD_DYNAMODB_REGION}"
+      hadoop s3guard prune -seconds 1 -meta "dynamodb://${S3GUARD_DYNAMODB_TABLE}" \
+        -region "${S3GUARD_DYNAMODB_REGION}"
+    fi
   else
     # Either isilon or hdfs, no change in procedure.
     if hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}; then

@@ -62,6 +62,7 @@ from tests.util.filesystem_utils import (
     IS_ABFS,
     IS_ADLS,
     S3_BUCKET_NAME,
+    S3GUARD_ENABLED,
     ADLS_STORE_NAME,
     FILESYSTEM_PREFIX,
     FILESYSTEM_NAME)
@@ -70,9 +71,8 @@ from tests.util.hdfs_util import (
   HdfsConfig,
   get_hdfs_client,
   get_hdfs_client_from_conf,
-  NAMENODE)
-from tests.util.s3_util import S3Client
-from tests.util.abfs_util import ABFSClient
+  NAMENODE,
+  HadoopFsCommandLineClient)
 from tests.util.test_file_parser import (
   QueryTestSectionReader,
   parse_query_test_file,
@@ -172,9 +172,12 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hdfs_client = cls.create_hdfs_client()
     cls.filesystem_client = cls.hdfs_client
     if IS_S3:
-      cls.filesystem_client = S3Client(S3_BUCKET_NAME)
+      # S3Guard needs filesystem operations to go through the s3 connector. Use the
+      # HDFS command line client.
+      cls.filesystem_client = HadoopFsCommandLineClient("S3")
     elif IS_ABFS:
-      cls.filesystem_client = ABFSClient()
+      # ABFS is implemented via HDFS command line client
+      cls.filesystem_client = HadoopFsCommandLineClient("ABFS")
     elif IS_ADLS:
       cls.filesystem_client = ADLSClient(ADLS_STORE_NAME)
 

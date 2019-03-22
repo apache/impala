@@ -80,9 +80,10 @@ def dump_config(d, source_path, out):
   print >>out, dedent(header)
   for k, v in sorted(d.iteritems()):
     try:
+      k_new = _substitute_env_vars(k)
       if isinstance(v, int):
         v = str(v)
-      v = _substitute_env_vars(v)
+      v_new = _substitute_env_vars(v)
     except KeyError, e:
       raise Exception("failed environment variable substitution for value {k}: {e}"
                       .format(k=k, e=e))
@@ -90,7 +91,7 @@ def dump_config(d, source_path, out):
       <property>
         <name>{name}</name>
         <value>{value}</value>
-      </property>""".format(name=xmlescape(k), value=xmlescape(v))
+      </property>""".format(name=xmlescape(k_new), value=xmlescape(v_new))
   print >>out, "</configuration>"
 
 
