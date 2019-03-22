@@ -52,6 +52,99 @@ under the License.
       <p> For the full list of issues closed in this release, including bug
         fixes, see the <xref keyref="changelog_32">changelog for <keyword
             keyref="impala32"/></xref>. </p>
+      <p>The following is a list of noteworthy issues fixed in <keyword
+          keyref="impala32"/>: </p>
+      <ul>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-341"
+            format="html" scope="external">IMPALA-341</xref> - Remote profiles
+          are no longer ignored by the coordinator for the queries with the
+            <codeph>LIMIT</codeph> clause.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-941"
+            format="html" scope="external">IMPALA-941</xref>- Impala supports
+          fully qualified table names that start with a number.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-1048"
+            format="html" scope="external">IMPALA-1048</xref> - The query
+          execution summary now includes the total time taken and memory
+          consumed by the data sink at the root of each query fragment.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-3323"
+            format="html" scope="external">IMPALA-3323</xref> - Fixed the issue
+          where valid impala-shell options, such as
+            <codeph>--ldap_password_cmd</codeph>, were unrecognized when the
+            <codeph>--config_file</codeph> option was specified.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-5397"
+            format="html" scope="external">IMPALA-5397</xref> - If a query has a
+          dedicated coordinator, its end time is now set when the query releases
+          its admission control resources. With no dedicated coordinator, the
+          end time is set on un-registration.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-5474"
+            format="html" scope="external">IMPALA-5474</xref> - Fixed an issue
+          where adding a trivial subquery to a query with an error turns the
+          error into a warning.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-6521"
+            format="html" scope="external">IMPALA-6521</xref> - When set,
+          experimental flags are now shown in /varz in web UI and log
+          files.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-6900"
+            format="html" scope="external">IMPALA-6900</xref> -
+            <codeph>INVALIDATE METADATA</codeph> operation is no longer ignored
+          when HMS is empty.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7446"
+            format="html" scope="external">IMPALA-7446</xref> - Impala enables
+          buffer pool garbage collection when near process memory limit to
+          prevent queries from spilling to disk earlier than necessary.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7659"
+            format="html" scope="external">IMPALA-7659</xref> - In
+            <codeph>COMPUTE STATS</codeph>, Impala counts the number of
+            <codeph>NULL</codeph> values in a table</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7857"
+            format="html" scope="external">IMPALA-7857</xref> - Logs more
+          information about StateStore failure detection.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7928"
+            format="html" scope="external">IMPALA-7928</xref> - To increase the
+          efficiency of the HDFS file handle cache, remote reads for a
+          particular file are scheduled to a consistent set of executor nodes. </li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7929"
+            format="html" scope="external">IMPALA-7929</xref> - Impala query on
+          tables created via Hive and mapped to HBase failed with an internal
+          exception because the qualifier of the HBase key column is null in the
+          mapped table. Impala relaxed the requirement and allows a
+            <codeph>NULL</codeph> qualifier.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7960"
+            format="html" scope="external">IMPALA-7960</xref> - Impala now
+          returns a correct result when comparing <codeph>TIMESTAMP</codeph> to
+          a string literal in a binary predicate where the
+            <codeph>TIMESTAMP</codeph> is casted to <codeph>VARCHAR</codeph> of
+          smaller length.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-7961"
+            format="html" scope="external">IMPALA-7961</xref> - Fixed an issue
+          where queries running with the <codeph>SYNC_DDL</codeph> query option
+          can fail when the Catalog Server is under a heavy load with concurrent
+          catalog operations of long-running DDLs.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8026"
+            format="html" scope="external">IMPALA-8026</xref> - Impala query
+          profile now reports correct row counts for all nested loop join
+          modes.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8061"
+            format="html" scope="external">IMPALA-8061</xref> - Impala correctly
+            initializes<codeph> S3_ACCESS_VALIDATED</codeph> variable to zero
+          when <codeph>TARGET_FILESYSTEM=3</codeph>.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8154"
+            format="html" scope="external">IMPALA-8154</xref> - Disabled the
+            Kerberos<codeph> auth_to_local</codeph> setting to prevent
+          connection issues between <codeph>impalads</codeph>.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8188"
+            format="html" scope="external">IMPALA-8188</xref> - Impala now
+          correctly detects an NVME device name and handles it.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8245"
+            format="html" scope="external">IMPALA-8245</xref> - Added hostname
+          to the timeout error message to enable the user to easily identify the
+          host which has reached a bad connection state with the HDFS
+          NameNode.</li>
+        <li><xref href="https://issues.apache.org/jira/browse/IMPALA-8254"
+            format="html" scope="external">IMPALA-8254</xref> - <codeph>COMPUTE
+            STATS</codeph> failed if <codeph>COMPRESSION_CODEC</codeph> is
+          set.</li>
+      </ul>
     </conbody>
   </concept>
   <!-- All 3.1.x subsections go under here -->

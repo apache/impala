@@ -49,11 +49,149 @@ under the License.
   <concept rev="3.2.0" id="new_features_32">
     <title>New Features in <keyword keyref="impala32"/></title>
     <conbody>
-      <p> For the full list of issues closed in this release, including the
-        issues marked as <q>new features</q> or <q>improvements</q>, see the
-          <xref keyref="changelog_32">changelog for <keyword keyref="impala32"
+      <p> The following sections describe the noteworthy improvements made in
+          <keyword keyref="impala32"/>. </p>
+      <p> For the full list of issues closed in this release, see the <xref
+          keyref="changelog_32">changelog for <keyword keyref="impala32"
           /></xref>. </p>
     </conbody>
+    <concept id="rn_32_multi_cluster">
+      <title>Multi-cluster Support</title>
+      <conbody>
+        <ul>
+          <li dir="ltr">Remote File Handle Cache<p>Impala can now cache remote
+              HDFS file handles when the
+                <codeph>cache_remote_file_handles</codeph> impalad flag is set
+              to <codeph>true</codeph>. This feature does not apply to non-HDFS
+              tables, such as Kudu or HBase tables, and does not apply to the
+              tables that store their data on cloud services, such as S3 or
+              ADLS. See <xref
+                href="https://impala.apache.org/docs/build/html/topics/impala_scalability.html"
+                format="html" scope="external">Scalabilty Considerations</xref>
+              for file handle caching in Impala.</p></li>
+        </ul>
+      </conbody>
+    </concept>
+    <concept id="rn_32_ac">
+      <title>Enhancements in Resource Management and Admission Control</title>
+      <conbody>
+        <ul>
+          <li>Admission Debug page is available in <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_webui.html"
+              format="html" scope="external">Impala Daemon (impalad) web
+              UI</xref> at <codeph>\admission</codeph> and provides the
+            following information about Impala resource pools:<ul>
+              <li>Pool configuration</li>
+              <li>Relevant pool stats</li>
+              <li>Queued queries in order of being queued (local to the
+                coordinator)</li>
+              <li>Running queries (local to this coordinator)</li>
+              <li>Histogram of the distribution of peak memory usage by admitted
+                queries</li>
+            </ul></li>
+        </ul>
+        <ul>
+          <li>A new query option, <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_num_rows_produced_limit.html"
+              format="html" scope="external">NUM_ROWS_PRODUCED_LIMIT</xref>, was
+            added to limit the number of rows returned from queries.<p>Impala
+              will cancel a query if the query produces more rows than the limit
+              specified by this query option. The limit applies only when the
+              results are returned to a client, e.g. for a
+                <codeph>SELECT</codeph> query, but not an
+                <codeph>INSERT</codeph> query. This query option is a guardrail
+              against users accidentally submitting queries that return a large
+              number of rows.</p></li>
+        </ul>
+      </conbody>
+    </concept>
+    <concept id="rn_32_metadata">
+      <title>Metadata Performance Improvements</title>
+      <conbody>
+        <ul>
+          <li><xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_metadata.html"
+              format="html" scope="external">Automatic Metadata Sync using Hive
+              Metastore Notification Events</xref><p>When enabled, the
+                <codeph>catalogd</codeph> polls Hive Metastore (HMS)
+              notifications events at a configurable interval and syncs with
+              HMS. You can use the new web UI pages of the
+                <codeph>catalogd</codeph> to check the state of the automatic
+              invalidate event processor. </p><p><b>Note</b>: This is a preview
+              feature in <keyword keyref="impala32">Impala
+            3.2</keyword>.</p></li>
+        </ul>
+      </conbody>
+    </concept>
+    <concept id="rn_32_usability">
+      <title>Compatibility and Usability Enhancements</title>
+      <conbody>
+        <ul>
+          <li>Impala can now read the <codeph>TIMESTAMP_MILLIS</codeph> and
+              <codeph>TIMESTAMP_MICROS</codeph> Parquet types. See <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_parquet.html"
+              format="html" scope="external">Using Parquet File Format for
+              Impala Tables</xref> for the Parquet support in Impala.</li>
+          <li>Impala can now read the complex types in ORC such as ARRAY,
+            STRUCT, and MAP. See <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_orc.html"
+              format="html" scope="external">Using ORC File Format for Impala
+              Tables</xref> for the ORC support in Impala.</li>
+          <li>The <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_string_functions.html"
+              format="html" scope="external">LEVENSHTEIN</xref> string function
+            is supported.<p>The function returns the Levenshtein distance
+              between two input strings, the minimum number of single-character
+              edits required to transform one string to other.</p></li>
+          <li>The <codeph>IF NOT EXISTS</codeph> clause is supported in the
+              <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_alter_table.html"
+              format="html" scope="external"><codeph>ALTER TABLE</codeph></xref>
+            statement.</li>
+          <li>The new <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_default_file_format.html"
+              format="html" scope="external"
+                ><codeph>DEFAULT_FILE_FORMAT</codeph></xref> query option allows
+            you to set the default table file format. This removes the need for
+            the <codeph>STORED AS &lt;format></codeph> clause. Set this option
+            if you prefer a value that is not <codeph>TEXT</codeph>. The
+            supported formats are: <ul>
+              <li><codeph>TEXT</codeph></li>
+              <li><codeph>RC_FILE</codeph></li>
+              <li><codeph>SEQUENCE_FILE</codeph></li>
+              <li><codeph>AVRO</codeph></li>
+              <li><codeph>PARQUET</codeph></li>
+              <li><codeph>KUDU</codeph></li>
+              <li><codeph>ORC</codeph></li>
+            </ul></li>
+          <li>The extended or verbose <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_explain.html"
+              format="html" scope="external"><codeph>EXPLAIN</codeph></xref>
+            output includes the following new information for queries:<ul>
+              <li>The text of the analyzed query that may have been rewritten to
+                include various optimizations and implicit casts. </li>
+              <li>The implicit casts and literals shown with the actual
+                types.</li>
+            </ul></li>
+          <li>CPU resource utilization (user, system, iowait) metrics were added
+            to the <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_explain_plan.html"
+              format="html" scope="external">Impala profile</xref> output.</li>
+        </ul>
+      </conbody>
+    </concept>
+    <concept id="rn_32_security">
+      <title><b id="docs-internal-guid-e1c558d3-7fff-4d4e-0ec1-e40f60c9b64a"
+            ><b>Security Enhancement</b></b></title>
+      <conbody>
+        <ul>
+          <li>The <xref
+              href="https://impala.apache.org/docs/build/html/topics/impala_refresh_authorization.html"
+              format="html" scope="external">REFRESH AUTHORIZATION</xref>
+            statement was implemented for refreshing authorization data.</li>
+        </ul>
+      </conbody>
+    </concept>
   </concept>
   <!-- All 3.1.x new features go under here -->
   <concept rev="3.1.0" id="new_features_31">

@@ -404,6 +404,14 @@ $ ps ax | grep [i]mpalad
       </conbody>
 
     </concept>
+    <concept id="impala-7985">
+      <title>Port Change for SHUTDOWN Command</title>
+      <conbody>
+        <p> If you used the <codeph>SHUTDOWN</codeph> command in Impala 3.1, and
+          specified a port explicitly, change the port number parameter, in
+          Impala 3.2, to use the KRPC port. </p>
+      </conbody>
+    </concept>
 
     <concept id="concept_mkn_ygr_jdb">
 

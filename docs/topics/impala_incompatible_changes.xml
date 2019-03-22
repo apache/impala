@@ -59,6 +59,13 @@ under the License.
         introduce behavior changes or incompatibilities, see the <xref
           keyref="changelog_32">changelog for <keyword keyref="impala32"
           /></xref>. </p>
+      <ul>
+        <li>The Port change for the <codeph>SHUTDOWN</codeph> command<p>The
+              <codeph>SHUTDOWN</codeph> command for shutting down a remote
+            server used the backend port in Impala 3.1. Starting in Impala 3.2,
+            the command uses the KRPC port, e.g.<codeph>
+              :shutdown('host100:27000')</codeph>.</p></li>
+      </ul>
     </conbody>
   </concept>
   <concept rev="3.1.0" id="new_features_31">
