@@ -161,9 +161,9 @@ fi
 export CDH_DOWNLOAD_HOST
 export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=909265
+export CDP_BUILD_NUMBER=976603
 export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
 export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_RANGER_VERSION=1.2.0
 export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
@@ -171,6 +171,12 @@ export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
+export USE_CDP_HIVE=${USE_CDP_HIVE-false}
+if $USE_CDP_HIVE; then
+  export IMPALA_HIVE_VERSION=3.1.0.6.0.99.0-9
+else
+  export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
+fi
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -280,7 +286,16 @@ export DEFAULT_FS="${DEFAULT_FS-hdfs://${INTERNAL_LISTEN_HOST}:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
-export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
+if $USE_CDP_HIVE; then
+  # It is likely that devs will want to with both the versions of metastore
+  # if cdp hive is being used change the metastore db name, so we don't have to
+  # format the metastore db everytime we switch between hive versions
+  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
+else
+  export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
+fi
+
+
 export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
 if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
     # On S3, disable Sentry HDFS sync plugin.
@@ -478,6 +493,12 @@ else
   export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
 fi
 
+# The directory in which all the CDP components live. Applies only when
+# USE_CDP_HIVE is set to true
+if $USE_CDP_HIVE; then
+  export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
+fi
+
 # Typically we build against a snapshot build of Hadoop that includes everything we need
 # for building Impala and running a minicluster.
 export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
@@ -511,9 +532,14 @@ export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 export RANGER_HOME="${IMPALA_TOOLCHAIN}/ranger-${IMPALA_RANGER_VERSION}-admin"
 export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
+
 # Extract the first component of the hive version.
 export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
-export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
+if $USE_CDP_HIVE; then
+  export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
+else
+  export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
+fi
 export PATH="$HIVE_HOME/bin:$PATH"
 # Allow overriding of Hive source location in case we want to build Impala without
 # a complete Hive build.
@@ -723,6 +749,12 @@ echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
 echo "CDH_DOWNLOAD_HOST       = $CDH_DOWNLOAD_HOST"
 echo "CDH_BUILD_NUMBER        = $CDH_BUILD_NUMBER"
+echo "CDP_BUILD_NUMBER        = $CDP_BUILD_NUMBER"
+if $USE_CDP_HIVE; then
+  echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
+fi
+echo "IMPALA_HIVE_VERSION     = $IMPALA_HIVE_VERSION"
+echo "METASTORE_DB            = $METASTORE_DB"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

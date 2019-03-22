@@ -126,16 +126,27 @@ pushd ${CONFIG_DIR}
 rm -f {core,hdfs,hbase,hive,yarn,mapred}-site.xml
 rm -f authz-provider.ini
 
+# Generate hive configs first so that schemaTool can be used to init the metastore schema
+# if needed
+if $USE_CDP_HIVE; then
+  # Certain configurations (like SentrySyncHMSNotificationsPostListener) do not work
+  # with HMS 3.1.0. Use a cdp specific configuration template
+  generate_config postgresql-hive-site.xml.cdp.template hive-site.xml
+else
+  # This is not a CDP Hive installation. Use the regular template
+  generate_config postgresql-hive-site.xml.template hive-site.xml
+fi
+generate_config hive-log4j2.properties.template hive-log4j2.properties
+
 if [ $CREATE_METASTORE -eq 1 ]; then
   echo "Creating postgresql database for Hive metastore"
   dropdb -U hiveuser ${METASTORE_DB} || true
   createdb -U hiveuser ${METASTORE_DB}
 
-  # Hive schema SQL scripts include other scripts using \i, which expects absolute paths.
-  # Switch to the scripts directory to make this work.
-  pushd ${HIVE_HOME}/scripts/metastore/upgrade/postgres
-  psql -q -U hiveuser -d ${METASTORE_DB} -f hive-schema-2.1.1.postgres.sql
-  popd
+  # Use schematool to initialize the metastore db schema. It detects the Hive
+  # version and invokes the appropriate scripts
+  CLASSPATH={$CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -initSchema -dbType \
+postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
   # HBase tables with large number of columns.
   echo "alter table \"SERDE_PARAMS\" alter column \"PARAM_VALUE\" type character varying" \
@@ -178,9 +189,7 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
   ln -s ${CLUSTER_HADOOP_CONF_DIR}/mapred-site.xml
 fi
 
-generate_config postgresql-hive-site.xml.template hive-site.xml
 generate_config log4j.properties.template log4j.properties
-generate_config hive-log4j2.properties.template hive-log4j2.properties
 generate_config hbase-site.xml.template hbase-site.xml
 generate_config authz-policy.ini.template authz-policy.ini
 generate_config sentry-site.xml.template sentry-site.xml

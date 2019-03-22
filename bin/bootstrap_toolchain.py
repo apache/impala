@@ -429,6 +429,45 @@ def download_ranger(toolchain_root):
   download_url = "{0}/ranger/{1}/{2}".format(TOOLCHAIN_HOST, version, file_name)
   wget_and_unpack_package(download_url, file_name, toolchain_root, False)
 
+
+def download_cdp_hive(toolchain_root):
+  use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
+  if not use_cdp_hive:
+    return
+
+  if "CDP_BUILD_NUMBER" not in os.environ:
+    logging.error("Impala environment not set up correctly. CDP_BUILD_NUMBER must "
+                  "be set when USE_CDP_HIVE is set to true. Make sure "
+                  "impala-config.sh is sourced.")
+    sys.exit(1)
+
+  cdp_build_number = os.environ.get("CDP_BUILD_NUMBER")
+  url_prefix = "https://{0}/build/cdp_components/{1}/tarballs/".format(
+    cdh_host, cdp_build_number)
+  cdp_components_home = os.environ.get("CDP_COMPONENTS_HOME")
+  if not cdp_components_home:
+    logging.error("Impala environment not set up correctly, make sure "
+                  "$CDP_COMPONENTS_HOME is set.")
+    sys.exit(1)
+
+  # Create the directory where CDH components live if necessary.
+  if not os.path.exists(cdp_components_home):
+    os.makedirs(cdp_components_home)
+
+  version = os.environ.get("IMPALA_HIVE_VERSION")
+  # TODO the naming convention of the CDP Hive is different than cdh6.x hive
+  # The tar balls are named for example like apache-hive-3.1.0.6.0.99.0-9-bin.tar.gz
+  dir_name = "apache-hive-{0}-bin".format(version)
+  pkg_directory = os.path.join(cdp_components_home, dir_name)
+  if os.path.isdir(pkg_directory):
+    return
+
+  # Download the package if it doesn't exist
+  file_name = "{0}.tar.gz".format(dir_name)
+  download_path = url_prefix + file_name
+  wget_and_unpack_package(download_path, file_name, cdp_components_home, False)
+
+
 if __name__ == "__main__":
   """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment.-
   By checking $IMPALA_HOME is present, we assume that IMPALA_{LIB}_VERSION will be present
@@ -495,7 +534,11 @@ if __name__ == "__main__":
   cdh_host = os.environ.get("CDH_DOWNLOAD_HOST")
   cdh_build_number = os.environ.get("CDH_BUILD_NUMBER")
 
-  cdh_components = map(Package, ["hadoop", "hbase", "hive", "sentry"])
+  cdh_components = map(Package, ["hadoop", "hbase", "sentry"])
+  use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
+  if not use_cdp_hive:
+    cdh_components += [Package("hive")]
+
   if use_cdh_kudu:
     if not try_get_platform_release_label() or not try_get_platform_release_label().cdh:
       logging.error("CDH Kudu is not supported on this platform. Set USE_CDH_KUDU=false "
@@ -515,3 +558,4 @@ if __name__ == "__main__":
   download_cdh_components(toolchain_root, cdh_components, download_path_prefix)
 
   download_ranger(toolchain_root)
+  download_cdp_hive(toolchain_root)
