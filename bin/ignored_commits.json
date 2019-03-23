@@ -38,7 +38,11 @@
       { "hash": "c8bfcbd6e826110678df4a699a9e8f05cf57b5d2",
         "comment": "Not applicable to 2.x: Fix loading test time-zone database for 3.x"},
       { "hash": "61e6a47776ba7f14139b69f91a49d2072a76178b",
-        "comment": "Not applicable to 2.x: Fix test of 3.x erasure coding"}
+        "comment": "Not applicable to 2.x: Fix test of 3.x erasure coding"},
+      { "hash": "c01efd09679faaacfd5488fc7f4c1526a1af2f35",
+        "comment": "Don't need to revert IMPALA-6988(54b3c60) since it doesn't cause build failure now"},
+      { "hash": "df78eaec0b42d7fa5d148238f40fa57fcfcb25b5",
+        "comment": "Don't need to revert c01efd0 since we've ignored it"}
     ]
   }
 ]
