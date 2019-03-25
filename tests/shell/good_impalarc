@@ -1,7 +1,6 @@
 [impala]
 query=select 1
 creds_ok_in_clear=true
-keyval=msg1=hello
-keyval=msg2=world
+keyval=msg1=hello,keyval=msg2=world
 verbose=true
 query_options=DEFAULT_FILE_FORMAT=parquet

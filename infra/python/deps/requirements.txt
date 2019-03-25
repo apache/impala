@@ -66,5 +66,3 @@ ipython == 1.2.1
   apipkg == 1.4
 
 virtualenv == 13.1.0
-# This is a backport of Python'3 configparser that supports Python 2.6+.
-configparser == 3.7.3

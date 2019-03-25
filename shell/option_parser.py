@@ -27,15 +27,10 @@
 # EXPLAIN_LEVEL=2
 # MT_DOP=2
 
-import configparser
+import ConfigParser
 import sys
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser
-try:
-  from collections import OrderedDict
-except ImportError:
-  # Python 2.6 and below does not have OrderedDict.
-  from ordereddict import OrderedDict
 
 
 class ConfigFileFormatError(Exception):
@@ -79,23 +74,12 @@ def parse_shell_options(options, defaults, option_list):
         opt.action == "store_true" or opt.action == "store_false":
       result[option] = parse_bool_option(value)
     elif opt.action == "append":
-      result[option] = value.split('\n')
+      result[option] = value.split(",%s=" % option)
     elif value.lower() == "none":
       result[option] = None
     else:
       result[option] = value
   return result
-
-
-class MultiOrderedDict(OrderedDict):
-  """
-  This custom collection is used to customize ConfigParser to allow duplicate keys.
-  """
-  def __setitem__(self, key, value):
-    if isinstance(value, list) and key in self:
-      self[key].extend(value)
-    else:
-      super(MultiOrderedDict, self).__setitem__(key, value)
 
 
 def get_config_from_file(config_filename, option_list):
@@ -107,6 +91,10 @@ def get_config_from_file(config_filename, option_list):
   and some values are converted from string to their corresponding python types
   (booleans and None).
 
+  Multiple flags are appended with ",option_name=" as its delimiter, e.g.
+  The delimiter is for multiple options is ,<option>=. For example:
+  var=msg1=hello,var=msg2=world.
+
   Setting 'config_filename' in the config file would have no effect,
   so its original value is kept.
 
@@ -117,9 +105,7 @@ def get_config_from_file(config_filename, option_list):
   Returns a pair of dictionaries (shell_options, query_options), with option names
   as keys and option values as values.
   """
-  # Customize the ConfigParser to allow duplicate keys. Values from duplicate keys will
-  # be appended with new lines.
-  config = configparser.RawConfigParser(dict_type=MultiOrderedDict, strict=False)
+  config = ConfigParser.ConfigParser()
   try:
     config.read(config_filename)
   except Exception, e:
@@ -134,9 +120,6 @@ def get_config_from_file(config_filename, option_list):
       print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
       shell_options["config_file"] = config_filename
 
-  # For query options, we use a standard config parser since we don't want to allow
-  # duplicate options.
-  config = configparser.ConfigParser(strict=False)
   try:
     config.read(config_filename)
   except Exception, e:
