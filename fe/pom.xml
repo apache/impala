@@ -448,12 +448,13 @@ under the License.
       <version>${kudu.version}</version>
     </dependency>
 
-    <!-- This driver supports PostgreSQL 7.2 and newer -->
+    <!-- https://mvnrepository.com/artifact/org.postgresql/postgresql -->
     <dependency>
-      <groupId>postgresql</groupId>
+      <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>9.0-801.jdbc4</version>
+      <version>${postgres.jdbc.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr-runtime</artifactId>

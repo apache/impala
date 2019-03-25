@@ -126,7 +126,7 @@ export IMPALA_ORC_VERSION=1.4.3-p3
 unset IMPALA_ORC_URL
 export IMPALA_PROTOBUF_VERSION=3.5.1
 unset IMPALA_PROTOBUF_URL
-export IMPALA_POSTGRES_JDBC_DRIVER_VERSION=9.0-801
+export IMPALA_POSTGRES_JDBC_DRIVER_VERSION=42.2.5
 unset IMPALA_POSTGRES_JDBC_DRIVER_URL
 export IMPALA_RAPIDJSON_VERSION=1.1.0
 unset IMPALA_RAPIDJSON_URL
@@ -564,7 +564,7 @@ export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
 # any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
 # The Postgres JDBC driver is downloaded by maven when building the frontend.
 # Export the location of Postgres JDBC driver so Sentry can pick it up.
-export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jdbc4.jar"
+export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jar"
 
 export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
 export AUX_CLASSPATH="${LZO_JAR_PATH}"

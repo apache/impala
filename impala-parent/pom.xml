@@ -39,6 +39,7 @@ under the License.
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
     <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
     <ranger.version>${env.IMPALA_RANGER_VERSION}</ranger.version>
+    <postgres.jdbc.version>${env.IMPALA_POSTGRES_JDBC_DRIVER_VERSION}</postgres.jdbc.version>
     <sentry.version>${env.IMPALA_SENTRY_VERSION}</sentry.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
