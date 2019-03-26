@@ -109,20 +109,35 @@ class TestGrantRevoke(SentryCacheTestSuite):
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1}"
                     .format(SENTRY_CONFIG_FILE, SENTRY_LONG_POLLING_FREQUENCY_S),
       sentry_config=SENTRY_CONFIG_FILE)
-  def test_grant_revoke_with_sentry(self, vector):
+  def test_grant_revoke_with_catalog_v1(self):
+    """Tests grant and revoke using catalog v1."""
+    self._test_grant_revoke()
+
+  @pytest.mark.execute_serially
+  @SentryCacheTestSuite.with_args(
+    impalad_args="--server_name=server1 --use_local_catalog=true",
+    catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
+                  "--use_local_catalog=true --catalog_topic_mode=minimal"
+                  .format(SENTRY_CONFIG_FILE, SENTRY_LONG_POLLING_FREQUENCY_S),
+    sentry_config=SENTRY_CONFIG_FILE)
+  def test_grant_revoke_with_local_catalog(self):
+    """Tests grant and revoke using local catalog mode."""
+    self._test_grant_revoke()
+
+  def _test_grant_revoke(self):
     """Tests grant and revoke for all objects. In these tests, we run tests twice. One
     with just using cache, hence the long sentry poll, and another one by ensuring
     refreshes happen from Sentry."""
     for refresh in [True, False]:
       for priv in ["all", "select"]:
         self._execute_with_grant_option_tests(
-            TestObject(TestObject.SERVER), priv, refresh)
+          TestObject(TestObject.SERVER), priv, refresh)
         self._execute_with_grant_option_tests(TestObject(
-            TestObject.DATABASE, "grant_rev_db"), priv, refresh)
+          TestObject.DATABASE, "grant_rev_db"), priv, refresh)
         self._execute_with_grant_option_tests(TestObject(
-            TestObject.TABLE, "grant_rev_db.tbl1"), priv, refresh)
+          TestObject.TABLE, "grant_rev_db.tbl1"), priv, refresh)
         self._execute_with_grant_option_tests(
-            TestObject(TestObject.VIEW, "grant_rev_db.tbl1"), priv, refresh)
+          TestObject(TestObject.VIEW, "grant_rev_db.tbl1"), priv, refresh)
 
   def _execute_with_grant_option_tests(self, test_obj, privilege, refresh_authorization):
     """
