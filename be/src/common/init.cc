@@ -128,6 +128,10 @@ static const int64_t BE_TEST_TIMEOUT_S = 60L * 60L * 4L;
 static const int64_t BE_TEST_TIMEOUT_S = 60L * 60L * 2L;
 #endif
 
+#ifdef CODE_COVERAGE_ENABLED
+extern "C" { void __gcov_flush(); }
+#endif
+
 [[noreturn]] static void LogMaintenanceThread() {
   while (true) {
     sleep(FLAGS_logbufsecs);
@@ -191,6 +195,13 @@ static void PauseMonitorLoop() {
 [[noreturn]] static void HandleSigTerm(int signum, siginfo_t* info, void* context) {
   const char* msg = "Caught signal: SIGTERM. Daemon will exit.\n";
   sys_write(STDOUT_FILENO, msg, strlen(msg));
+#ifdef CODE_COVERAGE_ENABLED
+  // On some systems __gcov_flush() only flushes a small subset of the coverage data.
+  // If you run into this problem, there is a workaround that you can use at your own
+  // risk: instead of calling __gcov_flush() and _exit(0) try to invoke exit(0) (no
+  // underscore). You should only do this in your dev environment.
+  __gcov_flush();
+#endif
   // _exit() is async signal safe and is equivalent to the behaviour of the default
   // SIGTERM handler. exit() can run arbitrary code and is *not* safe to use here.
   _exit(0);

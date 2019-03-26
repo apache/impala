@@ -56,7 +56,7 @@ if (APPLE)
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -stdlib=libstdc++")
 endif()
 
-SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
+SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage -DCODE_COVERAGE_ENABLED")
 
 # For any clang builds (currently only ASAN):
 #   -Qunused-arguments: quiet warnings about unused arguments to clang because ccache
@@ -520,6 +520,11 @@ set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS}
   -lrt
   -ldl # Needed for LLVM
 )
+
+if (ENABLE_CODE_COVERAGE)
+  set(IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
+  set(UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} -lgcov)
+endif()
 
 # The above link list does not include tcmalloc. This is because the Impala JVM support
 # libraries (libfesupport, libloggingsupport) cannot use tcmalloc in all cases. When they
