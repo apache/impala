@@ -136,9 +136,13 @@ DEFINE_uint64(num_file_handle_cache_partitions, 16, "Number of partitions used b
     "file handle cache.");
 
 // This parameter controls whether remote HDFS file handles are cached. It does not impact
-// S3, ADLS, or ABFS file handles. This is enabled by default.
+// S3, ADLS, or ABFS file handles.
 DEFINE_bool(cache_remote_file_handles, true, "Enable the file handle cache for "
     "remote HDFS files.");
+
+// This parameter controls whether S3 file handles are cached.
+DEFINE_bool(cache_s3_file_handles, true, "Enable the file handle cache for "
+    "S3 files.");
 
 AtomicInt32 DiskIoMgr::next_disk_id_;
 
