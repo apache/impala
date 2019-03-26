@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ORDER BY Clause" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="order_by" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -27,33 +27,23 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      The familiar <code class="ph codeph">ORDER BY</code> clause of a <code class="ph codeph">SELECT</code> statement sorts the result set
-      based on the values from one or more columns.
-    </p>
+    <p class="p"> The <code class="ph codeph">ORDER BY</code> clause of a <code class="ph codeph">SELECT</code>
+      statement sorts the result set based on the values from one or more
+      columns. </p>
 
 
-    <p class="p">
-      For distributed queries, this is a relatively expensive operation, because the entire result set must be
-      produced and transferred to one node before the sorting can happen. This can require more memory capacity
-      than a query without <code class="ph codeph">ORDER BY</code>. Even if the query takes approximately the same time to finish
-      with or without the <code class="ph codeph">ORDER BY</code> clause, subjectively it can appear slower because no results
-      are available until all processing is finished, rather than results coming back gradually as rows matching
-      the <code class="ph codeph">WHERE</code> clause are found. Therefore, if you only need the first N results from the sorted
-      result set, also include the <code class="ph codeph">LIMIT</code> clause, which reduces network overhead and the memory
-      requirement on the coordinator node.
-    </p>
-
-
-    <div class="note note"><span class="notetitle">Note:</span>
-      <p class="p">
-        In Impala 1.4.0 and higher, the <code class="ph codeph">LIMIT</code> clause is now optional (rather than required) for
-        queries that use the <code class="ph codeph">ORDER BY</code> clause. Impala automatically uses a temporary disk work area
-        to perform the sort if the sort operation would otherwise exceed the Impala memory limit for a particular
-        DataNode.
-      </p>
-
-    </div>
+    <p class="p"> First, data is sorted locally by each <code class="ph codeph">impalad</code> daemon,
+      then streamed to the coordinator daemon, which merges the sorted result
+      sets. For distributed queries, this is a relatively expensive operation
+      and can require more memory capacity than a query without <code class="ph codeph">ORDER
+        BY</code>. Even if the query takes approximately the same time to
+      finish with or without the <code class="ph codeph">ORDER BY</code> clause, subjectively
+      it can appear slower because no results are available until all processing
+      is finished, rather than results coming back gradually as rows matching
+      the <code class="ph codeph">WHERE</code> clause are found. Therefore, if you only need
+      the first N results from the sorted result set, also include the
+        <code class="ph codeph">LIMIT</code> clause, which reduces network overhead and the
+      memory requirement on the coordinator node. </p>
 
 
     <p class="p">
@@ -117,12 +107,11 @@ col_ref ::= <var class="keyword varname">column_name</var> | <var class="keyword
         <code class="ph codeph"><a class="xref" href="../shared/../topics/impala_order_by.html#order_by">ORDER BY</a></code> clause to also use a
         <code class="ph codeph"><a class="xref" href="../shared/../topics/impala_limit.html#limit">LIMIT</a></code> clause. In Impala 1.4.0 and
         higher, the <code class="ph codeph">LIMIT</code> clause is optional for <code class="ph codeph">ORDER BY</code> queries. In cases where
-        sorting a huge result set requires enough memory to exceed the Impala memory limit for a particular node,
-        Impala automatically uses a temporary disk work area to perform the sort operation.
+        sorting a huge result set requires enough memory to exceed the Impala
+        memory limit for a particular executor Impala daemon, Impala automatically uses a
+        temporary disk work area to perform the sort operation.
       </p>
 
-
-    
     <p class="p">
         <strong class="ph b">Complex type considerations:</strong>
       </p>
@@ -155,13 +144,12 @@ ERROR: AnalysisException: ORDER BY expression 'score' with complex type 'ARRAY&l
       </p>
 
 
-    <p class="p">
-      The following query retrieves the user ID and score, only for scores greater than one million,
-      with the highest scores for each user listed first.
-      Because the individual array elements are now represented as separate rows in the result set,
-      they can be used in the <code class="ph codeph">ORDER BY</code> clause, referenced using the <code class="ph codeph">ITEM</code>
-      pseudocolumn that represents each array element.
-    </p>
+    <p class="p"> The following query retrieves the user ID and score, only for scores
+      greater than one million, with the highest scores for each user listed
+      first. Because the individual array elements are now represented as
+      separate rows in the result set, they can be used in the <code class="ph codeph">ORDER
+        BY</code> clause, referenced using the <code class="ph codeph">ITEM</code>
+      pseudo-column that represents each array element. </p>
 
 
 <pre class="pre codeblock"><code>SELECT id, item FROM games, games.score
@@ -197,13 +185,14 @@ ORDER BY id, info.value desc;
       </p>
 
 
-    <p class="p">
-      Although the <code class="ph codeph">LIMIT</code> clause is now optional on <code class="ph codeph">ORDER BY</code> queries, if your
-      query only needs some number of rows that you can predict in advance, use the <code class="ph codeph">LIMIT</code> clause
-      to reduce unnecessary processing. For example, if the query has a clause <code class="ph codeph">LIMIT 10</code>, each data
-      node sorts its portion of the relevant result set and only returns 10 rows to the coordinator node. The
-      coordinator node picks the 10 highest or lowest row values out of this small intermediate result set.
-    </p>
+    <p class="p"> Although the <code class="ph codeph">LIMIT</code> clause is now optional on
+        <code class="ph codeph">ORDER BY</code> queries, if your query only needs some number
+      of rows that you can predict in advance, use the <code class="ph codeph">LIMIT</code>
+      clause to reduce unnecessary processing. For example, if the query has a
+      clause <code class="ph codeph">LIMIT 10</code>, each executor Impala daemon sorts its
+      portion of the relevant result set and only returns 10 rows to the
+      coordinator node. The coordinator node picks the 10 highest or lowest row
+      values out of this small intermediate result set. </p>
 
 
     <p class="p">
@@ -248,33 +237,36 @@ SELECT page_title AS "Page 3 of search results", page_url FROM search_content
       </p>
 
 
-    <p class="p">
-      Impala sorts the intermediate results of an <code class="ph codeph">ORDER BY</code> clause in memory whenever practical. In
-      a cluster of N DataNodes, each node sorts roughly 1/Nth of the result set, the exact proportion varying
-      depending on how the data matching the query is distributed in HDFS.
-    </p>
+    <p class="p"> Impala sorts the intermediate results of an <code class="ph codeph">ORDER BY</code>
+      clause in memory whenever practical. In a cluster of N executor Impala
+      daemons, each daemon sorts roughly 1/Nth of the result set, the exact
+      proportion varying depending on how the data matching the query is
+      distributed in HDFS. </p>
 
 
-    <p class="p">
-      If the size of the sorted intermediate result set on any DataNode would cause the query to exceed the Impala
-      memory limit, Impala sorts as much as practical in memory, then writes partially sorted data to disk. (This
-      technique is known in industry terminology as <span class="q">"external sorting"</span> and <span class="q">"spilling to disk"</span>.) As each
-      8 MB batch of data is written to disk, Impala frees the corresponding memory to sort a new 8 MB batch of
-      data. When all the data has been processed, a final merge sort operation is performed to correctly order the
-      in-memory and on-disk results as the result set is transmitted back to the coordinator node. When external
-      sorting becomes necessary, Impala requires approximately 60 MB of RAM at a minimum for the buffers needed to
-      read, write, and sort the intermediate results. If more RAM is available on the DataNode, Impala will use
-      the additional RAM to minimize the amount of disk I/O for sorting.
-    </p>
+    <p class="p"> If the size of the sorted intermediate result set on any executor Impala
+      daemon would cause the query to exceed the Impala memory limit, Impala
+      sorts as much as practical in memory, then writes partially sorted data to
+      disk. (This technique is known in industry terminology as <span class="q">"external
+        sorting"</span> and <span class="q">"spilling to disk"</span>.) As each 8 MB batch of data is
+      written to disk, Impala frees the corresponding memory to sort a new 8 MB
+      batch of data. When all the data has been processed, a final merge sort
+      operation is performed to correctly order the in-memory and on-disk
+      results as the result set is transmitted back to the coordinator node.
+      When external sorting becomes necessary, Impala requires approximately 60
+      MB of RAM at a minimum for the buffers needed to read, write, and sort the
+      intermediate results. If more RAM is available on the Impala daemon,
+      Impala will use the additional RAM to minimize the amount of disk I/O for
+      sorting. </p>
 
 
-    <p class="p">
-      This external sort technique is used as appropriate on each DataNode (possibly including the coordinator
-      node) to sort the portion of the result set that is processed on that node. When the sorted intermediate
-      results are sent back to the coordinator node to produce the final result set, the coordinator node uses a
-      merge sort technique to produce a final sorted result set without using any extra resources on the
-      coordinator node.
-    </p>
+    <p class="p"> This external sort technique is used as appropriate on each Impala
+      daemon (possibly including the coordinator node) to sort the portion of
+      the result set that is processed on that node. When the sorted
+      intermediate results are sent back to the coordinator node to produce the
+      final result set, the coordinator node uses a merge sort technique to
+      produce a final sorted result set without using any extra resources on the
+      coordinator node. </p>
 
 
     <p class="p">
@@ -300,15 +292,11 @@ SELECT page_title AS "Page 3 of search results", page_url FROM search_content
       </p>
 
 
-
-
-
-
     <p class="p">
         <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code> clause in an
         <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code> clause is ignored and the
         results are not necessarily sorted. An <code class="ph codeph">INSERT ... SELECT</code> operation potentially creates
-        many different data files, prepared on different data nodes, and therefore the notion of the data being
+        many different data files, prepared by different executor Impala daemons, and therefore the notion of the data being
         stored in sorted order is impractical.
       </p>
 
@@ -371,11 +359,11 @@ SELECT page_title AS "Page 3 of search results", page_url FROM search_content
 
     <ul class="ul">
       <li class="li">
-        <p class="p">
-          Now the use of scratch disk space raises the possibility of an <span class="q">"out of disk space"</span> error on a
-          particular DataNode, as opposed to the previous possibility of an <span class="q">"out of memory"</span> error. Make sure
-          to keep at least 1 GB free on the filesystem used for temporary sorting work.
-        </p>
+        <p class="p"> Now the use of scratch disk space raises the possibility of an
+            <span class="q">"out of disk space"</span> error on a particular Impala daemon, as
+          opposed to the previous possibility of an <span class="q">"out of memory"</span> error.
+          Make sure to keep at least 1 GB free on the filesystem used for
+          temporary sorting work. </p>
 
       </li>
 

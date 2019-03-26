@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Joins in Impala SELECT Statements" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="joins" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,13 +28,11 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      A join query is a <code class="ph codeph">SELECT</code> statement that combines data from two or more tables,
-      and returns a result set containing items from some or all of those tables. It is a way to
-      cross-reference and correlate related data that is organized into multiple tables, typically
-      using identifiers that are repeated in each of the joined tables.
-    </p>
+    <p class="p"> A join query is a <code class="ph codeph">SELECT</code> statement that combines data
+      from two or more tables, and returns a result set containing items from
+      some or all of those tables. It is a way to cross-reference and correlate
+      related data that is organized into multiple tables, typically using
+      identifiers that are repeated in each of the joined tables. </p>
 
 
     <p class="p">
@@ -130,27 +128,6 @@ SELECT t1.c1, t2.c2 FROM <strong class="ph b">t1 JOIN t2</strong>
 
 <pre class="pre codeblock"><code>-- Combine fields from both parent and child rows.
 SELECT lhs.id, rhs.parent, lhs.c1, rhs.c2 FROM tree_data lhs, tree_data rhs WHERE lhs.id = rhs.parent;</code></pre>
-
-    <p class="p">
-      <strong class="ph b">Cartesian joins:</strong>
-    </p>
-
-
-    <div class="p">
-      To avoid producing huge result sets by mistake, Impala does not allow Cartesian joins of the form:
-<pre class="pre codeblock"><code>SELECT ... FROM t1 JOIN t2;
-SELECT ... FROM t1, t2;</code></pre>
-      If you intend to join the tables based on common values, add <code class="ph codeph">ON</code> or <code class="ph codeph">WHERE</code>
-      clauses to compare columns across the tables. If you truly intend to do a Cartesian join, use the
-      <code class="ph codeph">CROSS JOIN</code> keyword as the join operator. The <code class="ph codeph">CROSS JOIN</code> form does not use
-      any <code class="ph codeph">ON</code> clause, because it produces a result set with all combinations of rows from the
-      left-hand and right-hand tables. The result set can still be filtered by subsequent <code class="ph codeph">WHERE</code>
-      clauses. For example:
-    </div>
-
-
-<pre class="pre codeblock"><code>SELECT ... FROM t1 CROSS JOIN t2;
-SELECT ... FROM t1 CROSS JOIN t2 WHERE <var class="keyword varname">tests_on_non_join_columns</var>;</code></pre>
 
     <p class="p">
       <strong class="ph b">Inner and outer joins:</strong>

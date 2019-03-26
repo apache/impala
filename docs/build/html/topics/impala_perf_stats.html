@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Table and Column Statistics" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="perf_stats" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -876,40 +876,6 @@ show column stats year_month_day;
 
       </div>
 
-      <div class="topic concept nested3" aria-labelledby="ariaid-title12" id="pull_incremental_statistics">
-        <h4 class="title topictitle4" id="ariaid-title12">Loading Incremental Statistics from Catalogd</h4>
-
-        <div class="body conbody">
-          <p class="p">
-            Starting in Impala 3.1, a new configuration setting,
-              <code class="ph codeph">--pull_incremental_statistics</code>, was added and set
-            to <code class="ph codeph">true</code> by default. When you start Impala catalogd
-            and impalad coordinators with this setting enabled:
-          </p>
-
-          <ul class="ul">
-            <li class="li"> Newly created incremental stats will be smaller in size thus
-              reducing memory pressure on the catalogd daemon. Your users can
-              keep more tables and partitions in the same catalog and have lower
-              chances of crashing catalogd due to out-of-memory issues. </li>
-
-            <li class="li">
-              Incremental stats will not be replicated to impalad and will be
-              accessed on demand from catalogd, resulting in a reduced memory
-              footprint of impalad.
-            </li>
-
-          </ul>
-
-          <p class="p">
-            We do not recommend you change the default setting of
-              <code class="ph codeph">--pull_incremental_statistics</code>.
-          </p>
-
-        </div>
-
-      </div>
-
 
     </div>
 
@@ -917,9 +883,9 @@ show column stats year_month_day;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="perf_stats_checking">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="perf_stats_checking">
 
-    <h2 class="title topictitle2" id="ariaid-title13">Detecting Missing Statistics</h2>
+    <h2 class="title topictitle2" id="ariaid-title12">Detecting Missing Statistics</h2>
 
 
     <div class="body conbody">
@@ -1075,14 +1041,14 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="concept_s3c_4gl_mdb">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="concept_s3c_4gl_mdb">
 
-    <h2 class="title topictitle2" id="ariaid-title14">Manually Setting Table and Column Statistics with ALTER TABLE</h2>
+    <h2 class="title topictitle2" id="ariaid-title13">Manually Setting Table and Column Statistics with ALTER TABLE</h2>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="concept_wpt_pgl_mdb">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="concept_wpt_pgl_mdb">
 
-      <h3 class="title topictitle3" id="ariaid-title15">Setting Table Statistics</h3>
+      <h3 class="title topictitle3" id="ariaid-title14">Setting Table Statistics</h3>
 
 
       <div class="body conbody">
@@ -1157,9 +1123,9 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title16" id="concept_asb_vgl_mdb">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="concept_asb_vgl_mdb">
 
-      <h3 class="title topictitle3" id="ariaid-title16">Setting Column Statistics</h3>
+      <h3 class="title topictitle3" id="ariaid-title15">Setting Column Statistics</h3>
 
 
       <div class="body conbody">
@@ -1210,9 +1176,9 @@ show column stats t1;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="perf_stats_examples">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="perf_stats_examples">
 
-    <h2 class="title topictitle2" id="ariaid-title17">Examples of Using Table and Column Statistics with Impala</h2>
+    <h2 class="title topictitle2" id="ariaid-title16">Examples of Using Table and Column Statistics with Impala</h2>
 
 
     <div class="body conbody">

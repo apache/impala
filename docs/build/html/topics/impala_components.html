@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Components of the Impala Server" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_concepts.html" />
@@ -14,11 +14,11 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="intro_components" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -34,10 +34,9 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      The Impala server is a distributed, massively parallel processing (MPP) database engine. It consists of
-      different daemon processes that run on specific hosts within your <span class="keyword"></span> cluster.
-    </p>
+    <p class="p"> The Impala server is a distributed, massively parallel processing (MPP)
+      database engine. It consists of different daemon processes that run on
+      specific hosts within your cluster. </p>
 
 
     <p class="p toc inpage"></p>
@@ -56,38 +55,46 @@
 
     <div class="body conbody">
 
-      <p class="p">
-        The core Impala component is a daemon process that runs on each DataNode of the cluster, physically represented
-        by the <code class="ph codeph">impalad</code> process. It reads and writes to data files; accepts queries transmitted
-        from the <code class="ph codeph">impala-shell</code> command, Hue, JDBC, or ODBC; parallelizes the queries and
-        distributes work across the cluster; and transmits intermediate query results back to the
-        central coordinator node.
-      </p>
+      <div class="p"> The core Impala component is the Impala daemon, physically represented
+        by the <code class="ph codeph">impalad</code> process. A few of the key functions that
+        an Impala daemon performs are:<ul class="ul">
+          <li class="li">Reads and writes to data files.</li>
+
+          <li class="li">Accepts queries transmitted from the <code class="ph codeph">impala-shell</code>
+            command, Hue, JDBC, or ODBC.</li>
+
+          <li class="li">Parallelizes the queries and distributes work across the
+            cluster.</li>
+
+          <li class="li">Transmits intermediate query results back to the central
+            coordinator. </li>
+
+        </ul>
+</div>
+
+      <div class="p">Impala daemons can be deployed in one of the following ways:<ul class="ul">
+          <li class="li">HDFS and Impala are co-located, and each Impala daemon runs on the
+            same host as a DataNode.</li>
+
+          <li class="li">Impala is deployed separately in a compute cluster and reads
+            remotely from HDFS, S3, ADLS, etc.</li>
+
+        </ul>
+</div>
 
 
-      <p class="p">
-        You can submit a query to the Impala daemon running on any DataNode, and that instance of the daemon serves as the
-        <dfn class="term">coordinator node</dfn> for that query. The other nodes transmit partial results back to the
-        coordinator, which constructs the final result set for a query. When running experiments with functionality
-        through the <code class="ph codeph">impala-shell</code> command, you might always connect to the same Impala daemon for
-        convenience. For clusters running production workloads, you might load-balance by
-        submitting each query to a different Impala daemon in round-robin style, using the JDBC or ODBC interfaces.
-      </p>
+      <p class="p"> The Impala daemons are in constant communication with StateStore, to
+        confirm which daemons are healthy and can accept new work. </p>
 
 
-      <p class="p">
-        The Impala daemons are in constant communication with the <dfn class="term">statestore</dfn>, to confirm which nodes
-        are healthy and can accept new work.
-      </p>
-
-
-      <p class="p">
-        They also receive broadcast messages from the <span class="keyword cmdname">catalogd</span> daemon (introduced in Impala 1.2)
-        whenever any Impala node in the cluster creates, alters, or drops any type of object, or when an
-        <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code> statement is processed through Impala. This
-        background communication minimizes the need for <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE
-        METADATA</code> statements that were needed to coordinate metadata across nodes prior to Impala 1.2.
-      </p>
+      <p class="p"> They also receive broadcast messages from the
+          <span class="keyword cmdname">catalogd</span> daemon (introduced in Impala 1.2) whenever
+        any Impala daemon in the cluster creates, alters, or drops any type of
+        object, or when an <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code>
+        statement is processed through Impala. This background communication
+        minimizes the need for <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE
+          METADATA</code> statements that were needed to coordinate metadata
+        across Impala daemons prior to Impala 1.2. </p>
 
 
       <p class="p">
@@ -115,34 +122,30 @@
 
     <div class="body conbody">
 
-      <p class="p">
-        The Impala component known as the <dfn class="term">statestore</dfn> checks on the health of Impala daemons on all the
-        DataNodes in a cluster, and continuously relays its findings to each of those daemons. It is physically
-        represented by a daemon process named <code class="ph codeph">statestored</code>; you only need such a process on one
-        host in the cluster. If an Impala daemon goes offline due to hardware failure, network error, software issue,
-        or other reason, the statestore informs all the other Impala daemons so that future queries can avoid making
-        requests to the unreachable node.
-      </p>
+      <p class="p"> The Impala component known as the StateStore checks on the health of
+        all Impala daemons in a cluster, and continuously relays its findings to
+        each of those daemons. It is physically represented by a daemon process
+        named <code class="ph codeph">statestored</code>. You only need such a process on one
+        host in a cluster. If an Impala daemon goes offline due to hardware
+        failure, network error, software issue, or other reason, the StateStore
+        informs all the other Impala daemons so that future queries can avoid
+        making requests to the unreachable Impala daemon. </p>
 
 
-      <p class="p">
-        Because the statestore's purpose is to help when things go wrong and
+      <p class="p"> Because the StateStore's purpose is to help when things go wrong and
         to broadcast metadata to coordinators, it is not always critical to the
-        normal operation of an Impala cluster. If the statestore is not running
+        normal operation of an Impala cluster. If the StateStore is not running
         or becomes unreachable, the Impala daemons continue running and
         distributing work among themselves as usual when working with the data
         known to Impala. The cluster just becomes less robust if other Impala
         daemons fail, and metadata becomes less consistent as it changes while
-        the statestore is offline. When the statestore comes back online, it
+        the StateStore is offline. When the StateStore comes back online, it
         re-establishes communication with the Impala daemons and resumes its
-        monitoring and broadcasting functions.
-      </p>
+        monitoring and broadcasting functions. </p>
 
 
-      <p class="p">
-        If you issue a DDL statement while the statestore is down, the queries
-        that access the new object the DDL created will fail.
-      </p>
+      <p class="p"> If you issue a DDL statement while the StateStore is down, the queries
+        that access the new object the DDL created will fail. </p>
 
 
       <p class="p">
@@ -179,29 +182,26 @@
 
     <div class="body conbody">
 
-      <p class="p">
-        The Impala component known as the <dfn class="term">catalog service</dfn> relays the metadata changes from Impala SQL
-        statements to all the Impala daemons in a cluster. It is physically represented by a daemon process named
-        <code class="ph codeph">catalogd</code>; you only need such a process on one host in the cluster. Because the requests
-        are passed through the statestore daemon, it makes sense to run the <span class="keyword cmdname">statestored</span> and
-        <span class="keyword cmdname">catalogd</span> services on the same host.
-      </p>
+      <p class="p"> The Impala component known as the Catalog Service relays the metadata
+        changes from Impala SQL statements to all the Impala daemons in a
+        cluster. It is physically represented by a daemon process named
+          <code class="ph codeph">catalogd</code>. You only need such a process on one host in
+        a cluster. Because the requests are passed through the StateStore
+        daemon, it makes sense to run the <span class="keyword cmdname">statestored</span> and
+          <span class="keyword cmdname">catalogd</span> services on the same host. </p>
 
 
-      <p class="p">
-        The catalog service avoids the need to issue
-        <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code> statements when the metadata changes are
-        performed by statements issued through Impala. When you create a table, load data, and so on through Hive,
-        you do need to issue <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> on an Impala node
-        before executing a query there.
-      </p>
+      <p class="p"> The catalog service avoids the need to issue <code class="ph codeph">REFRESH</code>
+        and <code class="ph codeph">INVALIDATE METADATA</code> statements when the metadata
+        changes are performed by statements issued through Impala. When you
+        create a table, load data, and so on through Hive, you do need to issue
+          <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> on an
+        Impala daemon before executing a query there. </p>
 
 
       <p class="p">
         This feature touches a number of aspects of Impala:
       </p>
-
-
 
 
       <ul class="ul" id="intro_catalogd__catalogd_xrefs">
@@ -216,16 +216,15 @@
 
 
         <li class="li">
-          <p class="p">
-            The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code> statements are not needed
-            when the <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, or other table-changing or
-            data-changing operation is performed through Impala. These statements are still needed if such
-            operations are done through Hive or by manipulating data files directly in HDFS, but in those cases the
-            statements only need to be issued on one Impala node rather than on all nodes. See
-            <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> and
-            <a class="xref" href="impala_invalidate_metadata.html#invalidate_metadata">INVALIDATE METADATA Statement</a> for the latest usage information for
-            those statements.
-          </p>
+          <p class="p"> The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE
+              METADATA</code> statements are not needed when the
+              <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, or other
+            table-changing or data-changing operation is performed through
+            Impala. These statements are still needed if such operations are
+            done through Hive or by manipulating data files directly in HDFS,
+            but in those cases the statements only need to be issued on one
+            Impala daemon rather than on all daemons. See <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> and <a class="xref" href="impala_invalidate_metadata.html#invalidate_metadata">INVALIDATE METADATA Statement</a> for
+            the latest usage information for those statements. </p>
 
         </li>
 

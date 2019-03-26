@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Runtime Filtering for Impala Queries (Impala 2.5 or higher only)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="runtime_filtering" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -87,13 +87,13 @@
 
       <ul class="ul">
         <li class="li">
-          <p class="p">
-            What a <dfn class="term">plan fragment</dfn> is.
-            Impala decomposes each query into smaller units of work that are distributed across the cluster.
-            Wherever possible, a data block is read, filtered, and aggregated by plan fragments executing
-            on the same host. For some operations, such as joins and combining intermediate results into
-            a final result set, data is transmitted across the network from one DataNode to another.
-          </p>
+          <p class="p"> What a <dfn class="term">plan fragment</dfn> is. Impala decomposes each query
+            into smaller units of work that are distributed across the cluster.
+            Wherever possible, a data block is read, filtered, and aggregated by
+            plan fragments executing on the same host. For some operations, such
+            as joins and combining intermediate results into a final result set,
+            data is transmitted across the network from one Impala daemon to
+            another. </p>
 
         </li>
 

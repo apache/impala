@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the RCFile File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="rcfile" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -37,23 +37,23 @@
 
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>RCFile Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d147351e80">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e80">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d147351e83">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e83">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d147351e86">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e86">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d147351e89">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e89">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d147351e92">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d150154e92">
               Impala Can INSERT?
             </th>
 
@@ -62,25 +62,26 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d147351e80 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e80 ">
               <a class="xref" href="impala_rcfile.html#rcfile">RCFile</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d147351e83 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e83 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d147351e86 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e86 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d147351e89 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e89 ">
               Yes.
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d147351e92 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d150154e92 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
 

@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Modifying Impala Startup Options" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_processes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="config_options" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -464,43 +464,6 @@ Starting Impala Catalog Server:                            [  OK  ]</code></pre>
 
     </div>
 
-
-  </div>
-
-  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="auto_invalidate_metadata">
-    <h2 class="title topictitle2" id="ariaid-title7">Startup Options for Automatic Invalidation of Metadata</h2>
-
-    <div class="body conbody">
-      <p class="p">To keep the size of metadata bounded, <code class="ph codeph">catalogd</code>
-        periodically scans all the tables and invalidates those not recently
-        used. There are two types of configurations in
-        <code class="ph codeph">catalogd</code>.</p>
-
-      <ul class="ul">
-        <li class="li">Time-based invalidation with the
-            <code class="ph codeph">--invalidate_tables_timeout_s</code> flag:
-            <code class="ph codeph">Catalogd</code> invalidates tables that are not recently
-          used in the specified time period (in seconds). This flag needs to be
-          applied to both <code class="ph codeph">impalad</code> and
-          <code class="ph codeph">catalogd</code>.</li>
-
-        <li class="li">Memory-based invalidation with the
-            <code class="ph codeph">--invalidate_tables_on_memory_pressure</code> flag: When
-          the memory pressure reaches 60% of JVM heap size after a Java garbage
-          collection in <code class="ph codeph">catalogd</code>, Impala invalidates 10% of the
-          least recently used tables. This flag needs to be applied to both
-            <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code>.</li>
-
-      </ul>
-
-      <p class="p">Automatic invalidation of metadata provides more stability with lower
-        chances of running out of memory, but the feature could potentially
-        cause performance issues and may require tuning.</p>
-
-      <div class="note note"><span class="notetitle">Note:</span> This is a preview feature in Impala 3.1 and not generally
-        available.</div>
-
-    </div>
 
   </div>
 

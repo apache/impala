@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="EXPLAIN Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="explain" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,12 +28,11 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      Returns the execution plan for a statement, showing the low-level mechanisms that Impala will use to read the
-      data, divide the work among nodes in the cluster, and transmit intermediate and final results across the
-      network. Use <code class="ph codeph">explain</code> followed by a complete <code class="ph codeph">SELECT</code> query. For example:
-    </p>
+    <p class="p"> Returns the execution plan for a statement, showing the low-level
+      mechanisms that Impala will use to read the data, divide the work among
+      nodes in the cluster, and transmit intermediate and final results across
+      the network. Use <code class="ph codeph">explain</code> followed by a complete
+        <code class="ph codeph">SELECT</code> query. For example: </p>
 
 
     <p class="p">
@@ -130,6 +129,15 @@
       able to optimize a query so that it executes in seconds rather than minutes.
     </p>
 
+    <p class="p"> The <code class="ph codeph">EXPLAIN</code> output becomes more accurate and informative
+      as statistics are gathered by the <code class="ph codeph">COMPUTE STATS</code>
+      statement. Initially, the information about data size and distribution,
+      such as the number of rows or number of distinct values for each column,
+      is marked "<code class="ph codeph">unavailable</code>". The <code class="ph codeph">COMPUTE
+        STATS</code> statement performs the analysis, so a subsequent
+        <code class="ph codeph">EXPLAIN</code> statement has additional information to use in
+      deciding how to optimize the distributed query. </p>
+
 
     <p class="p">
       For more information and examples to help you interpret <code class="ph codeph">EXPLAIN</code> output, see
@@ -142,21 +150,36 @@
     </p>
 
 
-    <p class="p">
-      For performance tuning of complex queries, and capacity planning (such as using the admission control and
-      resource management features), you can enable more detailed and informative output for the
-      <code class="ph codeph">EXPLAIN</code> statement. In the <span class="keyword cmdname">impala-shell</span> interpreter, issue the command
-      <code class="ph codeph">SET EXPLAIN_LEVEL=<var class="keyword varname">level</var></code>, where <var class="keyword varname">level</var> is an integer
-      from 0 to 3 or corresponding mnemonic values <code class="ph codeph">minimal</code>, <code class="ph codeph">standard</code>,
-      <code class="ph codeph">extended</code>, or <code class="ph codeph">verbose</code>.
-    </p>
+    <p class="p"> For performance tuning of complex queries, and capacity
+      planning (such as using the admission control and resource management
+      features), you can enable more detailed and informative output for the
+        <code class="ph codeph">EXPLAIN</code> statement. In the
+        <span class="keyword cmdname">impala-shell</span> interpreter, issue the command
+        <code class="ph codeph">SET EXPLAIN_LEVEL=<var class="keyword varname">level</var></code>, where
+        <var class="keyword varname">level</var> is <code class="ph codeph">MINIMAL</code>,
+        <code class="ph codeph">STANDARD</code>, <code class="ph codeph">EXTENDED</code>, or
+        <code class="ph codeph">VERBOSE</code>. </p>
 
 
-    <p class="p">
-      When extended <code class="ph codeph">EXPLAIN</code> output is enabled, <code class="ph codeph">EXPLAIN</code> statements print
-      information about estimated memory requirements, minimum number of virtual cores, and so on.
-      
-    </p>
+    <p class="p"> When extended <code class="ph codeph">EXPLAIN</code> output is enabled,
+        <code class="ph codeph">EXPLAIN</code> statements print information about estimated
+      memory requirements, minimum number of virtual cores, and so on. </p>
+
+    <p class="p">Starting in <span class="keyword">Impala 3.2</span>, if the
+        <code class="ph codeph">EXPLAIN_LEVEL</code> option is set to
+        <code class="ph codeph">EXTENDED</code> level or <code class="ph codeph">VERBOSE</code>, the output
+      contains the following additional information.</p>
+
+    <ul class="ul">
+      <li class="li">The analyzed query, in the output header. <p class="p">The analyzed query may
+          have been rewritten to include various optimizations and implicit
+          casts. See the example below.</p>
+</li>
+
+      <li class="li">The predicates in the plan output includes the same implicit casts and
+        literals printed with a cast to show the type.</li>
+
+    </ul>
 
 
     <p class="p">
@@ -169,25 +192,33 @@
       </p>
 
 
-    <p class="p">
-      This example shows how the standard <code class="ph codeph">EXPLAIN</code> output moves from the lowest (physical) level to
-      the higher (logical) levels. The query begins by scanning a certain amount of data; each node performs an
-      aggregation operation (evaluating <code class="ph codeph">COUNT(*)</code>) on some subset of data that is local to that
-      node; the intermediate results are transmitted back to the coordinator node (labelled here as the
-      <code class="ph codeph">EXCHANGE</code> node); lastly, the intermediate results are summed to display the final result.
-    </p>
+    <p class="p"> This example shows how the standard <code class="ph codeph">EXPLAIN</code> output
+      moves from the lowest (physical) level to the higher (logical) levels. </p>
+
+    <ol class="ol">
+      <li class="li">The query begins by scanning a certain amount of data; each node
+        performs an aggregation operation (evaluating <code class="ph codeph">COUNT(*)</code>)
+        on some subset of data that is local to that node.</li>
+
+      <li class="li">The intermediate results are transmitted back to the coordinator node
+        (labelled here as the <code class="ph codeph">EXCHANGE</code> node).</li>
+
+      <li class="li">Lastly, the intermediate results are summed to display the final
+        result. </li>
+
+    </ol>
 
 
-<pre class="pre codeblock" id="explain__explain_plan_simple"><code>[impalad-host:21000] &gt; explain select count(*) from customer_address;
+<pre class="pre codeblock" id="explain__explain_plan_simple"><code>[impalad-host:21000] &gt; EXPLAIN SELECT COUNT(*) FROM customer_address;
 +----------------------------------------------------------+
 | Explain String                                           |
 +----------------------------------------------------------+
-| Estimated Per-Host Requirements: Memory=42.00MB VCores=1 |
+| ...                                                      |
 |                                                          |
-| 03:AGGREGATE [MERGE FINALIZE]                            |
+| 03:AGGREGATE [FINALIZE]                                  |
 | |  output: sum(count(*))                                 |
 | |                                                        |
-| 02:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| 02:EXCHANGE [UNPARTITIONED]                              |
 | |                                                        |
 | 01:AGGREGATE                                             |
 | |  output: count(*)                                      |
@@ -196,65 +227,28 @@
 |    partitions=1/1 size=5.25MB                            |
 +----------------------------------------------------------+
 </code></pre>
+    <p class="p">The following example shows an extended <code class="ph codeph">EXPLAIN</code> output.
+      Note that the analyzed query was rewritten to include:</p>
 
-    <p class="p">
-      These examples show how the extended <code class="ph codeph">EXPLAIN</code> output becomes more accurate and informative as
-      statistics are gathered by the <code class="ph codeph">COMPUTE STATS</code> statement. Initially, much of the information
-      about data size and distribution is marked <span class="q">"unavailable"</span>. Impala can determine the raw data size, but
-      not the number of rows or number of distinct values for each column without additional analysis. The
-      <code class="ph codeph">COMPUTE STATS</code> statement performs this analysis, so a subsequent <code class="ph codeph">EXPLAIN</code>
-      statement has additional information to use in deciding how to optimize the distributed query.
-    </p>
+    <ul class="ul">
+      <li class="li">The 'constant folding' optimization, which simplified the expression
+        in the original query, '<code class="ph codeph">1000 / 100</code>' to
+          '<code class="ph codeph">10</code>'.</li>
 
+      <li class="li">The implicit casts in the <code class="ph codeph">WHERE</code> clause.</li>
 
-    
+    </ul>
 
-<pre class="pre codeblock"><code>[localhost:21000] &gt; set explain_level=extended;
-EXPLAIN_LEVEL set to extended
-[localhost:21000] &gt; explain select x from t1;
-[localhost:21000] &gt; explain select x from t1;
+    <pre class="pre codeblock"><code>EXPLAIN SELECT * FROM functional_kudu.alltypestiny WHERE bigint_col &lt; 1000 / 100;
 +----------------------------------------------------------+
 | Explain String                                           |
 +----------------------------------------------------------+
-| Estimated Per-Host Requirements: Memory=32.00MB VCores=1 |
-|                                                          |
-| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
-| |  hosts=1 per-host-mem=unavailable                      |
-<strong class="ph b">| |  tuple-ids=0 row-size=4B cardinality=unavailable       |</strong>
-| |                                                        |
-| 00:SCAN HDFS [default.t2, PARTITION=RANDOM]              |
-|    partitions=1/1 size=36B                               |
-<strong class="ph b">|    table stats: unavailable                              |</strong>
-<strong class="ph b">|    column stats: unavailable                             |</strong>
-|    hosts=1 per-host-mem=32.00MB                          |
-<strong class="ph b">|    tuple-ids=0 row-size=4B cardinality=unavailable       |</strong>
-+----------------------------------------------------------+
-</code></pre>
-
-<pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats t1;
-+-----------------------------------------+
-| summary                                 |
-+-----------------------------------------+
-| Updated 1 partition(s) and 1 column(s). |
-+-----------------------------------------+
-[localhost:21000] &gt; explain select x from t1;
-+----------------------------------------------------------+
-| Explain String                                           |
-+----------------------------------------------------------+
-| Estimated Per-Host Requirements: Memory=64.00MB VCores=1 |
-|                                                          |
-| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
-| |  hosts=1 per-host-mem=unavailable                      |
-| |  tuple-ids=0 row-size=4B cardinality=0                 |
-| |                                                        |
-| 00:SCAN HDFS [default.t1, PARTITION=RANDOM]              |
-|    partitions=1/1 size=36B                               |
-<strong class="ph b">|    table stats: 0 rows total                             |</strong>
-<strong class="ph b">|    column stats: all                                     |</strong>
-|    hosts=1 per-host-mem=64.00MB                          |
-<strong class="ph b">|    tuple-ids=0 row-size=4B cardinality=0                 |</strong>
-+----------------------------------------------------------+
-</code></pre>
+| ...
+| Analyzed query: SELECT * FROM mytable WHERE CAST(bigint_col AS DOUBLE) &lt; CAST(10 AS DOUBLE)
+| ...
+| 00:SCAN KUDU [functional_kudu.alltypestiny]
+| predicates: CAST(bigint_col AS DOUBLE) &lt; CAST(10 AS DOUBLE)
+...</code></pre>
 
     <p class="p">
         <strong class="ph b">Security considerations:</strong>

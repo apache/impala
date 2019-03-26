@@ -4,13 +4,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SHUTDOWN Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="shutdown" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -59,38 +59,39 @@
 
     <table cellpadding="4" cellspacing="0" summary="" id="shutdown__simpletable_sly_wrf_rfb" border="1" class="simpletable"><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><thead><tr class="sthead">
 
-        <th style="vertical-align:bottom;text-align:left;" id="d188306e96" class="stentry">Argument</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d191238e96" class="stentry">Argument</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d188306e99" class="stentry">Type</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d191238e99" class="stentry">Type</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d188306e102" class="stentry">Default</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d191238e102" class="stentry">Default</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d188306e105" class="stentry">Description</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d191238e105" class="stentry">Description</th>
 
 
       </tr>
 </thead><tbody><tr class="strow">
 
-        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">host_name</var></code>
+        <td style="vertical-align:top;" headers="d191238e96" class="stentry"><code class="ph codeph"><var class="keyword varname">host_name</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">STRING</code>
+        <td style="vertical-align:top;" headers="d191238e99" class="stentry"><code class="ph codeph">STRING</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e102" class="stentry">The current <code class="ph codeph">impalad</code> host</td>
+        <td style="vertical-align:top;" headers="d191238e102" class="stentry">The current <code class="ph codeph">impalad</code> host to whom the
+            <code class="ph codeph">SHUTDOWN</code> statement is submitted.</td>
 
 
-        <td style="vertical-align:top;" headers="d188306e105" class="stentry">
+        <td style="vertical-align:top;" headers="d191238e105" class="stentry">
 
           <p class="p">
-            Address of the backend to be shut down.
+            Address of the <code class="ph codeph">impalad</code> to be shut down.
           </p>
 
 
@@ -100,53 +101,74 @@
       </tr>
 <tr class="strow">
 
-        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">port_number</var></code>
+        <td style="vertical-align:top;" headers="d191238e96" class="stentry"><code class="ph codeph"><var class="keyword varname">port_number</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">INT</code>
+        <td style="vertical-align:top;" headers="d191238e99" class="stentry"><code class="ph codeph">INT</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e102" class="stentry"><code class="ph codeph">0</code> which is treated the same port as current
-            <code class="ph codeph">impalad</code>
+        <td style="vertical-align:top;" headers="d191238e102" class="stentry">
+
+          <ul class="ul">
+            <li class="li">
+              In Impala 3.1, the current <code class="ph codeph">impalad</code>'s port used for the thrift
+              based communication with other <code class="ph codeph">impalad</code>s (by default, 22000).
+            </li>
+
+
+            <li class="li">
+              In Impala 3.2 and higher, the current <code class="ph codeph">impalad</code>'s port used for the
+              KRPC based communication with other <code class="ph codeph">impalad</code>s (by default, 27000).
+            </li>
+
+          </ul>
+
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e105" class="stentry">n/a</td>
+        <td style="vertical-align:top;" headers="d191238e105" class="stentry">Specifies the port by which the <code class="ph codeph">impalad</code> can be
+          contacted. <ul class="ul">
+            <li class="li">
+              In Impala 3.1, use the same <code class="ph codeph">impalad</code> port used for the thrift
+              based inter-Impala communication.
+            </li>
+
+
+            <li class="li">
+              In Impala 3.2 and higher, use the same <code class="ph codeph">impalad</code> port used for the
+              KRPC based inter-Impala communication.
+            </li>
+
+          </ul>
+
+
+        </td>
 
 
       </tr>
 <tr class="strow">
 
-        <td style="vertical-align:top;" headers="d188306e96" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code>
+        <td style="vertical-align:top;" headers="d191238e96" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e99" class="stentry"><code class="ph codeph">INT</code>
+        <td style="vertical-align:top;" headers="d191238e99" class="stentry"><code class="ph codeph">INT</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e102" class="stentry"><code class="ph codeph">The value of the <code class="ph codeph">--shutdown_deadline_s</code>
-            flag, which defaults to 1 hour.</code>
-
-        </td>
+        <td style="vertical-align:top;" headers="d191238e102" class="stentry">The value of the <code class="ph codeph">‑‑shutdown_deadline_s</code> flag,
+          which defaults to 1 hour. </td>
 
 
-        <td style="vertical-align:top;" headers="d188306e105" class="stentry">
-
-          <p class="p">
-            <code class="ph codeph"><var class="keyword varname">deadline</var></code> must be a non-negative number,
-            specified in seconds.
-          </p>
-
-
-          <p class="p">
+        <td style="vertical-align:top;" headers="d191238e105" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code> must be a non-negative
+          number, specified in seconds. <p class="p">
             The value, 0, for <var class="keyword varname">deadline</var> specifies an immediate shutdown.
           </p>
 
@@ -173,7 +195,7 @@
 
 
       <li class="li">
-        A client can remotely shut down another non-coordinator <code class="ph codeph">impalad</code> via
+        A client can remotely shut down any <code class="ph codeph">impalad</code> via
         <code class="ph codeph">:SHUTDOWN('<var class="keyword varname">hostname</var>')</code>.
       </li>
 
@@ -188,7 +210,7 @@
       <li class="li">
         <a class="xref" href="impala_components.html#intro_impalad">Executors</a> can be shut down
         without disrupting running queries. Short-running queries will finish, and long-running
-        queries will continue until a threshold time limit is reached.
+        queries will continue until the <var class="keyword varname">deadline</var> is reached.
       </li>
 
 

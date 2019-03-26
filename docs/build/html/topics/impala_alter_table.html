@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ALTER TABLE Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="alter_table" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -30,11 +30,8 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      The <code class="ph codeph">ALTER TABLE</code> statement changes the structure or properties of an
-      existing Impala table.
-    </p>
+    <p class="p"> The <code class="ph codeph">ALTER TABLE</code> statement changes the structure or
+      properties of an existing Impala table. </p>
 
 
     <p class="p">
@@ -55,11 +52,12 @@
 
 <pre class="pre codeblock"><code>ALTER TABLE [<var class="keyword varname">old_db_name</var>.]<var class="keyword varname">old_table_name</var> RENAME TO [<var class="keyword varname">new_db_name</var>.]<var class="keyword varname">new_table_name</var>
 
-ALTER TABLE <var class="keyword varname">name</var> ADD COLUMNS (<var class="keyword varname">col_spec</var>[, <var class="keyword varname">col_spec</var> ...])
+ALTER TABLE <var class="keyword varname">name</var> ADD [IF NOT EXISTS] COLUMNS (<var class="keyword varname">col_spec</var>[, <var class="keyword varname">col_spec</var> ...])
+ALTER TABLE <var class="keyword varname">name</var> REPLACE COLUMNS (<var class="keyword varname">col_spec</var>[, <var class="keyword varname">col_spec</var> ...])
+
+ALTER TABLE <var class="keyword varname">name</var> ADD COLUMN [IF NOT EXISTS] <var class="keyword varname">col_spec</var>
 ALTER TABLE <var class="keyword varname">name</var> DROP [COLUMN] <var class="keyword varname">column_name</var>
 ALTER TABLE <var class="keyword varname">name</var> CHANGE <var class="keyword varname">column_name</var> <var class="keyword varname">col_spec</var>
-
-ALTER TABLE <var class="keyword varname">name</var> REPLACE COLUMNS (<var class="keyword varname">col_spec</var>[, <var class="keyword varname">col_spec</var> ...])
 
 <span class="ph">ALTER TABLE <var class="keyword varname">name</var> SET OWNER USER <var class="keyword varname">user_name</var>
 ALTER TABLE <var class="keyword varname">name</var> SET OWNER ROLE <var class="keyword varname">role_name</var>
@@ -644,23 +642,21 @@ show column stats t1;
       <strong class="ph b">To reorganize columns for a table:</strong>
     </p>
 
+    <p class="p">You can add multiple columns at a time using the <code class="ph codeph">ALTER
+        TABLE</code> statement. If you specify the <code class="ph codeph">IF NOT
+        EXISTS</code> clause, Impala silently ignores the <code class="ph codeph">ADD</code>
+      request and does not return an error if a column with the same name exists
+      in the table.</p>
 
-<pre class="pre codeblock"><code>ALTER TABLE <var class="keyword varname">table_name</var> ADD COLUMNS (<var class="keyword varname">column_defs</var>);
-ALTER TABLE <var class="keyword varname">table_name</var> REPLACE COLUMNS (<var class="keyword varname">column_defs</var>);
-ALTER TABLE <var class="keyword varname">table_name</var> CHANGE <var class="keyword varname">column_name</var> <var class="keyword varname">new_name</var> <var class="keyword varname">new_type</var>;
-ALTER TABLE <var class="keyword varname">table_name</var> DROP <var class="keyword varname">column_name</var>;</code></pre>
+    <p class="p">When you replace columns, all the original column definitions are
+      discarded. </p>
 
-    <p class="p">
-      The <var class="keyword varname">column_spec</var> is the same as in the <code class="ph codeph">CREATE TABLE</code>
-      statement: the column name, then its data type, then an optional comment. You can add
-      multiple columns at a time. The parentheses are required whether you add a single column
-      or multiple columns. When you replace columns, all the original column definitions are
-      discarded. You might use this technique if you receive a new set of data files with
-      different data types or columns in a different order. (The data files are retained, so if
-      the new columns are incompatible with the old ones, use <code class="ph codeph">INSERT OVERWRITE</code>
-      or <code class="ph codeph">LOAD DATA OVERWRITE</code> to replace all the data before issuing any further
-      queries.)
-    </p>
+    <p class="p">You might use these statements if you receive a new set of data files
+      with different data types or columns in a different order. The data files
+      are retained, so if the new columns are incompatible with the old ones,
+      use <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA
+        OVERWRITE</code> to replace all the data before issuing any further
+      queries.</p>
 
 
     <p class="p">

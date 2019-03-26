@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="BIGINT Data Type" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="bigint" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -52,10 +52,11 @@
 
 
     <p class="p">
-      <strong class="ph b">Conversions:</strong> Impala automatically converts to a floating-point type (<code class="ph codeph">FLOAT</code> or
-      <code class="ph codeph">DOUBLE</code>) automatically. Use <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">TINYINT</code>,
-      <code class="ph codeph">SMALLINT</code>, <code class="ph codeph">INT</code>, <code class="ph codeph">STRING</code>, or <code class="ph codeph">TIMESTAMP</code>.
-      <span class="ph">
+      <strong class="ph b">Conversions:</strong> Impala automatically converts to a floating-point type
+        (<code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>) automatically. Use
+        <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">TINYINT</code>,
+        <code class="ph codeph">SMALLINT</code>, <code class="ph codeph">INT</code>,
+      <code class="ph codeph">STRING</code>, or <code class="ph codeph">TIMESTAMP</code>. <span class="ph">
           Casting an integer or floating-point value <code class="ph codeph">N</code> to
         <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
         date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
@@ -145,22 +146,8 @@ SELECT CAST(1000 AS BIGINT);
       </p>
 
 
-    <p class="p">
-        <strong class="ph b">Sqoop considerations:</strong>
-      </p>
 
 
-    <p class="p"> If you use Sqoop to
-        convert RDBMS data to Parquet, be careful with interpreting any
-        resulting values from <code class="ph codeph">DATE</code>, <code class="ph codeph">DATETIME</code>,
-        or <code class="ph codeph">TIMESTAMP</code> columns. The underlying values are
-        represented as the Parquet <code class="ph codeph">INT64</code> type, which is
-        represented as <code class="ph codeph">BIGINT</code> in the Impala table. The Parquet
-        values represent the time in milliseconds, while Impala interprets
-          <code class="ph codeph">BIGINT</code> as the time in seconds. Therefore, if you have
-        a <code class="ph codeph">BIGINT</code> column in a Parquet table that was imported
-        this way from Sqoop, divide the values by 1000 when interpreting as the
-          <code class="ph codeph">TIMESTAMP</code> type.</p>
 
 
     <p class="p">

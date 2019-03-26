@@ -4,14 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="How to Configure Impala with Dedicated Coordinators" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_scalability.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="scalability" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -127,11 +128,9 @@
     </ul>
 
 
-    <p class="p">
-      If such scalability bottlenecks occur, in CDH 5.12 / Impala 2.9 and higher, you can assign
-      one dedicated role to each Impala daemon host, either as a coordinator or as an executor,
-      to address the issues.
-    </p>
+    <p class="p"> If such scalability bottlenecks occur, in Impala 2.9 and higher, you can
+      assign one dedicated role to each Impala daemon host, either as a
+      coordinator or as an executor, to address the issues. </p>
 
 
     <ul class="ul">
@@ -240,7 +239,11 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title2" id="concept_vhv_4b1_n2b">
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_scalability.html">Scalability Considerations for Impala</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="concept_vhv_4b1_n2b">
 
     <h2 class="title topictitle2" id="ariaid-title2">Determining the Optimal Number of Dedicated Coordinators</h2>
 
@@ -703,7 +706,7 @@
 
         <li class="li">
           <p class="p">
-            <strong class="ph b">(Dedicated) Executors: </strong>They should be collocated with DataNodes as usual. The
+            <strong class="ph b">(Dedicated) Executors: </strong>They should be colocated with DataNodes as usual. The
             number of hosts with this setting typically increases as the cluster grows larger
             and handles more table partitions, data files, and concurrent queries.
           </p>

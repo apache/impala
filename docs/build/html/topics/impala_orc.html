@@ -4,13 +4,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the ORC File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="orc" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -36,23 +36,23 @@
 
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>ORC Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e70">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d134310e70">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e73">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d134310e73">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e76">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d134310e76">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d131791e79">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d134310e79">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d131791e82">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d134310e82">
               Impala Can INSERT?
             </th>
 
@@ -61,25 +61,33 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e70 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d134310e70 ">
               <a class="xref" href="impala_orc.html#orc">ORC</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e73 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d134310e73 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e76 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d134310e76 ">
               gzip, Snappy, LZO, LZ4; currently gzip by default
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d131791e79 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d134310e79 ">
               Yes, in Impala 2.12.0 and higher.
+
+              <p class="p">
+                The ORC support is an experimental feature since Impala-2.12. To disable it, set
+                <code class="ph codeph">--enable_orc_scanner</code> to <code class="ph codeph">false</code> when starting
+                the cluster.
+              </p>
+
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d131791e82 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d134310e82 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
           </tr>
@@ -324,41 +332,16 @@ DATE (not supported)
         <strong class="ph b">Complex types:</strong>
       </p>
 
-      <p class="p">
-        Complex types are currently not supported on ORC. However, queries materializing only scalar type
-        columns are allowed:
-      </p>
 
+      <p class="p"> In <span class="keyword">Impala 2.3</span>
+        and higher, Impala supports the complex types <code class="ph codeph">ARRAY</code>,
+          <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>. In <span class="keyword">Impala 3.2</span> and higher, Impala also supports these
+        complex types in ORC. See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details.
+        These Complex types are currently supported only for the Parquet or ORC
+        file formats. Because Impala has better performance on Parquet than ORC,
+        if you plan to use complex types, become familiar with the performance
+        and storage aspects of Parquet first. </p>
 
-<pre class="pre codeblock"><code>$ hive
-hive&gt; CREATE TABLE orc_nested_table (id INT, a ARRAY&lt;INT&gt;) STORED AS ORC;
-hive&gt; INSERT INTO TABLE orc_nested_table SELECT 1, ARRAY(1,2,3);
-OK
-Time taken: 2.629 seconds
-hive&gt; quit;
-
-$ impala-shell -i localhost
-[localhost:21000] default&gt; INVALIDATE METADATA orc_nested_table;
-[localhost:21000] default&gt; SELECT 1 FROM orc_nested_table t, t.a;
-ERROR: NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 'a' with a complex type 'ARRAY&lt;INT&gt;'.
-Complex types are supported for these file formats: PARQUET.
-
-[localhost:21000] default&gt; SELECT COUNT(*) FROM orc_nested_table;
-+----------+
-| count(*) |
-+----------+
-| 1        |
-+----------+
-Fetched 1 row(s) in 0.12s
-
-[localhost:21000] default&gt; SELECT id FROM orc_nested_table;
-+----+
-| id |
-+----+
-| 1  |
-+----+
-Fetched 1 row(s) in 0.12s
-</code></pre>
 
     </div>
 

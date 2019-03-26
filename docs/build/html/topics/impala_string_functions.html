@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala String Functions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="string_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -144,6 +144,11 @@
 
       <li class="li">
         <a class="xref" href="#string_functions__length">LENGTH</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__levenshtein">LEVENSHTEIN, LE_DST</a>
       </li>
 
 
@@ -672,7 +677,7 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
         values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
         displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2663"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2675"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -1138,7 +1143,7 @@ select instr('foo bar bletch', 'b', 1, null);
         argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
         values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
         displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2663"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2675"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -1162,7 +1167,68 @@ from length_demo;
 
 
       
+    </dl>
 
+
+    <dl class="dl">
+
+
+        <dt class="dt dlterm" id="string_functions__levenshtein">
+          LEVENSHTEIN(STRING str1, STRING str2), <span class="ph" id="string_functions__le_dst">LE_DST(STRING
+          str1, STRING str2)</span>
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the Levenshtein distance between two input strings. The
+          Levenshtein distance between two strings is the minimum number of single-character
+          edits required to transform one string to other. The function indicates how different
+          the input strings are.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
+          </p>
+
+          <strong class="ph b">Usage notes:</strong>
+          <p class="p">
+            If input strings are equal, the function returns 0.
+          </p>
+
+
+          <p class="p">
+            If either input exceeds 255 characters, the function returns an error.
+          </p>
+
+
+          <p class="p">
+            If either input string is <code class="ph codeph">NULL</code>, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+
+
+          <p class="p">
+            If the length of one input string is zero, the function returns the length of the
+            other string.
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Example:</strong>
+          </p>
+
+          <p class="p">
+            <code class="ph codeph">LEVENSHTEIN ('welcome', 'We come')</code> returns 2, first change to
+            replace '<code class="ph codeph">w</code>' to '<code class="ph codeph">W</code>', and then to replace
+            '<code class="ph codeph">l</code>' to a space character.
+          </p>
+
+        </dd>
+
+
+
+    </dl>
+
+
+    <dl class="dl">
       
 
         <dt class="dt dlterm" id="string_functions__locate">

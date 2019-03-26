@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala Requirements" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_planning.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="prereqs" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -23,6 +23,7 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Requirements</h1>
 
+
   
 
   
@@ -30,14 +31,13 @@
   <div class="body conbody">
 
     <p class="p">
-      
-      
-      To perform as expected, Impala depends on the availability of the software, hardware, and configurations
-      described in the following sections.
+      To perform as expected, Impala depends on the availability of the software, hardware, and
+      configurations described in the following sections.
     </p>
 
 
     <p class="p toc inpage"></p>
+
 
   </div>
 
@@ -54,19 +54,13 @@
     <div class="body conbody">
 
       <p class="p">
-        
-        
-        
-        
-        
-        
-        
-        
-        Apache Impala runs on Linux systems only. See the <span class="ph filepath">README.md</span>
-        file for more information.
+        Apache Impala runs on Linux systems only. See the <span class="ph filepath">README.md</span> file
+        for more information.
       </p>
 
+
     </div>
+
 
   </div>
 
@@ -75,92 +69,93 @@
 
     <h2 class="title topictitle2" id="ariaid-title3">Hive Metastore and Related Configuration</h2>
 
-  
+
+
 
     <div class="body conbody">
 
       <p class="p">
-        
-        
-        
-        Impala can interoperate with data stored in Hive, and uses the same infrastructure as Hive for tracking
-        metadata about schema objects such as tables and columns. The following components are prerequisites for
-        Impala:
+        Impala can interoperate with data stored in Hive, and uses the same infrastructure as
+        Hive for tracking metadata about schema objects such as tables and columns. The
+        following components are prerequisites for Impala:
       </p>
 
 
       <ul class="ul">
         <li class="li">
           MySQL or PostgreSQL, to act as a metastore database for both Impala and Hive.
-          <div class="note note"><span class="notetitle">Note:</span>
-            <p class="p">
-              Installing and configuring a Hive metastore is an Impala requirement. Impala does not work without
-              the metastore database. For the process of installing and configuring the metastore, see
-              <a class="xref" href="impala_install.html#install">Installing Impala</a>.
-            </p>
+          <p class="p">
+            Always configure a <strong class="ph b">Hive metastore service</strong> rather than connecting directly to
+            the metastore database. The Hive metastore service is required to interoperate
+            between different levels of metastore APIs if this is necessary for your
+            environment, and using it avoids known issues with connecting directly to the
+            metastore database.
+          </p>
 
-
-            <p class="p">
-              Always configure a <strong class="ph b">Hive metastore service</strong> rather than connecting directly to the metastore
-              database. The Hive metastore service is required to interoperate between different levels of
-              metastore APIs if this is necessary for your environment, and using it avoids known issues with
-              connecting directly to the metastore database.
-            </p>
-
-
-            <p class="p">
-              A summary of the metastore installation process is as follows:
-            </p>
-
-            <ul class="ul">
-              <li class="li">
-                Install a MySQL or PostgreSQL database. Start the database if it is not started after installation.
-              </li>
-
-
-              <li class="li">
-                Download the
-                <a class="xref" href="http://www.mysql.com/products/connector/" target="_blank">MySQL
-                connector</a> or the
-                <a class="xref" href="http://jdbc.postgresql.org/download.html" target="_blank">PostgreSQL
-                connector</a> and place it in the <code class="ph codeph">/usr/share/java/</code> directory.
-              </li>
-
-
-              <li class="li">
-                Use the appropriate command line tool for your database to create the metastore database.
-              </li>
-
-
-              <li class="li">
-                Use the appropriate command line tool for your database to grant privileges for the metastore
-                database to the <code class="ph codeph">hive</code> user.
-              </li>
-
-
-              <li class="li">
-                Modify <code class="ph codeph">hive-site.xml</code> to include information matching your particular database: its
-                URL, username, and password. You will copy the <code class="ph codeph">hive-site.xml</code> file to the Impala
-                Configuration Directory later in the Impala installation process.
-              </li>
-
-            </ul>
-
-          </div>
+          <p class="p">
+            See below for a summary of the metastore installation process.
+          </p>
 
         </li>
 
 
         <li class="li">
-          <strong class="ph b">Optional:</strong> Hive. Although only the Hive metastore database is required for Impala to function, you
-          might install Hive on some client machines to create and load data into tables that use certain file
-          formats. See <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details. Hive does not need to be
-          installed on the same DataNodes as Impala; it just needs access to the same metastore database.
+          Hive (optional). Although only the Hive metastore database is required for Impala to
+          function, you might install Hive on some client machines to create and load data into
+          tables that use certain file formats. See
+          <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details. Hive does not need to
+          be installed on the same DataNodes as Impala; it just needs access to the same
+          metastore database.
         </li>
 
       </ul>
 
+
+      <p class="p">
+        To install the metastore:
+      </p>
+
+
+      <ol class="ol">
+        <li class="li">
+          Install a MySQL or PostgreSQL database. Start the database if it is not started after
+          installation.
+        </li>
+
+
+        <li class="li">
+          Download the
+          <a class="xref" href="http://www.mysql.com/products/connector/" target="_blank">MySQL
+          connector</a> or the
+          <a class="xref" href="http://jdbc.postgresql.org/download.html" target="_blank">PostgreSQL
+          connector</a> and place it in the <code class="ph codeph">/usr/share/java/</code> directory.
+        </li>
+
+
+        <li class="li">
+          Use the appropriate command line tool for your database to create the metastore
+          database.
+        </li>
+
+
+        <li class="li">
+          Use the appropriate command line tool for your database to grant privileges for the
+          metastore database to the <code class="ph codeph">hive</code> user.
+        </li>
+
+
+        <li class="li">
+          Modify <code class="ph codeph">hive-site.xml</code> to include information matching your particular
+          database: its URL, username, and password. You will copy the
+          <code class="ph codeph">hive-site.xml</code> file to the Impala Configuration Directory later in the
+          Impala installation process.
+        </li>
+
+      </ol>
+
+
     </div>
+
 
   </div>
 
@@ -169,42 +164,45 @@
 
     <h2 class="title topictitle2" id="ariaid-title4">Java Dependencies</h2>
 
-  
+
+
 
     <div class="body conbody">
 
       <p class="p">
-        
-        
-        Although Impala is primarily written in C++, it does use Java to communicate with various Hadoop
-        components:
+        Although Impala is primarily written in C++, it does use Java to communicate with
+        various Hadoop components:
       </p>
 
 
       <ul class="ul">
         <li class="li">
-          The officially supported JVM for Impala is the Oracle JVM. Other JVMs might cause issues, typically
-          resulting in a failure at <span class="keyword cmdname">impalad</span> startup. In particular, the JamVM used by default on
-          certain levels of Ubuntu systems can cause <span class="keyword cmdname">impalad</span> to fail to start.
+          The officially supported JVM for Impala is the Oracle JVM. Other JVMs might cause
+          issues, typically resulting in a failure at <span class="keyword cmdname">impalad</span> startup. In
+          particular, the JamVM used by default on certain levels of Ubuntu systems can cause
+          <span class="keyword cmdname">impalad</span> to fail to start.
         </li>
 
 
         <li class="li">
-          Internally, the <span class="keyword cmdname">impalad</span> daemon relies on the <code class="ph codeph">JAVA_HOME</code> environment
-          variable to locate the system Java libraries. Make sure the <span class="keyword cmdname">impalad</span> service is not run
-          from an environment with an incorrect setting for this variable.
+          Internally, the <span class="keyword cmdname">impalad</span> daemon relies on the
+          <code class="ph codeph">JAVA_HOME</code> environment variable to locate the system Java libraries.
+          Make sure the <span class="keyword cmdname">impalad</span> service is not run from an environment with
+          an incorrect setting for this variable.
         </li>
 
 
         <li class="li">
-          All Java dependencies are packaged in the <code class="ph codeph">impala-dependencies.jar</code> file, which is located
-          at <code class="ph codeph">/usr/lib/impala/lib/</code>. These map to everything that is built under
-          <code class="ph codeph">fe/target/dependency</code>.
+          All Java dependencies are packaged in the <code class="ph codeph">impala-dependencies.jar</code>
+          file, which is located at <code class="ph codeph">/usr/lib/impala/lib/</code>. These map to
+          everything that is built under <code class="ph codeph">fe/target/dependency</code>.
         </li>
 
       </ul>
 
+
     </div>
+
 
   </div>
 
@@ -213,32 +211,35 @@
 
     <h2 class="title topictitle2" id="ariaid-title5">Networking Configuration Requirements</h2>
 
-  
+
+
 
     <div class="body conbody">
 
       <p class="p">
-        
-        As part of ensuring best performance, Impala attempts to complete tasks on local data, as opposed to using
-        network connections to work with remote data. To support this goal, Impala matches
-        the <strong class="ph b">hostname</strong> provided to each Impala daemon with the <strong class="ph b">IP address</strong> of each DataNode by
-        resolving the hostname flag to an IP address. For Impala to work with local data, use a single IP interface
-        for the DataNode and the Impala daemon on each machine. Ensure that the Impala daemon's hostname flag
-        resolves to the IP address of the DataNode. For single-homed machines, this is usually automatic, but for
-        multi-homed machines, ensure that the Impala daemon's hostname resolves to the correct interface. Impala
-        tries to detect the correct hostname at start-up, and prints the derived hostname at the start of the log
-        in a message of the form:
+        As part of ensuring best performance, Impala attempts to complete tasks on local data,
+        as opposed to using network connections to work with remote data. To support this goal,
+        Impala matches the <strong class="ph b">hostname</strong> provided to each Impala daemon with the <strong class="ph b">IP
+        address</strong> of each DataNode by resolving the hostname flag to an IP address. For
+        Impala to work with local data, use a single IP interface for the DataNode and the
+        Impala daemon on each machine. Ensure that the Impala daemon's hostname flag resolves to
+        the IP address of the DataNode. For single-homed machines, this is usually automatic,
+        but for multi-homed machines, ensure that the Impala daemon's hostname resolves to the
+        correct interface. Impala tries to detect the correct hostname at start-up, and prints
+        the derived hostname at the start of the log in a message of the form:
       </p>
 
 
 <pre class="pre codeblock"><code>Using hostname: impala-daemon-1.example.com</code></pre>
 
       <p class="p">
-        In the majority of cases, this automatic detection works correctly. If you need to explicitly set the
-        hostname, do so by setting the <code class="ph codeph">--hostname</code> flag.
+        In the majority of cases, this automatic detection works correctly. If you need to
+        explicitly set the hostname, do so by setting the <code class="ph codeph">--hostname</code> flag.
       </p>
 
+
     </div>
+
 
   </div>
 
@@ -249,10 +250,11 @@
 
 
     <div class="body conbody">
+
       <p class="p">
-        The memory allocation should be consistent across Impala executor
-        nodes. A single Impala executor with a lower memory limit than the rest
-        can easily become a bottleneck and lead to suboptimal performance.
+        The memory allocation should be consistent across Impala executor nodes. A single Impala
+        executor with a lower memory limit than the rest can easily become a bottleneck and lead
+        to suboptimal performance.
       </p>
 
 
@@ -260,70 +262,89 @@
         This guideline does not apply to coordinator-only nodes.
       </p>
 
+
     </div>
 
+
     <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="concept_dqy_n1w_zdb">
+
       <h3 class="title topictitle3" id="ariaid-title7">Hardware Requirements for Optimal Join Performance</h3>
 
+
       <div class="body conbody">
+
         <p class="p">
-          During join operations, portions of data from each joined table are
-          loaded into memory. Data sets can be very large, so ensure your
-          hardware has sufficient memory to accommodate the joins you anticipate
-          completing.
+          During join operations, portions of data from each joined table are loaded into
+          memory. Data sets can be very large, so ensure your hardware has sufficient memory to
+          accommodate the joins you anticipate completing.
         </p>
 
-        <p class="p"> While requirements vary according to data set size, the following is
-          generally recommended:
+
+        <p class="p">
+          While requirements vary according to data set size, the following is generally
+          recommended:
         </p>
+
 
         <ul class="ul">
-          <li class="li"> CPU
+          <li class="li">
+            CPU
             <p class="p">
-              Impala version 2.2 and higher uses the SSSE3
-              instruction set, which is included in newer processors.
+              Impala version 2.2 and higher uses the SSSE3 instruction set, which is included in
+              newer processors.
             </p>
 
+
             <div class="note note"><span class="notetitle">Note:</span>
-              This required level of processor is the same as in Impala
-              version 1.x. The Impala 2.0 and 2.1 releases had a stricter
-              requirement for the SSE4.1 instruction set, which has now been
-              relaxed.
+              This required level of processor is the same as in Impala version 1.x. The Impala
+              2.0 and 2.1 releases had a stricter requirement for the SSE4.1 instruction set,
+              which has now been relaxed.
             </div>
 
 
           </li>
 
+
           <li class="li">
             Memory
             <p class="p">
-              128 GB or more recommended, ideally 256 GB
-              or more. If the intermediate results during query processing on a
-              particular node exceed the amount of memory available to Impala on
-              that node, the query writes temporary work data to disk, which can
-              lead to long query times. Note that because the work is
-              parallelized, and intermediate results for aggregate queries are
-              typically smaller than the original data, Impala can query and
-              join tables that are much larger than the memory available on an
-              individual node.
+              128 GB or more recommended, ideally 256 GB or more. If the intermediate results
+              during query processing on a particular node exceed the amount of memory available
+              to Impala on that node, the query writes temporary work data to disk, which can
+              lead to long query times. Note that because the work is parallelized, and
+              intermediate results for aggregate queries are typically smaller than the original
+              data, Impala can query and join tables that are much larger than the memory
+              available on an individual node.
             </p>
 
           </li>
 
+
+          <li class="li">
+            JVM Heap Size for Catalog Server
+            <p class="p">
+              4 GB or more recommended, ideally 8 GB or more, to accommodate the maximum numbers
+              of tables, partitions, and data files you are planning to use with Impala.
+            </p>
+
+          </li>
+
+
           <li class="li">
             Storage
             <p class="p">
-              DataNodes with 12 or more disks each. I/O speeds are
-              often the limiting factor for disk performance with Impala. Ensure
-              that you have sufficient disk space to store the data Impala will
-              be querying.
+              DataNodes with 12 or more disks each. I/O speeds are often the limiting factor for
+              disk performance with Impala. Ensure that you have sufficient disk space to store
+              the data Impala will be querying.
             </p>
 
           </li>
 
         </ul>
 
+
       </div>
+
 
     </div>
 
@@ -335,46 +356,51 @@
 
     <h2 class="title topictitle2" id="ariaid-title8">User Account Requirements</h2>
 
-  
+
+
 
     <div class="body conbody">
 
       <p class="p">
-        
-        
-        
-        Impala creates and uses a user and group named <code class="ph codeph">impala</code>. Do not delete this account or group
-        and do not modify the account's or group's permissions and rights. Ensure no existing systems obstruct the
-        functioning of these accounts and groups. For example, if you have scripts that delete user accounts not in
-        a white-list, add these accounts to the list of permitted accounts.
+        Impala creates and uses a user and group named <code class="ph codeph">impala</code>. Do not delete
+        this account or group and do not modify the account's or group's permissions and rights.
+        Ensure no existing systems obstruct the functioning of these accounts and groups. For
+        example, if you have scripts that delete user accounts not in a white-list, add these
+        accounts to the list of permitted accounts.
       </p>
 
 
       <p class="p">
-        For correct file deletion during <code class="ph codeph">DROP TABLE</code> operations, Impala must be able to move files
-        to the HDFS trashcan. You might need to create an HDFS directory <span class="ph filepath">/user/impala</span>,
-        writeable by the <code class="ph codeph">impala</code> user, so that the trashcan can be created. Otherwise, data files
-        might remain behind after a <code class="ph codeph">DROP TABLE</code> statement.
+        For correct file deletion during <code class="ph codeph">DROP TABLE</code> operations, Impala must be
+        able to move files to the HDFS trashcan. You might need to create an HDFS directory
+        <span class="ph filepath">/user/impala</span>, writeable by the <code class="ph codeph">impala</code> user, so
+        that the trashcan can be created. Otherwise, data files might remain behind after a
+        <code class="ph codeph">DROP TABLE</code> statement.
       </p>
 
 
       <p class="p">
-        Impala should not run as root. Best Impala performance is achieved using direct reads, but root is not
-        permitted to use direct reads. Therefore, running Impala as root negatively affects performance.
+        Impala should not run as root. Best Impala performance is achieved using direct reads,
+        but root is not permitted to use direct reads. Therefore, running Impala as root
+        negatively affects performance.
       </p>
 
 
       <p class="p">
-        By default, any user can connect to Impala and access all the associated databases and tables. You can
-        enable authorization and authentication based on the Linux OS user who connects to the Impala server, and
-        the associated groups for that user. <a class="xref" href="impala_security.html#security">Impala Security</a> for details. These
-        security features do not change the underlying file permission requirements; the <code class="ph codeph">impala</code>
-        user still needs to be able to access the data files.
+        By default, any user can connect to Impala and access all the associated databases and
+        tables. You can enable authorization and authentication based on the Linux OS user who
+        connects to the Impala server, and the associated groups for that user.
+        <a class="xref" href="impala_security.html#security">Impala Security</a> for details. These security features do not
+        change the underlying file permission requirements; the <code class="ph codeph">impala</code> user
+        still needs to be able to access the data files.
       </p>
+
 
     </div>
 
+
   </div>
+
 
 </body>
 </html>

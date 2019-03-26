@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="EXPLAIN_LEVEL Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="explain_level" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,14 +28,14 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      Controls the amount of detail provided in the output of the <code class="ph codeph">EXPLAIN</code> statement. The basic
-      output can help you identify high-level performance issues such as scanning a higher volume of data or more
-      partitions than you expect. The higher levels of detail show how intermediate results flow between nodes and
-      how different SQL operations such as <code class="ph codeph">ORDER BY</code>, <code class="ph codeph">GROUP BY</code>, joins, and
-      <code class="ph codeph">WHERE</code> clauses are implemented within a distributed query.
-    </p>
+    <p class="p"> Controls the amount of detail provided in the output of the
+        <code class="ph codeph">EXPLAIN</code> statement. The basic output can help you
+      identify high-level performance issues such as scanning a higher volume of
+      data or more partitions than you expect. The higher levels of detail show
+      how intermediate results flow between nodes and how different SQL
+      operations such as <code class="ph codeph">ORDER BY</code>, <code class="ph codeph">GROUP BY</code>,
+      joins, and <code class="ph codeph">WHERE</code> clauses are implemented within a
+      distributed query. </p>
 
 
     <p class="p">
@@ -73,10 +73,13 @@
 
 
       <li class="li">
-        <code class="ph codeph">2</code> or <code class="ph codeph">EXTENDED</code>: Includes additional detail about how the query planner
-        uses statistics in its decision-making process, to understand how a query could be tuned by gathering
-        statistics, using query hints, adding or removing predicates, and so on.
-      </li>
+        <code class="ph codeph">2</code> or <code class="ph codeph">EXTENDED</code>: Includes additional
+        detail about how the query planner uses statistics in its
+        decision-making process, to understand how a query could be tuned by
+        gathering statistics, using query hints, adding or removing predicates,
+        and so on. In <span class="keyword">Impala 3.2</span> and higher, the output
+        also includes the analyzed query with the cast information in the output
+        header, and the implicit cast info in the Predicate section.</li>
 
 
       <li class="li">
@@ -105,7 +108,7 @@
       most resource-intensive operations such as join queries against large tables, queries against tables with
       large numbers of partitions, and insert operations for Parquet tables. The extended information also helps to
       check estimated resource usage when you use the admission control or resource management features explained
-      in <a class="xref" href="impala_resource_management.html#resource_management">Resource Management for Impala</a>. See
+      in <a class="xref" href="impala_resource_management.html#resource_management">Resource Management</a>. See
       <a class="xref" href="impala_explain.html#explain">EXPLAIN Statement</a> for the syntax of the <code class="ph codeph">EXPLAIN</code> statement, and
       <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for details about how to use the extended information.
     </p>

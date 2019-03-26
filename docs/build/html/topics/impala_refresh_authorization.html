@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="REFRESH AUTHORIZATION Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="refresh_authorization" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>REFRESH AUTHORIZATION Statement</title>
+</head>
+<body id="refresh_authorization">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">REFRESH AUTHORIZATION Statement</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">REFRESH AUTHORIZATION</code> statement explicitly refreshes authorization
+      data, including privileges and principals. When there is an external update to
+      authorization metadata, use this statement to force Impala to refresh its authorization
+      data without having to wait for the Sentry polling or run <code class="ph codeph">INVALIDATE
+      METADATA</code>.
+    </p>
+
+
+    <p class="p">
+      Once issued, the <code class="ph codeph">REFRESH AUTHORIZATION</code> statement cannot be cancelled.
+    </p>
+
+
+    <p class="p">
+      See <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a> for
+      information on enabling and using authorization in Impala.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Syntax:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>REFRESH AUTHORIZATION</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong> If authorization is not enabled, Impala returns an error.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> Impala 3.2
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

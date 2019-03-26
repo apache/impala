@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Query Options for the SET Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_set.html" />
@@ -19,6 +19,7 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_compute_stats_min_sample_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_debug_action.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_decimal_v2.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_default_file_format.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_default_join_distribution_mode.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_default_spillable_buffer_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_disable_codegen.html" />
@@ -45,6 +46,7 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_min_spillable_buffer_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_mt_dop.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_num_nodes.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_num_rows_produced_limit.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_num_scanner_threads.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_optimize_partition_key_scans.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_compression_codec.html" />
@@ -56,8 +58,9 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_read_statistics.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_prefetch_mode.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_timeout_s.html" />
-<meta name="DC.Relation" scheme="URI" content="../topics/impala_request_pool.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_replica_preference.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_request_pool.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_trace_ratio.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_bloom_filter_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_filter_max_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_filter_min_size.html" />
@@ -76,8 +79,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_topn_bytes_limit.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="query_options" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -170,6 +173,8 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_decimal_v2.html">DECIMAL_V2 Query Option</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_default_file_format.html">DEFAULT_FILE_FORMAT Query Option</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_default_join_distribution_mode.html">DEFAULT_JOIN_DISTRIBUTION_MODE Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_default_spillable_buffer_size.html">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</a></strong><br />
@@ -222,6 +227,8 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_num_nodes.html">NUM_NODES Query Option</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_num_rows_produced_limit.html">NUM_ROWS_PRODUCED_LIMIT Query Option</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_num_scanner_threads.html">NUM_SCANNER_THREADS Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_optimize_partition_key_scans.html">OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</a></strong><br />
@@ -244,9 +251,11 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_query_timeout_s.html">QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_replica_preference.html">REPLICA_PREFERENCE Query Option (Impala 2.7 or higher only)</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_request_pool.html">REQUEST_POOL Query Option</a></strong><br />
 </li>
-<li class="link ulchildlink"><strong><a href="../topics/impala_replica_preference.html">REPLICA_PREFERENCE Query Option (Impala 2.7 or higher only)</a></strong><br />
+<li class="link ulchildlink"><strong><a href="../topics/impala_resource_trace_ratio.html">RESOURCE_TRACE_RATIO Query Option (Impala 3.2 or higher only)</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_runtime_bloom_filter_size.html">RUNTIME_BLOOM_FILTER_SIZE Query Option (Impala 2.5 or higher only)</a></strong><br />
 </li>

@@ -4,14 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Upgrading Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="upgrading" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -473,53 +473,49 @@ $ ps ax | grep [i]mpalad
 
     </div>
 
+    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="impala-7985">
+      <h3 class="title topictitle3" id="ariaid-title14">Port Change for SHUTDOWN Command</h3>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="concept_mkn_ygr_jdb">
+      <div class="body conbody">
+        <p class="p"> If you used the <code class="ph codeph">SHUTDOWN</code> command in Impala 3.1, and
+          specified a port explicitly, change the port number parameter, in
+          Impala 3.2, to use the KRPC port. </p>
 
-      <h3 class="title topictitle3" id="ariaid-title14">Default Setting Changes</h3>
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="concept_mkn_ygr_jdb">
+
+      <h3 class="title topictitle3" id="ariaid-title15">Default Setting Changes</h3>
 
 
       <div class="body conbody">
 
         <table cellpadding="4" cellspacing="0" summary="" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb" border="1" class="simpletable"><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><thead><tr class="sthead">
 
-            <th style="vertical-align:bottom;text-align:left;" id="d208645e603" class="stentry">Release Changed</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d211878e618" class="stentry">Release Changed</th>
 
 
-            <th style="vertical-align:bottom;text-align:left;" id="d208645e606" class="stentry">Setting</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d211878e621" class="stentry">Setting</th>
 
 
-            <th style="vertical-align:bottom;text-align:left;" id="d208645e609" class="stentry">Default Value</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d211878e624" class="stentry">Default Value</th>
 
 
           </tr>
 </thead><tbody><tr class="strow">
 
-            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 2.12</span>
+            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 2.12</span>
 
             </td>
 
 
-            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">compact_catalog_topic</code><code class="ph codeph">impalad</code> flag</td>
+            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">compact_catalog_topic</code><code class="ph codeph">impalad</code> flag</td>
 
 
-            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">true</code>
-
-            </td>
-
-
-          </tr>
-<tr class="strow">
-
-            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 2.12</span>
-
-            </td>
-
-
-            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">max_cached_file_handles</code><code class="ph codeph">impalad</code> flag</td>
-
-
-            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">20000</code>
+            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">true</code>
 
             </td>
 
@@ -527,16 +523,32 @@ $ ps ax | grep [i]mpalad
           </tr>
 <tr class="strow">
 
-            <td style="vertical-align:top;" headers="d208645e603" class="stentry"><span class="keyword">Impala 3.0</span>
+            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 2.12</span>
 
             </td>
 
 
-            <td style="vertical-align:top;" headers="d208645e606" class="stentry"><code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> query
+            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">max_cached_file_handles</code><code class="ph codeph">impalad</code> flag</td>
+
+
+            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">20000</code>
+
+            </td>
+
+
+          </tr>
+<tr class="strow">
+
+            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 3.0</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> query
               option</td>
 
 
-            <td style="vertical-align:top;" headers="d208645e609" class="stentry"><code class="ph codeph">THREE_LEVEL</code>
+            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">THREE_LEVEL</code>
 
             </td>
 

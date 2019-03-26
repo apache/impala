@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Connecting to impalad through impala-shell" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="connecting" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -52,10 +52,8 @@
     </div>
 
 
-    <p class="p">
-      You can connect to any DataNode where an instance of <span class="keyword cmdname">impalad</span> is running,
-      and that host coordinates the execution of all queries sent to it.
-    </p>
+    <p class="p"> You can connect to any Impala daemon (<span class="keyword cmdname">impalad</span>), and
+      that daemon coordinates the execution of all queries sent to it. </p>
 
 
     <p class="p">
@@ -64,11 +62,10 @@
     </p>
 
 
-    <p class="p">
-      In a production environment, you might enable load balancing, in which you connect to specific host/port combination
-      but queries are forwarded to arbitrary hosts. This technique spreads the overhead of acting as the coordinator
-      node among all the DataNodes in the cluster. See <a class="xref" href="impala_proxy.html">Using Impala through a Proxy for High Availability</a> for details.
-    </p>
+    <p class="p"> In a production environment, you might enable load balancing, in which
+      you connect to specific host/port combination but queries are forwarded to
+      arbitrary hosts. This technique spreads the overhead of acting as the
+      coordinator node among all the Impala daemons in the cluster. See <a class="xref" href="impala_proxy.html">Using Impala through a Proxy for High Availability</a> for details. </p>
 
 
     <p class="p">
@@ -77,12 +74,11 @@
 
 
     <ol class="ol">
-      <li class="li">
-        Locate the hostname of a DataNode within the cluster that is running an instance of the
-        <span class="keyword cmdname">impalad</span> daemon. If that DataNode uses a non-default port (something
-        other than port 21000) for <span class="keyword cmdname">impala-shell</span> connections, find out the
-        port number also.
-      </li>
+      <li class="li"> Locate the hostname that is running an instance of the
+          <span class="keyword cmdname">impalad</span> daemon. If that <span class="keyword cmdname">impalad</span>
+        uses a non-default port (something other than port 21000) for
+          <span class="keyword cmdname">impala-shell</span> connections, find out the port number
+        also. </li>
 
 
       <li class="li">
@@ -127,28 +123,24 @@ $ impala-shell -i <var class="keyword varname">some.other.hostname</var>:<var cl
 <pre class="pre codeblock"><code>Welcome to the Impala shell. Press TAB twice to see a list of available commands.
 ...
 <span class="ph">(Shell
-      build version: Impala Shell v3.0.x (<var class="keyword varname">hash</var>) built on
+      build version: Impala Shell v3.2.x (<var class="keyword varname">hash</var>) built on
       <var class="keyword varname">date</var>)</span>
 [Not connected] &gt; </code></pre>
       </li>
 
 
-      <li class="li">
-        Locate the hostname of a DataNode within the cluster that is running an instance of the
-        <span class="keyword cmdname">impalad</span> daemon. If that DataNode uses a non-default port (something
-        other than port 21000) for <span class="keyword cmdname">impala-shell</span> connections, find out the
-        port number also.
-      </li>
+      <li class="li"> Locate the hostname that is running the <span class="keyword cmdname">impalad</span>
+        daemon. If that <span class="keyword cmdname">impalad</span> uses a non-default port
+        (something other than port 21000) for <span class="keyword cmdname">impala-shell</span>
+        connections, find out the port number also. </li>
 
 
-      <li class="li">
-        Use the <code class="ph codeph">connect</code> command to connect to an Impala instance. Enter a command of the form:
-<pre class="pre codeblock"><code>[Not connected] &gt; connect <var class="keyword varname">impalad-host</var>
+      <li class="li"> Use the <code class="ph codeph">connect</code> command to connect to an Impala
+        instance. Enter a command of the form: <pre class="pre codeblock"><code>[Not connected] &gt; connect <var class="keyword varname">impalad-host</var>
 [<var class="keyword varname">impalad-host</var>:21000] &gt;</code></pre>
-        <div class="note note"><span class="notetitle">Note:</span>
-          Replace <var class="keyword varname">impalad-host</var> with the hostname you have configured for any DataNode running
-          Impala in your environment. The changed prompt indicates a successful connection.
-        </div>
+        <div class="note note"><span class="notetitle">Note:</span>  Replace <var class="keyword varname">impalad-host</var> with the hostname you
+          have configured to run Impala in your environment. The changed prompt
+          indicates a successful connection. </div>
 
       </li>
 
@@ -160,11 +152,9 @@ $ impala-shell -i <var class="keyword varname">some.other.hostname</var>:<var cl
     </p>
 
 
-    <p class="p">
-      You can use all the same connection options as in previous examples.
-      For simplicity, these examples assume that you are logged into one of
-      the DataNodes that is running the <span class="keyword cmdname">impalad</span> daemon.
-    </p>
+    <p class="p"> You can use all the same connection options as in previous examples. For
+      simplicity, these examples assume that you are logged into one of the
+      Impala daemons. </p>
 
 
     <ol class="ol">
@@ -199,11 +189,9 @@ $ impala-shell -i localhost -d parquet_gzip_compression
     </p>
 
 
-    <p class="p">
-      You can use all the same connection options as in previous examples.
-      For simplicity, these examples assume that you are logged into one of
-      the DataNodes that is running the <span class="keyword cmdname">impalad</span> daemon.
-    </p>
+    <p class="p"> You can use all the same connection options as in previous examples. For
+      simplicity, these examples assume that you are logged into one of the
+      Impala daemons. </p>
 
 
     <ol class="ol">

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="How Impala Works with Hadoop File Formats" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_txtfile.html" />
@@ -16,8 +16,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_seqfile.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="file_formats" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,59 +28,67 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">How Impala Works with Hadoop File Formats</h1>
 
+
   
+
   
 
   <div class="body conbody">
 
-    <p class="p">Impala supports several familiar file formats used in Apache Hadoop.
-      Impala can load and query data files produced by other Hadoop components
-      such as Pig or MapReduce, and data files produced by Impala can be used by
-      other components also. The following sections discuss the procedures,
-      limitations, and performance considerations for using each file format
-      with Impala. </p>
-
-
     <p class="p">
-      The file format used for an Impala table has significant performance consequences. Some file formats include
-      compression support that affects the size of data on the disk and, consequently, the amount of I/O and CPU
-      resources required to deserialize data. The amounts of I/O and CPU resources required can be a limiting
-      factor in query performance since querying often begins with moving and decompressing data. To reduce the
-      potential impact of this part of the process, data is often compressed. By compressing data, a smaller total
-      number of bytes are transferred from disk to memory. This reduces the amount of time taken to transfer the
-      data, but a tradeoff occurs when the CPU decompresses the content.
+      Impala supports several familiar file formats used in Apache Hadoop. Impala can load and
+      query data files produced by other Hadoop components such as Spark, and data files
+      produced by Impala can be used by other components also. The following sections discuss
+      the procedures, limitations, and performance considerations for using each file format
+      with Impala.
     </p>
 
 
     <p class="p">
-      Impala can query files encoded with most of the popular file formats and compression codecs used in Hadoop.
-      Impala can create and insert data into tables that use some file formats but not others; for file formats
-      that Impala cannot write to, create the table in Hive, issue the <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code>
-      statement in <code class="ph codeph">impala-shell</code>, and query the table through Impala. File formats can be
-      structured, in which case they may include metadata and built-in compression. Supported formats include:
+      The file format used for an Impala table has significant performance consequences. Some
+      file formats include compression support that affects the size of data on the disk and,
+      consequently, the amount of I/O and CPU resources required to deserialize data. The
+      amounts of I/O and CPU resources required can be a limiting factor in query performance
+      since querying often begins with moving and decompressing data. To reduce the potential
+      impact of this part of the process, data is often compressed. By compressing data, a
+      smaller total number of bytes are transferred from disk to memory. This reduces the amount
+      of time taken to transfer the data, but a tradeoff occurs when the CPU decompresses the
+      content.
+    </p>
+
+
+    <p class="p">
+      For the file formats that Impala cannot write to, create the table from within Impala
+      whenever possible and insert data using another component such as Hive or Spark. See the
+      table below for specific file formats.
+    </p>
+
+
+    <p class="p">
+      The following table lists the file formats that Impala supports.
     </p>
 
 
 
-<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>File Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64294e98">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e92">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64294e101">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e95">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64294e104">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e98">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64294e107">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e101">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d64294e110">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d64802e104">
               Impala Can INSERT?
             </th>
 
@@ -89,146 +97,162 @@
         </thead>
 <tbody class="tbody">
           <tr id="file_formats__parquet_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_parquet.html#parquet">Parquet</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e104 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
               Snappy, gzip; currently Snappy by default
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e107 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
               Yes.
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64294e110 ">
-              Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and query.
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+              Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+              DATA</code>, and query.
             </td>
 
           </tr>
 
           <tr id="file_formats__orc_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_orc.html#orc">ORC</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e104 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
               gzip, Snappy, LZO, LZ4; currently gzip by default
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e107 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
               Yes, in Impala 2.12.0 and higher.
+
+              <p class="p">
+                The ORC support is an experimental feature since Impala-2.12. To disable it, set
+                <code class="ph codeph">--enable_orc_scanner</code> to <code class="ph codeph">false</code> when starting
+                the cluster.
+              </p>
+
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64294e110 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
           </tr>
 
           <tr id="file_formats__txtfile_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_txtfile.html#txtfile">Text</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
               Unstructured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e104 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
               LZO, gzip, bzip2, Snappy
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e107 ">
-              Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause, the default file
-              format is uncompressed text, with values separated by ASCII <code class="ph codeph">0x01</code> characters
-              (typically represented as Ctrl-A).
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+              Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause,
+              the default file format is uncompressed text, with values separated by ASCII
+              <code class="ph codeph">0x01</code> characters (typically represented as Ctrl-A).
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64294e110 "> Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>,
-                <code class="ph codeph">LOAD DATA</code>, and query. If LZO compression is
-              used, you must create the table and load data in Hive. If other
-              kinds of compression are used, you must load data through
-                <code class="ph codeph">LOAD DATA</code>, Hive, or manually in HDFS.</td>
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+              Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+              DATA</code>, and query. If LZO compression is used, you must create the table
+              and load data in Hive. If other kinds of compression are used, you must load data
+              through <code class="ph codeph">LOAD DATA</code>, Hive, or manually in HDFS.
+            </td>
 
           </tr>
 
           <tr id="file_formats__avro_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_avro.html#avro">Avro</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e104 ">
-              Snappy, gzip, deflate, bzip2
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
+              Snappy, gzip, deflate
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e107 "> Yes, in Impala 1.4.0 and higher. In lower
-              versions, create the table using Hive. </td>
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+              Yes, in Impala 1.4.0 and higher. In lower versions, create the table using Hive.
+            </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64294e110 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
 
           </tr>
 
           <tr id="file_formats__rcfile_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_rcfile.html#rcfile">RCFile</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e104 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64294e107 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
               Yes.
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64294e110 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
 
           </tr>
 
           <tr id="file_formats__sequencefile_support" class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64294e98 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e92 ">
               <a class="xref" href="impala_seqfile.html#seqfile">SequenceFile</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64294e101 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e95 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64294e104 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e98 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64294e107 ">Yes.</td>
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e101 ">
+              Yes.
+            </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d64294e110 ">
-              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
-              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d64802e104 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
+              right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
+              <var class="keyword varname">table_name</var></code> in Impala.
             </td>
 
 
@@ -240,50 +264,101 @@
 
 
     <p class="p">
-      Impala can only query the file formats listed in the preceding table. The ORC support is an experimental feature
-      since Impala-2.12. To disable it, set --enable_orc_scanner to false when starting the cluster.
-    </p>
-
-
-    <p class="p">
       Impala supports the following compression codecs:
     </p>
 
 
-    <ul class="ul">
-      <li class="li">
-        Snappy. Recommended for its effective balance between compression ratio and decompression speed. Snappy
-        compression is very fast, but gzip provides greater space savings. Supported for text files in Impala 2.0
-        and higher.
-
-      </li>
+    <dl class="dl">
 
 
-      <li class="li">
-        Gzip. Recommended when achieving the highest level of compression (and therefore greatest disk-space
-        savings) is desired. Supported for text files in Impala 2.0 and higher.
-      </li>
+        <dt class="dt dlterm">
+          Snappy
+        </dt>
 
 
-      <li class="li">
-        Deflate. Not supported for text files.
-      </li>
+        <dd class="dd">
+          <p class="p">
+            Recommended for its effective balance between compression ratio and decompression
+            speed. Snappy compression is very fast, but gzip provides greater space savings.
+            Supported for text, RC, Sequence, and Avro files in Impala 2.0 and higher.
+          </p>
+
+        </dd>
 
 
-      <li class="li">
-        Bzip2. Supported for text files in Impala 2.0 and higher.
-
-      </li>
 
 
-      <li class="li">
-        <p class="p"> LZO, for text files only. Impala can query
-          LZO-compressed text tables, but currently cannot create them or insert
-          data into them; perform these operations in Hive. </p>
 
-      </li>
 
-    </ul>
+        <dt class="dt dlterm">
+          Gzip
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            Recommended when achieving the highest level of compression (and therefore greatest
+            disk-space savings) is desired. Supported for text, RC, Sequence and Avro files in
+            Impala 2.0 and higher.
+          </p>
+
+        </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm">
+          Deflate
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p"></p>
+
+        </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm">
+          Bzip2
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            Supported for text, RC, and Sequence files in Impala 2.0 and higher.
+          </p>
+
+        </dd>
+
+
+
+
+
+
+        <dt class="dt dlterm">
+          LZO
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            For text files only. Impala can query LZO-compressed text tables, but currently
+            cannot create them or insert data into them. You need to perform these operations in
+            Hive.
+          </p>
+
+        </dd>
+
+
+
+    </dl>
+
 
   </div>
 
@@ -307,51 +382,52 @@
 
     <h2 class="title topictitle2" id="ariaid-title2">Choosing the File Format for a Table</h2>
 
-  
+
+
 
     <div class="body conbody">
 
       <p class="p">
-        Different file formats and compression codecs work better for different data sets. While Impala typically
-        provides performance gains regardless of file format, choosing the proper format for your data can yield
-        further performance improvements. Use the following considerations to decide which combination of file
-        format and compression to use for a particular table:
+        Different file formats and compression codecs work better for different data sets.
+        Choosing the proper format for your data can yield performance improvements. Use the
+        following considerations to decide which combination of file format and compression to
+        use for a particular table:
       </p>
 
 
       <ul class="ul">
         <li class="li">
-          If you are working with existing files that are already in a supported file format, use the same format
-          for the Impala table where practical. If the original format does not yield acceptable query performance
-          or resource usage, consider creating a new Impala table with different file format or compression
-          characteristics, and doing a one-time conversion by copying the data to the new table using the
-          <code class="ph codeph">INSERT</code> statement. Depending on the file format, you might run the
-          <code class="ph codeph">INSERT</code> statement in <code class="ph codeph">impala-shell</code> or in Hive.
+          If you are working with existing files that are already in a supported file format,
+          use the same format for the Impala table if performance is acceptable. If the original
+          format does not yield acceptable query performance or resource usage, consider
+          creating a new Impala table with different file format or compression characteristics,
+          and doing a one-time conversion by rewriting the data to the new table.
         </li>
 
 
         <li class="li">
-          Text files are convenient to produce through many different tools, and are human-readable for ease of
-          verification and debugging. Those characteristics are why text is the default format for an Impala
-          <code class="ph codeph">CREATE TABLE</code> statement. When performance and resource usage are the primary
-          considerations, use one of the other file formats and consider using compression. A typical workflow
-          might involve bringing data into an Impala table by copying CSV or TSV files into the appropriate data
-          directory, and then using the <code class="ph codeph">INSERT ... SELECT</code> syntax to copy the data into a table
-          using a different, more compact file format.
-        </li>
+          Text files are convenient to produce through many different tools, and are
+          human-readable for ease of verification and debugging. Those characteristics are why
+          text is the default format for an Impala <code class="ph codeph">CREATE TABLE</code> statement.
+          However, when performance and resource usage are the primary considerations, use one
+          of the structured file formats that include metadata and built-in compression.
+          <p class="p">
+            A typical workflow might involve bringing data into an Impala table by copying CSV
+            or TSV files into the appropriate data directory, and then using the <code class="ph codeph">INSERT
+            ... SELECT</code> syntax to rewrite the data into a table using a different, more
+            compact file format.
+          </p>
 
-
-        <li class="li">
-          If your architecture involves storing data to be queried in memory, do not compress the data. There is no
-          I/O savings since the data does not need to be moved from disk, but there is a CPU cost to decompress the
-          data.
         </li>
 
       </ul>
 
+
     </div>
 
+
   </div>
+
 
 </body>
 </html>

@@ -4,146 +4,42 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
-<meta name="DC.Title" content="Resource Management for Impala" />
-<meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
+<meta name="DC.Title" content="Resource Management" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admission.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_admission_config.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="prodname" content="Impala" />
-<meta name="prodname" content="Impala" />
-<meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="resource_management" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
-<title>Resource Management for Impala</title>
+<title>Resource Management</title>
 </head>
 <body id="resource_management">
 
 
-  <h1 class="title topictitle1" id="ariaid-title1">Resource Management for Impala</h1>
+  <h1 class="title topictitle1" id="ariaid-title1">Resource Management</h1>
 
   
-
   <div class="body conbody">
-
-    <div class="note note"><span class="notetitle">Note:</span>
-        <p class="p">
-          The use of the Llama component for integrated resource management within YARN
-          is no longer supported with <span class="keyword">Impala 2.3</span> and higher.
-          The Llama support code is removed entirely in <span class="keyword">Impala 2.8</span> and higher.
-        </p>
-
-        <p class="p">
-          For clusters running Impala alongside
-          other data management components, you define static service pools to define the resources
-          available to Impala and other components. Then within the area allocated for Impala,
-          you can create dynamic service pools, each with its own settings for the Impala admission control feature.
-        </p>
-
-      </div>
-
-
-    <p class="p">
-      You can limit the CPU and memory resources used by Impala, to manage and prioritize workloads on clusters
-      that run jobs from many Hadoop components.
-    </p>
-
-
-    <p class="p toc inpage"></p>
+    <p class="p">Impala includes the features that balance and maximize resources in your
+        <span class="keyword">Apache Hadoop</span> cluster. This topic describes how you
+      can improve efficiency of your a <span class="keyword">Apache Hadoop</span> cluster
+      using the admission control feature. See the following topics for an
+      overview and the configuration steps for admission control.</p>
 
   </div>
 
-
-  <div class="related-links">
-<div class="familylinks">
-<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div>
-</div>
-</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="rm_enforcement">
-
-    <h2 class="title topictitle2" id="ariaid-title2">How Resource Limits Are Enforced</h2>
-
-  
-
-    <div class="body conbody">
-
-      <p class="p"> Limits on memory usage are enforced by Impala's process memory limit
-        with the <code class="ph codeph">MEM_LIMIT</code> query option. The admission control
-        feature checks this setting to decide how many queries can be safely run
-        at the same time. Then the Impala daemon enforces the limit by
-        activating the spill-to-disk mechanism when necessary, or cancelling a
-        query altogether if the limit is exceeded at runtime. </p>
-
-
-    </div>
-
-  </div>
-
-
-
-
-    <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="rm_query_options">
-
-      <h2 class="title topictitle2" id="ariaid-title3">impala-shell Query Options for Resource Management</h2>
-
-  
-
-      <div class="body conbody">
-
-        <p class="p">
-          Before issuing SQL statements through the <span class="keyword cmdname">impala-shell</span> interpreter, you can use the
-          <code class="ph codeph">SET</code> command to configure the following parameters related to resource management:
-        </p>
-
-
-        <ul class="ul" id="rm_query_options__ul_nzt_twf_jp">
-          <li class="li">
-            <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a>
-          </li>
-
-
-          <li class="li">
-            <a class="xref" href="impala_mem_limit.html#mem_limit">MEM_LIMIT Query Option</a>
-          </li>
-
-
-        </ul>
-
-      </div>
-
-    </div>
-
-
-
-
-  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="rm_limitations">
-
-    <h2 class="title topictitle2" id="ariaid-title4">Limitations of Resource Management for Impala</h2>
-
-
-    <div class="body conbody">
-
-
-
-      
-
-      
-
-      <p class="p">
-        The <code class="ph codeph">MEM_LIMIT</code> query option, and the other resource-related query options, are settable
-        through the ODBC or JDBC interfaces in Impala 2.0 and higher. This is a former limitation that is now
-        lifted.
-      </p>
-
-    </div>
-
-  </div>
-
-</body>
+<div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_admission.html">Admission Control and Query Queuing</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_admission_config.html">Configuring Admission Control</a></strong><br />
+</li>
+</ul>
+</div></body>
 </html>

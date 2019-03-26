@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="MEM_LIMIT Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="mem_limit" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -38,8 +38,17 @@
     <p class="p">
       There are two levels of memory limit for Impala.
       The <code class="ph codeph">-mem_limit</code> startup option sets an overall limit for the <span class="keyword cmdname">impalad</span> process
-      (which handles multiple queries concurrently).
-      That limit is typically expressed in terms of a percentage of the RAM available on the host, such as <code class="ph codeph">-mem_limit=70%</code>.
+      (which handles multiple queries concurrently). That process memory limit can be expressed either as a percentage
+      of RAM available to the process such as <code class="ph codeph">-mem_limit=70%</code> or as a fixed
+      amount of memory, such as <code class="ph codeph">100gb</code>. The memory available to the process is based on the host's
+      physical memory and, since Impala 3.2, memory limits from Linux Control Groups. E.g. if an
+      <span class="keyword cmdname">impalad</span> process is running in a Docker container on a host with 100GB of memory, the memory
+      available is 100GB or the Docker container's memory limit, whichever is less.
+    </p>
+
+
+
+    <p class="p">
       The <code class="ph codeph">MEM_LIMIT</code> query option, which you set through <span class="keyword cmdname">impala-shell</span>
       or the <code class="ph codeph">SET</code> statement in a JDBC or ODBC application, applies to each individual query.
       The <code class="ph codeph">MEM_LIMIT</code> query option is usually expressed as a fixed size such as <code class="ph codeph">10gb</code>,

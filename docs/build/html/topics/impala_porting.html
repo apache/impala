@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Porting SQL from Other Database Systems to Impala" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="porting" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -281,7 +281,7 @@
           <p class="p">
             Because Impala currently does not support composite or nested types, any spatial data types in other
             database systems do not have direct equivalents in Impala. You could represent spatial values in string
-            format and write UDFs to process them. See <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a> for details. Where
+            format and write UDFs to process them. See <a class="xref" href="impala_udf.html#udfs">User-Defined Functions (UDFs)</a> for details. Where
             practical, separate spatial types into separate tables so that Impala can still work with the
             non-spatial data.
           </p>
@@ -363,7 +363,7 @@
         <li class="li">
           <p class="p">
             For any other type not supported in Impala, you could represent their values in string format and write
-            UDFs to process them. See <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a> for details.
+            UDFs to process them. See <a class="xref" href="impala_udf.html#udfs">User-Defined Functions (UDFs)</a> for details.
           </p>
 
         </li>

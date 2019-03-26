@@ -4,14 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Impala to Query Kudu Tables" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="impala_kudu" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -156,15 +156,13 @@
 
 
           <li class="li">
-            <p class="p">
-              Data is physically divided based on units of storage called
+            <p class="p"> Data is physically divided based on units of storage called
                 <dfn class="term">tablets</dfn>. Tablets are stored by <dfn class="term">tablet
                 servers</dfn>. Each tablet server can store multiple tablets,
               and each tablet is replicated across multiple tablet servers,
               managed automatically by Kudu. Where practical, co-locate the
-              tablet servers on the same hosts as the DataNodes, although that
-              is not required.
-            </p>
+              tablet servers on the same hosts as the Impala daemons, although
+              that is not required. </p>
 
           </li>
 

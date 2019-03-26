@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="DISABLE_CODEGEN Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="disable_codegen" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -23,33 +23,56 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">DISABLE_CODEGEN Query Option</h1>
 
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      
-      This is a debug option, intended for diagnosing and working around issues that cause crashes. If a query
-      fails with an <span class="q">"illegal instruction"</span> or other hardware-specific message, try setting
-      <code class="ph codeph">DISABLE_CODEGEN=true</code> and running the query again. If the query succeeds only when the
-      <code class="ph codeph">DISABLE_CODEGEN</code> option is turned on, submit the problem to <span class="keyword">the appropriate support channel</span> and include that
-      detail in the problem report. Do not otherwise run with this setting turned on, because it results in lower
-      overall performance.
+      The <code class="ph codeph">DISABLE_CODEGEN</code> is a debug option, and it's used to work around any
+      issues with Impala's runtime code generation. If a query fails with an <span class="q">"illegal
+      instruction"</span> or other hardware-specific message, try setting
+      <code class="ph codeph">DISABLE_CODEGEN=true</code> and running the query again. If the query succeeds
+      only when the <code class="ph codeph">DISABLE_CODEGEN</code> option is turned on, submit the problem to
+      <span class="keyword"> the appropriate support channel</span> and include that detail in the problem report.
     </p>
 
 
     <p class="p">
-      Because the code generation phase adds a small amount of overhead for each query, you might turn on the
-      <code class="ph codeph">DISABLE_CODEGEN</code> option to achieve maximum throughput when running many short-lived queries
-      against small tables.
+      Most queries will run significantly slower with <code class="ph codeph">DISABLE_CODEGEN=true</code>.
     </p>
 
 
     <p class="p">
-        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
-        any other value interpreted as <code class="ph codeph">false</code>
-      </p>
+      In Impala 2.10 and higher, the <code class="ph codeph">DISABLE_CODEGEN_ROWS_THRESHOLD</code>
+      optimisation automatically disables codegen for small queries because short-running
+      queries may run faster without the overhead of codegen.
+    </p>
+
+
+    <div class="p">
+      The following values are supported:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">TRUE</code> or <code class="ph codeph">1</code>: Disables codegen.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">FALSE</code> or <code class="ph codeph">0</code>: Enables codegen.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> Boolean
+    </p>
+
 
     <p class="p">
         <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
@@ -57,6 +80,7 @@
 
 
   </div>
+
 
 <div class="related-links">
 <div class="familylinks">

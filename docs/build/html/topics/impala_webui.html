@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2018" />
-<meta name="DC.rights.owner" content="(C) Copyright 2018" />
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala Web User Interface for Debugging" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_troubleshooting.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.0.x" />
-<meta name="version" content="Impala 3.0.x" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.2.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="webui" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,51 +28,49 @@
 
   <div class="body conbody">
 
-    <div class="p" id="webui__webui_intro">
-      
-      
-      Each of the Impala daemons (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>,
-      and <span class="keyword cmdname">catalogd</span>) includes a built-in web server that displays
-      diagnostic and status information:
-      <ul class="ul">
-      <li class="li">
-        <p class="p">
-          The <span class="keyword cmdname">impalad</span> web UI (default port: 25000) includes
-          information about configuration settings, running and completed queries, and associated performance and
-          resource usage for queries. In particular, the <span class="ph uicontrol">Details</span> link for each query displays
-          alternative views of the query including a graphical representation of the plan, and the
-          output of the <code class="ph codeph">EXPLAIN</code>, <code class="ph codeph">SUMMARY</code>, and <code class="ph codeph">PROFILE</code>
-          statements from <span class="keyword cmdname">impala-shell</span>.
-          Each host that runs the <span class="keyword cmdname">impalad</span> daemon has
-          its own instance of the web UI, with details about those queries for which that
-          host served as the coordinator. The <span class="keyword cmdname">impalad</span> web UI is mainly
-          for diagnosing query problems that can be traced to a particular node.
-        </p>
+    <div class="p" id="webui__webui_intro">Each of the Impala daemons (<span class="keyword cmdname">impalad</span>,
+        <span class="keyword cmdname">statestored</span>, and <span class="keyword cmdname">catalogd</span>)
+      includes a built-in web server that displays diagnostic and status
+      information: <ul class="ul">
+        <li class="li">
+          <p class="p"> The <span class="keyword cmdname">impalad</span> web UI (default port: 25000)
+            includes information about configuration settings, running and
+            completed queries, and associated performance and resource usage for
+            queries. In particular, the <span class="ph uicontrol">Details</span> link for
+            each query displays alternative views of the query including a
+            graphical representation of the plan, and the output of the
+              <code class="ph codeph">EXPLAIN</code>, <code class="ph codeph">SUMMARY</code>, and
+              <code class="ph codeph">PROFILE</code> statements from
+              <span class="keyword cmdname">impala-shell</span>. Each host that runs the
+              <span class="keyword cmdname">impalad</span> daemon has its own instance of the web
+            UI, with details about those queries for which that host served as
+            the coordinator. The <span class="keyword cmdname">impalad</span> web UI is mainly for
+            diagnosing query problems that can be traced to a particular node.
+          </p>
 
-      </li>
+        </li>
 
-      <li class="li">
-        <p class="p">
-          The <span class="keyword cmdname">statestored</span> web UI (default port: 25010) includes
-          information about memory usage, configuration settings, and ongoing health checks
-          performed by this daemon. Because there is only a single instance of this
-          daemon within any cluster, you view the web UI only on the particular host
-          that serves as the Impala Statestore.
-        </p>
+        <li class="li">
+          <p class="p"> The <span class="keyword cmdname">statestored</span> web UI (default port: 25010)
+            includes information about memory usage, configuration settings, and
+            ongoing health checks performed by this daemon. Because there is
+            only a single instance of this daemon within any cluster, you view
+            the web UI only on the particular host that serves as the Impala
+            StateStore. </p>
 
-      </li>
+        </li>
 
-      <li class="li">
-        <p class="p">
-          The <span class="keyword cmdname">catalogd</span> web UI (default port: 25020) includes
-          information about the databases, tables, and other objects managed by Impala,
-          in addition to the resource usage and configuration settings of the daemon itself.
-          The catalog information is represented as the underlying Thrift data structures.
-          Because there is only a single instance of this daemon within any cluster, you view the
-          web UI only on the particular host that serves as the Impala Catalog Server.
-        </p>
+        <li class="li">
+          <p class="p"> The <span class="keyword cmdname">catalogd</span> web UI (default port: 25020)
+            includes information about the databases, tables, and other objects
+            managed by Impala, in addition to the resource usage and
+            configuration settings of the daemon itself. The catalog information
+            is represented as the underlying Thrift data structures. Because
+            there is only a single instance of this daemon within any cluster,
+            you view the web UI only on the particular host that serves as the
+            Impala Catalog Server. </p>
 
-      </li>
+        </li>
 
       </ul>
 
@@ -142,10 +140,84 @@
 
     </div>
 
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="webui_impalad_admission">
+      <h3 class="title topictitle3" id="ariaid-title4">Admission Control Page</h3>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="webui_impalad_backends">
+      <div class="body conbody">
+        <p class="p"> By default, the <span class="ph uicontrol">admission</span> page of the debug
+          web UI is at
+            <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/admission</code>
+          (non-secure cluster) or
+              <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/admission</code>
+          (secure cluster). </p>
 
-      <h3 class="title topictitle3" id="ariaid-title4">Backends Page</h3>
+        <p class="p">Use the <span class="ph uicontrol">admission</span> page to troubleshoot queued
+          queries and the admission control.</p>
+
+        <p class="p">The <span class="ph uicontrol">admission</span> page provides the following
+          information about each resource pool to which queries have been
+          submitted at least once:</p>
+
+        <ul class="ul">
+          <li class="li">Time since the <code class="ph codeph">statestored</code> received the last
+            update</li>
+
+          <li class="li">A warning if this <code class="ph codeph">impalad</code> is considered
+            disconnected from the <code class="ph codeph">statestored</code> and thus the
+            information on this page could be stale.</li>
+
+          <li class="li">Pool configuration</li>
+
+          <li class="li">Queued queries submitted to this coordinator, in the order of
+            submission</li>
+
+          <li class="li">Running queries submitted to this coordinator</li>
+
+          <li class="li">Pool stats<ul class="ul">
+              <li class="li">Average of time in queue<p class="p">This is an exponential moving
+                  average with the factor of 0.2, which considers approximately
+                  past 10 queries. If a query is admitted immediately, the wait
+                  time of 0 is used in calculating this average wait
+                time.</p>
+</li>
+
+            </ul>
+</li>
+
+          <li class="li">Histogram of the distribution of peak memory used by queries
+            admitted to the pool<p class="p">Use the histogram to figure out the minimum
+              and maximum query <code class="ph codeph">MEM_LIMIT</code> ranges of the this
+              pool.</p>
+<p class="p">The histogram displays data for all queries admitted
+              to the pool, including the queries finished, got canceled, or hit
+              an error. </p>
+</li>
+
+        </ul>
+
+        <p class="p">Click on the pool name to only display information relevant to that
+          pool. You can then refresh the debug page to see only the information
+          for that specific pool.</p>
+
+        <p class="p">You can reset the stats that keep track of historical data, such as
+            <strong class="ph b">Totals</strong> stats, <strong class="ph b">Time in queue (exponential moving
+            average)</strong>, and the histogram.</p>
+
+        <div class="p">The above information is also available as a JSON object from the
+          following HTTP
+          endpoint:<pre class="pre codeblock"><code><code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:<var class="keyword varname">port</var>/admission?json</code></code></pre></div>
+
+        <p class="p">See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for the
+          description of the properties in admission control.</p>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="webui_impalad_backends">
+
+      <h3 class="title topictitle3" id="ariaid-title5">Backends Page</h3>
 
 
       <div class="body conbody">
@@ -157,21 +229,22 @@
         </p>
 
 
-        <p class="p">
-          This page lists the host and port info for each of the <span class="keyword cmdname">impalad</span> nodes in the cluster.
-          Because each <span class="keyword cmdname">impalad</span> daemon knows about every other <span class="keyword cmdname">impalad</span> daemon
-          through the statestore, this information should be the same regardless of which node you select. Links
-          take you to the corresponding debug web pages for any of the other nodes in the cluster.
-        </p>
+        <p class="p"> This page lists the host and port info for each of the
+            <span class="keyword cmdname">impalad</span> nodes in the cluster. Because each
+            <span class="keyword cmdname">impalad</span> daemon knows about every other
+            <span class="keyword cmdname">impalad</span> daemon through the StateStore, this
+          information should be the same regardless of which node you select.
+          Links take you to the corresponding debug web pages for any of the
+          other nodes in the cluster. </p>
 
       </div>
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="webui_impalad_catalog">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="webui_impalad_catalog">
 
-      <h3 class="title topictitle3" id="ariaid-title5">Catalog Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title6">Catalog Page</h3>
 
 
       <div class="body conbody">
@@ -195,9 +268,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="webui_impalad_logs">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="webui_impalad_logs">
 
-      <h3 class="title topictitle3" id="ariaid-title6">Logs Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title7">Logs Page</h3>
 
   
 
@@ -224,9 +297,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="webui_impalad_memz">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="webui_impalad_memz">
 
-      <h3 class="title topictitle3" id="ariaid-title7">Memz Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title8">Memz Page</h3>
 
 
       <div class="body conbody">
@@ -249,9 +322,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="webui_impalad_metrics">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="webui_impalad_metrics">
 
-      <h3 class="title topictitle3" id="ariaid-title8">Metrics Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title9">Metrics Page</h3>
 
 
       <div class="body conbody">
@@ -274,9 +347,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="webui_impalad_queries">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="webui_impalad_queries">
 
-      <h3 class="title topictitle3" id="ariaid-title9">Queries Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title10">Queries Page</h3>
 
 
       <div class="body conbody">
@@ -314,9 +387,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="webui_impalad_sessions">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="webui_impalad_sessions">
 
-      <h3 class="title topictitle3" id="ariaid-title10">Sessions Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title11">Sessions Page</h3>
 
 
       <div class="body conbody">
@@ -339,9 +412,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="webui_impalad_threadz">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="webui_impalad_threadz">
 
-      <h3 class="title topictitle3" id="ariaid-title11">Threadz Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title12">Threadz Page</h3>
 
 
       <div class="body conbody">
@@ -364,9 +437,9 @@
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="webui_impalad_varz">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title13" id="webui_impalad_varz">
 
-      <h3 class="title topictitle3" id="ariaid-title12">Varz Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title13">Varz Page</h3>
 
 
       <div class="body conbody">

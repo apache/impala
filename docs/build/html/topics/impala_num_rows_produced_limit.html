@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="NUM_ROWS_PRODUCED_LIMIT Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.2.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="num_rows_produced_limit" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>NUM_ROWS_PRODUCED_LIMIT Query Option</title>
+</head>
+<body id="num_rows_produced_limit">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">NUM_ROWS_PRODUCED_LIMIT Query Option</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">NUM_ROWS_PRODUCED_LIMIT</code> query option limits the number of rows
+      produced by a query. A query is canceled when its execution produces more rows than the
+      specified limit set by the <code class="ph codeph">NUM_ROWS_PRODUCED_LIMIT</code> option.
+    </p>
+
+
+    <p class="p">
+      This limit only applies when the results are returned to a client, for example, to a
+      <code class="ph codeph">SELECT</code> query, but not to an <code class="ph codeph">INSERT</code> query.
+    </p>
+
+
+    <p class="p">
+      The default value of <code class="ph codeph">0</code> specifies that there is no limit on the number of
+      rows produced.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> <code class="ph codeph">INT</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Allowed values:</strong> 0 or positive numbers
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 0
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>
