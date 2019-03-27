@@ -32,19 +32,12 @@ under the License.
   <conbody>
 
     <p>
-      A query option that changes behavior related to the <codeph>DECIMAL</codeph>
-      data type.
+      A query option that changes behavior related to the
+        <codeph>DECIMAL</codeph> data type. Set this option to
+        <codeph>FALSE</codeph> for backward compatibility to Impala 2.x.
     </p>
-
-    <note type="important">
-      <p>
-        This query option is currently unsupported.
-        Its precise behavior is currently undefined and might change
-        in the future.
-      </p>
-    </note>
-
-    <p conref="../shared/impala_common.xml#common/type_boolean"/>
-    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p><b>Type:</b> Boolean</p>
+    <p><b>Default:</b>
+      <codeph>TRUE</codeph></p>
   </conbody>
 </concept>

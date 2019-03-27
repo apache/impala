@@ -473,6 +473,11 @@ $ ps ax | grep [i]mpalad
             </stentry>
 
           </strow>
+          <strow>
+            <stentry><keyword keyref="impala30_full"/></stentry>
+            <stentry><codeph>DECIMAL_V2</codeph></stentry>
+            <stentry><codeph>TRUE</codeph></stentry>
+          </strow>
 
         </simpletable>
 
