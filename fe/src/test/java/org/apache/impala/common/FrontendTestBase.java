@@ -40,7 +40,6 @@ import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
@@ -324,9 +323,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
           @Override
           public boolean isEnabled() { return true; }
           @Override
-          public AuthorizationProvider getProvider() {
-            return AuthorizationProvider.NOOP;
-          }
+          public String getProviderName() { return "noop"; }
           @Override
           public String getServerName() { return "server1"; }
         };

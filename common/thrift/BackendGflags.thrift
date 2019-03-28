@@ -125,4 +125,6 @@ struct TBackendGflags {
   49: required string ranger_service_type
 
   50: required string ranger_app_id
+
+  51: required string authorization_provider
 }

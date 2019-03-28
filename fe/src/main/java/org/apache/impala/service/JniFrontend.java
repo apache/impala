@@ -45,6 +45,7 @@ import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
@@ -97,6 +98,7 @@ import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TSessionStateUtil;
@@ -134,26 +136,8 @@ public class JniFrontend {
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);
 
-    AuthorizationFactory authzFactory;
-    try {
-      authzFactory = (AuthorizationFactory) Class.forName(
-          BackendConfig.INSTANCE.getAuthorizationFactoryClass())
-          .getConstructor(BackendConfig.class).newInstance(BackendConfig.INSTANCE);
-    } catch (Exception e) {
-      String msg = String.format("Unable to instantiate authorization provider: %s",
-          BackendConfig.INSTANCE.getAuthorizationFactoryClass());
-      throw new InternalException(msg,e);
-    }
-    AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
-    if (!authzConfig.isEnabled()) {
-      // For backward compatibility to keep the existing behavior, when authorization
-      // is not enabled, we need to use a dummy authorization config.
-      authzFactory = new NoopAuthorizationFactory(BackendConfig.INSTANCE);
-      LOG.info("Authorization is 'DISABLED'.");
-    } else {
-      LOG.info(String.format("Authorization is 'ENABLED' using %s.",
-          authzConfig.getProvider()));
-    }
+    final AuthorizationFactory authzFactory =
+        AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
     LOG.info(JniUtil.getJavaVersion());
     frontend_ = new Frontend(authzFactory);
   }

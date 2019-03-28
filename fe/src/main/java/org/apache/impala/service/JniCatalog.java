@@ -28,7 +28,6 @@ import java.util.UUID;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
-import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.sentry.SentryCatalogdAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
@@ -67,6 +66,7 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
+import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
@@ -111,29 +111,14 @@ public class JniCatalog {
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);
 
-    AuthorizationFactory authzFactory;
-    try {
-      authzFactory = (AuthorizationFactory) Class.forName(
-          BackendConfig.INSTANCE.getAuthorizationFactoryClass())
-          .getConstructor(BackendConfig.class).newInstance(BackendConfig.INSTANCE);
-    } catch (Exception e) {
-      String msg = String.format("Unable to instantiate authorization provider: %s",
-          BackendConfig.INSTANCE.getAuthorizationFactoryClass());
-      LOG.error(msg);
-      throw new InternalException(msg, e);
-    }
-    AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
-    if (!authzConfig.isEnabled()) {
-      // For backward compatibility to keep the existing behavior, when authorization
-      // is not enabled, we need to use a dummy authorization config.
-      authzFactory = new NoopAuthorizationFactory(BackendConfig.INSTANCE);
-      authzConfig = authzFactory.getAuthorizationConfig();
-      LOG.info("Authorization is 'DISABLED'.");
-    } else {
-      LOG.info(String.format("Authorization is 'ENABLED' using %s.",
-          authzConfig.getProvider()));
-    }
+    // create the appropriate auth factory from backend config
+    // this logic is shared with JniFrontend
+    final AuthorizationFactory authzFactory
+        = AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
+
     LOG.info(JniUtil.getJavaVersion());
+
+    final AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
         cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s, getServiceId(),

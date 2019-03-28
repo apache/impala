@@ -42,7 +42,7 @@ public class RangerAuthorizationConfig implements AuthorizationConfig {
   public boolean isEnabled() { return true; }
 
   @Override
-  public AuthorizationProvider getProvider() { return AuthorizationProvider.RANGER; }
+  public String getProviderName() { return "ranger"; }
 
   @Override
   public String getServerName() { return serverName_; }

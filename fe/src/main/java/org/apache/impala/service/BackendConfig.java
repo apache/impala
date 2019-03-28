@@ -130,8 +130,15 @@ public class BackendConfig {
     return backendCfg_.enable_orc_scanner;
   }
 
+  /**
+   * Returns the value of the `authorization_factory_class` flag or `null` if
+   * the flag was not specified.
+   *
+   * @return value of the `authorization_factory_class` flag or `null` if not specified
+   */
   public String getAuthorizationFactoryClass() {
-    return backendCfg_.getAuthorization_factory_class();
+    final String val =  backendCfg_.getAuthorization_factory_class();
+    return "".equals(val) ? null : val;
   }
 
   public boolean isMtDopUnlocked() {
@@ -144,6 +151,10 @@ public class BackendConfig {
 
   public String getRangerAppId() {
     return backendCfg_.getRanger_app_id();
+  }
+
+  public String getAuthorizationProvider() {
+    return backendCfg_.getAuthorization_provider();
   }
 
   // Inits the auth_to_local configuration in the static KerberosName class.

@@ -127,7 +127,7 @@ public class SentryAuthorizationConfig implements AuthorizationConfig {
   }
 
   @Override
-  public AuthorizationProvider getProvider() { return AuthorizationProvider.SENTRY; }
+  public String getProviderName() { return "sentry"; }
 
   /**
    * The server name to secure.

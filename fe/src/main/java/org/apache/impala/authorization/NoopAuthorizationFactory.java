@@ -65,7 +65,7 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
       @Override
       public boolean isEnabled() { return false; }
       @Override
-      public AuthorizationProvider getProvider() { return AuthorizationProvider.NOOP; }
+      public String getProviderName() { return "noop"; }
       @Override
       public String getServerName() { return null; }
     };

@@ -37,9 +37,14 @@ using namespace impala;
 
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
+DEFINE_string(authorization_provider,
+    "sentry",
+    "Specifies the type of internally-provided authorization provider to use. "
+    "['ranger', 'sentry' (default)]");
 DEFINE_string(authorization_factory_class,
-    "org.apache.impala.authorization.sentry.SentryAuthorizationFactory",
-    "Specifies the class name that implements the authorization provider.");
+    "",
+    "Specifies the class name that implements the authorization provider. "
+    "This will override the authorization_provider flag if both are specified.");
 DEFINE_string(ranger_service_type, "hive", "Specifies the Ranger service type.");
 DEFINE_string(ranger_app_id, "",
     "Specifies the Ranger application ID. Ranger application ID is an ID to "

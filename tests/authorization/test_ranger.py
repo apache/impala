@@ -29,11 +29,9 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
 IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
-               "--ranger_app_id=impala --authorization_factory_class=" \
-               "org.apache.impala.authorization.ranger.RangerAuthorizationFactory"
+               "--ranger_app_id=impala --authorization_provider=ranger"
 CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
-                "--ranger_app_id=impala --authorization_factory_class=" \
-                "org.apache.impala.authorization.ranger.RangerAuthorizationFactory"
+                "--ranger_app_id=impala --authorization_provider=ranger"
 
 
 class TestRanger(CustomClusterTestSuite):
