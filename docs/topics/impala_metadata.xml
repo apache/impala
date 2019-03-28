@@ -298,19 +298,13 @@ under the License.
     <concept id="event_processor_metrics">
 
       <title>Metrics for Event Based Automatic Metadata Sync</title>
+      <!--AR 3/29/2019 Incorporate this section to the web UI doc when this feature goes GA.-->
 
       <conbody>
 
         <p>
           You can use the web UI of the <codeph>catalogd</codeph> to check the state of the
           automatic invalidate event processor.
-        </p>
-
-        <p>
-          By default, the debug web UI of <codeph>catalogd</codeph> is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020</codeph> (non-secure
-          cluster) or <codeph>https://<varname>impala-server-hostname</varname>:25020</codeph>
-          (secure cluster).
         </p>
 
         <p>

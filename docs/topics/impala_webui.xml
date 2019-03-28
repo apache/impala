@@ -21,7 +21,13 @@ under the License.
 <concept id="webui">
 
   <title id="webui_title">Impala Web User Interface for Debugging</title>
-  <titlealts audience="PDF"><navtitle>Web User Interface</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Web User Interface</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -34,55 +40,77 @@ under the License.
 
   <conbody>
 
-    <p id="webui_intro">Each of the Impala daemons (<cmdname>impalad</cmdname>,
-        <cmdname>statestored</cmdname>, and <cmdname>catalogd</cmdname>)
-      includes a built-in web server that displays diagnostic and status
-      information: <ul>
-        <li>
-          <p> The <cmdname>impalad</cmdname> web UI (default port: 25000)
-            includes information about configuration settings, running and
-            completed queries, and associated performance and resource usage for
-            queries. In particular, the <uicontrol>Details</uicontrol> link for
-            each query displays alternative views of the query including a
-            graphical representation of the plan, and the output of the
-              <codeph>EXPLAIN</codeph>, <codeph>SUMMARY</codeph>, and
-              <codeph>PROFILE</codeph> statements from
-              <cmdname>impala-shell</cmdname>. Each host that runs the
-              <cmdname>impalad</cmdname> daemon has its own instance of the web
-            UI, with details about those queries for which that host served as
-            the coordinator. The <cmdname>impalad</cmdname> web UI is mainly for
-            diagnosing query problems that can be traced to a particular node.
-          </p>
-        </li>
-        <li>
-          <p> The <cmdname>statestored</cmdname> web UI (default port: 25010)
-            includes information about memory usage, configuration settings, and
-            ongoing health checks performed by this daemon. Because there is
-            only a single instance of this daemon within any cluster, you view
-            the web UI only on the particular host that serves as the Impala
-            StateStore. </p>
-        </li>
-        <li>
-          <p> The <cmdname>catalogd</cmdname> web UI (default port: 25020)
-            includes information about the databases, tables, and other objects
-            managed by Impala, in addition to the resource usage and
-            configuration settings of the daemon itself. The catalog information
-            is represented as the underlying Thrift data structures. Because
-            there is only a single instance of this daemon within any cluster,
-            you view the web UI only on the particular host that serves as the
-            Impala Catalog Server. </p>
-        </li>
-      </ul>
+    <p id="webui_intro">
+      Each of the Impala daemons (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>,
+      and <cmdname>catalogd</cmdname>) includes a built-in web server that displays diagnostic
+      and status information.
     </p>
 
-    <note>
-      <p>
-        The web user interface is primarily for problem diagnosis and troubleshooting. The items listed and their
-        formats are subject to change.
-      </p>
-    </note>
+    <dl>
+      <dlentry>
+
+        <dt>
+          impalad Web UI
+        </dt>
+
+        <dd>
+          <p>
+            The <cmdname>impalad</cmdname> Web UI includes information about configuration
+            settings, running and completed queries, and associated performance and resource
+            usage for queries. In particular, the <uicontrol>Details</uicontrol> link for each
+            query displays alternative views of the query including a graphical representation
+            of the plan, and the output of the <codeph>EXPLAIN</codeph>,
+            <codeph>SUMMARY</codeph>, and <codeph>PROFILE</codeph> statements from
+            <cmdname>impala-shell</cmdname>. Each host that runs the <cmdname>impalad</cmdname>
+            daemon has its own instance of the Web UI, with details about those queries for
+            which that host served as the coordinator. The <cmdname>impalad</cmdname> Web UI is
+            primarily used for diagnosing query problems that can be traced to a particular
+            node.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          statestored Web UI
+        </dt>
+
+        <dd>
+          <p>
+            The <cmdname>statestored</cmdname> Web UI includes information about memory usage,
+            configuration settings, and ongoing health checks performed by
+            <codeph>statestored</codeph>. Because there is only a single instance of the
+            <codeph>statestored</codeph> within any Impala cluster, you access the Web UI only
+            on the particular host that serves as the Impala StateStore.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          catalogd Web UI
+        </dt>
+
+        <dd>
+          <p>
+            The <cmdname>catalogd</cmdname> Web UI includes information about the databases,
+            tables, and other objects managed by Impala, in addition to the resource usage and
+            configuration settings of the <codeph>catalogd</codeph>. Because there is only a
+            single instance of the <codeph>catalogd</codeph> within any Impala cluster, you
+            access the Web UI only on the particular host that serves as the Impala Catalog
+            Server.
+          </p>
+        </dd>
+
+      </dlentry>
+    </dl>
 
     <p outputclass="toc inpage"/>
+
   </conbody>
 
   <concept id="webui_impalad">
@@ -92,23 +120,43 @@ under the License.
     <conbody>
 
       <p>
-        To debug and troubleshoot the <cmdname>impalad</cmdname> daemon using a web-based interface, open the URL
-        <codeph>http://<varname>impala-server-hostname</varname>:25000/</codeph> in a browser. (For secure
-        clusters, use the prefix <codeph>https://</codeph> instead of <codeph>http://</codeph>.) Because each
-        Impala node produces its own set of debug information, choose a specific node that you are curious about or
-        suspect is having problems.
+        To debug and troubleshoot an <cmdname>impalad</cmdname> using a web-based interface,
+        open the URL
+        <codeph>http://<varname>impala&#8209;server&#8209;hostname</varname>:25000/</codeph> in
+        a browser. (For secure clusters, use the prefix <codeph>https://</codeph> instead of
+        <codeph>http://</codeph>.)
+      </p>
+
+      <p>
+        Because each Impala node produces its own set of debug information, you should choose a
+        specific node that you want to investigate an issue on.
       </p>
 
     </conbody>
 
-    <concept audience="hidden" id="webui_impalad_disabling">
+    <concept id="webui_impalad_disabling">
 
       <title>Turning off the Web UI for impalad</title>
 
       <conbody>
 
-        <p>To disable web UI for an impalad, restart </p>
+        <p>
+          To disable Web UI for an <codeph>impalad</codeph>:
+        </p>
+
+        <ol>
+          <li>
+            Stop the <codeph>impalad</codeph>.
+          </li>
+
+          <li>
+            Restart the <codeph>impalad</codeph> with the
+            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
+          </li>
+        </ol>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_main">
@@ -118,90 +166,208 @@ under the License.
       <conbody>
 
         <p>
-          By default, the main page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/</codeph> (secure cluster).
+          The main <codeph>impalad</codeph> Web UI page at <b>/</b> lists the following
+          information about the <codeph>impalad</codeph>:
+        </p>
+
+        <ul>
+          <li>
+            The version of the <cmdname>impalad</cmdname> daemon
+            <ul>
+              <li>
+                The "Version" section contains some other information too, like when Impala was
+                built, what build flags were used.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            Process start time
+          </li>
+
+          <li>
+            Hardware information
+          </li>
+
+          <li>
+            OS information
+          </li>
+
+          <li>
+            Process information
+          </li>
+
+          <li>
+            CGroup information
+          </li>
+        </ul>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="webui_impalad_admission">
+
+      <title>Admission Controller Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>Admission Controller</b> <codeph>impalad</codeph> debug Web UI is at
+          <uicontrol>/admission</uicontrol> page under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
-          information about the corresponding host, such as information about the CPU, memory, disks, and operating
-          system version.
+          Use the <uicontrol>/admission</uicontrol> page to troubleshoot queued queries and the
+          admission control.
         </p>
-      </conbody>
-    </concept>
-    <concept id="webui_impalad_admission">
-      <title>Admission Control Page</title>
-      <conbody>
-        <p> By default, the <uicontrol>admission</uicontrol> page of the debug
-          web UI is at
-            <codeph>http://<varname>impala-server-hostname</varname>:25000/admission</codeph>
-          (non-secure cluster) or
-              <codeph>https://<varname>impala-server-hostname</varname>:25000/admission</codeph>
-          (secure cluster). </p>
-        <p>Use the <uicontrol>admission</uicontrol> page to troubleshoot queued
-          queries and the admission control.</p>
-        <p>The <uicontrol>admission</uicontrol> page provides the following
-          information about each resource pool to which queries have been
-          submitted at least once:</p>
+
+        <p>
+          The <uicontrol>admission</uicontrol> page provides the following information about
+          each resource pool to which queries have been submitted at least once:
+        </p>
+
         <ul>
-          <li>Time since the <codeph>statestored</codeph> received the last
-            update</li>
-          <li>A warning if this <codeph>impalad</codeph> is considered
-            disconnected from the <codeph>statestored</codeph> and thus the
-            information on this page could be stale.</li>
-          <li>Pool configuration</li>
-          <li>Queued queries submitted to this coordinator, in the order of
-            submission</li>
-          <li>Running queries submitted to this coordinator</li>
-          <li>Pool stats<ul>
-              <li>Average of time in queue<p>This is an exponential moving
-                  average with the factor of 0.2, which considers approximately
-                  past 10 queries. If a query is admitted immediately, the wait
-                  time of 0 is used in calculating this average wait
-                time.</p></li>
-            </ul></li>
-          <li>Histogram of the distribution of peak memory used by queries
-            admitted to the pool<p>Use the histogram to figure out the minimum
-              and maximum query <codeph>MEM_LIMIT</codeph> ranges of the this
-              pool.</p><p>The histogram displays data for all queries admitted
-              to the pool, including the queries finished, got canceled, or hit
-              an error. </p></li>
+          <li>
+            Time since the <codeph>statestored</codeph> received the last update
+          </li>
+
+          <li>
+            A warning if this <codeph>impalad</codeph> is considered disconnected from the
+            <codeph>statestored</codeph> and thus the information on this page could be stale.
+          </li>
+
+          <li>
+            Pool configuration
+          </li>
+
+          <li>
+            Queued queries submitted to this coordinator, in the order of submission
+          </li>
+
+          <li>
+            Running queries submitted to this coordinator
+          </li>
+
+          <li>
+            Pool stats
+            <ul>
+              <li>
+                Average of time in queue
+                <p>
+                  This is an exponential moving average which represents the average time in
+                  queue over the last 10 to 12 queries. If a query is admitted immediately, the
+                  wait time of 0 is used in calculating this average wait time.
+                </p>
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            Histogram of the distribution of peak memory used by queries admitted to the pool
+            <p>
+              Use the histogram to figure out settings for the minimum and maximum query
+              <codeph>MEM_LIMIT</codeph> ranges for this pool.
+            </p>
+
+            <p>
+              The histogram displays data for all queries admitted to the pool, including the
+              queries that finished, got canceled, or hit an error.
+            </p>
+          </li>
         </ul>
-        <p>Click on the pool name to only display information relevant to that
-          pool. You can then refresh the debug page to see only the information
-          for that specific pool.</p>
-        <p>You can reset the stats that keep track of historical data, such as
-            <b>Totals</b> stats, <b>Time in queue (exponential moving
-            average)</b>, and the histogram.</p>
-        <p>The above information is also available as a JSON object from the
-          following HTTP
-          endpoint:<codeblock><codeph>http://<varname>impala-server-hostname</varname>:<varname>port</varname>/admission?json</codeph></codeblock></p>
-        <p>See <xref href="impala_admission.xml#admission_control"/> for the
-          description of the properties in admission control.</p>
+
+        <p>
+          Click on the pool name to only display information relevant to that pool. You can then
+          refresh the debug page to see only the information for that specific pool.
+        </p>
+
+        <p>
+          Click <b>Reset informational stats for all pools</b> to reset the stats that keep
+          track of historical data, such as <b>Totals</b> stats, <b>Time in queue (exponential
+          moving average)</b>, and the histogram.
+        </p>
+
+        <p>
+          The above information is also available as a JSON object from the following HTTP
+          endpoint:
+<codeblock><codeph>http://<varname>impala-server-hostname</varname>:<varname>port</varname>/admission?json</codeph></codeblock>
+        </p>
+
+        <p>
+          See <xref href="impala_admission.xml#admission_control"/> for the description of the
+          properties in admission control.
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_backends">
 
-      <title>Backends Page</title>
+      <title>Known Backends Page</title>
 
       <conbody>
 
         <p>
-          By default, the <uicontrol>backends</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/backends</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/backends</codeph> (secure cluster).
+          The <b>Known backends</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/backends</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
-        <p> This page lists the host and port info for each of the
-            <cmdname>impalad</cmdname> nodes in the cluster. Because each
-            <cmdname>impalad</cmdname> daemon knows about every other
-            <cmdname>impalad</cmdname> daemon through the StateStore, this
-          information should be the same regardless of which node you select.
-          Links take you to the corresponding debug web pages for any of the
-          other nodes in the cluster. </p>
+        <p>
+          This page lists the following info for each of the <cmdname>impalad</cmdname> nodes in
+          the cluster. Because each <cmdname>impalad</cmdname> daemon knows about every other
+          <cmdname>impalad</cmdname> daemon through the StateStore, this information should be
+          the same regardless of which node you select.
+        </p>
+
+        <ul>
+          <li>
+            Address of the node: Host name and port
+          </li>
+
+          <li>
+            KRPC address: The KRPC address of the <codeph>impalad</codeph>. Use this address
+            when you issue the <codeph>SHUTDOWN</codeph> command for this
+            <codeph>impalad</codeph>.
+          </li>
+
+          <li>
+            Whether acting as a coordinator
+          </li>
+
+          <li>
+            Whether acting as an executor
+          </li>
+
+          <li>
+            Quiescing status: Specify whether the graceful shutdown process has been initiated
+            on this <codeph>impalad</codeph>.
+          </li>
+
+          <li>
+            Memory limit for admission: The amount of memory that can be admitted to this
+            backend by the admission controller.
+          </li>
+
+          <li>
+            Memory reserved: The amount of memory reserved by queries that are active, either
+            currently executing or finished but not yet closed, on this backend.
+            <p>
+              The memory reserved for a query that is currently executing is its memory limit,
+              if set. Otherwise, if the query has no limit or if the query finished executing,
+              the current consumption is used.
+            </p>
+          </li>
+
+          <li>
+            Memory of the queries admitted to this coordinator: The memory submitted to this
+            particular host by the queries admitted by this coordinator.
+          </li>
+        </ul>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_catalog">
@@ -211,46 +377,105 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>catalog</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/catalog</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/catalog</codeph> (secure cluster).
+          The <b>Catalog</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/catalog</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page displays a list of databases and associated tables recognized by this instance of
-          <cmdname>impalad</cmdname>. You can use this page to locate which database a table is in, check the
-          exact spelling of a database or table name, look for identical table names in multiple databases, and so
-          on.
+          This page displays a list of databases and associated tables recognized by this
+          instance of <cmdname>impalad</cmdname>. You can use this page to locate which database
+          a table is in, check the exact spelling of a database or table name, look for
+          identical table names in multiple databases. The primary debugging use case would be
+          to check if an <codeph>impalad</codeph> instance has knowledge of a particular table
+          that someone expects to be in a particular database.
         </p>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_impalad_hadoop-varz">
+
+      <title>Hadoop Configuration</title>
+
+      <conbody>
+
+        <p>
+          The <b>Hadoop Configuration</b> page of the <codeph>impalad</codeph> debug Web UI is
+          at <b>/hadoop-varz</b> under the main <codeph>impalad</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays the Hadoop common configurations that Impala is running with.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="webui_impalad_jmx">
+
+      <title>JMX</title>
+
+      <conbody>
+
+        <p>
+          The <b>JMX</b> page of the <codeph>impalad</codeph> debug Web UI is at <b>/jmx</b>
+          under the main <codeph>impalad</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays monitoring information about various JVM subsystems, such as memory
+          pools, thread management, runtime. etc.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="webui_impalad_log_level">
+
+      <title>Java Log Level</title>
+
+      <conbody>
+
+        <p>
+          The <b>Change log level</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/log_level</b> under the main <codeph>impalad</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays the current Java and backend log levels, and it allows you to
+          change the log levels dynamically without having to restart the
+          <codeph>impalad</codeph>.
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_impalad_logs">
 
       <title>Logs Page</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Logs"/>
-    </metadata>
-  </prolog>
 
       <conbody>
 
         <p>
-          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/logs</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/logs</codeph> (secure cluster).
+          The <b>INFO logs</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/logs</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
-          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
-          the details of the most recent operations, whether the operations succeeded or encountered errors. This
-          central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on clusters that use cluster management software.
+          This page shows the last portion of the <codeph>impalad.INFO</codeph> log file,
+          including the info, warning, and error logs for the <cmdname>impalad</cmdname>. You
+          can see the details of the most recent operations, whether the operations succeeded or
+          encountered errors. This page provides one central place for the log files and saves
+          you from looking around the filesystem for the log files, which could be in different
+          locations on clusters that use cluster management software.
         </p>
 
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_memz">
@@ -260,17 +485,17 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>memz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/memz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/memz</codeph> (secure cluster).
+          The <b>Memory Usage</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/memz</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page displays summary and detailed information about memory usage by the <cmdname>impalad</cmdname>
-          daemon. You can see the memory limit in effect for the node, and how much of that memory Impala is
-          currently using.
+          This page displays the summary and detailed information about memory usage by the
+          <codeph>impalad</codeph>.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_metrics">
@@ -280,17 +505,17 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (secure cluster).
+          The <b>Metrics</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/metrics</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation.
+          This page displays the current set of metrics, counters and flags representing various
+          aspects of <codeph>impalad</codeph> internal operations.
         </p>
 
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_queries">
@@ -300,30 +525,83 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>queries</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/queries</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/queries</codeph> (secure cluster).
+          The <b>Queries</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/queries</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page lists all currently running queries, plus any completed queries whose details still reside in
-          memory. The queries are listed in reverse chronological order, with the most recent at the top. (You can
-          control the amount of memory devoted to completed queries by specifying the
-          <codeph>--query_log_size</codeph> startup option for <cmdname>impalad</cmdname>.)
+          This page lists:
+          <ul>
+            <li>
+              Currently running queries
+            </li>
+
+            <li>
+              Queries that have completed their execution, but have not been closed yet
+            </li>
+
+            <li>
+              Completed queries whose details still reside in memory
+            </li>
+          </ul>
+          The queries are listed in reverse chronological order, with the most recent at the
+          top. You can control the amount of memory devoted to completed queries by specifying
+          the <codeph>-&#8209;-&#8209;query_log_size</codeph> startup option for
+          <codeph>impalad</codeph>.
         </p>
 
         <p>
-          On this page, you can see at a glance how many SQL statements are failing (<codeph>State</codeph> value
-          of <codeph>EXCEPTION</codeph>), how large the result sets are (<codeph># rows fetched</codeph>), and how
-          long each statement took (<codeph>Start Time</codeph> and <codeph>End Time</codeph>).
+          This page provides:
+          <ul>
+            <li>
+              How many SQL statements are failing (<codeph>State</codeph> value of
+              <codeph>EXCEPTION</codeph>)
+            </li>
+
+            <li>
+              How large the result sets are (<codeph># rows fetched</codeph>)
+            </li>
+
+            <li>
+              How long each statement took (<codeph>Start Time</codeph> and <codeph>End
+              Time</codeph>)
+            </li>
+          </ul>
         </p>
 
         <p>
-          Each query has an associated link that displays the detailed query profile, which you can examine to
-          understand the performance characteristics of that query. See
+          Each query has an associated link that displays the detailed query profile, which you
+          can examine to understand the performance characteristics of that query. See
           <xref href="impala_explain_plan.xml#perf_profile"/> for details.
         </p>
+
+        <p>
+          The <b>Queries</b> page also includes the <b>Query Locations</b> section that lists
+          the number of running queries with fragments on this host.
+        </p>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_impalad_rpcz">
+
+      <title>RPC Services Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>RPC durations</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/rpcz</b> under the main <codeph>impalad</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays information, such as the duration, about the RPC communications of
+          this <codeph>impalad</codeph> with other Impala daemons.
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_impalad_sessions">
@@ -333,17 +611,19 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>sessions</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/sessions</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/sessions</codeph> (secure cluster).
+          The <b>Sessions</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/session</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page displays information about the sessions currently connected to this <cmdname>impalad</cmdname>
-          instance. For example, sessions could include connections from the <cmdname>impala-shell</cmdname>
-          command, JDBC or ODBC applications, or the Impala Query UI in the Hue web interface.
+          This page displays information about the sessions currently connected to this
+          <cmdname>impalad</cmdname> instance. For example, sessions could include connections
+          from the <codeph>impala-shell</codeph> command, JDBC or ODBC applications, or the
+          Impala Query UI in the Hue web interface.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_threadz">
@@ -353,17 +633,18 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>threadz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/threadz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/threadz</codeph> (secure cluster).
+          The <b>Threads</b> page of the <codeph>impalad</codeph> debug Web UI is at
+          <b>/threadz</b> under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page displays information about the threads used by this instance of <cmdname>impalad</cmdname>,
-          and shows which categories they are grouped into. Making use of this information requires substantial
-          knowledge about Impala internals.
+          This page displays information about the threads used by this instance of
+          <codeph>impalad</codeph>, and it shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_impalad_varz">
@@ -373,43 +654,69 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25000/varz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25000/varz</codeph> (secure cluster).
+          The <b>Varz</b> page of the <codeph>impalad</codeph> debug Web UI is at <b>/varz</b>
+          under the main <codeph>impalad</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
-          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
-          of configuration files; Impala might not actually make use of all settings.
+          This page shows the configuration settings in effect when this instance of
+          <codeph>impalad</codeph> communicates with other Hadoop components such as HDFS and
+          YARN. These settings are collected from a set of configuration files.
         </p>
 
         <p>
-          The bottom of this page also lists all the command-line settings in effect for this instance of
-          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <codeph>impalad</codeph>. See
+          <xref
+            href="impala_config_options.xml#config_options"/> for information
           about modifying these values.
         </p>
+
       </conbody>
+
     </concept>
+
   </concept>
 
-  <concept audience="hidden" id="webui_statestored">
+  <concept id="webui_statestored">
 
     <title>Debug Web UI for statestored</title>
 
     <conbody>
 
-      <p></p>
+      <p>
+        To debug and troubleshoot the <codeph>statestored</codeph> daemon using a web-based
+        interface, open the URL
+        <codeph>http://<varname>impala&#8209;server&#8209;hostname</varname>:25010/</codeph> in
+        a browser. (For secure clusters, use the prefix <codeph>https://</codeph> instead of
+        <codeph>http://</codeph>.)
+      </p>
+
     </conbody>
 
-    <concept audience="hidden" id="webui_statestored_disabling">
+    <concept id="webui_statestored_disabling">
 
       <title>Turning off the Web UI for statestored</title>
 
       <conbody>
 
-        <p></p>
+        <p>
+          To disable Web UI for the <codeph>statestored</codeph>:
+        </p>
+
+        <ol>
+          <li>
+            Stop the <codeph>statestored</codeph>.
+          </li>
+
+          <li>
+            Restart the <codeph>statestored</codeph> with the
+            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
+          </li>
+        </ol>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_main">
@@ -419,17 +726,38 @@ under the License.
       <conbody>
 
         <p>
-          By default, the main page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/</codeph> (secure cluster).
+          The main <codeph>statestored</codeph> Web UI page at <b>/</b> lists the following
+          information about the <codeph>statestored</codeph>:
         </p>
 
-        <p>
-          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
-          information about the corresponding host, such as information about the CPU, memory, disks, and operating
-          system version.
-        </p>
+        <ul>
+          <li>
+            The version of the <codeph>statestored</codeph> daemon
+          </li>
+
+          <li>
+            Process start time
+          </li>
+
+          <li>
+            Hardware information
+          </li>
+
+          <li>
+            OS information
+          </li>
+
+          <li>
+            Process information
+          </li>
+
+          <li>
+            CGroup information
+          </li>
+        </ul>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_logs">
@@ -439,19 +767,22 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/logs</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/logs</codeph> (secure cluster).
+          The <b>INFO logs</b> page of the debug Web UI is at <b>/logs</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
-          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
-          the details of the most recent operations, whether the operations succeeded or encountered errors. This
-          central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on different hosts.
+          This page shows the last portion of the <filepath>statestored.INFO</filepath> log
+          file, including the info, warning, and error logs for the
+          <codeph>statestored</codeph>. You can refer here to see the details of the most recent
+          operations, whether the operations succeeded or encountered errors. This page provides
+          one central place for the log files and saves you from looking around the filesystem
+          for the log files, which could be in different locations on clusters that use cluster
+          management software.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_memz">
@@ -461,17 +792,18 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>memz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/memz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/memz</codeph> (secure cluster).
+          The <b>Memory Usage</b> page of the debug Web UI is at <b>/memz</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page displays summary and detailed information about memory usage by the <cmdname>impalad</cmdname>
-          daemon. You can see the memory limit in effect for the node, and how much of that memory Impala is
-          currently using.
+          This page displays summary and detailed information about memory usage by the
+          <codeph>statestored</codeph>. You can see the memory limit in effect for the node, and
+          how much of that memory Impala is currently using.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_metrics">
@@ -481,16 +813,37 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/metrics</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/metrics</codeph> (secure cluster).
+          The <b>Metrics</b> page of the debug Web UI is at <b>/metrics</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation.
+          This page displays the current set of metrics: counters and flags representing various
+          aspects of <codeph>statestored</codeph> internal operation.
         </p>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_statestored_rpcz">
+
+      <title>RPC Services Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>RPC durations</b> page of the <codeph>statestored</codeph> debug Web UI is at
+          <b>/rpcz</b> under the main <codeph>statestored</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays information, such as the durations, about the RPC communications of
+          this <codeph>statestored</codeph> with other Impala daemons.
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_statestored_subscribers">
@@ -500,15 +853,17 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>subscribers</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/subscribers</codeph> (non-secure cluster)
-          or <codeph>https://<varname>impala-server-hostname</varname>:25010/subscribers</codeph> (secure cluster).
+          The <b>Subscribers</b> page of the debug Web UI is at <b>/subscribers</b> under the
+          main <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page displays information about...
+          This page displays information about the other Impala daemons that have registered
+          with the <codeph>statestored</codeph> to receive and send updates.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_threadz">
@@ -518,17 +873,18 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>threadz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/threadz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/threadz</codeph> (secure cluster).
+          The <b>Threads</b> page of the debug Web UI is at <b>/threadz</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page displays information about the threads used by this instance of <cmdname>impalad</cmdname>,
-          and shows which categories they are grouped into. Making use of this information requires substantial
-          knowledge about Impala internals.
+          This page displays information about the threads used by this instance of
+          <codeph>statestored</codeph>, and shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_topics">
@@ -538,15 +894,17 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>topics</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/topics</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/topics</codeph> (secure cluster).
+          The <b>Topics</b> page of the debug Web UI is at <b>/topics</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page displays information about...
+          This page displays information about the topics to which the other Impala daemons have
+          registered to receive updates.
         </p>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_statestored_varz">
@@ -556,43 +914,69 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25010/varz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25010/varz</codeph> (secure cluster).
+          The <b>Varz</b> page of the debug Web UI is at <b>/varz</b> under the main
+          <codeph>statestored</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
-          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
-          of configuration files; Impala might not actually make use of all settings.
+          This page shows the configuration settings in effect when this instance of
+          <codeph>statestored</codeph> communicates with other Hadoop components such as HDFS
+          and YARN. These settings are collected from a set of configuration files.
         </p>
 
         <p>
-          The bottom of this page also lists all the command-line settings in effect for this instance of
-          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <codeph>statestored</codeph>. See
+          <xref
+            href="impala_config_options.xml#config_options"/> for information
           about modifying these values.
         </p>
+
       </conbody>
+
     </concept>
+
   </concept>
 
-  <concept audience="hidden" id="webui_catalogd">
+  <concept id="webui_catalogd">
 
     <title>Debug Web UI for catalogd</title>
 
     <conbody>
 
-      <p></p>
+      <p>
+        The main page of the debug Web UI is at
+        <codeph>http://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
+        (non-secure cluster) or
+        <codeph>https://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
+        (secure cluster).
+      </p>
+
     </conbody>
 
-    <concept audience="hidden" id="webui_catalogd_disabling">
+    <concept id="webui_catalogd_disabling">
 
-      <title>Turning off the Web UI for impalad</title>
+      <title>Turning off the Web UI for catalogd</title>
 
       <conbody>
 
-        <p></p>
+        <p>
+          To disable Web UI for the <codeph>catalogd</codeph>:
+        </p>
+
+        <ol>
+          <li>
+            Stop the <codeph>catalogd</codeph>.
+          </li>
+
+          <li>
+            Restart the <codeph>catalogd</codeph> with the
+            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
+          </li>
+        </ol>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_catalogd_main">
@@ -602,17 +986,38 @@ under the License.
       <conbody>
 
         <p>
-          By default, the main page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020/</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25020/</codeph> (secure cluster).
+          The main <codeph>catalogd</codeph> Web UI page at <b>/</b> lists the following
+          information about the <codeph>catalogd</codeph>:
         </p>
 
-        <p>
-          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
-          information about the corresponding host, such as information about the CPU, memory, disks, and operating
-          system version.
-        </p>
+        <ul>
+          <li>
+            The version of the <codeph>catalogd</codeph> daemon
+          </li>
+
+          <li>
+            Process start time
+          </li>
+
+          <li>
+            Hardware information
+          </li>
+
+          <li>
+            OS information
+          </li>
+
+          <li>
+            Process information
+          </li>
+
+          <li>
+            CGroup information
+          </li>
+        </ul>
+
       </conbody>
+
     </concept>
 
     <concept id="webui_catalogd_catalog">
@@ -622,18 +1027,60 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>catalog</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020/catalog</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25020/catalog</codeph> (secure cluster).
+          The <b>Catalog</b> page of the debug Web UI is at <b>/catalog</b> under the main
+          <codeph>catalogd</codeph> Web UI.
         </p>
 
         <p>
-          This page displays a list of databases and associated tables recognized by this instance of
-          <cmdname>impalad</cmdname>. You can use this page to locate which database a table is in, check the
-          exact spelling of a database or table name, look for identical table names in multiple databases, and so
-          on.
+          This page displays a list of databases and associated tables recognized by this
+          instance of <codeph>catalogd</codeph>. You can use this page to locate which database
+          a table is in, check the exact spelling of a database or table name, look for
+          identical table names in multiple databases. The catalog information is represented as
+          the underlying Thrift data structures.
         </p>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_catalogd_jmx">
+
+      <title>JMX</title>
+
+      <conbody>
+
+        <p>
+          The <b>JMX</b> page of the <codeph>catalogd</codeph> debug Web UI is at <b>/jmx</b>
+          under the main <codeph>catalogd</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays monitoring information about various JVM subsystems, such as memory
+          pools, thread management, runtime. etc.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="webui_catalogd_log_level">
+
+      <title>Java Log Level</title>
+
+      <conbody>
+
+        <p>
+          The <b>Change log level</b> page of the <codeph>catalogd</codeph> debug Web UI is at
+          <b>/log_level</b> under the main <codeph>catalogd</codeph> Web UI.
+        </p>
+
+        <p>
+          The page displays the current Java and backend log levels and allows you to change the
+          log levels dynamically without having to restart the <codeph>catalogd</codeph>
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_catalogd_logs">
@@ -643,19 +1090,43 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020/logs</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25020/logs</codeph> (secure cluster).
+          The <b>INFO logs</b> page of the debug Web UI is at <b>/logs</b> under the main
+          <codeph>catalogd</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
-          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
-          the details of the most recent operations, whether the operations succeeded or encountered errors. This
-          central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on different hosts.
+          This page shows the last portion of the <codeph>catalogd.INFO</codeph> log file,
+          including the info, warning, and error logs for the <codeph>catalogd</codeph> daemon.
+          You can refer here to see the details of the most recent operations, whether the
+          operations succeeded or encountered errors. This page provides one central place for
+          the log files and saves you from looking around the filesystem for the log files,
+          which could be in different locations on clusters that use cluster management
+          software.
         </p>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_catalogd_memz">
+
+      <title>Memz Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>Memory Usage</b> page of the debug Web UI is at <b>/memz</b> under the main
+          <codeph>catalogd</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays summary and detailed information about memory usage by the
+          <codeph>catalogd</codeph>. You can see the memory limit in effect for the node, and
+          how much of that memory Impala is currently using.
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_catalogd_metrics">
@@ -665,16 +1136,60 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020/metrics</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25020/metrics</codeph> (secure cluster).
+          The <b>Metrics</b> page of the debug Web UI is at <b>/metrics</b> under the main
+          <codeph>catalogd</codeph> Web UI.
         </p>
 
         <p>
-          This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation.
+          This page displays the current set of metrics: counters and flags representing various
+          aspects of <codeph>catalogd</codeph> internal operation.
         </p>
+
+        <p/>
+
       </conbody>
+
+    </concept>
+
+    <concept id="webui_catalogd_rpcz">
+
+      <title>RPC Services Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>RPC durations</b> page of the <codeph>catalogd</codeph> debug Web UI is at
+          <b>/rpcz</b> under the main <codeph>catalogd</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays information, such as the durations, about the RPC communications of
+          this <codeph>catalogd</codeph> with other Impala daemons.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="webui_catalogd_threadz">
+
+      <title>Threadz Page</title>
+
+      <conbody>
+
+        <p>
+          The <b>Threads</b> page of the debug Web UI is at <b>/threadz</b> under the main
+          <codeph>catalogd</codeph> Web UI.
+        </p>
+
+        <p>
+          This page displays information about the threads used by this instance of
+          <codeph>catalogd</codeph>, and shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
+        </p>
+
+      </conbody>
+
     </concept>
 
     <concept id="webui_catalogd_varz">
@@ -684,23 +1199,28 @@ under the License.
       <conbody>
 
         <p>
-          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
-          <codeph>http://<varname>impala-server-hostname</varname>:25020/varz</codeph> (non-secure cluster) or
-          <codeph>https://<varname>impala-server-hostname</varname>:25020/varz</codeph> (secure cluster).
+          The <b>Varz</b> page of the debug Web UI is at <b>/varz</b> under the main
+          <codeph>catalogd</codeph> Web UI.
         </p>
 
         <p>
-          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
-          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
-          of configuration files; Impala might not actually make use of all settings.
+          This page shows the configuration settings in effect when this instance of
+          <codeph>catalogd</codeph> communicates with other Hadoop components such as HDFS and
+          YARN. These settings are collected from a set of configuration files.
         </p>
 
         <p>
-          The bottom of this page also lists all the command-line settings in effect for this instance of
-          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <codeph>catalogd</codeph>. See
+          <xref
+            href="impala_config_options.xml#config_options"/> for information
           about modifying these values.
         </p>
+
       </conbody>
+
     </concept>
+
   </concept>
+
 </concept>
