@@ -165,16 +165,12 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void updateDatabaseOwnerPrivilege(String serverName, String databaseName,
       String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
   @Override
   public void updateTableOwnerPrivilege(String serverName, String databaseName,
       String tableName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,

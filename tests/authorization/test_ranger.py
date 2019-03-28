@@ -38,25 +38,38 @@ class TestRanger(CustomClusterTestSuite):
                   "--ranger_app_id=impala "
                   "--authorization_factory_class="
                   "org.apache.impala.authorization.ranger.RangerAuthorizationFactory")
-  def test_grant_revoke(self):
+  def test_grant_revoke(self, unique_name):
     user = getuser()
+    admin = "admin"
     admin_client = self.create_impala_client()
     user_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    unique_table = unique_name + "_tbl"
 
     try:
+      # Set-up temp database/table
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=admin)
+      admin_client.execute("create database {0}".format(unique_database), user=admin)
+      admin_client.execute("create table {0}.{1} (x int)"
+                           .format(unique_database, unique_table), user=admin)
+
       self.execute_query_expect_success(admin_client,
-                                        "grant select on database functional to user {0}"
-                                        .format(user), user="admin")
+                                        "grant select on database {0} to user {1}"
+                                        .format(unique_database, user), user=admin)
       # TODO: IMPALA-8293 use refresh authorization
       time.sleep(35)
-      self.execute_query_expect_success(user_client, "show tables in functional",
-                                        user=user)
+      self.execute_query_expect_success(user_client, "show tables in {0}"
+                                        .format(unique_database), user=user)
       self.execute_query_expect_success(admin_client,
-                                        "revoke select on database functional from user "
-                                        "{0}".format(getuser()), user="admin")
+                                        "revoke select on database {0} from user "
+                                        "{1}".format(unique_database, user), user=admin)
       # TODO: IMPALA-8293 use refresh authorization
       time.sleep(35)
-      self.execute_query_expect_failure(user_client, "show tables in functional")
+      self.execute_query_expect_failure(user_client, "show tables in {0}"
+                                        .format(unique_database))
     finally:
-      admin_client.execute("revoke select on database functional from user {0}"
-                           .format(getuser()), user="admin")
+      admin_client.execute("revoke select on database {0} from user {1}"
+                           .format(unique_database, user), user=admin)
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=admin)
