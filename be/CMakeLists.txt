@@ -601,9 +601,9 @@ ENDFUNCTION()
 FUNCTION(ADD_UNIFIED_BE_TEST TEST_NAME TEST_FILTER_PATTERN)
   # This gets the directory where the test is from (e.g. 'exprs' or 'runtime')
   file(RELATIVE_PATH DIR_NAME "${CMAKE_SOURCE_DIR}/be/src/" ${CMAKE_CURRENT_SOURCE_DIR})
-  add_custom_target(${TEST_NAME} "${CMAKE_SOURCE_DIR}/bin/gen-backend-test-script.sh"
-    "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}"
-    ${TEST_FILTER_PATTERN})
+  add_custom_target(${TEST_NAME} "${CMAKE_SOURCE_DIR}/bin/gen-backend-test-script.py"
+    "--test_script_output" "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}"
+    "--gtest_filter" ${TEST_FILTER_PATTERN})
   # Incorporate this TEST_FILTER_PATTERN into the aggregate list of filter patterns
   get_property(tmp GLOBAL PROPERTY AGG_UNIFIED_FILTER_PATTERN)
   set(tmp "${TEST_FILTER_PATTERN}:${tmp}")
