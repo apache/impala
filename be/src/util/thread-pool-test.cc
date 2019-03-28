@@ -95,7 +95,7 @@ private:
   bool* destructor_called_ptr_;
 };
 
-TEST(ThreadPoolTest, SynchronousThreadPoolTest) {
+TEST(ThreadPoolTest, SynchronousThreadPoolNoSleep) {
   // Create a synchronous pool with one thread and a queue size of one.
   SynchronousThreadPool pool("sync-thread-pool", "worker", 1, 1);
   ASSERT_OK(pool.Init());
@@ -109,7 +109,22 @@ TEST(ThreadPoolTest, SynchronousThreadPoolTest) {
   // shared_ptr to the work item. The caller is the only holder, so when it calls
   // reset, the destructor must be called.
   no_sleep.reset();
+  // The work item should be destroyed even if we are not shutting down the pool.
+  // IMPALA-8371: There is a race condition with the worker thread, as the worker thread
+  // may not have released its shared_ptr to the work item. Wait for a limited period of
+  // time for the work thread to release the shared_ptr.
+  for (int i = 0; i < 10; i++) {
+    if (*no_sleep_destroyed) break;
+    SleepForMs(5);
+  }
   ASSERT_TRUE(*no_sleep_destroyed);
+  pool.DrainAndShutdown();
+}
+
+TEST(ThreadPoolTest, SynchronousThreadPoolTimeouts) {
+  // Create a synchronous pool with one thread and a queue size of one.
+  SynchronousThreadPool pool("sync-thread-pool", "worker", 1, 1);
+  ASSERT_OK(pool.Init());
 
   // Timeout case #1: Submit one task that takes 100 milliseconds. Offer it with a timeout
   // of 1 millisecond so that the caller immediately times out.
