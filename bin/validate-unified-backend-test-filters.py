@@ -30,6 +30,14 @@ def get_set_of_tests(unified_binary, filters):
         command.append("--gtest_filter={0}".format(filters))
     p = subprocess.Popen(command, stdout=subprocess.PIPE)
     out, err = p.communicate()
+    if p.returncode != 0:
+        print("FAILED: Unified backend test executable returned an error when trying\n"
+              "        to list tests.")
+        print("Command: {0}".format(" ".join(command)))
+        print("Return Code: {0}".format(p.returncode))
+        print("stdout:\n{0}\nstderr:\n{1}".format(out, err))
+        sys.exit(1)
+
     test_list = set()
     cur_test_suite = None
     for line in out.split("\n"):
