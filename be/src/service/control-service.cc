@@ -49,6 +49,7 @@ DEFINE_string(control_service_queue_mem_limit, "50MB", QUEUE_LIMIT_MSG.c_str());
 DEFINE_int32(control_service_num_svc_threads, 0, "Number of threads for processing "
     "control service's RPCs. if left at default value 0, it will be set to number of "
     "CPU cores. Set it to a positive value to change from the default.");
+DECLARE_string(debug_actions);
 
 namespace impala {
 
@@ -116,6 +117,9 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
   shared_ptr<ClientRequestState> request_state =
       ExecEnv::GetInstance()->impala_server()->GetClientRequestState(query_id);
 
+  // This failpoint is to allow jitter to be injected.
+  DebugActionNoFail(FLAGS_debug_actions, "REPORT_EXEC_STATUS_DELAY");
+
   if (request_state.get() == nullptr) {
     // This is expected occasionally (since a report RPC might be in flight while
     // cancellation is happening). Return an error to the caller to get it to stop.
@@ -127,9 +131,6 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
     RespondAndReleaseRpc(Status::Expected(err), response, rpc_context);
     return;
   }
-
-  // This failpoint is to allow jitter to be injected.
-  DebugActionNoFail(request_state->query_options(), "REPORT_EXEC_STATUS_DELAY");
 
   // The runtime profile is sent as a Thrift serialized buffer via sidecar. Get the
   // sidecar and deserialize the thrift profile if there is any. The sender may have
@@ -167,8 +168,8 @@ void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB*
   DCHECK(request->has_query_id());
   const TUniqueId& query_id = ProtoToQueryId(request->query_id());
   VLOG_QUERY << "CancelQueryFInstances(): query_id=" << PrintId(query_id);
-  // TODO(IMPALA-8143) Use DebugAction for fault injection.
-  FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
+  // This failpoint is to allow jitter to be injected.
+  DebugActionNoFail(FLAGS_debug_actions, "CANCEL_QUERY_FINSTANCES_DELAY");
   QueryState::ScopedRef qs(query_id);
   if (qs.get() == nullptr) {
     Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR,
@@ -182,8 +183,8 @@ void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB*
 
 void ControlService::RemoteShutdown(const RemoteShutdownParamsPB* req,
     RemoteShutdownResultPB* response, RpcContext* rpc_context) {
-  // TODO(IMPALA-8143) Use DebugAction for fault injection.
-  FAULT_INJECTION_RPC_DELAY(RPC_REMOTESHUTDOWN);
+  // This failpoint is to allow jitter to be injected.
+  DebugActionNoFail(FLAGS_debug_actions, "REMOTE_SHUTDOWN_DELAY");
   Status status = ExecEnv::GetInstance()->impala_server()->StartShutdown(
       req->has_deadline_s() ? req->deadline_s() : -1,
       response->mutable_shutdown_status());

@@ -140,19 +140,29 @@ DebugActionTokens TokenizeDebugActions(const string& debug_actions);
 /// becomes {"x", "y"} and "x" becomes {"x"}.
 std::vector<std::string> TokenizeDebugActionParams(const string& action);
 
-/// Slow path implementing DebugAction() for the case where
-/// 'query_options.debug_action' is non-empty.
-Status DebugActionImpl(
-    const TQueryOptions& query_options, const char* label) WARN_UNUSED_RESULT;
+/// Slow path implementing DebugAction() for the case where 'debug_action' is non-empty.
+Status DebugActionImpl(const string& debug_action, const char* label) WARN_UNUSED_RESULT;
 
 /// If debug_action query option has a "global action" (i.e. not exec-node specific)
 /// and matches the given 'label', apply the the action. See ImpalaService.thrift for
 /// details of the format and available global actions. For ExecNode code, use
 /// ExecNode::ExecDebugAction() instead.
 WARN_UNUSED_RESULT static inline Status DebugAction(
+    const string& debug_action, const char* label) {
+  if (LIKELY(debug_action.empty())) return Status::OK();
+  return DebugActionImpl(debug_action, label);
+}
+
+WARN_UNUSED_RESULT static inline Status DebugAction(
     const TQueryOptions& query_options, const char* label) {
-  if (LIKELY(query_options.debug_action.empty())) return Status::OK();
-  return DebugActionImpl(query_options, label);
+  return DebugAction(query_options.debug_action, label);
+}
+
+static inline void DebugActionNoFail(const string& debug_action, const char* label) {
+  Status status = DebugAction(debug_action, label);
+  if (!status.ok()) {
+    LOG(ERROR) << "Ignoring debug action failure: " << status.GetDetail();
+  }
 }
 
 /// Like DebugAction() but for use in contexts that can't safely propagate an error
@@ -160,10 +170,7 @@ WARN_UNUSED_RESULT static inline Status DebugAction(
 /// and ignored.
 static inline void DebugActionNoFail(
     const TQueryOptions& query_options, const char* label) {
-  Status status = DebugAction(query_options, label);
-  if (!status.ok()) {
-    LOG(ERROR) << "Ignoring debug action failure: " << status.GetDetail();
-  }
+  DebugActionNoFail(query_options.debug_action, label);
 }
 
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed

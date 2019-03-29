@@ -26,17 +26,6 @@ namespace impala {
 
 class FaultInjectionUtil {
  public:
-  enum RpcCallType {
-    RPC_NULL = 0,
-    RPC_EXECQUERYFINSTANCES,
-    RPC_CANCELQUERYFINSTANCES,
-    RPC_PUBLISHFILTER,
-    RPC_UPDATEFILTER,
-    RPC_TRANSMITDATA,
-    RPC_REPORTEXECSTATUS,
-    RPC_REMOTESHUTDOWN,
-    RPC_RANDOM    // This must be last.
-  };
 
   enum RpcExceptionType {
     RPC_EXCEPTION_NONE = 0,
@@ -52,26 +41,14 @@ class FaultInjectionUtil {
     RPC_EXCEPTION_SSL_RECV_TIMEDOUT,
   };
 
-  /// Test util function that injects delays to specified RPC server handling function
-  /// so that RPC caller could hit the RPC recv timeout condition.
-  /// 'my_type' specifies which RPC type of the current function.
-  /// FLAGS_fault_injection_rpc_type specifies which RPC function the delay should
-  /// be enabled. FLAGS_fault_injection_rpc_delay_ms specifies the delay in ms.
-  static void InjectRpcDelay(RpcCallType my_type);
-
   /// Test util function that injects exceptions to RPC client functions.
   /// 'is_send' indicates whether injected fault is at the send() or recv() of an RPC.
   /// The exception specified in 'FLAGS_fault_injection_rpc_exception_type' is injected
   /// on every 'freq' invocations of this function.
   static void InjectRpcException(bool is_send, int freq);
 
- private:
-  static int32_t GetTargetRPCType();
-
 };
 
-#define FAULT_INJECTION_RPC_DELAY(type)                          \
-    FaultInjectionUtil::InjectRpcDelay(FaultInjectionUtil::type)
 #define FAULT_INJECTION_SEND_RPC_EXCEPTION(freq)                 \
     FaultInjectionUtil::InjectRpcException(true, freq)
 #define FAULT_INJECTION_RECV_RPC_EXCEPTION(freq)                 \
@@ -79,7 +56,6 @@ class FaultInjectionUtil {
 
 #else // NDEBUG
 
-#define FAULT_INJECTION_RPC_DELAY(type)
 #define FAULT_INJECTION_SEND_RPC_EXCEPTION(freq)
 #define FAULT_INJECTION_RECV_RPC_EXCEPTION(freq)
 

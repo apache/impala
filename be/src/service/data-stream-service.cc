@@ -49,6 +49,7 @@ DEFINE_string(datastream_service_queue_mem_limit, "5%", QUEUE_LIMIT_MSG.c_str())
 DEFINE_int32(datastream_service_num_svc_threads, 0, "Number of threads for processing "
     "datastream services' RPCs. If left at default value 0, it will be set to number of "
     "CPU cores.  Set it to a positive value to change from the default.");
+DECLARE_string(debug_actions);
 
 namespace impala {
 
@@ -94,13 +95,14 @@ bool DataStreamService::Authorize(const google::protobuf::Message* req,
 
 void DataStreamService::EndDataStream(const EndDataStreamRequestPB* request,
     EndDataStreamResponsePB* response, RpcContext* rpc_context) {
+  DebugActionNoFail(FLAGS_debug_actions, "END_DATA_STREAM_DELAY");
   // CloseSender() is guaranteed to eventually respond to this RPC so we don't do it here.
   ExecEnv::GetInstance()->stream_mgr()->CloseSender(request, response, rpc_context);
 }
 
 void DataStreamService::TransmitData(const TransmitDataRequestPB* request,
     TransmitDataResponsePB* response, RpcContext* rpc_context) {
-  FAULT_INJECTION_RPC_DELAY(RPC_TRANSMITDATA);
+  DebugActionNoFail(FLAGS_debug_actions, "TRANSMIT_DATA_DELAY");
   // AddData() is guaranteed to eventually respond to this RPC so we don't do it here.
   ExecEnv::GetInstance()->stream_mgr()->AddData(request, response, rpc_context);
 }

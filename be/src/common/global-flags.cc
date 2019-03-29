@@ -136,11 +136,6 @@ DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes d
     "stream receiver registration to be delayed. Effective in debug builds only.");
 DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering for"
     "testing purposes. Effective in debug builds only.");
-DEFINE_int32(fault_injection_rpc_delay_ms, 0, "A fault injection option that causes "
-    "rpc server handling to be delayed to trigger an RPC timeout on the caller side. "
-    "Effective in debug builds only.");
-DEFINE_int32(fault_injection_rpc_type, 0, "A fault injection option that specifies "
-    "which rpc call will be injected with the delay. Effective in debug builds only.");
 DEFINE_int32(fault_injection_rpc_exception_type, 0, "A fault injection option that "
     "specifies the exception to be thrown in the caller side of an RPC call. Effective "
     "in debug builds only");
@@ -155,6 +150,10 @@ DEFINE_int32(stress_catalog_init_delay_ms, 0, "A stress option that injects extr
 DEFINE_int32(stress_disk_read_delay_ms, 0, "A stress option that injects extra delay"
     " in milliseconds when the I/O manager is reading from disk.");
 #endif
+
+DEFINE_string(debug_actions, "", "For testing only. Uses the same format as the debug "
+    "action query options, but allows for injection of debug actions in code paths where "
+    "query options are not available.");
 
 // Used for testing the path where the Kudu client is stubbed.
 DEFINE_bool(disable_kudu, false, "If true, Kudu features will be disabled.");

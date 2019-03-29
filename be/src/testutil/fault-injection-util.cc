@@ -28,28 +28,12 @@
 
 #include "common/names.h"
 
-DECLARE_int32(fault_injection_rpc_delay_ms);
-DECLARE_int32(fault_injection_rpc_type);
 DECLARE_int32(fault_injection_rpc_exception_type);
 
 namespace impala {
 
 using apache::thrift::transport::TTransportException;
 using apache::thrift::transport::TSSLException;
-
-int32_t FaultInjectionUtil::GetTargetRPCType() {
-  int32_t target_rpc_type = FLAGS_fault_injection_rpc_type;
-  if (target_rpc_type == RPC_RANDOM) target_rpc_type = rand() % RPC_RANDOM;
-  DCHECK_LT(target_rpc_type, RPC_RANDOM);
-  return target_rpc_type;
-}
-
-void FaultInjectionUtil::InjectRpcDelay(RpcCallType my_type) {
-  int32_t delay_ms = FLAGS_fault_injection_rpc_delay_ms;
-  if (delay_ms == 0) return;
-  int32_t target_rpc_type = GetTargetRPCType();
-  if (target_rpc_type == my_type) SleepForMs(delay_ms);
-}
 
 void FaultInjectionUtil::InjectRpcException(bool is_send, int freq) {
   static AtomicInt32 send_count(-1);

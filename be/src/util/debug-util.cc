@@ -328,10 +328,8 @@ static bool ParseProbability(const string& prob_str, bool* should_execute) {
   return true;
 }
 
-Status DebugActionImpl(
-    const TQueryOptions& query_options, const char* label) {
-  const DebugActionTokens& action_list = TokenizeDebugActions(
-      query_options.debug_action);
+Status DebugActionImpl(const string& debug_action, const char* label) {
+  const DebugActionTokens& action_list = TokenizeDebugActions(debug_action);
   static const char ERROR_MSG[] = "Invalid debug_action $0:$1 ($2)";
   for (const vector<string>& components : action_list) {
     // size() != 2 check filters out ExecNode debug actions.

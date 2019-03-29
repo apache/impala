@@ -85,7 +85,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=1000 --fault_injection_rpc_type=1"
+      " --debug_actions=EXEC_QUERY_FINSTANCES_DELAY:SLEEP@1000"
       " --datastream_sender_timeout_ms=30000")
   def test_execqueryfinstances_race(self, vector):
     """ Test for IMPALA-7464, where the rpc times out while the rpc handler continues to
@@ -94,7 +94,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=1"
+      " --debug_actions=EXEC_QUERY_FINSTANCES_DELAY:SLEEP@3000"
       " --datastream_sender_timeout_ms=30000")
   def test_execqueryfinstances_timeout(self, vector):
     for i in range(3):
@@ -109,7 +109,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=2"
+      " --debug_actions=CANCEL_QUERY_FINSTANCES_DELAY:SLEEP@3000"
       " --datastream_sender_timeout_ms=30000")
   def test_cancelplanfragment_timeout(self, vector):
     query = "select * from tpch.lineitem limit 5000"
@@ -117,20 +117,22 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=3")
+      " --debug_actions=PUBLISH_FILTER_DELAY:SLEEP@3000")
   def test_publishfilter_timeout(self, vector):
     self.execute_runtime_filter_query()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=4")
+      " --debug_actions=UPDATE_FILTER_DELAY:SLEEP@3000")
   def test_updatefilter_timeout(self, vector):
     self.execute_runtime_filter_query()
 
+  all_rpcs = ["EXEC_QUERY_FINSTANCES", "CANCEL_QUERY_FINSTANCES", "PUBLISH_FILTER",
+      "UPDATE_FILTER", "TRANSMIT_DATA", "END_DATA_STREAM", "REMOTE_SHUTDOWN"]
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=7"
-      " --datastream_sender_timeout_ms=30000")
+      " --datastream_sender_timeout_ms=30000 --debug_actions=%s" %
+      "|".join(map(lambda rpc: "%s_DELAY:JITTER@3000@0.1" % rpc, all_rpcs)))
   def test_random_rpc_timeout(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
 
@@ -138,15 +140,15 @@ class TestRPCTimeout(CustomClusterTestSuite):
   # Useful for triggering IMPALA-8274.
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--status_report_interval_ms=100"
-      " --backend_client_rpc_timeout_ms=100")
+      " --backend_client_rpc_timeout_ms=100"
+      " --debug_actions=REPORT_EXEC_STATUS_DELAY:JITTER@110@0.7")
   def test_reportexecstatus_jitter(self, vector):
     LONG_RUNNING_QUERY = "with v as (select t1.ss_hdemo_sk as xk " +\
        "from tpcds_parquet.store_sales t1, tpcds_parquet.store_sales t2 " +\
        "where t1.ss_hdemo_sk = t2.ss_hdemo_sk) " +\
        "select count(*) from v, tpcds_parquet.household_demographics t3 " +\
        "where v.xk = t3.hd_demo_sk"
-    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:JITTER@110@0.7'}
-    self.execute_query_verify_metrics(LONG_RUNNING_QUERY, query_options, 1)
+    self.execute_query_verify_metrics(LONG_RUNNING_QUERY, None, 1)
 
   # Use a small service queue memory limit and a single service thread to exercise
   # the retry paths in the ReportExecStatus() RPC
@@ -165,16 +167,16 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=100"
-      " --status_report_interval_ms=1000 --status_report_max_retry_s=1000")
+      " --status_report_interval_ms=1000 --status_report_max_retry_s=1000"
+      " --debug_actions=REPORT_EXEC_STATUS_DELAY:SLEEP@1000")
   def test_reportexecstatus_retries(self, unique_database):
     tbl = "%s.kudu_test" % unique_database
     self.execute_query("create table %s (a int primary key) stored as kudu" % tbl)
     # Since the sleep time (1000ms) is much longer than the rpc timeout (100ms), all
     # reports will appear to fail. The query is designed to result in many intermediate
     # status reports but fewer than the max allowed failures, so the query should succeed.
-    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:SLEEP@1000'}
     result = self.execute_query(
-        "insert into %s select 0 from tpch.lineitem limit 100000" % tbl, query_options)
+        "insert into %s select 0 from tpch.lineitem limit 100000" % tbl)
     assert result.success, str(result)
     # Ensure that the error log was tracked correctly - all but the first row inserted
     # should result in a 'key already present' insert error.

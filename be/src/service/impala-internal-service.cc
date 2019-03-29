@@ -32,6 +32,8 @@
 
 using namespace impala;
 
+DECLARE_string(debug_actions);
+
 ImpalaInternalService::ImpalaInternalService() {
   impala_server_ = ExecEnv::GetInstance()->impala_server();
   DCHECK(impala_server_ != nullptr);
@@ -41,7 +43,7 @@ ImpalaInternalService::ImpalaInternalService() {
 
 void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& return_val,
     const TExecQueryFInstancesParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_EXECQUERYFINSTANCES);
+  DebugActionNoFail(FLAGS_debug_actions, "EXEC_QUERY_FINSTANCES_DELAY");
   DCHECK(params.__isset.coord_state_idx);
   DCHECK(params.__isset.query_ctx);
   DCHECK(params.__isset.fragment_ctxs);
@@ -68,7 +70,7 @@ template <typename T> void SetUnknownIdError(
 
 void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
     const TUpdateFilterParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);
+  DebugActionNoFail(FLAGS_debug_actions, "UPDATE_FILTER_DELAY");
   DCHECK(params.__isset.filter_id);
   DCHECK(params.__isset.query_id);
   DCHECK(params.__isset.bloom_filter || params.__isset.min_max_filter);
@@ -77,7 +79,7 @@ void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
 
 void ImpalaInternalService::PublishFilter(TPublishFilterResult& return_val,
     const TPublishFilterParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_PUBLISHFILTER);
+  DebugActionNoFail(FLAGS_debug_actions, "PUBLISH_FILTER_DELAY");
   DCHECK(params.__isset.filter_id);
   DCHECK(params.__isset.dst_query_id);
   DCHECK(params.__isset.dst_fragment_idx);
