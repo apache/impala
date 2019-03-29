@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -853,6 +854,20 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     // Return a lazily transformed list from our internal bytes storage.
     return Lists.transform(encodedFileDescriptors_, FileDescriptor.FROM_BYTES);
+  }
+
+  /**
+   * Returns a set of fully qualified file names in the partition.
+   */
+  public Set<String> getFileNames() {
+    List<FileDescriptor> fdList = getFileDescriptors();
+    Set<String> fileNames = new HashSet<>(fdList.size());
+    // Fully qualified file names.
+    String location = getLocation();
+    for (FileDescriptor fd : fdList) {
+      fileNames.add(location + Path.SEPARATOR + fd.getFileName());
+    }
+    return fileNames;
   }
 
   public void setFileDescriptors(List<FileDescriptor> descriptors) {

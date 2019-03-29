@@ -30,17 +30,22 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.google.common.base.Preconditions;
-
+import com.google.common.collect.Iterables;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -57,6 +62,8 @@ import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizatio
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.FeCatalogUtils;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
@@ -65,9 +72,11 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -508,6 +517,145 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Table should have been invalidated after alter partition event",
         catalog_.getTable(TEST_DB_NAME, testTblName)
             instanceof IncompleteTable);
+  }
+
+  /**
+   * Test insert events. Test creates a partitioned and a non-partitioned table and
+   * calls insertEvent tests on them.
+   */
+  @Test
+  public void testInsertEvents() throws TException, ImpalaException {
+    // Test insert into partition
+    createDatabase(TEST_DB_NAME, null);
+    String tableToInsertPart = "tbl_to_insert_part";
+    createTable(TEST_DB_NAME, tableToInsertPart, null, true);
+    testInsertEvents(TEST_DB_NAME, tableToInsertPart, true);
+
+    // Test insert into table
+    String tableToInsertNoPart = "tbl_to_insert_no_part";
+    createTable(TEST_DB_NAME, tableToInsertNoPart, null, false);
+    testInsertEvents(TEST_DB_NAME, tableToInsertNoPart,false);
+  }
+
+  /**
+   * Helper to test insert events. Creates a fake InsertEvent notification in the
+   * catalog and processes it. To simulate an insert, we load a file using FS APIs and
+   * verify the new file shows up after table/partition refresh.
+   */
+  public void testInsertEvents(String dbName, String tblName,
+      boolean isPartitionInsert) throws TException,
+      ImpalaException {
+
+    if (isPartitionInsert) {
+      // Add a partition
+      List<List<String>> partVals = new ArrayList<>();
+      partVals.add(new ArrayList<>(Arrays.asList("testPartVal")));
+      addPartitions(dbName, tblName, partVals);
+    }
+    eventsProcessor_.processEvents();
+
+    // To simulate an insert, load a file into the partition location.
+    String parentPathString =
+        "/test-warehouse/" + dbName +".db/" + tblName;
+    String filePathString = isPartitionInsert ? "/p1=testPartVal/testFile.0" :
+        "/testFile.0";
+    Path parentPath =
+        FileSystemUtil.createFullyQualifiedPath(new Path(parentPathString));
+    FileSystem fs = null;
+    FSDataOutputStream out = null;
+    List<String> newFiles = new ArrayList<>(1);
+    try {
+      fs = parentPath.getFileSystem(FileSystemUtil.getConfiguration());
+      // put a test file into the location.
+      out = fs.create(new Path(parentPathString + filePathString));
+      newFiles.add(filePathString);
+      org.apache.hadoop.hive.metastore.api.Partition partition = null ;
+      if (isPartitionInsert) {
+        // Get the partition from metastore. This should now contain the new file.
+        GetPartitionsRequest request = new GetPartitionsRequest();
+        request.setDbName(dbName);
+        try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+          partition = metaStoreClient.getHiveClient().getPartition(dbName,
+              tblName, "p1=testPartVal");
+        }
+      }
+      // Simulate a load table
+      Table tbl = catalog_.getOrLoadTable(dbName, tblName);
+      NotificationEvent fakeInsertEvent = createFakeInsertEvent(tbl.getMetaStoreTable(),
+          partition, false, newFiles);
+      InsertEvent insertEvent = new InsertEvent(catalog_,
+          eventsProcessor_.getMetrics(), fakeInsertEvent);
+
+      // Process this event, this should refresh the table.
+      insertEvent.process();
+
+      // Now check if the table is refreshed by checking the files size. A partition
+      // refresh will make the new file show up in the partition. NOTE: This is same
+      // for table and partition inserts as impala treats a non-partitioned table as a
+      // table with a single partition.
+      Table tblAfterInsert = catalog_.getTable(dbName, tblName);
+      Collection<? extends FeFsPartition> partsAfterInsert =
+          FeCatalogUtils.loadAllPartitions((HdfsTable) tblAfterInsert);
+      assertTrue("Partition not found after insert.",
+          partsAfterInsert.size() > 0);
+      FeFsPartition singlePart =
+          Iterables.getOnlyElement((List<FeFsPartition>) partsAfterInsert);
+      Set<String> filesAfterInsertForTable =
+          (((HdfsPartition) singlePart).getFileNames());
+      assertTrue("File count mismatch after insert.",
+          filesAfterInsertForTable.size() == 1);
+
+      // Create another event for overwrite
+      NotificationEvent fakeInsertOverwriteEvent =
+          createFakeInsertEvent(tbl.getMetaStoreTable(),
+              partition, true, newFiles);
+      InsertEvent insertOverwriteEvent = new InsertEvent(catalog_,
+          eventsProcessor_.getMetrics(), fakeInsertOverwriteEvent);
+      insertOverwriteEvent.process();
+
+      // Overwrite is expected to behave similarly.
+      Table tblAfterInsertOverwrite = catalog_.getTable(dbName, tblName);
+      Collection<? extends FeFsPartition> partsAfterInsertOverwrite =
+          FeCatalogUtils.loadAllPartitions((HdfsTable) tblAfterInsertOverwrite);
+      assertTrue("Partition not found after insert.",
+          partsAfterInsertOverwrite.size() > 0);
+      FeFsPartition singlePartAfterInsertOverwrite =
+          Iterables.getOnlyElement((List<FeFsPartition>) partsAfterInsertOverwrite);
+      Set<String> filesAfterInsertOverwriteForTable =
+          (((HdfsPartition) singlePartAfterInsertOverwrite).getFileNames());
+      assertTrue("File count mismatch after insert.",
+          filesAfterInsertOverwriteForTable.size() == 1);
+    } catch (IOException e) {
+      throw new MetastoreNotificationException(e);
+    } finally {
+      if (out != null) {
+        try {
+          out.close();
+        } catch (IOException e) {
+          throw new MetastoreNotificationException(e);
+        } finally {
+          FileSystemUtil.deleteIfExists(parentPath);
+        }
+      }
+    }
+  }
+
+  /**
+   * Helper to create a fake insert notification event.
+   */
+  private NotificationEvent createFakeInsertEvent(
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      org.apache.hadoop.hive.metastore.api.Partition partition,
+      boolean isInsertOverwrite, List<String> newFiles) {
+    NotificationEvent fakeEvent = new NotificationEvent();
+    fakeEvent.setTableName(msTbl.getTableName());
+    fakeEvent.setDbName(msTbl.getDbName());
+    fakeEvent.setEventId(eventIdGenerator.incrementAndGet());
+    fakeEvent.setMessage(MetastoreEventsProcessor.getMessageFactory()
+        .buildInsertMessage(msTbl, partition, isInsertOverwrite, newFiles).toString());
+    fakeEvent.setEventType("INSERT");
+    return fakeEvent;
+
   }
 
   /**

@@ -1079,6 +1079,7 @@ Status ClientRequestState::UpdateCatalog() {
 
       catalog_update.target_table = finalize_params.table_name;
       catalog_update.db_name = finalize_params.table_db;
+      catalog_update.is_overwrite = finalize_params.is_overwrite;
 
       Status cnxn_status;
       const TNetworkAddress& address =

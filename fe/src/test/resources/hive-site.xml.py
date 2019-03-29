@@ -97,6 +97,7 @@ CONFIG.update({
  'hive.metastore.notifications.add.thrift.objects': 'true',
  'hive.metastore.transactional.event.listeners': 'org.apache.hive.hcatalog.listener.DbNotificationListener',
  'hcatalog.message.factory.impl.json': 'org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory',
+ 'hive.metastore.dml.events': 'true',
 })
 
 # Database and JDO-related configs:

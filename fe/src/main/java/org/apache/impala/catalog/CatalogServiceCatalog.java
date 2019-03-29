@@ -2107,6 +2107,36 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Refresh table if exists. Returns true if reloadTable() succeeds, false
+   * otherwise. Throws CatalogException if reloadTable() is unsuccessful. Throws
+   * DatabaseNotFoundException if Db doesn't exist.
+   */
+  public boolean refreshTableIfExists(String dbName, String tblName)
+      throws CatalogException {
+    Table table = getTable(dbName, tblName);
+    if (table == null || table instanceof IncompleteTable) return false;
+    reloadTable(table);
+    return true;
+  }
+
+  /**
+   * Refresh partition if exists. Returns true if reloadPartitition() succeeds, false
+   * otherwise. Throws CatalogException if reloadPartition() is unsuccessful. Throws
+   * DatabaseNotFoundException if Db doesn't exist.
+   */
+  public boolean refreshPartitionIfExists(String dbName, String tblName,
+      Map<String, String> partSpec) throws CatalogException {
+    Table table = getTable(dbName, tblName);
+    if (table == null || table instanceof IncompleteTable) return false;
+    List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
+    for (Map.Entry<String, String> entry : partSpec.entrySet()) {
+      tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
+    }
+    reloadPartition(table, tPartSpec);
+    return true;
+  }
+
+  /**
    * Adds a new role with the given name and grant groups to the AuthorizationPolicy.
    * If a role with the same name already exists it will be overwritten.
    */

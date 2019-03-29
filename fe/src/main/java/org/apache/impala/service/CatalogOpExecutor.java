@@ -17,6 +17,7 @@
 
 package org.apache.impala.service;
 
+import com.google.common.collect.Iterables;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,6 +45,9 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.FireEventRequest;
+import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -3555,6 +3559,7 @@ public class CatalogOpExecutor {
     final Timer.Context context
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
     try {
+      // Get new catalog version for table in insert.
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
       // Collects the cache directive IDs of any cached table/partitions that were
@@ -3572,6 +3577,9 @@ public class CatalogOpExecutor {
       TableName tblName = new TableName(table.getDb().getName(), table.getName());
       List<String> errorMessages = Lists.newArrayList();
       HashSet<String> partsToLoadMetadata = null;
+      Collection<? extends FeFsPartition> parts =
+          FeCatalogUtils.loadAllPartitions((HdfsTable) table);
+      List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
       if (table.getNumClusteringCols() > 0) {
         // Set of all partition names targeted by the insert that need to be created
         // in the Metastore (partitions that do not currently exist in the catalog).
@@ -3581,8 +3589,6 @@ public class CatalogOpExecutor {
         HashSet<String> partsToCreate =
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
-        Collection<? extends FeFsPartition> parts =
-            FeCatalogUtils.loadAllPartitions((HdfsTable)table);
         for (FeFsPartition partition: parts) {
           // TODO: In the BE we build partition names without a trailing char. In FE
           // we build partition name with a trailing char. We should make this
@@ -3591,13 +3597,16 @@ public class CatalogOpExecutor {
 
           // Attempt to remove this partition name from from partsToCreate. If remove
           // returns true, it indicates the partition already exists.
-          if (partsToCreate.remove(partName) && partition.isMarkedCached()) {
-            // The partition was targeted by the insert and is also a cached. Since
-            // data was written to the partition, a watch needs to be placed on the
-            // cache cache directive so the TableLoadingMgr can perform an async
-            // refresh once all data becomes cached.
-            cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
-                partition.getParameters()));
+          if (partsToCreate.remove(partName)) {
+            affectedExistingPartitions.add(partition);
+            if (partition.isMarkedCached()) {
+              // The partition was targeted by the insert and is also a cached. Since
+              // data was written to the partition, a watch needs to be placed on the
+              // cache cache directive so the TableLoadingMgr can perform an async
+              // refresh once all data becomes cached.
+              cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
+                  partition.getParameters()));
+            }
           }
           if (partsToCreate.size() == 0) break;
         }
@@ -3683,8 +3692,11 @@ public class CatalogOpExecutor {
             throw new InternalException("Error adding partitions", e);
           }
         }
+      } else {
+        // For non-partitioned table, only single part exists
+        FeFsPartition singlePart = Iterables.getOnlyElement((List<FeFsPartition>) parts);
+        affectedExistingPartitions.add(singlePart);
       }
-
       // Submit the watch request for the given cache directives.
       if (!cacheDirIds.isEmpty()) {
         catalog_.watchCacheDirs(cacheDirIds, tblName.toThrift());
@@ -3703,6 +3715,9 @@ public class CatalogOpExecutor {
       }
 
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata);
+      // After loading metadata, fire insert events if external event processing is
+      // enabled.
+      createInsertEvents(table, affectedExistingPartitions, update.is_overwrite);
       addTableToCatalogUpdate(table, response.result);
     } finally {
       context.stop();
@@ -3715,6 +3730,98 @@ public class CatalogOpExecutor {
           catalog_.waitForSyncDdlVersion(response.getResult()));
     }
     return response;
+  }
+
+  /**
+   * Populates insert event data and calls fireInsertEvent() if external event processing
+   * is enabled. This is no-op if event processing is disabled or there are no existing
+   * partitions affected by this insert.
+   *
+   * @param affectedExistingPartitions List of existing partitions touched by the insert.
+   * @param isInsertOverwrite indicates if the operation was an insert overwrite. If it
+   *     is not, all the new files added by this insert is calculated.
+   */
+  private void createInsertEvents(Table table,
+      List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
+    if (!catalog_.isExternalEventProcessingEnabled() ||
+        affectedExistingPartitions.size() == 0) return;
+    // Map of partition ids to file names of all existing partitions touched by the
+    // insert.
+    Map<Long, Set<String>> partitionFilesMap = new HashMap<>();
+    if (!isInsertOverwrite) {
+      for (FeFsPartition partition : affectedExistingPartitions) {
+        partitionFilesMap.put(partition.getId(),
+            ((HdfsPartition) partition).getFileNames());
+      }
+    }
+    // If table is partitioned, we add all existing partitions touched by this insert
+    // to the insert event. If it is not an insert overwrite operation, we find new
+    // files added by this insert.
+    Collection<? extends FeFsPartition> partsPostInsert;
+    partsPostInsert = table.getNumClusteringCols() > 0 ?
+        ((FeFsTable)table).loadPartitions(partitionFilesMap.keySet()) :
+            FeCatalogUtils.loadAllPartitions((HdfsTable) table);
+    for (FeFsPartition part : partsPostInsert) {
+      // Find the delta of the files added by the insert if it is not an overwrite
+      // operation. HMS fireListenerEvent() expects an empty list if no new files are
+      // added or if the operation is an insert overwrite.
+      Set<String> deltaFiles = new HashSet<>();
+      List<String> partVals = null;
+      if (!isInsertOverwrite) {
+        Set<String> filesPostInsert = ((HdfsPartition) part).getFileNames();
+        if (table.getNumClusteringCols() > 0) {
+          Set<String> filesBeforeInsert = partitionFilesMap.get(part.getId());
+          deltaFiles = Sets.difference(filesBeforeInsert, filesPostInsert);
+          partVals = part.getPartitionValuesAsStrings(true);
+        } else {
+          Map.Entry<Long, Set<String>> entry =
+              partitionFilesMap.entrySet().iterator().next();
+          deltaFiles = Sets.difference(entry.getValue(), filesPostInsert);
+        }
+        LOG.info("{} new files detected for table {} partition {}.",
+            filesPostInsert.size(), table.getTableName(), part.getPartitionName());
+      }
+      if (deltaFiles != null || isInsertOverwrite) {
+        fireInsertEvent(table, partVals, deltaFiles, isInsertOverwrite);
+      }
+      else {
+        LOG.info("No new files were created, and is not a replace. Skipping "
+            + "generating INSERT event.");
+      }
+    }
+  }
+
+  /**
+   *  Fires an insert event to HMS notification log. For partitioned table, each
+   *  existing partition touched by the insert will fire a separate insert event.
+   *
+   * @param newFiles Set of all the 'new' files added by this insert. This is empty in
+   * case of insert overwrite.
+   * @param partVals List of partition values corresponding to the partition keys in
+   * a partitioned table. This is null for non-partitioned table.
+   * @param isOverwrite If true, sets the 'replace' flag to true indicating that the
+   * operation was an insert overwrite in the notification log. Will set the same to
+   * false otherwise.
+   */
+  private void fireInsertEvent(Table tbl, List<String> partVals,
+      Set<String> newFiles, boolean isOverwrite) {
+    LOG.debug("Firing an insert event for {}.", tbl.getName());
+    FireEventRequestData data = new FireEventRequestData();
+    InsertEventRequestData insertData = new InsertEventRequestData();
+    data.setInsertData(insertData);
+    FireEventRequest rqst = new FireEventRequest(true, data);
+    rqst.setDbName(tbl.getDb().getName());
+    rqst.setTableName(tbl.getName());
+    insertData.setFilesAdded(new ArrayList<>(newFiles));
+    insertData.setReplace(isOverwrite);
+    rqst.setPartitionVals(partVals);
+
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      msClient.getHiveClient().fireListenerEvent(rqst);
+    } catch (Exception e) {
+      LOG.error("Failed to fire insert event. Some tables might not be"
+          + " refreshed on other impala clusters.", e);
+    }
   }
 
   /**

@@ -189,6 +189,9 @@ struct TUpdateCatalogRequest {
   // List of partitions that are new and need to be created. May
   // include the root partition (represented by the empty string).
   6: required set<string> created_partitions;
+
+  // True if the update corresponds to an "insert overwrite" operation
+  7: required bool is_overwrite;
 }
 
 // Response from a TUpdateCatalogRequest
