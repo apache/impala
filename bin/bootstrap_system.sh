@@ -255,7 +255,7 @@ notindocker redhat7 sudo service ntpd start
 if [[ $UBUNTU = true && $DISTRIB_RELEASE = 16.04 ]]
 then
   SET_LD_LIBRARY_PATH='export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}'
-  echo "$SET_LD_LIBRARY_PATH" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
+  echo -e "\n$SET_LD_LIBRARY_PATH" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
   eval "$SET_LD_LIBRARY_PATH"
 fi
 
@@ -299,8 +299,9 @@ if ! [[ -f ~/.ssh/id_rsa ]]
 then
   ssh-keygen -t rsa -N '' -q -f ~/.ssh/id_rsa
 fi
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 0600 ~/.ssh/authorized_keys
-echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config && chmod 0600 ~/.ssh/config
+
+{ echo "" | cat - ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys; } && chmod 0600 ~/.ssh/authorized_keys
+echo -e "\nNoHostAuthenticationForLocalhost yes" >> ~/.ssh/config && chmod 0600 ~/.ssh/config
 ssh localhost whoami
 
 # Workarounds for HDFS networking issues: On the minicluster, tests that rely
@@ -322,7 +323,7 @@ ssh localhost whoami
 #  Traceback (most recent call last):
 #    ...
 #  ...ConnectionError: ('Connection aborted.', error(111, 'Connection refused'))
-echo "127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
+echo -e "\n127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
 #
 # In Docker, one can change /etc/hosts as above but not with sed -i. The error message is
 # "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines are
@@ -337,7 +338,7 @@ sudo mkdir -p /var/lib/hadoop-hdfs
 sudo chown $(whoami) /var/lib/hadoop-hdfs/
 
 # TODO: restrict this to only the users it is needed for
-echo "* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
+echo -e "\n* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
@@ -353,7 +354,7 @@ then
 fi
 cd "$IMPALA_HOME"
 SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
-echo "$SET_IMPALA_HOME" >> ~/.bashrc
+echo -e "\n$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
 # Ubuntu and RH install JDK's in slightly different paths.
@@ -365,7 +366,7 @@ else
   SET_JAVA_HOME="export JAVA_HOME=$(compgen -G '/usr/lib/jvm/java-1.8.0-openjdk-*')"
 fi
 
-echo "$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
+echo -e "\n$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
 eval "$SET_JAVA_HOME"
 
 # Assert that we have a java available
