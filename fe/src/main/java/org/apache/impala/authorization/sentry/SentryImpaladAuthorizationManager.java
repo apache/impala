@@ -164,6 +164,20 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
+  public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Impalad", ClassUtil.getMethodName()));
+  }
+
+  @Override
+  public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Impalad", ClassUtil.getMethodName()));
+  }
+
+  @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
     switch (params.getPrincipal_type()) {

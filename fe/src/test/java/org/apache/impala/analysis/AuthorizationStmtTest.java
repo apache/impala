@@ -24,6 +24,7 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,6 @@ import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
-import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.AfterClass;
@@ -100,7 +100,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private final ImpaladTestCatalog authzCatalog_;
   private final Frontend authzFrontend_;
   private final RangerImpalaPlugin rangerImpalaPlugin_;
-  private final RangerDefaultAuditHandler rangerAuditHandler_;
 
   public AuthorizationStmtTest(AuthorizationProvider authzProvider) {
     authzProvider_ = authzProvider;
@@ -116,7 +115,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         sentryService_ = new SentryPolicyService(
             ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
         rangerImpalaPlugin_ = null;
-        rangerAuditHandler_ = null;
         break;
       case RANGER:
         authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
@@ -128,7 +126,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         rangerImpalaPlugin_ =
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
                 .getRangerImpalaPlugin();
-        rangerAuditHandler_ = new RangerDefaultAuditHandler();
         sentryService_ = null;
         break;
       default:
@@ -2993,7 +2990,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     public String getName() { return role_; }
   }
 
-  private class WithRangerUser implements WithPrincipal {
+  private abstract class WithRanger implements WithPrincipal {
     private final List<GrantRevokeRequest> requests = new ArrayList<>();
     private final RangerCatalogdAuthorizationManager authzManager =
         new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_);
@@ -3001,10 +2998,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     @Override
     public void init(TPrivilege[]... privileges) throws ImpalaException {
       for (TPrivilege[] privilege : privileges) {
-        List<GrantRevokeRequest> request =
-            RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
-                RANGER_ADMIN.getName(), USER.getName(),
-                rangerImpalaPlugin_.getClusterName(), Arrays.asList(privilege))
+        requests.addAll(buildRequest(Arrays.asList(privilege))
             .stream()
             .peek(r -> {
               r.setResource(updateUri(r.getResource()));
@@ -3012,33 +3006,56 @@ public class AuthorizationStmtTest extends FrontendTestBase {
                 r.getAccessTypes().remove("owner");
                 r.getAccessTypes().add("all");
               }
-            }).collect(Collectors.toList());
-
-        requests.addAll(request);
+            }).collect(Collectors.toList()));
       }
 
-      authzManager.grantPrivilegeToUser(RANGER_ADMIN, requests, null);
+      authzManager.grantPrivilege(requests);
       // TODO: replace with the new API in RANGER-2349.
       rangerImpalaPlugin_.init();
     }
 
+    /**
+     * Create the {@link GrantRevokeRequest}s used for granting and revoking privileges.
+     */
+    protected abstract List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges);
+
     @Override
     public void cleanUp() throws ImpalaException {
-      authzManager.revokePrivilegeFromUser(RANGER_ADMIN, requests, null);
+      authzManager.revokePrivilege(requests);
     }
 
     @Override
     public String getName() { return USER.getName(); }
+  }
 
-    private Map<String, String> updateUri(Map<String, String> resources) {
-      String uri = resources.get(RangerImpalaResourceBuilder.URL);
-      if (uri != null && uri.startsWith("/")) {
-        uri = "hdfs://localhost:20500" + uri;
-      }
-      resources.put(RangerImpalaResourceBuilder.URL, uri);
-
-      return resources;
+  private class WithRangerUser extends WithRanger {
+    @Override
+    protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
+      return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
+          RANGER_ADMIN.getName(), USER.getName(), Collections.emptyList(),
+          rangerImpalaPlugin_.getClusterName(), privileges);
     }
+  }
+
+  private class WithRangerGroup extends WithRanger {
+    @Override
+    protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
+      List<String> groups = Collections.singletonList(System.getProperty("user.name"));
+
+      return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
+          RANGER_ADMIN.getName(), null, groups,
+          rangerImpalaPlugin_.getClusterName(), privileges);
+    }
+  }
+
+  private static Map<String, String> updateUri(Map<String, String> resources) {
+    String uri = resources.get(RangerImpalaResourceBuilder.URL);
+    if (uri != null && uri.startsWith("/")) {
+      uri = "hdfs://localhost:20500" + uri;
+    }
+    resources.put(RangerImpalaResourceBuilder.URL, uri);
+
+    return resources;
   }
 
   private class DescribeOutput {
@@ -3120,6 +3137,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           break;
         case RANGER:
           withPrincipals.add(new WithRangerUser());
+          withPrincipals.add(new WithRangerGroup());
           break;
         default:
           throw new IllegalArgumentException(String.format(

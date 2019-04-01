@@ -3262,6 +3262,9 @@ public class CatalogOpExecutor {
       case USER:
         authzManager_.grantPrivilegeToUser(requestingUser, grantRevokePrivParams, resp);
         break;
+      case GROUP:
+        authzManager_.grantPrivilegeToGroup(requestingUser, grantRevokePrivParams, resp);
+        break;
       default:
         throw new IllegalArgumentException("Unexpected principal type: " +
             grantRevokePrivParams.principal_type);
@@ -3288,6 +3291,10 @@ public class CatalogOpExecutor {
         break;
       case USER:
         authzManager_.revokePrivilegeFromUser(requestingUser, grantRevokePrivParams,
+            resp);
+        break;
+      case GROUP:
+        authzManager_.revokePrivilegeFromGroup(requestingUser, grantRevokePrivParams,
             resp);
         break;
       default:

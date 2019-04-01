@@ -17,6 +17,7 @@
 #
 # Client tests for SQL statement authorization
 
+import grp
 import pytest
 import time
 from getpass import getuser
@@ -45,31 +46,38 @@ class TestRanger(CustomClusterTestSuite):
     user_client = self.create_impala_client()
     unique_database = unique_name + "_db"
     unique_table = unique_name + "_tbl"
+    group = grp.getgrnam(getuser()).gr_name
+    test_data = [(user, "user"), (group, "group")]
 
-    try:
-      # Set-up temp database/table
-      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
-                           user=admin)
-      admin_client.execute("create database {0}".format(unique_database), user=admin)
-      admin_client.execute("create table {0}.{1} (x int)"
-                           .format(unique_database, unique_table), user=admin)
+    for data in test_data:
+      ident = data[0]
+      kw = data[1]
 
-      self.execute_query_expect_success(admin_client,
-                                        "grant select on database {0} to user {1}"
-                                        .format(unique_database, user), user=admin)
-      # TODO: IMPALA-8293 use refresh authorization
-      time.sleep(35)
-      self.execute_query_expect_success(user_client, "show tables in {0}"
-                                        .format(unique_database), user=user)
-      self.execute_query_expect_success(admin_client,
-                                        "revoke select on database {0} from user "
-                                        "{1}".format(unique_database, user), user=admin)
-      # TODO: IMPALA-8293 use refresh authorization
-      time.sleep(35)
-      self.execute_query_expect_failure(user_client, "show tables in {0}"
-                                        .format(unique_database))
-    finally:
-      admin_client.execute("revoke select on database {0} from user {1}"
-                           .format(unique_database, user), user=admin)
-      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
-                           user=admin)
+      try:
+        # Set-up temp database/table
+        admin_client.execute("drop database if exists {0} cascade"
+                             .format(unique_database), user=admin)
+        admin_client.execute("create database {0}".format(unique_database), user=admin)
+        admin_client.execute("create table {0}.{1} (x int)"
+                             .format(unique_database, unique_table), user=admin)
+
+        self.execute_query_expect_success(admin_client,
+                                          "grant select on database {0} to {1} {2}"
+                                          .format(unique_database, kw, ident), user=admin)
+        # TODO: IMPALA-8293 use refresh authorization
+        time.sleep(10)
+        self.execute_query_expect_success(user_client, "show tables in {0}"
+                                          .format(unique_database), user=user)
+        self.execute_query_expect_success(admin_client,
+                                          "revoke select on database {0} from {1} "
+                                          "{2}".format(unique_database, kw, ident),
+                                          user=admin)
+        # TODO: IMPALA-8293 use refresh authorization
+        time.sleep(10)
+        self.execute_query_expect_failure(user_client, "show tables in {0}"
+                                          .format(unique_database))
+      finally:
+        admin_client.execute("revoke select on database {0} from {1} {2}"
+                             .format(unique_database, kw, ident), user=admin)
+        admin_client.execute("drop database if exists {0} cascade"
+                             .format(unique_database), user=admin)

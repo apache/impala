@@ -3589,111 +3589,125 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestGrantRevokePrivilege() {
-    Object[][] grantRevFormatStrs = {{"GRANT", "TO"}, {"REVOKE", "FROM"}};
-    for (Object[] formatStr: grantRevFormatStrs) {
-      ParsesOk(String.format("%s ALL ON TABLE foo %s myRole", formatStr));
+    String[][] grantRevoke = {{"GRANT", "TO"}, {"REVOKE", "FROM"}};
+    String[] resources = {"SERVER", "SERVER foo", "DATABASE foo", "TABLE foo",
+        "URI 'foo'"};
+    String[] badResources = {"DATABASE", "TABLE", "URI", "URI foo", "TABLE 'foo'",
+        "SERVER 'foo'", "DATABASE 'foo'"};
+    String[] privileges = {"SELECT", "INSERT", "ALL", "REFRESH", "CREATE", "ALTER",
+        "DROP"};
+    String[] badPrivileges = {"UPDATE", "DELETE", "UPSERT", "FAKE"};
+    String[] columnPrivResource = {
+        "SELECT (a, b) ON TABLE foo",
+        "SELECT () on TABLE foo",
+        "INSERT (a, b) ON TABLE foo",
+        "ALL (a, b) ON TABLE foo"
+    };
+    String[] badColumnPrivResource = {
+        "SELECT (a,) ON TABLE foo",
+        "SELECT (*) ON TABLE foo",
+        "SELECT (a), b ON TABLE foo",
+        "SELECT ((a)) ON TABLE foo",
+        "SELECT (a, b) ON URI foo",
+        "SELECT ON TABLE (a, b) foo"
+    };
+    String[] idents = {"myRole", "GROUP myGroup", "USER user", "ROLE myRole"};
+    String[] badIdents = {"GROUP", "ROLE", "GROUP group", "GROUP role", "USER role",
+        "FOOBAR foobar", ""};
 
-      // KW_ROLE is optional (Hive requires KW_ROLE, but Impala does not).
-      ParsesOk(String.format("%s ALL ON TABLE foo %s ROLE myRole", formatStr));
+    // Good SQL
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .forEach(this::ParsesOk);
 
-      ParsesOk(String.format("%s ALL ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s ALL ON URI 'foo' %s  myRole", formatStr));
+    // Good SQL with grant option
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("GRANT"))
+        .map(s -> s + " WITH GRANT OPTION")
+        .forEach(this::ParsesOk);
 
-      ParsesOk(String.format("%s INSERT ON TABLE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s INSERT ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s INSERT ON URI 'foo' %s  myRole", formatStr));
+    // Good SQL with revoke option
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("REVOKE"))
+        .map(s -> s.replace("REVOKE", "REVOKE GRANT OPTION FOR"))
+        .forEach(this::ParsesOk);
 
-      ParsesOk(String.format("%s SELECT ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT ON TABLE %s myRole", formatStr));
-      ParsesOk(String.format("%s SELECT ON DATABASE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT ON DATABASE %s myRole", formatStr));
-      ParsesOk(String.format("%s SELECT ON URI 'foo' %s myRole", formatStr));
-      ParserError(String.format("%s SELECT ON URI %s myRole", formatStr));
+    // Column SQL
+    createColumnPrivSql(grantRevoke, columnPrivResource, idents)
+        .forEach(this::ParsesOk);
 
-      // Column-level authorization on TABLE scope
-      ParsesOk(String.format("%s SELECT (a, b) ON TABLE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s SELECT () ON TABLE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s INSERT (a, b) ON TABLE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s ALL (a, b) ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT (*) ON TABLE foo %s myRole", formatStr));
+    // Bad Resources
+    createPrivSQL(grantRevoke, badResources, privileges, idents)
+        .forEach(this::ParserError);
 
-      ParserError(String.format("%s SELECT (a,) ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT a, b ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT (a), b ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT ON TABLE (a, b) foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT ((a)) ON TABLE foo %s myRole", formatStr));
-      ParserError(String.format("%s SELECT (a, b) ON DATABASE foo %s myRole",
-          formatStr));
-      ParserError(String.format("%s SELECT (a, b) ON URI 'foo' %s myRole", formatStr));
+    // Bad privileges
+    createPrivSQL(grantRevoke, resources, badPrivileges, idents)
+        .forEach(this::ParserError);
 
-      // REFRESH privilege.
-      ParsesOk(String.format("%s REFRESH ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s REFRESH ON SERVER foo %s myRole", formatStr));
-      ParsesOk(String.format("%s REFRESH ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s REFRESH ON TABLE foo %s myRole", formatStr));
+    // Bad idents
+    createPrivSQL(grantRevoke, resources, privileges, badIdents)
+        .forEach(this::ParserError);
 
-      // CREATE privilege.
-      ParsesOk(String.format("%s CREATE ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s CREATE ON SERVER foo %s myRole", formatStr));
-      ParsesOk(String.format("%s CREATE ON DATABASE foo %s myRole", formatStr));
+    // Bad SQL with grant option
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("GRANT"))
+        .map(s -> s + " WITH GRANT")
+        .forEach(this::ParserError);
 
-      // ALTER privilege.
-      ParsesOk(String.format("%s ALTER ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s ALTER ON SERVER foo %s myRole", formatStr));
-      ParsesOk(String.format("%s ALTER ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s ALTER ON TABLE foo %s myRole", formatStr));
+    // Bad SQL with grant option
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("GRANT"))
+        .map(s -> s + " WITH")
+        .forEach(this::ParserError);
 
-      // DROP privilege.
-      ParsesOk(String.format("%s DROP ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s DROP ON SERVER foo %s myRole", formatStr));
-      ParsesOk(String.format("%s DROP ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s DROP ON TABLE foo %s myRole", formatStr));
+    // Bad SQL with revoke option (omit for)
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("REVOKE"))
+        .map(s -> s.replace("REVOKE", "REVOKE GRANT OPTION"))
+        .forEach(this::ParserError);
 
-      // Server scope does not accept a name.
-      ParsesOk(String.format("%s ALL ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s INSERT ON SERVER %s myRole", formatStr));
-      ParsesOk(String.format("%s SELECT ON SERVER %s myRole", formatStr));
+    // Bad SQL with revoke option (omit option for)
+    createPrivSQL(grantRevoke, resources, privileges, idents)
+        .stream()
+        .filter(s -> s.contains("REVOKE"))
+        .map(s -> s.replace("REVOKE", "REVOKE GRANT"))
+        .forEach(this::ParserError);
+  }
 
-      // URIs are string literals
-      ParserError(String.format("%s ALL ON URI foo %s myRole", formatStr));
-      ParserError(String.format("%s ALL ON DATABASE 'foo' %s myRole", formatStr));
-      ParserError(String.format("%s ALL ON TABLE 'foo' %s myRole", formatStr));
+  private static List<String> createPrivSQL(String[][] formats, String[] resources,
+      String[] privileges, String[] idents) {
+    List<String> result = new ArrayList<>();
 
-      // No object name (only works for SERVER scope)
-      ParserError(String.format("GRANT ALL ON TABLE FROM myrole", formatStr));
-      ParserError(String.format("GRANT ALL ON DATABASE FROM myrole", formatStr));
-      ParserError(String.format("GRANT ALL ON URI FROM myrole", formatStr));
-
-      // No role specified
-      ParserError(String.format("%s ALL ON TABLE foo %s", formatStr));
-      // Invalid privilege
-      ParserError(String.format("%s FAKE ON TABLE foo %s myRole", formatStr));
+    for (String[] formatStr : formats) {
+      for (String resource : resources) {
+        for (String privilege : privileges) {
+          for (String ident : idents) {
+            result.add(String.format("%s %s ON %s %s %s", formatStr[0], privilege,
+                resource, formatStr[1], ident));
+          }
+        }
+      }
     }
-    ParsesOk("GRANT ALL ON TABLE foo TO myRole WITH GRANT OPTION");
-    ParsesOk("GRANT ALL ON DATABASE foo TO myRole WITH GRANT OPTION");
-    ParsesOk("GRANT ALL ON SERVER TO myRole WITH GRANT OPTION");
-    ParsesOk("GRANT ALL ON URI '/abc/' TO myRole WITH GRANT OPTION");
-    ParserError("GRANT ALL ON TABLE foo TO myRole WITH GRANT");
-    ParserError("GRANT ALL ON TABLE foo TO myRole WITH");
-    ParserError("GRANT ALL ON TABLE foo TO ROLE");
-    ParserError("REVOKE ALL ON TABLE foo TO ROLE");
+    return result;
+  }
 
-    ParsesOk("REVOKE GRANT OPTION FOR ALL ON TABLE foo FROM myRole");
-    ParsesOk("REVOKE GRANT OPTION FOR ALL ON DATABASE foo FROM myRole");
-    ParsesOk("REVOKE GRANT OPTION FOR ALL ON SERVER FROM myRole");
-    ParsesOk("REVOKE GRANT OPTION FOR ALL ON URI '/abc/' FROM myRole");
-    ParserError("REVOKE GRANT OPTION ALL ON URI '/abc/' FROM myRole");
-    ParserError("REVOKE GRANT ALL ON URI '/abc/' FROM myRole");
+  private static List<String> createColumnPrivSql(String[][] formats,
+      String[] privResource, String[] idents) {
+    List<String> result = new ArrayList<>();
 
-    ParserError("ALL ON TABLE foo TO myrole");
-    ParserError("ALL ON TABLE foo FROM myrole");
-
-    ParserError("GRANT ALL ON TABLE foo FROM myrole");
-    ParserError("REVOKE ALL ON TABLE foo TO myrole");
-
-    ParserError("GRANT UPDATE ON TABLE foo TO myRole");
-    ParserError("GRANT DELETE ON TABLE foo TO myRole");
-    ParserError("GRANT UPSERT ON TABLE foo TO myRole");
+    for (String[] formatStr : formats) {
+      for (String pr : privResource) {
+        for (String ident : idents) {
+          result.add(String.format("%s %s %s %s", formatStr[0], pr, formatStr[1],
+              ident));
+        }
+      }
+    }
+    return result;
   }
 
   @Test

@@ -1,5 +1,6 @@
 {
   "name" : "${USER}",
   "password" : "password123",
-  "userRoleList" : [ "ROLE_USER" ]
+  "userRoleList" : [ "ROLE_USER" ],
+  "groupIdList" : [ "${GROUP_ID}" ]
 }

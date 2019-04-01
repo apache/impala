@@ -162,159 +162,162 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
 
   @Test
   public void AnalyzeGrantRevokePriv() throws AnalysisException {
+    String[] idents = {"myRole", "ROLE myRole", "GROUP myGroup", "USER myUser"};
     boolean[] isGrantVals = {true, false};
-    for (boolean isGrant: isGrantVals) {
-      Object[] formatArgs = new String[] {"REVOKE", "FROM"};
-      if (isGrant) formatArgs = new String[] {"GRANT", "TO"};
-      // ALL privileges
-      AnalyzesOk(String.format("%s ALL ON TABLE alltypes %s myrole", formatArgs),
-          createAnalysisCtx("functional"));
-      AnalyzesOk(String.format("%s ALL ON TABLE functional.alltypes %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format("%s ALL ON TABLE functional_kudu.alltypes %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format("%s ALL ON DATABASE functional %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s ALL ON SERVER %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s ALL ON SERVER server1 %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s ALL ON URI 'hdfs:////abc//123' %s myrole",
-          formatArgs));
-      AnalysisError(String.format("%s ALL ON URI 'xxxx:////abc//123' %s myrole",
-          formatArgs), "No FileSystem for scheme: xxxx");
-      AnalysisError(String.format("%s ALL ON DATABASE does_not_exist %s myrole",
-          formatArgs), "Error setting privileges for database 'does_not_exist'. " +
-          "Verify that the database exists and that you have permissions to issue " +
-          "a GRANT/REVOKE statement.");
-      AnalysisError(String.format("%s ALL ON TABLE does_not_exist %s myrole",
-          formatArgs), "Error setting privileges for table 'does_not_exist'. " +
-          "Verify that the table exists and that you have permissions to issue " +
-          "a GRANT/REVOKE statement.");
-      AnalysisError(String.format("%s ALL ON SERVER does_not_exist %s myrole",
-          formatArgs), "Specified server name 'does_not_exist' does not match the " +
-          "configured server name 'server1'");
 
-      // INSERT privilege
-      AnalyzesOk(String.format("%s INSERT ON TABLE alltypesagg %s myrole", formatArgs),
-          createAnalysisCtx("functional"));
-      AnalyzesOk(String.format(
-          "%s INSERT ON TABLE functional_kudu.alltypessmall %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s INSERT ON TABLE functional.alltypesagg %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format("%s INSERT ON DATABASE functional %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format("%s INSERT ON SERVER %s myrole", formatArgs));
-      AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
-          formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
-          "spec.");
+    for (String ident : idents) {
+      for (boolean isGrant : isGrantVals) {
+        Object[] formatArgs = new String[]{"REVOKE", "FROM", ident};
+        if (isGrant) formatArgs = new String[]{"GRANT", "TO", ident};
+        // ALL privileges
+        AnalyzesOk(String.format("%s ALL ON TABLE alltypes %s %s", formatArgs),
+            createAnalysisCtx("functional"));
+        AnalyzesOk(String.format("%s ALL ON TABLE functional.alltypes %s %s",
+            formatArgs));
+        AnalyzesOk(String.format("%s ALL ON TABLE functional_kudu.alltypes %s %s",
+            formatArgs));
+        AnalyzesOk(String.format("%s ALL ON DATABASE functional %s %s", formatArgs));
+        AnalyzesOk(String.format("%s ALL ON SERVER %s %s", formatArgs));
+        AnalyzesOk(String.format("%s ALL ON SERVER server1 %s %s", formatArgs));
+        AnalyzesOk(String.format("%s ALL ON URI 'hdfs:////abc//123' %s %s",
+            formatArgs));
+        AnalysisError(String.format("%s ALL ON URI 'xxxx:////abc//123' %s %s",
+            formatArgs), "No FileSystem for scheme: xxxx");
+        AnalysisError(String.format("%s ALL ON DATABASE does_not_exist %s %s",
+            formatArgs), "Error setting privileges for database 'does_not_exist'. " +
+            "Verify that the database exists and that you have permissions to issue " +
+            "a GRANT/REVOKE statement.");
+        AnalysisError(String.format("%s ALL ON TABLE does_not_exist %s %s",
+            formatArgs), "Error setting privileges for table 'does_not_exist'. " +
+            "Verify that the table exists and that you have permissions to issue " +
+            "a GRANT/REVOKE statement.");
+        AnalysisError(String.format("%s ALL ON SERVER does_not_exist %s %s",
+            formatArgs), "Specified server name 'does_not_exist' does not match the " +
+            "configured server name 'server1'");
 
-      // SELECT privilege
-      AnalyzesOk(String.format("%s SELECT ON TABLE alltypessmall %s myrole", formatArgs),
-          createAnalysisCtx("functional"));
-      AnalyzesOk(String.format("%s SELECT ON TABLE functional.alltypessmall %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format(
-          "%s SELECT ON TABLE functional_kudu.alltypessmall %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s SELECT ON DATABASE functional %s myrole",
-          formatArgs));
-      AnalyzesOk(String.format("%s SELECT ON SERVER %s myrole", formatArgs));
-      AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s myrole",
-          formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
-          "spec.");
+        // INSERT privilege
+        AnalyzesOk(String.format("%s INSERT ON TABLE alltypesagg %s %s", formatArgs),
+            createAnalysisCtx("functional"));
+        AnalyzesOk(String.format(
+            "%s INSERT ON TABLE functional_kudu.alltypessmall %s %s", formatArgs));
+        AnalyzesOk(String.format("%s INSERT ON TABLE functional.alltypesagg %s %s",
+            formatArgs));
+        AnalyzesOk(String.format("%s INSERT ON DATABASE functional %s %s",
+            formatArgs));
+        AnalyzesOk(String.format("%s INSERT ON SERVER %s %s", formatArgs));
+        AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s %s",
+            formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
+            "privilege spec.");
 
-      // SELECT privileges on columns
-      AnalyzesOk(String.format("%s SELECT (id, int_col) ON TABLE functional.alltypes " +
-          "%s myrole", formatArgs));
-      AnalyzesOk(String.format("%s SELECT (id, id) ON TABLE functional.alltypes " +
-          "%s myrole", formatArgs));
-      // SELECT privilege on both regular and partition columns
-      AnalyzesOk(String.format("%s SELECT (id, int_col, year, month) ON TABLE " +
-          "alltypes %s myrole", formatArgs), createAnalysisCtx("functional"));
-      AnalyzesOk(String.format("%s SELECT (id, bool_col) ON TABLE " +
-          "functional_kudu.alltypessmall %s myrole", formatArgs));
-      // Empty column list
-      AnalysisError(String.format("%s SELECT () ON TABLE functional.alltypes " +
-          "%s myrole", formatArgs), "Empty column list in column privilege spec.");
-      // INSERT/ALL privileges on columns
-      AnalysisError(String.format("%s INSERT (id, tinyint_col) ON TABLE " +
-          "functional.alltypes %s myrole", formatArgs), "Only 'SELECT' privileges " +
-          "are allowed in a column privilege spec.");
-      AnalysisError(String.format("%s ALL (id, tinyint_col) ON TABLE " +
-          "functional.alltypes %s myrole", formatArgs), "Only 'SELECT' privileges " +
-          "are allowed in a column privilege spec.");
-      // Column-level privileges on a VIEW
-      AnalysisError(String.format("%s SELECT (id, bool_col) ON TABLE " +
-          "functional.alltypes_hive_view %s myrole", formatArgs), "Column-level " +
-          "privileges on views are not supported.");
-      // Columns/table that don't exist
-      AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
-          "functional.alltypes %s myrole", formatArgs), "Error setting column-level " +
-          "privileges for table 'functional.alltypes'. Verify that both table and " +
-          "columns exist and that you have permissions to issue a GRANT/REVOKE " +
-          "statement.");
-      AnalysisError(String.format("%s SELECT (id, int_col) ON TABLE " +
-          "functional.does_not_exist %s myrole", formatArgs), "Error setting " +
-          "privileges for table 'functional.does_not_exist'. Verify that the table " +
-          "exists and that you have permissions to issue a GRANT/REVOKE statement.");
+        // SELECT privilege
+        AnalyzesOk(String.format("%s SELECT ON TABLE alltypessmall %s %s", formatArgs),
+            createAnalysisCtx("functional"));
+        AnalyzesOk(String.format("%s SELECT ON TABLE functional.alltypessmall %s %s",
+            formatArgs));
+        AnalyzesOk(String.format(
+            "%s SELECT ON TABLE functional_kudu.alltypessmall %s %s", formatArgs));
+        AnalyzesOk(String.format("%s SELECT ON DATABASE functional %s %s",
+            formatArgs));
+        AnalyzesOk(String.format("%s SELECT ON SERVER %s %s", formatArgs));
+        AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s %s",
+            formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
+            "privilege spec.");
 
-      // REFRESH privilege
-      AnalyzesOk(String.format(
-          "%s REFRESH ON TABLE functional.alltypes %s myrole", formatArgs));
-      AnalyzesOk(String.format(
-          "%s REFRESH ON DATABASE functional %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s REFRESH ON SERVER %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s REFRESH ON SERVER server1 %s myrole",
-          formatArgs));
-      AnalysisError(String.format(
-          "%s REFRESH ON URI 'hdfs:////abc//123' %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        // SELECT privileges on columns
+        AnalyzesOk(String.format("%s SELECT (id, int_col) ON TABLE functional.alltypes " +
+            "%s %s", formatArgs));
+        AnalyzesOk(String.format("%s SELECT (id, id) ON TABLE functional.alltypes " +
+            "%s %s", formatArgs));
+        // SELECT privilege on both regular and partition columns
+        AnalyzesOk(String.format("%s SELECT (id, int_col, year, month) ON TABLE " +
+            "alltypes %s %s", formatArgs), createAnalysisCtx("functional"));
+        AnalyzesOk(String.format("%s SELECT (id, bool_col) ON TABLE " +
+            "functional_kudu.alltypessmall %s %s", formatArgs));
+        // Empty column list
+        AnalysisError(String.format("%s SELECT () ON TABLE functional.alltypes " +
+            "%s %s", formatArgs), "Empty column list in column privilege spec.");
+        // INSERT/ALL privileges on columns
+        AnalysisError(String.format("%s INSERT (id, tinyint_col) ON TABLE " +
+            "functional.alltypes %s %s", formatArgs), "Only 'SELECT' privileges " +
+            "are allowed in a column privilege spec.");
+        AnalysisError(String.format("%s ALL (id, tinyint_col) ON TABLE " +
+            "functional.alltypes %s %s", formatArgs), "Only 'SELECT' privileges " +
+            "are allowed in a column privilege spec.");
+        // Column-level privileges on a VIEW
+        AnalysisError(String.format("%s SELECT (id, bool_col) ON TABLE " +
+            "functional.alltypes_hive_view %s %s", formatArgs), "Column-level " +
+            "privileges on views are not supported.");
+        // Columns/table that don't exist
+        AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
+            "functional.alltypes %s %s", formatArgs), "Error setting column-level " +
+            "privileges for table 'functional.alltypes'. Verify that both table and " +
+            "columns exist and that you have permissions to issue a GRANT/REVOKE " +
+            "statement.");
+        AnalysisError(String.format("%s SELECT (id, int_col) ON TABLE " +
+            "functional.does_not_exist %s %s", formatArgs), "Error setting " +
+            "privileges for table 'functional.does_not_exist'. Verify that the table " +
+            "exists and that you have permissions to issue a GRANT/REVOKE statement.");
 
-      // CREATE privilege
-      AnalyzesOk(String.format("%s CREATE ON SERVER %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s CREATE ON SERVER server1 %s myrole", formatArgs));
-      AnalyzesOk(String.format(
-          "%s CREATE ON DATABASE functional %s myrole", formatArgs));
-      AnalysisError(String.format(
-          "%s CREATE ON TABLE functional.alltypes %s myrole", formatArgs),
-          "Create-level privileges on tables are not supported.");
-      AnalysisError(String.format(
-          "%s CREATE ON URI 'hdfs:////abc//123' %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        // REFRESH privilege
+        AnalyzesOk(String.format(
+            "%s REFRESH ON TABLE functional.alltypes %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s REFRESH ON DATABASE functional %s %s", formatArgs));
+        AnalyzesOk(String.format("%s REFRESH ON SERVER %s %s", formatArgs));
+        AnalyzesOk(String.format("%s REFRESH ON SERVER server1 %s %s",
+            formatArgs));
+        AnalysisError(String.format(
+            "%s REFRESH ON URI 'hdfs:////abc//123' %s %s", formatArgs),
+            "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
 
-      // ALTER privilege
-      AnalyzesOk(String.format("%s ALTER ON SERVER %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s ALTER ON SERVER server1 %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s ALTER ON DATABASE functional %s myrole", formatArgs));
-      AnalyzesOk(String.format(
-          "%s ALTER ON TABLE functional.alltypes %s myrole", formatArgs));
-      AnalysisError(String.format(
-          "%s ALTER ON URI 'hdfs:////abc/123' %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        // CREATE privilege
+        AnalyzesOk(String.format("%s CREATE ON SERVER %s %s", formatArgs));
+        AnalyzesOk(String.format("%s CREATE ON SERVER server1 %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s CREATE ON DATABASE functional %s %s", formatArgs));
+        AnalysisError(String.format(
+            "%s CREATE ON TABLE functional.alltypes %s %s", formatArgs),
+            "Create-level privileges on tables are not supported.");
+        AnalysisError(String.format(
+            "%s CREATE ON URI 'hdfs:////abc//123' %s %s", formatArgs),
+            "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
 
-      // DROP privilege
-      AnalyzesOk(String.format("%s DROP ON SERVER %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s DROP ON SERVER server1 %s myrole", formatArgs));
-      AnalyzesOk(String.format("%s DROP ON DATABASE functional %s myrole", formatArgs));
-      AnalyzesOk(String.format(
-          "%s DROP ON TABLE functional.alltypes %s myrole", formatArgs));
-      AnalysisError(String.format(
-          "%s DROP ON URI 'hdfs:////abc/123' %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+        // ALTER privilege
+        AnalyzesOk(String.format("%s ALTER ON SERVER %s %s", formatArgs));
+        AnalyzesOk(String.format("%s ALTER ON SERVER server1 %s %s", formatArgs));
+        AnalyzesOk(String.format("%s ALTER ON DATABASE functional %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s ALTER ON TABLE functional.alltypes %s %s", formatArgs));
+        AnalysisError(String.format(
+            "%s ALTER ON URI 'hdfs:////abc/123' %s %s", formatArgs),
+            "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+
+        // DROP privilege
+        AnalyzesOk(String.format("%s DROP ON SERVER %s %s", formatArgs));
+        AnalyzesOk(String.format("%s DROP ON SERVER server1 %s %s", formatArgs));
+        AnalyzesOk(String.format("%s DROP ON DATABASE functional %s %s", formatArgs));
+        AnalyzesOk(String.format(
+            "%s DROP ON TABLE functional.alltypes %s myrole", formatArgs));
+        AnalysisError(String.format(
+            "%s DROP ON URI 'hdfs:////abc/123' %s %s", formatArgs),
+            "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+      }
+
+      AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+      AnalysisError("GRANT ALL ON SERVER TO myRole", authDisabledCtx,
+          "Authorization is not enabled.");
+      AnalysisError("REVOKE ALL ON SERVER FROM myRole", authDisabledCtx,
+          "Authorization is not enabled.");
+
+      TQueryCtx noUserNameQueryCtx = TestUtils.createQueryContext(
+          Catalog.DEFAULT_DB, "");
+      EventSequence timeline = new EventSequence("Authorization Test");
+      AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
+          new SentryAuthorizationFactory(
+              SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
+          timeline);
+      AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
+          "Cannot execute authorization statement with an empty username.");
     }
-
-    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
-    AnalysisError("GRANT ALL ON SERVER TO myRole", authDisabledCtx,
-        "Authorization is not enabled.");
-    AnalysisError("REVOKE ALL ON SERVER FROM myRole", authDisabledCtx,
-        "Authorization is not enabled.");
-
-
-    TQueryCtx noUserNameQueryCtx = TestUtils.createQueryContext(
-        Catalog.DEFAULT_DB, "");
-    EventSequence timeline = new EventSequence("Authorization Test");
-    AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
-        new SentryAuthorizationFactory(
-            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
-        timeline);
-    AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
-        "Cannot execute authorization statement with an empty username.");
   }
 }

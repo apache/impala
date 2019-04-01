@@ -95,6 +95,18 @@ public interface AuthorizationManager {
       TDdlExecResponse response) throws ImpalaException;
 
   /**
+   * Grants a privilege to a group.
+   */
+  void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException;
+
+  /**
+   * Revokes a privilege from a group.
+   */
+  void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException;
+
+  /**
    * Gets all privileges granted to the given principal.
    */
   TResultSet getPrivileges(TShowGrantPrincipalParams params) throws ImpalaException;

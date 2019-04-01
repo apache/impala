@@ -274,6 +274,20 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
+  public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+  }
+
+  @Override
+  public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
+      TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+  }
+
+  @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
     throw new UnsupportedOperationException(String.format(

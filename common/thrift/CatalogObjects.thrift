@@ -482,11 +482,11 @@ struct TDatabase {
   2: optional hive_metastore.Database metastore_db
 }
 
-// Represents a principal type that maps to Sentry principal type.
-// https://github.com/apache/sentry/blob/3d062f39ce6a047138660a7b3d0024bde916c5b4/sentry-service/sentry-service-api/src/gen/thrift/gen-javabean/org/apache/sentry/api/service/thrift/TSentryPrincipalType.java
+// Represents a type of principal.
 enum TPrincipalType {
   ROLE = 0
   USER = 1
+  GROUP = 2
 }
 
 // Represents a principal in an authorization policy.

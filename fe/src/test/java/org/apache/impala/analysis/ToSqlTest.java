@@ -1492,7 +1492,7 @@ public class ToSqlTest extends FrontendTestBase {
   @Test
   public void testGrantRevokePrivStmt() {
     AnalysisContext ctx = createAnalysisCtx(createAuthorizationFactory());
-    List<String> principalTypes = Arrays.asList("USER", "ROLE");
+    List<String> principalTypes = Arrays.asList("USER", "ROLE", "GROUP");
     String testRole = System.getProperty("user.name");
     String testUri = "hdfs://localhost:20500/test-warehouse";
 

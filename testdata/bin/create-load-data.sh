@@ -300,6 +300,17 @@ function setup-ranger {
   RANGER_SETUP_DIR="${IMPALA_HOME}/testdata/cluster/ranger/setup"
 
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    "${RANGER_SETUP_DIR}/impala_group.json.template" > \
+    "${RANGER_SETUP_DIR}/impala_group.json"
+
+  export GROUP_ID=$(wget -qO - --auth-no-challenge --user=admin --password=admin \
+    --post-file="${RANGER_SETUP_DIR}/impala_group.json" \
+    --header="accept:application/json" \
+    --header="Content-Type:application/json" \
+    http://localhost:6080/service/xusers/secure/groups |
+    python -c "import sys, json; print json.load(sys.stdin)['id']")
+
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     "${RANGER_SETUP_DIR}/impala_user.json.template" > \
     "${RANGER_SETUP_DIR}/impala_user.json"
 
