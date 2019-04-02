@@ -61,15 +61,17 @@ under the License.
 
     <p rev="2.2.0">
       Some of these functions are affected by the setting of the
-      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup flag for the
-      <cmdname>impalad</cmdname> daemon. This setting is off by default, meaning that functions
-      such as <codeph>from_unixtime()</codeph> and <codeph>unix_timestamp()</codeph> consider
-      the input values to always represent the UTC time zone. This setting also applies when you
-      <codeph>CAST()</codeph> a <codeph>BIGINT</codeph> value to <codeph>TIMESTAMP</codeph>, or
-      a <codeph>TIMESTAMP</codeph> value to <codeph>BIGINT</codeph>. When this setting is
-      enabled, these functions and operations convert to and from values representing the local
-      time zone. See <xref href="impala_timestamp.xml#timestamp"/> for details about how Impala
-      handles time zone considerations for the <codeph>TIMESTAMP</codeph> data type.
+      <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> startup flag
+      for the <cmdname>impalad</cmdname> daemon. This setting is off by default, meaning that
+      functions such as <codeph>from_unixtime()</codeph> and <codeph>unix_timestamp()</codeph>
+      consider the input values to always represent the UTC time zone. This setting also applies
+      when you <codeph>CAST()</codeph> a <codeph>BIGINT</codeph> value to
+      <codeph>TIMESTAMP</codeph>, or a <codeph>TIMESTAMP</codeph> value to
+      <codeph>BIGINT</codeph>. When this setting is enabled, these functions and operations
+      convert to and from values representing the local time zone. See
+      <xref
+        href="impala_timestamp.xml#timestamp"/> for details about how Impala handles
+      time zone considerations for the <codeph>TIMESTAMP</codeph> data type.
     </p>
 
     <p>

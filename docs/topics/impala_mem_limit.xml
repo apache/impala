@@ -21,7 +21,13 @@ under the License.
 <concept id="mem_limit">
 
   <title>MEM_LIMIT Query Option</title>
-  <titlealts audience="PDF"><navtitle>MEM_LIMIT</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>MEM_LIMIT</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -37,35 +43,37 @@ under the License.
   <conbody>
 
     <p>
-      The MEM_LIMIT query option defines the maximum amount of memory a query
-      can allocate on each node. The total memory that can be used by a query is
-      the <codeph>MEM_LIMIT</codeph> times the number of nodes.
+      The MEM_LIMIT query option defines the maximum amount of memory a query can allocate on
+      each node. The total memory that can be used by a query is the <codeph>MEM_LIMIT</codeph>
+      times the number of nodes.
     </p>
 
     <p rev="">
-      There are two levels of memory limit for Impala.
-      The <codeph>-mem_limit</codeph> startup option sets an overall limit for the <cmdname>impalad</cmdname> process
-      (which handles multiple queries concurrently). That process memory limit can be expressed either as a percentage
-      of RAM available to the process such as <codeph>-mem_limit=70%</codeph> or as a fixed
-      amount of memory, such as <codeph>100gb</codeph>. The memory available to the process is based on the host's
-      physical memory and, since Impala 3.2, memory limits from Linux Control Groups. E.g. if an
-      <cmdname>impalad</cmdname> process is running in a Docker container on a host with 100GB of memory, the memory
-      available is 100GB or the Docker container's memory limit, whichever is less.
-    </p>
-
-
-    <p rev="">
-      The <codeph>MEM_LIMIT</codeph> query option, which you set through <cmdname>impala-shell</cmdname>
-      or the <codeph>SET</codeph> statement in a JDBC or ODBC application, applies to each individual query.
-      The <codeph>MEM_LIMIT</codeph> query option is usually expressed as a fixed size such as <codeph>10gb</codeph>,
-      and must always be less than the <cmdname>impalad</cmdname> memory limit.
+      There are two levels of memory limit for Impala. The
+      <codeph>&#8209;&#8209;mem_limit</codeph> startup option sets an overall limit for the
+      <cmdname>impalad</cmdname> process (which handles multiple queries concurrently). That
+      process memory limit can be expressed either as a percentage of RAM available to the
+      process such as <codeph>&#8209;&#8209;mem_limit=70%</codeph> or as a fixed amount of
+      memory, such as <codeph>100gb</codeph>. The memory available to the process is based on
+      the host's physical memory and, since Impala 3.2, memory limits from Linux Control Groups.
+      E.g. if an <cmdname>impalad</cmdname> process is running in a Docker container on a host
+      with 100GB of memory, the memory available is 100GB or the Docker container's memory
+      limit, whichever is less.
     </p>
 
     <p rev="">
-      If query processing exceeds the specified memory limit on any node, either the per-query limit or the
-      <cmdname>impalad</cmdname> limit, Impala cancels the query automatically.
-      Memory limits are checked periodically during query processing, so the actual memory in use
-      might briefly exceed the limit without the query being cancelled.
+      The <codeph>MEM_LIMIT</codeph> query option, which you set through
+      <cmdname>impala-shell</cmdname> or the <codeph>SET</codeph> statement in a JDBC or ODBC
+      application, applies to each individual query. The <codeph>MEM_LIMIT</codeph> query option
+      is usually expressed as a fixed size such as <codeph>10gb</codeph>, and must always be
+      less than the <cmdname>impalad</cmdname> memory limit.
+    </p>
+
+    <p rev="">
+      If query processing exceeds the specified memory limit on any node, either the per-query
+      limit or the <cmdname>impalad</cmdname> limit, Impala cancels the query automatically.
+      Memory limits are checked periodically during query processing, so the actual memory in
+      use might briefly exceed the limit without the query being cancelled.
     </p>
 
     <p>
@@ -73,9 +81,10 @@ under the License.
     </p>
 
     <p rev="">
-      <b>Units:</b> A numeric argument represents memory size in bytes; you can also use a suffix of <codeph>m</codeph> or <codeph>mb</codeph>
-      for megabytes, or more commonly <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you specify a value with unrecognized
-      formats, subsequent queries fail with an error.
+      <b>Units:</b> A numeric argument represents memory size in bytes; you can also use a
+      suffix of <codeph>m</codeph> or <codeph>mb</codeph> for megabytes, or more commonly
+      <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you specify a value with
+      unrecognized formats, subsequent queries fail with an error.
     </p>
 
     <p rev="">
@@ -86,24 +95,24 @@ under the License.
 
     <p rev="">
       The <codeph>MEM_LIMIT</codeph> setting is primarily useful in a high-concurrency setting,
-      or on a cluster with a workload shared between Impala and other data processing components.
-      You can prevent any query from accidentally using much more memory than expected,
-      which could negatively impact other Impala queries.
+      or on a cluster with a workload shared between Impala and other data processing
+      components. You can prevent any query from accidentally using much more memory than
+      expected, which could negatively impact other Impala queries.
     </p>
 
     <p rev="">
       Use the output of the <codeph>SUMMARY</codeph> command in <cmdname>impala-shell</cmdname>
-      to get a report of memory used for each phase of your most heavyweight queries on each node,
-      and then set a <codeph>MEM_LIMIT</codeph> somewhat higher than that.
-      See <xref href="impala_explain_plan.xml#perf_summary"/> for usage information about
-      the <codeph>SUMMARY</codeph> command.
+      to get a report of memory used for each phase of your most heavyweight queries on each
+      node, and then set a <codeph>MEM_LIMIT</codeph> somewhat higher than that. See
+      <xref href="impala_explain_plan.xml#perf_summary"/> for usage information about the
+      <codeph>SUMMARY</codeph> command.
     </p>
 
     <p conref="../shared/impala_common.xml#common/example_blurb" rev=""/>
 
     <p rev="">
-      The following examples show how to set the <codeph>MEM_LIMIT</codeph> query option
-      using a fixed number of bytes, or suffixes representing gigabytes or megabytes.
+      The following examples show how to set the <codeph>MEM_LIMIT</codeph> query option using a
+      fixed number of bytes, or suffixes representing gigabytes or megabytes.
     </p>
 
 <codeblock rev="">
@@ -153,8 +162,8 @@ MEM_LIMIT set to 3mb
 </codeblock>
 
     <p rev="">
-      The following examples show how unrecognized <codeph>MEM_LIMIT</codeph>
-      values lead to errors for subsequent queries.
+      The following examples show how unrecognized <codeph>MEM_LIMIT</codeph> values lead to
+      errors for subsequent queries.
     </p>
 
 <codeblock rev="">
@@ -171,12 +180,10 @@ ERROR: Failed to parse query memory limit from 'xyz'.
 </codeblock>
 
     <p rev="">
-      The following examples shows the automatic query cancellation
-      when the <codeph>MEM_LIMIT</codeph> value is exceeded
-      on any host involved in the Impala query. First it runs a
-      successful query and checks the largest amount of memory
-      used on any node for any stage of the query.
-      Then it sets an artificially low <codeph>MEM_LIMIT</codeph>
+      The following examples shows the automatic query cancellation when the
+      <codeph>MEM_LIMIT</codeph> value is exceeded on any host involved in the Impala query.
+      First it runs a successful query and checks the largest amount of memory used on any node
+      for any stage of the query. Then it sets an artificially low <codeph>MEM_LIMIT</codeph>
       setting so that the same query cannot run.
     </p>
 
@@ -220,4 +227,5 @@ Query did not have enough memory to get the minimum required buffers in the bloc
 </codeblock>
 
   </conbody>
+
 </concept>

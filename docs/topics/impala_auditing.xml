@@ -21,7 +21,13 @@ under the License.
 <concept id="auditing">
 
   <title>Auditing Impala Operations</title>
-  <titlealts audience="PDF"><navtitle>Auditing</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Auditing</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -36,57 +42,58 @@ under the License.
   <conbody>
 
     <p>
-      To monitor how Impala data is being used within your organization, ensure
-      that your Impala authorization and authentication policies are effective.
-      To detect attempts at intrusion or unauthorized access to Impala
-      data, you can use the auditing feature in Impala 1.2.1 and higher:
+      To monitor how Impala data is being used within your organization, ensure that your Impala
+      authorization and authentication policies are effective. To detect attempts at intrusion
+      or unauthorized access to Impala data, you can use the auditing feature in Impala 1.2.1
+      and higher:
     </p>
 
     <ul>
       <li>
         Enable auditing by including the option
-        <codeph>-audit_event_log_dir=<varname>directory_path</varname></codeph>
-        in your <cmdname>impalad</cmdname> startup options.
-        The log directory must be a local directory on the
-        server, not an HDFS directory.
+        <codeph>&#8209;&#8209;audit_event_log_dir=<varname>directory_path</varname></codeph> in
+        your <cmdname>impalad</cmdname> startup options. The log directory must be a local
+        directory on the server, not an HDFS directory.
       </li>
 
       <li>
         Decide how many queries will be represented in each audit event log file. By default,
-        Impala starts a new audit event log file every 5000 queries. To specify a different number,
-        <ph audience="standalone">include
-        the option <codeph>--max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
+        Impala starts a new audit event log file every 5000 queries. To specify a different
+        number, <ph audience="standalone"
+          >include the option
+        <codeph>&#8209;&#8209;max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
         in the <cmdname>impalad</cmdname> startup options</ph>.
       </li>
 
       <li rev="2.9.0 IMPALA-4431">
-        In <keyword keyref="impala29_full"/> and higher, you can control how many
-        audit event log files are kept on each host. Specify the option
-        <codeph>--max_audit_event_log_files=<varname>number_of_log_files</varname></codeph>
+        In <keyword keyref="impala29_full"/> and higher, you can control how many audit event
+        log files are kept on each host. Specify the option
+        <codeph>&#8209;&#8209;max_audit_event_log_files=<varname>number_of_log_files</varname></codeph>
         in the <cmdname>impalad</cmdname> startup options. Once the limit is reached, older
-        files are rotated out using the same mechanism as for other Impala log files.
-        The default value for this setting is 0, representing an unlimited number of audit
-        event log files.
+        files are rotated out using the same mechanism as for other Impala log files. The
+        default value for this setting is 0, representing an unlimited number of audit event log
+        files.
       </li>
 
       <li>
-        Use a cluster manager with governance capabilities to filter, visualize,
-        and produce reports based on the audit logs collected
-        from all the hosts in the cluster.
+        Use a cluster manager with governance capabilities to filter, visualize, and produce
+        reports based on the audit logs collected from all the hosts in the cluster.
       </li>
     </ul>
 
     <p outputclass="toc inpage"/>
+
   </conbody>
 
   <concept id="auditing_performance">
 
     <title>Durability and Performance Considerations for Impala Auditing</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Performance"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Performance"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
@@ -98,15 +105,16 @@ under the License.
         Because any Impala host can process a query, enable auditing on all hosts where the
         <ph audience="standalone"><cmdname>impalad</cmdname> daemon</ph>
         <ph audience="integrated">Impala Daemon role</ph> runs. Each host stores its own log
-        files, in a directory in the local filesystem. The log data is periodically flushed to disk (through an
-        <codeph>fsync()</codeph> system call) to avoid loss of audit data in case of a crash.
+        files, in a directory in the local filesystem. The log data is periodically flushed to
+        disk (through an <codeph>fsync()</codeph> system call) to avoid loss of audit data in
+        case of a crash.
       </p>
 
       <p>
-        The runtime overhead of auditing applies to whichever host serves as the coordinator
-        for the query, that is, the host you connect to when you issue the query. This might
-        be the same host for all queries, or different applications or users might connect to
-        and issue queries through different hosts.
+        The runtime overhead of auditing applies to whichever host serves as the coordinator for
+        the query, that is, the host you connect to when you issue the query. This might be the
+        same host for all queries, or different applications or users might connect to and issue
+        queries through different hosts.
       </p>
 
       <p>
@@ -117,44 +125,51 @@ under the License.
       </p>
 
       <p>
-        By default, Impala avoids losing any audit log data in the case of an error during a logging operation
-        (such as a disk full error), by immediately shutting down
-        <cmdname audience="standalone">impalad</cmdname><ph audience="integrated">the Impala
-        Daemon role</ph> on the host where the auditing problem occurred.
-        <ph audience="standalone">You can override this setting by specifying the option
-        <codeph>-abort_on_failed_audit_event=false</codeph> in the <cmdname>impalad</cmdname> startup options.</ph>
+        By default, Impala avoids losing any audit log data in the case of an error during a
+        logging operation (such as a disk full error), by immediately shutting down
+        <cmdname audience="standalone"
+          >impalad</cmdname><ph audience="integrated">the
+        Impala Daemon role</ph> on the host where the auditing problem occurred.
+        <ph
+          audience="standalone">You can override this setting by specifying the
+        option <codeph>&#8209;&#8209;abort_on_failed_audit_event=false</codeph> in the
+        <cmdname>impalad</cmdname> startup options.</ph>
       </p>
+
     </conbody>
+
   </concept>
 
   <concept id="auditing_format">
 
     <title>Format of the Audit Log Files</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Logs"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Logs"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
       <p>
         The audit log files represent the query information in JSON format, one query per line.
-        Typically, rather than looking at the log files themselves, you should use cluster-management
-        software to consolidate the log data from all Impala hosts and filter and visualize the results
-        in useful ways. (If you do examine the raw log data, you might run the files through
-        a JSON pretty-printer first.)
-     </p>
+        Typically, rather than looking at the log files themselves, you should use
+        cluster-management software to consolidate the log data from all Impala hosts and filter
+        and visualize the results in useful ways. (If you do examine the raw log data, you might
+        run the files through a JSON pretty-printer first.)
+      </p>
 
       <p>
-        All the information about schema objects accessed by the query is encoded in a single nested record on the
-        same line. For example, the audit log for an <codeph>INSERT ... SELECT</codeph> statement records that a
-        select operation occurs on the source table and an insert operation occurs on the destination table. The
-        audit log for a query against a view records the base table accessed by the view, or multiple base tables
-        in the case of a view that includes a join query. Every Impala operation that corresponds to a SQL
-        statement is recorded in the audit logs, whether the operation succeeds or fails. Impala records more
-        information for a successful operation than for a failed one, because an unauthorized query is stopped
-        immediately, before all the query planning is completed.
+        All the information about schema objects accessed by the query is encoded in a single
+        nested record on the same line. For example, the audit log for an <codeph>INSERT ...
+        SELECT</codeph> statement records that a select operation occurs on the source table and
+        an insert operation occurs on the destination table. The audit log for a query against a
+        view records the base table accessed by the view, or multiple base tables in the case of
+        a view that includes a join query. Every Impala operation that corresponds to a SQL
+        statement is recorded in the audit logs, whether the operation succeeds or fails. Impala
+        records more information for a successful operation than for a failed one, because an
+        unauthorized query is stopped immediately, before all the query planning is completed.
       </p>
 
 <!-- Opportunity to conref at the phrase level here... the content of this paragraph is the same as part
@@ -217,8 +232,8 @@ under the License.
                 </li>
 
                 <li>
-                  Privilege - How the object is being used (<codeph>SELECT</codeph>, <codeph>INSERT</codeph>,
-                  <codeph>CREATE</codeph>, and so on)
+                  Privilege - How the object is being used (<codeph>SELECT</codeph>,
+                  <codeph>INSERT</codeph>, <codeph>CREATE</codeph>, and so on)
                 </li>
               </ul>
             </li>
@@ -232,7 +247,9 @@ Here is an excerpt from a sample audit log file:
 </p>
 <codeblock></codeblock>
 -->
+
     </conbody>
+
   </concept>
 
   <concept id="auditing_exceptions">
@@ -251,24 +268,30 @@ Here is an excerpt from a sample audit log file:
         </li>
 
         <li>
-          Queries that Impala can analyze and parse to determine that they are authorized. The audit data is
-          recorded immediately after Impala finishes its analysis, before the query is actually executed.
+          Queries that Impala can analyze and parse to determine that they are authorized. The
+          audit data is recorded immediately after Impala finishes its analysis, before the
+          query is actually executed.
         </li>
       </ul>
 
       <p>
-        The audit log does not contain entries for queries that could not be parsed and analyzed. For example, a
-        query that fails due to a syntax error is not recorded in the audit log. The audit log also does not
-        contain queries that fail due to a reference to a table that does not exist, if you would be authorized to
-        access the table if it did exist.
+        The audit log does not contain entries for queries that could not be parsed and
+        analyzed. For example, a query that fails due to a syntax error is not recorded in the
+        audit log. The audit log also does not contain queries that fail due to a reference to a
+        table that does not exist, if you would be authorized to access the table if it did
+        exist.
       </p>
 
       <p>
-        Certain statements in the <cmdname>impala-shell</cmdname> interpreter, such as <codeph>CONNECT</codeph>,
-        <codeph rev="1.4.0">SUMMARY</codeph>, <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and
-        <codeph>QUIT</codeph>, do not correspond to actual SQL queries, and these statements are not reflected in
-        the audit log.
+        Certain statements in the <cmdname>impala-shell</cmdname> interpreter, such as
+        <codeph>CONNECT</codeph>, <codeph rev="1.4.0">SUMMARY</codeph>,
+        <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and <codeph>QUIT</codeph>, do not
+        correspond to actual SQL queries, and these statements are not reflected in the audit
+        log.
       </p>
+
     </conbody>
+
   </concept>
+
 </concept>

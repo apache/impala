@@ -147,16 +147,24 @@ $ ps ax | grep [i]mpalad
   <concept id="concept_a2p_szq_jdb">
 
     <title>Impala Upgrade Considerations</title>
+
     <concept id="impala_privileges_30">
-      <title>Grant REFRESH Privilege to Impala Roles with SELECT or INSERT
-        Privilege when Upgrading to <keyword keyref="impala30"/></title>
+
+      <title>Grant REFRESH Privilege to Impala Roles with SELECT or INSERT Privilege when Upgrading to <keyword keyref="impala30"/></title>
+
       <conbody>
-        <p> To use the fine grained privileges feature in <keyword
+
+        <p>
+          To use the fine grained privileges feature in
+          <keyword
             keyref="impala30"/>, if a role has the <codeph>SELECT</codeph> or
-            <codeph>INSERT</codeph> privilege on an object in Impala before
-          upgrading to <keyword keyref="impala30"/>, grant that role the
-            <codeph>REFRESH</codeph> privilege after the upgrade. </p>
+          <codeph>INSERT</codeph> privilege on an object in Impala before upgrading to
+          <keyword keyref="impala30"/>, grant that role the <codeph>REFRESH</codeph> privilege
+          after the upgrade.
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="IMPALA-3916">
@@ -175,9 +183,9 @@ $ ps ax | grep [i]mpalad
 
         <p>
           If you need to use the reserved words from previous versions of Impala, set the
-          <codeph>impalad</codeph> and <codeph>catalogd</codeph> startup flag. Note that this
-          startup option will be deprecated in a future release.
-<codeblock>--reserved_words_version=2.11.0</codeblock>
+          <codeph>impalad</codeph> and <codeph>catalogd</codeph> startup flag.
+<codeblock>&#8209;&#8209;reserved_words_version=2.11.0</codeblock>
+          Note that this startup option will be deprecated in a future release.
         </p>
 
       </conbody>
@@ -243,8 +251,8 @@ $ ps ax | grep [i]mpalad
         </p>
 
         <p>
-          See <keyword keyref="parquet_array_resolution"/> for the information about the query
-          option.
+          See <codeph><keyword keyref="parquet_array_resolution"/></codeph> for the information
+          about the query option.
         </p>
 
       </conbody>
@@ -366,8 +374,9 @@ $ ps ax | grep [i]mpalad
       <conbody>
 
         <p>
-          The deprecated <codeph>refresh_after_connect</codeph> option was removed from Impala
-          Shell in <keyword keyref="impala30_full"/>
+          The deprecated <codeph>&#8209;&#8209;refresh_after_connect</codeph> option was removed
+          from Impala Shell in <keyword
+            keyref="impala30_full"/>
         </p>
 
       </conbody>
@@ -404,13 +413,20 @@ $ ps ax | grep [i]mpalad
       </conbody>
 
     </concept>
+
     <concept id="impala-7985">
+
       <title>Port Change for SHUTDOWN Command</title>
+
       <conbody>
-        <p> If you used the <codeph>SHUTDOWN</codeph> command in Impala 3.1, and
-          specified a port explicitly, change the port number parameter, in
-          Impala 3.2, to use the KRPC port. </p>
+
+        <p>
+          If you used the <codeph>SHUTDOWN</codeph> command in Impala 3.1, and specified a port
+          explicitly, change the port number parameter, in Impala 3.2, to use the KRPC port.
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="concept_mkn_ygr_jdb">
@@ -437,7 +453,8 @@ $ ps ax | grep [i]mpalad
 
             </stentry>
 
-            <stentry><codeph>compact_catalog_topic</codeph><codeph>impalad</codeph> flag</stentry>
+            <stentry><codeph>&#8209;&#8209;compact_catalog_topic</codeph><codeph>impalad</codeph>
+              flag</stentry>
 
             <stentry><codeph>true</codeph>
 
@@ -451,7 +468,8 @@ $ ps ax | grep [i]mpalad
 
             </stentry>
 
-            <stentry><codeph>max_cached_file_handles</codeph><codeph>impalad</codeph> flag</stentry>
+            <stentry><codeph>&#8209;&#8209;max_cached_file_handles</codeph><codeph>impalad</codeph>
+              flag</stentry>
 
             <stentry><codeph>20000</codeph>
 
@@ -473,10 +491,21 @@ $ ps ax | grep [i]mpalad
             </stentry>
 
           </strow>
+
           <strow>
-            <stentry><keyword keyref="impala30_full"/></stentry>
-            <stentry><codeph>DECIMAL_V2</codeph></stentry>
-            <stentry><codeph>TRUE</codeph></stentry>
+
+            <stentry><keyword keyref="impala30_full"/>
+
+            </stentry>
+
+            <stentry><codeph>DECIMAL_V2</codeph>
+
+            </stentry>
+
+            <stentry><codeph>TRUE</codeph>
+
+            </stentry>
+
           </strow>
 
         </simpletable>

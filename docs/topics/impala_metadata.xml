@@ -56,16 +56,17 @@ under the License.
 
       <ul>
         <li>
-          Time-based invalidation with the <codeph>‑‑invalidate_tables_timeout_s</codeph>
-          flag: <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
+          Time-based invalidation with the
+          <codeph>&#8209;&#8209;invalidate_tables_timeout_s</codeph> flag:
+          <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
           specified time period (in seconds). This flag needs to be applied to both
           <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
         </li>
 
         <li>
           Memory-based invalidation with the
-          <codeph>‑‑invalidate_tables_on_memory_pressure</codeph> flag: When the memory
-          pressure reaches 60% of JVM heap size after a Java garbage collection in
+          <codeph>&#8209;&#8209;invalidate_tables_on_memory_pressure</codeph> flag: When the
+          memory pressure reaches 60% of JVM heap size after a Java garbage collection in
           <codeph>catalogd</codeph>, Impala invalidates 10% of the least recently used tables.
           This flag needs to be applied to both <codeph>impalad</codeph> and
           <codeph>catalogd</codeph>.
@@ -94,7 +95,7 @@ under the License.
 
       <p>
         Starting in Impala 3.1, a new configuration setting,
-        <codeph>‑‑pull_incremental_statistics</codeph>, was added and set to
+        <codeph>&#8209;&#8209;pull_incremental_statistics</codeph>, was added and set to
         <codeph>true</codeph> by default. When you start Impala <codeph>catalogd</codeph> and
         <codeph>impalad</codeph> coordinators with this setting enabled:
       </p>
@@ -116,7 +117,7 @@ under the License.
 
       <p>
         We do not recommend you change the default setting of
-        <codeph>‑‑pull_incremental_statistics</codeph>.
+        <codeph>&#8209;&#8209;pull_incremental_statistics</codeph>.
       </p>
 
     </conbody>
@@ -158,11 +159,11 @@ under the License.
       </ul>
 
       <p>
-        This feature is controlled by the <codeph>‑‑hms_event_polling_interval_s</codeph>
-        flag. Start the <codeph>catalogd</codeph> with the
-        <codeph>‑‑hms_event_polling_interval_s</codeph> flag set to a non-zero value to
-        enable the feature and set the polling frequency in seconds. We recommend the value to
-        be less than 5 seconds.
+        This feature is controlled by the
+        <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag. Start the
+        <codeph>catalogd</codeph> with the <codeph>‑‑hms_event_polling_interval_s</codeph>
+        flag set to a non-zero value to enable the feature and set the polling frequency in
+        seconds. We recommend the value to be less than 5 seconds.
       </p>
 
       <p>
@@ -190,7 +191,8 @@ under the License.
 
       <p>
         This feature is turned off by default with the
-        <codeph>‑‑hms_event_polling_interval_s</codeph> flag set to <codeph>0</codeph>.
+        <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag set to
+        <codeph>0</codeph>.
       </p>
 
     </conbody>

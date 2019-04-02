@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?><!--
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
 distributed with this work for additional information
@@ -20,7 +21,12 @@ under the License.
 <concept rev="5.4.3" id="impala_isilon">
 
   <title>Using Impala with Isilon Storage</title>
-  <titlealts audience="PDF"><navtitle>Isilon Storage</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Isilon Storage</navtitle>
+
+  </titlealts>
 
   <prolog>
     <metadata>
@@ -37,23 +43,23 @@ under the License.
 
     <p>
       <indexterm audience="hidden">Isilon</indexterm>
-      You can use Impala to query data files that reside on EMC Isilon storage devices, rather than in HDFS.
-      This capability allows convenient query access to a storage system where you might already be
-      managing large volumes of data. The combination of the Impala query engine and Isilon storage is
-      certified on <keyword keyref="impala224"/> or higher.
+      You can use Impala to query data files that reside on EMC Isilon storage devices, rather
+      than in HDFS. This capability allows convenient query access to a storage system where you
+      might already be managing large volumes of data. The combination of the Impala query
+      engine and Isilon storage is certified on <keyword keyref="impala224"/> or higher.
     </p>
 
     <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>
 
     <p>
-      The typical use case for Impala and Isilon together is to use Isilon for the
-      default filesystem, replacing HDFS entirely. In this configuration,
-      when you create a database, table, or partition, the data always resides on
-      Isilon storage and you do not need to specify any special <codeph>LOCATION</codeph>
-      attribute. If you do specify a <codeph>LOCATION</codeph> attribute, its value refers
-      to a path within the Isilon filesystem.
-      For example:
+      The typical use case for Impala and Isilon together is to use Isilon for the default
+      filesystem, replacing HDFS entirely. In this configuration, when you create a database,
+      table, or partition, the data always resides on Isilon storage and you do not need to
+      specify any special <codeph>LOCATION</codeph> attribute. If you do specify a
+      <codeph>LOCATION</codeph> attribute, its value refers to a path within the Isilon
+      filesystem. For example:
     </p>
+
 <codeblock>-- If the default filesystem is Isilon, all Impala data resides there
 -- and all Impala databases and tables are located there.
 CREATE TABLE t1 (x INT, s STRING);
@@ -65,42 +71,38 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
 </codeblock>
 
     <p>
-      Impala can write to, delete, and rename data files and database, table,
-      and partition directories on Isilon storage. Therefore, Impala statements such
-      as
-      <codeph>CREATE TABLE</codeph>, <codeph>DROP TABLE</codeph>,
-      <codeph>CREATE DATABASE</codeph>, <codeph>DROP DATABASE</codeph>,
-      <codeph>ALTER TABLE</codeph>,
-      and
-      <codeph>INSERT</codeph> work the same with Isilon storage as with HDFS.
+      Impala can write to, delete, and rename data files and database, table, and partition
+      directories on Isilon storage. Therefore, Impala statements such as <codeph>CREATE
+      TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>CREATE DATABASE</codeph>,
+      <codeph>DROP DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, and <codeph>INSERT</codeph>
+      work the same with Isilon storage as with HDFS.
     </p>
 
     <p>
-      When the Impala spill-to-disk feature is activated by a query that approaches
-      the memory limit, Impala writes all the temporary data to a local (not Isilon)
-      storage device. Because the I/O bandwidth for the temporary data depends on
-      the number of local disks, and clusters using Isilon storage might not have
-      as many local disks attached, pay special attention on Isilon-enabled clusters
-      to any queries that use the spill-to-disk feature. Where practical, tune the
-      queries or allocate extra memory for Impala to avoid spilling.
-      Although you can specify an Isilon storage device as the destination for
-      the temporary data for the spill-to-disk feature, that configuration is
-      not recommended due to the need to transfer the data both ways using remote I/O.
+      When the Impala spill-to-disk feature is activated by a query that approaches the memory
+      limit, Impala writes all the temporary data to a local (not Isilon) storage device.
+      Because the I/O bandwidth for the temporary data depends on the number of local disks, and
+      clusters using Isilon storage might not have as many local disks attached, pay special
+      attention on Isilon-enabled clusters to any queries that use the spill-to-disk feature.
+      Where practical, tune the queries or allocate extra memory for Impala to avoid spilling.
+      Although you can specify an Isilon storage device as the destination for the temporary
+      data for the spill-to-disk feature, that configuration is not recommended due to the need
+      to transfer the data both ways using remote I/O.
     </p>
 
     <p>
-      When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
-      When the data resides on Isilon storage, all the I/O consists of remote reads.
-      Do not be alarmed when you see non-zero numbers for remote read measurements
-      in query profile output. The benefit of the Impala and Isilon integration is
-      primarily convenience of not having to move or copy large volumes of data to HDFS,
-      rather than raw query performance. You can increase the performance of Impala
-      I/O for Isilon systems by increasing the value for the
-      <codeph>--num_remote_hdfs_io_threads</codeph> startup option for the
+      When tuning Impala queries on HDFS, you typically try to avoid any remote reads. When the
+      data resides on Isilon storage, all the I/O consists of remote reads. Do not be alarmed
+      when you see non-zero numbers for remote read measurements in query profile output. The
+      benefit of the Impala and Isilon integration is primarily convenience of not having to
+      move or copy large volumes of data to HDFS, rather than raw query performance. You can
+      increase the performance of Impala I/O for Isilon systems by increasing the value for the
+      <codeph>&#8209;&#8209;num_remote_hdfs_io_threads</codeph> startup option for the
       <cmdname>impalad</cmdname> daemon.
     </p>
 
-    <!-- <p outputclass="toc inpage"/> -->
+<!-- <p outputclass="toc inpage"/> -->
+
   </conbody>
 
 </concept>

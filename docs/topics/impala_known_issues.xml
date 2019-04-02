@@ -91,23 +91,24 @@ under the License.
 
     <concept id="IMPALA-4978">
 
-      <title>Impala requires FQDN from hostname command on Kerberized
-        clusters</title>
+      <title>Impala requires FQDN from hostname command on Kerberized clusters</title>
 
       <conbody>
 
-        <p> The method Impala uses to retrieve the host name while constructing
-          the Kerberos principal is the <codeph>gethostname()</codeph> system
-          call. This function might not always return the fully qualified domain
-          name, depending on the network configuration. If the daemons cannot
-          determine the FQDN, Impala does not start on a Kerberized cluster. </p>
+        <p>
+          The method Impala uses to retrieve the host name while constructing the Kerberos
+          principal is the <codeph>gethostname()</codeph> system call. This function might not
+          always return the fully qualified domain name, depending on the network configuration.
+          If the daemons cannot determine the FQDN, Impala does not start on a Kerberized
+          cluster.
+        </p>
 
         <p>
           <b>Workaround:</b> Test if a host is affected by checking whether the output of the
           <cmdname>hostname</cmdname> command includes the FQDN. On hosts where
           <cmdname>hostname</cmdname>, only returns the short name, pass the command-line flag
-          <codeph>--hostname=<varname>fully_qualified_domain_name</varname></codeph> in the
-          startup options of all Impala-related daemons.
+          <codeph>&#8209;&#8209;hostname=<varname>fully_qualified_domain_name</varname></codeph>
+          in the startup options of all Impala-related daemons.
         </p>
 
         <p>
@@ -146,8 +147,7 @@ under the License.
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-6671">IMPALA-6671</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-6671">IMPALA-6671</xref>
         </p>
 
       </conbody>
@@ -185,8 +185,7 @@ under the License.
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-1792">IMPALA-1792</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-1792">IMPALA-1792</xref>
         </p>
 
         <p>
@@ -199,128 +198,224 @@ under the License.
 
   </concept>
 
-<concept id="known_issues_security">
-  <title id="ki_security">Impala Known Issues: Security</title>
-  <conbody>
-    <p>
-      These issues are related to security features, such as Kerberos
-        authentication, Sentry authorization, encryption, auditing, and
-        redaction.
-    </p>
-  </conbody>
-    <concept id="impala-7072">
-      <title>Impala does not support Heimdal Kerberos </title>
-      <conbody>
-        <p>Heimdal Kerberos is not supported in Impala.</p>
-        <p><b>Apache Issue:</b>
-          <xref keyref="IMPALA-7072">IMPALA-7072</xref></p>
-        <p><b>Affected Versions:</b> All versions of Impala</p>
-      </conbody>
-    </concept>
+  <concept id="known_issues_security">
 
-  <concept id="id_p1n_tbx_22b">
-    <title>Impala does not allow the use of insecure clusters with public IPs</title>
+    <title id="ki_security">Impala Known Issues: Security</title>
 
     <conbody>
-      <p>
-          Starting in <keyword keyref="impala212_full"/>, Impala, by default,
-          will only allow unencrypted or unauthenticated connections from
-          trusted subnets: <codeph>127.0.0.0/8</codeph>,
-            <codeph>10.0.0.0/8</codeph>, <codeph>172.16.0.0/12</codeph>,
-            <codeph>192.168.0.0/16</codeph>, <codeph>169.254.0.0/16</codeph>.
-          Unencrypted or unauthenticated connections from publicly routable IPs
-          will be rejected.
-      </p>
 
       <p>
-          The trusted subnets can be configured using the
-            <codeph>--trusted_subnets</codeph> flag. Set it to
-            '<codeph>0.0.0.0/0</codeph>' to allow unauthenticated connections
-          from all remote IP addresses. However, if network access is not
-          otherwise restricted by a firewall, malicious users may be able to
-          gain unauthorized access.
+        These issues are related to security features, such as Kerberos authentication, Sentry
+        authorization, encryption, auditing, and redaction.
       </p>
+
+    </conbody>
+
+    <concept id="impala-7072">
+
+      <title>Impala does not support Heimdal Kerberos</title>
+
+      <conbody>
+
+        <p>
+          Heimdal Kerberos is not supported in Impala.
+        </p>
+
+        <p>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-7072">IMPALA-7072</xref>
+        </p>
+
+        <p>
+          <b>Affected Versions:</b> All versions of Impala
+        </p>
+
       </conbody>
+
     </concept>
-    <!--IMPALA-7585 and IMPALA-7298 are fixed. Should be removed from here?-->
+
+    <concept id="id_p1n_tbx_22b">
+
+      <title>Impala does not allow the use of insecure clusters with public IPs</title>
+
+      <conbody>
+
+        <p>
+          Starting in <keyword keyref="impala212_full"/>, Impala, by default, will only allow
+          unencrypted or unauthenticated connections from trusted subnets:
+          <codeph>127.0.0.0/8</codeph>, <codeph>10.0.0.0/8</codeph>,
+          <codeph>172.16.0.0/12</codeph>, <codeph>192.168.0.0/16</codeph>,
+          <codeph>169.254.0.0/16</codeph>. Unencrypted or unauthenticated connections from
+          publicly routable IPs will be rejected.
+        </p>
+
+        <p>
+          The trusted subnets can be configured using the <codeph>--trusted_subnets</codeph>
+          flag. Set it to '<codeph>0.0.0.0/0</codeph>' to allow unauthenticated connections from
+          all remote IP addresses. However, if network access is not otherwise restricted by a
+          firewall, malicious users may be able to gain unauthorized access.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+<!--IMPALA-7585 and IMPALA-7298 are fixed. Should be removed from here?-->
+
     <concept id="IMPALA-7585" audience="hidden">
+
       <title>Impala user not added to /etc/passwd when LDAP is enabled</title>
+
       <conbody>
-        <p>When using Impala with LDAP enabled, a user may hit the
-          following:</p>
-        <pre>Not authorized: Client connection negotiation failed: client connection to 127.0.0.1:27000: SASL(-1): generic failure: All-whitespace username.</pre>
-        <p>The following sequence can lead to the <codeph>impala</codeph> user
-          not being created in <codeph>/etc/passwd</codeph> on some machines on
-          the cluster.<ul>
-            <li>Time 1: The <codeph>impala</codeph> user is not in LDAP. Impala
-              was installed on machine 1, and the user <codeph>impala</codeph>
-              is created in <codeph>/etc/passwd</codeph>. </li>
-            <li>Time 2: The <codeph>impala</codeph> user is added to LDAP.</li>
-            <li>Time 3: A new machine is added to the cluster. When adding
-              Impala service to this new machine, adding the
-                <codeph>impala</codeph> user will fail as it already exists in
-              LDAP.</li>
-          </ul></p>
-        <p>The consequence is that the <codeph>impala</codeph> user doesn't
-          exist in <codeph>/etc/passwd</codeph> on the new machine, leading to
-          the error above.</p>
-        <p><b>Workaround</b>: Manually edit <codeph>/etc/passwd</codeph> to add
-          the <codeph>impala</codeph> user</p>
-        <p><b>Apache Issue:</b>
-          <xref keyref="IMPALA-7585">IMPALA-7585</xref></p>
-        <p><b>Affected Versions:</b> Impala 2.12, Impala 3.0</p>
-        <p><b>Fixed Version:</b> Impala 3.1</p>
+
+        <p>
+          When using Impala with LDAP enabled, a user may hit the following:
+        </p>
+
+<pre>Not authorized: Client connection negotiation failed: client connection to 127.0.0.1:27000: SASL(-1): generic failure: All-whitespace username.</pre>
+
+        <p>
+          The following sequence can lead to the <codeph>impala</codeph> user not being created
+          in <codeph>/etc/passwd</codeph> on some machines on the cluster.
+          <ul>
+            <li>
+              Time 1: The <codeph>impala</codeph> user is not in LDAP. Impala was installed on
+              machine 1, and the user <codeph>impala</codeph> is created in
+              <codeph>/etc/passwd</codeph>.
+            </li>
+
+            <li>
+              Time 2: The <codeph>impala</codeph> user is added to LDAP.
+            </li>
+
+            <li>
+              Time 3: A new machine is added to the cluster. When adding Impala service to this
+              new machine, adding the <codeph>impala</codeph> user will fail as it already
+              exists in LDAP.
+            </li>
+          </ul>
+        </p>
+
+        <p>
+          The consequence is that the <codeph>impala</codeph> user doesn't exist in
+          <codeph>/etc/passwd</codeph> on the new machine, leading to the error above.
+        </p>
+
+        <p>
+          <b>Workaround</b>: Manually edit <codeph>/etc/passwd</codeph> to add the
+          <codeph>impala</codeph> user
+        </p>
+
+        <p>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-7585">IMPALA-7585</xref>
+        </p>
+
+        <p>
+          <b>Affected Versions:</b> Impala 2.12, Impala 3.0
+        </p>
+
+        <p>
+          <b>Fixed Version:</b> Impala 3.1
+        </p>
+
       </conbody>
+
     </concept>
-  <concept id="IMPALA-7298" audience="hidden">
-      <title>Kerberos authentication fails with the reverse DNS lookup
-        disabled</title>
+
+    <concept id="IMPALA-7298" audience="hidden">
+
+      <title>Kerberos authentication fails with the reverse DNS lookup disabled</title>
+
       <conbody>
-        <p> Kerberos authentication does not function correctly if <codeph>rdns
-            = false</codeph> is configured in <codeph>krb5.conf</codeph>. If the
-          flag <codeph>rdns = false</codeph>, when Impala tries to match
-          principals, it will fail because Kerberos receives a SPN (Service
-          Principal Name) with an IP address in it, but Impala expects a
-          principal with a FQDN in it. </p>
-        <p>You may hit the following error:</p>
-        <pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Not authorized: Client connection negotiation failed: client connection to X.X.X.X:27000: Server impala/X.X.X.X@VPC.CLOUDERA.COM not found in Kerberos database
+
+        <p>
+          Kerberos authentication does not function correctly if <codeph>rdns = false</codeph>
+          is configured in <codeph>krb5.conf</codeph>. If the flag <codeph>rdns =
+          false</codeph>, when Impala tries to match principals, it will fail because Kerberos
+          receives a SPN (Service Principal Name) with an IP address in it, but Impala expects a
+          principal with a FQDN in it.
+        </p>
+
+        <p>
+          You may hit the following error:
+        </p>
+
+<pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Not authorized: Client connection negotiation failed: client connection to X.X.X.X:27000: Server impala/X.X.X.X@VPC.CLOUDERA.COM not found in Kerberos database
 </pre>
+
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-7298">IMPALA-7298</xref></p>
-        <p><b>Affected Versions:</b> Impala 2.12.0 and 3.0</p>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-7298">IMPALA-7298</xref>
+        </p>
+
         <p>
-          <b>Workaround:</b> Set the following flags in
-            <codeph>krb5.conf</codeph>: <ul>
-            <li><codeph>dns_canonicalize_hostname = true</codeph></li>
-            <li><codeph>rdns = true</codeph></li>
-          </ul></p>
-        <p><b>Fixed Versions:</b> Impala 3.1</p>
+          <b>Affected Versions:</b> Impala 2.12.0 and 3.0
+        </p>
+
+        <p>
+          <b>Workaround:</b> Set the following flags in <codeph>krb5.conf</codeph>:
+          <ul>
+            <li>
+              <codeph>dns_canonicalize_hostname = true</codeph>
+            </li>
+
+            <li>
+              <codeph>rdns = true</codeph>
+            </li>
+          </ul>
+        </p>
+
+        <p>
+          <b>Fixed Versions:</b> Impala 3.1
+        </p>
+
       </conbody>
+
     </concept>
-    <!--kudu2198 is fixed-->
+
+<!--kudu2198 is fixed-->
+
     <concept id="KUDU-2198" audience="hidden">
-      <title>System-wide auth-to-local mapping not applied correctly to Kudu
-        service account</title>
+
+      <title>System-wide auth-to-local mapping not applied correctly to Kudu service account</title>
+
       <conbody>
-        <p>Due to system the <codeph>auth_to_local</codeph> mapping, the
-          principal may be mapped to some local name.</p>
-        <p>When running with Kerberos enabled, you may hit the following error
-          message where <varname>&lt;random-string></varname> is some random
-          string which doesn't match the primary in the Kerberos principal.</p>
-        <pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Remote error: Not authorized: {username='&lt;random-string>', principal='impala/redacted'} is not allowed to access DataStreamService
+
+        <p>
+          Due to system the <codeph>auth_to_local</codeph> mapping, the principal may be mapped
+          to some local name.
+        </p>
+
+        <p>
+          When running with Kerberos enabled, you may hit the following error message where
+          <varname>&lt;random-string></varname> is some random string which doesn't match the
+          primary in the Kerberos principal.
+        </p>
+
+<pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Remote error: Not authorized: {username='&lt;random-string>', principal='impala/redacted'} is not allowed to access DataStreamService
 </pre>
-        <p><b>Workaround</b>: Start Impala with the
-            <codeph>--use_system_auth_to_local=false</codeph> flag to ignore the
-          system-wide <codeph>auth_to_local</codeph> mappings configured in
-            <codeph>/etc/krb5.conf</codeph>.</p>
-        <p><b>Apache Issue:</b>
-          <xref keyref="IMPALA-8154">IMPALA-8154</xref></p>
-        <p><b>Affected Versions:</b> Impala 2.12, Impala 3.0 / Kudu 1.6</p>
-        <p><b>Fixed Versions:</b> Impala 3.2</p>
+
+        <p>
+          <b>Workaround</b>: Start Impala with the
+          <codeph>--use_system_auth_to_local=false</codeph> flag to ignore the system-wide
+          <codeph>auth_to_local</codeph> mappings configured in <codeph>/etc/krb5.conf</codeph>.
+        </p>
+
+        <p>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-8154">IMPALA-8154</xref>
+        </p>
+
+        <p>
+          <b>Affected Versions:</b> Impala 2.12, Impala 3.0 / Kudu 1.6
+        </p>
+
+        <p>
+          <b>Fixed Versions:</b> Impala 3.2
+        </p>
+
       </conbody>
+
     </concept>
-</concept>
+
+  </concept>
 
   <concept id="known_issues_resources">
 
@@ -353,8 +448,7 @@ terminate called after throwing an instance of 'boost::exception_detail::clone_i
 </codeblock>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-5605">IMPALA-5605</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-5605">IMPALA-5605</xref>
         </p>
 
         <p>
@@ -486,8 +580,7 @@ explain SELECT 1 FROM alltypestiny a1
 </codeblock>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-3094">IMPALA-3094</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-3094">IMPALA-3094</xref>
         </p>
 
         <p>
@@ -511,8 +604,7 @@ explain SELECT 1 FROM alltypestiny a1
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-2422">IMPALA-2422</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-2422">IMPALA-2422</xref>
         </p>
 
       </conbody>
@@ -531,8 +623,7 @@ explain SELECT 1 FROM alltypestiny a1
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-2603">IMPALA-2603</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-2603">IMPALA-2603</xref>
         </p>
 
       </conbody>
@@ -555,24 +646,38 @@ explain SELECT 1 FROM alltypestiny a1
       </p>
 
     </conbody>
+
     <concept id="hadoop-15720">
+
       <title>Queries Stuck on Failed HDFS Calls and not Timing out</title>
+
       <conbody>
-        <p>If the following error appears multiple times in a short duration
-          while running a query, it would mean that the connection between the
-            <codeph>impalad</codeph> and the HDFS NameNode is in a bad state and
-          hence the <codeph>impalad</codeph> would have to be restarted:</p>
-        <codeblock>"hdfsOpenFile() for &lt;filename> at backend &lt;hostname:port> failed to finish before the &lt;hdfs_operation_timeout_sec> second timeout " </codeblock>
+
+        <p>
+          If the following error appears multiple times in a short duration while running a
+          query, it would mean that the connection between the <codeph>impalad</codeph> and the
+          HDFS NameNode is in a bad state and hence the <codeph>impalad</codeph> would have to
+          be restarted:
+        </p>
+
+<codeblock>"hdfsOpenFile() for &lt;filename> at backend &lt;hostname:port> failed to finish before the &lt;hdfs_operation_timeout_sec> second timeout " </codeblock>
+
         <p>
           <b>Apache Issue:</b>
           <xref href="https://issues.apache.org/jira/browse/HADOOP-15720"
             format="html" scope="external">HADOOP-15720</xref>
         </p>
-        <p><b>Affected Versions:</b> All versions of Impala</p>
+
         <p>
-          <b>Workaround:</b> Restart the <codeph>impalad</codeph> in the bad
-          state.</p>
+          <b>Affected Versions:</b> All versions of Impala
+        </p>
+
+        <p>
+          <b>Workaround:</b> Restart the <codeph>impalad</codeph> in the bad state.
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="describe_formatted_avro">
@@ -618,16 +723,22 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMP-175" audience="hidden">
-      <title>Deviation from Hive behavior: Out of range values float/double
-        values are returned as maximum allowed value of type (Hive returns
-        NULL)</title>
+
+      <title>Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</title>
+
       <conbody>
-        <p> Impala behavior differs from Hive with respect to out of range
-          float/double values. Out of range values are returned as maximum
-          allowed value of type (Hive returns NULL). </p>
+
         <p>
-          <b>Workaround:</b> None </p>
+          Impala behavior differs from Hive with respect to out of range float/double values.
+          Out of range values are returned as maximum allowed value of type (Hive returns NULL).
+        </p>
+
+        <p>
+          <b>Workaround:</b> None
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="flume_writeformat_text">
@@ -660,23 +771,20 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          The default value in Avro schema must match type of first union
-          type, e.g. if the default value is <codeph>null</codeph>, then the
-          first type in the <codeph>UNION</codeph> must be
-            <codeph>"null"</codeph>.
+          The default value in Avro schema must match type of first union type, e.g. if the
+          default value is <codeph>null</codeph>, then the first type in the
+          <codeph>UNION</codeph> must be <codeph>"null"</codeph>.
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-635">IMPALA-635</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-635">IMPALA-635</xref>
         </p>
 
         <p>
-          <b>Workaround:</b>Swap the order of the fields in the schema
-          specification. For example, use <codeph>["null", "string"]</codeph>
-          instead of <codeph>["string", "null"]</codeph>. Note that the files
-          written with the problematic schema must be rewritten with the new
-          schema because Avro files have embedded schemas.
+          <b>Workaround:</b>Swap the order of the fields in the schema specification. For
+          example, use <codeph>["null", "string"]</codeph> instead of <codeph>["string",
+          "null"]</codeph>. Note that the files written with the problematic schema must be
+          rewritten with the new schema because Avro files have embedded schemas.
         </p>
 
       </conbody>
@@ -695,8 +803,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-1024">IMPALA-1024</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-1024">IMPALA-1024</xref>
         </p>
 
         <p>
@@ -719,8 +826,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-1652">IMPALA-1652</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-1652">IMPALA-1652</xref>
         </p>
 
         <p>
@@ -759,8 +865,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-4551">IMPALA-4551</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-4551">IMPALA-4551</xref>
         </p>
 
         <p>
@@ -790,8 +895,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-77">IMPALA-77</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-77">IMPALA-77</xref>
         </p>
 
         <p>
@@ -834,8 +938,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-2005">IMPALA-2005</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-2005">IMPALA-2005</xref>
         </p>
 
         <p>
@@ -861,8 +964,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-1821">IMPALA-1821</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-1821">IMPALA-1821</xref>
         </p>
 
 <!-- <p><b>Workaround:</b> Doublecheck that <codeph>CAST()</codeph> operations work as expect. The issue applies to expressions involving literals, not values read from table columns.</p> -->
@@ -870,24 +972,32 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </conbody>
 
     </concept>
-    <!--Fixed in 3.2-->
+
+<!--Fixed in 3.2-->
 
     <concept id="IMPALA-941" rev="IMPALA-941" audience="hidden">
-      <title>Impala Parser issue when using fully qualified table names that
-        start with a number</title>
+
+      <title>Impala Parser issue when using fully qualified table names that start with a number</title>
+
       <conbody>
-        <p> A fully qualified table name starting with a number could cause a
-          parsing error. In a name such as <codeph>db.571_market</codeph>, the
-          decimal point followed by digits is interpreted as a floating-point
-          number. </p>
+
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-941">IMPALA-941</xref>
+          A fully qualified table name starting with a number could cause a parsing error. In a
+          name such as <codeph>db.571_market</codeph>, the decimal point followed by digits is
+          interpreted as a floating-point number.
         </p>
+
         <p>
-          <b>Workaround:</b> Surround each part of the fully qualified name with
-          backticks (<codeph>``</codeph>). </p>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-941">IMPALA-941</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Surround each part of the fully qualified name with backticks
+          (<codeph>``</codeph>).
+        </p>
+
       </conbody>
+
     </concept>
 
     <concept id="IMPALA-532" rev="IMPALA-532">
@@ -902,8 +1012,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-532">IMPALA-532</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-532">IMPALA-532</xref>
         </p>
 
         <p>
@@ -971,8 +1080,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-6841">IMPALA-6841</xref>
+          <b>Apache Issue:</b> <xref keyref="IMPALA-6841">IMPALA-6841</xref>
         </p>
 
       </conbody>

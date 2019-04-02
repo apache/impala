@@ -59,24 +59,24 @@ under the License.
             Use the following start-up flags to customize the time zone definitions.
           </p>
           <ul>
-            <li >
-              <codeph>--hdfs_zone_info_zip</codeph>: This flag allows Impala administrators to
-              specify a custom timezone database. The flag should be set to a shared (not
-              necessarily HDFS) path that points to a zip archive of a custom IANA timezone
-              database. The timezone database is expected to be in a compiled binary format. If
-              the startup flag is set, Impala will use the specified timezone database instead
-              of the default <codeph>/usr/share/zoneinfo </codeph>database. The timezone db
-              upgrade process is described in detail below.
+            <li>
+              <codeph>&#8209;&#8209;hdfs_zone_info_zip</codeph>: This flag allows Impala
+              administrators to specify a custom timezone database. The flag should be set to a
+              shared (not necessarily HDFS) path that points to a zip archive of a custom IANA
+              timezone database. The timezone database is expected to be in a compiled binary
+              format. If the startup flag is set, Impala will use the specified timezone
+              database instead of the default <codeph>/usr/share/zoneinfo </codeph>database. The
+              timezone db upgrade process is described in detail below.
             </li>
 
             <li >
-              <p >
-                <codeph>--hdfs_zone_alias_conf</codeph>: This flag allows Impala administrators
-                to specify definitions for custom timezone aliases. The flag should be set to a
-                shared (not necessarily HDFS) path that specifies a config file containing
-                custom timezone alias definitions. This config file can be used as a workaround
-                for users who want to keep using their legacy timezone names. Configuring custom
-                aliases is described in detail below.
+              <p>
+                <codeph>&#8209;&#8209;hdfs_zone_alias_conf</codeph>: This flag allows Impala
+                administrators to specify definitions for custom timezone aliases. The flag
+                should be set to a shared (not necessarily HDFS) path that specifies a config
+                file containing custom timezone alias definitions. This config file can be used
+                as a workaround for users who want to keep using their legacy timezone names.
+                Configuring custom aliases is described in detail below.
               </p>
             </li>
           </ul>
@@ -120,8 +120,8 @@ popd</codeblock>
 hdfs dfs -copyFromLocal ./tzdata/etc/zoneinfo.zip /tzdb/latest</codeblock>
         </li>
 
-        <li >
-          Set the <codeph>--hdfs_zone_info_zip</codeph> startup flag to
+        <li>
+          Set the <codeph>&#8209;&#8209;hdfs_zone_info_zip</codeph> startup flag to
           <codeph>/tzdb/latest/zoneinfo.zip</codeph> as an <codeph>impalad </codeph>safety
           valve.
         </li>
@@ -161,8 +161,8 @@ GMT+01:00 = -3600</codeblock>
 hdfs dfs -copyFromLocal tzalias.conf /tzdb</codeblock>
         </li>
 
-        <li >
-          Set the <codeph>--hdfs_zone_alias_conf</codeph> startup flag to
+        <li>
+          Set the <codeph>&#8209;&#8209;hdfs_zone_alias_conf</codeph> startup flag to
           <codeph>/tzdb/tzalias.conf</codeph> as an <codeph>impalad </codeph>safety valve.
         </li>
 

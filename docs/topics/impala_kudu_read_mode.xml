@@ -64,8 +64,7 @@ under the License.
       <ul>
         <li>
           <codeph>"DEFAULT"</codeph>: The value of the startup flag,
-          <codeph>--kudu_read_mode</codeph>, is used.
-        </li>
+            <codeph>&#8209;&#8209;kudu_read_mode</codeph>, is used. </li>
 
         <li>
           <codeph>"READ_LATEST"</codeph>: Commonly known as the Read Committed isolation mode,

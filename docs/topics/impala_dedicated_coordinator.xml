@@ -124,9 +124,11 @@ under the License.
       </li>
     </ul>
 
-    <p> If such scalability bottlenecks occur, in Impala 2.9 and higher, you can
-      assign one dedicated role to each Impala daemon host, either as a
-      coordinator or as an executor, to address the issues. </p>
+    <p>
+      If such scalability bottlenecks occur, in Impala 2.9 and higher, you can assign one
+      dedicated role to each Impala daemon host, either as a coordinator or as an executor, to
+      address the issues.
+    </p>
 
     <ul>
       <li>
@@ -602,21 +604,22 @@ under the License.
         <ul>
           <li>
             <p>
-              <codeph>is_executor=false</codeph> for each host that does not act as an executor
-              for Impala queries. These hosts act exclusively as query coordinators. This
-              setting typically applies to a relatively small number of hosts, because the most
-              common topology is to have nearly all DataNodes doing work for query execution.
+              <codeph>&#8209;&#8209;is_executor=false</codeph> for each host that does not act
+              as an executor for Impala queries. These hosts act exclusively as query
+              coordinators. This setting typically applies to a relatively small number of
+              hosts, because the most common topology is to have nearly all DataNodes doing work
+              for query execution.
             </p>
           </li>
 
           <li>
             <p>
-              <codeph>is_coordinator=false</codeph> for each host that does not act as a
-              coordinator for Impala queries. These hosts act exclusively as executors. The
-              number of hosts with this setting typically increases as the cluster grows larger
-              and handles more table partitions, data files, and concurrent queries. As the
-              overhead for query coordination increases, it becomes more important to centralize
-              that work on dedicated hosts.
+              <codeph>&#8209;&#8209;is_coordinator=false</codeph> for each host that does not
+              act as a coordinator for Impala queries. These hosts act exclusively as executors.
+              The number of hosts with this setting typically increases as the cluster grows
+              larger and handles more table partitions, data files, and concurrent queries. As
+              the overhead for query coordination increases, it becomes more important to
+              centralize that work on dedicated hosts.
             </p>
           </li>
         </ul>

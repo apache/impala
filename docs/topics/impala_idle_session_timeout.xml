@@ -50,9 +50,9 @@ under the License.
 
     <p rev="2.12.0">
       The <codeph>IDLE_SESSION_TIMEOUT</codeph> query option overrides the
-      <codeph>--idle_session_timeout</codeph> startup option. See
+      <codeph>&#8209;&#8209;idle_session_timeout</codeph> startup option. See
       <xref href="impala_timeouts.xml#timeouts"/> for the
-      <codeph>--idle_session_timeout</codeph> startup option.
+      <codeph>&#8209;&#8209;idle_session_timeout</codeph> startup option.
     </p>
 
     <p>
@@ -74,11 +74,12 @@ under the License.
       <b>Default:</b> 0
       <ul>
         <li>
-          If <codeph>--idle_session_timeout</codeph> is not set, the session never expires.
+          If <codeph>&#8209;&#8209;idle_session_timeout</codeph> is not set, the session never
+          expires.
         </li>
 
         <li>
-          If <codeph>--idle_session_timeout</codeph> is set, use that timeout value.
+          If <codeph>&#8209;&#8209;idle_session_timeout</codeph> is set, use that timeout value.
         </li>
       </ul>
     </p>

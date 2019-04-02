@@ -121,7 +121,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>--enable_ldap_auth</codeph>
+            <codeph>&#8209;&#8209;enable_ldap_auth</codeph>
           </dt>
 
           <dd>
@@ -135,7 +135,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>--ldap_uri</codeph>
+            <codeph>&#8209;&#8209;ldap_uri</codeph>
           </dt>
 
           <dd>
@@ -276,7 +276,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>--ldap_tls</codeph>
+            <codeph>&#8209;&#8209;ldap_tls</codeph>
           </dt>
 
           <dd>
@@ -291,7 +291,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>--ldap_ca_certificate</codeph>
+            <codeph>&#8209;&#8209;ldap_ca_certificate</codeph>
           </dt>
 
           <dd>

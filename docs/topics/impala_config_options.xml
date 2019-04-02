@@ -34,10 +34,9 @@ under the License.
   <conbody>
 
     <p>
-      The configuration options for the Impala daemons let you choose which
-      hosts and ports to use for the services that run on a single host, specify
-      directories for logging, control resource usage and security, and specify
-      other aspects of the Impala software.
+      The configuration options for the Impala daemons let you choose which hosts and ports to
+      use for the services that run on a single host, specify directories for logging, control
+      resource usage and security, and specify other aspects of the Impala software.
     </p>
 
     <p outputclass="toc inpage"/>
@@ -51,16 +50,16 @@ under the License.
     <conbody>
 
       <p>
-        The Impala server, statestore, and catalog services start up using values provided in a
-        defaults file, <filepath>/etc/default/impala</filepath>.
+        The Impala server, <codeph>statestore</codeph>, and catalog services start up using
+        values provided in a defaults file, <filepath>/etc/default/impala</filepath>.
       </p>
 
       <p>
         This file includes information about many resources used by Impala. Most of the defaults
         included in this file should be effective in most cases. For example, typically you
         would not change the definition of the <codeph>CLASSPATH</codeph> variable, but you
-        would always set the address used by the statestore server. Some of the content you
-        might modify includes:
+        would always set the address used by the <codeph>statestore</codeph> server. Some of the
+        content you might modify includes:
       </p>
 
 <!-- Note: Update the following example for each release with the associated lines from /etc/default/impala. -->
@@ -93,7 +92,7 @@ Stopping Impala Server:                                    [  OK  ]
 Starting Impala Server:                                    [  OK  ]</codeblock>
 
       <p>
-        Restart the Impala statestore using the following commands:
+        Restart the Impala StateStore using the following commands:
       </p>
 
 <codeblock>$ sudo service impala-state-store restart
@@ -101,7 +100,7 @@ Stopping Impala State Store Server:                        [  OK  ]
 Starting Impala State Store Server:                        [  OK  ]</codeblock>
 
       <p>
-        Restart the Impala catalog service using the following commands:
+        Restart the Impala Catalog Service using the following commands:
       </p>
 
 <codeblock>$ sudo service impala-catalog restart
@@ -115,10 +114,11 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
       <ul>
         <li>
           <p>
-            Statestore address. Where practical, put the statestore on a separate host not
-            running the <cmdname>impalad</cmdname> daemon. In that recommended configuration,
-            the <cmdname>impalad</cmdname> daemon cannot refer to the statestore server using
-            the loopback address. If the statestore is hosted on a machine with an IP address of
+            StateStore address. Where practical, put the <codeph>statestored</codeph> on a
+            separate host not running the <cmdname>impalad</cmdname> daemon. In that recommended
+            configuration, the <cmdname>impalad</cmdname> daemon cannot refer to the
+            <codeph>statestored</codeph> server using the loopback address. If the
+            <codeph>statestored</codeph> is hosted on a machine with an IP address of
             192.168.0.27, change:
           </p>
 <codeblock>IMPALA_STATE_STORE_HOST=127.0.0.1</codeblock>
@@ -131,8 +131,8 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         <li rev="1.2">
           <p>
             Catalog server address (including both the hostname and the port number). Update the
-            value of the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph> variable. Where
-            practical, run the catalog server on the same host as the statestore. In that
+            value of the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph> variable. Where practical,
+            run the catalog server on the same host as the <codeph>statestore</codeph>. In that
             recommended configuration, the <cmdname>impalad</cmdname> daemon cannot refer to the
             catalog server using the loopback address. If the catalog service is hosted on a
             machine with an IP address of 192.168.0.27, add the following line:
@@ -143,9 +143,9 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
             an <codeph>IMPALA_CATALOG_ARGS</codeph> environment variable, but if you add one it
             will be recognized by the service startup/shutdown script. Add a definition for this
             variable to <filepath>/etc/default/impala</filepath> and add the option
-            <codeph>-catalog_service_host=<varname>hostname</varname></codeph>. If the port is
-            different than the default 26000, also add the option
-            <codeph>-catalog_service_port=<varname>port</varname></codeph>.
+            <codeph>&#8209;&#8209;catalog_service_host=<varname>hostname</varname></codeph>. If
+            the port is different than the default 26000, also add the option
+            <codeph>&#8209;&#8209;catalog_service_port=<varname>port</varname></codeph>.
           </p>
         </li>
 
@@ -180,36 +180,42 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         </li>
 
         <li>
-          <p> Core dump enablement. To enable core dumps, change: </p>
+          <p>
+            Core dump enablement. To enable core dumps, change:
+          </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-false}</codeblock>
           <p>
             to:
           </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-true}</codeblock>
-
-          <note conref="../shared/impala_common.xml#common/core_dump_considerations"/>
+          <note
+            conref="../shared/impala_common.xml#common/core_dump_considerations"/>
         </li>
 
         <li>
           <p>
             Authorization using the open source Sentry plugin. Specify the
-            <codeph>-server_name</codeph> and <codeph>-authorization_policy_file</codeph>
-            options as part of the <codeph>IMPALA_SERVER_ARGS</codeph> and
-            <codeph>IMPALA_STATE_STORE_ARGS</codeph> settings to enable the core Impala support
-            for authentication. See <xref href="impala_authorization.xml#secure_startup"/> for
-            details.
+            <codeph>&#8209;&#8209;server_name</codeph> and
+            <codeph>&#8209;&#8209;authorization_policy_file</codeph> options as part of the
+            <codeph>IMPALA_SERVER_ARGS</codeph> and <codeph>IMPALA_STATE_STORE_ARGS</codeph>
+            settings to enable the core Impala support for authentication. See
+            <xref
+              href="impala_authorization.xml#secure_startup"/> for details.
           </p>
         </li>
 
         <li>
           <p>
             Auditing for successful or blocked Impala queries, another aspect of security.
-            Specify the <codeph>-audit_event_log_dir=<varname>directory_path</varname></codeph>
+            Specify the
+            <codeph>&#8209;&#8209;audit_event_log_dir=<varname>directory_path</varname></codeph>
             option and optionally the
-            <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
-            and <codeph>-abort_on_failed_audit_event</codeph> options as part of the
-            <codeph>IMPALA_SERVER_ARGS</codeph> settings, for each Impala node, to enable and
-            customize auditing. See <xref href="impala_auditing.xml#auditing"/> for details.
+            <codeph>&#8209;&#8209;max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
+            and <codeph>&#8209;&#8209;abort_on_failed_audit_event</codeph> options as part of
+            the <codeph>IMPALA_SERVER_ARGS</codeph> settings, for each Impala node, to enable
+            and customize auditing. See
+            <xref
+              href="impala_auditing.xml#auditing"/> for details.
           </p>
         </li>
 
@@ -217,11 +223,13 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           <p>
             Password protection for the Impala web UI, which listens on port 25000 by default.
             This feature involves adding some or all of the
-            <codeph>--webserver_password_file</codeph>,
-            <codeph>--webserver_authentication_domain</codeph>, and
-            <codeph>--webserver_certificate_file</codeph> options to the
+            <codeph>&#8209;&#8209;webserver_password_file</codeph>,
+            <codeph>&#8209;&#8209;webserver_authentication_domain</codeph>, and
+            <codeph>&#8209;&#8209;webserver_certificate_file</codeph> options to the
             <codeph>IMPALA_SERVER_ARGS</codeph> and <codeph>IMPALA_STATE_STORE_ARGS</codeph>
-            settings. See <xref href="impala_security_guidelines.xml#security_guidelines"/> for
+            settings. See
+            <xref
+              href="impala_security_guidelines.xml#security_guidelines"/> for
             details.
           </p>
         </li>
@@ -230,11 +238,13 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           <p rev="DOCS-677">
             Another setting you might add to <codeph>IMPALA_SERVER_ARGS</codeph> is a
             comma-separated list of query options and values:
-<codeblock>-default_query_options='<varname>option</varname>=<varname>value</varname>,<varname>option</varname>=<varname>value</varname>,...'
+<codeblock>&#8209;&#8209;default_query_options='<varname>option</varname>=<varname>value</varname>,<varname>option</varname>=<varname>value</varname>,...'
 </codeblock>
             These options control the behavior of queries performed by this
             <cmdname>impalad</cmdname> instance. The option values you specify here override the
-            default values for <xref href="impala_query_options.xml#query_options">Impala query
+            default values for
+            <xref
+              href="impala_query_options.xml#query_options">Impala query
             options</xref>, as shown by the <codeph>SET</codeph> statement in
             <cmdname>impala-shell</cmdname>.
           </p>
@@ -242,9 +252,9 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
         <li>
           <p>
-            During troubleshooting, <keyword keyref="support_org"/> might direct you to change other values,
-            particularly for <codeph>IMPALA_SERVER_ARGS</codeph>, to work around issues or
-            gather debugging information.
+            During troubleshooting, <keyword keyref="support_org"/> might direct you to change
+            other values, particularly for <codeph>IMPALA_SERVER_ARGS</codeph>, to work around
+            issues or gather debugging information.
           </p>
         </li>
       </ul>
@@ -292,27 +302,25 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
     <conbody>
 
       <p>
-        The <codeph>impalad</codeph> daemon implements the main Impala
-        service, which performs query processing and reads from and writes to the data
-        files. Some of the noteworthy options are:
+        The <codeph>impalad</codeph> daemon implements the main Impala service, which performs
+        query processing and reads from and writes to the data files. Some of the noteworthy
+        options are:
         <ul>
           <li>
-            The <codeph>fe_service_threads</codeph> option specifies the
-            maximum number of concurrent client connections allowed. The
-            default value is 64 with which 64 queries can run
-              simultaneously.
+            The <codeph>&#8209;&#8209;fe_service_threads</codeph> option specifies the maximum
+            number of concurrent client connections allowed. The default value is 64 with which
+            64 queries can run simultaneously.
             <p>
-              If you have more clients trying to connect to
-              Impala than the value of this setting, the later arriving clients
-              have to wait until previous clients disconnect. You can increase
-              this value to allow more client connections. However, a large value
-              means more threads to be maintained even if most of the connections
-              are idle, and it could negatively impact query latency. Client
-              applications should use the connection pool to avoid need for
-              large number of sessions.
+              If you have more clients trying to connect to Impala than the value of this
+              setting, the later arriving clients have to wait until previous clients
+              disconnect. You can increase this value to allow more client connections. However,
+              a large value means more threads to be maintained even if most of the connections
+              are idle, and it could negatively impact query latency. Client applications should
+              use the connection pool to avoid need for large number of sessions.
             </p>
           </li>
-        </ul></p>
+        </ul>
+      </p>
 
     </conbody>
 
@@ -324,10 +332,11 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     <conbody>
 
-      <p> The <cmdname>statestored</cmdname> daemon implements the Impala
-        StateStore service, which monitors the availability of Impala services
-        across the cluster, and handles situations such as nodes becoming
-        unavailable or becoming available again. </p>
+      <p>
+        The <cmdname>statestored</cmdname> daemon implements the Impala StateStore service,
+        which monitors the availability of Impala services across the cluster, and handles
+        situations such as nodes becoming unavailable or becoming available again.
+      </p>
 
     </conbody>
 
@@ -339,10 +348,11 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     <conbody>
 
-      <p> The <cmdname>catalogd</cmdname> daemon implements the Impala Catalog
-        service, which broadcasts metadata changes to all the Impala nodes when
-        Impala creates a table, inserts data, or performs other kinds of DDL and
-        DML operations. </p>
+      <p>
+        The <cmdname>catalogd</cmdname> daemon implements the Impala Catalog service, which
+        broadcasts metadata changes to all the Impala nodes when Impala creates a table, inserts
+        data, or performs other kinds of DDL and DML operations.
+      </p>
 
       <p conref="../shared/impala_common.xml#common/load_catalog_in_background"/>
 

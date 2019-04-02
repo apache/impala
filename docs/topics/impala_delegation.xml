@@ -48,9 +48,10 @@ under the License.
     <p>
       Starting in <keyword keyref="impala31_full">Impala 3.1</keyword> and higher, you can
       delegate using groups. Instead of listing a large number of delegated users, you can
-      create a group of those users and specify the delegated group name in the Impalad startup
-      option. The client sends the delegated user name, and Impala performs an authorization to
-      see if the delegated user belongs to a delegated group.
+      create a group of those users and specify the delegated group name in the
+      <codeph>impalad</codeph> startup option. The client sends the delegated user name, and
+      Impala performs an authorization to see if the delegated user belongs to a delegated
+      group.
     </p>
 
     <p>
@@ -82,17 +83,17 @@ under the License.
 
     <p>
       The delegation feature is enabled by the startup options for <cmdname>impalad</cmdname>:
-      <codeph>--authorized_proxy_user_config</codeph> and
-      <codeph>--authorized_proxy_group_config</codeph>.
+      <codeph>&#8209;&#8209;authorized_proxy_user_config</codeph> and
+      <codeph>&#8209;&#8209;authorized_proxy_group_config</codeph>.
     </p>
 
     <p>
       The syntax for the options are:
     </p>
 
-<codeblock>--authorized_proxy_user_config=<varname>authenticated_user1</varname>=<varname>delegated_user1</varname>,<varname>delegated_user2</varname>,...;<varname>authenticated_user2</varname>=...</codeblock>
+<codeblock>&#8209;&#8209;authorized_proxy_user_config=<varname>authenticated_user1</varname>=<varname>delegated_user1</varname>,<varname>delegated_user2</varname>,...;<varname>authenticated_user2</varname>=...</codeblock>
 
-<codeblock>--authorized_proxy_group_config=<varname>authenticated_user1</varname>=<varname>delegated_group1</varname>,<varname>delegated_group2</varname>,...;<varname>authenticated_user2</varname>=...</codeblock>
+<codeblock>&#8209;&#8209;authorized_proxy_group_config=<varname>authenticated_user1</varname>=<varname>delegated_group1</varname>,<varname>delegated_group2</varname>,...;<varname>authenticated_user2</varname>=...</codeblock>
 
     <ul>
       <li>
@@ -104,28 +105,30 @@ under the License.
       </li>
 
       <li>
-        Use the <codeph>--authorized_proxy_user_config_delimiter</codeph> startup option to
-        override the default user delimiter (the comma character) to another character.
+        Use the <codeph>&#8209;&#8209;authorized_proxy_user_config_delimiter</codeph> startup
+        option to override the default user delimiter (the comma character) to another
+        character.
       </li>
 
       <li>
-        Use the <codeph>--authorized_proxy_group_config_delimiter</codeph> startup option to
-        override the default group delimiter ( (the comma character) to another character.
+        Use the <codeph>&#8209;&#8209;authorized_proxy_group_config_delimiter</codeph> startup
+        option to override the default group delimiter ( (the comma character) to another
+        character.
       </li>
 
       <li>
         Wildcard (<codeph>*</codeph>) is supported to delegated to any users or any groups, e.g.
-        <codeph>--authorized_proxy_group_config=hue=*</codeph>. Make sure to use single quotes
-        or escape characters to ensure that any <codeph>*</codeph> characters do not undergo
-        wildcard expansion when specified in command-line arguments.
+        <codeph>&#8209;&#8209;authorized_proxy_group_config=hue=*</codeph>. Make sure to use
+        single quotes or escape characters to ensure that any <codeph>*</codeph> characters do
+        not undergo wildcard expansion when specified in command-line arguments.
       </li>
     </ul>
 
     <p>
       When you start Impala with the
-      <codeph>--authorized_proxy_user_config=<varname>authenticated_user</varname>=<varname>delegated_user</varname></codeph>
+      <codeph>&#8209;&#8209;authorized_proxy_user_config=<varname>authenticated_user</varname>=<varname>delegated_user</varname></codeph>
       or
-      <codeph>--authorized_proxy_group_config=<varname>authenticated_user</varname>=<varname>delegated_group</varname></codeph>
+      <codeph>&#8209;&#8209;authorized_proxy_group_config=<varname>authenticated_user</varname>=<varname>delegated_group</varname></codeph>
       option:
     </p>
 
@@ -183,11 +186,11 @@ under the License.
           The Impalad daemon starts with one of the following options:
           <ul>
             <li>
-              <codeph>--authorized_proxy_user_config=<varname>authenticated_user</varname>=<varname>delegated_user</varname></codeph>
+              <codeph>&#8209;&#8209;authorized_proxy_user_config=<varname>authenticated_user</varname>=<varname>delegated_user</varname></codeph>
             </li>
 
             <li>
-              <codeph>--authorized_proxy_group_config=<varname>authenticated_user</varname>=<varname>delegated_group</varname></codeph>
+              <codeph>&#8209;&#8209;authorized_proxy_group_config=<varname>authenticated_user</varname>=<varname>delegated_group</varname></codeph>
             </li>
           </ul>
         </li>
