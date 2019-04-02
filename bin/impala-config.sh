@@ -171,22 +171,11 @@ export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
-export USE_CDP_HIVE=${USE_CDP_HIVE-false}
-if $USE_CDP_HIVE; then
-  export IMPALA_HIVE_VERSION=3.1.0.6.0.99.0-45
-  # Temporary version of Tez, patched with the fix for TEZ-1348:
-  # https://github.com/apache/tez/pull/40
-  # We'll switch to a non-"todd" version of Tez once that fix is integrated.
-  # For now, if you're bumping the CDP build number, you'll need to download
-  # this tarball from an earlier build and re-upload it to the new directory
-  # in the toolchain bucket.
-  #
-  # TODO(todd) switch to an official build.
-  export IMPALA_TEZ_VERSION=0.10.0-todd-6fcc41e5798b.1
-  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
-else
-  export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
-fi
+export CDH_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
+# This is a custom build of Hive which includes patches for HIVE-21586
+# HIVE-21077, HIVE-21526, HIVE-21561
+# TODO Use a official once these patches are merged
+export CDP_HIVE_VERSION=3.1.0.6.0.99.0-38-0e7f6337a50
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -205,6 +194,33 @@ unset IMPALA_LLAMA_MINIKDC_URL
 if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
 fi
+
+export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
+export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
+export USE_CDP_HIVE=${USE_CDP_HIVE-false}
+if $USE_CDP_HIVE; then
+  # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
+  # the minicluster
+  export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
+  # Temporary version of Tez, patched with the fix for TEZ-1348:
+  # https://github.com/apache/tez/pull/40
+  # We'll switch to a non-"todd" version of Tez once that fix is integrated.
+  # For now, if you're bumping the CDP build number, you'll need to download
+  # this tarball from an earlier build and re-upload it to the new directory
+  # in the toolchain bucket.
+  #
+  # TODO(todd) switch to an official build.
+  export IMPALA_TEZ_VERSION=0.10.0-todd-6fcc41e5798b.1
+else
+  # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
+  # false
+  export IMPALA_HIVE_VERSION=${CDH_HIVE_VERSION}
+fi
+# Extract the first component of the hive version.
+# Allow overriding of Hive source location in case we want to build Impala without
+# a complete Hive build. This is used by fe/pom.xml to activate compatibility shims
+# for Hive-2 or Hive-3
+export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
 
 # It is important to have a coherent view of the JAVA_HOME and JAVA executable.
 # The JAVA_HOME should be determined first, then the JAVA executable should be
@@ -291,16 +307,29 @@ export EXTERNAL_LISTEN_HOST="${EXTERNAL_LISTEN_HOST-0.0.0.0}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://${INTERNAL_LISTEN_HOST}:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
+
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
 if $USE_CDP_HIVE; then
-  # It is likely that devs will want to with both the versions of metastore
+  export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
+  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/apache-hive-\
+${IMPALA_HIVE_VERSION}-src"}
+  # Set the path to the hive_metastore.thrift which is used to build thrift code
+  export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
+  # It is likely that devs will want to work with both the versions of metastore
   # if cdp hive is being used change the metastore db name, so we don't have to
   # format the metastore db everytime we switch between hive versions
   export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
+  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 else
+  export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}"
+  # Allow overriding of Hive source location in case we want to build Impala without
+# a complete Hive build.
+  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
+  export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/metastore/if
   export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
 fi
-
+# Set the Hive binaries in the path
+export PATH="$HIVE_HOME/bin:$PATH"
 
 export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
 if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
@@ -492,12 +521,6 @@ export IMPALA_COMMON_DIR="$IMPALA_HOME/common"
 export PATH="$IMPALA_TOOLCHAIN/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
 export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
 
-# The directory in which all the thirdparty CDH components live.
-export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
-
-# The directory in which all the thirdparty CDP components live.
-export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
-
 # Typically we build against a snapshot build of Hadoop that includes everything we need
 # for building Impala and running a minicluster.
 export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
@@ -531,17 +554,6 @@ export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 export RANGER_HOME="${CDP_COMPONENTS_HOME}/ranger-${IMPALA_RANGER_VERSION}-admin"
 export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
-# Extract the first component of the hive version.
-export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
-if $USE_CDP_HIVE; then
-  export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
-else
-  export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
-fi
-export PATH="$HIVE_HOME/bin:$PATH"
-# Allow overriding of Hive source location in case we want to build Impala without
-# a complete Hive build.
-export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
 # To configure Hive logging, there's a hive-log4j2.properties[.template]
 # file in fe/src/test/resources. To get it into the classpath earlier
 # than the hive-log4j2.properties file included in some Hive jars,

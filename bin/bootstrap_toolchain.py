@@ -570,8 +570,10 @@ if __name__ == "__main__":
   ]
   use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
   if use_cdp_hive:
+    cdp_components.append(CdpComponent("apache-hive-{0}-src"
+                          .format(os.environ.get("IMPALA_HIVE_VERSION")))),
     cdp_components.append(CdpComponent("apache-hive-{0}-bin"
-                          .format(os.environ.get("IMPALA_HIVE_VERSION"))))
+                          .format(os.environ.get("IMPALA_HIVE_VERSION")))),
     cdp_components.append(CdpComponent(
         "tez-{0}-minimal".format(os.environ.get("IMPALA_TEZ_VERSION")),
         makedir=True))

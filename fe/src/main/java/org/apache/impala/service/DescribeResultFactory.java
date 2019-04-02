@@ -25,13 +25,13 @@ import java.util.Objects;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
-import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
@@ -216,15 +216,15 @@ public class DescribeResultFactory {
     hiveTable.setTTable(msTable);
     StringBuilder sb = new StringBuilder();
     // First add all the columns (includes partition columns).
-    sb.append(MetaDataFormatUtils.getAllColumnsInformation(msTable.getSd().getCols(),
+    sb.append(MetastoreShim.getAllColumnsInformation(msTable.getSd().getCols(),
         msTable.getPartitionKeys(), true, false, true));
     // Add the extended table metadata information.
-    sb.append(MetaDataFormatUtils.getTableInformation(hiveTable));
+    sb.append(MetastoreShim.getTableInformation(hiveTable));
 
     for (String line: sb.toString().split("\n")) {
       // To match Hive's HiveServer2 output, split each line into multiple column
       // values based on the field delimiter.
-      String[] columns = line.split(MetaDataFormatUtils.FIELD_DELIM);
+      String[] columns = line.split("\t");
       TResultRow resultRow = new TResultRow();
       for (int i = 0; i < NUM_DESC_FORMATTED_RESULT_COLS; ++i) {
         TColumnValue colVal = new TColumnValue();

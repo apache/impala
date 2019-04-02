@@ -172,7 +172,7 @@ set(HIVE_THRIFT_SOURCE_DIR "hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api")
 set(TCLI_SERVICE_THRIFT "${HIVE_THRIFT_SOURCE_DIR}/TCLIService.thrift")
 message("Using Thrift compiler: ${THRIFT_COMPILER}")
 message("Using Thrift 11 compiler: ${THRIFT11_COMPILER}")
-set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_SRC_DIR}/metastore/if
+set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_METASTORE_THRIFT_DIR}
   -I ${HIVE_THRIFT_SOURCE_DIR})
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
@@ -255,6 +255,13 @@ add_custom_command(OUTPUT hive-2-api/TCLIService.thrift
   COMMAND sed
       's/namespace java org.apache.hive.service.cli.thrift/namespace java org.apache.hive.service.rpc.thrift/'
       hive-1-api/TCLIService.thrift > hive-2-api/TCLIService.thrift
+  DEPENDS hive-1-api/TCLIService.thrift
+)
+
+add_custom_command(OUTPUT hive-3-api/TCLIService.thrift
+  COMMAND sed
+      's/namespace java org.apache.hive.service.cli.thrift/namespace java org.apache.hive.service.rpc.thrift/'
+      hive-1-api/TCLIService.thrift > hive-3-api/TCLIService.thrift
   DEPENDS hive-1-api/TCLIService.thrift
 )
 

@@ -40,6 +40,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TResultRow;
@@ -64,8 +65,8 @@ public class MetadataOp {
   // Static column values
   private static final TColumnValue NULL_COL_VAL = new TColumnValue();
   private static final TColumnValue EMPTY_COL_VAL = createTColumnValue("");
-  private static final String TABLE_TYPE_TABLE = "TABLE";
-  private static final String TABLE_TYPE_VIEW = "VIEW";
+  public static final String TABLE_TYPE_TABLE = "TABLE";
+  public static final String TABLE_TYPE_VIEW = "VIEW";
 
   // Result set schema for each of the metadata operations.
   private final static TResultSetMetadata GET_CATALOGS_MD = new TResultSetMetadata();
@@ -317,7 +318,10 @@ public class MetadataOp {
           } else {
             if (table.getMetaStoreTable() != null) {
               comment = table.getMetaStoreTable().getParameters().get("comment");
-              tableType = mapToInternalTableType(table.getMetaStoreTable().getTableType());
+              String tableTypeStr = table.getMetaStoreTable().getTableType() == null ?
+                  null : table.getMetaStoreTable().getTableType().toUpperCase();
+              tableType = MetastoreShim.HMS_TO_IMPALA_TYPE
+                  .getOrDefault(tableTypeStr, TABLE_TYPE_TABLE);
             }
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
           }
@@ -334,28 +338,6 @@ public class MetadataOp {
       }
     }
     return result;
-  }
-
-  private static String mapToInternalTableType(String typeStr) {
-    String defaultTableType = TABLE_TYPE_TABLE;
-    TableType tType;
-
-    if (typeStr == null) return defaultTableType;
-    try {
-      tType = TableType.valueOf(typeStr.toUpperCase());
-    } catch (Exception e) {
-      return defaultTableType;
-    }
-    switch (tType) {
-      case EXTERNAL_TABLE:
-      case MANAGED_TABLE:
-      case INDEX_TABLE:
-        return TABLE_TYPE_TABLE;
-      case VIRTUAL_VIEW:
-        return TABLE_TYPE_VIEW;
-      default:
-        return defaultTableType;
-    }
   }
 
   /**

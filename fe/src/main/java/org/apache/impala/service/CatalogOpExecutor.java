@@ -3640,7 +3640,7 @@ public class CatalogOpExecutor {
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
                   partName.substring(0, partName.length() - 1));
-              MetastoreShim.updatePartitionStatsFast(partition, warehouse);
+              MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
             }
 
             // First add_partitions and then alter_partitions the successful ones with

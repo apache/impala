@@ -35,8 +35,7 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
-import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
-import org.apache.hadoop.hive.metastore.messaging.json.ExtendedJSONMessageFactory;
+import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -44,6 +43,7 @@ import org.apache.impala.catalog.events.EventProcessorConfigValidator.Validation
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.util.MetaStoreUtil;
@@ -175,13 +175,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MetastoreEventsProcessor.class);
-  // Use ExtendedJSONMessageFactory to deserialize the event messages.
-  // ExtendedJSONMessageFactory adds additional information over JSONMessageFactory so
-  // that events are compatible with Sentry
-  // TODO this should be moved to JSONMessageFactory when Sentry switches to
-  // JSONMessageFactory
-  private static final MessageFactory messageFactory =
-      ExtendedJSONMessageFactory.getInstance();
+
+  private static final MessageDeserializer MESSAGE_DESERIALIZER =
+      MetastoreShim.getMessageDeserializer();
 
   private static MetastoreEventsProcessor instance;
 
@@ -632,7 +628,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     return metastoreEventFactory_;
   }
 
-  public static MessageFactory getMessageFactory() {
-    return messageFactory;
+  public static MessageDeserializer getMessageDeserializer() {
+    return MESSAGE_DESERIALIZER;
   }
 }

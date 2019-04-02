@@ -17,16 +17,33 @@
 
 package org.apache.impala.compat;
 
+import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
+import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.util.EnumSet;
 import java.util.List;
 
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
+import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
+import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
+import org.apache.hadoop.hive.metastore.messaging.json.ExtendedJSONMessageFactory;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
@@ -76,8 +93,8 @@ public class MetastoreShim {
    * Wrapper around MetaStoreUtils.updatePartitionStatsFast() to deal with added
    * arguments.
    */
-  public static void updatePartitionStatsFast(Partition partition, Warehouse warehouse)
-      throws MetaException {
+  public static void updatePartitionStatsFast(Partition partition, Table tbl,
+      Warehouse warehouse) throws MetaException {
     MetaStoreUtils.updatePartitionStatsFast(partition, warehouse, null);
   }
 
@@ -123,5 +140,86 @@ public class MetastoreShim {
     TGetSchemasReq req = request.getGet_schemas_req();
     return MetadataOp.getSchemas(
         frontend, req.getCatalogName(), req.getSchemaName(), user);
+  }
+
+  /**
+   * Supported HMS-2 types
+   */
+  public static final EnumSet<TableType> IMPALA_SUPPORTED_TABLE_TYPES = EnumSet
+      .of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE, TableType.VIRTUAL_VIEW);
+
+  /**
+   * mapping between the HMS-2 type the Impala types
+   */
+  public static final ImmutableMap<String, String> HMS_TO_IMPALA_TYPE =
+      new ImmutableMap.Builder<String, String>()
+          .put("EXTERNAL_TABLE", TABLE_TYPE_TABLE)
+          .put("MANAGED_TABLE", TABLE_TYPE_TABLE)
+          .put("INDEX_TABLE", TABLE_TYPE_TABLE)
+          .put("VIRTUAL_VIEW", TABLE_TYPE_VIEW).build();
+
+  /**
+   * Wrapper method which returns ExtendedJSONMessageFactory in case Impala is
+   * building against Hive-2 to keep compatibility with Sentry
+   */
+  public static MessageDeserializer getMessageDeserializer() {
+    return ExtendedJSONMessageFactory.getInstance().getDeserializer();
+  }
+
+  /**
+   * Wrapper around FileUtils.makePartName to deal with package relocation in Hive 3
+   * @param partitionColNames
+   * @param values
+   * @return
+   */
+  public static String makePartName(List<String> partitionColNames, List<String> values) {
+    return FileUtils.makePartName(partitionColNames, values);
+  }
+
+  /**
+   * Wrapper method around message factory's build alter table message due to added
+   * arguments in hive 3.
+   */
+  @VisibleForTesting
+  public static AlterTableMessage buildAlterTableMessage(Table before, Table after,
+      boolean isTruncateOp, long writeId) {
+    Preconditions.checkArgument(writeId < 0, "Write ids are not supported in Hive-2 "
+        + "compatible build");
+    Preconditions.checkArgument(!isTruncateOp, "Truncate operation is not supported in "
+        + "alter table messages in Hive-2 compatible build");
+    return ExtendedJSONMessageFactory.getInstance().buildAlterTableMessage(before, after);
+  }
+
+  @VisibleForTesting
+  public static InsertMessage buildInsertMessage(Table msTbl, Partition partition,
+      boolean isInsertOverwrite, List<String> newFiles) {
+    return ExtendedJSONMessageFactory.getInstance().buildInsertMessage(msTbl, partition,
+        isInsertOverwrite, newFiles);
+  }
+
+  public static String getAllColumnsInformation(List<FieldSchema> tabCols,
+      List<FieldSchema> partitionCols, boolean printHeader, boolean isOutputPadded,
+      boolean showPartColsSeparately) {
+    return MetaDataFormatUtils
+        .getAllColumnsInformation(tabCols, partitionCols, printHeader, isOutputPadded,
+            showPartColsSeparately);
+  }
+
+  /**
+   * Wrapper method around Hive's MetadataFormatUtils.getTableInformation which has
+   * changed significantly in Hive-3
+   * @return
+   */
+  public static String getTableInformation(
+      org.apache.hadoop.hive.ql.metadata.Table table) {
+    return MetaDataFormatUtils.getTableInformation(table);
+  }
+
+  /**
+   * Wrapper method around BaseSemanticAnalyzer's unespaceSQLString to be compatibility
+   * with Hive. Takes in a normalized value of the string surrounded by single quotes
+   */
+  public static String unescapeSQLString(String normalizedStringLiteral) {
+    return BaseSemanticAnalyzer.unescapeSQLString(normalizedStringLiteral);
   }
 }

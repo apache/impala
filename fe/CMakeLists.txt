@@ -16,7 +16,7 @@
 # under the License.
 
 add_custom_target(fe ALL DEPENDS
-  thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
+  shaded-deps thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
   COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
 )
 

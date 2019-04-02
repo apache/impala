@@ -18,6 +18,7 @@
 package org.apache.impala.testutil;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.log4j.Logger;
@@ -46,6 +47,15 @@ public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
     derbyDataStorePath_ = dbStorePath;
   }
 
+  // Embedded HMS instantiates partition expression proxy which by default brings in a
+  // lot of runtime dependencies from hive-exec. Since we don't depend on this, we
+  // should use a DefaultPartitionExpressionProxy which is a no-op implementation of
+  // PartitionExpressionProxy interface. It throws UnsupportedOperationException on its
+  // APIs so we will find them in tests in case we start using these features when
+  // using embedded HMS
+  private static final String DEFAULT_PARTITION_EXPRESSION_PROXY_CLASS = "org.apache"
+      + ".hadoop.hive.metastore.DefaultPartitionExpressionProxy";
+
   /**
    * Generates the HiveConf required to connect to an embedded metastore backed by
    * derby DB.
@@ -57,13 +67,17 @@ public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
     // hive.metastore.uris - empty
     // javax.jdo.option.ConnectionDriverName - org.apache.derby.jdbc.EmbeddedDriver
     // javax.jdo.option.ConnectionURL - jdbc:derby:;databaseName=<path>;create=true"
-    conf.set(HiveConf.ConfVars.METASTOREURIS.toString(), "");
-    conf.set(HiveConf.ConfVars.METASTORE_CONNECTION_DRIVER.toString(),
+    conf.set(ConfVars.METASTOREURIS.varname, "");
+    conf.set(ConfVars.METASTORE_CONNECTION_DRIVER.varname,
         "org.apache.derby.jdbc.EmbeddedDriver");
-    conf.setBoolean(HiveConf.ConfVars.METASTORE_SCHEMA_VERIFICATION.toString(), false);
-    conf.setBoolean(HiveConf.ConfVars.METASTORE_AUTO_CREATE_ALL.toString(), true);
-    conf.set(HiveConf.ConfVars.METASTORECONNECTURLKEY.toString(),
+    conf.setBoolean(ConfVars.METASTORE_SCHEMA_VERIFICATION.varname, false);
+    conf.setBoolean(ConfVars.METASTORE_AUTO_CREATE_ALL.varname, true);
+    conf.set(ConfVars.METASTORECONNECTURLKEY.varname,
         String.format(CONNECTION_URL_TEMPLATE, dbStorePath.toString()));
+    conf.set(ConfVars.METASTORE_EXPRESSION_PROXY_CLASS.varname,
+        DEFAULT_PARTITION_EXPRESSION_PROXY_CLASS);
+    // Disabling notification event listeners
+    conf.set(ConfVars.METASTORE_TRANSACTIONAL_EVENT_LISTENERS.varname, "");
     return conf;
   }
 

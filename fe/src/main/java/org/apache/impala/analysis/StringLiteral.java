@@ -21,10 +21,10 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 
-import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TStringLiteral;
@@ -91,7 +91,7 @@ public class StringLiteral extends LiteralExpr {
   public String getUnescapedValue() {
     // Unescape string exactly like Hive does. Hive's method assumes
     // quotes so we add them here to reuse Hive's code.
-    return BaseSemanticAnalyzer.unescapeSQLString("'" + getNormalizedValue()
+    return MetastoreShim.unescapeSQLString("'" + getNormalizedValue()
         + "'");
   }
 

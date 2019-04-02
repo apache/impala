@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <!-- This pom creates a jar which excludes most of the hive-exec classes to
+reduce the dependency footprint of hive in Impala. It uses maven-shade-plugin
+to include only those classes which are needed by fe to compile and run in a
+hive-3 environment. Additionally, it relocates some of the transitive dependencies
+coming from hive-exec so that it does not conflict with Impala's version of
+the same dependencies
+  -->
+  <parent>
+    <groupId>org.apache.impala</groupId>
+    <artifactId>impala-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <relativePath>../impala-parent/pom.xml</relativePath>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.apache.impala</groupId>
+  <artifactId>impala-minimal-hive-exec</artifactId>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <configuration>
+          <artifactSet>
+            <includes>
+              <include>org.apache.hive:hive-exec</include>
+              <include>org.apache.hadoop:hadoop-mapreduce-client</include>
+            </includes>
+          </artifactSet>
+          <relocations>
+            <relocation>
+              <pattern>com.google</pattern>
+              <shadedPattern>hiveexec.com.google</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.joda.time</pattern>
+              <shadedPattern>hiveexec.org.joda.time</shadedPattern>
+            </relocation>
+          </relocations>
+          <filters>
+            <filter>
+              <artifact>org.apache.hive:hive-exec</artifact>
+              <includes>
+                <include>org/apache/hadoop/hive/conf/**/*</include>
+                <include>org/apache/hadoop/hive/common/FileUtils*</include>
+                <!-- Needed to support describe formatted command compat with Hive --> 
+                <include>org/apache/hadoop/hive/ql/metadata/**/*</include>
+                <include>org/apache/hadoop/hive/ql/parse/SemanticException.class</include>
+                <!-- Needed to support Hive udfs -->
+                <include>org/apache/hadoop/hive/ql/exec/*UDF*</include>
+                <include>org/apache/hadoop/hive/ql/exec/FunctionUtils*</include>
+                <include>org/apache/hadoop/hive/ql/parse/HiveLexer*</include>
+                <include>org/apache/hadoop/hive/ql/udf/**/*</include>
+                <!-- Many of the UDFs are annotated with their vectorized counter-parts.
+                 Including them makes sure that we don't break -->
+                <include>org/apache/hadoop/hive/ql/exec/vector/expressions/**/*</include>
+                <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
+                <include>org/apache/hive/common/HiveCompat*</include>
+                <include>org/apache/hive/common/util/**</include>
+                <include>org/apache/hive/service/rpc/thrift/**</include>
+                <include>org/apache/hadoop/hive/serde/**</include>
+                <include>org/apache/hadoop/hive/serde2/**</include>
+                <include>org/apache/hive/service/rpc/thrift/**</include>
+                <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
+                <include>com/google/**</include>
+              </includes>
+            </filter>
+          </filters>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

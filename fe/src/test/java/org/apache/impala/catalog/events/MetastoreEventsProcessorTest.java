@@ -56,19 +56,18 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.GetPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
-import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
-import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -89,6 +88,7 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorS
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -508,11 +508,12 @@ public class MetastoreEventsProcessorTest {
     String testDbParamKey = "testKey";
     String testDbParamVal = "testVal";
     eventsProcessor_.processEvents();
-    assertFalse("Newly created test database has db should not have parameter with key "
+    Db db = catalog_.getDb(TEST_DB_NAME);
+    assertNotNull(db);
+    // db parameters should not have the test key
+    assertTrue("Newly created test database should not have parameter with key"
             + testDbParamKey,
-        catalog_.getDb(TEST_DB_NAME)
-            .getMetaStoreDb()
-            .getParameters()
+        !db.getMetaStoreDb().isSetParameters() || !db.getMetaStoreDb().getParameters()
             .containsKey(testDbParamKey));
     // test change of parameters to the Database
     addDatabaseParameters(testDbParamKey, testDbParamVal);
@@ -730,11 +731,9 @@ public class MetastoreEventsProcessorTest {
       org.apache.hadoop.hive.metastore.api.Partition partition = null ;
       if (isPartitionInsert) {
         // Get the partition from metastore. This should now contain the new file.
-        GetPartitionsRequest request = new GetPartitionsRequest();
-        request.setDbName(dbName);
         try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-          partition = metaStoreClient.getHiveClient().getPartition(dbName,
-              tblName, "p1=testPartVal");
+          partition = metaStoreClient.getHiveClient().getPartition(dbName, tblName, "p1"
+              + "=testPartVal");
         }
       }
       // Simulate a load table
@@ -809,8 +808,8 @@ public class MetastoreEventsProcessorTest {
     fakeEvent.setTableName(msTbl.getTableName());
     fakeEvent.setDbName(msTbl.getDbName());
     fakeEvent.setEventId(eventIdGenerator.incrementAndGet());
-    fakeEvent.setMessage(MetastoreEventsProcessor.getMessageFactory()
-        .buildInsertMessage(msTbl, partition, isInsertOverwrite, newFiles).toString());
+    fakeEvent.setMessage(MetastoreShim.buildInsertMessage(msTbl, partition,
+       isInsertOverwrite, newFiles).toString());
     fakeEvent.setEventType("INSERT");
     return fakeEvent;
 
@@ -1052,7 +1051,7 @@ public class MetastoreEventsProcessorTest {
     // limitation : the DROP_TABLE event filtering expects that while processing events,
     // the CREATION_TIME of two tables with same name won't have the same
     // creation timestamp.
-    sleep(2000);
+    Thread.sleep(2000);
     dropTableFromImpala(TEST_DB_NAME, testTblName);
     // now catalogD does not have the table entry, create the table again
     createTableFromImpala(TEST_DB_NAME, testTblName, false);
@@ -1210,7 +1209,7 @@ public class MetastoreEventsProcessorTest {
     // limitation : the DROP_DB event filtering expects that while processing events,
     // the CREATION_TIME of two Databases with same name won't have the same
     // creation timestamp.
-    sleep(2000);
+    Thread.sleep(2000);
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
     assertNull(catalog_.getDb(TEST_DB_NAME));
     createDatabaseFromImpala(TEST_DB_NAME, "second");
@@ -1475,8 +1474,9 @@ public class MetastoreEventsProcessorTest {
     fakeEvent.setTableName(tblName);
     fakeEvent.setDbName(dbName);
     fakeEvent.setEventId(eventIdGenerator.incrementAndGet());
-    fakeEvent.setMessage(MetastoreEventsProcessor.getMessageFactory()
-        .buildAlterTableMessage(tableBefore, tableAfter).toString());
+    fakeEvent.setMessage(
+        MetastoreShim.buildAlterTableMessage(tableBefore, tableAfter, false, -1L)
+            .toString());
     fakeEvent.setEventType("ALTER_TABLE");
     return fakeEvent;
   }
@@ -2110,17 +2110,16 @@ public class MetastoreEventsProcessorTest {
 
   private void createDatabase(String dbName, Map<String, String> params)
       throws TException {
-    DatabaseBuilder databaseBuilder =
-        new DatabaseBuilder()
-            .setName(dbName)
-            .setDescription("Notification test database")
-            .setOwnerName("NotificationTestOwner")
-            .setOwnerType(PrincipalType.USER);
+    Database database = new Database();
+    database.setName(dbName);
+    database.setDescription("Notification test database");
+    database.setOwnerName("NotificationOwner");
+    database.setOwnerType(PrincipalType.USER);
     if (params != null && !params.isEmpty()) {
-      databaseBuilder.setParams(params);
+      database.setParameters(params);
     }
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      msClient.getHiveClient().createDatabase(databaseBuilder.build());
+      msClient.getHiveClient().createDatabase(database);
     }
   }
 
@@ -2154,24 +2153,34 @@ public class MetastoreEventsProcessorTest {
   private org.apache.hadoop.hive.metastore.api.Table getTestTable(String dbName,
       String tblName, Map<String, String> params, boolean isPartitioned)
       throws MetaException {
-    TableBuilder tblBuilder =
-        new TableBuilder()
-            .setTableName(tblName)
-            .setDbName(dbName)
-            .addTableParam("tblParamKey", "tblParamValue")
-            .addCol("c1", "string", "c1 description")
-            .addCol("c2", "string", "c2 description")
-            .setSerdeLib(HdfsFileFormat.PARQUET.serializationLib())
-            .setInputFormat(HdfsFileFormat.PARQUET.inputFormat())
-            .setOutputFormat(HdfsFileFormat.PARQUET.outputFormat());
-    // if params are provided use them
+    org.apache.hadoop.hive.metastore.api.Table tbl =
+        new org.apache.hadoop.hive.metastore.api.Table();
+    tbl.setDbName(dbName);
+    tbl.setTableName(tblName);
+    tbl.putToParameters("tblParamKey", "tblParamValue");
+    List<FieldSchema> cols = Lists.newArrayList(
+        new FieldSchema("c1","string","c1 description"),
+        new FieldSchema("c2", "string","c2 description"));
+
+    StorageDescriptor sd = new StorageDescriptor();
+    sd.setCols(cols);
+    sd.setInputFormat(HdfsFileFormat.PARQUET.inputFormat());
+    sd.setOutputFormat(HdfsFileFormat.PARQUET.outputFormat());
+
+    SerDeInfo serDeInfo = new SerDeInfo();
+    serDeInfo.setSerializationLib(HdfsFileFormat.PARQUET.serializationLib());
+    sd.setSerdeInfo(serDeInfo);
+    tbl.setSd(sd);
+
     if (params != null && !params.isEmpty()) {
-      tblBuilder.setTableParams(params);
+      tbl.setParameters(params);
     }
     if (isPartitioned) {
-      tblBuilder.addPartCol("p1", "string", "partition p1 description");
+      List<FieldSchema> pcols = Lists.newArrayList(
+          new FieldSchema("p1","string","partition p1 description"));
+      tbl.setPartitionKeys(pcols);
     }
-    return tblBuilder.build();
+    return tbl;
   }
 
   /**
@@ -2643,8 +2652,6 @@ public class MetastoreEventsProcessorTest {
   private void alterPartitions(String tblName, List<List<String>> partValsList,
       String location)
       throws TException {
-    GetPartitionsRequest request = new GetPartitionsRequest();
-    request.setDbName(TEST_DB_NAME);
     List<Partition> partitions = new ArrayList<>();
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       for (List<String> partVal : partValsList) {
@@ -2667,14 +2674,12 @@ public class MetastoreEventsProcessorTest {
       org.apache.hadoop.hive.metastore.api.Table msTable =
           msClient.getHiveClient().getTable(dbName, tblName);
       for (List<String> partVals : partitionValues) {
-        partitions.add(
-            new PartitionBuilder()
-                .fromTable(msTable)
-                .setInputFormat(msTable.getSd().getInputFormat())
-                .setSerdeLib(msTable.getSd().getSerdeInfo().getSerializationLib())
-                .setOutputFormat(msTable.getSd().getOutputFormat())
-                .setValues(partVals)
-                .build());
+        Partition partition = new Partition();
+        partition.setDbName(msTable.getDbName());
+        partition.setTableName(msTable.getTableName());
+        partition.setSd(msTable.getSd().deepCopy());
+        partition.setValues(partVals);
+        partitions.add(partition);
       }
     }
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {

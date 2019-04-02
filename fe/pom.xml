@@ -176,6 +176,14 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive.hcatalog</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -214,6 +222,10 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive.hcatalog</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -232,6 +244,10 @@ under the License.
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -286,172 +302,10 @@ under the License.
       <version>0.11-a-czt02-cdh</version>
     </dependency>
 
-    <!-- Moved above Hive, because Hive bundles its own Thrift version
-         which supercedes this one if it comes first in the dependency
-         tree -->
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
       <version>${thrift.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-service</artifactId>
-      <version>${hive.version}</version>
-      <!--
-           hive-service pulls in an incoherent (not ${hadoop.version}) version of
-           hadoop-client via this dependency, which we don't need.
-      -->
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-llap-server</artifactId>
-        </exclusion>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.calcite.avatica</groupId>
-          <artifactId>avatica</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-serde</artifactId>
-      <version>${hive.version}</version>
-       <exclusions>
-         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-         <exclusion>
-           <groupId>net.minidev</groupId>
-           <artifactId>json-smart</artifactId>
-         </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-exec</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.calcite.avatica</groupId>
-          <artifactId>avatica</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-common</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-jdbc</artifactId>
-      <version>${hive.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-hbase-handler</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.calcite.avatica</groupId>
-          <artifactId>avatica</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-metastore</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive.shims</groupId>
-      <artifactId>hive-shims-common</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -550,7 +404,6 @@ under the License.
       <version>2.23.4</version>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
 
   <reporting>
@@ -694,7 +547,8 @@ under the License.
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
-              </sources>
+                <source>${project.basedir}/src/compat-hive-${hive.major.version}/java</source>
+               </sources>
             </configuration>
           </execution>
         </executions>
@@ -788,6 +642,7 @@ under the License.
                     <include>org.apache.hadoop:*:${hadoop.version}</include>
                     <include>org.apache.hbase:*:${hbase.version}</include>
                     <include>org.apache.hive:*:${hive.version}</include>
+                    <include>org.apache.hive:hive-storage-api:${hive.storage.api.version}</include>
                     <include>org.apache.kudu:*:${kudu.version}</include>
                     <include>org.apache.sentry:*:${sentry.version}</include>
                     <include>org.apache.parquet:*:${parquet.version}</include>
@@ -799,8 +654,8 @@ under the License.
           </execution>
         </executions>
       </plugin>
+    </plugins>
 
-  </plugins>
     <pluginManagement>
       <plugins>
         <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
@@ -898,6 +753,257 @@ under the License.
   </build>
 
   <profiles>
+    <!-- Profile which includes all of the Hive 2.x dependencies and appropriate exclusions. -->
+    <profile>
+      <id>hive-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-service</artifactId>
+          <version>${hive.version}</version>
+          <!--
+              hive-service pulls in an incoherent (not ${hadoop.version}) version of
+              hadoop-client via this dependency, which we don't need.
+          -->
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-llap-server</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite.avatica</groupId>
+              <artifactId>avatica</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-serde</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-exec</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite.avatica</groupId>
+              <artifactId>avatica</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <scope>test</scope>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-hbase-handler</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite.avatica</groupId>
+              <artifactId>avatica</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <!-- Profile which includes all of the Hive 3.x dependencies and appropriate exclusions. -->
+    <profile>
+      <id>hive-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>3</value>
+        </property>
+      </activation>
+      <dependencies>
+        <!-- This reduced dependency is derived from hive-exec and only contains classes needed
+             by Impala. See shaded-deps/pom.xml for more details -->
+        <dependency>
+          <groupId>org.apache.impala</groupId>
+          <artifactId>impala-minimal-hive-exec</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+        <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <scope>test</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.hbase</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <!-- We should exclude hive-serde since it brings along a
+               different version of flatbuffers causing problems for loading tables -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-serde</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-metastore</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-standalone-metastore</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-serde</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-shims</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+
     <profile>
       <id>thrift-home-defined</id>
       <activation>

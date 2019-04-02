@@ -2,3 +2,4 @@ Opcodes.thrift
 ErrorCodes.thrift
 MetricDefs.thrift
 hive-2-api/TCLIService.thrift
+hive-3-api/TCLIService.thrift

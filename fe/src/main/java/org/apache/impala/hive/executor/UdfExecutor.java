@@ -67,6 +67,8 @@ public class UdfExecutor {
   private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =
     new TBinaryProtocol.Factory();
 
+  // TODO UDF is deprecated in Hive and newer implementation of built-in functions using
+  // GenericUDF interface, we should consider supporting GenericUDFs in the future
   private UDF udf_;
   // setup by init() and cleared by close()
   private Method method_;

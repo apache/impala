@@ -100,7 +100,6 @@ can do so through the environment variables and scripts listed below.
 | HADOOP_INCLUDE_DIR   | "${HADOOP_HOME}/include" | For 'hdfs.h' |
 | HADOOP_LIB_DIR       | "${HADOOP_HOME}/lib" | For 'libhdfs.a' or 'libhdfs.so' |
 | HIVE_HOME            | "${CDH_COMPONENTS_HOME}/{hive-${IMPALA_HIVE_VERSION}/" | |
-| HIVE_SRC_DIR         | "${HIVE_HOME}/src" | Used to find Hive thrift files. |
 | HBASE_HOME           | "${CDH_COMPONENTS_HOME}/hbase-${IMPALA_HBASE_VERSION}/" | |
 | SENTRY_HOME          | "${CDH_COMPONENTS_HOME}/sentry-${IMPALA_SENTRY_VERSION}/" | Used to setup test data |
 | THRIFT_HOME          | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}" | |

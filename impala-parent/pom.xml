@@ -37,6 +37,7 @@ under the License.
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
+    <hive.storage.api.version>2.3.0.${env.IMPALA_HIVE_VERSION}</hive.storage.api.version>
     <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
     <ranger.version>${env.IMPALA_RANGER_VERSION}</ranger.version>
     <postgres.jdbc.version>${env.IMPALA_POSTGRES_JDBC_DRIVER_VERSION}</postgres.jdbc.version>
@@ -132,6 +133,14 @@ under the License.
       <name>Cloudera Third Party Repository</name>
       <snapshots>
         <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>hwx.public.repo</id>
+      <url>http://nexus-private.hortonworks.com/nexus/content/groups/public</url>
+      <name>Hortonworks public repository</name>
+      <snapshots>
+        <enabled>true</enabled>
       </snapshots>
     </repository>
   </repositories>

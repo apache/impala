@@ -505,9 +505,15 @@ class TestUdfPersistence(CustomClusterTestSuite):
       ('udfbin', 'org.apache.hadoop.hive.ql.udf.UDFBin'),
       ('udfhex', 'org.apache.hadoop.hive.ql.udf.UDFHex'),
       ('udfconv', 'org.apache.hadoop.hive.ql.udf.UDFConv'),
+      # TODO UDFHour was moved from UDF to GenericUDF in Hive 3
+      # This test will fail when running against HMS-3 unless we add
+      # support for GenericUDFs to handle such cases
       ('udfhour', 'org.apache.hadoop.hive.ql.udf.UDFHour'),
       ('udflike', 'org.apache.hadoop.hive.ql.udf.UDFLike'),
       ('udfsign', 'org.apache.hadoop.hive.ql.udf.UDFSign'),
+      # TODO UDFYear moved to GenericUDF in Hive 3
+      # This test will fail when running against HMS-3 unless we add
+      # support for GenericUDFs
       ('udfyear', 'org.apache.hadoop.hive.ql.udf.UDFYear'),
       ('udfascii','org.apache.hadoop.hive.ql.udf.UDFAscii')
   ]
