@@ -133,7 +133,10 @@ class QueryState {
 
   /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
-  const TExecQueryFInstancesParams& exec_rpc_params() const { return exec_rpc_params_; }
+  const ExecQueryFInstancesRequestPB& exec_rpc_params() const { return exec_rpc_params_; }
+  const TExecQueryFInstancesSidecar& exec_rpc_sidecar() const {
+    return exec_rpc_sidecar_;
+  }
 
   /// The following getters are only valid after Init() and should be called only from
   /// the backend execution (ie. not the coordinator side, since they require holding
@@ -169,7 +172,8 @@ class QueryState {
   ///
   /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
   /// The remaining public functions must be called only after Init().
-  Status Init(const TExecQueryFInstancesParams& exec_rpc_params) WARN_UNUSED_RESULT;
+  Status Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
+      const TExecQueryFInstancesSidecar& sidecar) WARN_UNUSED_RESULT;
 
   /// Performs the runtime-intensive parts of initial setup and starts all fragment
   /// instances belonging to this query. Each instance receives its own execution
@@ -310,10 +314,11 @@ class QueryState {
   /// Set in Init().
   std::unique_ptr<ControlServiceProxy> proxy_;
 
-  /// Set in Init(); exec_rpc_params_.query_ctx is *not* set to avoid duplication
+  /// Set in Init(); exec_rpc_sidecar_.query_ctx is *not* set to avoid duplication
   /// with query_ctx_.
   /// TODO: find a way not to have to copy this
-  TExecQueryFInstancesParams exec_rpc_params_;
+  ExecQueryFInstancesRequestPB exec_rpc_params_;
+  TExecQueryFInstancesSidecar exec_rpc_sidecar_;
 
   /// Buffer reservation for this query (owned by obj_pool_). Set in Init().
   ReservationTracker* buffer_reservation_ = nullptr;

@@ -42,6 +42,7 @@ class ClientRequestState;
 class ControlServiceProxy;
 class MemTracker;
 class MetricGroup;
+class QueryExecMgr;
 class TRuntimeProfileTree;
 
 /// This singleton class implements service for managing execution of queries in Impala.
@@ -58,6 +59,10 @@ class ControlService : public ControlServiceIf {
   /// Authorization is enforced only when Kerberos is enabled.
   virtual bool Authorize(const google::protobuf::Message* req,
       google::protobuf::Message* resp, kudu::rpc::RpcContext* rpc_context) override;
+
+  /// Starts execution of a query's fragment instances on a backend.
+  virtual void ExecQueryFInstances(const ExecQueryFInstancesRequestPB* req,
+      ExecQueryFInstancesResponsePB* resp, kudu::rpc::RpcContext* context) override;
 
   /// Updates the coordinator with the query status of the backend encoded in 'req'.
   virtual void ReportExecStatus(const ReportExecStatusRequestPB* req,
@@ -86,6 +91,12 @@ class ControlService : public ControlServiceIf {
   static Status GetProfile(const ReportExecStatusRequestPB& request,
       const ClientRequestState& request_state, kudu::rpc::RpcContext* rpc_context,
       TRuntimeProfileForest* thrift_profiles);
+
+  /// Helper for deserializing the ExecQueryFInstances sidecar attached in the inbound
+  /// call within 'rpc_context'. On success, returns the deserialized sidecar in
+  /// 'sidecar'. On failure, returns the error status;
+  static Status GetExecQueryFInstancesSidecar(const ExecQueryFInstancesRequestPB& request,
+      RpcContext* rpc_context, TExecQueryFInstancesSidecar* sidecar);
 
   /// Helper for serializing 'status' as part of 'response'. Also releases memory
   /// of the RPC payload previously accounted towards the internal memory tracker.

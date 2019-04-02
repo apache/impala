@@ -306,11 +306,15 @@ class Coordinator::BackendState {
   const TQueryCtx& query_ctx() const { return coord_.query_ctx(); }
   const TUniqueId& query_id() const { return coord_.query_id(); }
 
-  /// Fill in rpc_params based on state. Uses filter_routing_table to remove filters
-  /// that weren't selected during its construction.
+  /// Fill in 'request' and 'sidecar' based on state. Uses filter_routing_table to remove
+  /// filters that weren't selected during its construction.
   void SetRpcParams(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
-      TExecQueryFInstancesParams* rpc_params);
+      ExecQueryFInstancesRequestPB* request, TExecQueryFInstancesSidecar* sidecar);
+
+  /// Expects that 'status' is an error. Sets 'status_' to a formatted version of its
+  /// message.
+  void SetExecError(const Status& status);
 
   /// Version of IsDone() where caller must hold lock_ via lock;
   bool IsDoneLocked(const boost::unique_lock<boost::mutex>& lock) const;

@@ -216,9 +216,48 @@ message RemoteShutdownResultPB {
   optional ShutdownStatusPB shutdown_status = 2;
 }
 
+// ExecQueryFInstances
+message ExecQueryFInstancesRequestPB {
+  // This backend's index into Coordinator::backend_states_, needed for subsequent rpcs to
+  // the coordinator.
+  optional int32 coord_state_idx = 1;
+
+  // Sidecar index of the TExecQueryFInstancesSidecar, which contains the query and plan
+  // fragment contexts.
+  optional int32 sidecar_idx = 2;
+
+  // The minimum query-wide memory reservation (in bytes) required for the backend
+  // executing the instances in fragment_instance_ctxs. This is the peak minimum
+  // reservation that may be required by the concurrently-executing operators at any
+  // point in query execution. It may be less than the initial reservation total claims
+  // (below) if execution of some operators never overlaps, which allows reuse of
+  // reservations.
+  optional int64 min_mem_reservation_bytes = 3;
+
+  // Total of the initial buffer reservations that we expect to be claimed on this
+  // backend for all fragment instances in fragment_instance_ctxs. I.e. the sum over all
+  // operators in all fragment instances that execute on this backend. This is used for
+  // an optimization in InitialReservation. Measured in bytes.
+  optional int64 initial_mem_reservation_total_claims = 4;
+
+  // The backend memory limit (in bytes) as set by the admission controller. Used by the
+  // query mem tracker to enforce the memory limit.
+  optional int64 per_backend_mem_limit = 5;
+}
+
+message ExecQueryFInstancesResponsePB {
+  // Success or failure of the operation.
+  optional StatusPB status = 1;
+}
+
 service ControlService {
   // Override the default authorization method.
   option (kudu.rpc.default_authz_method) = "Authorize";
+
+  // Called by coord to start asynchronous execution of a query's fragment instances in
+  // backend. Returns as soon as all incoming data streams have been set up.
+  rpc ExecQueryFInstances(ExecQueryFInstancesRequestPB)
+      returns (ExecQueryFInstancesResponsePB);
 
   // Update the coordinator with the query status of the backend.
   rpc ReportExecStatus(ReportExecStatusRequestPB) returns (ReportExecStatusResponsePB);

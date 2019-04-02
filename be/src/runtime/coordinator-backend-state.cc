@@ -24,6 +24,7 @@
 #include "exec/kudu-util.h"
 #include "exec/scan-node.h"
 #include "kudu/rpc/rpc_controller.h"
+#include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
 #include "rpc/rpc-mgr.inline.h"
@@ -46,12 +47,16 @@
 
 using kudu::MonoDelta;
 using kudu::rpc::RpcController;
+using kudu::rpc::RpcSidecar;
 using namespace impala;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
 const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
     "Last report received time";
+
+DECLARE_int32(backend_client_rpc_timeout_ms);
+DECLARE_int64(rpc_max_message_size);
 
 Coordinator::BackendState::BackendState(
     const Coordinator& coord, int state_idx, TRuntimeFilterMode::type filter_mode)
@@ -94,30 +99,28 @@ void Coordinator::BackendState::Init(
 }
 
 void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
-    const FilterRoutingTable& filter_routing_table,
-    TExecQueryFInstancesParams* rpc_params) {
-  rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
-  rpc_params->__set_coord_state_idx(state_idx_);
-  rpc_params->__set_min_mem_reservation_bytes(
-      backend_exec_params_->min_mem_reservation_bytes);
-  rpc_params->__set_initial_mem_reservation_total_claims(
+    const FilterRoutingTable& filter_routing_table, ExecQueryFInstancesRequestPB* request,
+    TExecQueryFInstancesSidecar* sidecar) {
+  request->set_coord_state_idx(state_idx_);
+  request->set_min_mem_reservation_bytes(backend_exec_params_->min_mem_reservation_bytes);
+  request->set_initial_mem_reservation_total_claims(
       backend_exec_params_->initial_mem_reservation_total_claims);
-  rpc_params->__set_per_backend_mem_limit(coord_.schedule_.per_backend_mem_limit());
+  request->set_per_backend_mem_limit(coord_.schedule_.per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
-  rpc_params->__isset.fragment_ctxs = true;
-  rpc_params->__isset.fragment_instance_ctxs = true;
-  rpc_params->fragment_instance_ctxs.resize(backend_exec_params_->instance_params.size());
+  sidecar->__isset.fragment_ctxs = true;
+  sidecar->__isset.fragment_instance_ctxs = true;
+  sidecar->fragment_instance_ctxs.resize(backend_exec_params_->instance_params.size());
   for (int i = 0; i < backend_exec_params_->instance_params.size(); ++i) {
-    TPlanFragmentInstanceCtx& instance_ctx = rpc_params->fragment_instance_ctxs[i];
+    TPlanFragmentInstanceCtx& instance_ctx = sidecar->fragment_instance_ctxs[i];
     const FInstanceExecParams& params = *backend_exec_params_->instance_params[i];
     int fragment_idx = params.fragment_exec_params.fragment.idx;
 
     // add a TPlanFragmentCtx, if we don't already have it
-    if (rpc_params->fragment_ctxs.empty()
-        || rpc_params->fragment_ctxs.back().fragment.idx != fragment_idx) {
-      rpc_params->fragment_ctxs.emplace_back();
-      TPlanFragmentCtx& fragment_ctx = rpc_params->fragment_ctxs.back();
+    if (sidecar->fragment_ctxs.empty()
+        || sidecar->fragment_ctxs.back().fragment.idx != fragment_idx) {
+      sidecar->fragment_ctxs.emplace_back();
+      TPlanFragmentCtx& fragment_ctx = sidecar->fragment_ctxs.back();
       fragment_ctx.__set_fragment(params.fragment_exec_params.fragment);
       fragment_ctx.__set_destinations(params.fragment_exec_params.destinations);
     }
@@ -141,7 +144,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     // TODO: do this more efficiently, we're looping over the entire plan for each
     // instance separately
     int instance_idx = GetInstanceIdx(params.instance_id);
-    for (TPlanNode& plan_node: rpc_params->fragment_ctxs.back().fragment.plan.nodes) {
+    for (TPlanNode& plan_node : sidecar->fragment_ctxs.back().fragment.plan.nodes) {
       if (!plan_node.__isset.hash_join_node) continue;
       if (!plan_node.__isset.runtime_filters) continue;
 
@@ -167,6 +170,14 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   }
 }
 
+void Coordinator::BackendState::SetExecError(const Status& status) {
+  const string ERR_TEMPLATE = "ExecQueryFInstances rpc query_id=$0 failed: $1";
+  const string& err_msg =
+      Substitute(ERR_TEMPLATE, PrintId(query_id()), status.msg().GetFullMessageDetails());
+  LOG(ERROR) << err_msg;
+  status_ = Status::Expected(err_msg);
+}
+
 void Coordinator::BackendState::Exec(
     const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table,
@@ -176,9 +187,52 @@ void Coordinator::BackendState::Exec(
     last_report_time_ms_ = GenerateReportTimestamp();
     exec_complete_barrier->Notify();
   });
-  TExecQueryFInstancesParams rpc_params;
-  rpc_params.__set_query_ctx(query_ctx());
-  SetRpcParams(debug_options, filter_routing_table, &rpc_params);
+  std::unique_ptr<ControlServiceProxy> proxy;
+  Status get_proxy_status =
+      ControlService::GetProxy(krpc_host_, krpc_host_.hostname, &proxy);
+  if (!get_proxy_status.ok()) {
+    SetExecError(get_proxy_status);
+    return;
+  }
+
+  ExecQueryFInstancesRequestPB request;
+  TExecQueryFInstancesSidecar sidecar;
+  sidecar.__set_query_ctx(query_ctx());
+  SetRpcParams(debug_options, filter_routing_table, &request, &sidecar);
+
+  RpcController rpc_controller;
+  rpc_controller.set_timeout(
+      MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
+
+  // Serialize the sidecar and add it to the rpc controller. The serialized buffer is
+  // owned by 'serializer' and is freed when it is destructed.
+  ThriftSerializer serializer(true);
+  uint8_t* serialized_buf = nullptr;
+  uint32_t serialized_len = 0;
+  Status serialize_status =
+      serializer.SerializeToBuffer(&sidecar, &serialized_len, &serialized_buf);
+  if (UNLIKELY(!serialize_status.ok())) {
+    SetExecError(serialize_status);
+    return;
+  } else if (serialized_len > FLAGS_rpc_max_message_size) {
+    SetExecError(
+        Status::Expected("Serialized Exec() request exceeds --rpc_max_message_size."));
+    return;
+  }
+
+  unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
+  sidecar_buf->assign_copy(serialized_buf, serialized_len);
+  unique_ptr<RpcSidecar> rpc_sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
+
+  int sidecar_idx;
+  kudu::Status sidecar_status =
+      rpc_controller.AddOutboundSidecar(move(rpc_sidecar), &sidecar_idx);
+  if (!sidecar_status.ok()) {
+    SetExecError(FromKuduStatus(sidecar_status, "Failed to add sidecar"));
+    return;
+  }
+  request.set_sidecar_idx(sidecar_idx);
+
   VLOG_FILE << "making rpc: ExecQueryFInstances"
       << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="
       << PrintId(query_id());
@@ -187,33 +241,22 @@ void Coordinator::BackendState::Exec(
   lock_guard<mutex> l(lock_);
   int64_t start = MonotonicMillis();
 
-  ImpalaBackendConnection backend_client(
-      ExecEnv::GetInstance()->impalad_client_cache(), impalad_address(), &status_);
-  if (!status_.ok()) return;
+  ExecQueryFInstancesResponsePB response;
+  Status rpc_status =
+      FromKuduStatus(proxy->ExecQueryFInstances(request, &response, &rpc_controller),
+          "Exec() rpc failed");
 
-  TExecQueryFInstancesResult thrift_result;
-  Status rpc_status = backend_client.DoRpc(
-      &ImpalaBackendClient::ExecQueryFInstances, rpc_params, &thrift_result);
   rpc_sent_ = true;
   rpc_latency_ = MonotonicMillis() - start;
 
-  const string ERR_TEMPLATE =
-      "ExecQueryFInstances rpc query_id=$0 failed: $1";
-
   if (!rpc_status.ok()) {
-    const string& err_msg =
-        Substitute(ERR_TEMPLATE, PrintId(query_id()), rpc_status.msg().msg());
-    VLOG_QUERY << err_msg;
-    status_ = Status::Expected(err_msg);
+    SetExecError(rpc_status);
     return;
   }
 
-  Status exec_status = Status(thrift_result.status);
+  Status exec_status = Status(response.status());
   if (!exec_status.ok()) {
-    const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
-        exec_status.msg().GetFullMessageDetails());
-    VLOG_QUERY << err_msg;
-    status_ = Status::Expected(err_msg);
+    SetExecError(exec_status);
     return;
   }
 

@@ -134,7 +134,8 @@ QueryState::~QueryState() {
   host_profile_->StopPeriodicCounters();
 }
 
-Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
+Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
+    const TExecQueryFInstancesSidecar& sidecar) {
   // Decremented in QueryExecMgr::StartQueryHelper() on success or by the caller of
   // Init() on failure. We need to do this before any returns because Init() always
   // returns a resource refcount to its caller.
@@ -195,26 +196,26 @@ Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
       query_ctx().coord_address.hostname, &proxy_));
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
-  exec_rpc_params_.__set_coord_state_idx(exec_rpc_params.coord_state_idx);
-  TExecQueryFInstancesParams& non_const_params =
-      const_cast<TExecQueryFInstancesParams&>(exec_rpc_params);
-  exec_rpc_params_.fragment_ctxs.swap(non_const_params.fragment_ctxs);
-  exec_rpc_params_.__isset.fragment_ctxs = true;
-  exec_rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
-  exec_rpc_params_.__isset.fragment_instance_ctxs = true;
+  exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());
+  TExecQueryFInstancesSidecar& non_const_params =
+      const_cast<TExecQueryFInstancesSidecar&>(sidecar);
+  exec_rpc_sidecar_.fragment_ctxs.swap(non_const_params.fragment_ctxs);
+  exec_rpc_sidecar_.__isset.fragment_ctxs = true;
+  exec_rpc_sidecar_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
+  exec_rpc_sidecar_.__isset.fragment_instance_ctxs = true;
 
   instances_prepared_barrier_.reset(
-      new CountingBarrier(exec_rpc_params_.fragment_instance_ctxs.size()));
+      new CountingBarrier(exec_rpc_sidecar_.fragment_instance_ctxs.size()));
   instances_finished_barrier_.reset(
-      new CountingBarrier(exec_rpc_params_.fragment_instance_ctxs.size()));
+      new CountingBarrier(exec_rpc_sidecar_.fragment_instance_ctxs.size()));
 
   // Claim the query-wide minimum reservation. Do this last so that we don't need
   // to handle releasing it if a later step fails.
-  initial_reservations_ = obj_pool_.Add(new InitialReservations(&obj_pool_,
-      buffer_reservation_, query_mem_tracker_,
-      exec_rpc_params.initial_mem_reservation_total_claims));
-  RETURN_IF_ERROR(
-      initial_reservations_->Init(query_id(), exec_rpc_params.min_mem_reservation_bytes));
+  initial_reservations_ =
+      obj_pool_.Add(new InitialReservations(&obj_pool_, buffer_reservation_,
+          query_mem_tracker_, exec_rpc_params->initial_mem_reservation_total_claims()));
+  RETURN_IF_ERROR(initial_reservations_->Init(
+      query_id(), exec_rpc_params->min_mem_reservation_bytes()));
   scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
   return Status::OK();
 }
@@ -299,8 +300,8 @@ void QueryState::ConstructReport(bool instances_started,
     ReportExecStatusRequestPB* report, TRuntimeProfileForest* profiles_forest) {
   report->Clear();
   TUniqueIdToUniqueIdPB(query_id(), report->mutable_query_id());
-  DCHECK(exec_rpc_params().__isset.coord_state_idx);
-  report->set_coord_state_idx(exec_rpc_params().coord_state_idx);
+  DCHECK(exec_rpc_params().has_coord_state_idx());
+  report->set_coord_state_idx(exec_rpc_params().coord_state_idx());
   {
     std::unique_lock<SpinLock> l(status_lock_);
     overall_status_.ToProto(report->mutable_overall_status());
@@ -501,13 +502,13 @@ bool QueryState::WaitForFinishOrTimeout(int32_t timeout_ms) {
 
 bool QueryState::StartFInstances() {
   VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
-          << " #instances=" << exec_rpc_params_.fragment_instance_ctxs.size();
+          << " #instances=" << exec_rpc_sidecar_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
   DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
-  DCHECK_GT(exec_rpc_params_.fragment_ctxs.size(), 0);
-  TPlanFragmentCtx* fragment_ctx = &exec_rpc_params_.fragment_ctxs[0];
-  int num_unstarted_instances = exec_rpc_params_.fragment_instance_ctxs.size();
+  DCHECK_GT(exec_rpc_sidecar_.fragment_ctxs.size(), 0);
+  TPlanFragmentCtx* fragment_ctx = &exec_rpc_sidecar_.fragment_ctxs[0];
+  int num_unstarted_instances = exec_rpc_sidecar_.fragment_instance_ctxs.size();
   int fragment_ctx_idx = 0;
 
   // set up desc tbl
@@ -520,12 +521,12 @@ bool QueryState::StartFInstances() {
 
   fragment_events_start_time_ = MonotonicStopWatch::Now();
   for (const TPlanFragmentInstanceCtx& instance_ctx :
-           exec_rpc_params_.fragment_instance_ctxs) {
+      exec_rpc_sidecar_.fragment_instance_ctxs) {
     // determine corresponding TPlanFragmentCtx
     if (fragment_ctx->fragment.idx != instance_ctx.fragment_idx) {
       ++fragment_ctx_idx;
-      DCHECK_LT(fragment_ctx_idx, exec_rpc_params_.fragment_ctxs.size());
-      fragment_ctx = &exec_rpc_params_.fragment_ctxs[fragment_ctx_idx];
+      DCHECK_LT(fragment_ctx_idx, exec_rpc_sidecar_.fragment_ctxs.size());
+      fragment_ctx = &exec_rpc_sidecar_.fragment_ctxs[fragment_ctx_idx];
       // we expect fragment and instance contexts to follow the same order
       DCHECK_EQ(fragment_ctx->fragment.idx, instance_ctx.fragment_idx);
     }
@@ -640,11 +641,12 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   VLOG_QUERY << "Executing instance. instance_id=" << PrintId(fis->instance_id())
-      << " fragment_idx=" << fis->instance_ctx().fragment_idx
-      << " per_fragment_instance_idx=" << fis->instance_ctx().per_fragment_instance_idx
-      << " coord_state_idx=" << exec_rpc_params().coord_state_idx
-      << " #in-flight="
-      << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
+             << " fragment_idx=" << fis->instance_ctx().fragment_idx
+             << " per_fragment_instance_idx="
+             << fis->instance_ctx().per_fragment_instance_idx
+             << " coord_state_idx=" << exec_rpc_params().coord_state_idx()
+             << " #in-flight="
+             << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
   Status status = fis->Exec();
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(-1L);
   VLOG_QUERY << "Instance completed. instance_id=" << PrintId(fis->instance_id())

@@ -22,7 +22,6 @@
 #include "common/status.h"
 #include "gutil/strings/substitute.h"
 #include "service/impala-server.h"
-#include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/exec-env.h"
@@ -37,28 +36,6 @@ DECLARE_string(debug_actions);
 ImpalaInternalService::ImpalaInternalService() {
   impala_server_ = ExecEnv::GetInstance()->impala_server();
   DCHECK(impala_server_ != nullptr);
-  query_exec_mgr_ = ExecEnv::GetInstance()->query_exec_mgr();
-  DCHECK(query_exec_mgr_ != nullptr);
-}
-
-void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& return_val,
-    const TExecQueryFInstancesParams& params) {
-  DebugActionNoFail(FLAGS_debug_actions, "EXEC_QUERY_FINSTANCES_DELAY");
-  DCHECK(params.__isset.coord_state_idx);
-  DCHECK(params.__isset.query_ctx);
-  DCHECK(params.__isset.fragment_ctxs);
-  DCHECK(params.__isset.fragment_instance_ctxs);
-  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), params.query_ctx.query_id);
-  VLOG_QUERY << "ExecQueryFInstances():" << " query_id="
-             << PrintId(params.query_ctx.query_id)
-             << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address)
-             << " #instances=" << params.fragment_instance_ctxs.size();
-  Status status = query_exec_mgr_->StartQuery(params);
-  status.SetTStatus(&return_val);
-  if (!status.ok()) {
-    LOG(INFO) << "ExecQueryFInstances() failed: query_id="
-              << PrintId(params.query_ctx.query_id) << ": " << status.GetDetail();
-  }
 }
 
 template <typename T> void SetUnknownIdError(

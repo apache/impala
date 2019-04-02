@@ -18,6 +18,7 @@
 #include "service/control-service.h"
 
 #include "common/constant-strings.h"
+#include "common/thread-debug-info.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -26,6 +27,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
 #include "service/client-request-state.h"
 #include "service/impala-server.h"
@@ -35,9 +37,10 @@
 #include "util/parse-util.h"
 #include "util/uid-util.h"
 
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/RuntimeProfile_types.h"
 #include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"
-#include "gen-cpp/RuntimeProfile_types.h"
 
 #include "common/names.h"
 
@@ -109,6 +112,44 @@ Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
   RETURN_IF_ERROR(DeserializeThriftMsg(thrift_profiles_slice.data(),
       &len, true, thrift_profiles));
   return Status::OK();
+}
+
+Status ControlService::GetExecQueryFInstancesSidecar(
+    const ExecQueryFInstancesRequestPB& request, RpcContext* rpc_context,
+    TExecQueryFInstancesSidecar* sidecar) {
+  kudu::Slice sidecar_slice;
+  KUDU_RETURN_IF_ERROR(
+      rpc_context->GetInboundSidecar(request.sidecar_idx(), &sidecar_slice),
+      "Failed to get thrift profile sidecar");
+  uint32_t len = sidecar_slice.size();
+  RETURN_IF_ERROR(DeserializeThriftMsg(sidecar_slice.data(), &len, true, sidecar));
+  return Status::OK();
+}
+
+void ControlService::ExecQueryFInstances(const ExecQueryFInstancesRequestPB* request,
+    ExecQueryFInstancesResponsePB* response, RpcContext* rpc_context) {
+  DebugActionNoFail(FLAGS_debug_actions, "EXEC_QUERY_FINSTANCES_DELAY");
+  DCHECK(request->has_coord_state_idx());
+  DCHECK(request->has_sidecar_idx());
+  TExecQueryFInstancesSidecar sidecar;
+  const Status& sidecar_status =
+      GetExecQueryFInstancesSidecar(*request, rpc_context, &sidecar);
+  if (!sidecar_status.ok()) {
+    RespondAndReleaseRpc(sidecar_status, response, rpc_context);
+    return;
+  }
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), sidecar.query_ctx.query_id);
+  VLOG_QUERY << "ExecQueryFInstances():"
+             << " query_id=" << PrintId(sidecar.query_ctx.query_id)
+             << " coord=" << TNetworkAddressToString(sidecar.query_ctx.coord_address)
+             << " #instances=" << sidecar.fragment_instance_ctxs.size();
+  Status resp_status =
+      ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(request, sidecar);
+  if (!resp_status.ok()) {
+    LOG(INFO) << "ExecQueryFInstances() failed: query_id="
+              << PrintId(sidecar.query_ctx.query_id) << ": " << resp_status.GetDetail();
+  }
+  RespondAndReleaseRpc(resp_status, response, rpc_context);
 }
 
 void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,

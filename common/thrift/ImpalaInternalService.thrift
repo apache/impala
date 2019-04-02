@@ -576,48 +576,14 @@ enum ImpalaInternalServiceVersion {
 
 // The following contains the per-rpc structs for the parameters and the result.
 
-// ExecQueryFInstances
+// TODO: convert this fully to protobuf.
+struct TExecQueryFInstancesSidecar {
+  1: optional TQueryCtx query_ctx
 
-struct TExecQueryFInstancesParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // this backend's index into Coordinator::backend_states_,
-  // needed for subsequent rpcs to the coordinator
-  // required in V1
-  2: optional i32 coord_state_idx
-
-  // required in V1
-  3: optional TQueryCtx query_ctx
-
-  // required in V1
-  4: optional list<TPlanFragmentCtx> fragment_ctxs
+  2: optional list<TPlanFragmentCtx> fragment_ctxs
 
   // the order corresponds to the order of fragments in fragment_ctxs
-  // required in V1
-  5: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
-
-  // The minimum query-wide memory reservation (in bytes) required for the backend
-  // executing the instances in fragment_instance_ctxs. This is the peak minimum
-  // reservation that may be required by the concurrently-executing operators at any
-  // point in query execution. It may be less than the initial reservation total claims
-  // (below) if execution of some operators never overlaps, which allows reuse of
-  // reservations. required in V1
-  6: optional i64 min_mem_reservation_bytes
-
-  // Total of the initial buffer reservations that we expect to be claimed on this
-  // backend for all fragment instances in fragment_instance_ctxs. I.e. the sum over all
-  // operators in all fragment instances that execute on this backend. This is used for
-  // an optimization in InitialReservation. Measured in bytes. required in V1
-  7: optional i64 initial_mem_reservation_total_claims
-
-  // The backend memory limit (in bytes) as set by the admission controller. Used by the
-  // query mem tracker to enforce the memory limit. required in V1
-  8: optional i64 per_backend_mem_limit
-}
-
-struct TExecQueryFInstancesResult {
-  // required in V1
-  1: optional Status.TStatus status
+  3: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
 }
 
 // Parameters for RequestPoolService.resolveRequestPool()
@@ -792,10 +758,6 @@ struct TParseDateStringResult {
 }
 
 service ImpalaInternalService {
-  // Called by coord to start asynchronous execution of a query's fragment instances in
-  // backend.
-  // Returns as soon as all incoming data streams have been set up.
-  TExecQueryFInstancesResult ExecQueryFInstances(1:TExecQueryFInstancesParams params);
 
   // Called by fragment instances that produce local runtime filters to deliver them to
   // the coordinator for aggregation and broadcast.

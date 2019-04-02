@@ -99,7 +99,7 @@ class TestRPCTimeout(CustomClusterTestSuite):
   def test_execqueryfinstances_timeout(self, vector):
     for i in range(3):
       ex= self.execute_query_expect_failure(self.client, self.TEST_QUERY)
-      assert "RPC recv timed out" in str(ex)
+      assert "Exec() rpc failed: Timed out" in str(ex)
     verifiers = [MetricVerifier(i.service) for i in
                  ImpalaCluster.get_e2e_test_cluster().impalads]
 

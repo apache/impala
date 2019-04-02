@@ -49,7 +49,8 @@ class QueryExecMgr : public CacheLineAligned {
   /// was started (like low memory). In that case, no QueryState is created.
   /// After this function returns, it is legal to call QueryState::Cancel(), regardless of
   /// the return value of this function.
-  Status StartQuery(const TExecQueryFInstancesParams& params);
+  Status StartQuery(const ExecQueryFInstancesRequestPB* request,
+      const TExecQueryFInstancesSidecar& sidecar);
 
   /// Creates a QueryState for the given query with the provided parameters. Only valid
   /// to call if the QueryState does not already exist. The caller must call
