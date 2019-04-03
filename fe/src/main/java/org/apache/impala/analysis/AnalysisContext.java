@@ -28,7 +28,6 @@ import java.util.Set;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.AuthorizationChecker;
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -598,7 +597,7 @@ public class AnalysisContext {
    * this request. Also, checks if the request references a system database.
    */
   private void authorizePrivilegeRequest(AuthorizationChecker authzChecker,
-    PrivilegeRequest request) throws AuthorizationException, InternalException {
+      PrivilegeRequest request) throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(request);
     String dbName = null;
     if (request.getAuthorizable() != null) {
@@ -621,10 +620,15 @@ public class AnalysisContext {
    * sufficient privileges.
    */
   private void authorizeTableAccess(AuthorizationChecker authzChecker,
-      List<PrivilegeRequest> requests)
-      throws AuthorizationException, InternalException {
+      List<PrivilegeRequest> requests) throws AuthorizationException, InternalException {
     Preconditions.checkState(!requests.isEmpty());
     Analyzer analyzer = getAnalyzer();
+    // We need to temporarily deny access when column masking or row filtering feature is
+    // enabled until Impala has full implementation of column masking and row filtering.
+    // This is to prevent data leak since we do not want Impala to show any information
+    // when Hive has column masking and row filtering enabled.
+    authzChecker.authorizeRowFilterAndColumnMask(getAnalyzer().getUser(), requests);
+
     boolean hasTableSelectPriv = true;
     boolean hasColumnSelectPriv = false;
     for (PrivilegeRequest request: requests) {

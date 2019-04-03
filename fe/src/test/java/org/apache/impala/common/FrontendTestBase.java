@@ -21,6 +21,7 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -35,6 +36,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -48,7 +50,6 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
@@ -307,7 +308,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
   protected AuthorizationFactory createAuthorizationFactory() {
     return new AuthorizationFactory() {
       @Override
-      public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
+      public AuthorizationConfig getAuthorizationConfig() {
         return new AuthorizationConfig() {
           @Override
           public boolean isEnabled() { return true; }
@@ -321,14 +322,9 @@ public class FrontendTestBase extends AbstractFrontendTest {
       }
 
       @Override
-      public AuthorizationConfig getAuthorizationConfig() {
-        return newAuthorizationConfig(null);
-      }
-
-      @Override
       public AuthorizationChecker newAuthorizationChecker(
           AuthorizationPolicy authzPolicy) {
-        AuthorizationConfig authzConfig = newAuthorizationConfig(null);
+        AuthorizationConfig authzConfig = getAuthorizationConfig();
         return new AuthorizationChecker(authzConfig) {
           @Override
           protected boolean authorize(User user, PrivilegeRequest request)
@@ -339,6 +335,12 @@ public class FrontendTestBase extends AbstractFrontendTest {
           @Override
           public Set<String> getUserGroups(User user) throws InternalException {
             return Collections.emptySet();
+          }
+
+          @Override
+          public void authorizeRowFilterAndColumnMask(User user,
+              List<PrivilegeRequest> privilegeRequests)
+              throws AuthorizationException, InternalException {
           }
         };
       }

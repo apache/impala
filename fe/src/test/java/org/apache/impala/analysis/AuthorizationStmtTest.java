@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.sun.jersey.api.client.ClientResponse;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -69,6 +70,8 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
+import org.apache.ranger.plugin.util.RangerRESTClient;
+import org.apache.ranger.plugin.util.RangerRESTUtils;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -81,14 +84,20 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import javax.ws.rs.core.Response.Status.Family;
+
 /**
  * This class contains authorization tests for SQL statements.
  */
 @RunWith(Parameterized.class)
 public class AuthorizationStmtTest extends FrontendTestBase {
+  private static final String RANGER_ADMIN_URL = "http://localhost:6080";
+  private static final String RANGER_USER = "admin";
+  private static final String RANGER_PASSWORD = "admin";
   private static final String SERVER_NAME = "server1";
   private static final User USER = new User(System.getProperty("user.name"));
   private static final String RANGER_SERVICE_TYPE = "hive";
+  private static final String RANGER_SERVICE_NAME = "test_impala";
   private static final String RANGER_APP_ID = "impala";
   private static final User RANGER_ADMIN = new User("admin");
 
@@ -100,6 +109,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private final ImpaladTestCatalog authzCatalog_;
   private final Frontend authzFrontend_;
   private final RangerImpalaPlugin rangerImpalaPlugin_;
+  private final RangerRESTClient rangerRestClient_;
 
   public AuthorizationStmtTest(AuthorizationProvider authzProvider) {
     authzProvider_ = authzProvider;
@@ -115,6 +125,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         sentryService_ = new SentryPolicyService(
             ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
         rangerImpalaPlugin_ = null;
+        rangerRestClient_ = null;
         break;
       case RANGER:
         authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
@@ -127,6 +138,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
                 .getRangerImpalaPlugin();
         sentryService_ = null;
+        rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null);
+        rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
         break;
       default:
         throw new IllegalArgumentException(String.format(
@@ -2822,6 +2835,260 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             onTable("functional", "alltypes", TPrivilegeLevel.ALL));
   }
 
+  @Test
+  public void testColumnMaskEnabled() throws ImpalaException {
+    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
+
+    String policyName = "col_mask";
+    for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
+      String json = String.format("{\n" +
+          "  \"name\": \"%s\",\n" +
+          "  \"policyType\": 1,\n" +
+          "  \"serviceType\": \"%s\",\n" +
+          "  \"service\": \"%s\",\n" +
+          "  \"resources\": {\n" +
+          "    \"database\": {\n" +
+          "      \"values\": [\"functional\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"table\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"column\": {\n" +
+          "      \"values\": [\"string_col\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    }\n" +
+          "  },\n" +
+          "  \"dataMaskPolicyItems\": [\n" +
+          "    {\n" +
+          "      \"accesses\": [\n" +
+          "        {\n" +
+          "          \"type\": \"select\",\n" +
+          "          \"isAllowed\": true\n" +
+          "        }\n" +
+          "      ],\n" +
+          "      \"users\": [\"%s\"],\n" +
+          "      \"dataMaskInfo\": {\"dataMaskType\": \"MASK\"}\n" +
+          "    }\n" +
+          "  ]\n" +
+          "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
+          USER.getShortName());
+
+      try {
+        createRangerPolicy(policyName, json);
+        // TODO: replace with the new API in RANGER-2349.
+        rangerImpalaPlugin_.init();
+
+        // Queries on columns that are not masked should be allowed.
+        authorize("select id from functional.alltypes")
+            .ok(onServer(TPrivilegeLevel.ALL));
+        authorize("select x from functional.alltypes_view_sub")
+            .ok(onServer(TPrivilegeLevel.ALL));
+        authorize("select string_col from functional_kudu.alltypes")
+            .ok(onServer(TPrivilegeLevel.ALL));
+
+        // Normal select.
+        authorize(String.format("select string_col from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Column within a function.
+        authorize(String.format(
+            "select substr(string_col, 0, 1) from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Select with *.
+        authorize(String.format("select * from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Sub-query.
+        authorize(String.format(
+            "select t.string_col from (select * from functional.%s) t", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // CTE.
+        authorize(String.format("with t as (select * from functional.%s) " +
+            "select string_col from t", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // CTAS.
+        authorize(String.format(
+            "create table t as select * from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Create view.
+        authorize(String.format(
+            "create view v as select * from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Alter view.
+        authorize(String.format("alter view functional.alltypes_view_sub as " +
+            "select * from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Union.
+        authorize(String.format(
+            "select string_col from functional.%s union select 'hello'", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Update.
+        authorize(String.format(
+            "update functional_kudu.alltypes set int_col = 1 where string_col in " +
+            "(select string_col from functional.%s)", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Delete.
+        authorize(String.format("delete functional_kudu.alltypes where string_col in " +
+            "(select string_col from functional.%s)", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Copy testcase.
+        authorize(String.format(
+            "copy testcase to '/tmp' select * from functional.%s", tableName))
+            .error(columnMaskError(String.format("functional.%s.string_col", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+      } finally {
+        deleteRangerPolicy(policyName);
+      }
+    }
+  }
+
+  @Test
+  public void testRowFilterEnabled() throws ImpalaException {
+    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
+
+    String policyName = "row_filter";
+    for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
+      String json = String.format("{\n" +
+          "  \"name\": \"%s\",\n" +
+          "  \"policyType\": 2,\n" +
+          "  \"serviceType\": \"%s\",\n" +
+          "  \"service\": \"%s\",\n" +
+          "  \"resources\": {\n" +
+          "    \"database\": {\n" +
+          "      \"values\": [\"functional\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"table\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    }\n" +
+          "  },\n" +
+          "  \"rowFilterPolicyItems\": [\n" +
+          "    {\n" +
+          "      \"accesses\": [\n" +
+          "        {\n" +
+          "          \"type\": \"select\",\n" +
+          "          \"isAllowed\": true\n" +
+          "        }\n" +
+          "      ],\n" +
+          "      \"users\": [\"%s\"],\n" +
+          "      \"rowFilterInfo\": {\"filterExpr\": \"id = 0\"}\n" +
+          "    }\n" +
+          "  ]\n" +
+          "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
+          USER.getShortName());
+
+      try {
+        createRangerPolicy(policyName, json);
+        // TODO: replace with the new API in RANGER-2349.
+        rangerImpalaPlugin_.init();
+
+        // Queries on tables that are not filtered should be allowed.
+        authorize("select string_col from functional_kudu.alltypes")
+            .ok(onServer(TPrivilegeLevel.ALL));
+        authorize("select x from functional.alltypes_view_sub")
+            .ok(onServer(TPrivilegeLevel.ALL));
+
+        // Normal select.
+        authorize(String.format("select string_col from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Select with *.
+        authorize(String.format("select * from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Sub-query.
+        authorize(String.format(
+            "select t.string_col from (select * from functional.%s) t", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // CTE.
+        authorize(String.format("with t as (select * from functional.%s) " +
+            "select string_col from t", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // CTAS.
+        authorize(String.format(
+            "create table t as select * from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Create view.
+        authorize(String.format(
+            "create view v as select * from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Alter view.
+        authorize(String.format("alter view functional.alltypes_view_sub as " +
+            "select * from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Union.
+        authorize(String.format(
+            "select string_col from functional.%s union select 'hello'", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Update.
+        authorize(String.format(
+            "update functional_kudu.alltypes set int_col = 1 where string_col in " +
+                "(select string_col from functional.%s)", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Delete.
+        authorize(String.format("delete functional_kudu.alltypes where string_col in " +
+            "(select string_col from functional.%s)", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+        // Copy testcase.
+        authorize(String.format(
+            "copy testcase to '/tmp' select * from functional.%s", tableName))
+            .error(rowFilterError(String.format("functional.%s", tableName)),
+                onServer(TPrivilegeLevel.ALL));
+      } finally {
+        deleteRangerPolicy(policyName);
+      }
+    }
+  }
+
+  private void createRangerPolicy(String policyName, String json) {
+    ClientResponse response = rangerRestClient_
+        .getResource("/service/public/v2/api/policy")
+        .accept(RangerRESTUtils.REST_MIME_TYPE_JSON)
+        .type(RangerRESTUtils.REST_MIME_TYPE_JSON)
+        .post(ClientResponse.class, json);
+    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
+      throw new RuntimeException(
+          String.format("Unable to create a Ranger policy: %s.", policyName));
+    }
+  }
+
+  private void deleteRangerPolicy(String policyName) {
+    ClientResponse response = rangerRestClient_
+        .getResource("/service/public/v2/api/policy")
+        .queryParam("servicename", RANGER_SERVICE_NAME)
+        .queryParam("policyname", policyName)
+        .delete(ClientResponse.class);
+    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
+      throw new RuntimeException(
+          String.format("Unable to delete Ranger policy: %s.", policyName));
+    }
+  }
+
   // Convert TDescribeResult to list of strings.
   private static List<String> resultToStringList(TDescribeResult result) {
     List<String> list = new ArrayList<>();
@@ -2882,6 +3149,16 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   private static String dropFunctionError(String object) {
     return "User '%s' does not have privileges to DROP functions in: " + object;
+  }
+
+  private static String columnMaskError(String object) {
+    return "Impala does not support column masking yet. Column masking is enabled on " +
+        "column: " + object;
+  }
+
+  private static String rowFilterError(String object) {
+    return "Impala does not support row filtering yet. Row filtering is enabled on " +
+        "table: " + object;
   }
 
   private ScalarFunction addFunction(String db, String fnName, List<Type> argTypes,

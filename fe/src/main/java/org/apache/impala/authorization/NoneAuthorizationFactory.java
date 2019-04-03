@@ -36,6 +36,7 @@ import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -48,7 +49,7 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
 
   public NoneAuthorizationFactory(BackendConfig backendConfig) {
     Preconditions.checkNotNull(backendConfig);
-    authzConfig_ = newAuthorizationConfig(backendConfig);
+    authzConfig_ = disabledAuthorizationConfig();
   }
 
   /**
@@ -70,7 +71,7 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
     };
   }
 
-  public static class NoneAuthorizationManager implements AuthorizationManager {
+  public static class NoopAuthorizationManager implements AuthorizationManager {
     @Override
     public void createRole(User requestingUser, TCreateDropRoleParams params,
         TDdlExecResponse response) throws ImpalaException {
@@ -172,11 +173,6 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
   }
 
   @Override
-  public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
-    return disabledAuthorizationConfig();
-  }
-
-  @Override
   public AuthorizationConfig getAuthorizationConfig() { return authzConfig_; }
 
   @Override
@@ -192,17 +188,23 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
       public Set<String> getUserGroups(User user) throws InternalException {
         return Collections.emptySet();
       }
+
+      @Override
+      public void authorizeRowFilterAndColumnMask(User user,
+          List<PrivilegeRequest> privilegeRequests)
+          throws AuthorizationException, InternalException {
+      }
     };
   }
 
   @Override
   public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
       Supplier<? extends AuthorizationChecker> authzChecker) {
-    return new NoneAuthorizationManager();
+    return new NoopAuthorizationManager();
   }
 
   @Override
   public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
-    return new NoneAuthorizationManager();
+    return new NoopAuthorizationManager();
   }
 }

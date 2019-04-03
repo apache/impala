@@ -21,13 +21,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.impala.authorization.Authorizable;
+import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.DefaultAuthorizableFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.InternalException;
+import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -47,14 +50,19 @@ import java.util.Set;
  * Ranger plugin uses its own cache.
  */
 public class RangerAuthorizationChecker extends AuthorizationChecker {
+  // These are Ranger access types (privileges).
   public static final String UPDATE_ACCESS_TYPE = "update";
   public static final String REFRESH_ACCESS_TYPE = "read";
+  public static final String SELECT_ACCESS_TYPE = "select";
+
+  private final RangerDefaultAuditHandler auditHandler_;
   private final RangerImpalaPlugin plugin_;
 
   public RangerAuthorizationChecker(AuthorizationConfig authzConfig) {
     super(authzConfig);
     Preconditions.checkArgument(authzConfig instanceof RangerAuthorizationConfig);
     RangerAuthorizationConfig rangerConfig = (RangerAuthorizationConfig) authzConfig;
+    auditHandler_ = new RangerDefaultAuditHandler();
     plugin_ = new RangerImpalaPlugin(
         rangerConfig.getServiceType(), rangerConfig.getAppId());
     plugin_.init();
@@ -131,15 +139,13 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
 
     for (RangerAccessResourceImpl resource: resources) {
       if (request.getPrivilege() == Privilege.ANY) {
-        if (!authorize(plugin_, resource, user, request.getPrivilege())) {
+        if (!authorize(resource, user, request.getPrivilege())) {
           return false;
         }
       } else {
         boolean authorized = request.getPrivilege().hasAnyOf() ?
-            authorizeAny(plugin_, resource, user,
-                request.getPrivilege().getImpliedPrivileges()) :
-            authorizeAll(plugin_, resource, user,
-                request.getPrivilege().getImpliedPrivileges());
+            authorizeAny(resource, user, request.getPrivilege().getImpliedPrivileges()) :
+            authorizeAll(resource, user, request.getPrivilege().getImpliedPrivileges());
         if (!authorized) {
           return false;
         }
@@ -149,36 +155,95 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
   }
 
   @Override
+  public void authorizeRowFilterAndColumnMask(User user,
+      List<PrivilegeRequest> privilegeRequests)
+      throws AuthorizationException, InternalException {
+    for (PrivilegeRequest request : privilegeRequests) {
+      if (request.getAuthorizable().getType() == Type.COLUMN) {
+        authorizeColumnMask(user,
+            request.getAuthorizable().getDbName(),
+            request.getAuthorizable().getTableName(),
+            request.getAuthorizable().getColumnName());
+      } else if (request.getAuthorizable().getType() == Type.TABLE) {
+        if (request.getAuthorizable().getType() == Type.TABLE) {
+          authorizeRowFilter(user,
+              request.getAuthorizable().getDbName(),
+              request.getAuthorizable().getTableName());
+        }
+      }
+    }
+  }
+
+  /**
+   * This method checks if column mask is enabled on the given columns and deny access
+   * when column mask is enabled by throwing an {@link AuthorizationException}. This is
+   * to prevent data leak when Hive has column mask enabled but not in Impala.
+   */
+  private void authorizeColumnMask(User user, String dbName, String tableName,
+      String columnName) throws InternalException, AuthorizationException {
+    RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
+        .database(dbName)
+        .table(tableName)
+        .column(columnName)
+        .build();
+    RangerAccessRequest req = new RangerAccessRequestImpl(resource,
+        SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
+    if (plugin_.evalDataMaskPolicies(req, auditHandler_).isMaskEnabled()) {
+      throw new AuthorizationException(String.format(
+          "Impala does not support column masking yet. Column masking is enabled on " +
+              "column: %s.%s.%s", dbName, tableName, columnName));
+    }
+  }
+
+  /**
+   * This method checks if row filter is enabled on the given tables and deny access
+   * when row filter is enabled by throwing an {@link AuthorizationException} . This is
+   * to prevent data leak when Hive has row filter enabled but not in Impala.
+   */
+  private void authorizeRowFilter(User user, String dbName, String tableName)
+      throws InternalException, AuthorizationException {
+    RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
+        .database(dbName)
+        .table(tableName)
+        .build();
+    RangerAccessRequest req = new RangerAccessRequestImpl(resource,
+        SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
+    if (plugin_.evalRowFilterPolicies(req, auditHandler_).isRowFilterEnabled()) {
+      throw new AuthorizationException(String.format(
+          "Impala does not support row filtering yet. Row filtering is enabled " +
+              "on table: %s.%s", dbName, tableName));
+    }
+  }
+
+  @Override
   public Set<String> getUserGroups(User user) throws InternalException {
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user.getShortName());
     return new HashSet<>(ugi.getGroups());
   }
 
-  private boolean authorizeAny(RangerImpalaPlugin plugin,
-      RangerAccessResourceImpl resource, User user, EnumSet<Privilege> privileges)
-      throws InternalException {
+  private boolean authorizeAny(RangerAccessResourceImpl resource, User user,
+      EnumSet<Privilege> privileges) throws InternalException {
     for (Privilege privilege: privileges) {
-      if (authorize(plugin, resource, user, privilege)) {
+      if (authorize(resource, user, privilege)) {
         return true;
       }
     }
     return false;
   }
 
-  private boolean authorizeAll(RangerImpalaPlugin plugin,
-      RangerAccessResourceImpl resource, User user, EnumSet<Privilege> privileges)
+  private boolean authorizeAll(RangerAccessResourceImpl resource, User user,
+      EnumSet<Privilege> privileges)
       throws InternalException {
     for (Privilege privilege: privileges) {
-      if (!authorize(plugin, resource, user, privilege)) {
+      if (!authorize(resource, user, privilege)) {
         return false;
       }
     }
     return true;
   }
 
-  private boolean authorize(RangerImpalaPlugin plugin,
-      RangerAccessResourceImpl resource, User user, Privilege privilege)
-      throws InternalException {
+  private boolean authorize(RangerAccessResourceImpl resource, User user,
+      Privilege privilege) throws InternalException {
     String accessType;
     if (privilege == Privilege.ANY) {
       accessType = RangerPolicyEngine.ANY_ACCESS;
@@ -194,7 +259,7 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
     }
     RangerAccessRequest request = new RangerAccessRequestImpl(resource,
         accessType, user.getShortName(), getUserGroups(user));
-    RangerAccessResult result = plugin.isAccessAllowed(request);
+    RangerAccessResult result = plugin_.isAccessAllowed(request);
     return result != null && result.getIsAllowed();
   }
 

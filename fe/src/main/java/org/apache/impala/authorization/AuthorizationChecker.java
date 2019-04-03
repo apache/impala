@@ -18,6 +18,7 @@
 package org.apache.impala.authorization;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.Authorizable.Type;
@@ -116,4 +117,14 @@ public abstract class AuthorizationChecker {
    * Returns a set of groups for a given user.
    */
   public abstract Set<String> getUserGroups(User user) throws InternalException;
+
+  /**
+   * Checks if the given tables/columns are configured with row filtering/column masking
+   * enabled. If they do, throw an {@link AuthorizationException} to prevent data leak.
+   *
+   * TODO: Remove this method when Impala supports row filtering and column masking.
+   */
+  public abstract void authorizeRowFilterAndColumnMask(User user,
+      List<PrivilegeRequest> privilegeRequests)
+      throws AuthorizationException, InternalException;
 }

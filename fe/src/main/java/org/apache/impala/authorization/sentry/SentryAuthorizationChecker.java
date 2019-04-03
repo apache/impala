@@ -22,11 +22,11 @@ import com.google.common.collect.Lists;
 import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
@@ -72,6 +72,12 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
       }
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public void authorizeRowFilterAndColumnMask(User user,
+      List<PrivilegeRequest> privilegeRequests)
+      throws AuthorizationException, InternalException {
   }
 
   /*

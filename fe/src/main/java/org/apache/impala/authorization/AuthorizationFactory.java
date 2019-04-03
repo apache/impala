@@ -31,11 +31,6 @@ public interface AuthorizationFactory {
   AuthorizableFactory DEFAULT_AUTHORIZABLE_FACTORY = new DefaultAuthorizableFactory();
 
   /**
-   * Creates a new {@link AuthorizationFactory}.
-   */
-  AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig);
-
-  /**
    * Gets an instance of {@link AuthorizationConfig}.
    */
   AuthorizationConfig getAuthorizationConfig();

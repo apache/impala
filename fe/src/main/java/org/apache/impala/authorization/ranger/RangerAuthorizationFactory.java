@@ -51,8 +51,7 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
     authzConfig_ = authzConfig;
   }
 
-  @Override
-  public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
+  private static AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(
         backendConfig.getBackendCfg().getServer_name()),
         "Authorization is enabled but the server name is empty. " +

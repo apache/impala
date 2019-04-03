@@ -55,8 +55,7 @@ public class SentryAuthorizationFactory implements AuthorizationFactory {
     authzConfig_ = authzConfig;
   }
 
-  @Override
-  public AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
+  private static AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
     String serverName = backendConfig.getBackendCfg().getServer_name();
     String sentryConfigFile = backendConfig.getBackendCfg().getSentry_config();
     String policyProviderClassName = backendConfig.getBackendCfg()
