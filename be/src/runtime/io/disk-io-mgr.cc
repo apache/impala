@@ -20,6 +20,7 @@
 #include "common/global-flags.h"
 #include "common/thread-debug-info.h"
 #include "runtime/exec-env.h"
+#include "runtime/io/data-cache.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/handle-cache.inline.h"
 #include "runtime/io/error-converter.h"
@@ -51,6 +52,13 @@ DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // Default IoMgr configs:
 // The maximum number of the threads per disk is also the max queue depth per disk.
 DEFINE_int32(num_threads_per_disk, 0, "Number of I/O threads per disk");
+// Data cache configuration
+DEFINE_string(data_cache, "", "The configuration string for IO data cache. "
+    "Default to be an empty string so it's disabled. The configuration string is "
+    "expected to be a list of directories, separated by ',', followed by a ':' and "
+    "a capacity quota per directory. For example /data/0,/data/1:1TB means the cache "
+    "may use up to 2TB, with 1TB max in /data/0 and /data/1 respectively. Please note "
+    "that each Impala daemon on a host must have a unique caching directory.");
 
 // Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
@@ -228,6 +236,7 @@ DiskIoMgr::~DiskIoMgr() {
   disk_thread_group_.JoinAll();
   for (DiskQueue* disk_queue : disk_queues_) delete disk_queue;
   if (cached_read_options_ != nullptr) hadoopRzOptionsFree(cached_read_options_);
+  if (remote_data_cache_) remote_data_cache_->ReleaseResources();
 }
 
 Status DiskIoMgr::Init() {
@@ -279,6 +288,10 @@ Status DiskIoMgr::Init() {
   ret = hadoopRzOptionsSetByteBufferPool(cached_read_options_, nullptr);
   DCHECK_EQ(ret, 0);
 
+  if (!FLAGS_data_cache.empty()) {
+    remote_data_cache_.reset(new DataCache(FLAGS_data_cache));
+    RETURN_IF_ERROR(remote_data_cache_->Init());
+  }
   return Status::OK();
 }
 

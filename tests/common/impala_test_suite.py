@@ -18,12 +18,14 @@
 # The base class that should be used for almost all Impala tests
 
 import grp
+import json
 import logging
 import os
 import pprint
 import pwd
 import pytest
 import re
+import requests
 import shutil
 import socket
 import subprocess
@@ -115,6 +117,7 @@ EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
 SET_PATTERN = re.compile(
     COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
+METRICS_URL = 'http://localhost:25000/metrics?json'
 
 
 # Base class for Impala tests. All impala test cases should inherit from this class
@@ -301,6 +304,27 @@ class ImpalaTestSuite(BaseTestSuite):
           result_fields.append(fields[i])
       result.append(tuple(result_fields))
     return result
+
+  def get_debug_page(self, page_url):
+    """Returns the content of the debug page 'page_url' as json."""
+    response = requests.get(page_url)
+    assert response.status_code == requests.codes.ok
+    return json.loads(response.text)
+
+  def get_metric(self, name):
+    """Finds the metric with name 'name' and returns its value as an int."""
+    def iter_metrics(group):
+      for m in group['metrics']:
+        yield m
+      for c in group['child_groups']:
+        for m in iter_metrics(c):
+          yield m
+
+    metrics = self.get_debug_page(METRICS_URL)['metric_group']
+    for m in iter_metrics(metrics):
+      if m['name'] == name:
+        return int(m['value'])
+    assert False, "Could not find metric: %s" % name
 
   def __verify_exceptions(self, expected_strs, actual_str, use_db):
     """

@@ -115,7 +115,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       if catalogd_args is not None:
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
-        func.func_dict[START_ARGS] = start_args
+        func.func_dict[START_ARGS] = start_args.split()
       if sentry_config is not None:
         func.func_dict[SENTRY_CONFIG] = sentry_config
       if sentry_log_dir is not None:
@@ -137,7 +137,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       if arg in method.func_dict:
         cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:
-      cluster_args.append(method.func_dict[START_ARGS])
+      cluster_args.extend(method.func_dict[START_ARGS])
 
     if SENTRY_CONFIG in method.func_dict:
       self._start_sentry_service(method.func_dict[SENTRY_CONFIG],

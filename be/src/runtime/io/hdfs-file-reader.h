@@ -23,6 +23,8 @@
 namespace impala {
 namespace io {
 
+class DataCache;
+
 /// File reader class for HDFS.
 class HdfsFileReader : public FileReader {
 public:
@@ -35,16 +37,42 @@ public:
   virtual Status Open(bool use_file_handle_cache) override;
   virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
       int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override;
-  /// Reads from the DN cache. On success, sets cached_buffer_ to the DN
-  /// buffer and returns a pointer to the underlying raw buffer.
-  /// Returns nullptr if the data is not cached.
-  virtual void CachedFile(uint8_t** data, int64_t* length) override;
   virtual void Close() override;
   virtual void ResetState() override;
   virtual std::string DebugString() const override;
+
+  /// Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
+  /// and returns a pointer to the underlying raw buffer. 'cached_buffer_' is set to
+  /// nullptr if the data is not cached and 'length' is set to 0.
+  ///
+  /// Please note that this interface is only effective for local HDFS reads as it
+  /// relies on HDFS caching. For remote reads, this interface is not used.
+  virtual void CachedFile(uint8_t** data, int64_t* length) override;
+
 private:
+  /// Probes 'remote_data_cache' for a hit. The requested file's name and mtime
+  /// are stored in 'scan_range_'. 'file_offset' is the offset into the file to read
+  /// and 'bytes_to_read' is the number of bytes requested. On success, copies the
+  /// content of the cache into 'buffer' and returns the number of bytes read.
+  /// Also updates various cache metrics. Returns 0 on cache miss.
+  int64_t ReadDataCache(DataCache* remote_data_cache, int64_t file_offset,
+      uint8_t* buffer, int64_t bytes_to_read);
+
+  /// Inserts into 'remote_data_cache' with 'buffer' which contains the data read
+  /// from a file at 'file_offset'. 'buffer_len' is the length of the buffer in bytes.
+  /// The file's name and mtime are stored in 'scan_range_'. 'cached_bytes_missed' is
+  /// the number of bytes missed in the cache. Used for updating cache metrics.
+  /// No guarantee that the entry is inserted as caching is opportunistic.
+  void WriteDataCache(DataCache* remote_data_cache, int64_t file_offset,
+      const uint8_t* buffer, int64_t buffer_len, int64_t cached_bytes_missed);
+
+  /// Read [position_in_file, position_in_file + chunk_size) from 'hdfs_file'
+  /// into 'buffer'. Update 'bytes_read' on success. Returns error status on
+  /// failure. When not using HDFS pread, this function will always implicitly
+  /// seek to 'position_in_file' if 'hdfs_file' is not at it already.
   Status ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_in_file,
-      bool is_borrowed_fh, uint8_t* buffer, int64_t chunk_size, int* bytes_read);
+      uint8_t* buffer, int64_t chunk_size, int* bytes_read);
+
   void GetHdfsStatistics(hdfsFile hdfs_file);
 
   /// Hadoop filesystem that contains the file being read.

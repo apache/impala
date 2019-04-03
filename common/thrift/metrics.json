@@ -400,6 +400,46 @@
     "key": "impala-server.io-mgr.local-bytes-read"
   },
   {
+    "description": "Total number of bytes of hits in the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Hit In Bytes",
+    "units": "BYTES",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-hit-bytes"
+  },
+  {
+    "description": "Total number of bytes of misses in the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Miss In Bytes",
+    "units": "BYTES",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-miss-bytes"
+  },
+  {
+    "description": "Current byte size of the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Bytes Size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.remote-data-cache-total-bytes"
+  },
+  {
+    "description": "Total number of bytes not inserted in remote data cache due to concurrency limit.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Bytes Not Inserted Due To Concurrency limit",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-dropped-bytes"
+  },
+  {
     "description": "The number of allocated IO buffers. IO buffers are shared by all queries.",
     "contexts": [
       "IMPALAD"

@@ -539,6 +539,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// Total number of file handle opens where the file handle was not in the cache
   RuntimeProfile::Counter* cached_file_handles_miss_count_ = nullptr;
 
+  /// Counters for data cache.
+  RuntimeProfile::Counter* data_cache_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_partial_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_hit_bytes_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_bytes_ = nullptr;
+
   /// The amount of time scanner threads spend waiting for I/O.
   RuntimeProfile::Counter* scanner_io_wait_time_ = nullptr;
 

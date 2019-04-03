@@ -16,14 +16,27 @@
 // under the License.
 
 #include <fcntl.h>
+#include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <boost/filesystem.hpp>
+#include <gutil/strings/numbers.h>
 #include <gutil/strings/substitute.h>
+#include <gutil/strings/util.h>
 
+#include "exec/kudu-util.h"
+#include "gutil/macros.h"
 #include "runtime/io/error-converter.h"
+#include "kudu/util/env.h"
+#include "kudu/util/path_util.h"
 #include "util/filesystem-util.h"
 #include "util/error-util.h"
+#include "util/scope-exit-trigger.h"
+#include "util/uid-util.h"
+
+#ifndef FALLOC_FL_PUNCH_HOLE
+#include <linux/falloc.h>
+#endif
 
 #include "common/names.h"
 
@@ -31,6 +44,10 @@ namespace errc = boost::system::errc;
 namespace filesystem = boost::filesystem;
 
 using boost::system::error_code;
+using kudu::Env;
+using kudu::JoinPathSegments;
+using kudu::RWFile;
+using kudu::Slice;
 using std::exception;
 using namespace strings;
 
@@ -97,7 +114,8 @@ Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
 }
 
 Status FileSystemUtil::CreateFile(const string& file_path) {
-  int fd = creat(file_path.c_str(), S_IRUSR | S_IWUSR);
+  int fd;
+  RETRY_ON_EINTR(fd, creat(file_path.c_str(), S_IRUSR | S_IWUSR));
 
   if (fd < 0) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
@@ -223,7 +241,6 @@ bool FileSystemUtil::GetRelativePath(const string& path, const string& start,
   return false;
 }
 
-
 FileSystemUtil::Directory::Directory(const string& path)
     : dir_path_(path),
       status_(Status::OK()) {
@@ -237,7 +254,7 @@ FileSystemUtil::Directory::~Directory() {
   if (dir_stream_ != nullptr) (void)closedir(dir_stream_);
 }
 
-bool FileSystemUtil::Directory::GetNextEntryName(string* entry_name) {
+bool FileSystemUtil::Directory::GetNextEntryName(string* entry_name, EntryType type) {
   DCHECK(entry_name != nullptr);
 
   if (status_.ok()) {
@@ -249,6 +266,14 @@ bool FileSystemUtil::Directory::GetNextEntryName(string* entry_name) {
       if (dir_entry->d_name[0] == 0 || strcmp(dir_entry->d_name, ".") == 0
           || strcmp(dir_entry->d_name, "..") == 0) {
         continue;
+      }
+      if (type != DIR_ENTRY_ANY && dir_entry->d_type != DT_UNKNOWN) {
+        if (type == DIR_ENTRY_REG && dir_entry->d_type != DT_REG) {
+          continue;
+        }
+        if (type == DIR_ENTRY_DIR && dir_entry->d_type != DT_DIR) {
+          continue;
+        }
       }
       *entry_name = dir_entry->d_name;
       return true;
@@ -265,18 +290,114 @@ bool FileSystemUtil::Directory::GetNextEntryName(string* entry_name) {
 }
 
 Status FileSystemUtil::Directory::GetEntryNames(const string& path,
-    vector<string>* entry_names, int max_result_size) {
+    vector<string>* entry_names, int max_result_size, EntryType type) {
   DCHECK(entry_names != nullptr);
 
   Directory dir(path);
   entry_names->clear();
   string entry_name;
-  while ((max_result_size <= 0 || entry_names->size() < max_result_size)
-      && dir.GetNextEntryName(&entry_name)) {
+  while ((max_result_size <= 0 || entry_names->size() < max_result_size) &&
+      dir.GetNextEntryName(&entry_name, type)) {
     entry_names->push_back(entry_name);
   }
 
   return dir.GetLastStatus();
+}
+
+// Copied and pasted from Kudu source: src/kudu/fs/log_block_manager.cc
+bool FileSystemUtil::IsBuggyEl6Kernel(const string& kernel_release) {
+  autodigit_less lt;
+
+  // Only el6 is buggy.
+  if (kernel_release.find("el6") == string::npos) return false;
+
+  // Kernels in the 6.8 update stream (2.6.32-642.a.b) are fixed
+  // for a >= 15.
+  //
+  // https://rhn.redhat.com/errata/RHSA-2017-0307.html
+  if (MatchPattern(kernel_release, "2.6.32-642.*.el6.*") &&
+      lt("2.6.32-642.15.0", kernel_release)) {
+    return false;
+  }
+
+  // If the kernel older is than 2.6.32-674 (el6.9), it's buggy.
+  return lt(kernel_release, "2.6.32-674");
+}
+
+Status FileSystemUtil::CheckHolePunch(const string& path) {
+  kudu::Env* env = kudu::Env::Default();
+
+  // Check if the filesystem of 'path' is vulnerable to to KUDU-1508.
+  bool is_on_ext;
+  KUDU_RETURN_IF_ERROR(env->IsOnExtFilesystem(path, &is_on_ext),
+      Substitute("Failed to check filesystem type at $0", path));
+  if (is_on_ext && IsBuggyEl6Kernel(env->GetKernelRelease())) {
+    return Status(Substitute("Data dir $0 is on an ext4 filesystem vulnerable to "
+        "KUDU-1508.", path));
+  }
+
+  // Open the test file.
+  string filename = JoinPathSegments(path, PrintId(GenerateUUID()));
+  unique_ptr<RWFile> test_file;
+  KUDU_RETURN_IF_ERROR(kudu::Env::Default()->NewRWFile(filename, &test_file),
+      Substitute("Failed to create file $0", filename));
+
+  // Delete file on exit from the function.
+  auto delete_file = MakeScopeExitTrigger([&filename]() {
+      kudu::Env::Default()->DeleteFile(filename);
+  });
+
+  const int buffer_size = 4096 * 4;
+  unique_ptr<uint8_t[]> buffer(new uint8_t[buffer_size]);
+  memset(buffer.get(), 0xaa, buffer_size);
+  for (int i = 0; i < 4; ++i) {
+    KUDU_RETURN_IF_ERROR(test_file->Write(i * buffer_size,
+        Slice(buffer.get(), buffer_size)),
+        Substitute("Failed to write to file $0", path));
+  }
+
+  const off_t init_file_size = buffer_size * 4;
+  uint64_t sz;
+  KUDU_RETURN_IF_ERROR(env->GetFileSizeOnDisk(filename, &sz),
+      "Failed to get pre-punch file size");
+  if (sz != init_file_size) {
+    return Status(Substitute("Unexpected pre-punch file size for $0: expected $1 but "
+        "got $2", filename, init_file_size, sz));
+  }
+
+  // Punch the hole, testing the file's size again.
+  const off_t hole_offset = buffer_size;
+  const off_t hole_size = buffer_size * 2;
+  KUDU_RETURN_IF_ERROR(test_file->PunchHole(hole_offset, hole_size),
+      "Failed to punch hole");
+
+  const int final_file_size = init_file_size - hole_size;
+  KUDU_RETURN_IF_ERROR(env->GetFileSizeOnDisk(filename, &sz),
+      "Failed to get post-punch file size");
+  if (sz != final_file_size) {
+    return Status(Substitute("Unexpected post-punch file size for $0: expected $1 but "
+        "got $2", filename, final_file_size, sz));
+  }
+
+  int offset = 0;
+  unique_ptr<uint8_t[]> tmp_buffer(new uint8_t[buffer_size]);
+  memset(tmp_buffer.get(), 0, buffer_size);
+  KUDU_RETURN_IF_ERROR(test_file->Read(offset, Slice(tmp_buffer.get(), buffer_size)),
+      Substitute("Failed to read file $0", path));
+  if (memcmp(tmp_buffer.get(), buffer.get(), buffer_size) != 0) {
+    return Status(Substitute("Mismatched file content $0 at offset 0", filename));
+  }
+
+  offset = hole_offset + hole_size;
+  memset(tmp_buffer.get(), 0, buffer_size);
+  KUDU_RETURN_IF_ERROR(test_file->Read(offset, Slice(tmp_buffer.get(), buffer_size)),
+      Substitute("Failed to read file $0", path));
+  if (memcmp(tmp_buffer.get(), buffer.get(), buffer_size) != 0) {
+    return Status(Substitute("Mismatched file content $0 at offset $1", filename,
+        offset));
+  }
+
+  return Status::OK();
 }
 
 } // namespace impala

@@ -79,6 +79,19 @@ class ImpaladMetricKeys {
   /// Total number of cached bytes read by the io mgr
   static const char* IO_MGR_CACHED_BYTES_READ;
 
+  /// Total number of bytes read from the remote data cache.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES;
+
+  /// Total number of bytes missing from the remote data cache.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES;
+
+  /// Current byte size of the remote data cache.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES;
+
+  /// Total number of bytes not inserted into the remote data cache due to
+  /// concurrency limit.
+  static const char* IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES;
+
   /// Total number of bytes written to disk by the io mgr (for spilling)
   static const char* IO_MGR_BYTES_WRITTEN;
 
@@ -221,6 +234,9 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_BYTES_READ;
   static IntCounter* IO_MGR_LOCAL_BYTES_READ;
   static IntCounter* IO_MGR_CACHED_BYTES_READ;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES;
+  static IntCounter* IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES;
   static IntCounter* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static IntCounter* IO_MGR_BYTES_WRITTEN;
   static IntCounter* IO_MGR_CACHED_FILE_HANDLES_REOPENED;
@@ -253,7 +269,7 @@ class ImpaladMetrics {
   static IntGauge* IO_MGR_NUM_FILE_HANDLES_OUTSTANDING;
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT;
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
-  static IntGauge* IO_MGR_TOTAL_BYTES;
+  static IntGauge* IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES;
   static IntGauge* NUM_FILES_OPEN_FOR_INSERT;
   static IntGauge* NUM_QUERIES_REGISTERED;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;

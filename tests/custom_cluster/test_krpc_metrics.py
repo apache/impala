@@ -15,9 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 import pytest
-import requests
 import time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
@@ -27,7 +25,6 @@ from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 class TestKrpcMetrics(CustomClusterTestSuite):
   """Test for KRPC metrics that require special arguments during cluster startup."""
   RPCZ_URL = 'http://localhost:25000/rpcz?json'
-  METRICS_URL = 'http://localhost:25000/metrics?json'
   TEST_QUERY = 'select count(*) from tpch_parquet.lineitem l1 \
       join tpch_parquet.lineitem l2 where l1.l_orderkey = l2.l_orderkey;'
 
@@ -40,12 +37,6 @@ class TestKrpcMetrics(CustomClusterTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     super(TestKrpcMetrics, cls).setup_class()
-
-  def get_debug_page(self, page_url):
-    """Returns the content of the debug page 'page_url' as json."""
-    response = requests.get(page_url)
-    assert response.status_code == requests.codes.ok
-    return json.loads(response.text)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
@@ -67,21 +58,6 @@ class TestKrpcMetrics(CustomClusterTestSuite):
     after = get_rpc_overflows()
 
     assert before < after
-
-  def get_metric(self, name):
-    """Finds the metric with name 'name' and returns its value as an int."""
-    def iter_metrics(group):
-      for m in group['metrics']:
-        yield m
-      for c in group['child_groups']:
-        for m in iter_metrics(c):
-          yield m
-
-    metrics = self.get_debug_page(self.METRICS_URL)['metric_group']
-    for m in iter_metrics(metrics):
-      if m['name'] == name:
-        return int(m['value'])
-    assert False, "Could not find metric: %s" % name
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \

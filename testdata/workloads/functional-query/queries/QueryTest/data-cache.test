@@ -1,0 +1,49 @@
+====
+---- QUERY
+create table test_parquet stored as parquet as select * from tpch_parquet.lineitem;
+---- RUNTIME_PROFILE
+# Exepct all cache misses for tpch_parquet.lineitem.
+row_regex: .*DataCacheHitBytes: 0.*
+row_regex: .*DataCacheHitCount: 0 \(0\).*
+row_regex: .*DataCacheMissCount: 64 \(64\).*
+====
+---- QUERY
+select count(*) from tpch_parquet.lineitem t1, test_parquet t2 where t1.l_orderkey = t2.l_orderkey;
+---- RUNTIME_PROFILE
+# Exepct cache hits for t1 and cache misses for t2.
+row_regex: .*DataCacheHitCount: 6 \(6\).*
+row_regex: .*DataCacheMissBytes: 0.*
+row_regex: .*DataCacheMissCount: 0 \(0\).*
+row_regex: .*DataCachePartialHitCount: 0 \(0\).*
+row_regex: .*DataCacheHitBytes: 0.*
+row_regex: .*DataCacheHitCount: 0 \(0\).*
+row_regex: .*DataCacheMissCount: 3 \(3\).*
+row_regex: .*DataCachePartialHitCount: 0 \(0\).*
+====
+---- QUERY
+select count(distinct l_orderkey) from test_parquet;
+---- RESULTS
+1500000
+---- RUNTIME_PROFILE
+# Expect all cache hits.
+row_regex: .*DataCacheHitCount: 3 \(3\).*
+row_regex: .*DataCacheMissBytes: 0.*
+row_regex: .*DataCacheMissCount: 0 \(0\).*
+row_regex: .*DataCachePartialHitCount: 0 \(0\).*
+====
+---- QUERY
+# Overwrite temp table with subset of data.
+insert overwrite test_parquet select * from tpch_parquet.lineitem where l_shipmode = 'AIR';
+====
+---- QUERY
+# Verifies that stale data from the cache is not used due to change in mtime.
+select count(distinct l_orderkey) from test_parquet;
+---- RESULTS
+652393
+---- RUNTIME_PROFILE
+# Expect all cache misses due to change in mtime.
+row_regex: .*DataCacheHitBytes: 0.*
+row_regex: .*DataCacheHitCount: 0 \(0\).*
+row_regex: .*DataCacheMissCount: 2 \(2\).*
+row_regex: .*DataCachePartialHitCount: 0 \(0\).*
+====

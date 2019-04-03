@@ -184,6 +184,26 @@ class RequestContext {
     disks_accessed_bitmap_ = disks_accessed_bitmap;
   }
 
+  void set_data_cache_hit_counter(RuntimeProfile::Counter* counter) {
+    data_cache_hit_counter_ = counter;
+  }
+
+  void set_data_cache_partial_hit_counter(RuntimeProfile::Counter* counter) {
+    data_cache_partial_hit_counter_ = counter;
+  }
+
+  void set_data_cache_miss_counter(RuntimeProfile::Counter* counter) {
+    data_cache_miss_counter_ = counter;
+  }
+
+  void set_data_cache_hit_bytes_counter(RuntimeProfile::Counter* counter) {
+    data_cache_hit_bytes_counter_ = counter;
+  }
+
+  void set_data_cache_miss_bytes_counter(RuntimeProfile::Counter* counter) {
+    data_cache_miss_bytes_counter_ = counter;
+  }
+
   TUniqueId instance_id() const { return instance_id_; }
   void set_instance_id(const TUniqueId& instance_id) {
     instance_id_ = instance_id;
@@ -324,6 +344,13 @@ class RequestContext {
   /// TODO: we can only support up to 64 disks with this bitmap but it lets us use a
   /// builtin atomic instruction. Probably good enough for now.
   RuntimeProfile::Counter* disks_accessed_bitmap_ = nullptr;
+
+  /// Data cache counters.
+  RuntimeProfile::Counter* data_cache_hit_counter_ = nullptr;
+  RuntimeProfile::Counter* data_cache_partial_hit_counter_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_counter_ = nullptr;
+  RuntimeProfile::Counter* data_cache_hit_bytes_counter_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_bytes_counter_ = nullptr;
 
   /// Total number of bytes read locally, updated at end of each range scan
   AtomicInt64 bytes_read_local_{0};

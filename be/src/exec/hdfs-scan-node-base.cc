@@ -360,11 +360,28 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   } else {
     num_disks_accessed_counter_ = NULL;
   }
+
+  data_cache_hit_count_ = ADD_COUNTER(runtime_profile(),
+      "DataCacheHitCount", TUnit::UNIT);
+  data_cache_partial_hit_count_ = ADD_COUNTER(runtime_profile(),
+      "DataCachePartialHitCount", TUnit::UNIT);
+  data_cache_miss_count_ = ADD_COUNTER(runtime_profile(),
+      "DataCacheMissCount", TUnit::UNIT);
+  data_cache_hit_bytes_ = ADD_COUNTER(runtime_profile(),
+      "DataCacheHitBytes", TUnit::BYTES);
+  data_cache_miss_bytes_ = ADD_COUNTER(runtime_profile(),
+      "DataCacheMissBytes", TUnit::BYTES);
+
   reader_context_->set_bytes_read_counter(bytes_read_counter());
   reader_context_->set_read_timer(hdfs_read_timer_);
   reader_context_->set_open_file_timer(hdfs_open_file_timer_);
   reader_context_->set_active_read_thread_counter(&active_hdfs_read_thread_counter_);
   reader_context_->set_disks_accessed_bitmap(&disks_accessed_bitmap_);
+  reader_context_->set_data_cache_hit_counter(data_cache_hit_count_);
+  reader_context_->set_data_cache_partial_hit_counter(data_cache_partial_hit_count_);
+  reader_context_->set_data_cache_miss_counter(data_cache_miss_count_);
+  reader_context_->set_data_cache_hit_bytes_counter(data_cache_hit_bytes_);
+  reader_context_->set_data_cache_miss_bytes_counter(data_cache_miss_bytes_);
 
   average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);

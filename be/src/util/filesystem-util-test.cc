@@ -118,3 +118,39 @@ TEST(FilesystemUtil, Paths) {
   EXPECT_EQ(string("def"), relpath);
 }
 
+// This test exercises the handling of different directory entry types by GetEntryNames().
+TEST(FilesystemUtil, DirEntryTypes) {
+  // Setup a temporary directory with one subdir
+  path base_dir = filesystem::unique_path();
+  path dir = base_dir / "impala-dir";
+  path subdir = dir / "impala-subdir";
+  path file = dir / "impala-file";
+
+  ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(subdir.string()));
+  ASSERT_OK(FileSystemUtil::CreateFile(file.string()));
+
+  // Verify that all directory entires are listed with the default parameters.
+  vector<string> entries;
+  ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries));
+  ASSERT_EQ(entries.size(), 2);
+  for (const string& entry : entries) {
+    EXPECT_TRUE(entry == "impala-subdir" || entry == "impala-file");
+  }
+
+  // Verify that only directory type entries are listed with DIR_ENTRY_DIR.
+  entries.resize(0);
+  ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
+      FileSystemUtil::Directory::DIR_ENTRY_DIR));
+  ASSERT_EQ(entries.size(), 1);
+  EXPECT_TRUE(entries[0] == "impala-subdir");
+
+  // Verify that only file type entries are listed with DIR_ENTRY_REG.
+  entries.resize(0);
+  ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
+      FileSystemUtil::Directory::DIR_ENTRY_REG));
+  ASSERT_EQ(entries.size(), 1);
+  EXPECT_TRUE(entries[0] == "impala-file");
+
+  // Cleanup.
+  filesystem::remove_all(dir);
+}

@@ -38,7 +38,9 @@ namespace impala {
 
 namespace io {
 
+class DataCache;
 class DiskQueue;
+
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
 /// (such as S3). Each query maps to one or more RequestContext objects, each of which
 /// has its own queue of scan ranges and/or write ranges.
@@ -188,6 +190,13 @@ class DiskQueue;
 /// intensive than local disk/hdfs because of non-direct I/O and SSL processing, and can
 /// be CPU bottlenecked especially if not enough I/O threads for these queues are
 /// started.
+///
+/// Remote filesystem data caching:
+/// To reduce latency and avoid being network bound when reading from remote filesystems,
+/// a data cache can be optionally enabled (via --data_cache_config) for caching data read
+/// for remote scan ranges on local storage. The cache is independent of file formats.
+/// It's merely caching chunks of file blocks directly on local storage to avoid
+/// fetching them over network. Please see data-cache.h for details.
 ///
 /// TODO: We should implement more sophisticated resource management. Currently readers
 /// are the unit of scheduling and we attempt to distribute IOPS between them. Instead
@@ -358,6 +367,8 @@ class DiskIoMgr : public CacheLineAligned {
   /// is something invalid about the scan range.
   Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
 
+  DataCache* remote_data_cache() { return remote_data_cache_.get(); }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(DiskIoMgr);
   friend class DiskIoMgrTest_Buffers_Test;
@@ -428,6 +439,11 @@ class DiskIoMgr : public CacheLineAligned {
   /// Helper for AllocateBuffersForRange() to compute the buffer sizes for a scan range
   /// with length 'scan_range_len', given that 'max_bytes' of memory should be allocated.
   std::vector<int64_t> ChooseBufferSizes(int64_t scan_range_len, int64_t max_bytes);
+
+  /// Singleton IO data cache for remote reads. If configured, it will be probed for all
+  /// non-local reads and data read from remote data nodes will be stored in it. If not
+  /// configured, this would be NULL.
+  std::unique_ptr<DataCache> remote_data_cache_;
 };
 }
 }

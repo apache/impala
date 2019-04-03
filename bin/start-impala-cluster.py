@@ -112,7 +112,12 @@ parser.add_option("--docker_auto_ports", dest="docker_auto_ports",
                        "(Beewax, HS2, Web UIs, etc), which avoids collisions with other "
                        "running processes. If false, ports are mapped to the same ports "
                        "on localhost as the non-docker impala cluster.")
-
+parser.add_option("--data_cache_dir", dest="data_cache_dir", default=None,
+                  help="This specifies a base directory in which the IO data cache will "
+                       "use.")
+parser.add_option("--data_cache_size", dest="data_cache_size", default=0,
+                  help="This specifies the maximum storage usage of the IO data cache "
+                       "each Impala daemon can use.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -327,6 +332,18 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       args = "-stress_catalog_init_delay_ms={delay} {args}".format(
           delay=delay_list[i],
           args=args)
+
+    if options.data_cache_dir:
+      # create the base directory
+      assert options.data_cache_size != 0, "--data_cache_dir must be used along " \
+          "with --data_cache_size"
+      data_cache_path = \
+          os.path.join(options.data_cache_dir, "impala-datacache-{0}".format(str(i)))
+      # Try creating the directory if it doesn't exist already. May raise exception.
+      if not os.path.exists(data_cache_path):
+        os.mkdir(data_cache_path)
+      args = "-data_cache={dir}:{quota} {args}".format(
+          dir=data_cache_path, quota=options.data_cache_size, args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
