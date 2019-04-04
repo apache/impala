@@ -29,6 +29,16 @@ setup_report_build_error
 # Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
 # the environment then replace "${FOO}" with the environment value.  Also
 # remove or leave special kerberos settings as desired.  Sanity check at end.
+#
+# NOTE: for Hadoop-style XML configuration files (foo-site.xml) prefer using
+# bin/generate_xml_config.py instead of this method. This method is useful for
+# ini-style or other configuration formats.
+#
+# TODO(todd): convert remaining 'foo-site.xml' files to use the preferred
+# mechanism.
+#
+# TODO(todd): consider a better Python-based templating system for the other
+# configuration files as well.
 function generate_config {
   GCIN="$1"
   GCOUT="$2"
@@ -128,14 +138,9 @@ rm -f authz-provider.ini
 
 # Generate hive configs first so that schemaTool can be used to init the metastore schema
 # if needed
-if $USE_CDP_HIVE; then
-  # Certain configurations (like SentrySyncHMSNotificationsPostListener) do not work
-  # with HMS 3.1.0. Use a cdp specific configuration template
-  generate_config postgresql-hive-site.xml.cdp.template hive-site.xml
-else
-  # This is not a CDP Hive installation. Use the regular template
-  generate_config postgresql-hive-site.xml.template hive-site.xml
-fi
+
+$IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site.xml
+
 generate_config hive-log4j2.properties.template hive-log4j2.properties
 
 if [ $CREATE_METASTORE -eq 1 ]; then
@@ -192,10 +197,13 @@ fi
 generate_config log4j.properties.template log4j.properties
 generate_config hbase-site.xml.template hbase-site.xml
 generate_config authz-policy.ini.template authz-policy.ini
-generate_config sentry-site.xml.template sentry-site.xml
-generate_config sentry-site_oo.xml.template sentry-site_oo.xml
-generate_config sentry-site_oo_nogrant.xml.template sentry-site_oo_nogrant.xml
-generate_config sentry-site_no_oo.xml.template sentry-site_no_oo.xml
+
+$IMPALA_HOME/bin/generate_xml_config.py sentry-site.xml.py sentry-site.xml
+for SENTRY_VARIANT in oo oo_nogrant no_oo ; do
+  export SENTRY_VARIANT
+  $IMPALA_HOME/bin/generate_xml_config.py sentry-site.xml.py \
+      sentry-site_${SENTRY_VARIANT}.xml
+done
 
 if [ ! -z "${IMPALA_KERBERIZE}" ]; then
   generate_config hbase-jaas-server.conf.template hbase-jaas-server.conf
