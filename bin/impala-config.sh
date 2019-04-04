@@ -174,6 +174,16 @@ export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
 export USE_CDP_HIVE=${USE_CDP_HIVE-false}
 if $USE_CDP_HIVE; then
   export IMPALA_HIVE_VERSION=3.1.0.6.0.99.0-45
+  # Temporary version of Tez, patched with the fix for TEZ-1348:
+  # https://github.com/apache/tez/pull/40
+  # We'll switch to a non-"todd" version of Tez once that fix is integrated.
+  # For now, if you're bumping the CDP build number, you'll need to download
+  # this tarball from an earlier build and re-upload it to the new directory
+  # in the toolchain bucket.
+  #
+  # TODO(todd) switch to an official build.
+  export IMPALA_TEZ_VERSION=0.10.0-todd-6fcc41e5798b.1
+  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 else
   export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
 fi

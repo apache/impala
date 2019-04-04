@@ -313,6 +313,10 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.calcite.avatica</groupId>
+          <artifactId>avatica</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -348,6 +352,10 @@ under the License.
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.calcite.avatica</groupId>
+          <artifactId>avatica</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -407,6 +415,10 @@ under the License.
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.calcite.avatica</groupId>
+          <artifactId>avatica</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

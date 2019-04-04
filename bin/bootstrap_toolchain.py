@@ -103,6 +103,20 @@ class Package(object):
       self.url = os.environ.get(url_env_var)
 
 
+class CdpComponent(object):
+  def __init__(self, basename, makedir=False):
+    """
+    basename: the name of the file to be downloaded, without its .tar.gz suffix
+    makedir: if false, it is assumed that the downloaded tarball will expand
+             into a directory with the same name as 'basename'. If True, we
+             assume that the tarball doesn't have any top-level directory,
+             and so we need to manually create a directory within which to
+             expand the tarball.
+    """
+    self.basename = basename
+    self.makedir = makedir
+
+
 def try_get_platform_release_label():
   """Gets the right package label from the OS version. Returns an OsMapping with both
      'toolchain' and 'cdh' labels. Return None if not found.
@@ -418,8 +432,12 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
 
 
 def download_cdp_components(cdp_components, url_prefix):
-  """Downloads and unpacks the CDP components for a given URL prefix into
-  $CDP_COMPONENTS_HOME if not found."""
+  """
+  Downloads and unpacks the CDP components for a given URL prefix into
+  $CDP_COMPONENTS_HOME if not found.
+
+  cdp_components: list of CdpComponent instances
+  """
   cdp_components_home = os.environ.get("CDP_COMPONENTS_HOME")
   if not cdp_components_home:
     logging.error("Impala environment not set up correctly, make sure "
@@ -430,12 +448,27 @@ def download_cdp_components(cdp_components, url_prefix):
   if not os.path.exists(cdp_components_home):
     os.makedirs(cdp_components_home)
 
-  def download(component_name):
-    pkg_directory = "{0}/{1}".format(cdp_components_home, component_name)
+  def download(component):
+    pkg_directory = "{0}/{1}".format(cdp_components_home, component.basename)
     if os.path.isdir(pkg_directory): return
-    file_name = "{0}.tar.gz".format(component_name)
+    file_name = "{0}.tar.gz".format(component.basename)
     download_path = "{0}/{1}".format(url_prefix, file_name)
-    wget_and_unpack_package(download_path, file_name, cdp_components_home, False)
+    dst = cdp_components_home
+    if component.makedir:
+      # Download and unpack in a temp directory, which we'll later move into place
+      dst = tempfile.mkdtemp(dir=cdp_components_home)
+    try:
+      wget_and_unpack_package(download_path, file_name, dst, False)
+    except:  # noqa
+      # Clean up any partially-unpacked result.
+      if os.path.isdir(pkg_directory):
+        shutil.rmtree(pkg_directory)
+      # Clean up any temp directory if we made one
+      if component.makedir:
+        shutil.rmtree(dst)
+      raise
+    if component.makedir:
+      os.rename(dst, pkg_directory)
 
   execute_many(download, cdp_components)
 
@@ -533,11 +566,15 @@ if __name__ == "__main__":
 
   cdp_build_number = os.environ["CDP_BUILD_NUMBER"]
   cdp_components = [
-    "ranger-{0}-admin".format(os.environ.get("IMPALA_RANGER_VERSION")),
+    CdpComponent("ranger-{0}-admin".format(os.environ.get("IMPALA_RANGER_VERSION"))),
   ]
+  use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
   if use_cdp_hive:
-    cdp_components.append("apache-hive-{0}-bin"
-                          .format(os.environ.get("IMPALA_HIVE_VERSION")))
+    cdp_components.append(CdpComponent("apache-hive-{0}-bin"
+                          .format(os.environ.get("IMPALA_HIVE_VERSION"))))
+    cdp_components.append(CdpComponent(
+        "tez-{0}-minimal".format(os.environ.get("IMPALA_TEZ_VERSION")),
+        makedir=True))
   download_path_prefix = \
     "https://{0}/build/cdp_components/{1}/tarballs".format(toolchain_host,
                                                            cdp_build_number)

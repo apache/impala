@@ -76,7 +76,13 @@ if kerberize:
   #   hive.metastore.kerberos.keytab.file
   #   hive.metastore.kerberos.principal
 
-if hive_major_version < 3:
+# Enable Tez and ACID for Hive 3
+if hive_major_version >= 3:
+  CONFIG.update({
+   'hive.tez.container.size': '512',
+   'hive.txn.manager': 'org.apache.hadoop.hive.ql.lockmgr.DbTxnManager',
+   'tez.local.mode': 'true'})
+else:
   CONFIG.update({
    # TODO(vihang) Disabled for HMS3.
    'hive.metastore.event.listeners': 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener',
