@@ -190,8 +190,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
     for (TPrivilege p: privileges) {
       Function<Map<String, String>, GrantRevokeRequest> createRequest = (resource) ->
-          createGrantRevokeRequest(grantor, user, groups, clusterName, p.privilege_level,
-              resource);
+          createGrantRevokeRequest(grantor, user, groups, clusterName, p.has_grant_opt,
+              p.privilege_level, resource);
 
       // Ranger Impala service definition defines 3 resources:
       // [DB -> Table -> Column]
@@ -220,13 +220,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,
-      List<String> groups, String clusterName, TPrivilegeLevel level,
-      Map<String, String> resource) {
+      List<String> groups, String clusterName, boolean withGrantOpt,
+      TPrivilegeLevel level, Map<String, String> resource) {
     GrantRevokeRequest request = new GrantRevokeRequest();
     request.setGrantor(grantor);
     if (user != null) request.getUsers().add(user);
     if (!groups.isEmpty()) request.getGroups().addAll(groups);
-    request.setDelegateAdmin(Boolean.FALSE);
+    request.setDelegateAdmin((withGrantOpt) ? Boolean.TRUE : Boolean.FALSE);
     request.setEnableAudit(Boolean.TRUE);
     request.setReplaceExistingPermissions(Boolean.FALSE);
     request.setClusterName(clusterName);

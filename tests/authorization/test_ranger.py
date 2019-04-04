@@ -18,11 +18,16 @@
 # Client tests for SQL statement authorization
 
 import grp
+import json
 import pytest
+import requests
 import time
-from getpass import getuser
 
+from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+
+RANGER_AUTH = ("admin", "admin")
+RANGER_HOST = "http://localhost:6080"
 
 
 class TestRanger(CustomClusterTestSuite):
@@ -81,3 +86,89 @@ class TestRanger(CustomClusterTestSuite):
                              .format(unique_database, kw, ident), user=admin)
         admin_client.execute("drop database if exists {0} cascade"
                              .format(unique_database), user=admin)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala "
+                 "--authorization_factory_class="
+                 "org.apache.impala.authorization.ranger.RangerAuthorizationFactory",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala "
+                  "--authorization_factory_class="
+                  "org.apache.impala.authorization.ranger.RangerAuthorizationFactory")
+  def test_grant_option(self, unique_name):
+    user1 = getuser()
+    user2 = unique_name + "_user"
+    admin = "admin"
+    admin_client = self.create_impala_client()
+    user1_client = self.create_impala_client()
+    user2_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    unique_table = unique_name + "_tbl"
+    id = self._add_ranger_user(user2)
+
+    try:
+      # Set-up temp database/table
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=admin)
+      admin_client.execute("create database {0}".format(unique_database), user=admin)
+      admin_client.execute("create table {0}.{1} (x int)"
+                           .format(unique_database, unique_table), user=admin)
+
+      # Give user 1 the ability to grant select privileges on unique_database
+      self.execute_query_expect_success(admin_client,
+                                        "grant select on database {0} to user {1} with "
+                                        "grant option".format(unique_database, user1),
+                                        user=admin)
+      # TODO: IMPALA-8293 use refresh authorization
+      time.sleep(10)
+      # User 1 grants select privilege to user 2
+      self.execute_query_expect_success(user1_client,
+                                        "grant select on database {0} to user {1}"
+                                        .format(unique_database, user2), user=user1)
+      # TODO: IMPALA-8293 use refresh authorization
+      time.sleep(10)
+      # User 2 exercises select privilege
+      self.execute_query_expect_success(user2_client, "show tables in {0}"
+                                        .format(unique_database), user=user2)
+      # User 1 revokes select privilege from user 2
+      self.execute_query_expect_success(user1_client,
+                                        "revoke select on database {0} from user "
+                                        "{1}".format(unique_database, user2), user=user1)
+      # TODO: IMPALA-8293 use refresh authorization
+      time.sleep(10)
+      # User 2 can no longer select because the privilege was revoked
+      self.execute_query_expect_failure(user2_client, "show tables in {0}"
+                                        .format(unique_database))
+      # Revoke privilege granting from user 1
+      self.execute_query_expect_success(admin_client, "revoke grant option for select "
+                                        "on database {0} from user {1}"
+                                        .format(unique_database, user1), user=admin)
+      # TODO: IMPALA-8293 use refresh authorization
+      time.sleep(10)
+      # User 1 can no longer grant privileges on unique_database
+      self.execute_query_expect_failure(user1_client,
+                                        "grant select on database {0} to user {1}"
+                                        .format(unique_database, user2), user=user1)
+    finally:
+      admin_client.execute("revoke select on database {0} from user {1}"
+                           .format(unique_database, user2), user=admin)
+      admin_client.execute("revoke grant option for select on database {0} from user {1}"
+                           .format(unique_database, user1), user=admin)
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=admin)
+      self._remove_ranger_user(id)
+
+  def _add_ranger_user(self, user):
+    data = {"name": user, "password": "password123", "userRoleList": ["ROLE_USER"]}
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
+    r = requests.post("{0}/service/xusers/secure/users".format(RANGER_HOST),
+                      auth=RANGER_AUTH,
+                      json=data, headers=headers)
+    return json.loads(r.content)['id']
+
+  def _remove_ranger_user(self, id):
+    r = requests.delete("{0}/service/xusers/users/{1}?forceDelete=true"
+                        .format(RANGER_HOST, id), auth=RANGER_AUTH)
+    assert r.status_code < 300 and r.status_code >= 200
