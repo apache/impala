@@ -89,6 +89,22 @@ TEST_F(SystemStateInfoTest, ParseProcNetDevString) {
   EXPECT_EQ(state[SystemStateInfo::NET_TX_PACKETS], 176173628);
 }
 
+// Tests parsing a string similar to the contents of /proc/net/dev on older kernels, such
+// as the one on Centos6.
+TEST_F(SystemStateInfoTest, ParseProcNetDevStringCentos6) {
+  // Fields are: user nice system idle iowait irq softirq steal guest guest_nice
+  string dev_net = R"(Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:    5829      53    0    0    0     0          0         0     5829      53    0    0    0     0       0          0
+  eth0:285025090  212208    0    0    0     0          0         0  9137793   84770    0    0    0     0       0          0)";
+  info.ReadProcNetDevString(dev_net);
+  const SystemStateInfo::NetworkValues& state = info.network_values_[info.net_val_idx_];
+  EXPECT_EQ(state[SystemStateInfo::NET_RX_BYTES], 285025090);
+  EXPECT_EQ(state[SystemStateInfo::NET_RX_PACKETS], 212208);
+  EXPECT_EQ(state[SystemStateInfo::NET_TX_BYTES], 9137793);
+  EXPECT_EQ(state[SystemStateInfo::NET_TX_PACKETS], 84770);
+}
+
 // Tests that computing CPU ratios doesn't overflow
 TEST_F(SystemStateInfoTest, ComputeCpuRatiosIntOverflow) {
   // Load old and new values for CPU counters. These values are from a system where we

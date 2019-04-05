@@ -16,9 +16,11 @@
 // under the License.
 
 #include "gutil/strings/split.h"
+#include "gutil/strings/strip.h"
 #include "gutil/strings/util.h"
 #include "kudu/util/env.h"
 #include "kudu/util/faststring.h"
+#include "kudu/util/logging.h"
 #include "util/error-util.h"
 #include "util/string-parser.h"
 #include "util/system-state-info.h"
@@ -35,6 +37,7 @@ using kudu::Env;
 using kudu::faststring;
 using kudu::ReadFileToString;
 using strings::Split;
+using strings::SkipWhitespace;
 
 namespace impala {
 
@@ -152,24 +155,39 @@ void SystemStateInfo::ReadProcNetDevString(const string& dev_string) {
 
 void SystemStateInfo::ReadProcNetDevLine(
     const string& dev_string, NetworkValues* result) {
-  stringstream ss(dev_string);
+  StringPiece sp = StringPiece(dev_string);
+  // Lines can have leading whitespace
+  StripWhiteSpace(&sp);
 
-  // Read the interface name
-  string if_name;
-  ss >> if_name;
+  // Initialize result to 0 to simplify error handling below
+  memset(result, 0, sizeof(*result));
 
   // Don't include the loopback interface
-  if (HasPrefixString(if_name, "lo:")) {
-    memset(result, 0, sizeof(*result));
+  if (sp.starts_with("lo:")) return;
+
+  int colon_idx = sp.find_first_of(':');
+  if (colon_idx == StringPiece::npos) {
+    KLOG_EVERY_N_SECS(WARNING, 60) << "Failed to parse interface name in line: "
+        << sp.as_string();
+    return;
+  }
+
+  vector<StringPiece> counters = Split(sp.substr(colon_idx + 1), " ", SkipWhitespace());
+
+  // Something is wrong with the number of values that we read
+  if (NUM_NET_VALUES > counters.size()) {
+    KLOG_EVERY_N_SECS(WARNING, 60) << "Failed to parse enough values: expected "
+        << NUM_NET_VALUES << " but found " << counters.size();
     return;
   }
 
   for (int i = 0; i < NUM_NET_VALUES; ++i) {
-    int64_t v = -1;
-    ss >> v;
-    DCHECK_GE(v, 0) << "Value " << i << ": " << v;
-    // Clamp invalid entries at 0
-    (*result)[i] = max(v, 0L);
+    int64_t* v = &(*result)[i];
+    if (!safe_strto64(counters[i].as_string(), v)) {
+      KLOG_EVERY_N_SECS(WARNING, 60) << "Failed to parse value: " << *v;
+      *v = 0;
+    }
+    DCHECK_GE(*v, 0) << "Value " << i << ": " << *v;
   }
 }
 

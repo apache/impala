@@ -160,6 +160,7 @@ class SystemStateInfo {
   FRIEND_TEST(SystemStateInfoTest, ComputeCpuRatiosIntOverflow);
   FRIEND_TEST(SystemStateInfoTest, ComputeNetworkUsage);
   FRIEND_TEST(SystemStateInfoTest, ParseProcNetDevString);
+  FRIEND_TEST(SystemStateInfoTest, ParseProcNetDevStringCentos6);
   FRIEND_TEST(SystemStateInfoTest, ParseProcStat);
   FRIEND_TEST(SystemStateInfoTest, ReadProcNetDev);
   FRIEND_TEST(SystemStateInfoTest, ReadProcStat);
