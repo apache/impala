@@ -1813,7 +1813,11 @@ public class Analyzer {
         for (int j = 0; j < i; ++j) {
           SlotId lhs = slotIds.get(j);
           if (!partialEquivSlots.union(lhs, rhs)) continue;
-          conjuncts.add((T) createInferredEqPred(lhs, rhs));
+          T pred = (T) createInferredEqPred(lhs, rhs);
+          conjuncts.add(pred);
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Created inferred predicate: " + pred.debugString());
+          }
           // Check for early termination.
           if (partialEquivSlots.get(lhs).size() == slotIds.size()) {
             done = true;
@@ -2027,15 +2031,24 @@ public class Analyzer {
         Analyzer firstBlock = globalState_.blockBySlot.get(slotIds.first);
         Analyzer secondBlock = globalState_.blockBySlot.get(slotIds.second);
         if (LOG.isTraceEnabled()) {
-          LOG.trace("value transfer: from " + slotIds.first.toString());
+          LOG.trace("Considering value transfer between " + slotIds.first.toString() +
+              " and " + slotIds.second.toString());
         }
         if (!(secondBlock.hasLimitOffsetClause_ &&
             secondBlock.ancestors_.contains(firstBlock))) {
           g.addEdge(slotIds.first.asInt(), slotIds.second.asInt());
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("value transfer: from " + slotIds.first.toString() + " to " +
+                slotIds.second.toString());
+          }
         }
         if (!(firstBlock.hasLimitOffsetClause_ &&
             firstBlock.ancestors_.contains(secondBlock))) {
           g.addEdge(slotIds.second.asInt(), slotIds.first.asInt());
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("value transfer: from " + slotIds.second.toString() + " to " +
+                    slotIds.first.toString());
+          }
         }
         continue;
       }

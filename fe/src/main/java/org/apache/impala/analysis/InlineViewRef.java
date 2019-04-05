@@ -215,6 +215,7 @@ public class InlineViewRef extends TableRef {
       LOG.trace("inline view " + getUniqueAlias() + " baseTblSmap: " +
           baseTblSmap_.debugString());
     }
+    Preconditions.checkState(baseTblSmap_.checkComposedFrom(smap_));
 
     analyzeTableSample(analyzer);
     analyzeHints(analyzer);

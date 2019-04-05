@@ -1534,3 +1534,309 @@ PLAN-ROOT SINK
    partitions=4/4 files=4 size=460B
    row-size=8B cardinality=8
 ====
+# IMPALA-8386: Predicates generated from slot equivalences won't be identities.
+# Without this patch, there will be a predicate "sum(c.int_col) = sum(c.int_col)"
+# in node 05, which may incorrectly reject rows with nulls.
+select count(1) from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypes a
+    left outer join (
+        select c.bigint_col, sum(c.int_col) as amount1, sum(c.int_col) as amount2
+        from functional.alltypessmall b
+        join functional.alltypestiny c
+        on b.bigint_col = c.bigint_col
+        group by c.bigint_col
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = c.bigint_col
+|  row-size=16B cardinality=7.30K
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: c.bigint_col
+|  |  row-size=8B cardinality=2
+|  |
+|  03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.bigint_col = c.bigint_col
+|  |  runtime filters: RF000 <- c.bigint_col
+|  |  row-size=16B cardinality=80
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny c]
+|  |     partitions=4/4 files=4 size=460B
+|  |     row-size=8B cardinality=8
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF000 -> b.bigint_col
+|     row-size=8B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# IMPALA-8386: Predicates generated from slot equivalences won't be identities.
+# Without this patch, there will be a predicate "c.int_col = c.int_col" in node 04,
+# which may incorrectly reject rows with nulls.
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypes a
+    left outer join (
+        select c.bigint_col, c.int_col as amount1, c.int_col as amount2
+        from functional.alltypessmall b
+        join functional.alltypestiny c
+        on b.bigint_col = c.bigint_col
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = c.bigint_col
+|  row-size=28B cardinality=58.40K
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.bigint_col = c.bigint_col
+|  |  runtime filters: RF000 <- c.bigint_col
+|  |  row-size=20B cardinality=80
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny c]
+|  |     partitions=4/4 files=4 size=460B
+|  |     row-size=12B cardinality=8
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF000 -> b.bigint_col
+|     row-size=8B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# A more deeper inline view test for IMPALA-8386. No predicate "int_col = int_col" will
+# be generated.
+select * from (
+    select t2.id, t2.amount1, t2.amount2
+    from functional.alltypestiny a
+    left outer join (
+        select t3.id, t3.amount1, t3.amount2
+        from functional.alltypestiny b
+        left outer join (
+            select c.id, c.int_col as amount1, c.int_col as amount2
+            from functional.alltypestiny c
+            join functional.alltypestiny d
+            on c.id = d.id
+        ) t3
+        on b.id = t3.id
+    ) t2
+    on a.id = t2.id
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: c.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=20B cardinality=8
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+05:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: c.id = b.id
+|  runtime filters: RF002 <- b.id
+|  row-size=16B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: c.id = d.id
+|  runtime filters: RF004 <- d.id
+|  row-size=12B cardinality=8
+|
+|--03:SCAN HDFS [functional.alltypestiny d]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> d.id, RF002 -> d.id
+|     row-size=4B cardinality=8
+|
+02:SCAN HDFS [functional.alltypestiny c]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> c.id, RF002 -> c.id, RF004 -> c.id
+   row-size=8B cardinality=8
+====
+# A minimal reproduce for IMPALA-8386. Though the query results are correct, without
+# this patch there's a wrong inferred predicate "int_col = int_col" assigned at the
+# Join node.
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypessmall a
+    left outer join (
+        select bigint_col, int_col as amount1, int_col as amount2
+        from functional.alltypestiny
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = bigint_col
+|  row-size=20B cardinality=100
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
+====
+# IMPALA-8386: test coverage for ORDER BY/LIMIT
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypessmall a
+    left outer join (
+        select bigint_col, int_col as amount1, int_col as amount2
+        from functional.alltypestiny
+        order by bigint_col limit 10
+    ) t2
+    on a.bigint_col = t2.bigint_col
+    order by 1 limit 10
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: bigint_col ASC
+|  row-size=16B cardinality=10
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = bigint_col
+|  row-size=20B cardinality=100
+|
+|--02:TOP-N [LIMIT=10]
+|  |  order by: bigint_col ASC
+|  |  row-size=12B cardinality=8
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
+====
+# IMPALA-8386: test coverage for analytic functions
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypessmall a
+    left outer join (
+        select bigint_col, max(int_col) over (partition by bigint_col) as amount1,
+            max(int_col) over (partition by bigint_col) as amount2
+        from functional.alltypestiny
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = bigint_col
+|  row-size=24B cardinality=100
+|
+|--03:ANALYTIC
+|  |  functions: max(int_col)
+|  |  partition by: bigint_col
+|  |  row-size=16B cardinality=8
+|  |
+|  02:SORT
+|  |  order by: bigint_col ASC NULLS FIRST
+|  |  row-size=12B cardinality=8
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
+====
+# IMPALA-8386: test coverage for unions
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypessmall a
+    left outer join (
+        select bigint_col, int_col as amount1, int_col as amount2
+        from (
+            select * from functional.alltypestiny where id < 4
+            union all
+            select * from functional.alltypestiny where id >= 4
+        ) t3
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = bigint_col
+|  row-size=20B cardinality=100
+|
+|--01:UNION
+|  |  row-size=12B cardinality=2
+|  |
+|  |--03:SCAN HDFS [functional.alltypestiny]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     predicates: id >= 4
+|  |     row-size=16B cardinality=1
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: id < 4
+|     row-size=16B cardinality=1
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
+====
+# IMPALA-8386: test coverage for unions
+select * from (
+    select t2.bigint_col, t2.amount1, t2.amount2
+    from functional.alltypessmall a
+    left join (
+        select bigint_col, int_col as amount1, int_col as amount2
+        from functional.alltypestiny
+        union all values (NULL, NULL, NULL)
+    ) t2
+    on a.bigint_col = t2.bigint_col
+) t1;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.bigint_col = bigint_col
+|  row-size=24B cardinality=100
+|
+|--01:UNION
+|  |  constant-operands=1
+|  |  row-size=16B cardinality=9
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=12B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=8B cardinality=100
+====

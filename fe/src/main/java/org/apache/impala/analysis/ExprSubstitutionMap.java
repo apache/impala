@@ -176,4 +176,41 @@ public final class ExprSubstitutionMap {
   public ExprSubstitutionMap clone() {
     return new ExprSubstitutionMap(Expr.cloneList(lhs_), Expr.cloneList(rhs_));
   }
+
+  /**
+   * Returns whether we are composed from the other map.
+   */
+  public boolean checkComposedFrom(ExprSubstitutionMap other) {
+    // If g is composed from f, then g(x) = h(f(x)), so "f(a) == f(b)" => "g(a) == g(b)".
+    for (int i = 0; i < other.lhs_.size() - 1; ++i) {
+      for (int j = i + 1; j < other.lhs_.size(); ++j) {
+        Expr a = other.lhs_.get(i);
+        Expr b = other.lhs_.get(j);
+        Expr finalA = get(a);
+        Expr finalB = get(b);
+        if (finalA == null || finalB == null) {
+          if (LOG.isTraceEnabled()) {
+            if (finalA == null) {
+              LOG.trace("current smap misses item for " + a.debugString());
+            }
+            if (finalB == null) {
+              LOG.trace("current smap misses item for " + b.debugString());
+            }
+          }
+          return false;
+        }
+        if (other.rhs_.get(i).equals(other.rhs_.get(j)) && !finalA.equals(finalB)) {
+          // f(a) == f(b) but g(a) != g(b)
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(String.format("smap conflicts in substituting %s and %s. Result" +
+                " of the base map: %s. Results of current map: %s and %s",
+                a.debugString(), b.debugString(), other.rhs_.get(i).debugString(),
+                finalA.debugString(), finalB.debugString()));
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 }

@@ -1146,10 +1146,13 @@ public class SingleNodePlanner {
    * makes the *output* of the computation visible to the enclosing scope, so that
    * filters from the enclosing scope can be safely applied (to the grouping cols, say).
    */
-  public void migrateConjunctsToInlineView(Analyzer analyzer,
-      InlineViewRef inlineViewRef) throws ImpalaException {
+  public void migrateConjunctsToInlineView(final Analyzer analyzer,
+      final InlineViewRef inlineViewRef) throws ImpalaException {
     List<Expr> unassignedConjuncts =
         analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
+    if (LOG. isTraceEnabled()) {
+      LOG.trace("unassignedConjuncts: " + Expr.debugString(unassignedConjuncts));
+    }
     if (!canMigrateConjuncts(inlineViewRef)) {
       // mark (fully resolve) slots referenced by unassigned conjuncts as
       // materialized
@@ -1163,12 +1166,54 @@ public class SingleNodePlanner {
     for (Expr e: unassignedConjuncts) {
       if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) {
         preds.add(e);
+        if (LOG. isTraceEnabled()) {
+          LOG.trace(String.format("Can evaluate %s in inline view %s", e.debugString(),
+                  inlineViewRef.getExplicitAlias()));
+        }
       }
     }
     unassignedConjuncts.removeAll(preds);
+    // Migrate the conjuncts by marking the original ones as assigned. They will either
+    // be ignored if they are identity predicates (e.g. a = a), or be substituted into
+    // new ones (viewPredicates below). The substituted ones will be re-registered.
+    analyzer.markConjunctsAssigned(preds);
     // Generate predicates to enforce equivalences among slots of the inline view
     // tuple. These predicates are also migrated into the inline view.
     analyzer.createEquivConjuncts(inlineViewRef.getId(), preds);
+
+    // Remove unregistered predicates that finally resolved to predicates reference
+    // the same slot on both sides (e.g. a = a). Such predicates have been generated from
+    // slot equivalences and may incorrectly reject rows with nulls
+    // (IMPALA-1412/IMPALA-2643/IMPALA-8386).
+    Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr e) {
+        if (!org.apache.impala.analysis.Predicate.isEquivalencePredicate(e)
+            || !((BinaryPredicate) e).isInferred()) {
+          return false;
+        }
+        try {
+          BinaryPredicate finalExpr = (BinaryPredicate) e.trySubstitute(
+              inlineViewRef.getBaseTblSmap(), analyzer, false);
+          boolean isIdentity = finalExpr.hasIdenticalOperands();
+
+          // Verity that "smap[e1] == smap[e2]" => "baseTblSmap[e1] == baseTblSmap[e2]"
+          // in case we have bugs in generating baseTblSmap.
+          BinaryPredicate midExpr = (BinaryPredicate) e.trySubstitute(
+              inlineViewRef.getSmap(), analyzer, false);
+          Preconditions.checkState(!midExpr.hasIdenticalOperands() || isIdentity);
+
+          if (LOG.isTraceEnabled() && isIdentity) {
+            LOG.trace("Removed identity predicate: " + finalExpr.debugString());
+          }
+          return isIdentity;
+        } catch (Exception ex) {
+          throw new IllegalStateException(
+                  "Failed analysis after expr substitution.", ex);
+        }
+      }
+    };
+    Iterables.removeIf(preds, isIdentityPredicate);
 
     // create new predicates against the inline view's unresolved result exprs, not
     // the resolved result exprs, in order to avoid skipping scopes (and ignoring
@@ -1176,22 +1221,6 @@ public class SingleNodePlanner {
     List<Expr> viewPredicates =
         Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
 
-    // Remove unregistered predicates that reference the same slot on
-    // both sides (e.g. a = a). Such predicates have been generated from slot
-    // equivalences and may incorrectly reject rows with nulls (IMPALA-1412/IMPALA-2643).
-    Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
-      @Override
-      public boolean apply(Expr expr) {
-        return org.apache.impala.analysis.Predicate.isEquivalencePredicate(expr)
-            && ((BinaryPredicate) expr).isInferred()
-            && expr.getChild(0).equals(expr.getChild(1));
-      }
-    };
-    Iterables.removeIf(viewPredicates, isIdentityPredicate);
-
-    // Migrate the conjuncts by marking the original ones as assigned, and
-    // re-registering the substituted ones with new ids.
-    analyzer.markConjunctsAssigned(preds);
     // Unset the On-clause flag of the migrated conjuncts because the migrated conjuncts
     // apply to the post-join/agg/analytic result of the inline view.
     for (Expr e: viewPredicates) e.setIsOnClauseConjunct(false);
