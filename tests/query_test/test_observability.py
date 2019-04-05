@@ -585,3 +585,32 @@ class TestObservability(ImpalaTestSuite):
     query = "select count (*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_storage_load_time_filesystem(self):
+    """Test that when a query needs load metadata for table(s), the
+    storage load time should be in the profile. Tests file systems."""
+    self.__check_query_profile_storage_load_time("functional")
+
+  @SkipIfS3.hbase
+  @SkipIfLocal.hbase
+  @SkipIfIsilon.hbase
+  @SkipIfABFS.hbase
+  @SkipIfADLS.hbase
+  def test_query_profile_storage_load_time(self):
+    """Test that when a query needs load metadata for table(s), the
+    storage load time should be in the profile. Tests kudu and hbase."""
+    # KUDU table
+    self.__check_query_profile_storage_load_time("functional_kudu")
+
+    # HBASE table
+    self.__check_query_profile_storage_load_time("functional_hbase")
+
+  def __check_query_profile_storage_load_time(self, db_name):
+    """Check query profile for storage load time with a given database."""
+    self.execute_query("invalidate metadata {0}.alltypes".format(db_name))
+    query = "select count (*) from {0}.alltypes".format(db_name)
+    runtime_profile = self.execute_query(query).runtime_profile
+    assert "storage-load-time" in runtime_profile
+    # Call the second time, no metastore loading needed.
+    runtime_profile = self.execute_query(query).runtime_profile
+    assert "storage-load-time" not in runtime_profile

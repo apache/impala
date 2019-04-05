@@ -310,14 +310,19 @@ public class KuduTable extends Table implements FeKuduTable {
             " property found for Kudu table " + kuduTableName_);
       }
       setTableStats(msTable_);
-      // Load metadata from Kudu and HMS
+      // Load metadata from Kudu
+      final Timer.Context ctxStorageLdTime =
+          getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC).time();
       try {
         loadSchemaFromKudu();
-        loadAllColumnStats(msClient);
       } catch (ImpalaRuntimeException e) {
         throw new TableLoadingException("Error loading metadata for Kudu table " +
             kuduTableName_, e);
+      } finally {
+        storageMetadataLoadTime_ = ctxStorageLdTime.stop();
       }
+      // Load from HMS
+      loadAllColumnStats(msClient);
       refreshLastUsedTime();
       // Avoid updating HMS if the schema didn't change.
       if (msTable_.equals(msTbl)) return;

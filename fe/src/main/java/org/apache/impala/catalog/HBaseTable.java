@@ -103,11 +103,18 @@ public class HBaseTable extends Table implements FeHBaseTable {
     Preconditions.checkNotNull(getMetaStoreTable());
     try (Timer.Context timer = getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time()) {
       msTable_ = msTbl;
-      hbaseTableName_ = Util.getHBaseTableName(getMetaStoreTable());
-      // Warm up the connection and verify the table exists.
-      Util.getHBaseTable(hbaseTableName_).close();
-      columnFamilies_ = null;
-      List<Column> cols = Util.loadColumns(msTable_);
+      final Timer.Context storageLoadTimer =
+          getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC).time();
+      List<Column> cols;
+      try {
+        hbaseTableName_ = Util.getHBaseTableName(getMetaStoreTable());
+        // Warm up the connection and verify the table exists.
+        Util.getHBaseTable(hbaseTableName_).close();
+        columnFamilies_ = null;
+        cols = Util.loadColumns(msTable_);
+      } finally {
+        storageMetadataLoadTime_ = storageLoadTimer.stop();
+      }
       clearColumns();
       for (Column col : cols) addColumn(col);
       // Set table stats.
