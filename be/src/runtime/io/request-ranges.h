@@ -343,13 +343,15 @@ class ScanRange : public RequestRange {
   /// hold 'lock_'.
   void CleanUpBuffers(std::vector<std::unique_ptr<BufferDescriptor>>&& buffers);
 
-  /// Same as Cancel() except doesn't remove the scan range from
-  /// reader_->active_scan_ranges_ or wait for in-flight reads to finish.
-  /// This is invoked by RequestContext::Cancel(), which removes the range itself
-  /// to avoid invalidating its active_scan_ranges_ iterator. If 'read_error' is
-  /// true, this is being called from a disk thread to propagate a read error, so
-  /// 'read_in_flight_' is set to false and threads in WaitForInFlightRead() are
-  /// woken up.
+  /// Same as Cancel() except it doesn't remove the scan range from
+  /// reader_->active_scan_ranges_ or call WaitForInFlightRead(). This allows for
+  /// custom handling of in flight reads or active scan ranges. For example, this is
+  /// invoked by RequestContext::Cancel(), which removes the range itself to avoid
+  /// invalidating its active_scan_ranges_ iterator. It is also invoked by disk IO
+  /// threads to propagate a read error for a range that is in flight (i.e. when
+  /// read_error is true), so 'read_in_flight_' is set to false and threads in
+  /// WaitForInFlightRead() are woken up. Note that this is tearing down the FileReader,
+  /// so it may block waiting for other threads that are performing IO.
   void CancelInternal(const Status& status, bool read_error);
 
   /// Marks the scan range as blocked waiting for a buffer. Caller must not hold 'lock_'.

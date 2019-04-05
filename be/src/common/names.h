@@ -138,6 +138,7 @@ using boost::thread_group;
 
 #ifdef BOOST_THREAD_MUTEX_HPP
 using boost::mutex;
+using boost::timed_mutex;
 using boost::try_mutex;
 #endif
 

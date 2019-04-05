@@ -81,7 +81,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   virtual bool HasRowBatchQueue() const override { return true; }
 
-  bool done() const { return done_; }
+  bool done() const { return done_.Load(); }
 
   /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   /// The enqueue_location parameter determines the location at which the scan ranges are
@@ -114,8 +114,10 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   /// Lock protects access between scanner thread and main query thread (the one calling
   /// GetNext()) for all fields below.  If this lock and any other locks needs to be taken
-  /// together, this lock must be taken first.
-  boost::mutex lock_;
+  /// together, this lock must be taken first. This is a "timed_mutex" to allow specifying
+  /// a timeout when acquiring the mutex. Almost all code locations acquire the mutex
+  /// without a timeout; see ThreadTokenAvailableCb for a location using a timeout.
+  boost::timed_mutex lock_;
 
   /// Protects file_type_counts_. Cannot be taken together with any other lock
   /// except lock_, and if so, lock_ must be taken first.
@@ -124,8 +126,9 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// Flag signaling that all scanner threads are done.  This could be because they
   /// are finished, an error/cancellation occurred, or the limit was reached.
   /// Setting this to true triggers the scanner threads to clean up.
-  /// This should not be explicitly set. Instead, call SetDone().
-  bool done_ = false;
+  /// This should not be explicitly set. Instead, call SetDone(). This is set while
+  /// holding lock_, but it is atomic to allow reads without holding the lock.
+  AtomicBool done_;
 
   /// Set to true if all ranges have started. Some of the ranges may still be in flight
   /// being processed by scanner threads, but no new ScannerThreads should be started.
@@ -177,8 +180,8 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// Called by scanner thread to return some or all of its reservation that is not
   /// needed. Always holds onto at least the minimum reservation to avoid violating the
   /// invariants of ExecNode::buffer_pool_client_. 'lock_' must be held via 'lock'.
-  void ReturnReservationFromScannerThread(const boost::unique_lock<boost::mutex>& lock,
-      int64_t bytes);
+  void ReturnReservationFromScannerThread(
+      const boost::unique_lock<boost::timed_mutex>& lock, int64_t bytes);
 
   /// Checks for eos conditions and returns batches from the row batch queue.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)
