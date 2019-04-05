@@ -22,20 +22,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.HdfsTable.FileMetadataLoadStats;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
@@ -153,11 +149,11 @@ public class HdfsPartitionTest {
   public void testCloneWithNewHostIndex() throws Exception {
     // Fetch some metadata from a directory in HDFS.
     Path p = new Path("hdfs://localhost:20500/test-warehouse/schemas");
-    FileSystem fs = p.getFileSystem(new Configuration());
-    RemoteIterator<LocatedFileStatus> iter = fs.listLocatedStatus(p);
     ListMap<TNetworkAddress> origIndex = new ListMap<>();
-    List<FileDescriptor> fileDescriptors = HdfsTable.createFileDescriptors(fs, iter,
-        origIndex, new FileMetadataLoadStats(p));
+    FileMetadataLoader fml = new FileMetadataLoader(p, Collections.emptyList(),
+        origIndex);
+    fml.load();
+    List<FileDescriptor> fileDescriptors = fml.getLoadedFds();
     assertTrue(!fileDescriptors.isEmpty());
 
     FileDescriptor fd = fileDescriptors.get(0);

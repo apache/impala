@@ -48,8 +48,8 @@ public class TestCaseLoaderTest {
    */
   @Test
   public void testTestCaseImport() throws Exception {
-    FileStatus[] testCaseFiles = FileSystemUtil.listStatus(FileSystemUtil
-        .getFileSystemForPath(TESTCASE_DATA_DIR), TESTCASE_DATA_DIR);
+    FileStatus[] testCaseFiles = FileSystemUtil.getFileSystemForPath(TESTCASE_DATA_DIR)
+        .listStatus(TESTCASE_DATA_DIR);
     // Randomly pick testcases and try to replay them.
     Random rand = new Random();
     int maxIterations = 10;

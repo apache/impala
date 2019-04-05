@@ -378,8 +378,9 @@ public class CatalogTest {
     assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
     // REFRESH calls listStatus on each of the partitions, but doesn't re-check
     // the permissions of the partition directories themselves.
-    assertEquals(table.getPartitionIds().size(),
-        (long)opsCounts.getLong(LIST_STATUS));
+    seenCalls = opsCounts.getLong(LIST_LOCATED_STATUS) +
+        opsCounts.getLong(LIST_STATUS);
+    assertEquals(table.getPartitionIds().size(), seenCalls);
     // None of the underlying files changed so we should not do any ops for the files.
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 

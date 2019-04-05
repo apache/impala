@@ -539,9 +539,10 @@ public class FileSystemUtil {
    * the file does not exist and also saves an RPC as the caller need not do a separate
    * exists check for the path. Returns null if the path does not exist.
    */
-  public static FileStatus[] listStatus(FileSystem fs, Path p) throws IOException {
+  public static RemoteIterator<FileStatus> listStatus(FileSystem fs, Path p)
+      throws IOException {
     try {
-      return fs.listStatus(p);
+      return fs.listStatusIterator(p);
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;

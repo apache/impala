@@ -19,18 +19,12 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -40,9 +34,9 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.Pair;
@@ -67,7 +61,6 @@ import com.google.errorprone.annotations.Immutable;
  */
 class DirectMetaProvider implements MetaProvider {
   private static MetaStoreClientPool msClientPool_;
-  private static Configuration CONF = new Configuration();
 
   DirectMetaProvider() {
     initMsClientPool();
@@ -292,12 +285,12 @@ class DirectMetaProvider implements MetaProvider {
   private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
     Path partDir = new Path(msPartition.getSd().getLocation());
+    FileMetadataLoader fml = new FileMetadataLoader(partDir,
+        /* oldFds= */Collections.emptyList(),
+        hostIndex);
 
-    List<LocatedFileStatus> stats = new ArrayList<>();
     try {
-      FileSystem fs = partDir.getFileSystem(CONF);
-      RemoteIterator<LocatedFileStatus> it = fs.listFiles(partDir, /*recursive=*/false);
-      while (it.hasNext()) stats.add(it.next());
+      fml.load();
     } catch (FileNotFoundException fnf) {
       // If the partition directory isn't found, this is treated as having no
       // files.
@@ -308,19 +301,7 @@ class DirectMetaProvider implements MetaProvider {
           partName, fullTableName), ioe);
     }
 
-    HdfsTable.FileMetadataLoadStats loadStats =
-        new HdfsTable.FileMetadataLoadStats(partDir);
-
-    try {
-      FileSystem fs = partDir.getFileSystem(CONF);
-      return ImmutableList.copyOf(
-          HdfsTable.createFileDescriptors(fs, new FakeRemoteIterator<>(stats),
-              hostIndex, loadStats));
-    } catch (IOException e) {
-        throw new LocalCatalogException(String.format(
-            "Could not convert files to descriptors for partition %s of table %s",
-            partName, fullTableName), e);
-    }
+    return ImmutableList.copyOf(fml.getLoadedFds());
   }
 
   @Immutable
@@ -384,30 +365,6 @@ class DirectMetaProvider implements MetaProvider {
 
     private boolean isPartitioned() {
       return msTable_.getPartitionKeysSize() != 0;
-    }
-  }
-
-
-  /**
-   * Wrapper for a normal Iterable<T> to appear like a Hadoop RemoteIterator<T>.
-   * This is necessary because the existing code to convert file statuses to
-   * descriptors consumes the remote iterator directly and thus avoids materializing
-   * all of the LocatedFileStatus objects in memory at the same time.
-   */
-  private static class FakeRemoteIterator<T> implements RemoteIterator<T> {
-    private final Iterator<T> it_;
-
-    FakeRemoteIterator(Iterable<T> it) {
-      this.it_ = it.iterator();
-    }
-    @Override
-    public boolean hasNext() throws IOException {
-      return it_.hasNext();
-    }
-
-    @Override
-    public T next() throws IOException {
-      return it_.next();
     }
   }
 }

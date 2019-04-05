@@ -175,6 +175,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
         FileStatus fileStatus, int[] fbFileBlockOffets, boolean isEc) {
+      // TODO(todd): need to use path relative to the partition dir, not the
+      // filename here.
       int fileNameOffset = fbb.createString(fileStatus.getPath().getName());
       // A negative block vector offset is used when no block offsets are specified.
       int blockVectorOffset = -1;
