@@ -196,8 +196,10 @@ def pytest_generate_tests(metafunc):
     metafunc.cls.add_test_dimensions()
     vectors = metafunc.cls.ImpalaTestMatrix.generate_test_vectors(
         metafunc.config.option.exploration_strategy)
+
     if len(vectors) == 0:
-      LOG.warning('No test vectors generated. Check constraints and input vectors')
+      LOG.warning("No test vectors generated for test '%s'. Check constraints and "
+          "input vectors" % metafunc.function.func_name)
 
     vector_names = map(str, vectors)
     # In the case this is a test result update or sanity run, select a single test vector

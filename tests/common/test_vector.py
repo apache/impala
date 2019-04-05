@@ -72,8 +72,10 @@ class ImpalaTestVector(object):
     self.vector_values = vector_values
 
   def get_value(self, name):
-    return next(vector_value for vector_value in self.vector_values\
-                                              if vector_value.name == name).value
+    for vector_value in self.vector_values:
+      if vector_value.name == name:
+        return vector_value.value
+    raise ValueError("Test vector does not contain value '%s'" % name)
 
   def __str__(self):
       return ' | '.join(['%s' % vector_value for vector_value in self.vector_values])

@@ -244,22 +244,29 @@ class TestCancellationSerial(TestCancellation):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationSerial, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS' or
-        v.get_value('query').startswith('compute stats'))
-    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') != 0)
-    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('action') is None)
-    # Don't run across all cancel delay options unless running in exhaustive mode
+    # Only run the insert tests in this suite - they need to be serial to allow us to
+    # check for file handle leaks.
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS')
+
+    # This test suite is slow because it executes serially. Restrict some of the params
+    # that are not interesting for inserts.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('cpu_limit_s') == CPU_LIMIT_S[0])
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('join_before_close') == JOIN_BEFORE_CLOSE[0])
     if cls.exploration_strategy() != 'exhaustive':
-      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
+      # Only run a single 'cancel_delay' option in core.
+      cls.ImpalaTestMatrix.add_constraint(
+          lambda v: v.get_value('cancel_delay') == CANCEL_DELAY_IN_SECONDS[3])
+    else:
+      cls.ImpalaTestMatrix.add_constraint(
+          lambda v: v.get_value('cancel_delay') != CANCEL_DELAY_IN_SECONDS[0])
 
   @pytest.mark.execute_serially
   def test_cancel_insert(self, vector):
     self.execute_cancel_test(vector)
     metric_verifier = MetricVerifier(self.impalad_test_service)
-    try:
-      metric_verifier.verify_no_open_files(timeout=10)
-    except AssertionError:
-      pytest.xfail("IMPALA-551: File handle leak for INSERT")
+    metric_verifier.verify_no_open_files(timeout=10)
 
 class TestCancellationFullSort(TestCancellation):
   @classmethod
@@ -274,7 +281,8 @@ class TestCancellationFullSort(TestCancellation):
         ImpalaTestDimension('cancel_delay', *SORT_CANCEL_DELAY))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('buffer_pool_limit', *SORT_BUFFER_POOL_LIMIT))
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('action', None))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('fail_rpc_action') == FAIL_RPC_ACTIONS[0])
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
        v.get_value('table_format').file_format =='parquet' and\
        v.get_value('table_format').compression_codec == 'none')
