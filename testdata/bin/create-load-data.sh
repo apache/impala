@@ -669,8 +669,11 @@ fi
 run-step "Computing table stats" compute-table-stats.log \
     ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
 
-run-step "Creating tpcds testcase data" create-tpcds-testcase-data.log \
-    ${IMPALA_HOME}/testdata/bin/create-tpcds-testcase-files.sh
+# IMPALA-8346: this step only applies if the cluster is the local minicluster
+if [[ -z "$REMOTE_LOAD" ]]; then
+  run-step "Creating tpcds testcase data" create-tpcds-testcase-data.log \
+      ${IMPALA_HOME}/testdata/bin/create-tpcds-testcase-files.sh
+fi
 
 if [[ $SKIP_RANGER -eq 0 ]]; then
   run-step "Setting up Ranger" setup-ranger.log setup-ranger
