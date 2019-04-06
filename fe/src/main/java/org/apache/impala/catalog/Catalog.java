@@ -113,7 +113,7 @@ public abstract class Catalog implements AutoCloseable {
    * Returns null if no matching database is found.
    */
   public Db getDb(String dbName) {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
+    Preconditions.checkArgument(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
     return dbCache_.get().get(dbName.toLowerCase());
   }

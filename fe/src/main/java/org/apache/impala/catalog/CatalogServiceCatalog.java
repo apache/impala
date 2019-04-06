@@ -736,6 +736,9 @@ public class CatalogServiceCatalog extends Catalog {
         throw new DatabaseNotFoundException(
             String.format("Database %s not found", dbName));
       }
+      if (tblName == null) {
+        return db.getVersionsForInflightEvents();
+      }
       Table tbl = getTable(dbName, tblName);
       if (tbl == null) {
         throw new TableNotFoundException(
@@ -749,8 +752,11 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Removes a given version number from the catalog table's list of versions for
-   * in-flight events. Applicable only when external event processing is enabled.
+   * Removes a given version number from the catalog database/table's list of versions
+   * for in-flight events.
+   * If tblName is null, removes version number from database.
+   * If tblName not null and table is not incomplete, removes version number from table
+   * Applicable only when external event processing is enabled.
    * @param dbName database name
    * @param tblName table name
    */
@@ -762,6 +768,10 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       Db db = getDb(dbName);
       if (db == null) return;
+      if (tblName == null) {
+        db.removeFromVersionsForInflightEvents(versionNumber);
+        return;
+      }
       Table tbl = getTable(dbName, tblName);
       if (tbl == null) {
         throw new TableNotFoundException(
@@ -787,6 +797,23 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       if (tbl instanceof IncompleteTable) return;
       tbl.addToVersionsForInflightEvents(versionNumber);
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Adds a given version number from the catalog database's list of versions for
+   * in-flight events. Applicable only when external event processing is enabled.
+   *
+   * @param db Catalog database
+   * @param versionNumber version number to be added
+   */
+  public void addVersionsForInflightEvents(Db db, long versionNumber) {
+    if (!isExternalEventProcessingEnabled()) return;
+    versionLock_.writeLock().lock();
+    try {
+      db.addToVersionsForInflightEvents(versionNumber);
     } finally {
       versionLock_.writeLock().unlock();
     }

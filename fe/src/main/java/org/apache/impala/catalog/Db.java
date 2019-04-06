@@ -21,10 +21,11 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
@@ -94,6 +95,14 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // If true, this database is an Impala system database.
   // (e.g. can't drop it, can't add tables to it, etc).
   private boolean isSystemDb_ = false;
+
+  // maximum number of catalog versions to store for in-flight events for this database
+  private static final int MAX_NUMBER_OF_INFLIGHT_EVENTS = 10;
+
+  // FIFO list of versions for all the in-flight metastore events in this database
+  // This queue can only grow up to MAX_NUMBER_OF_INFLIGHT_EVENTS size. Anything which
+  // is attempted to be added to this list when its at maximum capacity is ignored
+  private final LinkedList<Long> versionsForInflightEvents_ = new LinkedList<>();
 
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     setMetastoreDb(name, msDb);
@@ -481,5 +490,43 @@ public class Db extends CatalogObjectImpl implements FeDb {
     TDatabase tDatabase = new TDatabase(name.toLowerCase());
     tDatabase.setMetastore_db(msDb);
     thriftDb_.set(tDatabase);
+  }
+
+  /**
+   * Gets the current list of versions for in-flight events for this database
+   */
+  public List<Long> getVersionsForInflightEvents() {
+    return Collections.unmodifiableList(versionsForInflightEvents_);
+  }
+
+  /**
+   * Removes a given version from the collection of version numbers for in-flight events
+   * @param versionNumber version number to remove from the collection
+   * @return true if version was successfully removed, false if didn't exist
+   */
+  public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    return versionsForInflightEvents_.remove(versionNumber);
+  }
+
+  /**
+   * Adds a version number to the collection of versions for in-flight events. If the
+   * collection is already at the max size defined by
+   * <code>MAX_NUMBER_OF_INFLIGHT_EVENTS</code>, then it ignores the given version and
+   * does not add it
+   * @param versionNumber version number to add
+   * @return True if version number was added, false if the collection is at its max
+   * capacity
+   */
+  public boolean addToVersionsForInflightEvents(long versionNumber) {
+    if (versionsForInflightEvents_.size() >= MAX_NUMBER_OF_INFLIGHT_EVENTS) {
+      LOG.warn(String.format("Number of versions to be stored for database %s is at "
+              + " its max capacity %d. Ignoring add request for version number %d. This "
+              + "could cause unnecessary database invalidation when the event is "
+              + "processed",
+          getName(), MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
+      return false;
+    }
+    versionsForInflightEvents_.add(versionNumber);
+    return true;
   }
 }

@@ -291,6 +291,9 @@ public class CatalogOpExecutor {
 
     boolean syncDdl = ddlRequest.isSync_ddl();
     switch (ddlRequest.ddl_type) {
+      case ALTER_DATABASE:
+        alterDatabase(ddlRequest.getAlter_db_params(), response);
+        break;
       case ALTER_TABLE:
         alterTable(ddlRequest.getAlter_table_params(), response);
         break;
@@ -365,9 +368,6 @@ public class CatalogOpExecutor {
         break;
       case COMMENT_ON:
         alterCommentOn(ddlRequest.getComment_on_params(), response);
-        break;
-      case ALTER_DATABASE:
-        alterDatabase(ddlRequest.getAlter_db_params(), response);
         break;
       case COPY_TESTCASE:
         copyTestCaseData(ddlRequest.getCopy_test_case_params(), response);
@@ -701,7 +701,7 @@ public class CatalogOpExecutor {
             reloadTableSchema, null);
         addTableToCatalogUpdate(tbl, response.result);
       }
-      // now that HMS alter operation has suceeded, add this version to list of inflight
+      // now that HMS alter operation has succeeded, add this version to list of inflight
       // events in catalog table if event processing is enabled
       catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
     } finally {
@@ -3799,9 +3799,15 @@ public class CatalogOpExecutor {
 
   private void alterDatabase(TAlterDbParams params, TDdlExecResponse response)
       throws ImpalaException {
+    Preconditions.checkNotNull(params);
+    String dbName = params.getDb();
+    Db db = catalog_.getDb(dbName);
+    if (db == null) {
+      throw new CatalogException("Database: " + dbName + " does not exist.");
+    }
     switch (params.getAlter_type()) {
       case SET_OWNER:
-        alterDatabaseSetOwner(params.getDb(), params.getSet_owner_params(), response);
+        alterDatabaseSetOwner(db, params.getSet_owner_params(), response);
         break;
       default:
         throw new UnsupportedOperationException(
@@ -3809,15 +3815,14 @@ public class CatalogOpExecutor {
     }
   }
 
-  private void alterDatabaseSetOwner(String dbName, TAlterDbSetOwnerParams params,
+  private void alterDatabaseSetOwner(Db db, TAlterDbSetOwnerParams params,
       TDdlExecResponse response) throws ImpalaException {
-    Db db = catalog_.getDb(dbName);
-    if (db == null) {
-      throw new CatalogException("Database: " + dbName + " does not exist.");
-    }
     Preconditions.checkNotNull(params.owner_name);
     Preconditions.checkNotNull(params.owner_type);
     synchronized (metastoreDdlLock_) {
+      // Get a new catalog version to assign to the database being altered.
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
       Database msDb = db.getMetaStoreDb().deepCopy();
       String originalOwnerName = msDb.getOwnerName();
       PrincipalType originalOwnerType = msDb.getOwnerType();
@@ -3835,8 +3840,24 @@ public class CatalogOpExecutor {
       }
       Db updatedDb = catalog_.updateDb(msDb);
       addDbToCatalogUpdate(updatedDb, response.result);
+      // now that HMS alter operation has succeeded, add this version to list of inflight
+      // events in catalog database if event processing is enabled
+      catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
     }
     addSummary(response, "Updated database.");
+  }
+
+  /**
+   * Adds the catalog service id and the given catalog version to the database
+   * parameters. No-op if event processing is disabled
+   */
+  private void addCatalogServiceIdentifiers(
+      Db db, String catalogServiceId, long newCatalogVersion) {
+    if (!catalog_.isExternalEventProcessingEnabled()) return;
+    org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
+    msDb.putToParameters(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY, catalogServiceId);
+    msDb.putToParameters(
+        MetastoreEvents.CATALOG_VERSION_PROP_KEY, String.valueOf(newCatalogVersion));
   }
 
   private void addDbToCatalogUpdate(Db db, TCatalogUpdateResult result) {

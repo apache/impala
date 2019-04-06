@@ -30,16 +30,17 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.google.common.base.Preconditions;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -72,6 +73,9 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.thrift.TAlterDbParams;
+import org.apache.impala.thrift.TAlterDbSetOwnerParams;
+import org.apache.impala.thrift.TAlterDbType;
 import org.apache.impala.thrift.TAlterTableAddColsParams;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
@@ -115,7 +119,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+
 import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -322,7 +328,6 @@ public class MetastoreEventsProcessorTest {
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
   }
 
-  @Ignore("Disabled until we fix Hive bug to deserialize alter_database event messages")
   @Test
   public void testAlterDatabaseEvents() throws TException, ImpalaException {
     createDatabase(TEST_DB_NAME, null);
@@ -336,14 +341,13 @@ public class MetastoreEventsProcessorTest {
             .getParameters()
             .containsKey(testDbParamKey));
     // test change of parameters to the Database
-    addDatabaseParameters(testDbParamKey, "someDbParamVal");
+    addDatabaseParameters(testDbParamKey, testDbParamVal);
     eventsProcessor_.processEvents();
+    String getParamValFromDb =
+        catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getParameters().get(testDbParamKey);
     assertTrue("Altered database should have set the key " + testDbParamKey + " to value "
-            + testDbParamVal + " in parameters",
-        testDbParamVal.equals(catalog_.getDb(TEST_DB_NAME)
-                                  .getMetaStoreDb()
-                                  .getParameters()
-                                  .get(testDbParamKey)));
+            + testDbParamVal + " in parameters, instead we get " + getParamValFromDb,
+        testDbParamVal.equals(getParamValFromDb));
 
     // test update to the default location
     String currentLocation =
@@ -368,6 +372,43 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     assertTrue("Altered database should have the updated owner",
         newOwner.equals(catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getOwnerName()));
+  }
+
+  /*
+   * Test to verify alter Db from Impala works fine and self events are caught
+   * successfully
+   */
+  @Test
+  public void testAlterDatabaseSetOwnerFromImpala() throws ImpalaException {
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    assertNotNull("Db should have been found after create database statement",
+        catalog_.getDb(TEST_DB_NAME));
+    long numberOfSelfEventsBefore =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCount();
+    String owner = catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getOwnerName();
+    String newOwnerUser = "newUserFromImpala";
+    String newOwnerRole = "newRoleFromImpala";
+    assertFalse(newOwnerUser.equals(owner) || newOwnerRole.equals(owner));
+    alterDbSetOwnerFromImpala(TEST_DB_NAME, newOwnerUser, TOwnerType.USER);
+    eventsProcessor_.processEvents();
+    assertEquals(
+        newOwnerUser, catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getOwnerName());
+
+    alterDbSetOwnerFromImpala(TEST_DB_NAME, newOwnerRole, TOwnerType.ROLE);
+    eventsProcessor_.processEvents();
+    assertEquals(
+        newOwnerRole, catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getOwnerName());
+
+    long selfEventsCountAfter =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCount();
+    // 2 alter commands above, so we expect the count to go up by 2
+    assertEquals("Unexpected number of self-events generated",
+        numberOfSelfEventsBefore + 2, selfEventsCountAfter);
   }
 
   /**
@@ -1468,7 +1509,6 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
-  @Ignore("Ignored we add alter database event support. See IMPALA-8149")
   @Test
   public void testAlterDisableFlagFromDb()
       throws TException, CatalogException, MetastoreNotificationFetchException {
@@ -1480,10 +1520,19 @@ public class MetastoreEventsProcessorTest {
     alterDatabase(alteredDb);
 
     createTable(testTblName, false);
-    assertEquals(1, eventsProcessor_.getNextMetastoreEvents().size());
+    assertEquals(2, eventsProcessor_.getNextMetastoreEvents().size());
+    long numSkippedEvents =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+            .getCount();
     eventsProcessor_.processEvents();
+    assertEquals(numSkippedEvents + 1,
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+            .getCount());
     assertNull("Table creation should be skipped when database level event sync flag is"
-        + " disabled", catalog_.getTable(TEST_DB_NAME, testTblName));
+            + " disabled",
+        catalog_.getTable(TEST_DB_NAME, testTblName));
   }
 
   private void confirmTableIsLoaded(String dbName, String tblname)
@@ -1828,6 +1877,24 @@ public class MetastoreEventsProcessorTest {
     createDbParams.setDb(dbName);
     createDbParams.setComment(desc);
     req.setCreate_db_params(createDbParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Sets the owner for the given Db from Impala
+   */
+  private void alterDbSetOwnerFromImpala(
+      String dbName, String owner, TOwnerType ownerType) throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_DATABASE);
+    TAlterDbParams alterDbParams = new TAlterDbParams();
+    alterDbParams.setDb(dbName);
+    alterDbParams.setAlter_type(TAlterDbType.SET_OWNER);
+    TAlterDbSetOwnerParams alterDbSetOwnerParams = new TAlterDbSetOwnerParams();
+    alterDbSetOwnerParams.setOwner_name(owner);
+    alterDbSetOwnerParams.setOwner_type(ownerType);
+    alterDbParams.setSet_owner_params(alterDbSetOwnerParams);
+    req.setAlter_db_params(alterDbParams);
     catalogOpExecutor_.execDdlRequest(req);
   }
 
