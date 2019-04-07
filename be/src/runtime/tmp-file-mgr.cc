@@ -66,11 +66,16 @@ const uint64_t AVAILABLE_SPACE_THRESHOLD_MB = 1024;
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS = "tmp-file-mgr.active-scratch-dirs";
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST =
     "tmp-file-mgr.active-scratch-dirs.list";
+const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK =
+    "tmp-file-mgr.scratch-space-bytes-used-high-water-mark";
+const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED =
+    "tmp-file-mgr.scratch-space-bytes-used";
 
 TmpFileMgr::TmpFileMgr()
   : initialized_(false),
     num_active_scratch_dirs_metric_(nullptr),
-    active_scratch_dirs_metric_(nullptr) {}
+    active_scratch_dirs_metric_(nullptr),
+    scratch_bytes_used_metric_(nullptr) {}
 
 Status TmpFileMgr::Init(MetricGroup* metrics) {
   string tmp_dirs_spec = FLAGS_scratch_dirs;
@@ -140,6 +145,9 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
   for (int i = 0; i < tmp_dirs_.size(); ++i) {
     active_scratch_dirs_metric_->Add(tmp_dirs_[i]);
   }
+  scratch_bytes_used_metric_ =
+      metrics->AddHWMGauge(TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK,
+          TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED, 0);
 
   initialized_ = true;
 
@@ -275,7 +283,10 @@ void TmpFileMgr::FileGroup::Close() {
   if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_.get());
   for (std::unique_ptr<TmpFileMgr::File>& file : tmp_files_) {
     Status status = file->Remove();
-    if (!status.ok()) {
+    if (status.ok()) {
+      tmp_file_mgr_->scratch_bytes_used_metric_->Increment(
+          -1 * scratch_space_bytes_used_counter_->value());
+    } else {
       LOG(WARNING) << "Error removing scratch file '" << file->path()
                    << "': " << status.msg().msg();
     }
@@ -310,6 +321,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     if ((*tmp_file)->is_blacklisted()) continue;
     (*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset);
     scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
+    tmp_file_mgr_->scratch_bytes_used_metric_->Increment(scratch_range_bytes);
     current_bytes_allocated_ += num_bytes;
     return Status::OK();
   }

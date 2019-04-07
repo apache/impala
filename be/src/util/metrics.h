@@ -26,6 +26,7 @@
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/atomic.h"
 #include "common/logging.h"
@@ -248,6 +249,62 @@ class AtomicMetric : public ScalarMetric<int64_t, metric_kind_t> {
 typedef class AtomicMetric<TMetricKind::GAUGE> IntGauge;
 typedef class AtomicMetric<TMetricKind::COUNTER> IntCounter;
 
+/// An AtomicMetric that keeps track of the highest value seen and the current value.
+///
+/// Implementation notes:
+/// The hwm_value_ member maintains the HWM while the current_value_ metric member
+/// maintains the current value. Note that since two separate atomics are used
+/// for maintaining the current value and HWM, they could be out of sync for a short
+/// duration. This behavior is acceptable for current use case. However, it is very
+/// important that both the hwm_value_ and current_value_ members are updated together
+/// using the interfaces from this class.
+class AtomicHighWaterMarkGauge : public ScalarMetric<int64_t, TMetricKind::GAUGE> {
+ public:
+  AtomicHighWaterMarkGauge(
+      const TMetricDef& metric_def, int64_t initial_value, IntGauge* current_value)
+    : ScalarMetric<int64_t, TMetricKind::GAUGE>(metric_def),
+      hwm_value_(initial_value),
+      current_value_(current_value) {
+    DCHECK(current_value_ != NULL && initial_value == current_value->GetValue());
+  }
+
+  ~AtomicHighWaterMarkGauge() {}
+
+  /// Returns the current high water mark value.
+  int64_t GetValue() override { return hwm_value_.Load(); }
+
+  /// Atomically sets the current value and atomically sets the high water mark value.
+  void SetValue(const int64_t& value) {
+    current_value_->SetValue(value);
+    UpdateMax(value);
+  }
+
+  /// Adds 'delta' to the current value atomically.
+  /// The hwm value is also updated atomically.
+  void Increment(int64_t delta) {
+    const int64_t new_val = current_value_->Increment(delta);
+    UpdateMax(new_val);
+  }
+
+ private:
+  FRIEND_TEST(MetricsTest, AtomicHighWaterMarkGauge);
+  /// Set 'hwm_value_' to 'v' if 'v' is larger than 'hwm_value_'. The entire operation is
+  /// atomic.
+  void UpdateMax(int64_t v) {
+    while (true) {
+      int64_t old_max = hwm_value_.Load();
+      int64_t new_max = std::max(old_max, v);
+      if (new_max == old_max) break; // Avoid atomic update.
+      if (LIKELY(hwm_value_.CompareAndSwap(old_max, new_max))) break;
+    }
+  }
+
+  /// The high water mark value.
+  AtomicInt64 hwm_value_;
+  /// The metric representing the current value.
+  IntGauge* current_value_;
+};
+
 /// Gauge metric that computes the sum of several gauges.
 class SumGauge : public IntGauge {
  public:
@@ -339,6 +396,15 @@ class MetricGroup {
   IntCounter* AddCounter(const std::string& key, const int64_t value,
       const std::string& metric_def_arg = "") {
     return RegisterMetric(new IntCounter(MetricDefs::Get(key, metric_def_arg), value));
+  }
+
+  AtomicHighWaterMarkGauge* AddHWMGauge(const std::string& key_hwm,
+      const std::string& key_curent_value, const int64_t value,
+      const std::string& metric_def_arg = "") {
+    IntGauge* current_value_metric = RegisterMetric(
+        new IntGauge(MetricDefs::Get(key_curent_value, metric_def_arg), value));
+    return RegisterMetric(new AtomicHighWaterMarkGauge(
+        MetricDefs::Get(key_hwm, metric_def_arg), value, current_value_metric));
   }
 
   /// Returns a metric by key. All MetricGroups reachable from this group are searched in

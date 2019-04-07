@@ -1820,6 +1820,26 @@
     "key": "tmp-file-mgr.active-scratch-dirs.list"
   },
   {
+    "description": "The current total spilled bytes across all scratch directories.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Spilled bytes for scratch directories",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.scratch-space-bytes-used"
+  },
+  {
+    "description": "The high water mark for spilled bytes across all scratch directories.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Spilled bytes HWM for scratch directories",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.scratch-space-bytes-used-high-water-mark"
+  },
+  {
     "description": "Number of senders waiting for receiving fragment to initialize",
     "contexts": [
       "IMPALAD"

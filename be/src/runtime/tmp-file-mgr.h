@@ -424,6 +424,9 @@ class TmpFileMgr {
   /// Metrics to track active scratch directories.
   IntGauge* num_active_scratch_dirs_metric_;
   SetMetric<std::string>* active_scratch_dirs_metric_;
+
+  /// Metrics to track the scratch space HWM.
+  AtomicHighWaterMarkGauge* scratch_bytes_used_metric_;
 };
 
 }

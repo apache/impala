@@ -106,6 +106,36 @@ TEST_F(MetricsTest, GaugeMetrics) {
   AssertValue(int_gauge_with_units, 10, "10s000ms");
 }
 
+TEST_F(MetricsTest, AtomicHighWaterMarkGauge) {
+  MetricGroup metrics("IntHWMGauge");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
+  AddMetricDef("hwm_gauge", TMetricKind::GAUGE, TUnit::NONE);
+  AtomicHighWaterMarkGauge* int_hwm_gauge = metrics.AddHWMGauge("hwm_gauge", "gauge", 0);
+  IntGauge* int_gauge = int_hwm_gauge->current_value_;
+  AssertValue(int_hwm_gauge, 0, "0");
+  AssertValue(int_gauge, 0, "0");
+  int_hwm_gauge->Increment(-1);
+  AssertValue(int_hwm_gauge, 0, "0");
+  AssertValue(int_gauge, -1, "-1");
+  int_hwm_gauge->Increment(10);
+  AssertValue(int_hwm_gauge, 9, "9");
+  AssertValue(int_gauge, 9, "9");
+  int_hwm_gauge->SetValue(3456);
+  AssertValue(int_hwm_gauge, 3456, "3456");
+  AssertValue(int_gauge, 3456, "3456");
+  int_hwm_gauge->SetValue(100);
+  AssertValue(int_hwm_gauge, 3456, "3456");
+  AssertValue(int_gauge, 100, "100");
+
+  AddMetricDef("hwm_gauge_with_units", TMetricKind::GAUGE, TUnit::BYTES);
+  AddMetricDef("gauge_with_units", TMetricKind::GAUGE, TUnit::BYTES);
+  AtomicHighWaterMarkGauge* int_hwm_gauge_with_units =
+      metrics.AddHWMGauge("hwm_gauge_with_units", "gauge_with_units", 10);
+  IntGauge* int_gauge_with_units = int_hwm_gauge_with_units->current_value_;
+  AssertValue(int_hwm_gauge_with_units, 10, "10.00 B");
+  AssertValue(int_gauge_with_units, 10, "10.00 B");
+}
+
 TEST_F(MetricsTest, SumGauge) {
   MetricGroup metrics("SumGauge");
   AddMetricDef("gauge1", TMetricKind::GAUGE, TUnit::NONE);
