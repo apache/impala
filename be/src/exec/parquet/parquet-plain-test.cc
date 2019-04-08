@@ -15,15 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <iostream>
 #include "exec/parquet/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
+#include "testutil/random-vector-generators.h"
+#include "testutil/rand-util.h"
 
 #include "common/names.h"
 
@@ -78,25 +80,8 @@ int Encode(const Decimal16Value& v, int encoded_byte_size, uint8_t* buffer,
 }
 
 /// Test that the decoder fails when asked to decode a truncated value.
-template <typename InternalType, parquet::Type::type PARQUET_TYPE>
-void TestTruncate(const InternalType& v, int expected_byte_size) {
-  uint8_t buffer[expected_byte_size];
-  int encoded_size = Encode(v, expected_byte_size, buffer, PARQUET_TYPE);
-  EXPECT_EQ(encoded_size, expected_byte_size);
-
-  // Check all possible truncations of the buffer.
-  for (int truncated_size = encoded_size - 1; truncated_size >= 0; --truncated_size) {
-    InternalType result;
-    /// Copy to heap-allocated buffer so that ASAN can detect buffer overruns.
-    uint8_t* truncated_buffer = new uint8_t[truncated_size];
-    memcpy(truncated_buffer, buffer, truncated_size);
-    int decoded_size = ParquetPlainEncoder::Decode<InternalType, PARQUET_TYPE>(
-        truncated_buffer, truncated_buffer + truncated_size, expected_byte_size, &result);
-    EXPECT_EQ(-1, decoded_size);
-    delete[] truncated_buffer;
-  }
-}
-
+/// This function can be used for type widening tests but also tests without type
+/// widening, in which case `WidenInternalType` is the same as `InternalType`.
 template <typename InternalType, typename WidenInternalType,
     parquet::Type::type PARQUET_TYPE>
 void TestTruncate(const InternalType& v, int expected_byte_size) {
@@ -111,28 +96,14 @@ void TestTruncate(const InternalType& v, int expected_byte_size) {
     uint8_t* truncated_buffer = new uint8_t[truncated_size];
     memcpy(truncated_buffer, buffer, truncated_size);
     int decoded_size = ParquetPlainEncoder::Decode<WidenInternalType, PARQUET_TYPE>(
-        truncated_buffer, truncated_buffer + truncated_size, expected_byte_size,
-        &result);
+        truncated_buffer, truncated_buffer + truncated_size, expected_byte_size, &result);
     EXPECT_EQ(-1, decoded_size);
     delete[] truncated_buffer;
   }
 }
 
-template <typename InternalType, parquet::Type::type PARQUET_TYPE>
-void TestType(const InternalType& v, int expected_byte_size) {
-  uint8_t buffer[expected_byte_size];
-  int encoded_size = Encode(v, expected_byte_size, buffer, PARQUET_TYPE);
-  EXPECT_EQ(encoded_size, expected_byte_size);
-
-  InternalType result;
-  int decoded_size = ParquetPlainEncoder::Decode<InternalType, PARQUET_TYPE>(buffer,
-      buffer + expected_byte_size, expected_byte_size, &result);
-  EXPECT_EQ(decoded_size, expected_byte_size);
-  EXPECT_EQ(result, v);
-
-  TestTruncate<InternalType, PARQUET_TYPE>(v, expected_byte_size);
-}
-
+/// This function can be used for type widening tests but also tests without type
+/// widening, in which case `WidenInternalType` is the same as `InternalType`.
 template <typename InternalType, typename WidenInternalType,
     parquet::Type::type PARQUET_TYPE>
 void TestTypeWidening(const InternalType& v, int expected_byte_size) {
@@ -143,10 +114,24 @@ void TestTypeWidening(const InternalType& v, int expected_byte_size) {
   WidenInternalType result;
   int decoded_size = ParquetPlainEncoder::Decode<WidenInternalType, PARQUET_TYPE>(
       buffer, buffer + expected_byte_size, expected_byte_size, &result);
-  EXPECT_EQ(decoded_size, expected_byte_size);
+  EXPECT_EQ(expected_byte_size, decoded_size);
   EXPECT_EQ(v, result);
 
+  WidenInternalType batch_result;
+  int batch_decoded_size
+      = ParquetPlainEncoder::DecodeBatch<WidenInternalType, PARQUET_TYPE>(
+          buffer, buffer + expected_byte_size, expected_byte_size, 1,
+          sizeof(WidenInternalType), &batch_result);
+  EXPECT_EQ(expected_byte_size, batch_decoded_size);
+  EXPECT_EQ(v, batch_result);
+
   TestTruncate<InternalType, WidenInternalType, PARQUET_TYPE>(
+      v, expected_byte_size);
+}
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE>
+void TestType(const InternalType& v, int expected_byte_size) {
+  return TestTypeWidening<InternalType, InternalType, PARQUET_TYPE>(
       v, expected_byte_size);
 }
 
@@ -284,6 +269,174 @@ TEST(PlainEncoding, Basic) {
     TestType<Decimal16Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal16Value(i), i);
     TestType<Decimal16Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal16Value(-i), i);
   }
+}
+
+template <typename InputType, typename OutputType>
+void ExpectEqualWithStride(const std::vector<InputType>& input,
+    const std::vector<uint8_t>& output, int stride) {
+  ASSERT_EQ(input.size() * stride, output.size());
+
+  for (int i = 0; i < input.size(); i++) {
+    const InputType& input_value = input[i];
+    OutputType output_value;
+
+    memcpy(&output_value, &output[i * stride], sizeof(OutputType));
+    EXPECT_EQ(input_value, output_value);
+  }
+}
+
+/// This function can be used for type widening tests but also tests without type
+/// widening, in which case `WidenInternalType` is the same as `InternalType`.
+template <typename InternalType, typename WidenInternalType,
+         parquet::Type::type PARQUET_TYPE>
+void TestTypeWideningBatch(const std::vector<InternalType>& values,
+    int expected_byte_size, int stride) {
+  ASSERT_GE(stride, sizeof(WidenInternalType));
+
+  constexpr bool var_length = PARQUET_TYPE == parquet::Type::BYTE_ARRAY;
+
+  std::vector<uint8_t> buffer(values.size() * expected_byte_size, 0);
+  uint8_t* output_pos = buffer.data();
+  for (int i = 0; i < values.size(); i++) {
+    int encoded_size = Encode(values[i], expected_byte_size, output_pos, PARQUET_TYPE);
+    if (var_length) {
+      /// For variable length types, the size is variable and `expected_byte_size` should
+      /// be the maximum.
+      EXPECT_GE(expected_byte_size, encoded_size);
+    } else {
+      EXPECT_EQ(expected_byte_size, encoded_size);
+    }
+
+    output_pos += encoded_size;
+  }
+
+  /// Decode one by one.
+  std::vector<uint8_t> output_1by1(values.size() * stride);
+  uint8_t* input_pos = buffer.data();
+  for (int i = 0; i < values.size(); i++) {
+    WidenInternalType* dest = reinterpret_cast<WidenInternalType*>(
+        &output_1by1[i * stride]);
+    int decoded_size = ParquetPlainEncoder::Decode<WidenInternalType, PARQUET_TYPE>(
+        input_pos, buffer.data() + buffer.size(), expected_byte_size, dest);
+    if (var_length) {
+      EXPECT_GE(expected_byte_size, decoded_size);
+    } else {
+      EXPECT_EQ(expected_byte_size, decoded_size);
+    }
+
+    input_pos += decoded_size;
+  }
+
+  ExpectEqualWithStride<InternalType, WidenInternalType>(values, output_1by1, stride);
+
+  /// Decode in batch.
+  std::vector<uint8_t> output_batch(values.size() * stride);
+  int decoded_size = ParquetPlainEncoder::DecodeBatch<WidenInternalType, PARQUET_TYPE>(
+      buffer.data(), buffer.data() + buffer.size(), expected_byte_size, values.size(),
+      stride, reinterpret_cast<WidenInternalType*>(output_batch.data()));
+  if (var_length) {
+    EXPECT_GE(buffer.size(), decoded_size);
+  } else {
+    EXPECT_EQ(buffer.size(), decoded_size);
+  }
+
+  ExpectEqualWithStride<InternalType, WidenInternalType>(values, output_batch, stride);
+}
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE>
+void TestTypeBatch(const std::vector<InternalType>& values, int expected_byte_size,
+    int stride) {
+  return TestTypeWideningBatch<InternalType, InternalType, PARQUET_TYPE>(values,
+      expected_byte_size, stride);
+}
+
+TEST(PlainEncoding, Batch) {
+  std::mt19937 gen;
+  RandTestUtil::SeedRng("PARQUET_PLAIN_ENCODING_TEST_RANDOM_SEED", &gen);
+
+  constexpr int NUM_ELEMENTS = 1024 * 5 + 10;
+  constexpr int stride = 20;
+
+  const std::vector<int8_t> int8_vec = RandomNumberVec<int8_t>(gen, NUM_ELEMENTS);
+  TestTypeBatch<int8_t, parquet::Type::INT32>(int8_vec, sizeof(int32_t), stride);
+
+  const std::vector<int16_t> int16_vec = RandomNumberVec<int16_t>(gen, NUM_ELEMENTS);
+  TestTypeBatch<int16_t, parquet::Type::INT32>(int16_vec, sizeof(int32_t), stride);
+
+  const std::vector<int32_t> int32_vec = RandomNumberVec<int32_t>(gen, NUM_ELEMENTS);
+  TestTypeBatch<int32_t, parquet::Type::INT32>(int32_vec, sizeof(int32_t), stride);
+
+  const std::vector<int64_t> int64_vec = RandomNumberVec<int64_t>(gen, NUM_ELEMENTS);
+  TestTypeBatch<int64_t, parquet::Type::INT64>(int64_vec, sizeof(int64_t), stride);
+
+  const std::vector<float> float_vec = RandomNumberVec<float>(gen, NUM_ELEMENTS);
+  TestTypeBatch<float, parquet::Type::FLOAT>(float_vec, sizeof(float), stride);
+
+  const std::vector<double> double_vec = RandomNumberVec<double>(gen, NUM_ELEMENTS);
+  TestTypeBatch<double, parquet::Type::DOUBLE>(double_vec, sizeof(double), stride);
+
+  constexpr int max_str_length = 100;
+  const std::vector<std::string> str_vec = RandomStrVec(gen, NUM_ELEMENTS,
+      max_str_length);
+  std::vector<StringValue> sv_vec(str_vec.size());
+  std::transform(str_vec.begin(), str_vec.end(), sv_vec.begin(),
+      [] (const std::string& s) { return StringValue(s); });
+  TestTypeBatch<StringValue, parquet::Type::BYTE_ARRAY>(sv_vec,
+      sizeof(int32_t) + max_str_length, stride);
+
+  const std::vector<TimestampValue> tv_vec = RandomTimestampVec(gen, NUM_ELEMENTS);
+  TestTypeBatch<TimestampValue, parquet::Type::INT96>(tv_vec, 12, stride);
+
+  // Test type widening.
+  TestTypeWideningBatch<int32_t, int64_t, parquet::Type::INT32>(int32_vec,
+      sizeof(int32_t), stride);
+  TestTypeWideningBatch<int32_t, double, parquet::Type::INT32>(int32_vec, sizeof(int32_t),
+      stride);
+  TestTypeWideningBatch<float, double, parquet::Type::FLOAT>(float_vec, sizeof(float),
+      stride);
+
+  // In the Decimal batch tests, when writing the decimals as BYTE_ARRAYs, we always use
+  // the size of the underlying type as the array length for simplicity.
+  // The non-batch tests take care of storing them on as many bytes as needed.
+
+  // BYTE_ARRAYs store the length of the array on 4 bytes.
+  constexpr int decimal_size_bytes = sizeof(int32_t);
+
+  // Decimal4Value
+  std::vector<Decimal4Value> decimal4_vec(int32_vec.size());
+  std::transform(int32_vec.begin(), int32_vec.end(), decimal4_vec.begin(),
+      [] (const int32_t i) { return Decimal4Value(i); });
+
+  TestTypeBatch<Decimal4Value, parquet::Type::BYTE_ARRAY>(decimal4_vec,
+      decimal_size_bytes + sizeof(Decimal4Value::StorageType), stride);
+  TestTypeBatch<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(decimal4_vec,
+      sizeof(Decimal4Value::StorageType), stride);
+  TestTypeBatch<Decimal4Value, parquet::Type::INT32>(decimal4_vec,
+      sizeof(Decimal4Value::StorageType), stride);
+
+  // Decimal8Value
+  std::vector<Decimal8Value> decimal8_vec(int64_vec.size());
+  std::transform(int64_vec.begin(), int64_vec.end(), decimal8_vec.begin(),
+      [] (const int64_t i) { return Decimal8Value(i); });
+
+  TestTypeBatch<Decimal8Value, parquet::Type::BYTE_ARRAY>(decimal8_vec,
+      decimal_size_bytes + sizeof(Decimal8Value::StorageType), stride);
+  TestTypeBatch<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(decimal8_vec,
+      sizeof(Decimal8Value::StorageType), stride);
+  TestTypeBatch<Decimal8Value, parquet::Type::INT64>(decimal8_vec,
+      sizeof(Decimal8Value::StorageType), stride);
+
+  // Decimal16Value
+  // We do not test the whole 16 byte range as generating random int128_t values is
+  // complicated.
+  std::vector<Decimal16Value> decimal16_vec(int64_vec.size());
+  std::transform(int64_vec.begin(), int64_vec.end(), decimal16_vec.begin(),
+      [] (const int64_t i) { return Decimal16Value(i); });
+
+  TestTypeBatch<Decimal16Value, parquet::Type::BYTE_ARRAY>(decimal16_vec,
+      decimal_size_bytes + sizeof(Decimal16Value::StorageType), stride);
+  TestTypeBatch<Decimal16Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(decimal16_vec,
+      sizeof(Decimal16Value::StorageType), stride);
 }
 
 TEST(PlainEncoding, DecimalBigEndian) {
