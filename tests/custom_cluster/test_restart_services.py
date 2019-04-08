@@ -19,6 +19,7 @@ import logging
 import pytest
 import psutil
 import re
+import signal
 import socket
 import time
 
@@ -93,15 +94,16 @@ def parse_shutdown_result(result):
   deadline left, queries registered, queries executing)."""
   assert len(result.data) == 1
   summary = result.data[0]
-  match = re.match(r'startup grace period left: ([0-9ms]*), deadline left: ([0-9ms]*), ' +
-      r'queries registered on coordinator: ([0-9]*), queries executing: ([0-9]*), ' +
-      r'fragment instances: [0-9]*', summary)
+  match = re.match(r'shutdown grace period left: ([0-9ms]*), deadline left: ([0-9ms]*), '
+                   r'queries registered on coordinator: ([0-9]*), queries executing: '
+                   r'([0-9]*), fragment instances: [0-9]*', summary)
   assert match is not None, summary
   return match.groups()
 
 
-class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
+class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   IDLE_SHUTDOWN_GRACE_PERIOD_S = 1
+  IMPALA_SHUTDOWN_SIGNAL = signal.SIGRTMIN
 
   @classmethod
   def get_workload(cls):
@@ -113,8 +115,8 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
           --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
             hostname=socket.gethostname()))
   def test_shutdown_idle(self):
-    """Test that idle impalads shut down in a timely manner after the startup grace period
-    elapses."""
+    """Test that idle impalads shut down in a timely manner after the shutdown grace
+    period elapses."""
     impalad1 = psutil.Process(self.cluster.impalads[0].get_pid())
     impalad2 = psutil.Process(self.cluster.impalads[1].get_pid())
     impalad3 = psutil.Process(self.cluster.impalads[2].get_pid())
@@ -158,7 +160,7 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
         ":shutdown('{0}:27000')".format(socket.gethostname()),
         query_options={'debug_action': 'CRS_SHUTDOWN_RPC:FAIL'})
 
-    # Make sure that the impala daemons exit after the startup grace period plus a 10
+    # Make sure that the impala daemons exit after the shutdown grace period plus a 10
     # second margin of error.
     start_time = time.time()
     LOG.info("Waiting for impalads to exit {0}".format(start_time))
@@ -218,11 +220,11 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
     SHUTDOWN_EXEC2 = ": shutdown('localhost:27001')"
 
     # Run this query before shutdown and make sure that it executes successfully on
-    # all executors through the startup grace period without disruption.
+    # all executors through the shutdown grace period without disruption.
     before_shutdown_handle = self.__exec_and_wait_until_running(QUERY)
 
     # Run this query which simulates getting stuck in admission control until after
-    # the startup grace period expires. This exercises the code path where the
+    # the shutdown grace period expires. This exercises the code path where the
     # coordinator terminates the query before it has started up.
     before_shutdown_admission_handle = self.execute_query_async(QUERY,
         {'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@30000'})
@@ -423,3 +425,48 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
       assert False, "Expected query to fail"
     except Exception, e:
       assert 'Failed due to unreachable impalad(s)' in str(e)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
+            hostname=socket.gethostname()), cluster_size=1)
+  def test_shutdown_signal(self):
+    """Test that an idle impalad shuts down in a timely manner after the shutdown grace
+    period elapses."""
+    impalad = psutil.Process(self.cluster.impalads[0].get_pid())
+    LOG.info(
+      "Sending IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {0}) signal to impalad PID = {1}",
+      self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid)
+    impalad.send_signal(self.IMPALA_SHUTDOWN_SIGNAL)
+    # Make sure that the impala daemon exits after the shutdown grace period plus a 10
+    # second margin of error.
+    start_time = time.time()
+    LOG.info("Waiting for impalad to exit {0}".format(start_time))
+    impalad.wait()
+    shutdown_duration = time.time() - start_time
+    assert shutdown_duration <= self.IDLE_SHUTDOWN_GRACE_PERIOD_S + 10
+    # Make sure signal was received and the grace period and deadline are as expected.
+    self.assert_impalad_log_contains('INFO',
+      "Shutdown signal received. Current Shutdown Status: shutdown grace period left: "
+      "{0}s000ms, deadline left: 8760h".format(self.IDLE_SHUTDOWN_GRACE_PERIOD_S))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1)
+  def test_sending_multiple_shutdown_signals(self):
+    """Test that multiple IMPALA_SHUTDOWN_SIGNAL signals are all handeled without
+    crashing the process."""
+    impalad = psutil.Process(self.cluster.impalads[0].get_pid())
+    NUM_SIGNALS_TO_SEND = 10
+    LOG.info(
+      "Sending {0} IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {1}) signals to impalad PID = {2}",
+      NUM_SIGNALS_TO_SEND, self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid)
+    for i in range(NUM_SIGNALS_TO_SEND):
+      impalad.send_signal(self.IMPALA_SHUTDOWN_SIGNAL)
+    # Give shutdown thread some time to wake up and handle all the signals to avoid
+    # flakiness.
+    sleep(5)
+    # Make sure all signals were received and the process is still up.
+    self.assert_impalad_log_contains('INFO', "Shutdown signal received.",
+                                     NUM_SIGNALS_TO_SEND)
+    assert impalad.is_running(), "Impalad process should still be running."

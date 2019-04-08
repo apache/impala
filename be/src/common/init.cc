@@ -38,6 +38,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
+#include "service/impala-server.h"
 #include "util/cgroup-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -112,6 +113,10 @@ static unique_ptr<impala::Thread> log_maintenance_thread;
 // 2) Frees excess memory that TCMalloc has left in its pageheap.
 static unique_ptr<impala::Thread> memory_maintenance_thread;
 
+// Shutdown signal handler thread that calls sigwait() on IMPALA_SHUTDOWN_SIGNAL and
+// initiates a graceful shutdown with a virtually unlimited deadline (one year).
+static unique_ptr<impala::Thread> shutdown_signal_handler_thread;
+
 // A pause monitor thread to monitor process pauses in impala daemons. The thread sleeps
 // for a short interval of time (THREAD_SLEEP_TIME_MS), wakes up and calculates the actual
 // time slept. If that exceeds PAUSE_WARN_THRESHOLD_MS, a warning is logged.
@@ -177,6 +182,31 @@ extern "C" { void __gcov_flush(); }
   }
 }
 
+[[noreturn]] static void ImpalaShutdownSignalHandler() {
+  sigset_t signals;
+  CHECK_EQ(0, sigemptyset(&signals));
+  CHECK_EQ(0, sigaddset(&signals, IMPALA_SHUTDOWN_SIGNAL));
+  DCHECK(ExecEnv::GetInstance() != nullptr);
+  DCHECK(ExecEnv::GetInstance()->impala_server() != nullptr);
+  ImpalaServer* impala_server = ExecEnv::GetInstance()->impala_server();
+  while (true) {
+    int signal;
+    int err = sigwait(&signals, &signal);
+    CHECK(err == 0) << "sigwait(): " << GetStrErrMsg(err) << ": " << err;
+    CHECK_EQ(IMPALA_SHUTDOWN_SIGNAL, signal);
+    ShutdownStatusPB shutdown_status;
+    const int ONE_YEAR_IN_SECONDS = 365 * 24 * 60 * 60;
+    Status status = impala_server->StartShutdown(ONE_YEAR_IN_SECONDS, &shutdown_status);
+    if (!status.ok()) {
+      LOG(ERROR) << "Shutdown signal received but unable to initiate shutdown. Status: "
+                 << status.GetDetail();
+      continue;
+    }
+    LOG(INFO) << "Shutdown signal received. Current Shutdown Status: "
+              << ImpalaServer::ShutdownStatusToString(shutdown_status);
+  }
+}
+
 static void PauseMonitorLoop() {
   if (FLAGS_pause_monitor_warn_threshold_ms <= 0) return;
   int64_t time_before_sleep = MonotonicMillis();
@@ -207,9 +237,30 @@ static void PauseMonitorLoop() {
   _exit(0);
 }
 
+// Helper method that checks the return value of a syscall passed through
+// 'syscall_ret_val'. If it indicates an error, it writes an error message to stderr along
+// with the error string fetched via errno and calls exit().
+void AbortIfError(const int syscall_ret_val, const string& msg) {
+  if (syscall_ret_val == 0) return;
+  cerr << Substitute("$0 Error: $1", msg, GetStrErrMsg());
+  exit(1);
+}
+
+// Blocks the IMPALA_SHUTDOWN_SIGNAL signal. Should be called by the process before
+// spawning any other threads to make sure it gets blocked in all threads and will only be
+// caught by the thread waiting on it.
+void BlockImpalaShutdownSignal() {
+  const string error_msg = "Failed to block IMPALA_SHUTDOWN_SIGNAL for all threads.";
+  sigset_t signals;
+  AbortIfError(sigemptyset(&signals), error_msg);
+  AbortIfError(sigaddset(&signals, IMPALA_SHUTDOWN_SIGNAL), error_msg);
+  AbortIfError(pthread_sigmask(SIG_BLOCK, &signals, nullptr), error_msg);
+}
+
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode) {
   srand(time(NULL));
+  BlockImpalaShutdownSignal();
 
   CpuInfo::Init();
   DiskInfo::Init();
@@ -349,6 +400,11 @@ Status impala::StartMemoryMaintenanceThread() {
   DCHECK(AggregateMemoryMetrics::TOTAL_USED != nullptr) << "Mem metrics not registered.";
   return Thread::Create("common", "memory-maintenance-thread",
       &MemoryMaintenanceThread, &memory_maintenance_thread);
+}
+
+Status impala::StartImpalaShutdownSignalHandlerThread() {
+  return Thread::Create("common", "shutdown-signal-handler", &ImpalaShutdownSignalHandler,
+      &shutdown_signal_handler_thread);
 }
 
 #if defined(ADDRESS_SANITIZER)

@@ -2456,7 +2456,7 @@ ShutdownStatusPB ImpalaServer::GetShutdownStatus() const {
 }
 
 string ImpalaServer::ShutdownStatusToString(const ShutdownStatusPB& shutdown_status) {
-  return Substitute("startup grace period left: $0, deadline left: $1, "
+  return Substitute("shutdown grace period left: $0, deadline left: $1, "
                     "queries registered on coordinator: $2, queries executing: $3, "
                     "fragment instances: $4",
       PrettyPrinter::Print(shutdown_status.grace_remaining_ms(), TUnit::TIME_MS),

@@ -21,6 +21,10 @@
 #include "util/test-info.h"
 #include "common/status.h"
 
+// Using the first real-time signal available to initiate graceful shutdown.
+// See "Real-time signals" section under signal(7)'s man page for more info.
+#define IMPALA_SHUTDOWN_SIGNAL SIGRTMIN
+
 namespace impala {
 
 /// Initialises logging, flags, and, if init_jvm is true, an embedded JVM.
@@ -35,6 +39,12 @@ void InitCommonRuntime(int argc, char** argv, bool init_jvm,
 /// RegisterMemoryMetrics(). This thread is needed for daemons to free memory and
 /// refresh metrics but is not needed for standalone tests.
 Status StartMemoryMaintenanceThread() WARN_UNUSED_RESULT;
+
+/// Starts Impala shutdown signal handler thread. This thread is responsible for
+/// synchronously handling the IMPALA_SHUTDOWN_SIGNAL signal and initiating graceful
+/// shutdown when it is received. Must be called only after IMPALA_SHUTDOWN_SIGNAL is
+/// blocked on all threads in the process and impala server has started.
+Status StartImpalaShutdownSignalHandlerThread() WARN_UNUSED_RESULT;
 }
 
 #endif

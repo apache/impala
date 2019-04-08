@@ -92,7 +92,7 @@ int ImpaladMain(int argc, char** argv) {
     ShutdownLogging();
     exit(1);
   }
-
+  ABORT_IF_ERROR(StartImpalaShutdownSignalHandlerThread());
   impala_server->Join();
 
   return 0;
