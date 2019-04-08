@@ -5,7 +5,6 @@
 # num_nodes to 1 in the python test and mt_dop to 1 here in order to make the query as
 # deterministic as possible. mem_limit is tuned for a 3-node HDFS minicluster.
 set buffer_pool_limit=24m;
-set mem_limit=28m;
 set mt_dop=1;
 select max(cnt1), max(cnt2), max(cnt3), max(cnt4), max(cnt5)
 from customer c,

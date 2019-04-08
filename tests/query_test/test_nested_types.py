@@ -118,6 +118,11 @@ class TestNestedTypes(ImpalaTestSuite):
     a 3-node HDFS minicluster with num_nodes=1."""
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
+    if vector.get_value('table_format').file_format == 'orc':
+      # IMPALA-8336: lower memory limit for ORC
+      new_vector.get_value('exec_option')['mem_limit'] = '20M'
+    else:
+      new_vector.get_value('exec_option')['mem_limit'] = '28M'
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-tpch-mem-limit-single-node',
                        new_vector, use_db='tpch_nested' + db_suffix)
