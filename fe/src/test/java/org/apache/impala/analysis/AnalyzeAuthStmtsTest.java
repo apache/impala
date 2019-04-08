@@ -233,6 +233,9 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
             "alltypes %s %s", formatArgs), createAnalysisCtx("functional"));
         AnalyzesOk(String.format("%s SELECT (id, bool_col) ON TABLE " +
             "functional_kudu.alltypessmall %s %s", formatArgs));
+        // Column-level privileges on a VIEW
+        AnalyzesOk(String.format("%s SELECT (id, bool_col) ON TABLE " +
+            "functional.alltypes_hive_view %s %s", formatArgs));
         // Empty column list
         AnalysisError(String.format("%s SELECT () ON TABLE functional.alltypes " +
             "%s %s", formatArgs), "Empty column list in column privilege spec.");
@@ -243,10 +246,6 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format("%s ALL (id, tinyint_col) ON TABLE " +
             "functional.alltypes %s %s", formatArgs), "Only 'SELECT' privileges " +
             "are allowed in a column privilege spec.");
-        // Column-level privileges on a VIEW
-        AnalysisError(String.format("%s SELECT (id, bool_col) ON TABLE " +
-            "functional.alltypes_hive_view %s %s", formatArgs), "Column-level " +
-            "privileges on views are not supported.");
         // Columns/table that don't exist
         AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
             "functional.alltypes %s %s", formatArgs), "Error setting column-level " +

@@ -245,10 +245,6 @@ public class PrivilegeSpec extends StmtNode {
           "in a column privilege spec.");
     }
     FeTable table = analyzeTargetTable(analyzer);
-    if (table instanceof FeView) {
-      throw new AnalysisException("Column-level privileges on views are not " +
-          "supported.");
-    }
     if (table instanceof FeDataSourceTable) {
       throw new AnalysisException("Column-level privileges on external data " +
           "source tables are not supported.");

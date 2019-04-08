@@ -544,26 +544,30 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
 
     // Select a specific column on a view.
-    // Column-level privileges on views are not currently supported.
-    authorize("select id from functional.alltypes_view")
-        .ok(onServer(TPrivilegeLevel.ALL))
-        .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.SELECT))
-        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
-        .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
-        .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
-        .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
-        .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
-        .error(selectError("functional.alltypes_view"))
-        .error(selectError("functional.alltypes_view"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.SELECT)))
-        .error(selectError("functional.alltypes_view"), onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-            TPrivilegeLevel.SELECT)))
-        .error(selectError("functional.alltypes_view"), onTable("functional",
-            "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-            TPrivilegeLevel.SELECT)));
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("select id from functional.alltypes_view"),
+        authorize("select 2 * v.id from functional.alltypes_view v"),
+        authorize("select cast(id as bigint) from functional.alltypes_view")}) {
+      test.ok(onServer(TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onServer(TPrivilegeLevel.SELECT))
+          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
+          .ok(onColumn("functional", "alltypes_view", "id", TPrivilegeLevel.SELECT))
+          .error(selectError("functional.alltypes_view"))
+          .error(selectError("functional.alltypes_view"), onServer(allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.SELECT)))
+          .error(selectError("functional.alltypes_view"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+                  TPrivilegeLevel.SELECT)))
+          .error(selectError("functional.alltypes_view"), onTable("functional",
+              "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+                  TPrivilegeLevel.SELECT)));
+    }
 
     // Constant select.
     authorize("select 1").ok();
@@ -795,7 +799,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     }
 
     // Union on views.
-    // Column-level privileges on views are not currently supported.
     authorize("select id from functional.alltypes_view union all " +
         "select x from functional.alltypes_view_sub")
         .ok(onServer(TPrivilegeLevel.ALL))
@@ -810,6 +813,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             onTable("functional", "alltypes_view_sub", TPrivilegeLevel.OWNER))
         .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT),
             onTable("functional", "alltypes_view_sub", TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "alltypes_view", "id", TPrivilegeLevel.SELECT),
+            onColumn("functional", "alltypes_view_sub", "x", TPrivilegeLevel.SELECT))
         .error(selectError("functional.alltypes_view"))
         .error(selectError("functional.alltypes_view"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.SELECT)))
@@ -902,7 +907,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     }
 
     // Insert with select on a target view.
-    // Column-level privileges on views are not currently supported.
     authorize("insert into functional.alltypes partition(month, year) " +
         "select * from functional.alltypes_view where id < 100")
         .ok(onServer(TPrivilegeLevel.ALL))
@@ -917,6 +921,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
             onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onColumn("functional", "alltypes_view", ALLTYPES_COLUMNS,
+                TPrivilegeLevel.SELECT))
         .error(selectError("functional.alltypes_view"))
         .error(selectError("functional.alltypes_view"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT,

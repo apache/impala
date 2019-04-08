@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -208,6 +209,7 @@ public class SelectStmt extends QueryStmt {
 
       analyzeSelectClause();
       verifyResultExprs();
+      registerViewColumnPrivileges();
       analyzeWhereClause();
       createSortInfo(analyzer_);
 
@@ -535,6 +537,54 @@ public class SelectStmt extends QueryStmt {
       slotRef.analyze(analyzer_);
       resultExprs_.add(slotRef);
       colLabels_.add(relRawPath[relRawPath.length - 1]);
+    }
+
+    /**
+     * Registers view column privileges only when the view a catalog view.
+     */
+    private void registerViewColumnPrivileges() {
+      for (TableRef tableRef: fromClause_.getTableRefs()) {
+        if (!(tableRef instanceof InlineViewRef)) continue;
+        InlineViewRef inlineViewRef = (InlineViewRef) tableRef;
+        FeView view = inlineViewRef.getView();
+        // For, local views (CTE), the view definition is explicitly defined in the query,
+        // this requires registering base column privileges instead of view column
+        // privileges. For example:
+        //
+        // with v as (select id as foo from functional.alltypes) select foo from v
+        //
+        // The query will register "functional.alltypes.id" column instead of
+        // "v.foo" column. This behavior is similar to inline views, e.g.
+        //
+        // select foo from (select id as foo from functional.alltypes) v
+        //
+        // The query will register "functional.alltypes.id" column instead of "v.foo"
+        // column.
+        //
+        // Contrasting this with catalog views.
+        //
+        // create view v(foo) as select id from functional.alltypes
+        // select v.foo from v
+        //
+        // The "select v.foo from v" query requires "v.foo" view column privilege because
+        // the "v" view definition is not exposed in the query. This behavior is also
+        // consistent with view access, such that the query requires a "select" privilege
+        // on "v" view and not "functional.alltypes" table.
+        boolean isCatalogView = view != null && !view.isLocalView();
+        if (!isCatalogView) continue;
+        for (Expr expr: getResultExprs()) {
+          List<Expr> slotRefs = new ArrayList<>();
+          expr.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
+          for (Expr e: slotRefs) {
+            SlotRef slotRef = (SlotRef) e;
+            analyzer_.registerPrivReq(builder -> builder
+                .allOf(Privilege.SELECT)
+                .onColumn(view.getDb().getName(), view.getName(),
+                    slotRef.getDesc().getLabel())
+                .build());
+          }
+        }
+      }
     }
 
     /**
