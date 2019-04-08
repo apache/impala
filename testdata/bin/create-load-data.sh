@@ -46,6 +46,7 @@ setup_report_build_error
 
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
+SKIP_RANGER=0
 SNAPSHOT_FILE=""
 LOAD_DATA_ARGS=""
 EXPLORATION_STRATEGY="exhaustive"
@@ -85,17 +86,25 @@ do
       CM_HOST=${2-}
       shift;
       ;;
+    -skip_ranger)
+      SKIP_RANGER=1
+      ;;
     -help|-h|*)
       echo "create-load-data.sh : Creates data and loads from scratch"
       echo "[-skip_metadata_load] : Skips loading of metadata"
       echo "[-skip_snapshot_load] : Assumes that the snapshot is already loaded"
       echo "[-snapshot_file] : Loads the test warehouse snapshot into hdfs"
       echo "[-cm_host] : Address of the Cloudera Manager host if loading to a remote cluster"
+      echo "[-skip_ranger] : Skip the set-up for Ranger."
       exit 1;
       ;;
     esac
   shift;
 done
+
+if [[ -n $REMOTE_LOAD ]]; then
+  SKIP_RANGER=1
+fi
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   run-step "Generating HBase data" create-hbase.log \
@@ -663,4 +672,6 @@ run-step "Computing table stats" compute-table-stats.log \
 run-step "Creating tpcds testcase data" create-tpcds-testcase-data.log \
     ${IMPALA_HOME}/testdata/bin/create-tpcds-testcase-files.sh
 
-run-step "Setting up Ranger" setup-ranger.log setup-ranger
+if [[ $SKIP_RANGER -eq 0 ]]; then
+  run-step "Setting up Ranger" setup-ranger.log setup-ranger
+fi
