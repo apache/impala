@@ -85,10 +85,11 @@ public class KuduColumn extends Column {
       }
       Preconditions.checkNotNull(defaultValueExpr);
     }
+    String comment = !colSchema.getComment().isEmpty() ? colSchema.getComment() : null;
     return new KuduColumn(colSchema.getName(), type, colSchema.isKey(),
         colSchema.isNullable(), colSchema.getEncoding(),
         colSchema.getCompressionAlgorithm(), defaultValueExpr,
-        colSchema.getDesiredBlockSize(), null, position);
+        colSchema.getDesiredBlockSize(), comment, position);
   }
 
   public static KuduColumn fromThrift(TColumn column, int position)
@@ -111,8 +112,10 @@ public class KuduColumn extends Column {
     }
     int blockSize = 0;
     if (column.isSetBlock_size()) blockSize = column.getBlock_size();
+    String comment = (column.isSetComment() && !column.getComment().isEmpty()) ?
+        column.getComment() : null;
     return new KuduColumn(column.getKudu_column_name(), columnType, column.isIs_key(),
-        column.isIs_nullable(), encoding, compression, defaultValue, blockSize, null,
+        column.isIs_nullable(), encoding, compression, defaultValue, blockSize, comment,
         position);
   }
 

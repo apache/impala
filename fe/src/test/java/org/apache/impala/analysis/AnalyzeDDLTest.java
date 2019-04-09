@@ -1479,6 +1479,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "compression LZ4 encoding RLE");
     AnalyzesOk("alter table functional.alltypes alter int_col set comment 'a'");
     AnalyzesOk("alter table functional_kudu.alltypes alter int_col drop default");
+    AnalyzesOk("alter table functional_kudu.alltypes alter int_col set comment 'a'");
 
     AnalysisError("alter table functional_kudu.alltypes alter id set default 0",
         "Cannot set default value for primary key column 'id'");
@@ -1493,8 +1494,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Altering a column to be a primary key is not supported.");
     AnalysisError("alter table functional_kudu.alltypes alter int_col set not null",
         "Altering the nullability of a column is not supported.");
-    AnalysisError("alter table functional_kudu.alltypes alter int_col set comment 'a'",
-        "Kudu does not support column comments.");
     AnalysisError("alter table functional.alltypes alter int_col set compression lz4",
         "Unsupported column options for non-Kudu table: 'int_col INT COMPRESSION LZ4'");
     AnalysisError("alter table functional.alltypes alter int_col drop default",
@@ -2604,14 +2603,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // ALTER TABLE CHANGE COLUMN on Kudu tables
     AnalyzesOk("alter table functional_kudu.testtbl change column name new_name string");
+    AnalyzesOk("alter table functional_kudu.testtbl change column zip " +
+        "zip int comment 'comment'");
     // Unsupported column options
     AnalysisError("alter table functional_kudu.testtbl change column zip zip_code int " +
         "encoding rle compression lz4 default 90000", "Unsupported column options in " +
         "ALTER TABLE CHANGE COLUMN statement: 'zip_code INT ENCODING RLE COMPRESSION " +
         "LZ4 DEFAULT 90000'. Use ALTER TABLE ALTER COLUMN instead.");
-    AnalysisError(
-        "alter table functional_kudu.testtbl change column zip zip int comment 'comment'",
-        "Kudu does not support column comments.");
     // Changing the column type is not supported for Kudu tables
     AnalysisError("alter table functional_kudu.testtbl change column zip zip bigint",
         "Cannot change the type of a Kudu column using an ALTER TABLE CHANGE COLUMN " +
@@ -3019,6 +3017,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ts timestamp not null default '2009-1 foo') " +
         "partition by hash(id) partitions 3 stored as kudu",
         "String '2009-1 foo' cannot be cast to a TIMESTAMP literal.");
+
+    // Test column comments.
+    AnalyzesOk("create table tab (x int comment 'x', y int comment 'y', " +
+        "primary key (x, y)) stored as kudu");
   }
 
   @Test
@@ -4325,7 +4327,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         new Pair<>("functional.alltypes.id", createAnalysisCtx()),
         new Pair<>("alltypes.id", createAnalysisCtx("functional")),
         new Pair<>("functional.alltypes_view.id", createAnalysisCtx()),
-        new Pair<>("alltypes_view.id", createAnalysisCtx("functional"))}) {
+        new Pair<>("alltypes_view.id", createAnalysisCtx("functional")),
+        new Pair<>("functional_kudu.alltypes.id", createAnalysisCtx())}) {
       AnalyzesOk(String.format("comment on column %s is 'comment'", pair.first),
           pair.second);
       AnalyzesOk(String.format("comment on column %s is ''", pair.first), pair.second);

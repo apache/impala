@@ -39,7 +39,7 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 'pk1','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'pk2','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'pk3','string','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'c1','string','','false','true','abc','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'c1','string','testing','false','true','abc','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'c2','int','','false','false','100','PLAIN_ENCODING','SNAPPY','0'
 'c3','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','8388608'
 ---- TYPES

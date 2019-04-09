@@ -728,6 +728,48 @@ class TestDdlStatements(TestDdlBase):
       self.client, "show create table {0}".format(orc_table))
     assert any("ORC" in x for x in result.data)
 
+  def test_kudu_column_comment(self, vector, unique_database):
+    table = "{0}.kudu_table0".format(unique_database)
+    self.client.execute("create table {0}(x int comment 'x' primary key) \
+                        stored as kudu".format(table))
+    comment = self._get_column_comment(table, 'x')
+    assert "x" == comment
+
+    table = "{0}.kudu_table".format(unique_database)
+    self.client.execute("create table {0}(i int primary key) stored as kudu"
+                        .format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "" == comment
+
+    self.client.execute("comment on column {0}.i is 'comment1'".format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "comment1" == comment
+
+    self.client.execute("comment on column {0}.i is ''".format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "" == comment
+
+    self.client.execute("comment on column {0}.i is 'comment2'".format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "comment2" == comment
+
+    self.client.execute("comment on column {0}.i is null".format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "" == comment
+
+    self.client.execute("alter table {0} alter column i set comment 'comment3'"
+                        .format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "comment3" == comment
+
+    self.client.execute("alter table {0} alter column i set comment ''".format(table))
+    comment = self._get_column_comment(table, 'i')
+    assert "" == comment
+
+    self.client.execute("alter table {0} add columns (j int comment 'comment4')"
+                        .format(table))
+    comment = self._get_column_comment(table, 'j')
+    assert "comment4" == comment
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.
 class TestLibCache(TestDdlBase):

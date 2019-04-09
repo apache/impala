@@ -4021,15 +4021,23 @@ public class CatalogOpExecutor {
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
-      org.apache.hadoop.hive.metastore.api.Table msTbl =
-          tbl.getMetaStoreTable().deepCopy();
-      if (!updateColumnComment(msTbl.getSd().getColsIterator(), columnName, comment)) {
-        if (!updateColumnComment(msTbl.getPartitionKeysIterator(), columnName, comment)) {
-          throw new ColumnNotFoundException(String.format(
-              "Column name %s not found in table %s.", columnName, tbl.getFullName()));
+      if (tbl instanceof KuduTable) {
+        TColumn new_col = new TColumn(columnName,
+            tbl.getColumn(columnName).getType().toThrift());
+        new_col.setComment(comment != null ? comment : "");
+        KuduCatalogOpExecutor.alterColumn((KuduTable) tbl, columnName, new_col);
+      } else {
+        org.apache.hadoop.hive.metastore.api.Table msTbl =
+            tbl.getMetaStoreTable().deepCopy();
+        if (!updateColumnComment(msTbl.getSd().getColsIterator(), columnName, comment)) {
+          if (!updateColumnComment(msTbl.getPartitionKeysIterator(), columnName,
+              comment)) {
+            throw new ColumnNotFoundException(String.format(
+                "Column name %s not found in table %s.", columnName, tbl.getFullName()));
+          }
         }
+        applyAlterTable(msTbl, true);
       }
-      applyAlterTable(msTbl, true);
       loadTableMetadata(tbl, newCatalogVersion, false, true, null);
       addTableToCatalogUpdate(tbl, response.result);
       addSummary(response, "Column has been altered.");

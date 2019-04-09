@@ -165,10 +165,6 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
             "Cannot %s default value for primary key column '%s'",
             isDropDefault_ ? "drop" : "set", colName_));
       }
-      if (newColDef_.getComment() != null) {
-        // IMPALA-5351
-        throw new AnalysisException("Kudu does not support column comments.");
-      }
       if (newColDef_.isPrimaryKey()) {
         throw new AnalysisException(
             "Altering a column to be a primary key is not supported.");

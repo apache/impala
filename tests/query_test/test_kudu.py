@@ -776,6 +776,7 @@ class TestCreateExternalTable(KuduTestSuite):
         kudu_client.delete_table(table_name)
 
 class TestShowCreateTable(KuduTestSuite):
+  column_properties = "ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION"
 
   def assert_show_create_equals(self, cursor, create_sql, show_create_sql):
     """Executes 'create_sql' to create a table, then runs "SHOW CREATE TABLE" and checks
@@ -790,7 +791,6 @@ class TestShowCreateTable(KuduTestSuite):
         textwrap.dedent(show_create_sql.format(**format_args)).strip()
 
   def test_primary_key_and_distribution(self, cursor):
-    # TODO: Add test cases with column comments once KUDU-1711 is fixed.
     # TODO: Add case with BLOCK_SIZE
     self.assert_show_create_equals(cursor,
         """
@@ -877,7 +877,18 @@ class TestShowCreateTable(KuduTestSuite):
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
-
+    self.assert_show_create_equals(cursor,
+        """
+        CREATE TABLE {table} (c INT COMMENT 'Ab 1@' PRIMARY KEY) STORED AS KUDU""",
+        """
+        CREATE TABLE {db}.{{table}} (
+          c INT NOT NULL {p} COMMENT 'Ab 1@',
+          PRIMARY KEY (c)
+        )
+        STORED AS KUDU
+        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
+            db=cursor.conn.db_name, p=self.column_properties,
+            kudu_addr=KUDU_MASTER_HOSTS))
 
   def test_timestamp_default_value(self, cursor):
     create_sql_fmt = """
