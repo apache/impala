@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoneAuthorizationFactory;
 import org.apache.impala.authorization.User;
+import org.apache.impala.authorization.sentry.SentryCatalogdAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
@@ -60,6 +60,7 @@ import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSentryAdminCheckRequest;
+import org.apache.impala.thrift.TSentryAdminCheckResponse;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
@@ -298,20 +299,21 @@ public class JniCatalog {
   }
 
   /**
-   * Verifies whether the user is configured as an admin. Throws an AuthorizationException
-   * if the user does not have admin privileges.
-   *
-   * TODO: rename this method name.
+   * Verifies whether the user is configured as a Sentry admin.
    */
-  public void checkUserSentryAdmin(byte[] thriftReq) throws ImpalaException,
-      TException  {
+  public byte[] checkUserSentryAdmin(byte[] thriftReq)
+      throws ImpalaException, TException {
     TSentryAdminCheckRequest request = new TSentryAdminCheckRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftReq);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     User user = new User(request.getHeader().getRequesting_user());
-    if (!catalogOpExecutor_.getAuthzManager().isAdmin(user)) {
-      throw new AuthorizationException(String.format("User '%s' does not have " +
-          "privileges to access the requested policy metadata.", user.getName()));
-    }
+    Preconditions.checkState(catalogOpExecutor_.getAuthzManager() instanceof
+        SentryCatalogdAuthorizationManager);
+
+    TSentryAdminCheckResponse response = new TSentryAdminCheckResponse();
+    response.setIs_admin(((SentryCatalogdAuthorizationManager)
+        catalogOpExecutor_.getAuthzManager()).isSentryAdmin(user));
+    return serializer.serialize(response);
   }
 
   /**

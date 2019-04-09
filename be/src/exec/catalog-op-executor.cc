@@ -324,16 +324,16 @@ Status CatalogOpExecutor::GetPartitionStats(
   return Status::OK();
 }
 
-Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
+Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req,
+    TSentryAdminCheckResponse* result) {
   const TNetworkAddress& address =
       MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
   Status cnxn_status;
   CatalogServiceConnection client(env_->catalogd_client_cache(), address, &cnxn_status);
   RETURN_IF_ERROR(cnxn_status);
-  TSentryAdminCheckResponse resp;
   RETURN_IF_ERROR(
-      client.DoRpc(&CatalogServiceClientWrapper::SentryAdminCheck, req, &resp));
-  return Status(resp.status);
+      client.DoRpc(&CatalogServiceClientWrapper::SentryAdminCheck, req, result));
+  return Status::OK();
 }
 
 Status CatalogOpExecutor::UpdateTableUsage(const TUpdateTableUsageRequest& req,

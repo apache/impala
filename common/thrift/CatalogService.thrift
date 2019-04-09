@@ -478,9 +478,11 @@ struct TSentryAdminCheckRequest {
 }
 
 struct TSentryAdminCheckResponse {
-  // Contains an error if the user does not have privileges to access the Sentry Service
-  // or if the Sentry Service is unavailable. Returns OK if the operation was successful.
+  // Returns OK if the operation was successful.
   1: optional Status.TStatus status
+
+  // Returns true if the user is a Sentry admin user.
+  2: required bool is_admin
 }
 
 struct TTableUsage {

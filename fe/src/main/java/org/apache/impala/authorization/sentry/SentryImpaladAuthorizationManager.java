@@ -17,22 +17,30 @@
 
 package org.apache.impala.authorization.sentry;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
 import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TSentryAdminCheckRequest;
+import org.apache.impala.thrift.TSentryAdminCheckResponse;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
@@ -71,12 +79,6 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
-  public boolean isAdmin(User user) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Impalad", ClassUtil.getMethodName()));
-  }
-
-  @Override
   public void createRole(User requestingUser, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
@@ -92,6 +94,10 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
 
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
+    if (params.isIs_admin_op()) {
+      validateSentryAdmin(params.getRequesting_user());
+    }
+
     TShowRolesResult result = new TShowRolesResult();
     List<Role> roles = Lists.newArrayList();
     if (params.isIs_show_current_roles() || params.isSetGrant_group()) {
@@ -180,6 +186,10 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
+    if (params.isIs_admin_op()) {
+      validateSentryAdmin(params.getRequesting_user());
+    }
+
     switch (params.getPrincipal_type()) {
       case USER:
         Set<String> groupNames = authzChecker_.get().getUserGroups(
@@ -209,5 +219,38 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
+  }
+
+  /**
+   * Validates if the given user is a Sentry admin. The Sentry admin check will make an
+   * RPC call to the Catalog server. This check is necessary because some operations
+   * in this class does not need to make a call to Sentry, e.g. "show roles" and
+   * "show grant" because the authorization data can be retrieved directly from the
+   * Impalad catalog without going to Sentry. In order to ensure those operations can
+   * only be executed by a Sentry admin, a separate call to the Catalog server is needed
+   * to check if the given user is a Sentry admin.
+   *
+   * @throws AuthorizationException thrown when a given user is not a Sentry admin.
+   */
+  private static void validateSentryAdmin(String user) throws ImpalaException {
+    TSentryAdminCheckRequest request = new TSentryAdminCheckRequest();
+    TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
+    header.setRequesting_user(user);
+    request.setHeader(header);
+
+    byte[] thriftReq = JniUtil.serializeToThrift(request);
+    byte[] thriftRes = FeSupport.CheckSentryAdmin(thriftReq);
+
+    TSentryAdminCheckResponse response = new TSentryAdminCheckResponse();
+    JniUtil.deserializeThrift(response, thriftRes);
+
+    if (response.getStatus().getStatus_code() != TErrorCode.OK) {
+      throw new InternalException(String.format("Error requesting SentryAdminCheck: %s",
+          Joiner.on("\n").join(response.getStatus().getError_msgs())));
+    }
+    if (!response.isIs_admin()) {
+      throw new AuthorizationException(String.format("User '%s' does not have " +
+          "privileges to access the requested policy metadata.", user));
+    }
   }
 }

@@ -36,12 +36,6 @@ import org.apache.impala.thrift.TShowRolesResult;
  */
 public interface AuthorizationManager {
   /**
-   * Returns true if the given user is an admin user.
-   * TODO: Do we really need this?
-   */
-  boolean isAdmin(User user) throws ImpalaException;
-
-  /**
    * Creates a role.
    */
   void createRole(User requestingUser, TCreateDropRoleParams params,

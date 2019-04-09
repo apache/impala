@@ -61,7 +61,7 @@ Catalog::Catalog() {
     {"getTableMetrics", "([B)Ljava/lang/String;", &get_table_metrics_id_},
     {"getDbs", "([B)[B", &get_dbs_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
-    {"checkUserSentryAdmin", "([B)V", &sentry_admin_check_id_},
+    {"checkUserSentryAdmin", "([B)[B", &sentry_admin_check_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getPartialCatalogObject", "([B)[B", &get_partial_catalog_object_id_},
     {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
@@ -184,8 +184,9 @@ Status Catalog::GetPartitionStats(
   return JniUtil::CallJniMethod(catalog_, get_partition_stats_id_, req, resp);
 }
 
-Status Catalog::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
-  return JniUtil::CallJniMethod(catalog_, sentry_admin_check_id_, req);
+Status Catalog::SentryAdminCheck(const TSentryAdminCheckRequest& req,
+    TSentryAdminCheckResponse* resp) {
+  return JniUtil::CallJniMethod(catalog_, sentry_admin_check_id_, req, resp);
 }
 
 Status Catalog::UpdateTableUsage(const TUpdateTableUsageRequest& req) {

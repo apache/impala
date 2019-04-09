@@ -208,7 +208,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void SentryAdminCheck(TSentryAdminCheckResponse& resp,
       const TSentryAdminCheckRequest& req) override {
     VLOG_RPC << "SentryAdminCheck(): request=" << ThriftDebugString(req);
-    Status status = catalog_server_->catalog()->SentryAdminCheck(req);
+    Status status = catalog_server_->catalog()->SentryAdminCheck(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
     status.ToThrift(&thrift_status);

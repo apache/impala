@@ -24,9 +24,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -509,11 +507,13 @@ public class Frontend {
       // Check if the user is part of the group (case-sensitive) this SHOW ROLE
       // statement is targeting. If they are already a member of the group,
       // the admin requirement can be removed.
+      // If the the statement is SHOW CURRENT ROLES, the admin requirement can also be
+      // removed.
       Preconditions.checkState(ddl.getShow_roles_params().isSetIs_admin_op());
-      if (ddl.getShow_roles_params().isSetGrant_group() &&
-          groupNames.contains(ddl.getShow_roles_params().getGrant_group())) {
-        ddl.getShow_roles_params().setIs_admin_op(false);
-      }
+      ddl.getShow_roles_params().setIs_admin_op(!(
+          (ddl.getShow_roles_params().isSetGrant_group() &&
+              groupNames.contains(ddl.getShow_roles_params().getGrant_group())) ||
+              ddl.getShow_roles_params().isIs_show_current_roles()));
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
     } else if (analysis.isShowGrantPrincipalStmt()) {

@@ -354,18 +354,6 @@ Status ClientRequestState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::SHOW_ROLES: {
       const TShowRolesParams& params = catalog_op.show_roles_params;
-      if (params.is_admin_op) {
-        // Verify the user has privileges to perform this operation by checking against
-        // the Sentry Service (via the Catalog Server).
-        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
-            server_profile_));
-
-        TSentryAdminCheckRequest req;
-        req.__set_header(TCatalogServiceRequestHeader());
-        req.header.__set_requesting_user(effective_user());
-        RETURN_IF_ERROR(catalog_op_executor_->SentryAdminCheck(req));
-      }
-
       // If we have made it here, the user has privileges to execute this operation.
       // Return the results.
       TShowRolesResult result;
@@ -375,18 +363,6 @@ Status ClientRequestState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::SHOW_GRANT_PRINCIPAL: {
       const TShowGrantPrincipalParams& params = catalog_op.show_grant_principal_params;
-      if (params.is_admin_op) {
-        // Verify the user has privileges to perform this operation by checking against
-        // the Sentry Service (via the Catalog Server).
-        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
-            server_profile_));
-
-        TSentryAdminCheckRequest req;
-        req.__set_header(TCatalogServiceRequestHeader());
-        req.header.__set_requesting_user(effective_user());
-        RETURN_IF_ERROR(catalog_op_executor_->SentryAdminCheck(req));
-      }
-
       TResultSet response;
       RETURN_IF_ERROR(frontend_->GetPrincipalPrivileges(params, &response));
       // Set the result set and its schema from the response.

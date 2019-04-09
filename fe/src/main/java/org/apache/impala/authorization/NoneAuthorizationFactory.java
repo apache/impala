@@ -72,11 +72,6 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
 
   public static class NoneAuthorizationManager implements AuthorizationManager {
     @Override
-    public boolean isAdmin(User user) throws ImpalaException {
-      return false;
-    }
-
-    @Override
     public void createRole(User requestingUser, TCreateDropRoleParams params,
         TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",

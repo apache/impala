@@ -114,6 +114,9 @@ public class FeSupport {
 
   public native static byte[] NativeUpdateTableUsage(byte[] thriftReq);
 
+  // Does an RPC to the Catalog Server to check if the given user is a Sentry admin.
+  public native static byte[] NativeSentryAdminCheck(byte[] thriftReq);
+
   // Parses a string of comma-separated key=value query options ('csvQueryOptions'),
   // updates the existing query options ('queryOptions') with them and returns the
   // resulting serialized TQueryOptions object.
@@ -412,6 +415,14 @@ public class FeSupport {
     return NativeGetPartialCatalogObject(thriftReq);
   }
 
+  public static byte[] CheckSentryAdmin(byte[] thriftReq) {
+    try {
+      return NativeSentryAdminCheck(thriftReq);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeSentryAdminCheck(thriftReq);
+  }
 
   /**
    * This function should be called explicitly by the FeSupport to ensure that

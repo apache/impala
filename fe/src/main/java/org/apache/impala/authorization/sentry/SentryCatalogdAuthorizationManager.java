@@ -71,8 +71,10 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     catalog_ = catalog;
   }
 
-  @Override
-  public boolean isAdmin(User user) throws ImpalaException {
+  /**
+   * Checks if the given user is a Sentry admin.
+   */
+  public boolean isSentryAdmin(User user) throws ImpalaException {
     return catalog_.getSentryProxy().isSentryAdmin(user);
   }
 

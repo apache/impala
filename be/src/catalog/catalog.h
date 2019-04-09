@@ -126,9 +126,10 @@ class Catalog {
       const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* resp);
 
   /// Checks whether the requesting user has admin privileges on the Sentry Service and
-  /// returns OK if they do. Returns a bad status if the user is not an admin or if there
-  /// was an error executing the request.
-  Status SentryAdminCheck(const TSentryAdminCheckRequest& req);
+  /// returns OK if they do. Returns a bad status if there was an error executing the
+  /// request.
+  Status SentryAdminCheck(const TSentryAdminCheckRequest& req,
+      TSentryAdminCheckResponse* resp);
 
   /// Update recently used table names and their use counts in an impalad since the last
   /// report.

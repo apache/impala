@@ -549,6 +549,30 @@ Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage(
   return result_bytes;
 }
 
+// Calls the catalog server to to check if the given user is a Sentry admin.
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeSentryAdminCheck(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
+  TSentryAdminCheckRequest request;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TSentryAdminCheckResponse result;
+  Status status = catalog_op_executor.SentryAdminCheck(request, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetDetail();
+    status.AddDetail("Error making an RPC call to Catalog server.");
+    status.SetTStatus(&result);
+  }
+
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 // Calls in to the catalog server to request partial information about a
 // catalog object.
 extern "C"
@@ -661,6 +685,11 @@ static JNINativeMethod native_methods[] = {
       const_cast<char*>("NativeUpdateTableUsage"),
       const_cast<char*>("([B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage
+  },
+  {
+      const_cast<char*>("NativeSentryAdminCheck"),
+      const_cast<char*>("([B)[B"),
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeSentryAdminCheck
   },
   {
       const_cast<char*>("NativeParseQueryOptions"),
