@@ -28,6 +28,12 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
+IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+               "--ranger_app_id=impala --authorization_factory_class=" \
+               "org.apache.impala.authorization.ranger.RangerAuthorizationFactory"
+CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+                "--ranger_app_id=impala --authorization_factory_class=" \
+                "org.apache.impala.authorization.ranger.RangerAuthorizationFactory"
 
 
 class TestRanger(CustomClusterTestSuite):
@@ -36,15 +42,22 @@ class TestRanger(CustomClusterTestSuite):
   """
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
-                 "--ranger_app_id=impala "
-                 "--authorization_factory_class="
-                 "org.apache.impala.authorization.ranger.RangerAuthorizationFactory",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
-                  "--ranger_app_id=impala "
-                  "--authorization_factory_class="
-                  "org.apache.impala.authorization.ranger.RangerAuthorizationFactory")
-  def test_grant_revoke(self, unique_name):
+      impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_grant_revoke_with_catalog_v1(self, unique_name):
+    """Tests grant/revoke with catalog v1."""
+    self._test_grant_revoke(unique_name)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="{0} {1}".format(IMPALAD_ARGS, "--use_local_catalog=true"),
+      catalogd_args="{0} {1}".format(CATALOGD_ARGS,
+                                     "--use_local_catalog=true "
+                                     "--catalog_topic_mode=minimal"))
+  def test_grant_revoke_with_local_catalog(self, unique_name):
+    """Tests grant/revoke with catalog v2 (local catalog)."""
+    self._test_grant_revoke(unique_name)
+
+  def _test_grant_revoke(self, unique_name):
     user = getuser()
     admin = "admin"
     admin_client = self.create_impala_client()
@@ -88,14 +101,7 @@ class TestRanger(CustomClusterTestSuite):
                              .format(unique_database), user=admin)
 
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
-                 "--ranger_app_id=impala "
-                 "--authorization_factory_class="
-                 "org.apache.impala.authorization.ranger.RangerAuthorizationFactory",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
-                  "--ranger_app_id=impala "
-                  "--authorization_factory_class="
-                  "org.apache.impala.authorization.ranger.RangerAuthorizationFactory")
+      impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_grant_option(self, unique_name):
     user1 = getuser()
     user2 = unique_name + "_user"
