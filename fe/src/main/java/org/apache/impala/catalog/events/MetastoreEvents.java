@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.messaging.CreateTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.DropPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONAlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONCreateDatabaseMessage;
+import org.apache.hadoop.hive.metastore.messaging.json.JSONDropDatabaseMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropTableMessage;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.CatalogException;
@@ -204,6 +205,8 @@ public class MetastoreEvents {
       }
       LOG.info(String.format("Total number of events received: %d Total number of events "
           + "filtered out: %d", sizeBefore, numFilteredEvents));
+      metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+              .inc(numFilteredEvents);
       return metastoreEvents;
     }
   }
@@ -824,10 +827,7 @@ public class MetastoreEvents {
 
     /**
      * Processes the create database event by adding the Db object from the event if it
-     * does not exist in the catalog already. TODO we should compare the creationTime of
-     * the Database in catalog with the Database in the event to make sure we are ignoring
-     * only catalog has the latest Database object. This will be added after HIVE-21077 is
-     * fixed and available
+     * does not exist in the catalog already.
      */
     @Override
     public void process() {
@@ -865,33 +865,55 @@ public class MetastoreEvents {
    */
   public static class DropDatabaseEvent extends MetastoreDatabaseEvent {
 
+    // Metastore database object as parsed from NotificationEvent message
+    private final Database droppedDatabase_;
+
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
     private DropDatabaseEvent(
-        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
+        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event)
+        throws MetastoreNotificationException {
       super(catalog, metrics, event);
+      Preconditions.checkArgument(MetastoreEventType.DROP_DATABASE.equals(eventType_));
+      JSONDropDatabaseMessage dropDatabaseMessage =
+          (JSONDropDatabaseMessage) MetastoreEventsProcessor.getMessageFactory()
+              .getDeserializer().getDropDatabaseMessage(event.getMessage());
+      try {
+        droppedDatabase_ =
+            Preconditions.checkNotNull(dropDatabaseMessage.getDatabaseObject());
+      } catch (Exception e) {
+        throw new MetastoreNotificationException(debugString(
+            "Database object is null in the event. "
+                + "This could be a metastore configuration problem. "
+                + "Check if %s is set to true in metastore configuration",
+            MetastoreEventsProcessor.HMS_ADD_THRIFT_OBJECTS_IN_EVENTS_CONFIG_KEY), e);
+      }
     }
 
     /**
-     * Process the drop database event. Currently, this handler removes the db object from
-     * catalog. TODO Once we have HIVE-21077 we should compare creationTime to make sure
-     * that catalog's Db matches with the database object in the event
+     * Process the drop database event. This handler removes the db object from catalog
+     * only if the CREATION_TIME of the catalog's database object is lesser than or equal
+     * to that of the database object present in the notification event. If the
+     * CREATION_TIME of the catalog's DB object is greater than that of the notification
+     * event's DB object, it means that the Database object present in the catalog is a
+     * later version and we can skip the event. (For instance, when user does a create db,
+     * drop db and create db again with the same dbName.)
      */
     @Override
     public void process() {
-      // TODO this does not currently handle the case where the was a new instance
-      // of database with the same name created in catalog after this database instance
-      // was removed. For instance, user does a CREATE db, drop db and create db again
-      // with the same dbName. In this case, the drop database event will remove the
-      // database instance which is created after this create event. We should add a
-      // check to compare the creation time of the database with the creation time in
-      // the event to make sure we are removing the right databases object. Unfortunately,
-      // database do not have creation time currently. This would be fixed in HIVE-21077
-      Db removedDb = catalog_.removeDb(dbName_);
-      // if database did not exist in the cache there was nothing to do
+      Reference<Boolean> dbFound = new Reference<>();
+      Reference<Boolean> dbMatched = new Reference<>();
+      Db removedDb = catalog_.removeDbIfExists(droppedDatabase_, dbFound, dbMatched);
       if (removedDb != null) {
-        infoLog("Successfully removed database {}", dbName_);
+        infoLog("Removed Database {} ", dbName_);
+      } else if (!dbFound.getRef()) {
+        debugLog("Database {} was not removed since it " +
+            "did not exist in catalog.", dbName_);
+      } else if (!dbMatched.getRef()) {
+        infoLog(debugString("Database %s was not removed from catalog since "
+            + "the creation time of the Database did not match", dbName_));
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
       }
     }
   }

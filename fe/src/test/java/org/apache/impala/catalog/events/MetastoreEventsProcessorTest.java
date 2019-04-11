@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.events;
 
+import static java.lang.Thread.sleep;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.ALTER_TABLE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_DATABASE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_TABLE;
@@ -266,6 +267,60 @@ public class MetastoreEventsProcessorTest {
     } catch (DatabaseNotFoundException expectedEx) {
       // expected exception; ignored
     }
+  }
+
+  /**
+   * DROP_DATABASE uses CREATION_TIME to filter events that try to drop an earlier version
+   * of DB, hence this test is to verify that the sequence of operations CREATE_DB,
+   * DROP_DB, CREATE_DB from Hive will produce expected result in Impala's Catalog.
+   */
+  @Test
+  public void testCreateDropCreateDatabase() throws TException {
+    createDatabase(TEST_DB_NAME, null);
+    dropDatabaseCascade(TEST_DB_NAME);
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    // Check that the database exists in Catalog
+    assertNotNull(catalog_.getDb(TEST_DB_NAME));
+  }
+
+  /**
+   * Test to verify that DROP_DATABASE event is processed such that it removes the DB from
+   * Catalog only if the CREATION_TIME of the Catalog's DB object is less than or equal to
+   * that in the event.
+   */
+  @Test
+  public void testDropDatabaseCreationTime()
+      throws ImpalaException, InterruptedException {
+    long filteredCount = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
+    createDatabaseFromImpala(TEST_DB_NAME, "Test DB for CREATION_TIME");
+    // now drop the database with cascade option
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
+
+    // Adding sleep here to make sure that the CREATION_TIME is not same
+    // as the previous CREATE_DB operation, so as to trigger the filtering logic
+    // based on CREATION_TIME in DROP_DB event processing. This is currently a
+    // limitation : the DROP_DB event filtering expects that while processing events,
+    // the CREATION_TIME of two DB's with same name won't have the same
+    // creation timestamp.
+    sleep(2000);
+    // Create database again with same name
+    createDatabaseFromImpala(TEST_DB_NAME, "Test DB for CREATION_TIME");
+    eventsProcessor_.processEvents();
+
+    // Here, we expect the events CREATE_DB, DROP_DB, CREATE_DB for the
+    // same Database name. Hence, the DROP_DB event should not be processed,
+    // as the CREATION_TIME of the catalog's Database object should be greater
+    // than that in the DROP_DB notification event. Two events are filtered here,
+    // 1 : first CREATE_DATABASE as it is followed by another create of the same name.
+    // 2 : DROP_DATABASE as it is trying to drop a database which is again created.
+    assertEquals(2, eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+        .getCount() - filteredCount);
+
+    // Teardown step - Drop the created DB
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
   }
 
   @Ignore("Disabled until we fix Hive bug to deserialize alter_database event messages")
@@ -779,10 +834,8 @@ public class MetastoreEventsProcessorTest {
   /**
    * Similar to create,drop,create sequence table as in
    * <code>testCreateDropCreateTableFromImpala</code> but operates on Database instead
-   * of Table. Makes sure that the database creationTime is checked before processing
-   * create and drop database events
+   * of Table.
    */
-  @Ignore("Ignored since database createTime is unavailable until we have HIVE-21077")
   @Test
   public void testCreateDropCreateDatabaseFromImpala() throws ImpalaException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());

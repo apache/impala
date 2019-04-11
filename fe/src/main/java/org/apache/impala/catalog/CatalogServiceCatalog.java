@@ -1528,6 +1528,39 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * @param msDb Metastore Database used to remove Db from Catalog
+   * @param dbFound Set to true if Database is found in Catalog
+   * @param dbMatched Set to true if Database is found in Catalog and it's CREATION_TIME
+   * is equal to the metastore DB
+   * @return the DB object removed. Return null if DB does not exist or was not removed
+   * because CREATION_TIME does not match.
+   */
+  public Db removeDbIfExists(org.apache.hadoop.hive.metastore.api.Database msDb,
+      Reference<Boolean> dbFound, Reference<Boolean> dbMatched) {
+    dbFound.setRef(false);
+    dbMatched.setRef(false);
+    versionLock_.writeLock().lock();
+    try {
+      String dbName = msDb.getName();
+      Db catalogDb = getDb(dbName);
+      if (catalogDb == null) return null;
+
+      dbFound.setRef(true);
+      // Remove the DB only if the CREATION_TIME matches with the metastore DB from event.
+      if (msDb.getCreateTime() == catalogDb.getMetaStoreDb().getCreateTime()) {
+        Db removedDb = removeDb(dbName);
+        if (removedDb != null) {
+          dbMatched.setRef(true);
+          return removedDb;
+        }
+      }
+      return null;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
+  /**
    * Helper function to clean up the state associated with a removed database. It creates
    * the entries in the delete log for 'db' as well as for its tables and functions
    * (if any).
