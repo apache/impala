@@ -273,7 +273,7 @@ void Plan::BuildScanRange(const TableName& table_name, const Block& block, int b
   // 'length' is the only member considered by the scheduler.
   file_split.length = block.length;
   // Encoding the table name and block index in the file helps debugging.
-  file_split.file_name = table_name + "_block_" + std::to_string(block_idx);
+  file_split.relative_path = table_name + "_block_" + std::to_string(block_idx);
   file_split.offset = 0;
   file_split.partition_id = 0;
   // For now, we model each file by a single block.
@@ -289,9 +289,9 @@ void Plan::BuildScanRangeSpec(const TableName& table_name,
   THdfsFileDesc thrift_file;
 
   flatbuffers::FlatBufferBuilder fb_builder;
-  auto file_name =
+  auto rel_path =
       fb_builder.CreateString(table_name + "_spec_" + std::to_string(spec_idx));
-  auto fb_file_desc = CreateFbFileDesc(fb_builder, file_name, spec.length);
+  auto fb_file_desc = CreateFbFileDesc(fb_builder, rel_path, spec.length);
   fb_builder.Finish(fb_file_desc);
 
   string buffer(

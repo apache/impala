@@ -286,6 +286,7 @@ class DirectMetaProvider implements MetaProvider {
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
     Path partDir = new Path(msPartition.getSd().getLocation());
     FileMetadataLoader fml = new FileMetadataLoader(partDir,
+        /* recursive= */false,
         /* oldFds= */Collections.emptyList(),
         hostIndex);
 

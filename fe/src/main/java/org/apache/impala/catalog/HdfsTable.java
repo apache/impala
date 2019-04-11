@@ -560,7 +560,8 @@ public class HdfsTable extends Table implements FeFsTable {
     Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
     for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
-      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(), oldFds, hostIndex_);
+      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(), /*recursive=*/false,
+          oldFds, hostIndex_);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
@@ -1645,7 +1646,8 @@ public class HdfsTable extends Table implements FeFsTable {
       return;
     }
 
-    RemoteIterator<FileStatus> statuses = FileSystemUtil.listStatus(fs, path);
+    RemoteIterator<? extends FileStatus> statuses = FileSystemUtil.listStatus(fs, path,
+        /*recursive=*/false);
     if (statuses == null) return;
     while (statuses.hasNext()) {
       FileStatus status = statuses.next();

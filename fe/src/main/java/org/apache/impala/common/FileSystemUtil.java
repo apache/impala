@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Stack;
 import java.util.UUID;
 
 import org.apache.commons.io.IOUtils;
@@ -539,9 +541,33 @@ public class FileSystemUtil {
    * the file does not exist and also saves an RPC as the caller need not do a separate
    * exists check for the path. Returns null if the path does not exist.
    */
-  public static RemoteIterator<FileStatus> listStatus(FileSystem fs, Path p)
-      throws IOException {
+  public static RemoteIterator<? extends FileStatus> listStatus(FileSystem fs, Path p,
+      boolean recursive) throws IOException {
     try {
+      if (recursive) {
+        // The Hadoop FileSystem API doesn't provide a recursive listStatus call that
+        // doesn't also fetch block locations, and fetching block locations is expensive.
+        // Here, our caller specifically doesn't need block locations, so we don't want to
+        // call the expensive 'listFiles' call on HDFS. Instead, we need to "manually"
+        // recursively call FileSystem.listStatusIterator().
+        //
+        // Note that this "manual" recursion is not actually any slower than the recursion
+        // provided by the HDFS 'listFiles(recursive=true)' API, since the HDFS wire
+        // protocol doesn't provide any such recursive support anyway. In other words,
+        // the API that looks like a single recursive call is just as bad as what we're
+        // doing here.
+        //
+        // However, S3 actually implements 'listFiles(recursive=true)' with a faster path
+        // which natively recurses. In that case, it's quite preferable to use 'listFiles'
+        // even though it returns LocatedFileStatus objects with "fake" blocks which we
+        // will ignore.
+        if (isS3AFileSystem(fs)) {
+          return listFiles(fs, p, recursive);
+        }
+
+        return new RecursingIterator(fs, p);
+      }
+
       return fs.listStatusIterator(p);
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
@@ -568,5 +594,71 @@ public class FileSystemUtil {
   public static boolean isDir(Path p) throws IOException {
     FileSystem fs = getFileSystemForPath(p);
     return fs.isDirectory(p);
+  }
+
+  /**
+   * Iterator which recursively visits directories on a FileSystem, yielding
+   * files in an unspecified order. Only files are yielded -- not directories.
+   */
+  private static class RecursingIterator implements RemoteIterator<FileStatus> {
+    private final FileSystem fs_;
+    private final Stack<RemoteIterator<FileStatus>> iters_ = new Stack<>();
+    private RemoteIterator<FileStatus> curIter_;
+    private FileStatus curFile_;
+
+    private RecursingIterator(FileSystem fs, Path startPath) throws IOException {
+      this.fs_ = Preconditions.checkNotNull(fs);
+      curIter_ = fs.listStatusIterator(Preconditions.checkNotNull(startPath));
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      // Pull the next file to be returned into 'curFile'. If we've already got one,
+      // we don't need to do anything (extra calls to hasNext() must not affect
+      // state)
+      while (curFile_ == null) {
+        if (curIter_.hasNext()) {
+          // Consume the next file or directory from the current iterator.
+          handleFileStat(curIter_.next());
+        } else if (!iters_.empty()) {
+          // We ran out of entries in the current one, but we might still have
+          // entries at a higher level of recursion.
+          curIter_ = iters_.pop();
+        } else {
+          // No iterators left to process, so we are entirely done.
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /**
+     * Process the input stat.
+     * If it is a file, return the file stat.
+     * If it is a directory, traverse the directory if recursive is true;
+     * ignore it if recursive is false.
+     * @param fileStatus input status
+     * @throws IOException if any IO error occurs
+     */
+    private void handleFileStat(FileStatus fileStatus) throws IOException {
+      if (fileStatus.isFile()) { // file
+        curFile_ = fileStatus;
+      } else { // directory
+        iters_.push(curIter_);
+        curIter_ = fs_.listStatusIterator(fileStatus.getPath());
+      }
+    }
+
+    @Override
+    public FileStatus next() throws IOException {
+      if (hasNext()) {
+        FileStatus result = curFile_;
+        // Reset back to 'null' so that hasNext() will pull a new entry on the next
+        // call.
+        curFile_ = null;
+        return result;
+      }
+      throw new NoSuchElementException("No more entries");
+    }
   }
 }

@@ -878,7 +878,7 @@ public class HdfsScanNode extends ScanNode {
             fileDesc.getIsEc()) {
           throw new ImpalaRuntimeException(String.format(
               "Scanning of HDFS erasure-coded file (%s/%s) is not supported",
-              partition.getLocation(), fileDesc.getFileName()));
+              partition.getLocation(), fileDesc.getRelativePath()));
         }
         if (!fsHasBlocks) {
           Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
@@ -945,7 +945,7 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkArgument(maxBlockSize > 0);
     if (fileDesc.getFileLength() <= 0) return;
     boolean splittable = partition.getFileFormat().isSplittable(
-        HdfsCompression.fromFileName(fileDesc.getFileName()));
+        HdfsCompression.fromFileName(fileDesc.getRelativePath()));
     TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
         fileDesc.toThrift(), maxBlockSize, splittable, partition.getId());
     scanRangeSpecs_.addToSplit_specs(splitSpec);
@@ -1010,7 +1010,7 @@ public class HdfsScanNode extends ScanNode {
           currentLength = scanRangeBytesLimit;
         }
         TScanRange scanRange = new TScanRange();
-        scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getFileName(),
+        scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getRelativePath(),
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
             fileDesc.getIsEc()));

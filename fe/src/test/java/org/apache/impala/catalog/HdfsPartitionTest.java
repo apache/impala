@@ -150,8 +150,8 @@ public class HdfsPartitionTest {
     // Fetch some metadata from a directory in HDFS.
     Path p = new Path("hdfs://localhost:20500/test-warehouse/schemas");
     ListMap<TNetworkAddress> origIndex = new ListMap<>();
-    FileMetadataLoader fml = new FileMetadataLoader(p, Collections.emptyList(),
-        origIndex);
+    FileMetadataLoader fml = new FileMetadataLoader(p, /* recursive= */false,
+        Collections.emptyList(), origIndex);
     fml.load();
     List<FileDescriptor> fileDescriptors = fml.getLoadedFds();
     assertTrue(!fileDescriptors.isEmpty());

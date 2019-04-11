@@ -32,7 +32,6 @@ import javax.annotation.Nonnull;
 
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -135,12 +134,23 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
      * file resides and 'hostIndex' stores the network addresses of the hosts that store
      * blocks of the parent HdfsTable. 'isEc' indicates whether the file is erasure-coded.
      * Populates 'numUnknownDiskIds' with the number of unknown disk ids.
+     *
+     *
      */
-    public static FileDescriptor create(FileStatus fileStatus,
-        BlockLocation[] blockLocations, FileSystem fileSystem,
-        ListMap<TNetworkAddress> hostIndex, boolean isEc,
+    /**
+     * Creates a FileDescriptor with block locations.
+     *
+     * @param fileStatus the status returned from file listing
+     * @param relPath the path of the file relative to the partition directory
+     * @param blockLocations the block locations for the file
+     * @param hostIndex the host index to use for encoding the hosts
+     * @param isEc true if the file is known to be erasure-coded
+     * @param numUnknownDiskIds reference which will be set to the number of blocks
+     *                          for which no disk ID could be determined
+     */
+    public static FileDescriptor create(FileStatus fileStatus, String relPath,
+        BlockLocation[] blockLocations, ListMap<TNetworkAddress> hostIndex, boolean isEc,
         Reference<Long> numUnknownDiskIds) throws IOException {
-      Preconditions.checkState(FileSystemUtil.supportsStorageIds(fileSystem));
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       int[] fbFileBlockOffsets = new int[blockLocations.length];
       int blockIdx = 0;
@@ -154,17 +164,18 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
               FileBlock.createFbFileBlock(fbb, loc, hostIndex, numUnknownDiskIds);
         }
       }
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffsets,
-          isEc));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath,
+          fbFileBlockOffsets, isEc));
     }
 
     /**
      * Creates the file descriptor of a file represented by 'fileStatus' that
      * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
      */
-    public static FileDescriptor createWithNoBlocks(FileStatus fileStatus) {
+    public static FileDescriptor createWithNoBlocks(FileStatus fileStatus,
+        String relPath) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, null, false));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath, null, false));
     }
 
     /**
@@ -174,17 +185,16 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
      * in the underlying buffer. Can be null if there are no blocks.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
-        FileStatus fileStatus, int[] fbFileBlockOffets, boolean isEc) {
-      // TODO(todd): need to use path relative to the partition dir, not the
-      // filename here.
-      int fileNameOffset = fbb.createString(fileStatus.getPath().getName());
+        FileStatus fileStatus, String relPath, int[] fbFileBlockOffets, boolean isEc) {
+      int relPathOffset = fbb.createString(relPath);
       // A negative block vector offset is used when no block offsets are specified.
       int blockVectorOffset = -1;
       if (fbFileBlockOffets != null) {
         blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
       }
       FbFileDesc.startFbFileDesc(fbb);
-      FbFileDesc.addFileName(fbb, fileNameOffset);
+      // TODO(todd) rename to RelativePathin the FBS
+      FbFileDesc.addRelativePath(fbb, relPathOffset);
       FbFileDesc.addLength(fbb, fileStatus.getLen());
       FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
       FbFileDesc.addIsEc(fbb, isEc);
@@ -200,7 +210,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       return FbFileDesc.getRootAsFbFileDesc((ByteBuffer)compressedBb.flip());
     }
 
-    public String getFileName() { return fbFileDescriptor_.fileName(); }
+    public String getRelativePath() { return fbFileDescriptor_.relativePath(); }
     public long getFileLength() { return fbFileDescriptor_.length(); }
 
     /** Compute the total length of files in fileDescs */
@@ -239,7 +249,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         blocks.add(FileBlock.debugString(getFbFileBlock(i)));
       }
       return Objects.toStringHelper(this)
-          .add("FileName", getFileName())
+          .add("RelativePath", getRelativePath())
           .add("Length", getFileLength())
           .add("Compression", getFileCompression())
           .add("ModificationTime", getModificationTime())
@@ -248,7 +258,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
     @Override
     public int compareTo(FileDescriptor otherFd) {
-      return getFileName().compareTo(otherFd.getFileName());
+      return getRelativePath().compareTo(otherFd.getRelativePath());
     }
 
     /**

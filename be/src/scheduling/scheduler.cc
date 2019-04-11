@@ -256,7 +256,7 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       RETURN_IF_ERROR(FromFbCompression(fb_desc->compression(), &compression));
       hdfs_scan_range.__set_file_compression(compression);
       hdfs_scan_range.__set_file_length(fb_desc->length());
-      hdfs_scan_range.__set_file_name(fb_desc->file_name()->str());
+      hdfs_scan_range.__set_relative_path(fb_desc->relative_path()->str());
       hdfs_scan_range.__set_length(scan_range_length);
       hdfs_scan_range.__set_mtime(fb_desc->last_modification_time());
       hdfs_scan_range.__set_offset(scan_range_offset);
@@ -921,8 +921,8 @@ void Scheduler::AssignmentCtx::GetRemoteExecutorCandidates(
   // Generate multiple hashes of the file split by using the hash as a seed to a PRNG.
   // Note: This hashes both the filename and the offset to allow very large files
   // to be spread across more executors.
-  uint32_t hash = HashUtil::Hash(hdfs_file_split->file_name.data(),
-      hdfs_file_split->file_name.length(), 0);
+  uint32_t hash = HashUtil::Hash(hdfs_file_split->relative_path.data(),
+      hdfs_file_split->relative_path.length(), 0);
   hash = HashUtil::Hash(&hdfs_file_split->offset, sizeof(hdfs_file_split->offset), hash);
   pcg32 prng(hash);
   // To avoid any problem scenarios, limit the total number of iterations

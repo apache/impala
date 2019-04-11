@@ -167,9 +167,9 @@ struct TRuntimeFilterDesc {
 
 // Specification of subsection of a single hdfs file.
 struct THdfsFileSplit {
-  // File name (not the full path).  The path is assumed to be the
+  // File name (not the full path).  The path is assumed to be relative to the
   // 'location' of the THdfsPartition referenced by partition_id.
-  1: required string file_name
+  1: required string relative_path
 
   // starting offset
   2: required i64 offset

@@ -156,7 +156,7 @@ public class ExplainTest extends FrontendTestBase {
     List<HdfsPartition.FileDescriptor> mockFilesDescs = new ArrayList<>();
     HdfsPartition.FileDescriptor mockFileDesc = mock(HdfsPartition.FileDescriptor.class);
     when(mockFileDesc.getFileLength()).thenReturn(1L);
-    when(mockFileDesc.getFileName()).thenReturn("");
+    when(mockFileDesc.getRelativePath()).thenReturn("");
     mockFilesDescs.add(mockFileDesc);
 
     when(mockHdfsPartition.getLocationPath())

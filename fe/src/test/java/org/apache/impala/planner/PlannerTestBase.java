@@ -290,7 +290,7 @@ public class PlannerTestBase extends FrontendTestBase {
               file_location =
                   table.getPartition_prefixes().get(location.prefix_index) + file_location;
             }
-            Path filePath = new Path(file_location, split.file_name);
+            Path filePath = new Path(file_location, split.relative_path);
             filePath = cleanseFilePath(filePath);
             result.append("HDFS SPLIT " + filePath.toString() + " "
                 + Long.toString(split.offset) + ":" + Long.toString(split.length));

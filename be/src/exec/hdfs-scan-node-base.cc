@@ -207,7 +207,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     }
 
     filesystem::path file_path(partition_desc->location());
-    file_path.append(split.file_name, filesystem::path::codecvt());
+    file_path.append(split.relative_path, filesystem::path::codecvt());
     const string& native_file_path = file_path.native();
 
     auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);

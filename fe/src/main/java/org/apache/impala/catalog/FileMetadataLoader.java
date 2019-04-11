@@ -17,6 +17,7 @@
 package org.apache.impala.catalog;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +50,8 @@ public class FileMetadataLoader {
   private static final Configuration CONF = new Configuration();
 
   private final Path partDir_;
-  private final ImmutableMap<String, FileDescriptor> oldFdsByName_;
+  private final boolean recursive_;
+  private final ImmutableMap<String, FileDescriptor> oldFdsByRelPath_;
   private final ListMap<TNetworkAddress> hostIndex_;
 
   private boolean forceRefreshLocations = false;
@@ -59,15 +61,17 @@ public class FileMetadataLoader {
 
   /**
    * @param partDir the dir for which to fetch file metadata
+   * @param recursive whether to recursively list files
    * @param oldFds any pre-existing file descriptors loaded for this table, used
    *   to optimize refresh if available.
    * @param hostIndex the host index with which to associate the file descriptors
    */
-  public FileMetadataLoader(Path partDir, List<FileDescriptor> oldFds,
+  public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
       ListMap<TNetworkAddress> hostIndex) {
     partDir_ = Preconditions.checkNotNull(partDir);
+    recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
-    oldFdsByName_ = Maps.uniqueIndex(oldFds, FileDescriptor::getFileName);
+    oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
   }
 
   /**
@@ -121,19 +125,19 @@ public class FileMetadataLoader {
     // assume that most _can_ be reused, in which case it's faster to _not_ prefetch
     // the locations.
     boolean listWithLocations = FileSystemUtil.supportsStorageIds(fs) &&
-        (oldFdsByName_.isEmpty() || forceRefreshLocations);
+        (oldFdsByRelPath_.isEmpty() || forceRefreshLocations);
 
     String msg = String.format("%s file metadata%s from path %s",
-          oldFdsByName_.isEmpty() ? "Loading" : "Refreshing",
+          oldFdsByRelPath_.isEmpty() ? "Loading" : "Refreshing",
           listWithLocations ? " with eager location-fetching" : "",
           partDir_);
     LOG.trace(msg);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
       RemoteIterator<? extends FileStatus> fileStatuses;
       if (listWithLocations) {
-        fileStatuses = FileSystemUtil.listFiles(fs, partDir_, /*recursive=*/false);
+        fileStatuses = FileSystemUtil.listFiles(fs, partDir_, recursive_);
       } else {
-        fileStatuses = FileSystemUtil.listStatus(fs, partDir_);
+        fileStatuses = FileSystemUtil.listStatus(fs, partDir_, recursive_);
 
         // TODO(todd): we could look at the result of listing without locations, and if
         // we see that a substantial number of the files have changed, it may be better
@@ -149,14 +153,11 @@ public class FileMetadataLoader {
           ++loadStats_.hiddenFiles;
           continue;
         }
-        // TODO(todd): this logic will have to change when we support recursive partition
-        // listing -- we need to index the old FDs by their relative path to the partition
-        // directory, not just the file name (last path component)
-        String fileName = fileStatus.getPath().getName().toString();
-        FileDescriptor fd = oldFdsByName_.get(fileName);
+        String relPath = relativizePath(fileStatus.getPath());
+        FileDescriptor fd = oldFdsByRelPath_.get(relPath);
         if (listWithLocations || forceRefreshLocations ||
             hasFileChanged(fd, fileStatus)) {
-          fd = createFd(fs, fileStatus, numUnknownDiskIds);
+          fd = createFd(fs, fileStatus, relPath, numUnknownDiskIds);
           ++loadStats_.loadedFiles;
         } else {
           ++loadStats_.skippedFiles;
@@ -171,15 +172,28 @@ public class FileMetadataLoader {
   }
 
   /**
+   * Return the path of 'path' relative to the partition dir being listed. This may
+   * differ from simply the file name in the case of recursive listings.
+   */
+  private String relativizePath(Path path) {
+    URI relUri = partDir_.toUri().relativize(path.toUri());
+    if (relUri.isAbsolute() || relUri.getPath().startsWith("/")) {
+      throw new RuntimeException("FileSystem returned an unexpected path " +
+          path + " for a file within " + partDir_);
+    }
+    return relUri.getPath();
+  }
+
+  /**
    * Create a FileDescriptor for the given FileStatus. If the FS supports block locations,
    * and FileStatus is a LocatedFileStatus (i.e. the location was prefetched) this uses
    * the already-loaded information; otherwise, this may have to remotely look up the
    * locations.
    */
   private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
-      Reference<Long> numUnknownDiskIds) throws IOException {
+      String relPath, Reference<Long> numUnknownDiskIds) throws IOException {
     if (!FileSystemUtil.supportsStorageIds(fs)) {
-      return FileDescriptor.createWithNoBlocks(fileStatus);
+      return FileDescriptor.createWithNoBlocks(fileStatus, relPath);
     }
     BlockLocation[] locations;
     if (fileStatus instanceof LocatedFileStatus) {
@@ -187,7 +201,7 @@ public class FileMetadataLoader {
     } else {
       locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
     }
-    return FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
+    return FileDescriptor.create(fileStatus, relPath, locations, hostIndex_,
         HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
   }
 
