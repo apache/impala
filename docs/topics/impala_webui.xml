@@ -173,12 +173,10 @@ under the License.
         <ul>
           <li>
             The version of the <cmdname>impalad</cmdname> daemon
-            <ul>
-              <li>
-                The "Version" section contains some other information too, like when Impala was
-                built, what build flags were used.
-              </li>
-            </ul>
+            <p>
+              The <b>Version</b> section also contains other information, such as when Impala
+              was built and what build flags were used.
+            </p>
           </li>
 
           <li>
@@ -253,12 +251,9 @@ under the License.
             Pool stats
             <ul>
               <li>
-                Average of time in queue
-                <p>
-                  This is an exponential moving average which represents the average time in
-                  queue over the last 10 to 12 queries. If a query is admitted immediately, the
-                  wait time of 0 is used in calculating this average wait time.
-                </p>
+                Average of time in queue: An exponential moving average which represents the
+                average time in queue over the last 10 to 12 queries. If a query is admitted
+                immediately, the wait time of 0 is used in calculating this average wait time.
               </li>
             </ul>
           </li>
