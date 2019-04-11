@@ -840,6 +840,9 @@ class ImpalaShell(object, cmd.Cmd):
           self.ldap_password.endswith('\n'):
         print_to_stderr("Warning: LDAP password contains a trailing newline. "
                       "Did you use 'echo' instead of 'echo -n'?")
+      if self.use_ssl and sys.version_info < (2,7,9) \
+          and "EOF occurred in violation of protocol" in str(e):
+        print_to_stderr("Warning: TLSv1.2 is not supported for Python < 2.7.9")
       print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
       # A secure connection may still be open. So we explicitly close it.
       self.imp_client.close_connection()

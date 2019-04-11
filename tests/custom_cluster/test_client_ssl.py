@@ -165,10 +165,14 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=TLS_V12_ARGS,
                                     catalogd_args=TLS_V12_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
-  @pytest.mark.skipif(sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12, \
-      reason="Python version too old to allow Thrift client to use TLSv1.2")
   def test_tls_v12(self, vector):
-    self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
+    if sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
+      result = run_impala_shell_cmd_no_expect(
+          "--ssl -q 'select 1 + 2'", wait_until_connected=False)
+      assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \
+          result.stderr
+    else:
+      self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_ARGS,
