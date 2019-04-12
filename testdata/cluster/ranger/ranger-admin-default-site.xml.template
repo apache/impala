@@ -214,7 +214,7 @@
   </property>
   <property>
     <name>ranger.unixauth.keystore.password</name>
-    <value>_</value>
+    <value>password</value>
   </property>
   <property>
     <name>ranger.unixauth.truststore</name>
@@ -226,7 +226,7 @@
   </property>
   <property>
     <name>ranger.unixauth.truststore.password</name>
-    <value>_</value>
+    <value>changeit</value>
   </property>
 
   <property>

@@ -157,15 +157,15 @@ if [[ $OSTYPE == "darwin"* ]]; then
   unset IMPALA_OPENSSL_URL
 fi
 
-: ${CDH_DOWNLOAD_HOST:=native-toolchain.s3.amazonaws.com}
-export CDH_DOWNLOAD_HOST
+: ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
+export IMPALA_TOOLCHAIN_HOST
 export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=1009254
-export CDP_BUILD_NUMBER=976603
+export CDP_BUILD_NUMBER=1013201
 export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export IMPALA_RANGER_VERSION=1.2.0
+export IMPALA_RANGER_VERSION=1.2.0.6.0.99.0-45
 export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
@@ -173,7 +173,7 @@ export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
 export USE_CDP_HIVE=${USE_CDP_HIVE-false}
 if $USE_CDP_HIVE; then
-  export IMPALA_HIVE_VERSION=3.1.0.6.0.99.0-9
+  export IMPALA_HIVE_VERSION=3.1.0.6.0.99.0-45
 else
   export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
 fi
@@ -493,11 +493,8 @@ else
   export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
 fi
 
-# The directory in which all the CDP components live. Applies only when
-# USE_CDP_HIVE is set to true
-if $USE_CDP_HIVE; then
-  export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
-fi
+# The directory in which all the thirdparty CDP components live.
+export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 
 # Typically we build against a snapshot build of Hadoop that includes everything we need
 # for building Impala and running a minicluster.
@@ -529,9 +526,8 @@ export MINIKDC_HOME="$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_V
 export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
 export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
-export RANGER_HOME="${IMPALA_TOOLCHAIN}/ranger-${IMPALA_RANGER_VERSION}-admin"
+export RANGER_HOME="${CDP_COMPONENTS_HOME}/ranger-${IMPALA_RANGER_VERSION}-admin"
 export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
-
 
 # Extract the first component of the hive version.
 export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
@@ -745,16 +741,20 @@ echo "LD_LIBRARY_PATH         = $LD_LIBRARY_PATH"
 echo "LD_PRELOAD              = $LD_PRELOAD"
 echo "POSTGRES_JDBC_DRIVER    = $POSTGRES_JDBC_DRIVER"
 echo "IMPALA_TOOLCHAIN        = $IMPALA_TOOLCHAIN"
+echo "METASTORE_DB            = $METASTORE_DB"
 echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
-echo "CDH_DOWNLOAD_HOST       = $CDH_DOWNLOAD_HOST"
+echo "IMPALA_TOOLCHAIN_HOST   = $IMPALA_TOOLCHAIN_HOST"
 echo "CDH_BUILD_NUMBER        = $CDH_BUILD_NUMBER"
+echo "CDH_COMPONENTS_HOME     = $CDH_COMPONENTS_HOME"
 echo "CDP_BUILD_NUMBER        = $CDP_BUILD_NUMBER"
-if $USE_CDP_HIVE; then
-  echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
-fi
+echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
+echo "IMPALA_HADOOP_VERSION   = $IMPALA_HADOOP_VERSION"
 echo "IMPALA_HIVE_VERSION     = $IMPALA_HIVE_VERSION"
-echo "METASTORE_DB            = $METASTORE_DB"
+echo "IMPALA_HBASE_VERSION    = $IMPALA_HBASE_VERSION"
+echo "IMPALA_SENTRY_VERSION   = $IMPALA_SENTRY_VERSION"
+echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
+echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

@@ -15,6 +15,7 @@ bin/version.info
 bin/impala-config-local.sh
 .cache
 .cdh
+.cdp
 
 # distcc options
 .impala_compiler_opts

@@ -536,17 +536,20 @@ create_log_dirs
 
 bootstrap_dependencies
 
-# Create .cdh file that contains the CDH_BUILD_NUMBER. If the content
-# of the file is different than the one in the environment variable,
-# append -U into IMPALA_MAVEN_OPTION to force Maven to update its local
-# cache.
+# Create .cdh and .cdp files that contains the CDH_BUILD_NUMBER and CDP_BUILD_NUMBER
+# respectively. If the content of the files are different than the ones in the
+# environment variable, append -U into IMPALA_MAVEN_OPTION to force Maven to update its
+# local cache.
 CDH_FILE="${IMPALA_HOME}/.cdh"
-if [[ -f ${CDH_FILE} ]]; then
-  if [[ $(cat ${CDH_FILE}) != ${CDH_BUILD_NUMBER} ]]; then
+CDP_FILE="${IMPALA_HOME}/.cdp"
+if [[ -f ${CDH_FILE} && -f ${CDP_FILE} ]]; then
+  if [[ $(cat ${CDH_FILE}) != ${CDH_BUILD_NUMBER} || \
+        $(cat ${CDP_FILE}) != ${CDP_BUILD_NUMBER} ]]; then
     export IMPALA_MAVEN_OPTIONS="${IMPALA_MAVEN_OPTIONS} -U"
   fi
 fi
 echo "${CDH_BUILD_NUMBER}" > ${CDH_FILE}
+echo "${CDP_BUILD_NUMBER}" > ${CDP_FILE}
 
 if [[ "$BUILD_FE_ONLY" -eq 1 ]]; then
   build_fe

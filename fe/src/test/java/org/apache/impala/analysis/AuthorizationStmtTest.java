@@ -2880,8 +2880,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
       try {
         createRangerPolicy(policyName, json);
-        // TODO: replace with the new API in RANGER-2349.
-        rangerImpalaPlugin_.init();
+        rangerImpalaPlugin_.refreshPoliciesAndTags();
 
         // Queries on columns that are not masked should be allowed.
         authorize("select id from functional.alltypes")
@@ -2996,8 +2995,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
       try {
         createRangerPolicy(policyName, json);
-        // TODO: replace with the new API in RANGER-2349.
-        rangerImpalaPlugin_.init();
+        rangerImpalaPlugin_.refreshPoliciesAndTags();
 
         // Queries on tables that are not filtered should be allowed.
         authorize("select string_col from functional_kudu.alltypes")
@@ -3294,8 +3292,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       }
 
       authzManager.grantPrivilege(requests);
-      // TODO: replace with the new API in RANGER-2349.
-      rangerImpalaPlugin_.init();
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
     }
 
     /**

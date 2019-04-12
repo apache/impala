@@ -213,6 +213,7 @@ fi
 popd
 
 RANGER_SERVER_CONF_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf"
+RANGER_SERVER_CONFDIST_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf.dist"
 RANGER_SERVER_LIB_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/lib"
 if [[ ! -d "${RANGER_SERVER_CONF_DIR}" ]]; then
     mkdir -p "${RANGER_SERVER_CONF_DIR}"
@@ -221,7 +222,7 @@ fi
 cp -f "${RANGER_TEST_CONF_DIR}/java_home.sh" "${RANGER_SERVER_CONF_DIR}"
 cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-logdir.sh" "${RANGER_SERVER_CONF_DIR}"
 cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-piddir.sh" "${RANGER_SERVER_CONF_DIR}"
-cp -f "${RANGER_TEST_CONF_DIR}/security-applicationContext.xml" \
+cp -f "${RANGER_SERVER_CONFDIST_DIR}/security-applicationContext.xml" \
     "${RANGER_SERVER_CONF_DIR}"
 if [[ -f "${POSTGRES_JDBC_DRIVER}" ]]; then
   cp -f "${POSTGRES_JDBC_DRIVER}" "${RANGER_SERVER_LIB_DIR}"

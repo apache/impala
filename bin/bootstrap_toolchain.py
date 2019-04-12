@@ -384,7 +384,7 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
   cdh_components_home = os.environ.get("CDH_COMPONENTS_HOME")
   if not cdh_components_home:
     logging.error("Impala environment not set up correctly, make sure "
-          "$CDH_COMPONENTS_HOME is present.")
+          "$CDH_COMPONENTS_HOME is set.")
     sys.exit(1)
 
   # Create the directory where CDH components live if necessary.
@@ -417,72 +417,45 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
   execute_many(download, cdh_components)
 
 
-def download_ranger(toolchain_root):
-  env_var_version = "IMPALA_RANGER_VERSION"
-  version = os.environ.get(env_var_version)
-  # If Ranger has already been downloaded, do not re-download it.
-  if not version:
-    raise Exception("Could not find version for Ranger in environment var {0}"
-                    .format(env_var_version))
-  pkg_directory = "{0}/ranger-{1}-admin".format(toolchain_root, version)
-  if os.path.isdir(pkg_directory): return
-  file_name = "ranger-{0}-admin.tar.gz".format(version)
-  download_url = "{0}/ranger/{1}/{2}".format(TOOLCHAIN_HOST, version, file_name)
-  wget_and_unpack_package(download_url, file_name, toolchain_root, False)
-
-
-def download_cdp_hive(toolchain_root):
-  use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
-  if not use_cdp_hive:
-    return
-
-  if "CDP_BUILD_NUMBER" not in os.environ:
-    logging.error("Impala environment not set up correctly. CDP_BUILD_NUMBER must "
-                  "be set when USE_CDP_HIVE is set to true. Make sure "
-                  "impala-config.sh is sourced.")
-    sys.exit(1)
-
-  cdp_build_number = os.environ.get("CDP_BUILD_NUMBER")
-  url_prefix = "https://{0}/build/cdp_components/{1}/tarballs/".format(
-    cdh_host, cdp_build_number)
+def download_cdp_components(cdp_components, url_prefix):
+  """Downloads and unpacks the CDP components for a given URL prefix into
+  $CDP_COMPONENTS_HOME if not found."""
   cdp_components_home = os.environ.get("CDP_COMPONENTS_HOME")
   if not cdp_components_home:
     logging.error("Impala environment not set up correctly, make sure "
                   "$CDP_COMPONENTS_HOME is set.")
     sys.exit(1)
 
-  # Create the directory where CDH components live if necessary.
+  # Create the directory where CDP components live if necessary.
   if not os.path.exists(cdp_components_home):
     os.makedirs(cdp_components_home)
 
-  version = os.environ.get("IMPALA_HIVE_VERSION")
-  # TODO the naming convention of the CDP Hive is different than cdh6.x hive
-  # The tar balls are named for example like apache-hive-3.1.0.6.0.99.0-9-bin.tar.gz
-  dir_name = "apache-hive-{0}-bin".format(version)
-  pkg_directory = os.path.join(cdp_components_home, dir_name)
-  if os.path.isdir(pkg_directory):
-    return
+  def download(component_name):
+    pkg_directory = "{0}/{1}".format(cdp_components_home, component_name)
+    if os.path.isdir(pkg_directory): return
+    file_name = "{0}.tar.gz".format(component_name)
+    download_path = "{0}/{1}".format(url_prefix, file_name)
+    wget_and_unpack_package(download_path, file_name, cdp_components_home, False)
 
-  # Download the package if it doesn't exist
-  file_name = "{0}.tar.gz".format(dir_name)
-  download_path = url_prefix + file_name
-  wget_and_unpack_package(download_path, file_name, cdp_components_home, False)
+  execute_many(download, cdp_components)
 
 
 if __name__ == "__main__":
   """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment.-
-  By checking $IMPALA_HOME is present, we assume that IMPALA_{LIB}_VERSION will be present
+  By checking $IMPALA_HOME is set, we assume that IMPALA_{LIB}_VERSION will be set
   as well. Will create the directory specified by $IMPALA_TOOLCHAIN if it doesn't exist
   yet. Each of the packages specified in `packages` is downloaded and extracted into
   $IMPALA_TOOLCHAIN. If $DOWNLOAD_CDH_COMPONENTS is true, the presence of
-  $CDH_DOWNLOAD_HOST and $CDH_BUILD_NUMBER will be checked and this function will also
-  download the following CDH components into the directory specified by
-  $CDH_COMPONENTS_HOME.
-  - hadoop (downloaded from $CDH_DOWNLOAD_HOST for a given $CDH_BUILD_NUMBER)
-  - hbase (downloaded from $CDH_DOWNLOAD_HOST for a given $CDH_BUILD_NUMBER)
-  - hive (downloaded from $CDH_DOWNLOAD_HOST for a given $CDH_BUILD_NUMBER)
-  - sentry (downloaded from $CDH_DOWNLOAD_HOST for a given $CDH_BUILD_NUMBER)
+  $IMPALA_TOOLCHAIN_HOST and $CDH_BUILD_NUMBER will be checked and this function will also
+  download the following CDH/CDP components into the directory specified by
+  $CDH_COMPONENTS_HOME/$CDP_COMPONENTS_HOME.
+  - hadoop (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
+  - hbase (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
+  - hive (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
+  - sentry (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
   - llama-minikdc (downloaded from $TOOLCHAIN_HOST)
+  - ranger (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDP_BUILD_NUMBER)
+  - hive3 (downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDP_BUILD_NUMBER)
   """
   logging.basicConfig(level=logging.INFO,
       format='%(asctime)s %(threadName)s %(levelname)s: %(message)s')
@@ -498,7 +471,7 @@ if __name__ == "__main__":
   toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
   if not toolchain_root:
     logging.error("Impala environment not set up correctly, make sure "
-          "$IMPALA_TOOLCHAIN is present.")
+          "$IMPALA_TOOLCHAIN is set.")
     sys.exit(1)
 
   if not os.path.exists(toolchain_root):
@@ -527,13 +500,13 @@ if __name__ == "__main__":
   # Download the CDH components if necessary.
   if not os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true": sys.exit(0)
 
-  if "CDH_DOWNLOAD_HOST" not in os.environ or "CDH_BUILD_NUMBER" not in os.environ:
+  if "IMPALA_TOOLCHAIN_HOST" not in os.environ or "CDH_BUILD_NUMBER" not in os.environ:
     logging.error("Impala environment not set up correctly, make sure "
                   "impala-config.sh is sourced.")
     sys.exit(1)
 
-  cdh_host = os.environ.get("CDH_DOWNLOAD_HOST")
-  cdh_build_number = os.environ.get("CDH_BUILD_NUMBER")
+  toolchain_host = os.environ["IMPALA_TOOLCHAIN_HOST"]
+  cdh_build_number = os.environ["CDH_BUILD_NUMBER"]
 
   cdh_components = map(Package, ["hadoop", "hbase", "sentry"])
   use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
@@ -546,8 +519,8 @@ if __name__ == "__main__":
                     "to use the toolchain Kudu.")
       sys.exit(1)
     cdh_components += [Package("kudu")]
-  download_path_prefix= \
-      "https://{0}/build/cdh_components/{1}/tarballs/".format(cdh_host,
+  download_path_prefix = \
+      "https://{0}/build/cdh_components/{1}/tarballs/".format(toolchain_host,
                                                               cdh_build_number)
   download_cdh_components(toolchain_root, cdh_components, download_path_prefix)
 
@@ -558,5 +531,14 @@ if __name__ == "__main__":
   download_path_prefix = "{0}/cdh_components/".format(TOOLCHAIN_HOST)
   download_cdh_components(toolchain_root, cdh_components, download_path_prefix)
 
-  download_ranger(toolchain_root)
-  download_cdp_hive(toolchain_root)
+  cdp_build_number = os.environ["CDP_BUILD_NUMBER"]
+  cdp_components = [
+    "ranger-{0}-admin".format(os.environ.get("IMPALA_RANGER_VERSION")),
+  ]
+  if use_cdp_hive:
+    cdp_components.append("apache-hive-{0}-bin"
+                          .format(os.environ.get("IMPALA_HIVE_VERSION")))
+  download_path_prefix = \
+    "https://{0}/build/cdp_components/{1}/tarballs".format(toolchain_host,
+                                                           cdp_build_number)
+  download_cdp_components(cdp_components, download_path_prefix)
