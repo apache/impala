@@ -577,7 +577,7 @@ class ImpalaServer : public ImpalaServiceIf,
       std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
 
   /// Registers the query exec state with client_request_state_map_ using the
-  /// globally unique query_id and add the query id to session state's open query list.
+  /// globally unique query_id.
   /// The caller must have checked out the session state.
   Status RegisterQuery(std::shared_ptr<SessionState> session_state,
       const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
