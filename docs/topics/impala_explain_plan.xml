@@ -189,16 +189,18 @@ under the License.
 
     <conbody>
 
-      <p>
-        The <codeph>PROFILE</codeph> statement, available in the <cmdname>impala-shell</cmdname> interpreter,
-        produces a detailed low-level report showing how the most recent query was executed. Unlike the
-        <codeph>EXPLAIN</codeph> plan described in <xref href="#perf_explain"/>, this information is only available
-        after the query has finished. It shows physical details such as the number of bytes read, maximum memory
-        usage, and so on for each node. You can use this information to determine if the query is I/O-bound or
-        CPU-bound, whether some network condition is imposing a bottleneck, whether a slowdown is affecting some
-        nodes but not others, and to check that recommended configuration settings such as short-circuit local
-        reads are in effect.
-      </p>
+      <p> The <codeph>PROFILE</codeph> command, available in the
+          <cmdname>impala-shell</cmdname> interpreter, produces a detailed
+        low-level report showing how the most recent query was executed. Unlike
+        the <codeph>EXPLAIN</codeph> plan described in <xref
+          href="#perf_explain"/>, this information is only available after the
+        query has finished. It shows physical details such as the number of
+        bytes read, maximum memory usage, and so on for each node. You can use
+        this information to determine if the query is I/O-bound or CPU-bound,
+        whether some network condition is imposing a bottleneck, whether a
+        slowdown is affecting some nodes but not others, and to check that
+        recommended configuration settings such as short-circuit local reads are
+        in effect. </p>
 
       <p rev="">
         By default, time values in the profile output reflect the wall-clock time taken by an operation.
@@ -223,14 +225,29 @@ under the License.
         section includes the following metrics that can be controlled by the
             <codeph><xref
             href="impala_resource_trace_ratio.xml#resource_trace_ratio"
-            >RESOURCE_TRACE_RATIO</xref></codeph> query option. The host CPU
-        usage metrics (user, system, and IO wait time) are already in the
-        section.</p>
+            >RESOURCE_TRACE_RATIO</xref></codeph> query option.</p>
       <ul>
+        <li>For each host that participates in the query execution it adds the
+          read and write bandwidth across all disks. This includes all data read
+          or written by the host as part of the execution of a query (spilling),
+          by the HDFS data node, and by other processes running on the same
+          system.</li>
         <li><codeph>CpuIoWaitPercentage</codeph>
         </li>
         <li><codeph>CpuSysPercentage</codeph></li>
         <li><codeph>CpuUserPercentage</codeph></li>
+        <li><codeph>HostDiskReadThroughput</codeph>: All data read by the host
+          as part of the execution of this query (spilling), by the HDFS data
+          node, and by other processes running on the same system.</li>
+        <li><codeph>HostDiskWriteThroughput</codeph>: All data written by the
+          host as part of the execution of this query (spilling), by the HDFS
+          data node, and by other processes running on the same system.</li>
+        <li><codeph>HostNetworkRx</codeph>: All data received by the host as
+          part of the execution of this query, other queries, and other
+          processes running on the same system. </li>
+        <li><codeph>HostNetworkTx</codeph>: All data transmitted by the host as
+          part of the execution of this query, other queries, and other
+          processes running on the same system. </li>
       </ul>
       <!--AR 3/11/2019 The below example is out dated and does not add much value. Hiding it until this doc gets refactored.-->
 
