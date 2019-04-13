@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.fs.Hdfs;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationDelta;
@@ -2107,6 +2109,20 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Refresh partition if it exists. Returns true if reload of the partition succeeds,
+   * false otherwise.
+   * @throws CatalogException if partition reload is unsuccessful.
+   * @throws DatabaseNotFoundException if Db doesn't exist.
+   */
+  public boolean reloadPartitionIfExists(String dbName, String tblName,
+      List<TPartitionKeyValue> tPartSpec) throws CatalogException {
+    Table table = getTable(dbName, tblName);
+    if (table == null || table instanceof IncompleteTable) return false;
+    reloadPartition(table, tPartSpec);
+    return true;
+  }
+
+  /**
    * Refresh table if exists. Returns true if reloadTable() succeeds, false
    * otherwise. Throws CatalogException if reloadTable() is unsuccessful. Throws
    * DatabaseNotFoundException if Db doesn't exist.
@@ -2116,23 +2132,6 @@ public class CatalogServiceCatalog extends Catalog {
     Table table = getTable(dbName, tblName);
     if (table == null || table instanceof IncompleteTable) return false;
     reloadTable(table);
-    return true;
-  }
-
-  /**
-   * Refresh partition if exists. Returns true if reloadPartitition() succeeds, false
-   * otherwise. Throws CatalogException if reloadPartition() is unsuccessful. Throws
-   * DatabaseNotFoundException if Db doesn't exist.
-   */
-  public boolean refreshPartitionIfExists(String dbName, String tblName,
-      Map<String, String> partSpec) throws CatalogException {
-    Table table = getTable(dbName, tblName);
-    if (table == null || table instanceof IncompleteTable) return false;
-    List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
-    for (Map.Entry<String, String> entry : partSpec.entrySet()) {
-      tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
-    }
-    reloadPartition(table, tPartSpec);
     return true;
   }
 

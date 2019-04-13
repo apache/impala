@@ -18,13 +18,11 @@
 package org.apache.impala.catalog.events;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -53,10 +51,12 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
+import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.ClassUtil;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import org.apache.hadoop.hive.common.FileUtils;
 
 /**
  * Main class which provides Metastore event objects for various event types. Also
@@ -566,6 +566,38 @@ public class MetastoreEvents {
       if (val == null || val.isEmpty()) return null;
       return Boolean.valueOf(val);
     }
+
+    /**
+     * Util method to create partition key-value map from HMS Partition objects.
+     */
+    protected static List<TPartitionKeyValue> getTPartitionSpecFromHmsPartition(
+        org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition) {
+      List<TPartitionKeyValue> tPartSpec = new ArrayList<>();
+      List<org.apache.hadoop.hive.metastore.api.FieldSchema> fsList =
+          msTbl.getPartitionKeys();
+      List<String> partVals = partition.getValues();
+      Preconditions.checkNotNull(partVals);
+      Preconditions.checkState(fsList.size() == partVals.size());
+      for (int i = 0; i < fsList.size(); i++) {
+        tPartSpec.add(new TPartitionKeyValue(fsList.get(i).getName(), partVals.get(i)));
+      }
+      return tPartSpec;
+    }
+
+    /**
+     * Util method to create a partition spec string out of a TPartitionKeyValue objects.
+     */
+    protected static String constructPartitionStringFromTPartitionSpec(
+        List<TPartitionKeyValue> tPartSpec) {
+      List<String> partitionCols = new ArrayList<>();
+      List<String> partitionVals = new ArrayList<>();
+      for (TPartitionKeyValue kv: tPartSpec) {
+        partitionCols.add(kv.getName());
+        partitionVals.add(kv.getValue());
+      }
+      String partString = FileUtils.makePartName(partitionCols, partitionVals);
+      return partString;
+    }
   }
 
   /**
@@ -736,39 +768,31 @@ public class MetastoreEvents {
     private void processPartitionInserts() throws MetastoreNotificationException {
       // For partitioned table, refresh the partition only.
       Preconditions.checkNotNull(insertPartition_);
-      Map<String, String> partSpec = new HashMap<>();
-      List<org.apache.hadoop.hive.metastore.api.FieldSchema> fsList =
-          msTbl_.getPartitionKeys();
-      List<String> partVals = insertPartition_.getValues();
-      Preconditions.checkNotNull(partVals);
-      Preconditions.checkState(fsList.size() == partVals.size());
-      for (int i = 0; i < fsList.size(); i++) {
-        partSpec.put(fsList.get(i).getName(), partVals.get(i));
-      }
+      List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
+          insertPartition_);
       try {
         // Ignore event if table or database is not in catalog. Throw exception if
         // refresh fails.
-        if (!catalog_.refreshPartitionIfExists(dbName_, tblName_, partSpec)) {
+        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
           debugLog("Refresh of table {} partition {} after insert "
                   + "event failed as the table is not present in the catalog.",
-              getFullyQualifiedTblName(), Joiner.on(",").withKeyValueSeparator("=")
-                  .join(partSpec));
+              getFullyQualifiedTblName(), (tPartSpec));
         } else {
           infoLog("Table {} partition {} has been refreshed after insert.",
-              getFullyQualifiedTblName(), Joiner.on(",").withKeyValueSeparator("=")
-                  .join(partSpec));
+              getFullyQualifiedTblName(),
+              constructPartitionStringFromTPartitionSpec(tPartSpec));
         }
       } catch (DatabaseNotFoundException e) {
         debugLog("Refresh of table {} partition {} for insert "
                 + "event failed as the database is not present in the catalog.",
-            getFullyQualifiedTblName(), Joiner.on(",").withKeyValueSeparator("=")
-                .join(partSpec));
+            getFullyQualifiedTblName(),
+            constructPartitionStringFromTPartitionSpec(tPartSpec));
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                 + "partition on table {} partition {} failed. Event processing cannot "
                 + "continue. Issue and invalidate command to reset the event processor "
                 + "state.", getFullyQualifiedTblName(),
-            Joiner.on(",").withKeyValueSeparator("=").join(partSpec)));
+            constructPartitionStringFromTPartitionSpec(tPartSpec)));
       }
     }
 
@@ -1280,6 +1304,7 @@ public class MetastoreEvents {
 
   public static class AddPartitionEvent extends TableInvalidatingEvent {
     private final Partition lastAddedPartition_;
+    private final List<Partition> addedPartitions_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -1296,19 +1321,60 @@ public class MetastoreEvents {
             MetastoreEventsProcessor.getMessageFactory()
                 .getDeserializer()
                 .getAddPartitionMessage(event.getMessage());
-        List<Map<String, String>> keyValues = addPartitionMessage_.getPartitions();
-        Preconditions.checkState(keyValues.size() > 0);
-        ArrayList<Partition> addedPartitions =
+        addedPartitions_ =
             Lists.newArrayList(addPartitionMessage_.getPartitionObjs());
-        Preconditions.checkState(addedPartitions.size() > 0);
+        Preconditions.checkState(addedPartitions_.size() > 0);
         // when multiple partitions are added in HMS they are all added as one transaction
         // Hence all the partitions which are present in the message must have the same
         // serviceId and version if it is set. hence it is fine to just look at the
         // last added partition in the list and use it for the self-event ids
-        lastAddedPartition_ = addedPartitions.get(addedPartitions.size() - 1);
+        lastAddedPartition_ = addedPartitions_.get(addedPartitions_.size() - 1);
         msTbl_ = addPartitionMessage_.getTableObj();
       } catch (Exception ex) {
         throw new MetastoreNotificationException(ex);
+      }
+    }
+
+    @Override
+    public void process() throws MetastoreNotificationException, CatalogException {
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
+      // Notification is created for newly created partitions only. We need not worry
+      // about "IF NOT EXISTS".
+      try {
+        boolean success = true;
+        // HMS adds partitions in a transactional way. This means there may be multiple
+        // HMS partition objects in an add_partition event. We try to do the same here by
+        // refreshing all those partitions in a loop. If any partition refresh fails, we
+        // throw MetastoreNotificationNeedsInvalidateException exception. We skip
+        // refresh of the partitions if the table is not present in the catalog.
+        infoLog("Trying to refresh {} partitions added to table {} in the event",
+            addedPartitions_.size(), getFullyQualifiedTblName());
+        for (Partition partition : addedPartitions_) {
+          List<TPartitionKeyValue> tPartSpec =
+              getTPartitionSpecFromHmsPartition(msTbl_, partition);
+          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+            debugLog("Refresh partitions on table {} failed "
+                + "as table was not present in the catalog.", getFullyQualifiedTblName());
+            success = false;
+            break;
+          }
+        }
+        if (success) {
+          infoLog("Refreshed {} partitions of table {}", addedPartitions_.size(),
+              getFullyQualifiedTblName());
+        }
+      } catch (DatabaseNotFoundException e) {
+        debugLog("Refresh partitions on table {} after add_partitions event failed as "
+                + "the database was not present in the catalog.",
+            getFullyQualifiedTblName());
+      } catch (CatalogException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
+                + "refresh newly added partitions of table {}. Event processing cannot "
+                + "continue. Issue an invalidate command to reset event processor.",
+            getFullyQualifiedTblName()));
       }
     }
 
@@ -1363,6 +1429,42 @@ public class MetastoreEvents {
     }
 
     @Override
+    public void process() throws MetastoreNotificationException, CatalogException {
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
+      // Refresh the partition that was altered.
+      Preconditions.checkNotNull(partitionAfter_);
+      List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
+          partitionAfter_);
+      try {
+        // Ignore event if table or database is not in catalog. Throw exception if
+        // refresh fails.
+
+        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+          debugLog("Refresh of table {} partition {} failed as the table "
+                  + "is not present in the catalog.", getFullyQualifiedTblName(),
+              constructPartitionStringFromTPartitionSpec(tPartSpec));
+        } else {
+          infoLog("Table {} partition {} has been refreshed", getFullyQualifiedTblName(),
+              constructPartitionStringFromTPartitionSpec(tPartSpec));
+        }
+      } catch (DatabaseNotFoundException e) {
+        debugLog("Refresh of table {} partition {} "
+                + "event failed as the database is not present in the catalog.",
+            getFullyQualifiedTblName(),
+            constructPartitionStringFromTPartitionSpec(tPartSpec));
+      } catch (CatalogException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
+                + "partition on table {} partition {} failed. Event processing cannot "
+                + "continue. Issue and invalidate command to reset the event processor "
+                + "state.", getFullyQualifiedTblName(),
+            constructPartitionStringFromTPartitionSpec(tPartSpec)));
+      }
+    }
+
+    @Override
     protected void initSelfEventIdentifiersFromEvent() {
       versionNumberFromEvent_ = Long.parseLong(getStringProperty(
           partitionAfter_.getParameters(),
@@ -1383,6 +1485,7 @@ public class MetastoreEvents {
   }
 
   public static class DropPartitionEvent extends TableInvalidatingEvent {
+    private final List<Map<String, String>> droppedPartitions_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -1397,7 +1500,10 @@ public class MetastoreEvents {
               .getDeserializer()
               .getDropPartitionMessage(event.getMessage());
       try {
-        msTbl_ = dropPartitionMessage.getTableObj();
+        msTbl_ = Preconditions.checkNotNull(dropPartitionMessage.getTableObj());
+        droppedPartitions_ = dropPartitionMessage.getPartitions();
+        Preconditions.checkNotNull(droppedPartitions_);
+        Preconditions.checkState(droppedPartitions_.size() > 0);
       } catch (Exception ex) {
         throw new MetastoreNotificationException(
             debugString("Could not parse event message. "
@@ -1408,12 +1514,41 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected boolean isSelfEvent() {
-      // TODO currently we don't have a way to determine if drop_partition is a self-event
-      // since this NotificationEvent does not contain the partition objects
-      // However, detecting this as a self-event will not be needed once we have
-      // IMPALA-7973
-      return false;
+    public void process() throws MetastoreNotificationException {
+      // We do not need self event as dropPartition() call is a no-op if the directory
+      // doesn't exist.
+      try {
+        boolean success = true;
+        // We refresh all the partitions that were dropped from HMS. If a refresh
+        // fails, we throw a MetastoreNotificationNeedsInvalidateException
+        infoLog("{} partitions dropped from table {}. Trying "
+            + "to refresh.", droppedPartitions_.size(), getFullyQualifiedTblName());
+        for (Map<String, String> partSpec : droppedPartitions_) {
+          List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
+          for (Map.Entry<String, String> entry : partSpec.entrySet()) {
+            tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
+          }
+          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+            debugLog("Could not refresh partition {} of table {} as table "
+                    + "was not present in the catalog.",
+                    getFullyQualifiedTblName());
+            success = false;
+            break;
+          }
+        }
+        if (success) {
+          infoLog("Refreshed {} partitions of table {}", droppedPartitions_.size(),
+              getFullyQualifiedTblName());
+        }
+      } catch (DatabaseNotFoundException e) {
+        debugLog("Could not refresh partitions of table {}"
+            + "as database was not present in the catalog.", getFullyQualifiedTblName());
+      } catch (CatalogException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
+            + "drop some partitions from table {} after a drop partitions event. Event "
+                + "processing cannot continue. Issue an invalidate command to reset "
+            + "event processor state.", getFullyQualifiedTblName()));
+      }
     }
 
     @Override
