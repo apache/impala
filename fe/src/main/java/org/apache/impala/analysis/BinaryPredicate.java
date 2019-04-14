@@ -162,10 +162,11 @@ public class BinaryPredicate extends Predicate {
 
   @Override
   public String debugString() {
-    return Objects.toStringHelper(this)
-        .add("op", op_)
-        .addValue(super.debugString())
-        .toString();
+    Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
+    toStrHelper.add("op", op_).addValue(super.debugString());
+    if (isAuxExpr()) toStrHelper.add("isAux", true);
+    if (isInferred_) toStrHelper.add("isInferred", true);
+    return toStrHelper.toString();
   }
 
   @Override

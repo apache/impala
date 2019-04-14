@@ -169,6 +169,7 @@ public class SlotRef extends Expr {
   @Override
   public String debugString() {
     Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
+    if (label_ != null) toStrHelper.add("label", label_);
     if (rawPath_ != null) toStrHelper.add("path", Joiner.on('.').join(rawPath_));
     toStrHelper.add("type", type_.toSql());
     String idStr = (desc_ == null ? "null" : Integer.toString(desc_.getId().asInt()));

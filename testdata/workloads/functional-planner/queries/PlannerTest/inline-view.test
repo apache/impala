@@ -1840,3 +1840,383 @@ PLAN-ROOT SINK
    HDFS partitions=4/4 files=4 size=6.32KB
    row-size=8B cardinality=100
 ====
+# IMPALA-7957: Slot equivalences should not be enforced multiple times.
+# Without this patch, the planner will incorrectly generated a SELECT node with a wrong
+# predicate "functional.alltypestiny.id = functional.alltypestiny.int_col" on top of the
+# JOIN node. So LEFT JOIN results with NULL values will be incorrectly rejects.
+SELECT t.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+   FROM functional.alltypestiny
+   WHERE int_col = id) t2
+ON (t.id = t2.id)
+UNION ALL
+VALUES (NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=4B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  row-size=12B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-7957: Slot equivalences should not be enforced multiple times.
+# Coverage for UNION DISTINCT
+SELECT t.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+  FROM functional.alltypestiny
+  WHERE int_col = id) t2
+ON (t.id = t2.id)
+UNION DISTINCT
+VALUES (NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  group by: id
+|  row-size=4B cardinality=9
+|
+00:UNION
+|  constant-operands=1
+|  row-size=4B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  row-size=12B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-7957: Slot equivalences should not be enforced multiple times.
+# The WHERE predicate "t.int_col = t.id" is pushed down to the scan node of t.
+SELECT t.id, t.int_col
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+  FROM functional.alltypestiny) t2
+ON (t.id = t2.id)
+WHERE t.int_col = t.id
+UNION ALL
+VALUES (NULL, NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id = t.id
+|  runtime filters: RF000 <- t.id
+|  row-size=12B cardinality=1
+|
+|--01:SCAN HDFS [functional.alltypestiny t]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: t.int_col = t.id
+|     row-size=8B cardinality=1
+|
+02:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> id
+   row-size=4B cardinality=8
+====
+# Regression test for IMPALA-7957. Comparing to the test above, this test changes the
+# WHERE clause to target on the rhs of the LEFT JOIN. The WHERE predicate is correctly
+# duplicated and pushed down to the SCAN node.
+SELECT t2.id, t2.int_col
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+  FROM functional.alltypestiny) t2
+ON (t.id = t2.id)
+WHERE t2.int_col = t2.id
+UNION ALL
+VALUES (NULL, NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: int_col = id
+|  row-size=12B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: functional.alltypestiny.int_col = functional.alltypestiny.id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Regression test for IMPALA-7957. The inline view t2 has a ORDER BY LIMIT clause.
+# No behavior changes after the patch.
+SELECT t2.id, t2.int_col
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+  FROM functional.alltypestiny
+  ORDER BY id LIMIT 2) t2
+ON (t.id = t2.id)
+WHERE t2.int_col = t2.id
+UNION ALL
+VALUES (NULL, NULL);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=9
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: int_col = id
+|  row-size=12B cardinality=8
+|
+|--04:SELECT
+|  |  predicates: id = int_col
+|  |  row-size=8B cardinality=0
+|  |
+|  03:TOP-N [LIMIT=2]
+|  |  order by: id ASC
+|  |  row-size=8B cardinality=2
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=8B cardinality=8
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Regression test for IMPALA-7957. The inline view t2 has an analytic function.
+# No behavior changes after the patch.
+SELECT t2.id, t2.int_col
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col, count(int_col) over (partition by int_col) int_sum
+  FROM functional.alltypestiny
+  ORDER BY id LIMIT 2) t2
+ON (t.id = t2.id)
+WHERE t2.int_col = t2.id
+UNION ALL
+VALUES (NULL, NULL);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=9
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: int_col = id
+|  row-size=12B cardinality=8
+|
+|--04:SELECT
+|  |  predicates: id = int_col
+|  |  row-size=8B cardinality=0
+|  |
+|  03:TOP-N [LIMIT=2]
+|  |  order by: id ASC
+|  |  row-size=8B cardinality=2
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=8B cardinality=8
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Regression test for IMPALA-7957. The first union operand has an ORDER BY LIMIT clause.
+SELECT t.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+   FROM functional.alltypestiny
+   WHERE int_col = id) t2
+ON (t.id = t2.id)
+ORDER BY 1 LIMIT 3
+UNION ALL
+VALUES (NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  pass-through-operands: all
+|  row-size=4B cardinality=4
+|
+04:TOP-N [LIMIT=3]
+|  order by: id ASC
+|  row-size=4B cardinality=3
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  row-size=12B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Regression test for IMPALA-7957. The first union operand has a GROUP BY clause.
+SELECT t.id, sum(t.int_col)
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+   FROM functional.alltypestiny
+   WHERE int_col = id) t2
+ON (t.id = t2.id)
+GROUP BY 1
+UNION ALL
+VALUES (NULL, NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  pass-through-operands: all
+|  row-size=12B cardinality=9
+|
+04:AGGREGATE [FINALIZE]
+|  output: sum(t.int_col)
+|  group by: t.id
+|  row-size=12B cardinality=8
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  row-size=16B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=8B cardinality=8
+====
+# IMPALA-7957: Add the same predicate *outside* the left join, it should still be enforced.
+SELECT t.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col
+  FROM functional.alltypestiny
+  WHERE int_col = id) t2
+ON (t.id = t2.id) where t2.id = t2.int_col
+UNION ALL
+VALUES (NULL);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=4B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: id = int_col
+|  row-size=12B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id
+|     row-size=8B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-7957: Same thing except with a predicate on a different column (i.e. adding it
+# to the equivalence class)
+SELECT t.id, t2.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col, smallint_col
+  FROM functional.alltypestiny
+  WHERE int_col = id) t2
+ON (t.id = t2.id) where t2.int_col = t2.smallint_col
+UNION ALL
+VALUES (NULL, NULL)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: int_col = smallint_col
+|  row-size=14B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id, id = smallint_col
+|     row-size=10B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-7957: Multiple predicates that must not be placed above the join
+SELECT t.id, t2.id
+FROM functional.alltypestiny t
+LEFT JOIN
+  (SELECT id, int_col, smallint_col
+  FROM functional.alltypestiny
+  WHERE int_col = id and smallint_col = id and tinyint_col = id) t2
+ON (t.id = t2.id)
+UNION ALL
+VALUES (NULL, NULL);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  constant-operands=1
+|  row-size=8B cardinality=9
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  row-size=15B cardinality=8
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = id, smallint_col = id, tinyint_col = id
+|     row-size=11B cardinality=1
+|
+01:SCAN HDFS [functional.alltypestiny t]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====

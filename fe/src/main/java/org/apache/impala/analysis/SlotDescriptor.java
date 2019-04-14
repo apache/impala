@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -290,12 +291,22 @@ public class SlotDescriptor {
     return result;
   }
 
+  public static String debugString(Collection<SlotDescriptor> slots) {
+    if (slots == null || slots.isEmpty()) return "";
+    List<String> strings = new ArrayList<>();
+    for (SlotDescriptor slot: slots) {
+      strings.add(slot.debugString());
+    }
+    return Joiner.on("\n").join(strings);
+  }
+
   public String debugString() {
     String pathStr = (path_ == null) ? "null" : path_.toString();
     String typeStr = (type_ == null ? "null" : type_.toString());
     return Objects.toStringHelper(this)
         .add("id", id_.asInt())
         .add("path", pathStr)
+        .add("label", label_)
         .add("type", typeStr)
         .add("materialized", isMaterialized_)
         .add("byteSize", byteSize_)

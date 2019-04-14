@@ -254,6 +254,12 @@ public class Analyzer {
     // preserve the order in which conjuncts are added.
     public final Map<ExprId, Expr> conjuncts = new LinkedHashMap<>();
 
+    // all registered inferred conjuncts (map from tuple id to conjuncts). This map is
+    // used to make sure that slot equivalences are not enforced multiple times (e.g.
+    // duplicated to previously inferred conjuncts).
+    public final Map<TupleId, List<BinaryPredicate>> assignedConjunctsByTupleId =
+        new HashMap<>();
+
     // all registered conjuncts bound by a single tuple id; used in getBoundPredicates()
     public final List<ExprId> singleTidConjuncts = new ArrayList<>();
 
@@ -1161,7 +1167,7 @@ public class Analyzer {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
-      + " " + e.toSql() + " " + e.debugString());
+          + " " + e.toSql() + " " + e.debugString());
     }
 
     if (!(e instanceof BinaryPredicate)) return;
@@ -1214,7 +1220,7 @@ public class Analyzer {
     BinaryPredicate p = new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs);
     p.setIsAuxExpr();
     if (LOG.isTraceEnabled()) {
-      LOG.trace("register eq predicate: " + p.toSql() + " " + p.debugString());
+      LOG.trace("register auxiliary eq predicate: " + p.toSql() + " " + p.debugString());
     }
     registerConjunct(p);
   }
@@ -1295,6 +1301,16 @@ public class Analyzer {
       if (canEvalPredicate(tupleIds, e)) result.add(e);
     }
     return result;
+  }
+
+  public String conjunctAssignmentsDebugString() {
+    StringBuilder res = new StringBuilder();
+    for (Expr _e : globalState_.conjuncts.values()) {
+      String state = globalState_.assignedConjuncts.contains(_e.getId()) ? "assigned"
+              : "unassigned";
+      res.append("\n\t" + state + " " + _e.debugString());
+    }
+    return res.toString();
   }
 
   /**
@@ -1658,7 +1674,10 @@ public class Analyzer {
                     != globalState_.outerJoinedTupleIds.get(destTid)));
 
           // mark all bound predicates including duplicate ones
-          if (reverseValueTransfer && !evalAfterJoin) markConjunctAssigned(srcConjunct);
+          if (reverseValueTransfer && !evalAfterJoin) {
+            markConjunctAssigned(srcConjunct);
+            if (p != srcConjunct) markConjunctAssigned(p);
+          }
         }
 
         // check if we already created this predicate
@@ -1801,6 +1820,11 @@ public class Analyzer {
   @SuppressWarnings("unchecked")
   public <T extends Expr> void createEquivConjuncts(TupleId tid, List<T> conjuncts,
       Set<SlotId> ignoreSlots) {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format(
+          "createEquivConjuncts: tid=%s, conjuncts=%s, ignoreSlots=%s", tid.toString(),
+          Expr.debugString(conjuncts), ignoreSlots), new Exception("call trace"));
+    }
     // Maps from a slot id to its set of equivalent slots. Used to track equivalences
     // that have been established by 'conjuncts' and the 'ignoredsSlots'.
     DisjointSet<SlotId> partialEquivSlots = new DisjointSet<SlotId>();
@@ -1822,7 +1846,27 @@ public class Analyzer {
       // slots may not be in the same eq class due to outer joins
       if (firstEqClassId != secondEqClassId) continue;
       // update equivalences and remove redundant conjuncts
-      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)) conjunctIter.remove();
+      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)) {
+        conjunctIter.remove();
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Removed redundant conjunct: " + conjunct.debugString());
+        }
+      }
+    }
+    // For any assigned predicate, union its slots. So we can make sure that slot
+    // equivalences are not enforced multiple times.
+    if (globalState_.assignedConjunctsByTupleId.containsKey(tid)) {
+      List<BinaryPredicate> inferredConjuncts =
+          globalState_.assignedConjunctsByTupleId.get(tid);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Previously assigned predicates: " +
+            Expr.debugString(inferredConjuncts));
+      }
+      for (BinaryPredicate conjunct : inferredConjuncts) {
+        Pair<SlotId, SlotId> slots = conjunct.getEqSlots();
+        if (slots == null) continue;
+        partialEquivSlots.union(slots.first, slots.second);
+      }
     }
     // Suppose conjuncts had these predicates belonging to equivalence classes e1 and e2:
     // e1: s1 = s2, s3 = s4, s3 = s5
@@ -1892,6 +1936,9 @@ public class Analyzer {
           result.put(sccId, slotIds);
         }
         slotIds.add(slotDesc.getId());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("slot(%s) -> scc(%d)", slotDesc.getId(), sccId));
+        }
       }
     }
     return result;
@@ -2026,11 +2073,19 @@ public class Analyzer {
    * predicates.
    */
   public void computeValueTransferGraph() {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("All slots: " + SlotDescriptor.debugString(
+          globalState_.descTbl.getSlotDescs()));
+    }
     WritableGraph directValueTransferGraph =
         new WritableGraph(globalState_.descTbl.getMaxSlotId().asInt() + 1);
     constructValueTransfersFromEqPredicates(directValueTransferGraph);
     for (Pair<SlotId, SlotId> p : globalState_.registeredValueTransfers) {
       directValueTransferGraph.addEdge(p.first.asInt(), p.second.asInt());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("value transfer: from " + p.first.toString() + " to " +
+            p.second.toString());
+      }
     }
     globalState_.valueTransferGraph =
         SccCondensedGraph.condensedReflexiveTransitiveClosure(directValueTransferGraph);
@@ -2251,10 +2306,8 @@ public class Analyzer {
    * Mark predicates as assigned.
    */
   public void markConjunctsAssigned(List<Expr> conjuncts) {
-    if (conjuncts == null) return;
-    for (Expr p: conjuncts) {
-      globalState_.assignedConjuncts.add(p.getId());
-    }
+    if (conjuncts == null || conjuncts.isEmpty()) return;
+    for (Expr p: conjuncts) markConjunctAssigned(p);
   }
 
   /**
@@ -2262,6 +2315,24 @@ public class Analyzer {
    */
   public void markConjunctAssigned(Expr conjunct) {
     globalState_.assignedConjuncts.add(conjunct.getId());
+    if (Predicate.isEquivalencePredicate(conjunct)) {
+      BinaryPredicate binaryPred = (BinaryPredicate) conjunct;
+      List<TupleId> tupleIds = new ArrayList<>();
+      List<SlotId> slotIds = new ArrayList<>();
+      binaryPred.getIds(tupleIds, slotIds);
+      if (tupleIds.size() == 1 && slotIds.size() == 2
+          && binaryPred.getEqSlots() != null) {
+        // keep assigned predicates that bounds in a tuple
+        TupleId tupleId = tupleIds.get(0);
+        if (!globalState_.assignedConjunctsByTupleId.containsKey(tupleId)) {
+          globalState_.assignedConjunctsByTupleId.put(tupleId, new ArrayList<>());
+        }
+        globalState_.assignedConjunctsByTupleId.get(tupleId).add(binaryPred);
+      }
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Assigned " + conjunct.debugString());
+    }
   }
 
   public Set<ExprId> getAssignedConjuncts() {

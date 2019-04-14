@@ -355,9 +355,14 @@ public class SingleNodePlanner {
     // No point in adding SelectNode on top of an EmptyNode.
     if (root instanceof EmptySetNode) return root;
     Preconditions.checkNotNull(root);
-    // Gather unassigned conjuncts and generate predicates to enfore
+    // Gather unassigned conjuncts and generate predicates to enforce
     // slot equivalences for each tuple id.
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("unassigned conjuncts for (Node %s): %s",
+          root.getDisplayLabel(), Expr.debugString(conjuncts)));
+      LOG.trace("all conjuncts: " + analyzer.conjunctAssignmentsDebugString());
+    }
     for (TupleId tid: tupleIds) {
       analyzer.createEquivConjuncts(tid, conjuncts);
     }
