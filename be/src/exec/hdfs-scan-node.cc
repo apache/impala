@@ -511,8 +511,8 @@ void HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     if (VLOG_QUERY_IS_ON) {
       stringstream ss;
       ss << "Error preparing scanner for scan range " << scan_range->file() <<
-          "(" << scan_range->offset() << ":" << scan_range->len() << ").";
-      ss << endl << runtime_state_->ErrorLog();
+          "(" << scan_range->offset() << ":" << scan_range->len() << "). ";
+      ss << status.msg().msg() << endl << runtime_state_->ErrorLog();
       VLOG_QUERY << ss.str();
     }
 
