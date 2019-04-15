@@ -52,10 +52,12 @@ TEST_F(SystemStateInfoTest, ReadProcStat) {
 TEST_F(SystemStateInfoTest, ReadProcNetDev) {
   info.ReadCurrentProcNetDev();
   const SystemStateInfo::NetworkValues& state = info.network_values_[info.net_val_idx_];
-  EXPECT_GT(state[SystemStateInfo::NET_RX_BYTES], 0);
-  EXPECT_GT(state[SystemStateInfo::NET_RX_PACKETS], 0);
-  EXPECT_GT(state[SystemStateInfo::NET_TX_BYTES], 0);
-  EXPECT_GT(state[SystemStateInfo::NET_TX_PACKETS], 0);
+  // IMPALA-8413: Don't assume that counters are non-zero as that is sometimes not the
+  // case, e.g. in virtualized environments.
+  EXPECT_GE(state[SystemStateInfo::NET_RX_BYTES], 0);
+  EXPECT_GE(state[SystemStateInfo::NET_RX_PACKETS], 0);
+  EXPECT_GE(state[SystemStateInfo::NET_TX_BYTES], 0);
+  EXPECT_GE(state[SystemStateInfo::NET_TX_PACKETS], 0);
 }
 
 // Smoke test to make sure that we read non-zero values from /proc/diskstats.
