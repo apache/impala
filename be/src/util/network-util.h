@@ -58,10 +58,6 @@ TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
 /// hostname and a port of 0.
 TNetworkAddress MakeNetworkAddress(const std::string& address);
 
-/// Utility method because Thrift does not supply useful constructors
-TBackendDescriptor MakeBackendDescriptor(const Hostname& hostname, const IpAddr& ip,
-    int port);
-
 /// Returns true if the ip address parameter is the wildcard interface (0.0.0.0)
 bool IsWildcardAddress(const std::string& ipaddress);
 

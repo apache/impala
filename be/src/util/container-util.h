@@ -25,9 +25,70 @@
 #include <boost/functional/hash.hpp>
 
 #include "util/hash-util.h"
+
+#include "gen-cpp/ErrorCodes_types.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/StatestoreService_types.h"
+#include "gen-cpp/Status_types.h"
 #include "gen-cpp/Types_types.h"
 
+/// Comparators for types that we commonly use in containers.
 namespace impala {
+
+// This function and the following macro are used to assert that the size of the type T
+// does not change unexpectedly. This helps to ensure that the operators take all fields
+// of a struct into consideration. The benefit of this solution over a simple static
+// assert is that it includes the expected and actual struct sizes in the compile time
+// error message.
+template <typename T, int64_t Expected, int64_t Actual = sizeof(T)>
+constexpr void static_assert_size() {
+  static_assert(Expected == Actual, "Type has unexpected size");
+}
+#define STATIC_ASSERT_SIZE(type, expected) \
+  inline void static_assert_size_##type() { static_assert_size<type, expected>(); }
+
+// TUniqueId
+STATIC_ASSERT_SIZE(TUniqueId, 24);
+
+inline bool operator==(const TUniqueId& lhs, const TUniqueId& rhs) {
+  return std::tie(lhs.hi, lhs.lo) == std::tie(rhs.hi, rhs.lo);
+}
+
+inline bool operator!=(const TUniqueId& lhs, const TUniqueId& rhs) {
+  return !(lhs == rhs);
+}
+
+inline bool operator<(const TUniqueId& lhs, const TUniqueId& rhs) {
+  return std::tie(lhs.hi, lhs.lo) < std::tie(rhs.hi, rhs.lo);
+}
+
+// TNetworkAddress
+STATIC_ASSERT_SIZE(TNetworkAddress, 24);
+
+inline bool operator==(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
+  return std::tie(lhs.hostname, lhs.port) == std::tie(rhs.hostname, rhs.port);
+}
+
+inline bool operator!=(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
+  return !(lhs == rhs);
+}
+
+// TStatus
+STATIC_ASSERT_SIZE(TStatus, 48);
+
+inline bool operator==(const TStatus& lhs, const TStatus& rhs) {
+  //static_assert_size<TStatus, 48>();
+  return std::tie(lhs.status_code, lhs.error_msgs)
+      == std::tie(rhs.status_code, rhs.error_msgs);
+}
+
+// TCounter
+STATIC_ASSERT_SIZE(TCounter, 32);
+
+inline bool operator==(const TCounter& lhs, const TCounter& rhs) {
+  return std::tie(lhs.name, lhs.unit, lhs.value)
+      == std::tie(rhs.name, rhs.unit, rhs.value);
+}
 
 /// Hash function for TNetworkAddress. This function must be called hash_value to be picked
 /// up properly by boost.
@@ -37,7 +98,7 @@ inline std::size_t hash_value(const TNetworkAddress& host_port) {
   return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
 }
 
-}
+} // end namespace impala
 
 /// Hash function for std:: containers
 namespace std {
@@ -48,7 +109,7 @@ template<> struct hash<impala::TNetworkAddress> {
   }
 };
 
-}
+} // end namespace std
 
 namespace impala {
 
@@ -139,6 +200,6 @@ void MergeMapValues(const MAP_TYPE& src, MAP_TYPE* dst) {
   }
 }
 
-}
+} // end namespace impala
 
 #endif

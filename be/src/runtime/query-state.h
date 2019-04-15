@@ -29,6 +29,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
 #include "runtime/tmp-file-mgr.h"
+#include "util/container-util.h"
 #include "util/counting-barrier.h"
 #include "util/uid-util.h"
 

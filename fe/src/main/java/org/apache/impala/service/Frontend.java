@@ -100,6 +100,7 @@ import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
+import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
@@ -1367,7 +1368,7 @@ public class Frontend {
       TQueryCtx queryCtx, AnalysisResult analysisResult) {
     TExecRequest result = new TExecRequest();
     result.setQuery_options(queryCtx.client_request.getQuery_options());
-    result.setAccess_events(analysisResult.getAccessEvents());
+    result.setAccess_events(Lists.newArrayList(analysisResult.getAccessEvents()));
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
     result.setUser_has_profile_access(analysisResult.userHasProfileAccess());
     return result;

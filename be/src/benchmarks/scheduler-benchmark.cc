@@ -20,7 +20,6 @@
 #include <vector>
 
 #include "gutil/strings/substitute.h"
-#include "scheduling/scheduler.h"
 #include "scheduling/scheduler-test-util.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"

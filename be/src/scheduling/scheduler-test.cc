@@ -15,8 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "scheduling/scheduler.h"
 #include "common/logging.h"
+#include "scheduling/cluster-membership-mgr.h"
+#include "scheduling/scheduler.h"
 #include "scheduling/scheduler-test-util.h"
 #include "testutil/gtest-util.h"
 
@@ -383,49 +384,12 @@ TEST_F(SchedulerTest, TestCachedReadPreferred) {
   EXPECT_EQ(0, result.NumRemoteAssignedBytes());
 }
 
-/// IMPALA-3019: Test for round robin reset problem. We schedule the same plan twice but
-/// send an empty statestored message in between.
-/// TODO: This problem cannot occur anymore and the test is merely green for random
-/// behavior. Remove.
-TEST_F(SchedulerTest, EmptyStatestoreMessage) {
-  Cluster cluster;
-  cluster.AddHosts(2, true, true);
-  cluster.AddHosts(3, false, true);
-
-  Schema schema(cluster);
-  schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::REMOTE_ONLY, 3);
-
-  Plan plan(schema);
-  plan.AddTableScan("T1");
-  // Test only applies when num_remote_executor_candidates=0.
-  plan.SetNumRemoteExecutorCandidates(0);
-
-  Result result(plan);
-  SchedulerWrapper scheduler(plan);
-
-  ASSERT_OK(scheduler.Compute(&result));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(3));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(4));
-  result.Reset();
-
-  scheduler.SendEmptyUpdate();
-  ASSERT_OK(scheduler.Compute(&result));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(3));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(4));
-}
-
 /// Test sending updates to the scheduler.
 TEST_F(SchedulerTest, TestSendUpdates) {
   Cluster cluster;
-  // 3 hosts, only first two run backends. This allows us to remove one of the backends
+  // 3 hosts, only last two run backends. This allows us to remove one of the backends
   // from the scheduler and then verify that reads are assigned to the other backend.
-  for (int i = 0; i < 3; ++i) cluster.AddHost(i < 2, true);
+  for (int i = 0; i < 3; ++i) cluster.AddHost(i > 0, true);
 
   Schema schema(cluster);
   schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::REMOTE_ONLY, 1);
@@ -441,24 +405,39 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   ASSERT_OK(scheduler.Compute(&result));
   // Two backends are registered, so the scheduler will pick a random one.
   EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(2));
 
-  // Remove first host from scheduler.
-  scheduler.RemoveBackend(cluster.hosts()[1]);
+  // Remove one host from scheduler.
+  int test_host = 2;
+  scheduler.RemoveBackend(cluster.hosts()[test_host]);
   result.Reset();
 
   ASSERT_OK(scheduler.Compute(&result));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
 
-  // Re-add first host from scheduler.
-  scheduler.AddBackend(cluster.hosts()[1]);
+  // Re-add host to scheduler.
+  scheduler.AddBackend(cluster.hosts()[test_host]);
   result.Reset();
 
   ASSERT_OK(scheduler.Compute(&result));
   // Two backends are registered, so the scheduler will pick a random one.
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
+
+  // Remove the other host from the scheduler.
+  test_host = 1;
+  scheduler.RemoveBackend(cluster.hosts()[test_host]);
+  result.Reset();
+
+  ASSERT_OK(scheduler.Compute(&result));
+  // Only one backend remains so the scheduler must pick it.
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(2));
 }
 
 TEST_F(SchedulerTest, TestGeneratedSingleSplit) {
@@ -550,12 +529,8 @@ TEST_F(SchedulerTest, TestBlockAndGenerateSplit) {
   EXPECT_EQ(0, result.NumCachedAssignedBytes());
 }
 
-/// IMPALA-4329: Test scheduling with no backends.
-/// With the fix for IMPALA-5058, the scheduler is no longer responsible for
-/// registering the local backend with itself. This functionality is moved to
-/// ImpalaServer::MembershipCallback() and the scheduler will receive the local
-/// backend info through the statestore update, so until that happens, scheduling
-/// should fail.
+/// Test scheduling fails with no backends (the local backend gets registered with the
+/// scheduler but is not marked as an executor).
 TEST_F(SchedulerTest, TestEmptyBackendConfig) {
   Cluster cluster;
   cluster.AddHost(false, true);

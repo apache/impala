@@ -33,6 +33,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "scheduling/admission-controller.h"
+#include "scheduling/cluster-membership-mgr.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
@@ -866,7 +867,13 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
   ExecEnv::GetInstance()->admission_controller()->PopulatePerHostMemReservedAndAdmitted(
       &host_mem_map);
   Value backends_list(kArrayType);
-  for (const auto& entry : server_->GetKnownBackends()) {
+  ClusterMembershipMgr* cluster_membership_mgr =
+      ExecEnv::GetInstance()->cluster_membership_mgr();
+  DCHECK(cluster_membership_mgr != nullptr);
+  ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+      cluster_membership_mgr->GetSnapshot();
+  DCHECK(membership_snapshot.get() != nullptr);
+  for (const auto& entry : membership_snapshot->current_backends) {
     TBackendDescriptor backend = entry.second;
     Value backend_obj(kObjectType);
     string address = TNetworkAddressToString(backend.address);

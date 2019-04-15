@@ -23,6 +23,7 @@
 
 #include "common/object-pool.h"
 #include "testutil/gtest-util.h"
+#include "util/container-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/thread.h"

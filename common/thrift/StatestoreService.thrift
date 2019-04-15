@@ -45,7 +45,7 @@ struct TPoolStats {
 }
 
 // Structure serialised in the Impala backend topic. Each Impalad
-// constructs one TBackendDescriptor, and registers it in the backend
+// constructs one TBackendDescriptor, and registers it in the cluster-membership
 // topic. Impalads subscribe to this topic to learn of the location of
 // all other Impalads in the cluster. Impalads can act as coordinators, executors or
 // both.

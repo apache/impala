@@ -33,6 +33,7 @@
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
 #include "statestore/statestore-service-client-wrapper.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/openssl-util.h"
 #include "util/time.h"
@@ -55,6 +56,10 @@ DEFINE_int32(statestore_subscriber_cnxn_attempts, 10, "The number of times to re
     "RPC connection to the statestore. A setting of 0 means retry indefinitely");
 DEFINE_int32(statestore_subscriber_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
     "to wait between attempts to make an RPC connection to the statestore.");
+DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Period "
+    "after the last successful subscription attempt until the subscriber will be "
+    "considered fully recovered. After a successful reconnect attempt, updates to the "
+    "cluster membership will only become effective after this period has elapsed.");
 
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
@@ -124,6 +129,8 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
       is_registered_(false) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
+  connection_failure_metric_ =
+    metrics_->AddCounter("statestore-subscriber.num-connection-failures", 0);
   last_recovery_duration_metric_ = metrics_->AddDoubleGauge(
       "statestore-subscriber.last-recovery-duration", 0.0);
   last_recovery_time_metric_ = metrics_->AddProperty<string>(
@@ -265,6 +272,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       MonotonicStopWatch recovery_timer;
       recovery_timer.Start();
       connected_to_statestore_metric_->SetValue(false);
+      connection_failure_metric_->Increment(1);
       LOG(INFO) << subscriber_id_
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
@@ -457,5 +465,11 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
   return Status::OK();
 }
 
+bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() const {
+  bool has_failed_before = connection_failure_metric_->GetValue() > 0;
+  bool in_grace_period = MilliSecondsSinceLastRegistration()
+      < FLAGS_statestore_subscriber_recovery_grace_period_ms;
+  return has_failed_before && in_grace_period;
+}
 
 }

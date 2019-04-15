@@ -67,14 +67,6 @@ static_assert(PACKAGE_VERSION[3] == '.', "");
 static_assert(PACKAGE_VERSION[4] == '3', "");
 static_assert(PACKAGE_VERSION[5] == '\0', "");
 
-// Thrift defines operator< but does not implement it. This is a stub
-// implementation so we can link.
-bool Apache::Hadoop::Hive::Partition::operator<(
-    const Apache::Hadoop::Hive::Partition& x) const {
-  DCHECK(false) << "This should not get called.";
-  return false;
-}
-
 namespace impala {
 
 ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :
@@ -97,26 +89,6 @@ boost::shared_ptr<TProtocol> CreateDeserializeProtocol(
     TBinaryProtocolFactoryT<TMemoryBuffer> tproto_factory;
     return tproto_factory.getProtocol(mem);
   }
-}
-
-// Comparator for THostPorts. Thrift declares this (in gen-cpp/Types_types.h) but
-// never defines it.
-bool TNetworkAddress::operator<(const TNetworkAddress& that) const {
-  if (this->hostname < that.hostname) {
-    return true;
-  } else if ((this->hostname == that.hostname) && (this->port < that.port)) {
-    return true;
-  }
-  return false;
-};
-
-// Comparator for TUniqueIds
-bool TUniqueId::operator<(const TUniqueId& that) const {
-  return (hi < that.hi) || (hi == that.hi &&  lo < that.lo);
-}
-
-bool TAccessEvent::operator<(const TAccessEvent& that) const {
-  return this->name < that.name;
 }
 
 static void ThriftOutputFunction(const char* output) {

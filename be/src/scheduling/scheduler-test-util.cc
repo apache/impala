@@ -22,6 +22,8 @@
 #include "common/names.h"
 #include "flatbuffers/flatbuffers.h"
 #include "gen-cpp/CatalogObjects_generated.h"
+#include "scheduling/cluster-membership-mgr.h"
+#include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/scheduler.h"
 
 using namespace impala;
@@ -69,6 +71,17 @@ const int64_t FileSplitGeneratorSpec::DEFAULT_FILE_SIZE = 1 << 22;
 /// Default size for file splits is 1 MB.
 const int64_t FileSplitGeneratorSpec::DEFAULT_BLOCK_SIZE = 1 << 20;
 
+ClusterMembershipMgr::BeDescSharedPtr BuildBackendDescriptor(const Host& host) {
+  auto be_desc = make_shared<TBackendDescriptor>();
+  be_desc->address.hostname = host.ip;
+  be_desc->address.port = host.be_port;
+  be_desc->ip_address = host.ip;
+  be_desc->__set_is_coordinator(host.is_coordinator);
+  be_desc->__set_is_executor(host.is_executor);
+  be_desc->is_quiescing = false;
+  return be_desc;
+}
+
 int Cluster::AddHost(bool has_backend, bool has_datanode, bool is_executor) {
   int host_idx = hosts_.size();
   int be_port = has_backend ? BACKEND_PORT : -1;
@@ -76,7 +89,8 @@ int Cluster::AddHost(bool has_backend, bool has_datanode, bool is_executor) {
   IpAddr ip = HostIdxToIpAddr(host_idx);
   DCHECK(ip_to_idx_.find(ip) == ip_to_idx_.end());
   ip_to_idx_[ip] = host_idx;
-  hosts_.push_back(Host(HostIdxToHostname(host_idx), ip, be_port, dn_port, is_executor));
+  hosts_.push_back(Host(HostIdxToHostname(host_idx),
+      ip, be_port, dn_port, has_backend && is_executor));
   // Add host to lists of backend indexes per type.
   if (has_backend) backend_host_idxs_.push_back(host_idx);
   if (has_datanode) {
@@ -95,10 +109,6 @@ void Cluster::AddHosts(int num_hosts, bool has_backend, bool has_datanode,
   for (int i = 0; i < num_hosts; ++i) AddHost(has_backend, has_datanode, is_executor);
 }
 
-Hostname Cluster::HostIdxToHostname(int host_idx) {
-  return HOSTNAME_PREFIX + std::to_string(host_idx);
-}
-
 void Cluster::GetBackendAddress(int host_idx, TNetworkAddress* addr) const {
   DCHECK_LT(host_idx, hosts_.size());
   addr->hostname = hosts_[host_idx].ip;
@@ -111,17 +121,6 @@ const vector<int>& Cluster::datanode_with_backend_host_idxs() const {
 
 const vector<int>& Cluster::datanode_only_host_idxs() const {
   return datanode_only_host_idxs_;
-}
-
-IpAddr Cluster::HostIdxToIpAddr(int host_idx) {
-  DCHECK_LT(host_idx, (1 << 24));
-  string suffix;
-  for (int i = 0; i < 3; ++i) {
-    suffix = "." + std::to_string(host_idx % 256) + suffix; // prepend
-    host_idx /= 256;
-  }
-  DCHECK_EQ(0, host_idx);
-  return IP_PREFIX + suffix;
 }
 
 void Schema::AddSingleBlockTable(
@@ -524,7 +523,19 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
     locations = &expanded_locations;
   }
   DCHECK(locations != nullptr);
-  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetExecutorsConfig(), 0,
+
+  ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+      cluster_membership_mgr_->GetSnapshot();
+  auto it = membership_snapshot->executor_groups.find(
+      ClusterMembershipMgr::DEFAULT_EXECUTOR_GROUP);
+  // If a group does not exist (e.g. no executors are registered), we pass an empty group
+  // to the scheduler to exercise its error handling logic.
+  bool no_executor_group = it == membership_snapshot->executor_groups.end();
+  ExecutorGroup empty_group;
+  DCHECK(membership_snapshot->local_be_desc.get() != nullptr);
+  Scheduler::ExecutorConfig executor_config =
+      {no_executor_group ? empty_group : it->second, *membership_snapshot->local_be_desc};
+  return scheduler_->ComputeScanRangeAssignment(executor_config, 0,
       nullptr, false, *locations, plan_.referenced_datanodes(), exec_at_coord,
       plan_.query_options(), nullptr, assignment);
 }
@@ -573,35 +584,27 @@ void SchedulerWrapper::InitializeScheduler() {
                                            << "hosts.";
   const Host& scheduler_host = plan_.cluster().hosts()[0];
   string scheduler_backend_id = scheduler_host.ip;
-  TNetworkAddress scheduler_backend_address =
-      MakeNetworkAddress(scheduler_host.ip, scheduler_host.be_port);
-  TNetworkAddress scheduler_krpc_address =
-      MakeNetworkAddress(scheduler_host.ip, FLAGS_krpc_port);
-  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id,
-      &metrics_, nullptr, nullptr));
-  const Status status = scheduler_->Init(scheduler_backend_address,
-      scheduler_krpc_address, scheduler_host.ip, /* admit_mem_limit */ 0L);
-  DCHECK(status.ok()) << "Scheduler init failed in test";
-  // Initialize the scheduler backend maps.
+  cluster_membership_mgr_.reset(new ClusterMembershipMgr(scheduler_backend_id, nullptr));
+  cluster_membership_mgr_->SetLocalBeDescFn([scheduler_host]() {
+      return BuildBackendDescriptor(scheduler_host);
+  });
+  Status status = cluster_membership_mgr_->Init();
+  DCHECK(status.ok()) << "Cluster membership manager init failed in test";
+  scheduler_.reset(new Scheduler(cluster_membership_mgr_.get(), &metrics_, nullptr));
+  // Initialize the cluster membership manager
   SendFullMembershipMap();
 }
 
 void SchedulerWrapper::AddHostToTopicDelta(const Host& host, TTopicDelta* delta) const {
   DCHECK_GT(host.be_port, 0) << "Host cannot be added to scheduler without a running "
                              << "backend";
-  // Build backend descriptor.
-  TBackendDescriptor be_desc;
-  be_desc.address.hostname = host.ip;
-  be_desc.address.port = host.be_port;
-  be_desc.ip_address = host.ip;
-  be_desc.__set_is_coordinator(host.is_coordinator);
-  be_desc.__set_is_executor(host.is_executor);
+  ClusterMembershipMgr::BeDescSharedPtr be_desc = BuildBackendDescriptor(host);
 
   // Build topic item.
   TTopicItem item;
   item.key = host.ip;
   ThriftSerializer serializer(false);
-  Status status = serializer.SerializeToString(&be_desc, &item.value);
+  Status status = serializer.SerializeToString(be_desc.get(), &item.value);
   DCHECK(status.ok());
 
   // Add to topic delta.
@@ -616,5 +619,5 @@ void SchedulerWrapper::SendTopicDelta(const TTopicDelta& delta) {
 
   // Send to the scheduler.
   vector<TTopicDelta> dummy_result;
-  scheduler_->UpdateMembership(delta_map, &dummy_result);
+  cluster_membership_mgr_->UpdateMembership(delta_map, &dummy_result);
 }

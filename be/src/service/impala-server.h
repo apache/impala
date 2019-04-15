@@ -37,6 +37,7 @@
 #include "common/status.h"
 #include "service/query-options.h"
 #include "util/condition-variable.h"
+#include "util/container-util.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "util/sharded-query-map-util.h"
@@ -87,7 +88,10 @@ class QuerySchedule;
 ///
 /// Main thread (caller code), after instantiating the server, must call Start().
 /// Start() does the following:
-///    - Registers the ImpalaServer instance with the ExecEnv
+///    - Registers the ImpalaServer instance with the ExecEnv. This also registers it with
+///      the ClusterMembershipMgr, which will register it with the statestore as soon as
+///      the local backend becomes available through GetLocalBackendDescriptor(), which is
+///      in turn gated by the services_started_.
 ///    - Start internal services
 ///    - Wait (indefinitely) for local catalog to be initialized from statestore
 ///      (if coordinator)
@@ -97,8 +101,6 @@ class QuerySchedule;
 ///    - Start client service API's (if coordinator)
 ///    - Set services_started_ flag
 ///
-/// Internally, the Membership callback thread also participates in startup:
-///    - If services_started_, then register to the statestore as an executor.
 ///
 /// Shutdown
 /// --------
@@ -111,8 +113,9 @@ class QuerySchedule;
 /// 2. The startup grace period starts, during which:
 ///   - no new client requests are accepted. Clients can still interact with registered
 ///     requests and sessions as normal.
-///   - the Impala daemon is marked in the statestore as quiescing, so coordinators
-///     will not schedule new fragments on it (once the statestore update propagates).
+///   - the local backend of the Impala daemon is marked in the statestore as quiescing,
+///     so coordinators will not schedule new fragments on it (once the statestore update
+///     propagates through the ClusterMembershipMgr).
 ///   - the Impala daemon continues to start executing any new fragments sent to it by
 ///     coordinators. This is required because the query may have been submitted before
 ///     the coordinator learned that the executor was quiescing. Delays occur for several
@@ -156,7 +159,6 @@ class QuerySchedule;
 /// * uuid_lock_
 /// * catalog_version_lock_
 /// * connection_to_sessions_map_lock_
-/// * known_backends_lock_
 ///
 /// TODO: The same doesn't apply to the execution state of an individual plan
 /// fragment: the originating coordinator might die, but we can get notified of
@@ -303,8 +305,7 @@ class ImpalaServer : public ImpalaServiceIf,
       const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
 
   /// ImpalaInternalService rpcs
-  void UpdateFilter(TUpdateFilterResult& return_val,
-      const TUpdateFilterParams& params);
+  void UpdateFilter(TUpdateFilterResult& return_val, const TUpdateFilterParams& params);
 
   /// Generates a unique id for this query and sets it in the given query context.
   /// Prepares the given query context by populating fields required for evaluating
@@ -326,15 +327,6 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Called when a Beeswax or HS2 connection terminates. Unregisters all sessions
   /// associated with the closed connection.
   virtual void ConnectionEnd(const ThriftServer::ConnectionContext& session_context);
-
-  /// Called when a membership update is received from the statestore. Looks for
-  /// active nodes that have failed, and cancels any queries running on them.
-  ///  - incoming_topic_deltas: all changes to registered statestore topics
-  ///  - subscriber_topic_updates: output parameter to publish any topic updates to.
-  ///                              Currently unused.
-  void MembershipCallback(
-      const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
-      std::vector<TTopicDelta>* subscriber_topic_updates);
 
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
@@ -408,8 +400,13 @@ class ImpalaServer : public ImpalaServiceIf,
   /// the server has started successfully.
   int GetHS2Port();
 
-  typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
-  const BackendDescriptorMap GetKnownBackends();
+  /// Returns a current snapshot of the local backend descriptor.
+  std::shared_ptr<const TBackendDescriptor> GetLocalBackendDescriptor();
+
+  /// Takes a set of network addresses of active backends and cancels all the queries
+  /// running on failed ones (that is, addresses not in the active set).
+  void CancelQueriesOnFailedBackends(
+      const std::unordered_set<TNetworkAddress>& current_membership);
 
   /// Start the shutdown process. Return an error if it could not be started. Otherwise,
   /// if it was successfully started by this or a previous call, return OK along with
@@ -724,14 +721,8 @@ class ImpalaServer : public ImpalaServiceIf,
   Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user)
       WARN_UNUSED_RESULT;
 
-  /// Check if the local backend descriptor is in the list of known backends. If not, add
-  /// it to the list of known backends and add it to the 'topic_updates'.
-  /// 'known_backends_lock_' must be held by the caller.
-  void AddLocalBackendToStatestore(std::vector<TTopicDelta>* topic_updates);
-
-  /// Takes a set of network addresses of active backends and cancels all the queries
-  /// running on failed ones (that is, addresses not in the active set).
-  void CancelQueriesOnFailedBackends(const std::set<TNetworkAddress>& current_membership);
+  /// Initializes the backend descriptor in 'be_desc' with the local backend information.
+  void BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_desc);
 
   /// Snapshot of a query's state, archived in the query log.
   struct QueryStateRecord {
@@ -1126,21 +1117,10 @@ class ImpalaServer : public ImpalaServiceIf,
       QueryLocations;
   QueryLocations query_locations_;
 
-  /// A map from unique backend ID to the corresponding TBackendDescriptor of that
-  /// backend. Used to track membership updates from the statestore so queries can be
-  /// cancelled when a backend is removed. It's not enough to just cancel fragments that
-  /// are running based on the deletions mentioned in the most recent statestore
-  /// heartbeat; sometimes cancellations are skipped and the statestore, at its
-  /// discretion, may send only a delta of the current membership so we need to compute
-  /// any deletions.
-  /// TODO: Currently there are multiple locations where cluster membership is tracked,
-  /// here and in the scheduler. This should be consolidated so there is a single
-  /// component (the scheduler?) that tracks this information and calls other interested
-  /// components.
-  BackendDescriptorMap known_backends_;
-
-  /// Lock to protect 'known_backends_'. Not held in conjunction with other locks.
-  boost::mutex known_backends_lock_;
+  /// The local backend descriptor. Updated in GetLocalBackendDescriptor() and protected
+  /// by 'local_backend_descriptor_lock_';
+  std::shared_ptr<const TBackendDescriptor> local_backend_descriptor_;
+  boost::mutex local_backend_descriptor_lock_;
 
   /// Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;
@@ -1251,9 +1231,6 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Container for a thread that runs ExpireQueries() if FLAGS_idle_query_timeout is set.
   std::unique_ptr<Thread> query_expiration_thread_;
-
-  /// Serializes TBackendDescriptors when creating topic updates
-  ThriftSerializer thrift_serializer_;
 
   /// True if this ImpalaServer can accept client connections and coordinate
   /// queries.

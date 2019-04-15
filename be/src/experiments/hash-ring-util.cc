@@ -22,6 +22,7 @@
 
 #include "common/init.h"
 #include "scheduling/hash-ring.h"
+#include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/scheduler-test-util.h"
 #include "testutil/gtest-util.h"
 #include "util/network-util.h"
@@ -53,7 +54,7 @@ public:
     cluster.AddHosts(num_hosts, true, false);
     HashRing hashring(num_replicas);
     for (int host_idx = 0; host_idx < num_hosts; host_idx++) {
-      IpAddr node = test::Cluster::HostIdxToIpAddr(host_idx);
+      IpAddr node = test::HostIdxToIpAddr(host_idx);
       hashring.AddNode(node);
     }
     int64_t end_nanos = MonotonicNanos();

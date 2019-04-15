@@ -41,6 +41,7 @@ namespace impala {
 class AdmissionController;
 class BufferPool;
 class CallableThreadPool;
+class ClusterMembershipMgr;
 class ControlService;
 class DataStreamMgr;
 class DataStreamService;
@@ -143,6 +144,7 @@ class ExecEnv {
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
+  ClusterMembershipMgr* cluster_membership_mgr() { return cluster_membership_mgr_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
@@ -175,6 +177,7 @@ class ExecEnv {
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<KrpcDataStreamMgr> stream_mgr_;
+  boost::scoped_ptr<ClusterMembershipMgr> cluster_membership_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<AdmissionController> admission_controller_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;

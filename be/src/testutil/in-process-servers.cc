@@ -87,7 +87,6 @@ Status InProcessImpalaServer::StartWithClientServers(
   SetCatalogIsReady();
   RETURN_IF_ERROR(
       impala_server_->Start(backend_port_, beeswax_port, hs2_port, hs2_http_port_));
-  exec_env_->scheduler()->UpdateLocalBackendAddrForBeTest();
 
   // This flag is read directly in several places to find the address of the local
   // backend interface.

@@ -78,8 +78,8 @@ struct BackendExecParams {
   int64_t admit_mem_limit = 0;
 };
 
-/// map from an impalad host address to the list of assigned fragment instance params.
-typedef std::map<TNetworkAddress, BackendExecParams> PerBackendExecParams;
+/// Map from an impalad host address to the list of assigned fragment instance params.
+typedef std::unordered_map<TNetworkAddress, BackendExecParams> PerBackendExecParams;
 
 /// Execution parameters for a single fragment instance; used to assemble the
 /// TPlanFragmentInstanceCtx

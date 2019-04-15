@@ -23,7 +23,6 @@
 #include <boost/uuid/uuid_generators.hpp>
 
 #include "runtime/bufferpool/reservation-util.h"
-#include "util/container-util.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"

@@ -625,7 +625,7 @@ struct TExecRequest {
 
   // List of catalog objects accessed by this request. May be empty in this
   // case that the query did not access any Catalog objects.
-  8: optional set<TAccessEvent> access_events
+  8: optional list<TAccessEvent> access_events
 
   // List of warnings that were generated during analysis. May be empty.
   9: required list<string> analysis_warnings

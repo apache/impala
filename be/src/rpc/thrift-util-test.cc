@@ -21,6 +21,7 @@
 
 #include "rpc/thrift-util.h"
 #include "testutil/gtest-util.h"
+#include "util/container-util.h"
 #include "util/network-util.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
@@ -62,7 +63,7 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     TCounter deserialized_counter;
     EXPECT_OK(DeserializeThriftMsg(buffer1, &len1, compact, &deserialized_counter));
     EXPECT_EQ(len1, len2);
-    EXPECT_TRUE(counter == deserialized_counter);
+    EXPECT_EQ(counter, deserialized_counter);
 
     // Serialize to string
     std::string str;
@@ -73,7 +74,7 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     TCounter deserialized_counter_2;
     EXPECT_OK(DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(str.data()), &len2,
         compact, &deserialized_counter_2));
-    EXPECT_TRUE(counter == deserialized_counter_2);
+    EXPECT_EQ(counter, deserialized_counter_2);
   }
 }
 

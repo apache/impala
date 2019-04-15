@@ -15,27 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
+#pragma once
 
-#include "testutil/gtest-util.h"
-#include "util/container-util.h"
-#include "util/uid-util.h"
+#include "gen-cpp/StatestoreService_types.h"
+#include <string>
 
 namespace impala {
+namespace test {
 
-TEST(UidUtil, FragmentInstanceId) {
-  boost::uuids::random_generator uuid_generator;
-  boost::uuids::uuid query_uuid = uuid_generator();
-  TUniqueId query_id = UuidToQueryId(query_uuid);
+/// Convert a host index to a hostname.
+std::string HostIdxToHostname(int host_idx);
 
-  for (int i = 0; i < 100; ++i) {
-    TUniqueId instance_id = CreateInstanceId(query_id, i);
-    EXPECT_EQ(GetQueryId(instance_id), query_id);
-    EXPECT_EQ(GetInstanceIdx(instance_id), i);
-  }
-}
+/// Convert a host index to an IP address. The host index must be smaller than 2^24 and
+/// will specify the lower 24 bits of the IPv4 address (the lower 3 octets).
+std::string HostIdxToIpAddr(int host_idx);
 
-}
+/// Builds a new backend descriptor. 'idx' is used to determine its name and IP address
+/// and the caller must make sure that it is unique across sets of hosts. To create
+/// backends on the same host, an optional port offset can be specified.
+TBackendDescriptor MakeBackendDescriptor(int idx, int port_offset = 0);
 
+}  // end namespace test
+}  // end namespace impala

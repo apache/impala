@@ -13,6 +13,9 @@ using std::iterator_traits;
 #include <limits>
 using std::numeric_limits;
 
+using std::unordered_map;
+using std::unordered_set;
+
 #include "gutil/integral_types.h"
 #include <common/logging.h>
 #include "gutil/logging-inl.h"

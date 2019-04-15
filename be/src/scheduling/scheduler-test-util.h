@@ -26,11 +26,14 @@
 
 #include "common/status.h"
 #include "gen-cpp/ImpalaInternalService.h" // for TQueryOptions
+#include "scheduling/cluster-membership-mgr.h"
+#include "scheduling/scheduler.h"
 #include "scheduling/query-schedule.h"
 #include "util/metrics.h"
 
 namespace impala {
 
+class ClusterMembershipMgr;
 class Scheduler;
 class TTopicDelta;
 
@@ -112,13 +115,6 @@ class Cluster {
   /// Add a number of hosts with the same properties by repeatedly calling AddHost(..).
   void AddHosts(int num_hosts, bool has_backend, bool has_datanode,
       bool is_executor = true);
-
-  /// Convert a host index to a hostname.
-  static Hostname HostIdxToHostname(int host_idx);
-
-  /// Convert a host index to an IP address. The host index must be smaller than 2^24 and
-  /// will specify the lower 24 bits of the IPv4 address (the lower 3 octets).
-  static IpAddr HostIdxToIpAddr(int host_idx);
 
   /// Return the backend address (ip, port) for the host with index 'host_idx'.
   void GetBackendAddress(int host_idx, TNetworkAddress* addr) const;
@@ -492,6 +488,7 @@ class SchedulerWrapper {
 
  private:
   const Plan& plan_;
+  boost::scoped_ptr<ClusterMembershipMgr> cluster_membership_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   MetricGroup metrics_;
 

@@ -45,9 +45,7 @@ using std::pair;
 #include <vector>
 using std::vector;
 #include <unordered_map>
-using std::unordered_map;
 #include <unordered_set>
-using std::unordered_set;
 
 #include <common/logging.h>
 
@@ -677,7 +675,7 @@ void SplitStringPieceToVector(const StringPiece& full,
 void SplitStringUsing(const string& full, const char* delimiters,
                       vector<string>* result);
 void SplitStringToHashsetUsing(const string& full, const char* delimiters,
-                               unordered_set<string>* result);
+                               std::unordered_set<string>* result);
 void SplitStringToSetUsing(const string& full, const char* delimiters,
                            set<string>* result);
 // The even-positioned (0-based) components become the keys for the
@@ -688,7 +686,7 @@ void SplitStringToSetUsing(const string& full, const char* delimiters,
 void SplitStringToMapUsing(const string& full, const char* delim,
                            map<string, string>* result);
 void SplitStringToHashmapUsing(const string& full, const char* delim,
-                               unordered_map<string, string>* result);
+                               std::unordered_map<string, string>* result);
 
 // ----------------------------------------------------------------------
 // SplitStringAllowEmpty()
@@ -742,7 +740,7 @@ void SplitStringWithEscapingToSet(const string& full,
                                   set<string>* result);
 void SplitStringWithEscapingToHashset(const string& full,
                                       const strings::CharSet& delimiters,
-                                      unordered_set<string>* result);
+                                      std::unordered_set<string>* result);
 
 // ----------------------------------------------------------------------
 // SplitStringIntoNPiecesAllowEmpty()

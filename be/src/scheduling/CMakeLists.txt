@@ -25,7 +25,9 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 # TODO: Move other scheduling-related classes here
 add_library(Scheduling STATIC
   admission-controller.cc
-  backend-config.cc
+  cluster-membership-mgr.cc
+  cluster-membership-test-util.cc
+  executor-group.cc
   hash-ring.cc
   query-schedule.cc
   request-pool-service.cc
@@ -34,7 +36,8 @@ add_library(Scheduling STATIC
 )
 add_dependencies(Scheduling gen-deps)
 
-ADD_BE_LSAN_TEST(scheduler-test)
-ADD_BE_LSAN_TEST(backend-config-test)
-ADD_BE_LSAN_TEST(hash-ring-test)
 ADD_BE_LSAN_TEST(admission-controller-test)
+ADD_BE_LSAN_TEST(cluster-membership-mgr-test)
+ADD_BE_LSAN_TEST(executor-group-test)
+ADD_BE_LSAN_TEST(hash-ring-test)
+ADD_BE_LSAN_TEST(scheduler-test)

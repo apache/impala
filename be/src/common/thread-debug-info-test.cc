@@ -19,6 +19,7 @@
 
 #include "common/thread-debug-info.h"
 #include "testutil/gtest-util.h"
+#include "util/container-util.h"
 #include "util/thread.h"
 
 #include "common/names.h"

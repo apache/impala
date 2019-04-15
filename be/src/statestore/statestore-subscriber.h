@@ -26,14 +26,14 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
-#include "statestore/statestore.h"
-#include "util/stopwatch.h"
-#include "rpc/thrift-util.h"
-#include "rpc/thrift-client.h"
-#include "statestore/statestore-service-client-wrapper.h"
-#include "util/metrics.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
+#include "rpc/thrift-client.h"
+#include "rpc/thrift-util.h"
+#include "statestore/statestore.h"
+#include "statestore/statestore-service-client-wrapper.h"
+#include "util/metrics.h"
+#include "util/stopwatch.h"
 
 namespace impala {
 
@@ -127,9 +127,9 @@ class StatestoreSubscriber {
 
   const std::string& id() const { return subscriber_id_; }
 
-  int64_t MilliSecondsSinceLastRegistration() const {
-    return MonotonicMillis() - last_registration_ms_.Load();
-  }
+  /// Returns true if the statestore has recovered and the configurable post-recovery
+  /// grace period has not yet elapsed.
+  bool IsInPostRecoveryGracePeriod() const;
 
  private:
   /// Unique, but opaque, identifier for this subscriber.
@@ -159,6 +159,9 @@ class StatestoreSubscriber {
 
   /// Metric to indicate if we are successfully registered with the statestore
   BooleanProperty* connected_to_statestore_metric_;
+
+  /// Metric to count the total number of connection failures to the statestore
+  IntCounter* connection_failure_metric_;
 
   /// Amount of time last spent in recovery mode
   DoubleGauge* last_recovery_duration_metric_;
@@ -304,6 +307,10 @@ class StatestoreSubscriber {
   /// set, an error otherwise. Used to confirm that RPCs from the statestore are intended
   /// for the current registration epoch.
   Status CheckRegistrationId(const RegistrationId& registration_id);
+
+  int64_t MilliSecondsSinceLastRegistration() const {
+    return MonotonicMillis() - last_registration_ms_.Load();
+  }
 };
 
 }

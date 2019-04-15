@@ -147,12 +147,12 @@ class TestCoordinators(CustomClusterTestSuite):
     tgt_dir = get_fs_path('/test-warehouse/{0}.db'.format(db_name))
     tgt_path = tgt_dir + "/tmp.jar"
 
-    try:
-      # copy jar with TestUpdateUdf (old) to tmp.jar
-      check_call(["hadoop", "fs", "-mkdir", "-p", tgt_dir])
-      check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path])
+    # copy jar with TestUpdateUdf (old) to tmp.jar
+    check_call(["hadoop", "fs", "-mkdir", "-p", tgt_dir])
+    check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path])
 
-      coordinator = self.cluster.impalads[0]
+    coordinator = self.cluster.impalads[0]
+    try:
       client = coordinator.service.create_beeswax_client()
 
       # create the database

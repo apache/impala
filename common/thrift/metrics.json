@@ -1055,6 +1055,17 @@
     "key": "statestore-subscriber.connected"
   },
   {
+    "description": "Number of times that the Daemon detected a loss of connectivity to the StateStore.",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "StateStore Connectivity Loss Count.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "statestore-subscriber.num-connection-failures"
+  },
+  {
     "description": "The time (sec) between Statestore heartbeats.",
     "contexts": [
       "CATALOGSERVER",

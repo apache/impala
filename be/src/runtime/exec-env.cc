@@ -45,6 +45,7 @@
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/admission-controller.h"
+#include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
 #include "scheduling/scheduler.h"
 #include "service/control-service.h"
@@ -196,13 +197,15 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
       Substitute("impalad@$0", TNetworkAddressToString(configured_backend_address_)),
       subscriber_address, statestore_address, metrics_.get()));
 
+  cluster_membership_mgr_.reset(new ClusterMembershipMgr(statestore_subscriber_->id(),
+      statestore_subscriber_.get()));
+
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
     exec_rpc_thread_pool_.reset(new CallableThreadPool("exec-rpc-pool", "worker",
         FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max()));
-    scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
-        statestore_subscriber_->id(), metrics_.get(), webserver_.get(),
+    scheduler_.reset(new Scheduler(cluster_membership_mgr_.get(), metrics_.get(),
         request_pool_service_.get()));
   }
 
@@ -336,10 +339,12 @@ Status ExecEnv::Init() {
     LOG(INFO) << "Not starting webserver";
   }
 
-  if (scheduler_ != nullptr) {
-    RETURN_IF_ERROR(scheduler_->Init(
-          configured_backend_address_, krpc_address_, ip_address_, admit_mem_limit_));
-  }
+  RETURN_IF_ERROR(cluster_membership_mgr_->Init());
+  cluster_membership_mgr_->SetUpdateFrontendFn(
+      [this](const TUpdateExecutorMembershipRequest& update_req) {
+        return this->frontend()->UpdateExecutorMembership(update_req);
+  });
+
   RETURN_IF_ERROR(admission_controller_->Init());
 
   // Get the fs.defaultFS value set in core-site.xml and assign it to configured_defaultFs
@@ -445,7 +450,16 @@ Status ExecEnv::StartKrpcService() {
 
 void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   DCHECK(impala_server_ == nullptr) << "ImpalaServer already registered";
+  DCHECK(server != nullptr);
   impala_server_ = server;
+  // Register the ImpalaServer with the cluster membership manager
+  cluster_membership_mgr_->SetLocalBeDescFn([server]() {
+    return server->GetLocalBackendDescriptor();
+  });
+  cluster_membership_mgr_->SetUpdateLocalServerFn(
+      [server](const ClusterMembershipMgr::BackendAddressSet& current_backends) {
+        server->CancelQueriesOnFailedBackends(current_backends);
+  });
 }
 
 void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,

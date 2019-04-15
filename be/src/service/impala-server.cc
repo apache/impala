@@ -61,7 +61,6 @@
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/admission-controller.h"
-#include "scheduling/scheduler.h"
 #include "service/cancellation-work.h"
 #include "service/impala-http-handler.h"
 #include "service/impala-internal-service.h"
@@ -69,7 +68,6 @@
 #include "service/frontend.h"
 #include "util/auth-util.h"
 #include "util/bit-util.h"
-#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
@@ -246,13 +244,6 @@ DEFINE_int64(shutdown_deadline_s, 60 * 60, "Default time limit in seconds for th
     "down process. If this duration elapses after the shut down process is started, "
     "the daemon shuts down regardless of any running queries.");
 
-DEFINE_int64_hidden(failed_backends_query_cancellation_grace_period_ms, 30000L,
-    "Grace period since last successful subscriber registration that impala server is "
-    "willing to wait before initiating cancellation of queries running on backends not "
-    "included in the latest membership update. This value should be large enough to give "
-    "the statestore enough time to get a consistent view of cluster membership after "
-    "recovery.");
-
 #ifndef NDEBUG
   DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
       "for a given query by injecting a sleep equivalent to this configuration in "
@@ -305,7 +296,6 @@ ThreadSafeRandom ImpalaServer::rng_(GetRandomSeed32());
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     : exec_env_(exec_env),
-      thrift_serializer_(false),
       services_started_(false) {
   // Initialize default config
   InitializeConfigVariables();
@@ -377,33 +367,22 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env_->metrics()));
 
-  // Register the membership callback if running in a real cluster.
-  if (!TestInfo::is_test()) {
-    auto cb = [this](const StatestoreSubscriber::TopicDeltaMap& state,
+  // Register the catalog update callback if running in a real cluster as a coordinator.
+  if (!TestInfo::is_test() && FLAGS_is_coordinator) {
+    auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
         vector<TTopicDelta>* topic_updates) {
-      this->MembershipCallback(state, topic_updates);
+      this->CatalogUpdateCallback(state, topic_updates);
     };
-    ABORT_IF_ERROR(exec_env_->subscriber()->AddTopic(
-        Statestore::IMPALA_MEMBERSHIP_TOPIC, /* is_transient=*/ true,
-        /* populate_min_subscriber_topic_version=*/ false,
-        /* filter_prefix=*/"", cb));
-
-    if (FLAGS_is_coordinator) {
-      auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
-          vector<TTopicDelta>* topic_updates) {
-        this->CatalogUpdateCallback(state, topic_updates);
-      };
-      // The 'local-catalog' implementation only needs minimal metadata to
-      // trigger cache invalidations.
-      // The legacy implementation needs full metadata objects.
-      string filter_prefix = FLAGS_use_local_catalog ?
+    // The 'local-catalog' implementation only needs minimal metadata to
+    // trigger cache invalidations.
+    // The legacy implementation needs full metadata objects.
+    string filter_prefix = FLAGS_use_local_catalog ?
         g_CatalogService_constants.CATALOG_TOPIC_V2_PREFIX :
         g_CatalogService_constants.CATALOG_TOPIC_V1_PREFIX;
-      ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
-          CatalogServer::IMPALA_CATALOG_TOPIC, /* is_transient=*/ true,
-          /* populate_min_subscriber_topic_version=*/ true,
-          filter_prefix, catalog_cb));
-    }
+    ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
+        CatalogServer::IMPALA_CATALOG_TOPIC, /* is_transient=*/ true,
+        /* populate_min_subscriber_topic_version=*/ true,
+        filter_prefix, catalog_cb));
   }
 
   ABORT_IF_ERROR(UpdateCatalogMetrics());
@@ -560,11 +539,6 @@ int ImpalaServer::GetBeeswaxPort() {
 int ImpalaServer::GetHS2Port() {
   DCHECK(hs2_server_ != nullptr);
   return hs2_server_->port();
-}
-
-const ImpalaServer::BackendDescriptorMap ImpalaServer::GetKnownBackends() {
-  lock_guard<mutex> l(known_backends_lock_);
-  return known_backends_;
 }
 
 bool ImpalaServer::IsLineageLoggingEnabled() {
@@ -1797,88 +1771,8 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
   return Status::OK();
 }
 
-void ImpalaServer::MembershipCallback(
-    const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
-    vector<TTopicDelta>* subscriber_topic_updates) {
-  // TODO: Consider rate-limiting this. In the short term, best to have
-  // statestore heartbeat less frequently.
-  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(Statestore::IMPALA_MEMBERSHIP_TOPIC);
-  if (topic == incoming_topic_deltas.end()) return;
-
-  const TTopicDelta& delta = topic->second;
-  // Create a set of known backend network addresses. Used to test for cluster
-  // membership by network address.
-  set<TNetworkAddress> current_membership;
-  {
-    lock_guard<mutex> l(known_backends_lock_);
-    // If this is not a delta, the update should include all entries in the topic so
-    // clear the saved mapping of known backends.
-    if (!delta.is_delta) known_backends_.clear();
-
-    // Process membership additions/deletions.
-    for (const TTopicItem& item : delta.topic_entries) {
-      if (item.deleted) {
-        auto entry = known_backends_.find(item.key);
-        // Remove stale connections to removed members.
-        if (entry != known_backends_.end()) {
-          exec_env_->impalad_client_cache()->CloseConnections(entry->second.address);
-          known_backends_.erase(item.key);
-        }
-        continue;
-      }
-      uint32_t len = item.value.size();
-      TBackendDescriptor backend_descriptor;
-      Status status =
-          DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(item.value.data()),
-              &len, false, &backend_descriptor);
-      if (!status.ok()) {
-        VLOG(2) << "Error deserializing topic item with key: " << item.key;
-        continue;
-      }
-      // This is a new or modified item - add it to the map of known backends.
-      auto it = known_backends_.find(item.key);
-      if (it != known_backends_.end()) {
-        it->second = backend_descriptor;
-      } else {
-        known_backends_.emplace_hint(it, item.key, backend_descriptor);
-      }
-    }
-
-    // Register the local backend in the statestore and update the list of known
-    // backends. Only register if all ports have been opened and are ready.
-    if (services_started_.load()) AddLocalBackendToStatestore(subscriber_topic_updates);
-
-    // Also reflect changes to the frontend. Initialized only if any_changes is true.
-    // Only send the hostname and ip_address of the executors to the frontend.
-    TUpdateExecutorMembershipRequest update_req;
-    bool any_changes = !delta.topic_entries.empty() || !delta.is_delta;
-    for (const BackendDescriptorMap::value_type& backend : known_backends_) {
-      current_membership.insert(backend.second.address);
-      if (any_changes && backend.second.is_executor) {
-        update_req.hostnames.insert(backend.second.address.hostname);
-        update_req.ip_addresses.insert(backend.second.ip_address);
-        update_req.num_executors++;
-      }
-    }
-    if (any_changes) {
-      Status status = exec_env_->frontend()->UpdateExecutorMembership(update_req);
-      if (!status.ok()) {
-        LOG(WARNING) << "Error updating frontend membership snapshot: "
-                     << status.GetDetail();
-      }
-    }
-  }
-
-  // Only initiate cancellation after a grace period since last successful registration.
-  if (exec_env_->subscriber()->MilliSecondsSinceLastRegistration()
-      >= FLAGS_failed_backends_query_cancellation_grace_period_ms) {
-    CancelQueriesOnFailedBackends(current_membership);
-  }
-}
-
 void ImpalaServer::CancelQueriesOnFailedBackends(
-    const set<TNetworkAddress>& current_membership) {
+    const std::unordered_set<TNetworkAddress>& current_membership) {
   // Maps from query id (to be cancelled) to a list of failed Impalads that are
   // the cause of the cancellation.
   map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
@@ -1935,42 +1829,56 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
   }
 }
 
-void ImpalaServer::AddLocalBackendToStatestore(
-    vector<TTopicDelta>* subscriber_topic_updates) {
-  const string& local_backend_id = exec_env_->subscriber()->id();
+std::shared_ptr<const TBackendDescriptor> ImpalaServer::GetLocalBackendDescriptor() {
+  if (!services_started_.load()) return nullptr;
+
+  lock_guard<mutex> l(local_backend_descriptor_lock_);
+  // Check if the current backend descriptor needs to be initialized.
+  if (local_backend_descriptor_.get() == nullptr) {
+    std::shared_ptr<TBackendDescriptor> new_be_desc =
+        std::make_shared<TBackendDescriptor>();
+    BuildLocalBackendDescriptorInternal(new_be_desc.get());
+    local_backend_descriptor_ = new_be_desc;
+  }
+
+  // Check to see if it needs to be updated.
+  if (IsShuttingDown() != local_backend_descriptor_->is_quiescing) {
+    std::shared_ptr<TBackendDescriptor> new_be_desc =
+      std::make_shared<TBackendDescriptor>(*local_backend_descriptor_);
+    new_be_desc->is_quiescing = IsShuttingDown();
+    local_backend_descriptor_ = new_be_desc;
+  }
+
+  return local_backend_descriptor_;
+}
+
+void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_desc) {
+  DCHECK(services_started_.load());
   bool is_quiescing = shutting_down_.Load() != 0;
-  auto it = known_backends_.find(local_backend_id);
-  // 'is_quiescing' can change during the lifetime of the Impalad - make sure that the
-  // membership reflects the current value.
-  if (it != known_backends_.end()
-      && is_quiescing == it->second.is_quiescing) {
-    return;
+
+  be_desc->__set_address(exec_env_->GetThriftBackendAddress());
+  be_desc->__set_ip_address(exec_env_->ip_address());
+  be_desc->__set_is_coordinator(FLAGS_is_coordinator);
+  be_desc->__set_is_executor(FLAGS_is_executor);
+
+  Webserver* webserver = ExecEnv::GetInstance()->webserver();
+  if (webserver != nullptr) {
+    const TNetworkAddress& webserver_address = webserver->http_address();
+    if (IsWildcardAddress(webserver_address.hostname)) {
+      be_desc->__set_debug_http_address(
+          MakeNetworkAddress(be_desc->ip_address, webserver_address.port));
+    } else {
+      be_desc->__set_debug_http_address(webserver_address);
+    }
+    be_desc->__set_secure_webserver(webserver->IsSecure());
   }
 
-  TBackendDescriptor local_backend_descriptor =
-      Scheduler::BuildLocalBackendDescriptor(exec_env_->webserver(),
-          exec_env_->GetThriftBackendAddress(), exec_env_->krpc_address(),
-          exec_env_->ip_address(), exec_env_->admit_mem_limit());
-  local_backend_descriptor.__set_is_quiescing(is_quiescing);
+  const TNetworkAddress& krpc_address = exec_env_->krpc_address();
+  DCHECK(IsResolvedAddress(krpc_address));
+  be_desc->__set_krpc_address(krpc_address);
 
-  subscriber_topic_updates->emplace_back(TTopicDelta());
-  TTopicDelta& update = subscriber_topic_updates->back();
-  update.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
-  update.topic_entries.emplace_back(TTopicItem());
-
-  TTopicItem& item = update.topic_entries.back();
-  item.key = local_backend_id;
-  Status status = thrift_serializer_.SerializeToString(&local_backend_descriptor,
-      &item.value);
-  if (!status.ok()) {
-    LOG(WARNING) << "Failed to serialize Impala backend descriptor for statestore topic:"
-                 << " " << status.GetDetail();
-    subscriber_topic_updates->pop_back();
-  } else if (it != known_backends_.end()) {
-    it->second.is_quiescing = is_quiescing;
-  } else {
-    known_backends_.insert(make_pair(item.key, local_backend_descriptor));
-  }
+  be_desc->__set_admit_mem_limit(exec_env_->admit_mem_limit());
+  be_desc->__set_is_quiescing(is_quiescing);
 }
 
 ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& request_state,

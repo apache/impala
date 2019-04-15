@@ -96,9 +96,9 @@ class TestRestart(CustomClusterTestSuite):
   @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
     impalad_args="--statestore_subscriber_timeout_seconds={timeout_s} "
-                 "--failed_backends_query_cancellation_grace_period_ms={grace_period_ms}"
+                 "--statestore_subscriber_recovery_grace_period_ms={recovery_period_ms}"
     .format(timeout_s=SUBSCRIBER_TIMEOUT_S,
-            grace_period_ms=(CANCELLATION_GRACE_PERIOD_S * 1000)),
+            recovery_period_ms=(CANCELLATION_GRACE_PERIOD_S * 1000)),
     catalogd_args="--statestore_subscriber_timeout_seconds={timeout_s}".format(
       timeout_s=SUBSCRIBER_TIMEOUT_S))
   def test_restart_statestore_query_resilience(self):

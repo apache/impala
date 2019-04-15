@@ -58,8 +58,8 @@ function(THRIFT_GEN VAR)
     # It depends on hive_meta_store, which in turn depends on fb303.
     # The java dependency is handled by maven.
     # We need to generate C++ src file for the parent dependencies using the "-r" option.
-    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp:moveable_types -o
-        ${BE_OUTPUT_DIR})
+    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION}
+        --gen cpp:moveable_types,no_default_operators -o ${BE_OUTPUT_DIR})
     IF (THRIFT_FILE STREQUAL "beeswax.thrift")
       set(CPP_ARGS -r ${CPP_ARGS})
     ENDIF(THRIFT_FILE STREQUAL "beeswax.thrift")

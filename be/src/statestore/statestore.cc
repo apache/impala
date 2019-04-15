@@ -33,6 +33,7 @@
 #include "rpc/thrift-util.h"
 #include "statestore/failure-detector.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/openssl-util.h"

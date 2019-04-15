@@ -46,7 +46,7 @@
   #include <gflags/gflags.h>
 #endif
 
-/// Define verbose logging levels.  Per-row logging is more verbase than per-file /
+/// Define verbose logging levels.  Per-row logging is more verbose than per-file /
 /// per-rpc logging which is more verbose than per-connection / per-query logging.
 #define VLOG_CONNECTION VLOG(1)
 #define VLOG_RPC        VLOG(2)
