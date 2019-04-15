@@ -167,8 +167,11 @@ void SystemStateInfo::ReadProcNetDevString(const string& dev_string) {
   memset(&sum_values, 0, sizeof(sum_values));
 
   StringPiece sp(dev_string);
-  vector<StringPiece> lines = Split(sp, "\n");
-  for (const StringPiece& line : lines) {
+  vector<StringPiece> lines = Split(sp, "\n", SkipWhitespace());
+  // The first two lines contain the header, skip them.
+  DCHECK_GT(lines.size(), 2);
+  for (int i = 2; i < lines.size(); ++i) {
+    const StringPiece& line = lines[i];
     NetworkValues line_values;
     ReadProcNetDevLine(line, &line_values);
     AddNetworkValues(line_values, &sum_values);
