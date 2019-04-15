@@ -27,7 +27,12 @@ from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_S3, IS_ADLS
+from tests.util.filesystem_utils import (
+    WAREHOUSE,
+    IS_HDFS,
+    IS_S3,
+    IS_ADLS,
+    FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
 
 # Validates DDL statements (create, drop)
@@ -509,16 +514,17 @@ class TestDdlStatements(TestDdlBase):
     # Test the plan to make sure hints were applied correctly
     plan = self.execute_query("explain select * from %s.hints_test" % unique_database,
         query_options={'explain_level':0})
-    assert """PLAN-ROOT SINK
+    plan_match = """PLAN-ROOT SINK
 08:EXCHANGE [UNPARTITIONED]
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |--07:EXCHANGE [HASH(c.id)]
-|  02:SCAN HDFS [functional.alltypessmall c]
+|  02:SCAN {filesystem_name} [functional.alltypessmall c]
 06:EXCHANGE [HASH(b.id)]
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |--05:EXCHANGE [BROADCAST]
-|  01:SCAN HDFS [functional.alltypes b]
-00:SCAN HDFS [functional.alltypestiny a]""" in '\n'.join(plan.data)
+|  01:SCAN {filesystem_name} [functional.alltypes b]
+00:SCAN {filesystem_name} [functional.alltypestiny a]"""
+    assert plan_match.format(filesystem_name=FILESYSTEM_NAME) in '\n'.join(plan.data)
 
   def _verify_describe_view(self, vector, view_name, expected_substr):
     """

@@ -62,7 +62,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
-'00:SCAN HDFS [$DATABASE.alltypes]'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=12 size=.*
 '   stored statistics:'
 row_regex:.*table: rows=3.65K size=.*
@@ -90,7 +90,7 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
-'00:SCAN HDFS [$DATABASE.alltypes]'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
 '   partition predicates: `month` IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
 row_regex:.*partitions=3/12 files=3 size=.*
 '   stored statistics:'
@@ -119,7 +119,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
-'00:SCAN HDFS [$DATABASE.alltypes]'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=24 size=.*
 '   stored statistics:'
 row_regex:.*table: rows=3.65K size=.*
@@ -149,7 +149,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
-'00:SCAN HDFS [$DATABASE.alltypes]'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
 '   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'
@@ -179,7 +179,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
-'00:SCAN HDFS [$DATABASE.alltypes]'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
 '   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'

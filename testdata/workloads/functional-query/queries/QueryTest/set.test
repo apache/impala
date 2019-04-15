@@ -191,7 +191,7 @@ explain select min(month), max(year), ndv(day) from functional.alltypesagg;
 '03:AGGREGATE [FINALIZE]'
 '02:EXCHANGE [UNPARTITIONED]'
 '01:AGGREGATE'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set explain_level=0;
@@ -201,7 +201,7 @@ explain select min(month), max(year), ndv(day) from functional.alltypesagg;
 '03:AGGREGATE [FINALIZE]'
 '02:EXCHANGE [UNPARTITIONED]'
 '01:AGGREGATE'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set explain_level=0;
@@ -214,7 +214,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '04:AGGREGATE'
 '03:EXCHANGE [HASH(double_col)]'
 '01:AGGREGATE [STREAMING]'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set explain_level=0;
@@ -227,7 +227,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '04:AGGREGATE'
 '03:EXCHANGE [HASH(double_col)]'
 '01:AGGREGATE [STREAMING]'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set explain_level=0;
@@ -240,7 +240,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '04:AGGREGATE'
 '03:EXCHANGE [HASH(double_col)]'
 '01:AGGREGATE'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set explain_level=0;
@@ -253,7 +253,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '04:AGGREGATE'
 '03:EXCHANGE [HASH(double_col)]'
 '01:AGGREGATE'
-'00:SCAN HDFS [functional.alltypesagg]'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
 ---- QUERY
 set max_row_size=-1;
