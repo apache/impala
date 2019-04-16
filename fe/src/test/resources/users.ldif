@@ -23,3 +23,13 @@ cn: Test1Ldap
 sn: Ldap
 uid: ldaptest1
 userPassword: 12345
+
+dn: cn=Test2Ldap,ou=Users,dc=myorg,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Test2Ldap
+sn: Ldap
+uid: ldaptest2
+userPassword: abcde

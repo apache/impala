@@ -33,8 +33,8 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.ImpalaJdbcClient;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -56,8 +56,10 @@ public class LdapJdbcTest extends JdbcTestBase {
   private static final String testUser_ = "Test1Ldap";
   private static final String testPassword_ = "12345";
 
-  @BeforeClass
-  public static void setUp() throws Exception {
+  public LdapJdbcTest(String connectionType) { super(connectionType); }
+
+  @Before
+  public void setUp() throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
@@ -66,13 +68,13 @@ public class LdapJdbcTest extends JdbcTestBase {
     int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
 
-    con_ =
-        createConnection(ImpalaJdbcClient.getLdapConnectionStr(testUser_, testPassword_));
+    con_ = createConnection(
+        ImpalaJdbcClient.getLdapConnectionStr(connectionType_, testUser_, testPassword_));
   }
 
-  @AfterClass
-  public static void cleanUp() throws Exception {
-    JdbcTestBase.cleanUp();
+  @After
+  public void cleanUp() throws Exception {
+    super.cleanUp();
     CustomClusterRunner.StartImpalaCluster();
   }
 
@@ -87,16 +89,16 @@ public class LdapJdbcTest extends JdbcTestBase {
   @Test
   public void testFailedConnection() throws Exception {
     try {
-      Connection con = createConnection(
-          ImpalaJdbcClient.getLdapConnectionStr(testUser_, "invalid-password"));
+      Connection con = createConnection(ImpalaJdbcClient.getLdapConnectionStr(
+          connectionType_, testUser_, "invalid-password"));
       fail("Connecting with an invalid password should throw an error.");
     } catch (SQLException e) {
       assertTrue(e.getMessage().contains("Could not open client transport"));
     }
 
     try {
-      Connection con = createConnection(
-          ImpalaJdbcClient.getLdapConnectionStr("invalid-user", testPassword_));
+      Connection con = createConnection(ImpalaJdbcClient.getLdapConnectionStr(
+          connectionType_, "invalid-user", testPassword_));
       fail("Connecting with an invalid user name should throw an error.");
     } catch (SQLException e) {
       assertTrue(e.getMessage().contains("Could not open client transport"));

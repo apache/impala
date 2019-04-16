@@ -60,10 +60,17 @@ public class ImpalaJdbcClient {
 
   private final static String LDAP_AUTH_SPEC = ";user=%s;password=%s";
 
-  // The default connection string connects to localhost at the default hs2_port without
-  // Sasl.
-  private final static String DEFAULT_CONNECTION_STRING =
-      "jdbc:hive2://localhost:21050/default";
+  // Connects with HTTP as the transport.
+  private final static String HTTP_TRANSPORT_SPEC = ";transportMode=http";
+
+  // HiveServer2 compatible ports on coordinator for BINARY and HTTP based transports.
+  private final static int HS2_BINARY_PORT = 21050;
+  private final static int HS2_HTTP_PORT = 28000;
+
+  // The default connection string template to connect to localhost on a given port
+  // number.
+  private final static String DEFAULT_CONNECTION_TEMPLATE =
+      "jdbc:hive2://localhost:%d/default";
 
   private final String driverName_;
   private final String connString_;
@@ -139,23 +146,35 @@ public class ImpalaJdbcClient {
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {
-    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr());
+    return new ImpalaJdbcClient(
+        HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("binary"));
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {
     return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, connString);
   }
 
-  public static String getNoAuthConnectionStr() {
-    return getConnectionStr(NOSASL_AUTH_SPEC);
+  public static ImpalaJdbcClient createHttpClientUsingHiveJdbcDriver() {
+    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("http"));
   }
 
-  public static String getLdapConnectionStr(String username, String password) {
-    return getConnectionStr(String.format(LDAP_AUTH_SPEC, username, password));
+  public static String getNoAuthConnectionStr(String connType) {
+    return getConnectionStr(connType, NOSASL_AUTH_SPEC);
   }
 
-  private static String getConnectionStr(String authStr) {
-    return DEFAULT_CONNECTION_STRING + authStr;
+  public static String getLdapConnectionStr(
+      String connType, String username, String password) {
+    return getConnectionStr(connType, String.format(LDAP_AUTH_SPEC, username, password));
+  }
+
+  private static String getConnectionStr(String connType, String authStr) {
+    String connString = DEFAULT_CONNECTION_TEMPLATE + authStr;
+    if (connType == "binary") {
+      return String.format(connString, HS2_BINARY_PORT);
+    } else {
+      Preconditions.checkState(connType == "http");
+      return String.format(connString + HTTP_TRANSPORT_SPEC, HS2_HTTP_PORT);
+    }
   }
 
   /**

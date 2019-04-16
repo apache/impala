@@ -411,6 +411,9 @@ error_codes = (
 
   ("DISCONNECTED_SESSION_CLOSED", 135,
    "Session closed because it has no active connections"),
+
+  ("UNAUTHORIZED_SESSION_USER", 136,
+   "The user authorized on the connection '$0' does not match the session username '$1'"),
 )
 
 import sys

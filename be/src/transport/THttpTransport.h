@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef _THRIFT_TRANSPORT_THTTPTRANSPORT_H_
-#define _THRIFT_TRANSPORT_THTTPTRANSPORT_H_ 1
+#ifndef IMPALA_TRANSPORT_THTTPTRANSPORT_H
+#define IMPALA_TRANSPORT_THTTPTRANSPORT_H
 
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TVirtualTransport.h>
@@ -58,6 +58,8 @@ public:
 
   virtual const std::string getOrigin();
 
+  boost::shared_ptr<TTransport> getUnderlyingTransport() { return transport_; }
+
 protected:
   boost::shared_ptr<TTransport> transport_;
   std::string origin_;
@@ -76,7 +78,7 @@ protected:
   uint32_t httpBufLen_;
   uint32_t httpBufSize_;
 
-  virtual void init();
+  void init();
 
   uint32_t readMoreData();
   char* readLine();
@@ -84,6 +86,9 @@ protected:
   void readHeaders();
   virtual void parseHeader(char* header) = 0;
   virtual bool parseStatusLine(char* status) = 0;
+  // Called each time we finish reading a set of headers. Allows subclasses to do
+  // verification, eg. of authorization, before proceeding.
+  virtual void headersDone() {}
 
   uint32_t readChunked();
   void readChunkedFooters();
@@ -101,4 +106,4 @@ protected:
 }
 } // apache::thrift::transport
 
-#endif // #ifndef _THRIFT_TRANSPORT_THTTPCLIENT_H_
+#endif // #ifndef IMPALA_TRANSPORT_THTTPCLIENT_H

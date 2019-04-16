@@ -44,24 +44,36 @@ class AuthProvider;
 /// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
-  /// Transport factory that procuess buffered transports with a customisable
-  /// buffer-size. A larger buffer is usually more efficient, as it allows the underlying
-  /// transports to perform fewer system calls.
+  /// Transport factory that wraps transports in a buffered transport with a customisable
+  /// buffer-size and optionally in another transport from a provided factory. A larger
+  /// buffer is usually more efficient, as it allows the underlying transports to perform
+  /// fewer system calls.
   class BufferedTransportFactory :
       public apache::thrift::transport::TBufferedTransportFactory {
    public:
     static const int DEFAULT_BUFFER_SIZE_BYTES = 128 * 1024;
 
-    BufferedTransportFactory(uint32_t buffer_size = DEFAULT_BUFFER_SIZE_BYTES) :
-        buffer_size_(buffer_size) { }
+    BufferedTransportFactory(uint32_t buffer_size = DEFAULT_BUFFER_SIZE_BYTES,
+        apache::thrift::transport::TTransportFactory* wrapped_factory =
+            new apache::thrift::transport::TTransportFactory())
+      : buffer_size_(buffer_size), wrapped_factory_(wrapped_factory) {}
 
     virtual boost::shared_ptr<apache::thrift::transport::TTransport> getTransport(
         boost::shared_ptr<apache::thrift::transport::TTransport> trans) {
+      boost::shared_ptr<apache::thrift::transport::TTransport> wrapped =
+          wrapped_factory_->getTransport(trans);
       return boost::shared_ptr<apache::thrift::transport::TTransport>(
-          new apache::thrift::transport::TBufferedTransport(trans, buffer_size_));
+          new apache::thrift::transport::TBufferedTransport(wrapped, buffer_size_));
     }
    private:
     uint32_t buffer_size_;
+    std::unique_ptr<apache::thrift::transport::TTransportFactory> wrapped_factory_;
+  };
+
+  /// Transport implementation used by the thrift server.
+  enum TransportType {
+    BINARY, // Thrift bytes over default transport.
+    HTTP, // Thrift bytes over HTTP transport.
   };
 
   /// Username.
@@ -151,7 +163,8 @@ class ThriftServer {
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
-      int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0);
+      int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0,
+      TransportType server_transport = TransportType::BINARY);
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
   /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
@@ -244,6 +257,9 @@ class ThriftServer {
   /// Not owned by us, owned by the AuthManager
   AuthProvider* auth_provider_;
 
+  /// Underlying transport type used by this thrift server.
+  TransportType transport_type_;
+
   /// Helper class which monitors starting servers. Needs access to internal members, and
   /// is not used outside of this class.
   class ThriftServerEventProcessor;
@@ -311,13 +327,20 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  /// Sets the underlying transport type for the thrift server.
+  ThriftServerBuilder& transport_type(ThriftServer::TransportType transport_type) {
+    server_transport_type_ = transport_type;
+    return *this;
+  }
+
   /// Constructs a new ThriftServer and puts it in 'server', if construction was
   /// successful, returns an error otherwise. In the error case, 'server' will not have
   /// been set and will not need to be freed, otherwise the caller assumes ownership of
   /// '*server'.
   Status Build(ThriftServer** server) {
-    std::unique_ptr<ThriftServer> ptr(new ThriftServer(name_, processor_, port_,
-        auth_provider_, metrics_, max_concurrent_connections_, queue_timeout_ms_));
+    std::unique_ptr<ThriftServer> ptr(
+        new ThriftServer(name_, processor_, port_, auth_provider_, metrics_,
+            max_concurrent_connections_, queue_timeout_ms_, server_transport_type_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
@@ -332,6 +355,8 @@ class ThriftServerBuilder {
   std::string name_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
   int port_ = 0;
+  ThriftServer::TransportType server_transport_type_ =
+      ThriftServer::TransportType::BINARY;
 
   AuthProvider* auth_provider_ = nullptr;
   MetricGroup* metrics_ = nullptr;

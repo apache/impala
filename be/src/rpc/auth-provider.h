@@ -23,6 +23,7 @@
 #include <sasl/sasl.h>
 
 #include "common/status.h"
+#include "rpc/thrift-server.h"
 #include "util/promise.h"
 
 namespace sasl { class TSasl; }
@@ -39,33 +40,45 @@ class AuthProvider {
   virtual Status Start() WARN_UNUSED_RESULT = 0;
 
   /// Creates a new Thrift transport factory in the out parameter that performs
-  /// authorisation per this provider's protocol.
+  /// authorisation per this provider's protocol. The top-level transport returned by
+  /// 'factory' must always be a TBufferedTransport, but depending on the AuthProvider
+  /// implementation and the value of 'underlying_transport_type', that may be wrapped
+  /// around another transport type, eg. a TSaslServerTransport.
   virtual Status GetServerTransportFactory(
+      ThriftServer::TransportType underlying_transport_type,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory)
       WARN_UNUSED_RESULT = 0;
 
   /// Called by Thrift clients to wrap a raw transport with any intermediate transport
   /// that an auth protocol requires.
+  /// TODO: Return the correct clients for HTTP base transport. At this point, no clients
+  /// for HTTP endpoints are internal to the Impala service, so it should be OK.
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
       WARN_UNUSED_RESULT = 0;
 
+  /// Setup 'connection_ptr' to get its username from 'underlying_transport'.
+  virtual void SetupConnectionContext(
+      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      ThriftServer::TransportType underlying_transport_type,
+      apache::thrift::transport::TTransport* underlying_transport) = 0;
+
   /// Returns true if this provider uses Sasl at the transport layer.
-  virtual bool is_sasl() = 0;
+  virtual bool is_secure() = 0;
 
   virtual ~AuthProvider() { }
 };
 
-/// If either (or both) Kerberos and LDAP auth are desired, we use Sasl for the
-/// communication.  This "wraps" the underlying communication, in thrift-speak.
-/// This is used for both client and server contexts; there is one for internal
-/// and one for external communication.
-class SaslAuthProvider : public AuthProvider {
+/// Used if either (or both) Kerberos and LDAP auth are desired. For BINARY connections we
+/// use Sasl for the communication, and for HTTP connections we use BASIC auth.  This
+/// "wraps" the underlying communication, in thrift-speak. This is used for both client
+/// and server contexts; there is one for internal and one for external communication.
+class SecureAuthProvider : public AuthProvider {
  public:
-  SaslAuthProvider(bool is_internal) : has_ldap_(false), is_internal_(is_internal),
-      needs_kinit_(false) {}
+  SecureAuthProvider(bool is_internal)
+    : has_ldap_(false), is_internal_(is_internal), needs_kinit_(false) {}
 
   /// Performs initialization of external state. Kinit if configured to use kerberos.
   /// If we're using ldap, set up appropriate certificate usage.
@@ -86,9 +99,19 @@ class SaslAuthProvider : public AuthProvider {
   /// Then presto! You've got authentication for the connection.
   /// This is only applicable to Thrift connections and not KRPC connections.
   virtual Status GetServerTransportFactory(
+      ThriftServer::TransportType underlying_transport_type,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
-  virtual bool is_sasl() { return true; }
+  /// IF sasl was used, the username will be available from the handshake, and we set it
+  /// here. If HTTP BASIC auth was used, the username won't be available until the first
+  /// packet is received, so w register a callback with the transport that will set the
+  /// username then.
+  virtual void SetupConnectionContext(
+      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      ThriftServer::TransportType underlying_transport_type,
+      apache::thrift::transport::TTransport* underlying_transport);
+
+  virtual bool is_secure() { return true; }
 
   /// Initializes kerberos items and checks for sanity.  Failures can occur on a
   /// malformed principal or when setting some environment variables.  Called
@@ -152,6 +175,7 @@ class NoAuthProvider : public AuthProvider {
   virtual Status Start() { return Status::OK(); }
 
   virtual Status GetServerTransportFactory(
+      ThriftServer::TransportType underlying_transport_type,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   virtual Status WrapClientTransport(const std::string& hostname,
@@ -159,7 +183,15 @@ class NoAuthProvider : public AuthProvider {
       const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
-  virtual bool is_sasl() { return false; }
+  /// If there is no auth, then we don't have a username available.
+  virtual void SetupConnectionContext(
+      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      ThriftServer::TransportType underlying_transport_type,
+      apache::thrift::transport::TTransport* underlying_transport) {
+    connection_ptr->username = "";
+  }
+
+  virtual bool is_secure() { return false; }
 };
 
 /// The first entry point to the authentication subsystem.  Performs initialization

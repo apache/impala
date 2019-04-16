@@ -19,7 +19,7 @@
 
 #include <sstream>
 
-#include <thrift/transport/THttpTransport.h>
+#include "transport/THttpTransport.h"
 
 namespace apache {
 namespace thrift {
@@ -234,7 +234,7 @@ void THttpTransport::readHeaders() {
     if (strlen(line) == 0) {
       if (finished) {
         readHeaders_ = false;
-        return;
+        break;
       } else {
         // Must have been an HTTP 100, keep going for another status line
         statusLine = true;
@@ -248,6 +248,8 @@ void THttpTransport::readHeaders() {
       }
     }
   }
+
+  headersDone();
 }
 
 void THttpTransport::write(const uint8_t* buf, uint32_t len) {

@@ -67,6 +67,7 @@
 #include "service/impala-internal-service.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
+#include "util/auth-util.h"
 #include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
@@ -124,12 +125,15 @@ DECLARE_string(authorized_proxy_group_config);
 DECLARE_string(authorized_proxy_group_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
+DECLARE_bool(enable_ldap_auth);
 DECLARE_bool(use_local_catalog);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
     "If 0 or less, the Beeswax server is not started.");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served."
     "If 0 or less, the HiveServer2 server is not started.");
+DEFINE_int32(hs2_http_port, 28000, "port on which HiveServer2 HTTP(s) client "
+    "requests are served. If 0 or less, the HiveServer2 http server is not started.");
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
@@ -288,6 +292,7 @@ const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
 const string BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string HS2_SERVER_NAME = "hiveserver2-frontend";
+const string HS2_HTTP_SERVER_NAME = "hiveserver2-http-frontend";
 
 const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
@@ -2106,7 +2111,8 @@ void ImpalaServer::ConnectionEnd(
       }
     }
   } else {
-    DCHECK_EQ(connection_context.server_name, HS2_SERVER_NAME);
+    DCHECK(connection_context.server_name ==  HS2_SERVER_NAME
+        || connection_context.server_name == HS2_HTTP_SERVER_NAME);
     for (const TUniqueId& session_id : disconnected_sessions) {
       shared_ptr<SessionState> state;
       Status status = GetSessionState(session_id, &state);
@@ -2414,8 +2420,8 @@ void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {
   crs->set_expired();
 }
 
-Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
-   int32_t hs2_port) {
+Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port,
+    int32_t hs2_http_port) {
   exec_env_->SetImpalaServer(this);
 
   // We must register the HTTP handlers after registering the ImpalaServer with the
@@ -2524,6 +2530,39 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
       hs2_server_.reset(server);
       hs2_server_->SetConnectionHandler(this);
     }
+
+    // We can't currently secure the http server with Kerberos, only with LDAP, so if
+    // Kerberos is enabled and LDAP isn't we automatically disable the http server.
+    if ((hs2_http_port > 0 && (!IsKerberosEnabled() || FLAGS_enable_ldap_auth))
+        || (TestInfo::is_test() && hs2_http_port == 0)) {
+      boost::shared_ptr<TProcessor> hs2_http_processor(
+          new ImpalaHiveServer2ServiceProcessor(handler));
+      boost::shared_ptr<TProcessorEventHandler> event_handler(
+          new RpcEventHandler("hs2_http", exec_env_->metrics()));
+      hs2_http_processor->setEventHandler(event_handler);
+
+      ThriftServer* http_server;
+      ThriftServerBuilder http_builder(
+          HS2_HTTP_SERVER_NAME, hs2_http_processor, hs2_http_port);
+      if (IsExternalTlsConfigured()) {
+        LOG(INFO) << "Enabling SSL for HiveServer2 HTTP endpoint.";
+        http_builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+            .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+            .ssl_version(ssl_version)
+            .cipher_list(FLAGS_ssl_cipher_list);
+      }
+
+      RETURN_IF_ERROR(
+          http_builder
+              .auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
+              .transport_type(ThriftServer::TransportType::HTTP)
+              .metrics(exec_env_->metrics())
+              .max_concurrent_connections(FLAGS_fe_service_threads)
+              .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
+              .Build(&http_server));
+      hs2_http_server_.reset(http_server);
+      hs2_http_server_->SetConnectionHandler(this);
+    }
   }
   LOG(INFO) << "Initialized coordinator/executor Impala server on "
       << TNetworkAddressToString(GetThriftBackendAddress());
@@ -2537,6 +2576,11 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
   if (hs2_server_.get()) {
     RETURN_IF_ERROR(hs2_server_->Start());
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_server_->port();
+  }
+  if (hs2_http_server_.get()) {
+    RETURN_IF_ERROR(hs2_http_server_->Start());
+    LOG(INFO) << "Impala HiveServer2 Service (HTTP) listening on "
+              << hs2_http_server_->port();
   }
   if (beeswax_server_.get()) {
     RETURN_IF_ERROR(beeswax_server_->Start());

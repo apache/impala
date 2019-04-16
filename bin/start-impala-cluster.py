@@ -36,7 +36,7 @@ from subprocess import call, check_call
 from testdata.common import cgroups
 from tests.common.environ import build_flavor_timeout
 from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
-    DEFAULT_HS2_PORT, DEFAULT_BE_PORT, DEFAULT_KRPC_PORT,
+    DEFAULT_HS2_PORT, DEFAULT_BE_PORT, DEFAULT_KRPC_PORT, DEFAULT_HS2_HTTP_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
     DEFAULT_CATALOGD_JVM_DEBUG_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
@@ -201,6 +201,7 @@ def choose_impalad_ports(instance_num):
   from the argument name to the port number."""
   return {'beeswax_port': DEFAULT_BEESWAX_PORT + instance_num,
           'hs2_port': DEFAULT_HS2_PORT + instance_num,
+          'hs2_http_port': DEFAULT_HS2_HTTP_PORT + instance_num,
           'be_port': DEFAULT_BE_PORT + instance_num,
           'krpc_port': DEFAULT_KRPC_PORT + instance_num,
           'state_store_subscriber_port':
@@ -212,6 +213,7 @@ def build_impalad_port_args(instance_num):
   IMPALAD_PORTS = (
       "-beeswax_port={beeswax_port} "
       "-hs2_port={hs2_port} "
+      "-hs2_http_port={hs2_http_port} "
       "-be_port={be_port} "
       "-krpc_port={krpc_port} "
       "-state_store_subscriber_port={state_store_subscriber_port} "
@@ -511,6 +513,7 @@ class DockerMiniClusterOperations(object):
       chosen_ports = choose_impalad_ports(i)
       port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
                   DEFAULT_HS2_PORT: chosen_ports['hs2_port'],
+                  DEFAULT_HS2_HTTP_PORT: chosen_ports['hs2_http_port'],
                   DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
       self.__run_container__("impalad_coord_exec", impalad_arg_lists[i], port_map, i,
           mem_limit=mem_limit)

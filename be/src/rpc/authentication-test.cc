@@ -54,7 +54,7 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
 TEST(Auth, PrincipalSubstitution) {
   string hostname;
   ASSERT_OK(GetHostname(&hostname));
-  SaslAuthProvider sa(false);  // false means it's external
+  SecureAuthProvider sa(false); // false means it's external
 
   FLAGS_principal = "service_name/_HOST@some.realm";
   string principal;
@@ -70,20 +70,20 @@ TEST(Auth, PrincipalSubstitution) {
   FLAGS_principal.clear();
 }
 
-void AuthOk(const string& name, SaslAuthProvider* sa) {
+void AuthOk(const string& name, SecureAuthProvider* sa) {
   EXPECT_EQ(SASL_OK,
       SaslAuthorizeInternal(NULL, (void*)sa, name.c_str(), name.size(), NULL, 0, NULL, 0,
           NULL));
 }
 
-void AuthFails(const string& name, SaslAuthProvider* sa) {
+void AuthFails(const string& name, SecureAuthProvider* sa) {
   EXPECT_EQ(SASL_BADAUTH,
       SaslAuthorizeInternal(NULL, (void*)sa, name.c_str(), name.size(), NULL, 0, NULL, 0,
           NULL));
 }
 
 TEST(Auth, AuthorizeInternalPrincipals) {
-  SaslAuthProvider sa(true);  // false means it's external
+  SecureAuthProvider sa(true); // false means it's external
   ASSERT_OK(sa.InitKerberos("service_name/localhost@some.realm", "/etc/hosts"));
 
   AuthOk("service_name/localhost@some.realm", &sa);
@@ -116,7 +116,7 @@ TEST(Auth, ValidAuthProviders) {
 // Set up ldap flags and ensure we make the appropriate auth providers
 TEST(Auth, LdapAuth) {
   AuthProvider* ap = NULL;
-  SaslAuthProvider* sa = NULL;
+  SecureAuthProvider* sa = NULL;
 
   FLAGS_enable_ldap_auth = true;
   FLAGS_ldap_uri = "ldaps://bogus.com";
@@ -126,20 +126,20 @@ TEST(Auth, LdapAuth) {
 
   // External auth provider is sasl, ldap, but not kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
-  ASSERT_TRUE(ap->is_sasl());
-  sa = dynamic_cast<SaslAuthProvider*>(ap);
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
   ASSERT_TRUE(sa->has_ldap());
   ASSERT_EQ("", sa->principal());
 
   // Internal auth provider isn't sasl.
   ap = AuthManager::GetInstance()->GetInternalAuthProvider();
-  ASSERT_FALSE(ap->is_sasl());
+  ASSERT_FALSE(ap->is_secure());
 }
 
 // Set up ldap and kerberos flags and ensure we make the appropriate auth providers
 TEST(Auth, LdapKerbAuth) {
   AuthProvider* ap = NULL;
-  SaslAuthProvider* sa = NULL;
+  SecureAuthProvider* sa = NULL;
 
   if ((env_keytab == NULL) || (env_princ == NULL)) {
     return;     // In a non-kerberized environment
@@ -154,15 +154,15 @@ TEST(Auth, LdapKerbAuth) {
 
   // External auth provider is sasl, ldap, and kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
-  ASSERT_TRUE(ap->is_sasl());
-  sa = dynamic_cast<SaslAuthProvider*>(ap);
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
   ASSERT_TRUE(sa->has_ldap());
   ASSERT_EQ(FLAGS_principal, sa->principal());
 
   // Internal auth provider is sasl and kerberos
   ap = AuthManager::GetInstance()->GetInternalAuthProvider();
-  ASSERT_TRUE(ap->is_sasl());
-  sa = dynamic_cast<SaslAuthProvider*>(ap);
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
   ASSERT_FALSE(sa->has_ldap());
   ASSERT_EQ(FLAGS_principal, sa->principal());
 }
@@ -176,10 +176,10 @@ TEST(Auth, KerbAndSslEnabled) {
   FLAGS_ssl_server_certificate = "some_path";
   FLAGS_ssl_private_key = "some_path";
   ASSERT_TRUE(IsInternalTlsConfigured());
-  SaslAuthProvider sa_internal(true);
+  SecureAuthProvider sa_internal(true);
   ASSERT_OK(
       sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
-  SaslAuthProvider sa_external(false);
+  SecureAuthProvider sa_external(false);
   ASSERT_OK(
       sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
 }

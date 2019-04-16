@@ -21,7 +21,10 @@
 #include <sstream>
 #include <iostream>
 
-#include <thrift/transport/THttpServer.h>
+#include <gutil/strings/strip.h>
+#include <gutil/strings/util.h>
+
+#include "transport/THttpServer.h"
 #include <thrift/transport/TSocket.h>
 #ifdef _MSC_VER
 #include <Shlwapi.h>
@@ -33,7 +36,8 @@ namespace transport {
 
 using namespace std;
 
-THttpServer::THttpServer(boost::shared_ptr<TTransport> transport) : THttpTransport(transport) {
+THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool requireBasicAuth)
+  : THttpTransport(transport), requireBasicAuth_(requireBasicAuth) {
 }
 
 THttpServer::~THttpServer() {
@@ -64,6 +68,8 @@ void THttpServer::parseHeader(char* header) {
     contentLength_ = atoi(value);
   } else if (strncmp(header, "X-Forwarded-For", sz) == 0) {
     origin_ = value;
+  } else if (requireBasicAuth_ && THRIFT_strncasecmp(header, "Authorization", sz) == 0) {
+    authValue_ = string(value);
   }
 }
 
@@ -115,6 +121,26 @@ bool THttpServer::parseStatusLine(char* status) {
   throw TTransportException(string("Bad Status (unsupported method): ") + status);
 }
 
+void THttpServer::headersDone() {
+  if (requireBasicAuth_) {
+    bool authorized = false;
+    if (authValue_ != "") {
+      StripWhiteSpace(&authValue_);
+      string base64;
+      if (TryStripPrefixString(authValue_, "Basic ", &base64)) {
+        if (authFn_(base64.c_str())) {
+          authorized = true;
+        }
+      }
+    }
+    if (!authorized) {
+      returnUnauthorized();
+      throw TTransportException("HTTP Basic auth failed.");
+    }
+    authValue_ = "";
+  }
+}
+
 void THttpServer::flush() {
   // Fetch the contents of the write buffer
   uint8_t* buf;
@@ -158,6 +184,15 @@ std::string THttpServer::getTimeRFC1123() {
           broken_t->tm_min,
           broken_t->tm_sec);
   return std::string(buff);
+}
+
+void THttpServer::returnUnauthorized() {
+  std::ostringstream h;
+  h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << getTimeRFC1123() << CRLF
+    << "WWW-Authenticate: Basic" << CRLF << CRLF;
+  string header = h.str();
+  transport_->write((const uint8_t*)header.c_str(), static_cast<uint32_t>(header.size()));
+  transport_->flush();
 }
 }
 }

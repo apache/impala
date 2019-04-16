@@ -24,6 +24,8 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/filesystem.hpp>
+#include <gutil/casts.h>
+#include <gutil/strings/escaping.h>
 #include <gutil/strings/substitute.h>
 #include <random>
 #include <string>
@@ -40,6 +42,7 @@
 #include "kudu/security/init.h"
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
+#include "transport/THttpServer.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/auth-util.h"
 #include "util/debug-util.h"
@@ -62,6 +65,7 @@ using boost::algorithm::trim;
 using boost::mt19937;
 using boost::uniform_int;
 using namespace apache::thrift;
+using namespace apache::thrift::transport;
 using namespace boost::filesystem;   // for is_regular(), is_absolute()
 using namespace strings;
 
@@ -192,18 +196,14 @@ static int SaslLogCallback(void* context, int level, const char* message) {
 // Use --ldap_ca_certificate to specify the location of the certificate used to confirm
 // the authenticity of the LDAP server certificate.
 //
-// conn: The Sasl connection struct, which we ignore
-// context: Ignored; always NULL
 // user: The username to authenticate
 // pass: The password to use
 // passlen: The length of pass
-// propctx: Ignored - properties requested
-// Return: SASL_OK on success, SASL_FAIL otherwise
-int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
-    const char* pass, unsigned passlen, struct propctx* propctx) {
+// Return: true on success, false otherwise
+static bool LdapCheckPass(const char* user, const char* pass, unsigned passlen) {
   if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
     // Disable anonymous binds.
-    return SASL_FAIL;
+    return false;
   }
 
   LDAP* ld;
@@ -211,7 +211,7 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "Could not initialize connection with LDAP server ("
                  << FLAGS_ldap_uri << "). Error: " << ldap_err2string(rc);
-    return SASL_FAIL;
+    return false;
   }
 
   // Force the LDAP version to 3 to make sure TLS is supported.
@@ -227,7 +227,7 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
       LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
                    << FLAGS_ldap_uri << "). Error: " << ldap_err2string(tls_rc);
       ldap_unbind_ext(ld, NULL, NULL);
-      return SASL_FAIL;
+      return false;
     }
     VLOG(2) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
@@ -260,12 +260,27 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "LDAP authentication failure for " << user_str
                  << " : " << ldap_err2string(rc);
-    return SASL_FAIL;
+    return false;
   }
 
   VLOG_QUERY << "LDAP bind successful";
 
-  return SASL_OK;
+  return true;
+}
+
+// Wrapper around the function we use to check passwords with LDAP which converts the
+// return value to something appropriate for SASL.
+//
+// conn: The Sasl connection struct, which we ignore
+// context: Ignored; always NULL
+// user: The username to authenticate
+// pass: The password to use
+// passlen: The length of pass
+// propctx: Ignored - properties requested
+// Return: SASL_OK on success, SASL_FAIL otherwise
+int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
+    const char* pass, unsigned passlen, struct propctx* propctx) {
+  return LdapCheckPass(user, pass, passlen) ? SASL_OK : SASL_FAIL;
 }
 
 // Sasl wants a way to ask us about some options, this function provides
@@ -409,14 +424,14 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
               << "<service>/<hostname>@<realm> - got: " << requested_user;
     return SASL_BADAUTH;
   }
-  SaslAuthProvider* internal_auth_provider;
+  SecureAuthProvider* internal_auth_provider;
   if (context == NULL) {
-    internal_auth_provider = static_cast<SaslAuthProvider*>(
+    internal_auth_provider = static_cast<SecureAuthProvider*>(
         AuthManager::GetInstance()->GetInternalAuthProvider());
   } else {
     // Branch should only be taken for testing, where context is used to inject an auth
     // provider.
-    internal_auth_provider = static_cast<SaslAuthProvider*>(context);
+    internal_auth_provider = static_cast<SecureAuthProvider*>(context);
   }
 
   vector<string> whitelist;
@@ -479,6 +494,30 @@ static int SaslAuthorizeExternal(sasl_conn_t* conn, void* context,
 static int SaslGetPath(void* context, const char** path) {
   *path = FLAGS_sasl_path.c_str();
   return SASL_OK;
+}
+
+bool BasicAuth(ThriftServer::ConnectionContext* connection_context, const char* base64) {
+  int64_t in_len = strlen(base64);
+  string decoded;
+  if (!Base64Unescape(base64, in_len, &decoded)) {
+    LOG(ERROR) << "Failed to decode base64 auth string from: "
+               << TNetworkAddressToString(connection_context->network_address);
+    return false;
+  }
+  std::size_t colon = decoded.find(':');
+  if (colon == std::string::npos) {
+    LOG(ERROR) << "Auth string must be in the form '<username>:<password>' from: "
+               << TNetworkAddressToString(connection_context->network_address);
+    return false;
+  }
+  string username = decoded.substr(0, colon);
+  string password = decoded.substr(colon + 1);
+  bool ret = LdapCheckPass(username.c_str(), password.c_str(), password.length());
+  if (ret) {
+    // Authenication was successful, so set the username on the connection.
+    connection_context->username = username;
+  }
+  return ret;
 }
 
 namespace {
@@ -658,9 +697,8 @@ Status CheckReplayCacheDirPermissions() {
   return Status::OK();
 }
 
-Status SaslAuthProvider::InitKerberos(const string& principal,
-    const string& keytab_file) {
-
+Status SecureAuthProvider::InitKerberos(
+    const string& principal, const string& keytab_file) {
   principal_ = principal;
   keytab_file_ = keytab_file;
   // The logic here is that needs_kinit_ is false unless we are the internal
@@ -782,7 +820,7 @@ Status AuthManager::InitKerberosEnv() {
   return Status::OK();
 }
 
-Status SaslAuthProvider::Start() {
+Status SecureAuthProvider::Start() {
   // True for kerberos internal use
   if (needs_kinit_) {
     DCHECK(is_internal_);
@@ -825,10 +863,26 @@ Status SaslAuthProvider::Start() {
   return Status::OK();
 }
 
-Status SaslAuthProvider::GetServerTransportFactory(
+Status SecureAuthProvider::GetServerTransportFactory(
+    ThriftServer::TransportType underlying_transport_type,
     boost::shared_ptr<TTransportFactory>* factory) {
   DCHECK(!principal_.empty() || has_ldap_);
 
+  if (underlying_transport_type == ThriftServer::HTTP) {
+    // TODO: add support for SPNEGO style of HTTP auth
+    if (!principal_.empty() && !has_ldap_) {
+      const string err = "Kerberos not yet supported with HTTP transport.";
+      LOG(ERROR) << err;
+      return Status(err);
+    }
+
+    factory->reset(new ThriftServer::BufferedTransportFactory(
+        ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
+        new THttpServerTransportFactory(/* requireBasicAuth */ true)));
+    return Status::OK();
+  }
+
+  DCHECK(underlying_transport_type == ThriftServer::BINARY);
   // This is the heart of the link between this file and thrift.  Here we
   // associate a Sasl mechanism with our callbacks.
   try {
@@ -863,10 +917,9 @@ Status SaslAuthProvider::GetServerTransportFactory(
   return Status::OK();
 }
 
-Status SaslAuthProvider::WrapClientTransport(const string& hostname,
+Status SecureAuthProvider::WrapClientTransport(const string& hostname,
     boost::shared_ptr<TTransport> raw_transport, const string& service_name,
     boost::shared_ptr<TTransport>* wrapped_transport) {
-
   boost::shared_ptr<sasl::TSasl> sasl_client;
   const map<string, string> props; // Empty; unused by thrift
   const string auth_id; // Empty; unused by thrift
@@ -894,10 +947,46 @@ Status SaslAuthProvider::WrapClientTransport(const string& hostname,
   return Status::OK();
 }
 
+void SecureAuthProvider::SetupConnectionContext(
+    const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+    ThriftServer::TransportType underlying_transport_type,
+    TTransport* underlying_transport) {
+  switch (underlying_transport_type) {
+    case ThriftServer::BINARY: {
+      TSaslServerTransport* sasl_transport =
+          down_cast<TSaslServerTransport*>(underlying_transport);
+
+      // Get the username from the transport.
+      connection_ptr->username = sasl_transport->getUsername();
+      break;
+    }
+    case ThriftServer::HTTP: {
+      THttpServer* http_transport = down_cast<THttpServer*>(underlying_transport);
+      http_transport->setAuthFn(
+          std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1));
+      break;
+    }
+    default:
+      LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
+  }
+}
+
 Status NoAuthProvider::GetServerTransportFactory(
+    ThriftServer::TransportType underlying_transport_type,
     boost::shared_ptr<TTransportFactory>* factory) {
   // No Sasl - yawn.  Here, have a regular old buffered transport.
-  factory->reset(new ThriftServer::BufferedTransportFactory());
+  switch (underlying_transport_type) {
+    case ThriftServer::BINARY:
+      factory->reset(new ThriftServer::BufferedTransportFactory());
+      break;
+    case ThriftServer::HTTP:
+      factory->reset(new ThriftServer::BufferedTransportFactory(
+          ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
+          new THttpServerTransportFactory()));
+      break;
+    default:
+      LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
+  }
   return Status::OK();
 }
 
@@ -1006,8 +1095,8 @@ Status AuthManager::Init() {
   // the client side, this is just a check for the "back end" kerberos
   // principal.
   if (use_kerberos) {
-    SaslAuthProvider* sap = NULL;
-    internal_auth_provider_.reset(sap = new SaslAuthProvider(true));
+    SecureAuthProvider* sap = NULL;
+    internal_auth_provider_.reset(sap = new SecureAuthProvider(true));
     RETURN_IF_ERROR(sap->InitKerberos(kerberos_internal_principal,
         FLAGS_keytab_file));
     LOG(INFO) << "Internal communication is authenticated with Kerberos";
@@ -1018,11 +1107,11 @@ Status AuthManager::Init() {
   RETURN_IF_ERROR(internal_auth_provider_->Start());
 
   // Set up the external auth provider as per above.  Either a "front end"
-  // principal or ldap tells us to use a SaslAuthProvider, and we fill in
+  // principal or ldap tells us to use a SecureAuthProvider, and we fill in
   // details from there.
   if (use_ldap || use_kerberos) {
-    SaslAuthProvider* sap = NULL;
-    external_auth_provider_.reset(sap = new SaslAuthProvider(false));
+    SecureAuthProvider* sap = NULL;
+    external_auth_provider_.reset(sap = new SecureAuthProvider(false));
     if (use_kerberos) {
       RETURN_IF_ERROR(sap->InitKerberos(kerberos_external_principal,
           FLAGS_keytab_file));

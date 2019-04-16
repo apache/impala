@@ -31,25 +31,40 @@ import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.junit.After;
-import org.junit.AfterClass;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+import org.junit.runner.RunWith;
 
 import com.google.common.collect.Lists;
 
 /**
  * Base class providing utility functions for tests that need a Jdbc connection.
  */
+@RunWith(Parameterized.class)
 public abstract class JdbcTestBase {
-  protected static Connection con_;
+  protected String connectionType_;
+  protected Connection con_;
 
   // Test-local list of test tables. These are cleaned up in @After.
   protected final List<String> testTableNames_ = Lists.newArrayList();
 
+  public JdbcTestBase(String connectionType) { connectionType_ = connectionType; }
+
+  @Parameterized.Parameters
+  public static String[] createConnections() {
+    return new String[] {"binary", "http"};
+  }
+
   /**
-   * Closes 'con_'. Any subclasses that specify their own 'AfterClass' will need to call
-   * this function there.
+   * Closes 'con_'. Any subclasses that specify their own 'After' will need to call this
+   * function there.
    */
-  @AfterClass
-  public static void cleanUp() throws Exception {
+  @After
+  public void cleanUp() throws Exception {
+    for (String tableName : testTableNames_) {
+      dropTestTable(tableName);
+    }
+
     con_.close();
     assertTrue("Connection should be closed", con_.isClosed());
 
@@ -110,13 +125,6 @@ public abstract class JdbcTestBase {
       stmt.execute("DROP TABLE " + tableName);
     } finally {
       stmt.close();
-    }
-  }
-
-  @After
-  public void testCleanUp() throws SQLException {
-    for (String tableName : testTableNames_) {
-      dropTestTable(tableName);
     }
   }
 }

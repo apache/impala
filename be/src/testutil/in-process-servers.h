@@ -59,7 +59,7 @@ class InProcessImpalaServer {
 
   /// Starts all servers, including the beeswax and hs2 client
   /// servers.
-  Status StartWithClientServers(int beeswax_port, int hs2_port);
+  Status StartWithClientServers(int beeswax_port, int hs2_port, int hs2_http_port);
 
   /// Blocks until the backend server exits. Returns Status::OK unless
   /// there was an error joining.
@@ -85,6 +85,8 @@ class InProcessImpalaServer {
   uint32_t beeswax_port_;
 
   uint32_t hs2_port_;
+
+  uint32_t hs2_http_port_;
 
   /// The ImpalaServer that handles client and backend requests.
   boost::shared_ptr<ImpalaServer> impala_server_;

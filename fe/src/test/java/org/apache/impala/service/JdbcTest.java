@@ -37,7 +37,7 @@ import java.util.Map;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.util.Metrics;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -48,9 +48,11 @@ import org.junit.Test;
  *
  */
 public class JdbcTest extends JdbcTestBase {
-  @BeforeClass
-  public static void setUp() throws Exception {
-    con_ = createConnection(ImpalaJdbcClient.getNoAuthConnectionStr());
+  public JdbcTest(String connectionType) { super(connectionType); }
+
+  @Before
+  public void setUp() throws Exception {
+    con_ = createConnection(ImpalaJdbcClient.getNoAuthConnectionStr(connectionType_));
   }
 
   @Test
@@ -554,7 +556,8 @@ public class JdbcTest extends JdbcTestBase {
     List<Long> lastTimeSessionActive = new ArrayList<>();
 
     for (int timeout : timeoutPeriods) {
-      connections.add(createConnection(ImpalaJdbcClient.getNoAuthConnectionStr()));
+      connections.add(
+          createConnection(ImpalaJdbcClient.getNoAuthConnectionStr(connectionType_)));
     }
 
     Long numOpenSessions = (Long)metrics.getMetric(

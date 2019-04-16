@@ -38,6 +38,7 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
+#include "transport/THttpServer.h"
 #include "util/condition-variable.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
@@ -259,15 +260,19 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(
       boost::shared_ptr<ConnectionContext>(new ConnectionContext);
   TTransport* underlying_transport =
       (static_cast<TBufferedTransport*>(transport))->getUnderlyingTransport().get();
-  if (!thrift_server_->auth_provider_->is_sasl()) {
-    socket = static_cast<TSocket*>(underlying_transport);
-  } else {
+
+  thrift_server_->auth_provider_->SetupConnectionContext(
+      connection_ptr, thrift_server_->transport_type_, underlying_transport);
+  if (thrift_server_->auth_provider_->is_secure()
+      && thrift_server_->transport_type_ == ThriftServer::BINARY) {
     TSaslServerTransport* sasl_transport = static_cast<TSaslServerTransport*>(
         underlying_transport);
-
-    // Get the username from the transport.
-    connection_ptr->username = sasl_transport->getUsername();
     socket = static_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
+  } else if (thrift_server_->transport_type_ == ThriftServer::HTTP) {
+    THttpServer* http_transport = static_cast<THttpServer*>(underlying_transport);
+    socket = static_cast<TSocket*>(http_transport->getUnderlyingTransport().get());
+  } else {
+    socket = static_cast<TSocket*>(underlying_transport);
   }
 
   {
@@ -324,7 +329,8 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 
 ThriftServer::ThriftServer(const string& name,
     const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
-    MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms)
+    MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms,
+    TransportType transport_type)
   : started_(false),
     port_(port),
     ssl_enabled_(false),
@@ -335,7 +341,8 @@ ThriftServer::ThriftServer(const string& name,
     processor_(processor),
     connection_handler_(NULL),
     metrics_(NULL),
-    auth_provider_(auth_provider) {
+    auth_provider_(auth_provider),
+    transport_type_(transport_type) {
   if (auth_provider_ == NULL) {
     auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();
   }
@@ -483,7 +490,8 @@ Status ThriftServer::Start() {
   boost::shared_ptr<TServerSocket> server_socket;
   boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
-  RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
+  RETURN_IF_ERROR(
+      auth_provider_->GetServerTransportFactory(transport_type_, &transport_factory));
 
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
       protocol_factory, thread_factory, name_, max_concurrent_connections_,

@@ -53,6 +53,7 @@ using namespace impala;
 
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
+DECLARE_int32(hs2_http_port);
 DECLARE_int32(be_port);
 DECLARE_bool(is_coordinator);
 
@@ -84,8 +85,8 @@ int ImpaladMain(int argc, char** argv) {
   InitRpcEventTracing(exec_env.webserver(), exec_env.rpc_mgr());
 
   boost::shared_ptr<ImpalaServer> impala_server(new ImpalaServer(&exec_env));
-  Status status =
-      impala_server->Start(FLAGS_be_port, FLAGS_beeswax_port, FLAGS_hs2_port);
+  Status status = impala_server->Start(
+      FLAGS_be_port, FLAGS_beeswax_port, FLAGS_hs2_port, FLAGS_hs2_http_port);
   if (!status.ok()) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
         << status.GetDetail();
