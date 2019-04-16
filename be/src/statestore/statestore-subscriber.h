@@ -127,6 +127,10 @@ class StatestoreSubscriber {
 
   const std::string& id() const { return subscriber_id_; }
 
+  int64_t MilliSecondsSinceLastRegistration() const {
+    return MonotonicMillis() - last_registration_ms_.Load();
+  }
+
  private:
   /// Unique, but opaque, identifier for this subscriber.
   const std::string subscriber_id_;
@@ -206,6 +210,9 @@ class StatestoreSubscriber {
   /// subscriber to reject communication from the statestore that pertains to a previous
   /// registration.
   RegistrationId registration_id_;
+
+  /// Monotonic timestamp of the last successful registration.
+  AtomicInt64 last_registration_ms_{0};
 
   struct TopicRegistration {
     /// Held when processing a topic update. 'StatestoreSubscriber::lock_' must be held in

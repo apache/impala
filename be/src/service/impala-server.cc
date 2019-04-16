@@ -238,6 +238,13 @@ DEFINE_int64(shutdown_deadline_s, 60 * 60, "Default time limit in seconds for th
     "down process. If this duration elapses after the shut down process is started, "
     "the daemon shuts down regardless of any running queries.");
 
+DEFINE_int64_hidden(failed_backends_query_cancellation_grace_period_ms, 30000L,
+    "Grace period since last successful subscriber registration that impala server is "
+    "willing to wait before initiating cancellation of queries running on backends not "
+    "included in the latest membership update. This value should be large enough to give "
+    "the statestore enough time to get a consistent view of cluster membership after "
+    "recovery.");
+
 #ifndef NDEBUG
   DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
       "for a given query by injecting a sleep equivalent to this configuration in "
@@ -1814,7 +1821,11 @@ void ImpalaServer::MembershipCallback(
     }
   }
 
-  CancelQueriesOnFailedBackends(current_membership);
+  // Only initiate cancellation after a grace period since last successful registration.
+  if (exec_env_->subscriber()->MilliSecondsSinceLastRegistration()
+      >= FLAGS_failed_backends_query_cancellation_grace_period_ms) {
+    CancelQueriesOnFailedBackends(current_membership);
+  }
 }
 
 void ImpalaServer::CancelQueriesOnFailedBackends(

@@ -182,7 +182,10 @@ Status StatestoreSubscriber::Register() {
   RETURN_IF_ERROR(client.DoRpc(&StatestoreServiceClientWrapper::RegisterSubscriber,
       request, &response));
   Status status = Status(response.status);
-  if (status.ok()) connected_to_statestore_metric_->SetValue(true);
+  if (status.ok()) {
+    connected_to_statestore_metric_->SetValue(true);
+    last_registration_ms_.Store(MonotonicMillis());
+  }
   if (response.__isset.registration_id) {
     lock_guard<mutex> l(registration_id_lock_);
     registration_id_ = response.registration_id;

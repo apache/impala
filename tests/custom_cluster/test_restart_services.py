@@ -29,6 +29,7 @@ from time import sleep
 from impala.error import HiveServer2Error
 from TCLIService import TCLIService
 
+from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfEC
@@ -86,6 +87,73 @@ class TestRestart(CustomClusterTestSuite):
         # as certain builds (e.g. ASAN) can be really slow.
         sleep(3)
 
+      client.close()
+
+  SUBSCRIBER_TIMEOUT_S = 2
+  CANCELLATION_GRACE_PERIOD_S = 5
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--statestore_subscriber_timeout_seconds={timeout_s} "
+                 "--failed_backends_query_cancellation_grace_period_ms={grace_period_ms}"
+    .format(timeout_s=SUBSCRIBER_TIMEOUT_S,
+            grace_period_ms=(CANCELLATION_GRACE_PERIOD_S * 1000)),
+    catalogd_args="--statestore_subscriber_timeout_seconds={timeout_s}".format(
+      timeout_s=SUBSCRIBER_TIMEOUT_S))
+  def test_restart_statestore_query_resilience(self):
+    """IMPALA-7665: Test that after restarting statestore a momentary inconsistent
+    cluster membership state will not result in query cancellation. Also make sure that
+    queries get cancelled if a backend actually went down while the statestore was
+    down or during the grace period."""
+    slow_query = \
+      "select distinct * from tpch_parquet.lineitem where l_orderkey > sleep(1000)"
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    try:
+      handle = client.execute_async(slow_query)
+      # Make sure query starts running.
+      self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      # Restart Statestore and wait till the grace period ends + some buffer.
+      self.cluster.statestored.restart()
+      self.cluster.statestored.service.wait_for_live_subscribers(4)
+      sleep(self.CANCELLATION_GRACE_PERIOD_S + 1)
+      assert client.get_state(handle) == QueryState.RUNNING
+      # Now restart statestore and kill a backend while it is down, and make sure the
+      # query fails when it comes back up.
+      start_time = time.time()
+      self.cluster.statestored.kill()
+      self.cluster.impalads[1].kill()
+      self.cluster.statestored.start()
+      try:
+        client.wait_for_finished_timeout(handle, 100)
+        assert False, "Query expected to fail"
+      except ImpalaBeeswaxException as e:
+        assert "Failed due to unreachable impalad" in str(e), str(e)
+        assert time.time() - start_time > self.CANCELLATION_GRACE_PERIOD_S + \
+                                     self.SUBSCRIBER_TIMEOUT_S, \
+          "Query got cancelled earlier than the cancellation grace period"
+      # Now restart statestore and kill a backend after it comes back up, and make sure
+      # the query eventually fails.
+      # Make sure the new statestore has received update from catalog and sent it to the
+      # impalad.
+      catalogd_version = self.cluster.catalogd.service.get_catalog_version()
+      impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
+      handle = client.execute_async(slow_query)
+      self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      start_time = time.time()
+      self.cluster.statestored.restart()
+      # Make sure it has connected to the impalads before killing one.
+      self.cluster.statestored.service.wait_for_live_subscribers(3)
+      self.cluster.impalads[2].kill()
+      try:
+        client.wait_for_finished_timeout(handle, 100)
+        assert False, "Query expected to fail"
+      except ImpalaBeeswaxException as e:
+        assert "Failed due to unreachable impalad" in str(e), str(e)
+        assert time.time() - start_time > self.CANCELLATION_GRACE_PERIOD_S + \
+                                     self.SUBSCRIBER_TIMEOUT_S, \
+          "Query got cancelled earlier than the cancellation grace period"
+    finally:
       client.close()
 
 
