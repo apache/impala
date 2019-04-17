@@ -157,8 +157,9 @@ class TestWebPage(ImpalaTestSuite):
     for port in ports_to_test:
       input_url = url.format(port)
       response = requests.get(input_url)
-      assert response.status_code == requests.codes.ok\
-          and string_to_search in response.text, "Offending url: " + input_url
+      assert (response.status_code == requests.codes.ok
+          and string_to_search in response.text), "URL: {0} Str:'{1}'\nResp:{2}".format(
+              input_url, string_to_search, response.text)
       responses.append(response)
     return responses
 
