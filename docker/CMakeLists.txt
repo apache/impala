@@ -35,6 +35,9 @@ add_custom_command(
   COMMENT "Creating impala base build context."
   VERBATIM
 )
+add_custom_target(impala_base_build_context
+  DEPENDS ${IMPALA_BASE_BUILD_CONTEXT_TIMESTAMP}
+)
 
 # Command and target for the base Impala image.
 set(IMPALA_BASE_IMAGE_TIMESTAMP
@@ -46,7 +49,7 @@ add_custom_command(
   # directories in the build context.
   COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR} && tar cvh . | docker build -t impala_base -
   COMMAND touch ${IMPALA_BASE_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_BUILD_CONTEXT_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
+  DEPENDS impala_base_build_context ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
   DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
   COMMENT "Building Impala base docker image."
   VERBATIM
@@ -63,7 +66,7 @@ add_custom_command(
   OUTPUT ${COORD_EXEC_IMAGE_TIMESTAMP}
   COMMAND cd ${CMAKE_SOURCE_DIR}/docker/coord_exec && docker build -t impalad_coord_exec .
   COMMAND touch ${COORD_EXEC_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/coord_exec/Dockerfile
+  DEPENDS impala_base_image ${CMAKE_SOURCE_DIR}/docker/coord_exec/Dockerfile
   COMMENT "Building Impalad Coord Exec docker image."
   VERBATIM
 )
@@ -77,7 +80,7 @@ add_custom_command(
   OUTPUT ${COORDINATOR_IMAGE_TIMESTAMP}
   COMMAND cd ${CMAKE_SOURCE_DIR}/docker/coordinator && docker build -t impalad_coordinator .
   COMMAND touch ${COORDINATOR_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/coordinator/Dockerfile
+  DEPENDS impala_base_image ${CMAKE_SOURCE_DIR}/docker/coordinator/Dockerfile
   COMMENT "Building Impalad Coordinator docker image."
   VERBATIM
 )
@@ -91,7 +94,7 @@ add_custom_command(
   OUTPUT ${EXECUTOR_IMAGE_TIMESTAMP}
   COMMAND cd ${CMAKE_SOURCE_DIR}/docker/executor && docker build -t impalad_executor .
   COMMAND touch ${EXECUTOR_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/executor/Dockerfile
+  DEPENDS impala_base_image ${CMAKE_SOURCE_DIR}/docker/executor/Dockerfile
   COMMENT "Building Impalad Executor docker image."
   VERBATIM
 )
@@ -107,7 +110,7 @@ add_custom_command(
   OUTPUT ${STATESTORED_IMAGE_TIMESTAMP}
   COMMAND cd ${CMAKE_SOURCE_DIR}/docker/statestored && docker build -t statestored .
   COMMAND touch ${STATESTORED_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/statestored/Dockerfile
+  DEPENDS impala_base_image ${CMAKE_SOURCE_DIR}/docker/statestored/Dockerfile
   COMMENT "Building Statestored docker image."
   VERBATIM
 )
@@ -123,7 +126,7 @@ add_custom_command(
   OUTPUT ${CATALOGD_IMAGE_TIMESTAMP}
   COMMAND cd ${CMAKE_SOURCE_DIR}/docker/catalogd && docker build -t catalogd .
   COMMAND touch ${CATALOGD_IMAGE_TIMESTAMP}
-  DEPENDS ${IMPALA_BASE_IMAGE_TIMESTAMP} ${CMAKE_SOURCE_DIR}/docker/catalogd/Dockerfile
+  DEPENDS impala_base_image ${CMAKE_SOURCE_DIR}/docker/catalogd/Dockerfile
   COMMENT "Building Catalogd docker image."
   VERBATIM
 )
