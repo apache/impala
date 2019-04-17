@@ -300,7 +300,7 @@ public class MetastoreEventsProcessorTest {
     // as the previous CREATE_DB operation, so as to trigger the filtering logic
     // based on CREATION_TIME in DROP_DB event processing. This is currently a
     // limitation : the DROP_DB event filtering expects that while processing events,
-    // the CREATION_TIME of two DB's with same name won't have the same
+    // the CREATION_TIME of two Databases with same name won't have the same
     // creation timestamp.
     sleep(2000);
     // Create database again with same name
@@ -687,7 +687,8 @@ public class MetastoreEventsProcessorTest {
    * already at its latest state
    */
   @Test
-  public void testCreateDropCreateTableFromImpala() throws ImpalaException, TException {
+  public void testCreateDropCreateTableFromImpala()
+      throws ImpalaException, TException, InterruptedException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     createDatabase(TEST_DB_NAME, null);
     final String testTblName = "testCreateDropCreateTableFromImpala";
@@ -696,6 +697,13 @@ public class MetastoreEventsProcessorTest {
     assertNotNull("Table should have been found after create table statement",
         catalog_.getTable(TEST_DB_NAME, testTblName));
     loadTable(testTblName);
+    // Adding sleep here to make sure that the CREATION_TIME is not same
+    // as the previous CREATE_TABLE operation, so as to trigger the filtering logic
+    // based on CREATION_TIME in DROP_TABLE event processing. This is currently a
+    // limitation : the DROP_TABLE event filtering expects that while processing events,
+    // the CREATION_TIME of two tables with same name won't have the same
+    // creation timestamp.
+    sleep(2000);
     dropTableFromImpala(TEST_DB_NAME, testTblName);
     // now catalogD does not have the table entry, create the table again
     createTableFromImpala(TEST_DB_NAME, testTblName, false);
@@ -841,11 +849,19 @@ public class MetastoreEventsProcessorTest {
    * of Table.
    */
   @Test
-  public void testCreateDropCreateDatabaseFromImpala() throws ImpalaException {
+  public void testCreateDropCreateDatabaseFromImpala()
+      throws ImpalaException, InterruptedException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     createDatabaseFromImpala(TEST_DB_NAME, "first");
     assertNotNull("Db should have been found after create database statement",
         catalog_.getDb(TEST_DB_NAME));
+    // Adding sleep here to make sure that the CREATION_TIME is not same
+    // as the previous CREATE_DB operation, so as to trigger the filtering logic
+    // based on CREATION_TIME in DROP_DB event processing. This is currently a
+    // limitation : the DROP_DB event filtering expects that while processing events,
+    // the CREATION_TIME of two Databases with same name won't have the same
+    // creation timestamp.
+    sleep(2000);
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
     assertNull(catalog_.getDb(TEST_DB_NAME));
     createDatabaseFromImpala(TEST_DB_NAME, "second");

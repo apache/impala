@@ -777,7 +777,16 @@ public class MetastoreEvents {
      * catalog, ignore the event. If the table exists in the catalog, compares the
      * createTime of the table in catalog with the createTime of the table from the event
      * and remove the catalog table if there is a match. If the catalog table is a
-     * incomplete table it is removed as well.
+     * incomplete table it is removed as well. The creation_time from HMS is unfortunately
+     * in seconds granularity, which means there is a limitation that we cannot
+     * distinguish between tables which are created with the same name within a second.
+     * So a sequence of create_table, drop_table, create_table happening within the
+     * same second might cause false positives on drop_table event processing. This is
+     * not a huge problem since the tables will eventually be created when the
+     * create events are processed but there will be a non-zero amount of time when the
+     * table will not be existing in catalog.
+     * TODO : Once HIVE-21595 is available we should rely on table_id for determining a
+     * newer incarnation of a previous table.
      */
     @Override
     public void process() {
@@ -900,7 +909,17 @@ public class MetastoreEvents {
      * CREATION_TIME of the catalog's DB object is greater than that of the notification
      * event's DB object, it means that the Database object present in the catalog is a
      * later version and we can skip the event. (For instance, when user does a create db,
-     * drop db and create db again with the same dbName.)
+     * drop db and create db again with the same dbName.).
+     * The creation_time from HMS is unfortunately in seconds granularity, which means
+     * there is a limitation that we cannot distinguish between databases which are
+     * created with the same name within a second. So a sequence of create_database,
+     * drop_database, create_database happening within the same second might cause
+     * false positives on drop_database event processing. This is not a huge problem
+     * since the databases will eventually be created when the create events are
+     * processed but there will be a non-zero amount of time when the database will not
+     * be existing in catalog.
+     * TODO : Once HIVE-21595 is available we should rely on database_id for determining a
+     * newer incarnation of a previous database.
      */
     @Override
     public void process() {
