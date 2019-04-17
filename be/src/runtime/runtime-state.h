@@ -107,10 +107,10 @@ class RuntimeState {
         ? instance_ctx_->fragment_instance_id
         : no_instance_id_;
   }
-  MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
+  MemTracker* instance_mem_tracker() { return instance_mem_tracker_; }
   MemTracker* query_mem_tracker();  // reference to the query_state_'s memtracker
   ReservationTracker* instance_buffer_reservation() {
-    return instance_buffer_reservation_.get();
+    return instance_buffer_reservation_;
   }
   ThreadResourcePool* resource_pool() { return resource_pool_.get(); }
 
@@ -368,12 +368,15 @@ class RuntimeState {
   /// Counters for bytes sent over the network in this instance's tree, not owned.
   std::vector<RuntimeProfile::Counter*> bytes_sent_counters_;
 
-  /// Memory usage of this fragment instance, a child of 'query_mem_tracker_'.
-  boost::scoped_ptr<MemTracker> instance_mem_tracker_;
+  /// Memory usage of this fragment instance, a child of 'query_mem_tracker_'. Owned by
+  /// 'query_state_' and destroyed with the rest of the query's MemTracker hierarchy.
+  /// See IMPALA-8270 for a reason why having the QueryState own this is important.
+  MemTracker* instance_mem_tracker_ = nullptr;
 
   /// Buffer reservation for this fragment instance - a child of the query buffer
-  /// reservation. Non-NULL if 'query_state_' is not NULL.
-  boost::scoped_ptr<ReservationTracker> instance_buffer_reservation_;
+  /// reservation. Non-NULL if this is a finstance's RuntimeState used for query
+  /// execution. Owned by 'query_state_'.
+  ReservationTracker* const instance_buffer_reservation_;
 
   /// if true, execution should stop with a CANCELLED status
   bool is_cancelled_ = false;

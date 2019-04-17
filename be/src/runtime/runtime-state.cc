@@ -75,7 +75,7 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
     profile_(RuntimeProfile::Create(
         obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
-    instance_buffer_reservation_(new ReservationTracker) {
+    instance_buffer_reservation_(obj_pool()->Add(new ReservationTracker)) {
   Init();
 }
 
@@ -95,7 +95,8 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
-    profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
+    profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")),
+    instance_buffer_reservation_(nullptr) {
   // We may use execution resources while evaluating exprs, etc. Decremented in
   // ReleaseResources() to release resources.
   local_query_state_->AcquireBackendResourceRefcount();
@@ -108,6 +109,10 @@ RuntimeState::RuntimeState(
 
 RuntimeState::~RuntimeState() {
   DCHECK(released_resources_) << "Must call ReleaseResources()";
+  // IMPALA-8270: run local_query_state_ destructor *before* other destructors so that
+  // teardown order for the TestEnv/fe-support RuntimeState matches the teardown order
+  // for the "real" RuntimeState. The previous divergence lead to hard-to-find bugs.
+  if (local_query_state_ != nullptr) local_query_state_.reset();
 }
 
 void RuntimeState::Init() {
@@ -126,12 +131,12 @@ void RuntimeState::Init() {
   total_network_send_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkSendTime");
   total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
 
-  instance_mem_tracker_.reset(new MemTracker(
+  instance_mem_tracker_ = obj_pool()->Add(new MemTracker(
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker()));
 
   if (instance_buffer_reservation_ != nullptr) {
     instance_buffer_reservation_->InitChildTracker(profile_,
-        query_state_->buffer_reservation(), instance_mem_tracker_.get(),
+        query_state_->buffer_reservation(), instance_mem_tracker_,
         numeric_limits<int64_t>::max());
   }
 
@@ -163,7 +168,7 @@ Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK();
   // TODO: add the fragment ID to the codegen ID as well
   RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(this,
-      instance_mem_tracker_.get(), PrintId(fragment_instance_id()), &codegen_));
+      instance_mem_tracker_, PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_->AddChild(codegen_->runtime_profile());
   return Status::OK();
@@ -269,7 +274,7 @@ void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 Status RuntimeState::CheckQueryState() {
   DCHECK(instance_mem_tracker_ != nullptr);
   if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded(MemLimit::HARD))) {
-    SetMemLimitExceeded(instance_mem_tracker_.get());
+    SetMemLimitExceeded(instance_mem_tracker_);
   }
   return GetQueryStatus();
 }
