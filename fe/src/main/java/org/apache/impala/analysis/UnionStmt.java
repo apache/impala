@@ -157,6 +157,12 @@ public class UnionStmt extends QueryStmt {
   // (if any). Same as resultExprs_ if there is no ORDER BY.
   private List<Expr> unionResultExprs_ = new ArrayList<>();
 
+  // List of expressions produced by analyzer.castToUnionCompatibleTypes().
+  // Contains a list of exprs such that for every i-th expr in that list, it is the first
+  // widest compatible expression encountered among all i-th exprs in every result expr
+  // list of the union operands.
+  protected List<Expr> widestExprs_ = new ArrayList<>();
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -191,6 +197,7 @@ public class UnionStmt extends QueryStmt {
     hasAnalyticExprs_ = other.hasAnalyticExprs_;
     withClause_ = (other.withClause_ != null) ? other.withClause_.clone() : null;
     unionResultExprs_ = Expr.cloneList(other.unionResultExprs_);
+    widestExprs_ = other.widestExprs_;
   }
 
   public List<UnionOperand> getOperands() { return operands_; }
@@ -241,7 +248,7 @@ public class UnionStmt extends QueryStmt {
     for (UnionOperand op: operands_) {
       resultExprLists.add(op.getQueryStmt().getResultExprs());
     }
-    analyzer.castToUnionCompatibleTypes(resultExprLists);
+    widestExprs_ = analyzer.castToUnionCompatibleTypes(resultExprLists);
 
     // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
     // its sortInfo if necessary.
@@ -616,6 +623,8 @@ public class UnionStmt extends QueryStmt {
 
   public List<Expr> getUnionResultExprs() { return unionResultExprs_; }
 
+  public List<Expr> getWidestExprs() { return widestExprs_; }
+
   @Override
   public UnionStmt clone() { return new UnionStmt(this); }
 
@@ -637,5 +646,6 @@ public class UnionStmt extends QueryStmt {
     toSqlString_ = null;
     hasAnalyticExprs_ = false;
     unionResultExprs_.clear();
+    widestExprs_ = null;
   }
 }

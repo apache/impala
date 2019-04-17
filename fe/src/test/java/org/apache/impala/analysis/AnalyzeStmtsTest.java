@@ -3399,6 +3399,37 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     AnalyzesOk("insert into d.flt select cast(1 as decimal(20, 10))", decimalV1Ctx);
     AnalyzesOk("insert into d.flt select cast(1 as decimal(20, 10))", decimalV2Ctx);
+
+    // IMPALA-966: Test insertion of incompatible expressions. Error should blame the
+    // first widest (highest precision) incompatible type expression.
+    // Test insert multiple values with compatible and incompatible types into a column
+    String query = "insert into functional.testtbl (id) "
+        + "values (10), (cast(1 as float)), (cast(3 as double))";
+    AnalysisError(query,
+        "Possible loss of precision "
+            + "for target table 'functional.testtbl'.\n"
+            + "Expression 'CAST(3 AS DOUBLE)' (type: DOUBLE) "
+            + "would need to be cast to BIGINT for column 'id'");
+    // Test insert multiple values with the same incompatible type into a column
+    query = "insert into functional.testtbl (id) "
+        + "values (cast(1 as float)), (cast(2 as float)), (cast(3 as float))";
+    AnalysisError(query,
+        "Possible loss of precision "
+            + "for target table 'functional.testtbl'.\n"
+            + "Expression 'CAST(1 AS FLOAT)' (type: FLOAT) "
+            + "would need to be cast to BIGINT for column 'id'");
+    // Test insert unions of multiple compatible and incompatible types expressions
+    // into multiple columns
+    query = "insert into functional.alltypes (int_col, float_col) "
+        + "partition(year=2019, month=4) "
+        + "(select int_col, float_col from functional.alltypes union "
+        + "select float_col, double_col from functional.alltypes union "
+        + "select double_col, int_col from functional.alltypes)";
+    AnalysisError(query,
+        "Possible loss of precision "
+            + "for target table 'functional.alltypes'.\n"
+            + "Expression 'double_col' (type: DOUBLE) "
+            + "would need to be cast to INT for column 'int_col'");
   }
 
   /**
@@ -3896,7 +3927,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestClone() {
     testNumberOfMembers(QueryStmt.class, 11);
-    testNumberOfMembers(UnionStmt.class, 9);
+    testNumberOfMembers(UnionStmt.class, 10);
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.

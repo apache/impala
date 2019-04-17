@@ -396,7 +396,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("insert into functional.alltypesinsert (tinyint_col, year, month) " +
         "values(CAST(999 AS DECIMAL(3,0)), 1, 1)",
         "Possible loss of precision for target table 'functional.alltypesinsert'.\n" +
-        "Expression 'cast(999 as decimal(3,0))' (type: DECIMAL(3,0)) would need to be " +
+        "Expression 'CAST(999 AS DECIMAL(3,0))' (type: DECIMAL(3,0)) would need to be " +
         "cast to TINYINT for column 'tinyint_col'");
   }
 

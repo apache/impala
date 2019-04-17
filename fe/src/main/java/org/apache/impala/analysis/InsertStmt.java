@@ -684,12 +684,23 @@ public class InsertStmt extends StatementBase {
       kuduPartitionColumnNames = getKuduPartitionColumnNames((FeKuduTable) table_);
     }
 
+    UnionStmt unionStmt =
+        (queryStmt_ instanceof UnionStmt) ? (UnionStmt) queryStmt_ : null;
+    List<Expr> widestTypeExprList = null;
+    if (unionStmt != null && unionStmt.getWidestExprs() != null
+        && unionStmt.getWidestExprs().size() > 0) {
+      widestTypeExprList = unionStmt.getWidestExprs();
+    }
+
     // Check dynamic partition columns for type compatibility.
     for (int i = 0; i < selectListExprs.size(); ++i) {
       Column targetColumn = selectExprTargetColumns.get(i);
-      Expr compatibleExpr = checkTypeCompatibility(
-          targetTableName_.toString(), targetColumn, selectListExprs.get(i),
-          analyzer.getQueryOptions().isDecimal_v2());
+      // widestTypeExpr is widest type expression for column i
+      Expr widestTypeExpr =
+          (widestTypeExprList != null) ? widestTypeExprList.get(i) : null;
+      Expr compatibleExpr = checkTypeCompatibility(targetTableName_.toString(),
+          targetColumn, selectListExprs.get(i), analyzer.getQueryOptions().isDecimal_v2(),
+          widestTypeExpr);
       if (targetColumn.getPosition() < numClusteringCols) {
         // This is a dynamic clustering column
         tmpPartitionKeyExprs.add(compatibleExpr);
@@ -710,9 +721,8 @@ public class InsertStmt extends StatementBase {
         if (pkv.isStatic()) {
           // tableColumns is guaranteed to exist after the earlier analysis checks
           Column tableColumn = table_.getColumn(pkv.getColName());
-          Expr compatibleExpr = checkTypeCompatibility(
-              targetTableName_.toString(), tableColumn,
-              pkv.getLiteralValue(), analyzer.isDecimalV2());
+          Expr compatibleExpr = checkTypeCompatibility(targetTableName_.toString(),
+              tableColumn, pkv.getLiteralValue(), analyzer.isDecimalV2(), null);
           tmpPartitionKeyExprs.add(compatibleExpr);
           tmpPartitionKeyNames.add(pkv.getColName());
         }

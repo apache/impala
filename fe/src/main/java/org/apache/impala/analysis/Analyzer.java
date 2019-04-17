@@ -2323,25 +2323,31 @@ public class Analyzer {
   /**
    * Casts the exprs in the given lists position-by-position such that for every i,
    * the i-th expr among all expr lists is compatible.
+   * Returns a list of exprs such that for every i-th expr in that list, it is the first
+   * widest compatible expression encountered among all i-th exprs in the expr lists.
+   * Returns null if an empty expression list or null is passed to it.
    * Throw an AnalysisException if the types are incompatible.
    */
-  public void castToUnionCompatibleTypes(List<List<Expr>> exprLists)
+  public List<Expr> castToUnionCompatibleTypes(List<List<Expr>> exprLists)
       throws AnalysisException {
-    if (exprLists == null || exprLists.size() < 2) return;
+    if (exprLists == null || exprLists.size() == 0) return null;
+    if (exprLists.size() == 1) return exprLists.get(0);
 
     // Determine compatible types for exprs, position by position.
     List<Expr> firstList = exprLists.get(0);
+    List<Expr> widestExprs = new ArrayList<>(firstList.size());
     for (int i = 0; i < firstList.size(); ++i) {
       // Type compatible with the i-th exprs of all expr lists.
       // Initialize with type of i-th expr in first list.
       Type compatibleType = firstList.get(i).getType();
-      // Remember last compatible expr for error reporting.
-      Expr lastCompatibleExpr = firstList.get(i);
+      widestExprs.add(firstList.get(i));
       for (int j = 1; j < exprLists.size(); ++j) {
         Preconditions.checkState(exprLists.get(j).size() == firstList.size());
-        compatibleType = getCompatibleType(compatibleType,
-            lastCompatibleExpr, exprLists.get(j).get(i));
-        lastCompatibleExpr = exprLists.get(j).get(i);
+        Type preType = compatibleType;
+        compatibleType = getCompatibleType(
+            compatibleType, widestExprs.get(i), exprLists.get(j).get(i));
+        // compatibleType will be updated if a new wider type is encountered
+        if (preType != compatibleType) widestExprs.set(i, exprLists.get(j).get(i));
       }
       // Now that we've found a compatible type, add implicit casts if necessary.
       for (int j = 0; j < exprLists.size(); ++j) {
@@ -2351,6 +2357,7 @@ public class Analyzer {
         }
       }
     }
+    return widestExprs;
   }
 
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }

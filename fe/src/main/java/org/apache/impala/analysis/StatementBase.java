@@ -193,14 +193,19 @@ public abstract class StatementBase extends StmtNode {
    * are incompatible. 'dstTableName' is only used when constructing an AnalysisException
    * message.
    *
+   * 'widestTypeSrcExpr' is the first widest type expression of the source expressions.
+   * This is only used when constructing an AnalysisException message to make sure the
+   * right expression is blamed in the error message.
+   *
    * If strictDecimal is true, only consider casts that result in no loss of information
    * when casting between decimal types.
    */
-  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol,
-      Expr srcExpr, boolean strictDecimal) throws AnalysisException {
+  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol, Expr srcExpr,
+      boolean strictDecimal, Expr widestTypeSrcExpr) throws AnalysisException {
     Type dstColType = dstCol.getType();
     Type srcExprType = srcExpr.getType();
 
+    if (widestTypeSrcExpr == null) widestTypeSrcExpr = srcExpr;
     // Trivially compatible, unless the type is complex.
     if (dstColType.equals(srcExprType) && !dstColType.isComplexType()) return srcExpr;
 
@@ -215,10 +220,10 @@ public abstract class StatementBase extends StmtNode {
     }
     if (!compatType.equals(dstColType) && !compatType.isNull()) {
       throw new AnalysisException(String.format(
-          "Possible loss of precision for target table '%s'.\nExpression '%s' (type: " +
-              "%s) would need to be cast to %s for column '%s'",
-          dstTableName, srcExpr.toSql(), srcExprType.toSql(), dstColType.toSql(),
-          dstCol.getName()));
+          "Possible loss of precision for target table '%s'.\nExpression '%s' (type: "
+              + "%s) would need to be cast to %s for column '%s'",
+          dstTableName, widestTypeSrcExpr.toSql(), srcExprType.toSql(),
+          dstColType.toSql(), dstCol.getName()));
     }
     return srcExpr.castTo(compatType);
   }

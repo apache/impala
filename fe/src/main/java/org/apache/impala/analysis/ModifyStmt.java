@@ -288,7 +288,7 @@ public abstract class ModifyStmt extends StatementBase {
       }
 
       rhsExpr = checkTypeCompatibility(targetTableRef_.getDesc().getTable().getFullName(),
-          c, rhsExpr, analyzer.isDecimalV2());
+          c, rhsExpr, analyzer.isDecimalV2(), null /*widestTypeSrcExpr*/);
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns.add(colIndexMap.get(c.getName()));
