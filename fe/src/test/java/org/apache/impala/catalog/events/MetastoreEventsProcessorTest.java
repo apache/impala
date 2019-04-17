@@ -313,9 +313,9 @@ public class MetastoreEventsProcessorTest {
     // than that in the DROP_DB notification event. Two events are filtered here,
     // 1 : first CREATE_DATABASE as it is followed by another create of the same name.
     // 2 : DROP_DATABASE as it is trying to drop a database which is again created.
-    assertEquals(2, eventsProcessor_.getMetrics()
+    assertEquals(filteredCount + 2, eventsProcessor_.getMetrics()
         .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
-        .getCount() - filteredCount);
+        .getCount());
 
     // Teardown step - Drop the created DB
     dropDatabaseCascadeFromImpala(TEST_DB_NAME);
@@ -716,7 +716,13 @@ public class MetastoreEventsProcessorTest {
     //second event should be drop_table. This event should also be skipped since
     // catalog state is more recent than the event
     assertEquals("DROP_TABLE", events.get(1).getEventType());
+    long numFilteredEvents =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(1)));
+    // Verify that the drop_table event is skipped and the metric is incremented.
+    assertEquals(numFilteredEvents + 1, eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
     // even after drop table event, the table should still exist
     assertNotNull("Table should have existed since catalog state is current and event "
         + "is stale", catalog_.getTable(TEST_DB_NAME, testTblName));

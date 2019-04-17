@@ -786,11 +786,13 @@ public class MetastoreEvents {
       Table removedTable = catalog_.removeTableIfExists(msTbl_, tblWasFound, tblMatched);
       if (removedTable != null) {
         infoLog("Removed table {} ", getFullyQualifiedTblName());
-      } else if (!tblMatched.getRef()) {
-        LOG.warn(debugString("Table %s was not removed from "
-            + "catalog since the creation time of the table did not match", tblName_));
       } else if (!tblWasFound.getRef()) {
-        debugLog("Table {} was not removed since it did not exist in catalog.", tblName_);
+        debugLog("Table {} was not removed since it did not exist in catalog.",
+            tblName_);
+      } else if (!tblMatched.getRef()) {
+        infoLog(debugString("Table %s was not removed from "
+            + "catalog since the creation time of the table did not match", tblName_));
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
       }
     }
   }
