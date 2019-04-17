@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -471,89 +472,71 @@ public class CatalogTest {
     assertEquals(1, uniqueSds.size());
   }
 
-  // TODO: All Hive-stats related tests are temporarily disabled because of an unknown,
-  // sporadic issue causing stats of some columns to be absent in Jenkins runs.
-  // Investigate this issue further.
-  //@Test
-  public void testStats() throws TableLoadingException {
+  @Test
+  public void testStats() throws CatalogException {
     // make sure the stats for functional.alltypesagg look correct
-    HdfsTable table =
-        (HdfsTable) catalog_.getDb("functional").getTable("AllTypesAgg");
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypesAgg");
 
     Column idCol = table.getColumn("id");
-    assertEquals(idCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.INT.getSlotSize(),
+    assertEquals(idCol.getStats().getAvgSerializedSize(),
         PrimitiveType.INT.getSlotSize(), 0.0001);
     assertEquals(idCol.getStats().getMaxSize(), PrimitiveType.INT.getSlotSize());
-    assertTrue(!idCol.getStats().hasNulls());
+    assertFalse(idCol.getStats().hasNulls());
 
     Column boolCol = table.getColumn("bool_col");
-    assertEquals(boolCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.BOOLEAN.getSlotSize(),
+    assertEquals(boolCol.getStats().getAvgSerializedSize(),
         PrimitiveType.BOOLEAN.getSlotSize(), 0.0001);
     assertEquals(boolCol.getStats().getMaxSize(), PrimitiveType.BOOLEAN.getSlotSize());
-    assertTrue(!boolCol.getStats().hasNulls());
+    assertFalse(boolCol.getStats().hasNulls());
 
     Column tinyintCol = table.getColumn("tinyint_col");
-    assertEquals(tinyintCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.TINYINT.getSlotSize(),
+    assertEquals(tinyintCol.getStats().getAvgSerializedSize(),
         PrimitiveType.TINYINT.getSlotSize(), 0.0001);
-    assertEquals(tinyintCol.getStats().getMaxSize(),
-        PrimitiveType.TINYINT.getSlotSize());
+    assertEquals(tinyintCol.getStats().getMaxSize(), PrimitiveType.TINYINT.getSlotSize());
     assertTrue(tinyintCol.getStats().hasNulls());
 
     Column smallintCol = table.getColumn("smallint_col");
-    assertEquals(smallintCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.SMALLINT.getSlotSize(),
+    assertEquals(smallintCol.getStats().getAvgSerializedSize(),
         PrimitiveType.SMALLINT.getSlotSize(), 0.0001);
     assertEquals(smallintCol.getStats().getMaxSize(),
         PrimitiveType.SMALLINT.getSlotSize());
     assertTrue(smallintCol.getStats().hasNulls());
 
     Column intCol = table.getColumn("int_col");
-    assertEquals(intCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.INT.getSlotSize(),
+    assertEquals(intCol.getStats().getAvgSerializedSize(),
         PrimitiveType.INT.getSlotSize(), 0.0001);
     assertEquals(intCol.getStats().getMaxSize(), PrimitiveType.INT.getSlotSize());
     assertTrue(intCol.getStats().hasNulls());
 
     Column bigintCol = table.getColumn("bigint_col");
-    assertEquals(bigintCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.BIGINT.getSlotSize(),
+    assertEquals(bigintCol.getStats().getAvgSerializedSize(),
         PrimitiveType.BIGINT.getSlotSize(), 0.0001);
     assertEquals(bigintCol.getStats().getMaxSize(), PrimitiveType.BIGINT.getSlotSize());
     assertTrue(bigintCol.getStats().hasNulls());
 
     Column floatCol = table.getColumn("float_col");
-    assertEquals(floatCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.FLOAT.getSlotSize(),
+    assertEquals(floatCol.getStats().getAvgSerializedSize(),
         PrimitiveType.FLOAT.getSlotSize(), 0.0001);
     assertEquals(floatCol.getStats().getMaxSize(), PrimitiveType.FLOAT.getSlotSize());
     assertTrue(floatCol.getStats().hasNulls());
 
     Column doubleCol = table.getColumn("double_col");
-    assertEquals(doubleCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.DOUBLE.getSlotSize(),
+    assertEquals(doubleCol.getStats().getAvgSerializedSize(),
         PrimitiveType.DOUBLE.getSlotSize(), 0.0001);
     assertEquals(doubleCol.getStats().getMaxSize(), PrimitiveType.DOUBLE.getSlotSize());
     assertTrue(doubleCol.getStats().hasNulls());
 
     Column timestampCol = table.getColumn("timestamp_col");
-    assertEquals(timestampCol.getStats().getAvgSerializedSize() -
-        PrimitiveType.TIMESTAMP.getSlotSize(),
+    assertEquals(timestampCol.getStats().getAvgSerializedSize(),
         PrimitiveType.TIMESTAMP.getSlotSize(), 0.0001);
     assertEquals(timestampCol.getStats().getMaxSize(),
         PrimitiveType.TIMESTAMP.getSlotSize());
-    // this does not have nulls, it's not clear why this passes
-    // TODO: investigate and re-enable
-    //assertTrue(timestampCol.getStats().hasNulls());
+    assertFalse(timestampCol.getStats().hasNulls());
 
     Column stringCol = table.getColumn("string_col");
-    assertTrue(stringCol.getStats().getAvgSerializedSize() >=
-        PrimitiveType.STRING.getSlotSize());
     assertTrue(stringCol.getStats().getAvgSerializedSize() > 0);
     assertTrue(stringCol.getStats().getMaxSize() > 0);
-    assertTrue(!stringCol.getStats().hasNulls());
+    assertFalse(stringCol.getStats().hasNulls());
   }
 
   /**
@@ -561,10 +544,7 @@ public class CatalogTest {
    * the column type results in the stats being set to "unknown". This is a regression
    * test for IMPALA-588, where this used to result in a Preconditions failure.
    */
-  // TODO: All Hive-stats related tests are temporarily disabled because of an unknown,
-  // sporadic issue causing stats of some columns to be absent in Jenkins runs.
-  // Investigate this issue further.
-  //@Test
+  @Test
   public void testColStatsColTypeMismatch() throws Exception {
     // First load a table that has column stats.
     //catalog_.refreshTable("functional", "alltypesagg", false);
@@ -597,7 +577,7 @@ public class CatalogTest {
 
       // Now try to apply a matching column stats data and ensure it succeeds.
       assertTrue(table.getColumn("string_col").updateStats(stringColStatsData));
-      assertEquals(1178, table.getColumn("string_col").getStats().getNumDistinctValues());
+      assertEquals(963, table.getColumn("string_col").getStats().getNumDistinctValues());
     }
   }
 
@@ -606,7 +586,6 @@ public class CatalogTest {
     assertEquals(-1, column.getStats().getNumNulls());
     double expectedSize = column.getType().isFixedLengthType() ?
         column.getType().getSlotSize() : -1;
-
     assertEquals(expectedSize, column.getStats().getAvgSerializedSize(), 0.0001);
     assertEquals(expectedSize, column.getStats().getMaxSize(), 0.0001);
   }

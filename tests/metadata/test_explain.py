@@ -70,6 +70,22 @@ class TestExplain(ImpalaTestSuite):
     vector.get_value('exec_option')['explain_level'] = 3
     self.run_test_case('QueryTest/explain-level3', vector)
 
+  @staticmethod
+  def check_row_size_and_cardinality(query_result, expected_row_size=None,
+                                     expected_cardinality=None):
+    regex = re.compile('tuple-ids=.+ row-size=(\d+)B cardinality=(.*)')
+    found_match = False
+    for res in query_result:
+      m = regex.match(res.strip())
+      if m:
+        found_match = True
+        assert len(m.groups()) == 2
+        if expected_row_size:
+          assert m.groups()[0] == expected_row_size
+        if expected_cardinality:
+          assert m.groups()[1] == expected_cardinality
+    assert found_match, query_result
+
   def test_explain_validate_cardinality_estimates(self, vector, unique_database):
     # Tests that the cardinality estimates are correct for partitioned tables.
     # TODO Cardinality estimation tests should eventually be part of the planner tests.
@@ -78,13 +94,8 @@ class TestExplain(ImpalaTestSuite):
     tbl_name = 'alltypes'
 
     def check_cardinality(query_result, expected_cardinality):
-      regex = re.compile(' row-size=\d+B cardinality=(.*)$')
-      for res in query_result:
-        m = regex.match(res.strip())
-        if m:
-          assert len(m.groups()) == 1
-          # The cardinality should be zero.
-          assert m.groups()[0] == expected_cardinality
+      self.check_row_size_and_cardinality(
+          query_result, expected_cardinality=expected_cardinality)
 
     # All partitions are filtered out, cardinality should be 0.
     result = self.execute_query("explain select * from %s.%s where year = 1900" % (
@@ -129,6 +140,44 @@ class TestExplain(ImpalaTestSuite):
     result = self.execute_query("explain select * from %s where p = 2" % mixed_tbl,
         query_options={'explain_level':3})
     check_cardinality(result.data, '100')
+
+  def test_explain_row_size_estimates(self, vector, unique_database):
+    """ Tests that EXPLAIN returns the expected row sizes with and without stats.
+
+    Planner tests is probably a more logical place for this, but covering string avg_size
+    handling end-to-end seemed easier here.
+
+    Note that row sizes do not include the null indicator bytes, so actual tuple sizes
+    are a bit larger. """
+    def check_row_size(query_result, expected_row_size):
+      self.check_row_size_and_cardinality(
+          query_result, expected_row_size=expected_row_size)
+
+    def execute_explain(query):
+      return self.execute_query("explain " + query, query_options={'explain_level': 3})
+
+    FQ_TBL_NAME = unique_database + ".t"
+    self.execute_query("create table %s (i int, s string)" % FQ_TBL_NAME)
+    # Fill the table with data that leads to avg_size of 4 for 's'.
+    self.execute_query("insert into %s values (1, '123'), (2, '12345')" % FQ_TBL_NAME)
+
+    # Always use slot size for fixed sized types.
+    result = execute_explain("select i from %s" % FQ_TBL_NAME)
+    check_row_size(result.data, '4')
+
+    # If there are no stats, use slot size for variable length types.
+    result = execute_explain("select s from %s" % FQ_TBL_NAME)
+    check_row_size(result.data, "12")
+
+    self.execute_query("compute stats %s" % FQ_TBL_NAME)
+
+    # Always use slot size for fixed sized types.
+    result = execute_explain("select i from %s" % FQ_TBL_NAME)
+    check_row_size(result.data, '4')
+
+    # If there are no stats, use slot size  + avg_size for variable length types.
+    result = execute_explain("select s from %s" % FQ_TBL_NAME)
+    check_row_size(result.data, "16")
 
 
 class TestExplainEmptyPartition(ImpalaTestSuite):

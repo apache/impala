@@ -166,7 +166,6 @@ public class ColumnStats {
   public boolean hasNulls() { return numNulls_ > 0; }
   public long getNumNulls() { return numNulls_; }
   public boolean hasAvgSize() { return avgSize_ >= 0; }
-  public boolean hasAvgSerializedSize() { return avgSerializedSize_ >= 0; }
   public boolean hasNumDistinctValues() { return numDistinctValues_ >= 0; }
   public boolean hasStats() { return numNulls_ != -1 || numDistinctValues_ != -1; }
 

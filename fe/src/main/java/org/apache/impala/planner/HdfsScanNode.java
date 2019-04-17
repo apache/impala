@@ -1694,6 +1694,9 @@ public class HdfsScanNode extends ScanNode {
     if (stats.hasAvgSize() && maxScanRangeNumRows_ != -1) {
       // Estimate the column's uncompressed data size based on row count and average
       // size.
+      // TODO: Size of strings seems to be underestimated, as avg size returns the
+      //       average length of the strings and does not include the 4 byte length
+      //       field used in Parquet plain encoding. (IMPALA-8431)
       reservationBytes =
           (long) Math.min(reservationBytes, stats.getAvgSize() * maxScanRangeNumRows_);
       if (stats.hasNumDistinctValues()) {

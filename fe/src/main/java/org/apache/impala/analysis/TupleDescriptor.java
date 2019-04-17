@@ -268,7 +268,7 @@ public class TupleDescriptor {
       ColumnStats stats = d.getStats();
       int slotSize = d.getType().getSlotSize();
 
-      if (stats.hasAvgSerializedSize()) {
+      if (stats.hasAvgSize()) {
         avgSerializedSize_ += d.getStats().getAvgSerializedSize();
       } else {
         // TODO: for computed slots, try to come up with stats estimates
