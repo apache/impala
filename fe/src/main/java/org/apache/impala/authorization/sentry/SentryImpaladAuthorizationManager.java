@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
@@ -217,6 +218,12 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   public void updateTableOwnerPrivilege(String serverName, String databaseName,
       String tableName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Impalad", ClassUtil.getMethodName()));
+  }
+
+  @Override
+  public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }

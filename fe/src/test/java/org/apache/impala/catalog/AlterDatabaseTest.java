@@ -33,7 +33,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -84,10 +85,12 @@ public class AlterDatabaseTest {
    * @throws ImpalaException
    */
   @BeforeClass
-  public static void setUpTest() {
+  public static void setUpTest() throws ImpalaException {
     catalog_ = new ImpaladTestCatalog(CatalogServiceTestCatalog.create());
     catalogOpExecutor_ =
-        new CatalogOpExecutor(catalog_.getSrcCatalog(), new NoneAuthorizationFactory());
+        new CatalogOpExecutor(catalog_.getSrcCatalog(),
+            new NoopAuthorizationFactory().getAuthorizationConfig(),
+            new NoopAuthorizationManager());
   }
 
   /**

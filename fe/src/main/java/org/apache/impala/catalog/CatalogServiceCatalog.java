@@ -44,11 +44,9 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationDelta;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.authorization.AuthorizationProvider;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryProxy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
@@ -186,6 +184,11 @@ public class CatalogServiceCatalog extends Catalog {
 
   private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
+  // Timeout for acquiring a table lock
+  // TODO: Make this configurable
+  private static final long TBL_LOCK_TIMEOUT_MS = 7200000;
+  // Time to sleep before retrying to acquire a table lock
+  private static final int TBL_LOCK_RETRY_MS = 10;
 
   private final TUniqueId catalogServiceId_;
 
@@ -219,10 +222,6 @@ public class CatalogServiceCatalog extends Catalog {
   // Periodically polls HDFS to get the latest set of known cache pools.
   private final ScheduledExecutorService cachePoolReader_ =
       Executors.newScheduledThreadPool(1);
-
-  // Proxy to access the Sentry Service and also periodically refreshes the
-  // policy metadata. Null if Sentry Service is not enabled.
-  private final SentryProxy sentryProxy_;
 
   // Log of deleted catalog objects.
   private final CatalogDeltaLog deleteLog_;
@@ -265,17 +264,20 @@ public class CatalogServiceCatalog extends Catalog {
   private final Semaphore partialObjectFetchAccess_ =
       new Semaphore(MAX_PARALLEL_PARTIAL_FETCH_RPC_COUNT, /*fair =*/ true);
 
-    /**
-     * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
-     * @param loadInBackground If true, table metadata will be loaded in the background.
-     * @param numLoadingThreads Number of threads used to load table metadata.
-     * @param metaStoreClientPool A pool of HMS clients backing this Catalog.
-     * @throws ImpalaException
-     */
+  private AuthorizationManager authzManager_;
+
+  /**
+   * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
+   *
+   * @param loadInBackground    If true, table metadata will be loaded in the background.
+   * @param numLoadingThreads   Number of threads used to load table metadata.
+   * @param metaStoreClientPool A pool of HMS clients backing this Catalog.
+   * @throws ImpalaException
+   */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      AuthorizationConfig authConfig, TUniqueId catalogServiceId,
-      String kerberosPrincipal, String localLibraryPath,
-      MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
+      TUniqueId catalogServiceId, String localLibraryPath,
+      MetaStoreClientPool metaStoreClientPool)
+      throws ImpalaException {
     super(metaStoreClientPool);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
@@ -290,13 +292,6 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (IOException e) {
       LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
     }
-    if (authConfig != null && authConfig.isEnabled() &&
-        authConfig.getProvider() == AuthorizationProvider.SENTRY) {
-      sentryProxy_ = new SentryProxy((SentryAuthorizationConfig) authConfig, this,
-          kerberosPrincipal);
-    } else {
-      sentryProxy_ = null;
-    }
     localLibraryPath_ = localLibraryPath;
     deleteLog_ = new CatalogDeltaLog();
     topicMode_ = TopicMode.valueOf(
@@ -307,6 +302,23 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
     // start polling for metastore events
     metastoreEventProcessor_.start();
+  }
+
+  /**
+   * Initializes the Catalog using the default MetastoreClientPool impl.
+   * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
+   * to establish an initial connection to the HMS before giving up.
+   */
+  public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
+      int initialHmsCnxnTimeoutSec, TUniqueId catalogServiceId, String localLibraryPath)
+      throws ImpalaException {
+    this(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
+        new MetaStoreClientPool(INITIAL_META_STORE_CLIENT_POOL_SIZE,
+            initialHmsCnxnTimeoutSec));
+  }
+
+  public void setAuthzManager(AuthorizationManager authzManager) {
+    authzManager_ = Preconditions.checkNotNull(authzManager);
   }
 
   /**
@@ -346,27 +358,6 @@ public class CatalogServiceCatalog extends Catalog {
   public boolean isExternalEventProcessingEnabled() {
     return !(metastoreEventProcessor_ instanceof NoOpEventProcessor);
   }
-
-  /**
-   * Initializes the Catalog using the default MetastoreClientPool impl.
-   * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
-   * to establish an initial connection to the HMS before giving up.
-   */
-
-  public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      int initialHmsCnxnTimeoutSec, AuthorizationConfig authConfig,
-      TUniqueId catalogServiceId, String kerberosPrincipal, String localLibraryPath)
-      throws ImpalaException {
-    this(loadInBackground, numLoadingThreads, authConfig, catalogServiceId,
-        kerberosPrincipal, localLibraryPath, new MetaStoreClientPool(
-            INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec));
-  }
-
-  // Timeout for acquiring a table lock
-  // TODO: Make this configurable
-  private static final long TBL_LOCK_TIMEOUT_MS = 7200000;
-  // Time to sleep before retrying to acquire a table lock
-  private static final int TBL_LOCK_RETRY_MS = 10;
 
   /**
    * Tries to acquire versionLock_ and the lock of 'tbl' in that order. Returns true if it
@@ -1367,16 +1358,14 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Refreshes Sentry authorization metadata. When authorization is not enabled, this
+   * Refreshes authorization metadata. When authorization is not enabled, this
    * method is a no-op.
    */
-  public void refreshAuthorization(boolean resetVersions, List<TCatalogObject> added,
-      List<TCatalogObject> removed) throws CatalogException {
-    // Do nothing if authorization is not enabled.
-    if (sentryProxy_ == null) return;
+  public AuthorizationDelta refreshAuthorization(boolean resetVersions)
+      throws CatalogException {
+    Preconditions.checkState(authzManager_ != null);
     try {
-      // Update the authorization policy, waiting for the result to complete.
-      sentryProxy_.refresh(resetVersions, added, removed);
+      return authzManager_.refreshAuthorization(resetVersions);
     } catch (Exception e) {
       throw new CatalogException("Error refreshing authorization policy: ", e);
     }
@@ -1392,8 +1381,7 @@ public class CatalogServiceCatalog extends Catalog {
     long currentCatalogVersion = getCatalogVersion();
     LOG.info("Invalidating all metadata. Version: " + currentCatalogVersion);
     // First update the policy metadata.
-    refreshAuthorization(true, /*catalog objects added*/ new ArrayList<>(),
-        /*catalog objects removed*/ new ArrayList<>());
+    refreshAuthorization(true);
 
     // Even though we get the current notification event id before stopping the event
     // processing here there is a small window of time where we could re-process some of
@@ -2349,7 +2337,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   public ReentrantReadWriteLock getLock() { return versionLock_; }
-  public SentryProxy getSentryProxy() { return sentryProxy_; }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 
   /**

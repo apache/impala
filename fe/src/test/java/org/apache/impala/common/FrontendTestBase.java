@@ -41,6 +41,7 @@ import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
@@ -306,6 +307,16 @@ public class FrontendTestBase extends AbstractFrontendTest {
    * not do the actual authorization.
    */
   protected AuthorizationFactory createAuthorizationFactory() {
+    return createAuthorizationFactory(true);
+  }
+
+  /**
+   * Creates a dummy {@link AuthorizationFactory} with authorization enabled, but does
+   * not do the actual authorization.
+   *
+   * @param authorized the result of the authorization.
+   */
+  protected AuthorizationFactory createAuthorizationFactory(boolean authorized) {
     return new AuthorizationFactory() {
       @Override
       public AuthorizationConfig getAuthorizationConfig() {
@@ -314,7 +325,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
           public boolean isEnabled() { return true; }
           @Override
           public AuthorizationProvider getProvider() {
-            return AuthorizationProvider.NONE;
+            return AuthorizationProvider.NOOP;
           }
           @Override
           public String getServerName() { return "server1"; }
@@ -329,7 +340,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
           @Override
           protected boolean authorize(User user, PrivilegeRequest request)
               throws InternalException {
-            return true;
+            return authorized;
           }
 
           @Override
@@ -348,12 +359,12 @@ public class FrontendTestBase extends AbstractFrontendTest {
       @Override
       public AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
           Supplier<? extends AuthorizationChecker> authzChecker) {
-        return null;
+        return new NoopAuthorizationManager();
       }
 
       @Override
       public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
-        return null;
+        return new NoopAuthorizationManager();
       }
     };
   }

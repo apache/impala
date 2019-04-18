@@ -111,7 +111,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private final RangerImpalaPlugin rangerImpalaPlugin_;
   private final RangerRESTClient rangerRestClient_;
 
-  public AuthorizationStmtTest(AuthorizationProvider authzProvider) {
+  public AuthorizationStmtTest(AuthorizationProvider authzProvider)
+      throws ImpalaException {
     authzProvider_ = authzProvider;
     switch (authzProvider) {
       case SENTRY:
@@ -120,7 +121,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
         authzFactory_ = new SentryAuthorizationFactory(authzConfig_);
         authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
-        authzCatalog_ = new ImpaladTestCatalog(authzConfig_);
+        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
         authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
         sentryService_ = new SentryPolicyService(
             ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
@@ -132,7 +133,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             SERVER_NAME);
         authzFactory_ = new RangerAuthorizationFactory(authzConfig_);
         authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
-        authzCatalog_ = new ImpaladTestCatalog(authzConfig_);
+        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
         authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
         rangerImpalaPlugin_ =
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())

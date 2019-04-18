@@ -44,10 +44,10 @@ import java.util.function.Supplier;
  * An implementation of {@link AuthorizationFactory} that does not do any
  * authorization. This is the default implementation when authorization is disabled.
  */
-public class NoneAuthorizationFactory implements AuthorizationFactory {
+public class NoopAuthorizationFactory implements AuthorizationFactory {
   private final AuthorizationConfig authzConfig_;
 
-  public NoneAuthorizationFactory(BackendConfig backendConfig) {
+  public NoopAuthorizationFactory(BackendConfig backendConfig) {
     Preconditions.checkNotNull(backendConfig);
     authzConfig_ = disabledAuthorizationConfig();
   }
@@ -56,7 +56,7 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
    * This is for testing.
    */
   @VisibleForTesting
-  public NoneAuthorizationFactory() {
+  public NoopAuthorizationFactory() {
     authzConfig_ = disabledAuthorizationConfig();
   }
 
@@ -65,7 +65,7 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
       @Override
       public boolean isEnabled() { return false; }
       @Override
-      public AuthorizationProvider getProvider() { return AuthorizationProvider.NONE; }
+      public AuthorizationProvider getProvider() { return AuthorizationProvider.NOOP; }
       @Override
       public String getServerName() { return null; }
     };
@@ -169,6 +169,11 @@ public class NoneAuthorizationFactory implements AuthorizationFactory {
         PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
+      return new AuthorizationDelta();
     }
   }
 

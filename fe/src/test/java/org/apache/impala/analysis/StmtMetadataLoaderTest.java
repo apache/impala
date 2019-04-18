@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.Arrays;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
@@ -38,7 +38,7 @@ public class StmtMetadataLoaderTest {
       String[] expectedDbs, String[] expectedTables)
       throws ImpalaException {
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
-      Frontend fe = new Frontend(new NoneAuthorizationFactory(), catalog);
+      Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
       StatementBase stmt = Parser.parse(stmtStr);
       // Catalog is fresh and no tables are cached.
       validateUncached(stmt, fe, expectedNumLoadRequests, expectedNumCatalogUpdates,
@@ -50,7 +50,7 @@ public class StmtMetadataLoaderTest {
 
   private void testNoLoad(String stmtStr) throws ImpalaException {
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
-      Frontend fe = new Frontend(new NoneAuthorizationFactory(), catalog);
+      Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
       StatementBase stmt = Parser.parse(stmtStr);
       validateCached(stmt, fe, new String[]{}, new String[]{});
     }

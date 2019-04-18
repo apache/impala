@@ -20,6 +20,7 @@ package org.apache.impala.authorization.sentry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
@@ -28,6 +29,7 @@ import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TCatalogObject;
@@ -47,6 +49,7 @@ import org.apache.impala.util.ClassUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -65,17 +68,21 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       LoggerFactory.getLogger(SentryCatalogdAuthorizationManager.class);
 
   private final CatalogServiceCatalog catalog_;
+  // Proxy to access the Sentry Service and also periodically refreshes the
+  // policy metadata. Null if Sentry Service is not enabled.
+  private final SentryProxy sentryProxy_;
 
-  public SentryCatalogdAuthorizationManager(CatalogServiceCatalog catalog) {
-    Preconditions.checkNotNull(catalog);
-    catalog_ = catalog;
+  public SentryCatalogdAuthorizationManager(SentryAuthorizationConfig authzConfig,
+      CatalogServiceCatalog catalog) throws ImpalaException {
+    sentryProxy_ = new SentryProxy(Preconditions.checkNotNull(authzConfig), catalog);
+    catalog_ = Preconditions.checkNotNull(catalog);
   }
 
   /**
    * Checks if the given user is a Sentry admin.
    */
   public boolean isSentryAdmin(User user) throws ImpalaException {
-    return catalog_.getSentryProxy().isSentryAdmin(user);
+    return sentryProxy_.isSentryAdmin(user);
   }
 
   @Override
@@ -83,8 +90,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
-    Role role = catalog_.getSentryProxy().createRole(requestingUser,
-        params.getRole_name());
+    Role role = sentryProxy_.createRole(requestingUser, params.getRole_name());
     Preconditions.checkNotNull(role);
 
     TCatalogObject catalogObject = new TCatalogObject();
@@ -100,7 +106,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
-    Role role = catalog_.getSentryProxy().dropRole(requestingUser, params.getRole_name());
+    Role role = sentryProxy_.dropRole(requestingUser, params.getRole_name());
     if (role == null) {
       // Nothing was removed from the catalogd's cache.
       response.result.setVersion(catalog_.getCatalogVersion());
@@ -131,8 +137,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
 
     String roleName = params.getRole_names().get(0);
     String groupName = params.getGroup_names().get(0);
-    Role role = catalog_.getSentryProxy().grantRoleGroup(requestingUser, roleName,
-        groupName);
+    Role role = sentryProxy_.grantRoleGroup(requestingUser, roleName, groupName);
     Preconditions.checkNotNull(role);
     TCatalogObject catalogObject = new TCatalogObject();
     catalogObject.setType(role.getCatalogObjectType());
@@ -151,8 +156,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
 
     String roleName = params.getRole_names().get(0);
     String groupName = params.getGroup_names().get(0);
-    Role role = catalog_.getSentryProxy().revokeRoleGroup(requestingUser, roleName,
-        groupName);
+    Role role = sentryProxy_.revokeRoleGroup(requestingUser, roleName, groupName);
     Preconditions.checkNotNull(role);
     TCatalogObject catalogObject = new TCatalogObject();
     catalogObject.setType(role.getCatalogObjectType());
@@ -178,8 +182,8 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     List<PrincipalPrivilege> removedGrantOptPrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
     List<PrincipalPrivilege> addedRolePrivileges =
-        catalog_.getSentryProxy().grantRolePrivileges(requestingUser, roleName,
-            privileges, params.isHas_grant_opt(), removedGrantOptPrivileges);
+        sentryProxy_.grantRolePrivileges(requestingUser, roleName, privileges,
+            params.isHas_grant_opt(), removedGrantOptPrivileges);
 
     Preconditions.checkNotNull(addedRolePrivileges);
     List<TCatalogObject> updatedPrivs =
@@ -229,8 +233,8 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     List<PrincipalPrivilege> addedRolePrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
     List<PrincipalPrivilege> removedGrantOptPrivileges =
-        catalog_.getSentryProxy().revokeRolePrivileges(requestingUser, roleName,
-            privileges, params.isHas_grant_opt(), addedRolePrivileges);
+        sentryProxy_.revokeRolePrivileges(requestingUser, roleName, privileges,
+            params.isHas_grant_opt(), addedRolePrivileges);
     Preconditions.checkNotNull(addedRolePrivileges);
 
     List<TCatalogObject> updatedPrivs =
@@ -301,7 +305,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
-    if (!catalog_.getSentryProxy().isObjectOwnershipEnabled()) return;
+    if (!sentryProxy_.isObjectOwnershipEnabled()) return;
 
     Preconditions.checkNotNull(serverName);
     Preconditions.checkNotNull(databaseName);
@@ -335,7 +339,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       String tableName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
-    if (!catalog_.getSentryProxy().isObjectOwnershipEnabled()) return;
+    if (!sentryProxy_.isObjectOwnershipEnabled()) return;
 
     Preconditions.checkNotNull(serverName);
     Preconditions.checkNotNull(databaseName);
@@ -344,6 +348,15 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
         serverName);
     updateOwnerPrivilege(oldOwner, oldOwnerType, newOwner, newOwnerType, response,
         filter);
+  }
+
+  @Override
+  public AuthorizationDelta refreshAuthorization(boolean resetVersions)
+      throws ImpalaException {
+    List<TCatalogObject> catalogObjectsAdded = new ArrayList<>();
+    List<TCatalogObject> catalogObjectsRemoved = new ArrayList<>();
+    sentryProxy_.refresh(resetVersions, catalogObjectsAdded, catalogObjectsRemoved);
+    return new AuthorizationDelta(catalogObjectsAdded, catalogObjectsRemoved);
   }
 
   private void updateOwnerPrivilege(String oldOwner, PrincipalType oldOwnerType,
@@ -361,7 +374,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
    * Throws a CatalogException if the Sentry Service is not enabled.
    */
   private void verifySentryServiceEnabled() throws CatalogException {
-    if (catalog_.getSentryProxy() == null) {
+    if (sentryProxy_ == null) {
       throw new CatalogException("Sentry Service is not enabled on the " +
           "CatalogServer.");
     }
@@ -371,8 +384,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
    * Checks if with grant is enabled for object ownership in Sentry.
    */
   private boolean isObjectOwnershipGrantEnabled() throws ImpalaException {
-    return catalog_.getSentryProxy() == null ? false :
-        catalog_.getSentryProxy().isObjectOwnershipGrantEnabled();
+    return sentryProxy_ == null ? false : sentryProxy_.isObjectOwnershipGrantEnabled();
   }
 
   /**

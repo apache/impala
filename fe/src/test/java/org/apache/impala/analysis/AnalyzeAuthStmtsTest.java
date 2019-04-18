@@ -19,7 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.HashSet;
 
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
@@ -80,7 +80,7 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         Catalog.DEFAULT_DB, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        new NoneAuthorizationFactory(), timeline);
+        new NoopAuthorizationFactory(), timeline);
     return analysisCtx;
   }
 

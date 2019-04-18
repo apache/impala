@@ -17,7 +17,8 @@
 
 package org.apache.impala.testutil;
 
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -56,9 +57,10 @@ public class PlannerTestCaseLoader implements AutoCloseable {
   public PlannerTestCaseLoader() throws ImpalaException {
     catalog_ = new ImpaladTestCatalog(
         CatalogServiceTestCatalog.createTransientTestCatalog());
-    frontend_ = new Frontend(new NoneAuthorizationFactory(), catalog_);
+    frontend_ = new Frontend(new NoopAuthorizationFactory(), catalog_);
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_.getSrcCatalog(),
-        new NoneAuthorizationFactory());
+        new NoopAuthorizationFactory().getAuthorizationConfig(),
+        new NoopAuthorizationManager());
   }
 
   public Catalog getSrcCatalog() { return catalog_.getSrcCatalog(); }

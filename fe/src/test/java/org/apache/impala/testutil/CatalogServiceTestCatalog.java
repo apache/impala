@@ -17,10 +17,10 @@
 
 package org.apache.impala.testutil;
 
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.common.ImpalaException;
@@ -37,9 +37,9 @@ import java.util.UUID;
  */
 public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   public CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
-      AuthorizationConfig authConfig, TUniqueId catalogServiceId,
-      MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
-    super(loadInBackground, numLoadingThreads, authConfig, catalogServiceId, null,
+      TUniqueId catalogServiceId, MetaStoreClientPool metaStoreClientPool)
+      throws ImpalaException {
+    super(loadInBackground, numLoadingThreads, catalogServiceId,
         System.getProperty("java.io.tmpdir"), metaStoreClientPool);
 
     // Cache pools are typically loaded asynchronously, but as there is no fixed execution
@@ -50,19 +50,20 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   }
 
   public static CatalogServiceCatalog create() {
-    return createWithAuth(new SentryAuthorizationConfig(new SentryConfig(null)));
+    return createWithAuth(new NoopAuthorizationFactory());
   }
 
   /**
    * Creates a catalog server that reads authorization policy metadata from the
    * authorization config.
    */
-  public static CatalogServiceCatalog createWithAuth(AuthorizationConfig config) {
+  public static CatalogServiceCatalog createWithAuth(AuthorizationFactory authzFactory) {
     FeSupport.loadLibrary();
     CatalogServiceCatalog cs;
     try {
-      cs = new CatalogServiceTestCatalog(false, 16, config, new TUniqueId(),
+      cs = new CatalogServiceTestCatalog(false, 16, new TUniqueId(),
           new MetaStoreClientPool(0, 0));
+      cs.setAuthzManager(authzFactory.newAuthorizationManager(cs));
       cs.reset();
     } catch (ImpalaException e) {
       throw new IllegalStateException(e.getMessage(), e);
@@ -80,8 +81,9 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     FeSupport.loadLibrary();
     Path derbyPath = Paths.get(System.getProperty("java.io.tmpdir"),
         UUID.randomUUID().toString());
-    CatalogServiceCatalog cs = new CatalogServiceTestCatalog(false, 16, null,
+    CatalogServiceCatalog cs = new CatalogServiceTestCatalog(false, 16,
         new TUniqueId(), new EmbeddedMetastoreClientPool(0, derbyPath));
+    cs.setAuthzManager(new NoopAuthorizationManager());
     cs.reset();
     return cs;
   }

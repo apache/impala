@@ -27,6 +27,7 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeCatalogManager;
 
@@ -95,7 +96,9 @@ public class SentryAuthorizationFactory implements AuthorizationFactory {
   }
 
   @Override
-  public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
-    return new SentryCatalogdAuthorizationManager(catalog);
+  public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog)
+      throws ImpalaException {
+    return new SentryCatalogdAuthorizationManager(
+        (SentryAuthorizationConfig) getAuthorizationConfig(), catalog);
   }
 }

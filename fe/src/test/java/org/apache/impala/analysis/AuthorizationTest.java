@@ -83,11 +83,19 @@ public class AuthorizationTest extends FrontendTestBase {
       SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
           System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
   private static final ImpaladTestCatalog AUTHZ_CATALOG =
-      new ImpaladTestCatalog(AUTHZ_CONFIG);
+      new ImpaladTestCatalog(new SentryAuthorizationFactory(AUTHZ_CONFIG));
   private static final AuthorizationFactory AUTHZ_FACTORY =
       new SentryAuthorizationFactory(AUTHZ_CONFIG);
 
-  private static final Frontend AUTHZ_FE = new Frontend(AUTHZ_FACTORY, AUTHZ_CATALOG);
+  private static final Frontend AUTHZ_FE;
+
+  static {
+    try {
+      AUTHZ_FE = new Frontend(AUTHZ_FACTORY, AUTHZ_CATALOG);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   private final AnalysisContext authzCtx;
 
@@ -463,7 +471,9 @@ public class AuthorizationTest extends FrontendTestBase {
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
        AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
         CustomClusterResourceAuthorizationProvider.class.getName());
-    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
+        authzConfig);
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
       setupImpalaCatalog(catalog);
       // This test relies on the auth_to_local rule -
       // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
@@ -475,8 +485,6 @@ public class AuthorizationTest extends FrontendTestBase {
       User.setRulesForTesting(
           new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
       User user = new User("authtest/hostname@REALM.COM");
-      SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
-          authzConfig);
       AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
       Frontend fe = new Frontend(authzFactory, catalog);
 
@@ -619,8 +627,7 @@ public class AuthorizationTest extends FrontendTestBase {
         AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
         CustomClusterResourceAuthorizationProvider.class.getName());
     SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
-
-    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
       setupImpalaCatalog(catalog);
       // Create an analysis context + FE with the test user
       // (as defined in the policy file)

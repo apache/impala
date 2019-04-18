@@ -272,7 +272,7 @@ public class SentryProxyTest {
         lowerCaseRoleName.substring(1);
 
     try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-        new SentryAuthorizationConfig(authzConfig_.getSentryConfig()))) {
+        new SentryAuthorizationFactory(authzConfig_))) {
       addSentryRolePrivileges(sentryService_, lowerCaseRoleName, "functional");
       CatalogState noReset = refreshSentryAuthorization(catalog, sentryService_, false);
 
@@ -317,7 +317,7 @@ public class SentryProxyTest {
         lowerCaseUserName.substring(1);
 
     try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-        new SentryAuthorizationConfig(authzConfig_.getSentryConfig()))) {
+        new SentryAuthorizationFactory(authzConfig_))) {
       SentryPolicyServiceStub sentryService = createSentryPolicyServiceStub(
           authzConfig_.getSentryConfig());
       // We grant different privileges to different users to ensure each user is
@@ -599,7 +599,7 @@ public class SentryProxyTest {
   private void withAllPrincipalTypes(Consumer<SentryProxyTestContext> consumer) {
     for (TPrincipalType type: TPrincipalType.values()) {
       try (CatalogServiceCatalog catalog = CatalogServiceTestCatalog.createWithAuth(
-          new SentryAuthorizationConfig(authzConfig_.getSentryConfig()))) {
+          new SentryAuthorizationFactory(authzConfig_))) {
         SentryPolicyService sentryService = sentryService_;
         if (type == TPrincipalType.USER) {
           sentryService = createSentryPolicyServiceStub(authzConfig_.getSentryConfig());

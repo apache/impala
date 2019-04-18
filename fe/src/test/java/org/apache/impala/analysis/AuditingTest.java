@@ -19,9 +19,8 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationException;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
@@ -368,11 +367,8 @@ public class AuditingTest extends FrontendTestBase {
   public void TestAccessEventsOnAuthFailure() throws ImpalaException {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
-    SentryAuthorizationConfig config =
-        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
-            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
-      SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(config);
+    AuthorizationFactory authzFactory = createAuthorizationFactory(false);
+    try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
       Frontend fe = new Frontend(authzFactory, catalog);
       AnalysisContext analysisCtx = createAnalysisCtx(authzFactory);
       // We should get an audit event even when an authorization failure occurs.

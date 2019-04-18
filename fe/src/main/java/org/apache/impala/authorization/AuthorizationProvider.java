@@ -24,5 +24,5 @@ package org.apache.impala.authorization;
 public enum AuthorizationProvider {
   SENTRY,
   RANGER,
-  NONE
+  NOOP
 }

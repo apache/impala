@@ -19,11 +19,21 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.thrift.*;
+import org.apache.impala.thrift.TCreateDropRoleParams;
+import org.apache.impala.thrift.TDdlExecResponse;
+import org.apache.impala.thrift.TGrantRevokePrivParams;
+import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TShowGrantPrincipalParams;
+import org.apache.impala.thrift.TShowRolesParams;
+import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
@@ -182,6 +192,12 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void updateTableOwnerPrivilege(String serverName, String databaseName,
       String tableName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException {
+  }
+
+  @Override
+  public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
+    // TODO: IMPALA-8293 (part 2)
+    return new AuthorizationDelta();
   }
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,

@@ -19,8 +19,8 @@ package org.apache.impala.testutil;
 
 import com.google.common.base.Preconditions;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -48,17 +48,16 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   private final CatalogServiceCatalog srcCatalog_;
 
   public ImpaladTestCatalog() {
-    this(new NoneAuthorizationFactory().getAuthorizationConfig());
+    this(new NoopAuthorizationFactory());
   }
 
   /**
-   * Takes an AuthorizationConfig to bootstrap the backing CatalogServiceCatalog.
+   * Takes an {@link AuthorizationFactory} to bootstrap the backing CatalogServiceCatalog.
    */
-  public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
+  public ImpaladTestCatalog(AuthorizationFactory authzFactory) {
     super("127.0.0.1");
-    CatalogServiceCatalog catalogServerCatalog = authzConfig.isEnabled() ?
-        CatalogServiceTestCatalog.createWithAuth(authzConfig) :
-        CatalogServiceTestCatalog.create();
+    CatalogServiceCatalog catalogServerCatalog =
+        CatalogServiceTestCatalog.createWithAuth(authzFactory);
     authPolicy_ = catalogServerCatalog.getAuthPolicy();
     srcCatalog_ = catalogServerCatalog;
     srcCatalog_.addDb(BuiltinsDb.getInstance());

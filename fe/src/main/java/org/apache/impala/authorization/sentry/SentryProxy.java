@@ -111,13 +111,14 @@ public class SentryProxy {
   // The value for the object ownership config.
   private final String objectOwnershipConfigValue_;
 
-  public SentryProxy(SentryAuthorizationConfig authzConfig, CatalogServiceCatalog catalog,
-      String kerberosPrincipal) throws ImpalaException {
+  public SentryProxy(SentryAuthorizationConfig authzConfig, CatalogServiceCatalog catalog)
+      throws ImpalaException {
     Preconditions.checkNotNull(authzConfig);
     SentryConfig sentryConfig = authzConfig.getSentryConfig();
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(sentryConfig);
     catalog_ = catalog;
+    String kerberosPrincipal = BackendConfig.INSTANCE.getBackendCfg().getPrincipal();
     if (Strings.isNullOrEmpty(kerberosPrincipal)) {
       processUser_ = new User(System.getProperty("user.name"));
     } else {
@@ -647,5 +648,4 @@ public class SentryProxy {
     }
     return false;
   }
-
 }

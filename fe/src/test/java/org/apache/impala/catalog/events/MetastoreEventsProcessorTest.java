@@ -24,7 +24,6 @@ import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventTyp
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_TABLE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -52,8 +51,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -140,9 +139,11 @@ public class MetastoreEventsProcessorTest {
       LoggerFactory.getLogger(MetastoreEventsProcessorTest.class);
 
   @BeforeClass
-  public static void setUpTestEnvironment() throws TException {
+  public static void setUpTestEnvironment() throws TException, ImpalaException {
     catalog_ = CatalogServiceTestCatalog.create();
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, new NoneAuthorizationFactory());
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_,
+        new NoopAuthorizationFactory().getAuthorizationConfig(),
+        new NoopAuthorizationManager());
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();
@@ -997,19 +998,19 @@ public class MetastoreEventsProcessorTest {
     private String tblName_;
 
     private FakeCatalogServiceCatalogForFlagTests(boolean loadInBackground,
-        int numLoadingThreads, AuthorizationConfig authConfig, TUniqueId catalogServiceId,
-        String kerberosPrincipal, String localLibraryPath,
+        int numLoadingThreads, TUniqueId catalogServiceId, String localLibraryPath,
         MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
-      super(loadInBackground, numLoadingThreads, authConfig, catalogServiceId,
-          kerberosPrincipal, localLibraryPath, metaStoreClientPool);
+      super(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
+          metaStoreClientPool);
     }
 
     public static CatalogServiceCatalog create() {
       FeSupport.loadLibrary();
       CatalogServiceCatalog cs;
       try {
-        cs = new FakeCatalogServiceCatalogForFlagTests(false, 16, null, new TUniqueId(),
-            null, System.getProperty("java.io.tmpdir"), new MetaStoreClientPool(0, 0));
+        cs = new FakeCatalogServiceCatalogForFlagTests(false, 16, new TUniqueId(),
+            System.getProperty("java.io.tmpdir"), new MetaStoreClientPool(0, 0));
+        cs.setAuthzManager(new NoopAuthorizationManager());
         cs.reset();
       } catch (ImpalaException e) {
         throw new IllegalStateException(e.getMessage(), e);

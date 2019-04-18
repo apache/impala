@@ -46,7 +46,7 @@ import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
@@ -148,7 +148,7 @@ public class JniFrontend {
     if (!authzConfig.isEnabled()) {
       // For backward compatibility to keep the existing behavior, when authorization
       // is not enabled, we need to use a dummy authorization config.
-      authzFactory = new NoneAuthorizationFactory(BackendConfig.INSTANCE);
+      authzFactory = new NoopAuthorizationFactory(BackendConfig.INSTANCE);
       LOG.info("Authorization is 'DISABLED'.");
     } else {
       LOG.info(String.format("Authorization is 'ENABLED' using %s.",

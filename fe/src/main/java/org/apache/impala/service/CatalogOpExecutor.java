@@ -54,7 +54,7 @@ import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
@@ -267,13 +267,12 @@ public class CatalogOpExecutor {
   // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
   private final Object metastoreDdlLock_ = new Object();
 
-  public CatalogOpExecutor(CatalogServiceCatalog catalog,
-      AuthorizationFactory authzFactory) {
-    Preconditions.checkNotNull(catalog);
-    Preconditions.checkNotNull(authzFactory);
-    catalog_ = catalog;
-    authzConfig_ = authzFactory.getAuthorizationConfig();
-    authzManager_ = authzFactory.newAuthorizationManager(catalog);
+  public CatalogOpExecutor(CatalogServiceCatalog catalog, AuthorizationConfig authzConfig,
+      AuthorizationManager authzManager) throws ImpalaException {
+    Preconditions.checkNotNull(authzManager);
+    catalog_ = Preconditions.checkNotNull(catalog);
+    authzConfig_ = Preconditions.checkNotNull(authzConfig);
+    authzManager_ = Preconditions.checkNotNull(authzManager);
   }
 
   public CatalogServiceCatalog getCatalog() { return catalog_; }
@@ -3513,11 +3512,9 @@ public class CatalogOpExecutor {
       }
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else if (req.isAuthorization()) {
-      List<TCatalogObject> added = new ArrayList<>();
-      List<TCatalogObject> removed = new ArrayList<>();
-      catalog_.refreshAuthorization(false, added, removed);
-      resp.result.setUpdated_catalog_objects(added);
-      resp.result.setRemoved_catalog_objects(removed);
+      AuthorizationDelta authzDelta = catalog_.refreshAuthorization(false);
+      resp.result.setUpdated_catalog_objects(authzDelta.getCatalogObjectsAdded());
+      resp.result.setRemoved_catalog_objects(authzDelta.getCatalogObjectsRemoved());
       resp.result.setVersion(catalog_.getCatalogVersion());
     } else {
       // Invalidate the entire catalog if no table name is provided.

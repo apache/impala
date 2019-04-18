@@ -27,7 +27,8 @@ import java.util.UUID;
 
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
-import org.apache.impala.authorization.NoneAuthorizationFactory;
+import org.apache.impala.authorization.AuthorizationManager;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.sentry.SentryCatalogdAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
@@ -84,6 +85,7 @@ public class JniCatalog {
       new TBinaryProtocol.Factory();
   private final CatalogServiceCatalog catalog_;
   private final CatalogOpExecutor catalogOpExecutor_;
+  private final AuthorizationManager authzManager_;
 
   // A unique identifier for this instance of the Catalog Service.
   private static final TUniqueId catalogServiceId_ = generateId();
@@ -124,7 +126,7 @@ public class JniCatalog {
     if (!authzConfig.isEnabled()) {
       // For backward compatibility to keep the existing behavior, when authorization
       // is not enabled, we need to use a dummy authorization config.
-      authzFactory = new NoneAuthorizationFactory(BackendConfig.INSTANCE);
+      authzFactory = new NoopAuthorizationFactory(BackendConfig.INSTANCE);
       authzConfig = authzFactory.getAuthorizationConfig();
       LOG.info("Authorization is 'DISABLED'.");
     } else {
@@ -134,14 +136,16 @@ public class JniCatalog {
     LOG.info(JniUtil.getJavaVersion());
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
-        cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s,
-        authzConfig, getServiceId(), cfg.principal, cfg.local_library_path);
+        cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s, getServiceId(),
+        cfg.local_library_path);
+    authzManager_ = authzFactory.newAuthorizationManager(catalog_);
+    catalog_.setAuthzManager(authzManager_);
     try {
       catalog_.reset();
     } catch (CatalogException e) {
       LOG.error("Error initializing Catalog. Please run 'invalidate metadata'", e);
     }
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzFactory);
+    catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_);
   }
 
   public static TUniqueId getServiceId() { return catalogServiceId_; }

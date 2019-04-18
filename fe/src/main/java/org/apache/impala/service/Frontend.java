@@ -237,7 +237,7 @@ public class Frontend {
 
   private final ImpaladTableUsageTracker impaladTableUsageTracker_;
 
-  public Frontend(AuthorizationFactory authzFactory) {
+  public Frontend(AuthorizationFactory authzFactory) throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig());
   }
 
@@ -246,11 +246,13 @@ public class Frontend {
    * updates and will be used for all requests.
    */
   @VisibleForTesting
-  public Frontend(AuthorizationFactory authzFactory, FeCatalog testCatalog) {
+  public Frontend(AuthorizationFactory authzFactory, FeCatalog testCatalog)
+      throws ImpalaException {
     this(authzFactory, FeCatalogManager.createForTests(testCatalog));
   }
 
-  private Frontend(AuthorizationFactory authzFactory, FeCatalogManager catalogManager) {
+  private Frontend(AuthorizationFactory authzFactory, FeCatalogManager catalogManager)
+      throws ImpalaException {
     catalogManager_ = catalogManager;
     authzFactory_ = authzFactory;
 
@@ -278,7 +280,7 @@ public class Frontend {
   }
 
   public TUpdateCatalogCacheResponse updateCatalogCache(
-      TUpdateCatalogCacheRequest req) throws CatalogException, TException {
+      TUpdateCatalogCacheRequest req) throws ImpalaException, TException {
     TUpdateCatalogCacheResponse resp = catalogManager_.updateCatalogCache(req);
     if (!req.is_delta) {
       // In the case that it was a non-delta update, the catalog might have reloaded

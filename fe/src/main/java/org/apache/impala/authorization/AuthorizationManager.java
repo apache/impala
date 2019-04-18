@@ -18,6 +18,7 @@
 package org.apache.impala.authorization;
 
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
@@ -122,4 +123,14 @@ public interface AuthorizationManager {
   void updateTableOwnerPrivilege(String serverName, String databaseName, String tableName,
       String oldOwner, PrincipalType oldOwnerType, String newOwner,
       PrincipalType newOwnerType, TDdlExecResponse response) throws ImpalaException;
+
+  /**
+   * Performs a refresh authorization by updating the authorization catalog objects.
+   *
+   * @param resetVersions when resetVersions is true (used by INVALIDATE METADATA),
+   *                      catalog object versions will need to be incremented.
+   * @return {@link AuthorizationDelta} for the authorization catalog objects
+   *         added/removed.
+   */
+  AuthorizationDelta refreshAuthorization(boolean resetVersions) throws ImpalaException;
 }

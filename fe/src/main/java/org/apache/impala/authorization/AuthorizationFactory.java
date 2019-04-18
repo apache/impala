@@ -18,6 +18,7 @@
 package org.apache.impala.authorization;
 
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeCatalogManager;
 
@@ -38,12 +39,13 @@ public interface AuthorizationFactory {
   /**
    * Creates a new instance of {@link AuthorizationChecker}.
    */
-  AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy);
+  AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy)
+      throws ImpalaException;
 
   /**
    * Creates a new instance of {@link AuthorizationChecker}.
    */
-  default AuthorizationChecker newAuthorizationChecker() {
+  default AuthorizationChecker newAuthorizationChecker() throws ImpalaException {
     return newAuthorizationChecker(null);
   }
 
@@ -61,10 +63,11 @@ public interface AuthorizationFactory {
    * object may become stale.
    */
   AuthorizationManager newAuthorizationManager(FeCatalogManager catalog,
-      Supplier<? extends AuthorizationChecker> authzChecker);
+      Supplier<? extends AuthorizationChecker> authzChecker) throws ImpalaException;
 
   /**
    * Creates a new instance of {@link AuthorizationManager}.
    */
-  AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog);
+  AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog)
+      throws ImpalaException;
 }
