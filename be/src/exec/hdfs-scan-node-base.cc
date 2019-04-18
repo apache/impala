@@ -470,7 +470,7 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
     MakeScopeExitTrigger([&](){ UpdateRemainingScanRangeSubmissions(-1); });
 
   // No need to issue ranges with limit 0.
-  if (ReachedLimit()) {
+  if (ReachedLimitShared()) {
     DCHECK_EQ(limit_, 0);
     return Status::OK();
   }

@@ -95,7 +95,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 
   // If there are no scan tokens, nothing is ever placed in the materialized
   // row batch, so exit early for this case.
-  if (ReachedLimit() || NumScanTokens() == 0) {
+  if (NumScanTokens() == 0 || ReachedLimitShared()) {
     *eos = true;
     return Status::OK();
   }
@@ -104,18 +104,10 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   unique_ptr<RowBatch> materialized_batch = thread_state_.batch_queue()->GetBatch();
   if (materialized_batch != NULL) {
     row_batch->AcquireState(materialized_batch.get());
-    num_rows_returned_ += row_batch->num_rows();
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
-    if (ReachedLimit()) {
-      int num_rows_over = num_rows_returned_ - limit_;
-      row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
-      num_rows_returned_ -= num_rows_over;
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-      *eos = true;
-
+    if (CheckLimitAndTruncateRowBatchIfNeededShared(row_batch, eos)) {
       SetDone();
     }
+    COUNTER_SET(rows_returned_counter_, rows_returned_shared());
     materialized_batch.reset();
   } else {
     *eos = true;

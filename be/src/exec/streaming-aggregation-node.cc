@@ -83,8 +83,8 @@ Status StreamingAggregationNode::GetNext(
     *eos = curr_output_agg_idx_ >= aggs_.size();
   }
 
-  num_rows_returned_ += row_batch->num_rows();
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  IncrementNumRowsReturned(row_batch->num_rows());
+  COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
 }
 

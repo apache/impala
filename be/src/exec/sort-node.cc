@@ -135,13 +135,9 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   }
 
   returned_buffer_ = row_batch->num_buffers() > 0;
-  num_rows_returned_ += row_batch->num_rows();
-  if (ReachedLimit()) {
-    row_batch->set_num_rows(row_batch->num_rows() - (num_rows_returned_ - limit_));
-    *eos = true;
-  }
+  CheckLimitAndTruncateRowBatchIfNeeded(row_batch, eos);
 
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  COUNTER_SET(rows_returned_counter_, rows_returned());
 
   return Status::OK();
 }

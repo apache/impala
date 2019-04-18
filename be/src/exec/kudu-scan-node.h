@@ -44,6 +44,9 @@ class KuduScanNode : public KuduScanNodeBase {
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual void Close(RuntimeState* state) override;
+  virtual ExecutionModel getExecutionModel() const override {
+    return NON_TASK_BASED_SYNC;
+  }
 
  private:
   friend class KuduScanner;

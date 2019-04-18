@@ -203,9 +203,45 @@ class ExecNode {
     DCHECK(containing_subplan_ == NULL);
     containing_subplan_ = sp;
   }
-  int64_t rows_returned() const { return num_rows_returned_; }
+
   int64_t limit() const { return limit_; }
-  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
+
+  /// Returns the number of rows returned by this Node.
+  int64_t rows_returned() const {
+    DCHECK(getExecutionModel() != NON_TASK_BASED_SYNC);
+    return num_rows_returned_;
+  }
+
+  /// Returns the number of rows returned by this Node. Thread safe version of
+  /// rows_returned().
+  /// TODO: The thread safe versions can be removed if we remove the legacy multi-threaded
+  /// scan nodes.
+  int64_t rows_returned_shared() const {
+    // Ideally this function should only be called when num_rows_returned_ is shared by
+    // multiple threads. Both the HdfsScanNodeMt and KuduScanNodeMt call this function
+    // from the scanner code-path for simplicity.
+    DCHECK(
+        getExecutionModel() == NON_TASK_BASED_SYNC || getExecutionModel() == TASK_BASED);
+    return base::subtle::Acquire_Load(&num_rows_returned_);
+  }
+
+  /// Returns true if a valid limit is set and number of rows returned by this node has
+  /// exceeded the limit.
+  bool ReachedLimit() {
+    DCHECK(getExecutionModel() != NON_TASK_BASED_SYNC);
+    return limit_ != -1 && num_rows_returned_ >= limit_;
+  }
+
+  /// Returns true if a valid limit is set and number of rows returned by this node has
+  /// exceeded the limit. Thread safe version of ReachedLimit().
+  bool ReachedLimitShared() {
+    // Ideally this function should only be called when num_rows_returned_ is shared by
+    // multiple threads. Both the HdfsScanNodeMt and KuduScanNodeMt call this function
+    // from the scanner code-path for simplicity.
+    DCHECK(
+        getExecutionModel() == NON_TASK_BASED_SYNC || getExecutionModel() == TASK_BASED);
+    return limit_ != -1 && base::subtle::Acquire_Load(&num_rows_returned_) >= limit_;
+  }
 
   RuntimeProfile* runtime_profile() { return runtime_profile_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
@@ -230,6 +266,22 @@ class ExecNode {
   friend class DataSink;
   friend class ScopedGetNextEventAdder;
   friend class ScopedOpenEventAdder;
+
+  enum ExecutionModel {
+    /// Exec nodes with single threaded execution. This is the default execution model
+    /// for majority of the nodes. BlockingJoin node is an exception since it could spawn
+    /// a build thread in some cases. Due to the blocking nature of such join operators,
+    /// it can be considered as not requiring explicit synchronization.
+    NON_TASK_BASED_NO_SYNC,
+    /// Exec nodes which spawn multiple worker threads. Examples are HdfsScanNode and
+    /// and KuduScanNode. Requires syncronization if the main thread and worker threads
+    /// share resources.
+    NON_TASK_BASED_SYNC,
+    /// Task Based multi-threading. Examples are HdfsScanNodeMt and KuduScanNodeMt.
+    TASK_BASED
+  };
+
+  virtual ExecutionModel getExecutionModel() const { return NON_TASK_BASED_NO_SYNC; }
 
   BufferPool::ClientHandle* buffer_pool_client() {
     return reservation_manager_.buffer_pool_client();
@@ -275,7 +327,6 @@ class ExecNode {
   TDebugOptions debug_options_;
 
   int64_t limit_;  // -1: no limit
-  int64_t num_rows_returned_;
 
   /// Runtime profile for this node. Owned by the QueryState's ObjectPool.
   RuntimeProfile* const runtime_profile_;
@@ -333,7 +384,56 @@ class ExecNode {
   /// TODO: IMPALA-2399: replace QueryMaintenance() - see JIRA for more details.
   Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
 
+  /// Sets the number of rows returned.
+  void SetNumRowsReturned(int64_t value) {
+    DCHECK(getExecutionModel() != NON_TASK_BASED_SYNC);
+    num_rows_returned_ = value;
+    DFAKE_SCOPED_LOCK_THREAD_LOCKED(single_thread_check_);
+  }
+
+  /// Increment the number of rows returned.
+  void IncrementNumRowsReturned(int64_t value) {
+    DCHECK(getExecutionModel() != NON_TASK_BASED_SYNC);
+    num_rows_returned_ += value;
+    DFAKE_SCOPED_LOCK_THREAD_LOCKED(single_thread_check_);
+  }
+
+  /// Increment the number of rows returned. Thread safe version of
+  /// IncrementNumRowsReturned().
+  void IncrementNumRowsReturnedShared(int64_t value) {
+    DCHECK(getExecutionModel() == NON_TASK_BASED_SYNC);
+    base::subtle::Barrier_AtomicIncrement(&num_rows_returned_, value);
+  }
+
+  /// Decrement the number of rows returned.
+  void DecrementNumRowsReturned(int64_t value) { IncrementNumRowsReturned(-1 * value); }
+
+  /// Decrement the number of rows returned. Thread safe version of
+  /// DecrementNumRowsReturned().
+  void DecrementNumRowsReturnedShared(int64_t value) {
+    IncrementNumRowsReturnedShared(-1 * value);
+  }
+
+  /// Caps the input row batch to ensure that the limit is not exceeded.
+  /// Sets the eos and returns true, if the limit is reached.
+  bool CheckLimitAndTruncateRowBatchIfNeeded(RowBatch* row_batch, bool* eos);
+
+  /// Caps the input row batch to ensure that the limit is not exceeded.
+  /// Sets the eos and returns true, if the limit is reached.
+  /// Uses thread safe functions.
+  bool CheckLimitAndTruncateRowBatchIfNeededShared(RowBatch* row_batch, bool* eos);
+
  private:
+  /// Keeps track of number of rows returned by an exec node. If this variable is shared
+  /// by multiple threads, it should be accessed using thread-safe functions defined
+  /// above. The single-threaded code-paths should use non-atomic functions defined
+  /// above. The only exceptions are HdfsScanNodeMt and KuduScanNodeMt, which are single
+  /// threaded (task based multi-threading support), but use the thread-safe functions
+  /// in the scanner code-path for code simplicity. This is because both the task based
+  /// MT scan nodes (HdfsScanNodeMt/KuduScanNodeMt) and regular scan nodes
+  /// (HdfsScanNode/KuduScanNode) call common scanner functions.
+  int64_t num_rows_returned_;
+  DFAKE_MUTEX(single_thread_check_);
   /// Implementation of ExecDebugAction(). This is the slow path we take when there is
   /// actually a debug action enabled for 'phase'.
   Status ExecDebugActionImpl(

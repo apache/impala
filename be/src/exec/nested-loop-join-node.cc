@@ -246,11 +246,11 @@ Status NestedLoopJoinNode::GetNext(
 
 end:
   if (ReachedLimit()) {
-    int64_t extra_rows = num_rows_returned_ - limit_;
+    int64_t extra_rows = rows_returned() - limit_;
     DCHECK_GE(extra_rows, 0);
     DCHECK_LE(extra_rows, output_batch->num_rows());
     output_batch->set_num_rows(output_batch->num_rows() - extra_rows);
-    num_rows_returned_ = limit_;
+    SetNumRowsReturned(limit_);
     eos_ = true;
   }
   if (eos_) {
@@ -258,7 +258,7 @@ end:
     probe_batch_->TransferResourceOwnership(output_batch);
     build_batches_->TransferResourceOwnership(output_batch);
   }
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
 }
 
@@ -321,7 +321,7 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
       output_batch->CopyRow(current_probe_row_, output_row);
       VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
-      ++num_rows_returned_;
+      IncrementNumRowsReturned(1);
       if (ReachedLimit()) {
         eos_ = true;
         return Status::OK();
@@ -435,7 +435,7 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
       ++current_build_row_idx_;
       VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
-      ++num_rows_returned_;
+      IncrementNumRowsReturned(1);
       if (output_batch->AtCapacity()) return Status::OK();
     }
     RETURN_IF_ERROR(NextProbeRow(state, output_batch));
@@ -519,7 +519,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedProbeRow(RuntimeState* state,
   if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
     VLOG_ROW << "match row:" << PrintRow(output_row, *row_desc());
     output_batch->CommitLastRow();
-    ++num_rows_returned_;
+    IncrementNumRowsReturned(1);
     if (ReachedLimit()) eos_ = true;
   }
   return Status::OK();
@@ -572,7 +572,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
     if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
       VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
-      ++num_rows_returned_;
+      IncrementNumRowsReturned(1);
       if (output_batch->AtCapacity()) return Status::OK();
     }
   }
@@ -619,7 +619,7 @@ Status NestedLoopJoinNode::FindBuildMatches(
     if (!EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) continue;
     VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
     output_batch->CommitLastRow();
-    ++num_rows_returned_;
+    IncrementNumRowsReturned(1);
     if (output_batch->AtCapacity()) {
       *return_output_batch = true;
       return Status::OK();

@@ -612,7 +612,7 @@ Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
     }
     COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
     RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
   }
 
   if (row_pos_ == num_rows_) {

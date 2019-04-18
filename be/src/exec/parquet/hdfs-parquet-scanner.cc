@@ -357,7 +357,7 @@ Status HdfsParquetScanner::ProcessSplit() {
     if ((row_batches_produced_ & (BATCHES_PER_FILTER_SELECTIVITY_CHECK - 1)) == 0) {
       CheckFiltersEffectiveness();
     }
-  } while (!eos_ && !scan_node_->ReachedLimit());
+  } while (!eos_ && !scan_node_->ReachedLimitShared());
   return Status::OK();
 }
 
@@ -1255,7 +1255,7 @@ bool HdfsParquetScanner::AssembleCollection(
       conjunct_evals_map_[tuple_desc->id()];
 
   int64_t rows_read = 0;
-  bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
+  bool continue_execution = !scan_node_->ReachedLimitShared() && !context_->cancelled();
   // Note that this will be set to true at the end of the row group or the end of the
   // current collection (if applicable).
   bool end_of_collection = column_readers[0]->rep_level() == -1;
@@ -1309,7 +1309,7 @@ bool HdfsParquetScanner::AssembleCollection(
 
     rows_read += row_idx;
     coll_value_builder->CommitTuples(num_to_commit);
-    continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
+    continue_execution &= !scan_node_->ReachedLimitShared() && !context_->cancelled();
   }
   coll_items_read_counter_ += rows_read;
   if (end_of_collection) {

@@ -105,8 +105,8 @@ Status PartialSortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       sorter_->Reset();
       *eos = input_eos_;
     }
-    num_rows_returned_ += row_batch->num_rows();
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+    IncrementNumRowsReturned(row_batch->num_rows());
+    COUNTER_SET(rows_returned_counter_, rows_returned());
     return Status::OK();
   }
 
@@ -139,8 +139,8 @@ Status PartialSortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     *eos = input_eos_;
   }
 
-  num_rows_returned_ += row_batch->num_rows();
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  IncrementNumRowsReturned(row_batch->num_rows());
+  COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
 }
 

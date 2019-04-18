@@ -179,7 +179,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-    if (ReachedLimit() || row_batch->AtCapacity()) {
+    if (row_batch->AtCapacity() || ReachedLimit()) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
       *eos = ReachedLimit();
@@ -251,8 +251,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
     if (EvalConjuncts(conjunct_evals_.data(), conjuncts_.size(), row)) {
       row_batch->CommitLastRow();
-      ++num_rows_returned_;
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+      IncrementNumRowsReturned(1);
+      COUNTER_SET(rows_returned_counter_, rows_returned());
       tuple = reinterpret_cast<Tuple*>(
           reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
     } else {

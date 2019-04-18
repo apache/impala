@@ -106,6 +106,10 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// Transfers all memory from 'pool' to 'scan_node_pool_'.
   virtual void TransferToScanNodePool(MemPool* pool) override;
 
+  virtual ExecutionModel getExecutionModel() const override {
+    return NON_TASK_BASED_SYNC;
+  }
+
  private:
   ScannerThreadState thread_state_;
 

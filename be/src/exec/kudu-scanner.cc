@@ -125,7 +125,7 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
       if (row_batch->AtCapacity()) break;
     }
 
-    if (scanner_->HasMoreRows() && !scan_node_->ReachedLimit()) {
+    if (scanner_->HasMoreRows() && !scan_node_->ReachedLimitShared()) {
       RETURN_IF_ERROR(GetNextScannerBatch());
       continue;
     }
@@ -333,7 +333,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
     row->SetTuple(0, *tuple_mem);
     row_batch->CommitLastRow();
     // If we've reached the capacity, or the LIMIT for the scan, return.
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
     // Move to the next tuple in the tuple buffer.
     *tuple_mem = next_tuple(*tuple_mem);
   }

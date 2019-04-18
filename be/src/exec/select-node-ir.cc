@@ -34,7 +34,7 @@ void SelectNode::CopyRows(RowBatch* output_batch) {
     if (EvalConjuncts(conjunct_evals, num_conjuncts, src_row)) {
       output_batch->CopyRow(src_row, dst_row);
       output_batch->CommitLastRow();
-      ++num_rows_returned_;
+      IncrementNumRowsReturned(1);
       if (ReachedLimit() || output_batch->AtCapacity()) return;
     }
   }

@@ -432,7 +432,7 @@ Status HdfsOrcScanner::ProcessSplit() {
     if ((row_batches_produced_ & (BATCHES_PER_FILTER_SELECTIVITY_CHECK - 1)) == 0) {
       CheckFiltersEffectiveness();
     }
-  } while (!eos_ && !scan_node_->ReachedLimit());
+  } while (!eos_ && !scan_node_->ReachedLimitShared());
   return Status::OK();
 }
 
@@ -593,7 +593,7 @@ Status HdfsOrcScanner::NextStripe() {
 }
 
 Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
-  bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
+  bool continue_execution = !scan_node_->ReachedLimitShared() && !context_->cancelled();
   if (!continue_execution) return Status::CancelledInternal("ORC scanner");
 
   // We're going to free the previous batch. Clear the reference first.
@@ -628,7 +628,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
 
     RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch));
     if (row_batch->AtCapacity()) break;
-    continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
+    continue_execution &= !scan_node_->ReachedLimitShared() && !context_->cancelled();
   }
   stripe_rows_read_ += num_rows_read;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
@@ -721,7 +721,7 @@ Status HdfsOrcScanner::AssembleCollection(
       conjunct_evals_map_[tuple_desc->id()];
 
   int tuple_idx = 0;
-  while (!scan_node_->ReachedLimit() && !context_->cancelled()
+  while (!scan_node_->ReachedLimitShared() && !context_->cancelled()
       && tuple_idx < total_tuples) {
     MemPool* pool;
     Tuple* tuple;

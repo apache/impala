@@ -359,13 +359,13 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
           row_batch->CommitLastRow();
           tuple = reinterpret_cast<Tuple*>(
               reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
-          ++num_rows_returned_;
+          IncrementNumRowsReturned(1);
         }
         ++next_row_idx_;
       }
-      if (ReachedLimit() || row_batch->AtCapacity() || input_batch_->eos) {
-        *eos = ReachedLimit() || input_batch_->eos;
-        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+      if (row_batch->AtCapacity() || input_batch_->eos || ReachedLimit()) {
+        *eos = input_batch_->eos || ReachedLimit();
+        COUNTER_SET(rows_returned_counter_, rows_returned());
         COUNTER_ADD(rows_read_counter_, rows_read);
         return Status::OK();
       }

@@ -415,7 +415,7 @@ Status HdfsTextScanner::ProcessRange(RowBatch* row_batch, int* num_tuples) {
       break;
     }
 
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
   }
   return Status::OK();
 }
@@ -446,7 +446,7 @@ Status HdfsTextScanner::GetNextInternal(RowBatch* row_batch) {
     int num_tuples;
     RETURN_IF_ERROR(ProcessRange(row_batch, &num_tuples));
   }
-  if (scan_node_->ReachedLimit()) {
+  if (scan_node_->ReachedLimitShared()) {
     eos_ = true;
     scan_state_ = DONE;
     return Status::OK();
@@ -845,7 +845,8 @@ int HdfsTextScanner::WriteFields(int num_fields, int num_tuples, MemPool* pool,
     const bool copy_strings = !string_slot_offsets_.empty() &&
         stream_->file_desc()->file_compression == THdfsCompression::NONE;
     int max_added_tuples = (scan_node_->limit() == -1) ?
-        num_tuples : scan_node_->limit() - scan_node_->rows_returned();
+        num_tuples :
+        scan_node_->limit() - scan_node_->rows_returned_shared();
     int tuples_returned = 0;
     // Call jitted function if possible
     if (write_tuples_fn_ != nullptr) {

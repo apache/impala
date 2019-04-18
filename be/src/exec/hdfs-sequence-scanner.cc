@@ -187,7 +187,7 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange(RowBatch* row_batch)
   // Step 2
   while (num_buffered_records_in_compressed_block_ > 0) {
     RETURN_IF_ERROR(ProcessDecompressedBlock(row_batch));
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
   }
 
   if (num_buffered_records_in_compressed_block_ == 0) {
@@ -291,8 +291,8 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
   }
 
   int max_added_tuples = (scan_node_->limit() == -1) ?
-                         num_to_process :
-                         scan_node_->limit() - scan_node_->rows_returned();
+      num_to_process :
+      scan_node_->limit() - scan_node_->rows_returned_shared();
 
   // Materialize parsed cols to tuples
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
@@ -393,7 +393,7 @@ Status HdfsSequenceScanner::ProcessRange(RowBatch* row_batch) {
 
     // These checks must come after advancing past the next sync such that the stream is
     // at the start of the next data block when this function is called again.
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
   }
 
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);

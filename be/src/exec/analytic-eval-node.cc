@@ -725,7 +725,7 @@ Status AnalyticEvalNode::GetNextOutputBatch(
     input_batch.CopyRow(input_batch.GetRow(i), dest);
     dest->SetTuple(num_child_tuples, result_tuples_.front().second);
     output_batch->CommitLastRow();
-    ++num_rows_returned_;
+    IncrementNumRowsReturned(1);
 
     // Remove the head of result_tuples_ if all rows using that evaluated tuple
     // have been returned.
@@ -809,7 +809,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     prev_pool_last_window_idx_ = -1;
   }
 
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
 }
 

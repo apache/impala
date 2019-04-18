@@ -498,7 +498,7 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
   // so that we make progress even if the batch starts off with AtCapacity() == true,
   // which can happen if the tuple buffer is > 8MB.
   DCHECK_GT(row_batch->capacity(), row_batch->num_rows());
-  while (!eos_ && !scan_node_->ReachedLimit()) {
+  while (!eos_ && !scan_node_->ReachedLimitShared()) {
     if (record_pos_ == num_records_in_block_) {
       // Read new data block
       RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block_, &parse_status_));
@@ -560,7 +560,7 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
       RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
       record_pos_ += max_tuples;
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
-      if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+      if (row_batch->AtCapacity() || scan_node_->ReachedLimitShared()) break;
     }
 
     if (record_pos_ == num_records_in_block_) {

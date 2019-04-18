@@ -111,17 +111,12 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   }
   InitNullCollectionValues(row_batch);
 
-  num_rows_returned_ += row_batch->num_rows();
-  if (ReachedLimit()) {
-    int num_rows_over = num_rows_returned_ - limit_;
-    row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
-    num_rows_returned_ -= num_rows_over;
+  if (CheckLimitAndTruncateRowBatchIfNeeded(row_batch, eos)) {
     scan_range_ = NULL;
     scanner_->Close(row_batch);
     scanner_.reset();
-    *eos = true;
   }
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  COUNTER_SET(rows_returned_counter_, rows_returned());
 
   if (*eos) StopAndFinalizeCounters();
   return Status::OK();

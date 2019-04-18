@@ -103,7 +103,7 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     } else {
       CopyRows(row_batch);
     }
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+    COUNTER_SET(rows_returned_counter_, rows_returned());
     *eos = ReachedLimit()
         || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
     if (*eos || child_row_idx_ == child_row_batch_->num_rows()) {

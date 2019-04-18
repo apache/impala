@@ -121,7 +121,7 @@ Status HdfsScanNode::GetNextInternal(
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  if (ReachedLimit()) {
+  if (ReachedLimitShared()) {
     // LIMIT 0 case.  Other limit values handled below.
     DCHECK_EQ(limit_, 0);
     *eos = true;
@@ -131,22 +131,10 @@ Status HdfsScanNode::GetNextInternal(
   unique_ptr<RowBatch> materialized_batch = thread_state_.batch_queue()->GetBatch();
   if (materialized_batch != NULL) {
     row_batch->AcquireState(materialized_batch.get());
-    // Update the number of materialized rows now instead of when they are materialized.
-    // This means that scanners might process and queue up more rows than are necessary
-    // for the limit case but we want to avoid the synchronized writes to
-    // num_rows_returned_.
-    num_rows_returned_ += row_batch->num_rows();
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
-    if (ReachedLimit()) {
-      int num_rows_over = num_rows_returned_ - limit_;
-      row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
-      num_rows_returned_ -= num_rows_over;
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
-      *eos = true;
-      SetDone();
-    }
+    // Note that the scanner threads may have processed and queued up extra rows before
+    // this thread incremented the rows returned.
+    if (CheckLimitAndTruncateRowBatchIfNeededShared(row_batch, eos)) SetDone();
+    COUNTER_SET(rows_returned_counter_, rows_returned_shared());
     materialized_batch.reset();
     return Status::OK();
   }

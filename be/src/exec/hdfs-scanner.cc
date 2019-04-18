@@ -138,7 +138,7 @@ Status HdfsScanner::ProcessSplit() {
     // data referenced by previously appended batches.
     if (returned_rows) scan_node->AddMaterializedRowBatch(move(batch));
     RETURN_IF_ERROR(status);
-  } while (!eos_ && !scan_node_->ReachedLimit());
+  } while (!eos_ && !scan_node_->ReachedLimitShared());
   return Status::OK();
 }
 

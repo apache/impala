@@ -202,8 +202,8 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     row_batch->CopyRow(src_row, dst_row);
     ++get_next_iter_;
     row_batch->CommitLastRow();
-    ++num_rows_returned_;
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+    IncrementNumRowsReturned(1);
+    COUNTER_SET(rows_returned_counter_, rows_returned());
   }
   *eos = get_next_iter_ == sorted_top_n_.end();
 
