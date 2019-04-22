@@ -25,7 +25,7 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/thread/mutex.hpp>
+#include <gtest/gtest_prod.h>
 
 #include "common/status.h"
 #include "scheduling/request-pool-service.h"
@@ -95,10 +95,10 @@ enum class AdmissionOutcome {
 /// reservation of the query. The final memory limit used is also clamped by the max/min
 /// memory limits configured for the pool with an option to not enforce these limits on
 /// the MEM_LIMIT query option (If both these max/min limits are not configured, then the
-/// estimates from planning are not used as a memory limit and only used for making
+/// estimates from planning are not used as a memory limit and are only used for making
 /// admission decisions. Moreover the estimates will no longer have a lower bound based on
 /// the largest initial reservation).
-/// The following three conditions must hold in order for the request to be admitted:
+/// The following four conditions must hold in order for the request to be admitted:
 ///  1) The current pool configuration is valid.
 ///  2) There must be enough memory resources available in this resource pool for the
 ///     request. The max memory resources configured for the resource pool specifies the
@@ -388,9 +388,8 @@ class AdmissionController {
     void Queue(const QuerySchedule& schedule);
     void Dequeue(const QuerySchedule& schedule, bool timed_out);
 
-
     /// STATESTORE CALLBACK METHODS
-    /// Updates the local_stats_.mem_reserved with the pool mem tracker. Called
+    /// Updates the local_stats_.backend_mem_reserved with the pool mem tracker. Called
     /// before sending local_stats().
     void UpdateMemTrackerStats();
 
@@ -484,6 +483,8 @@ class AdmissionController {
     static const double EMA_MULTIPLIER;
 
     void InitMetrics();
+
+    FRIEND_TEST(AdmissionControllerTest, Simple);
   };
 
   /// Map of pool names to pool stats. Accessed via GetPoolStats().
@@ -626,6 +627,13 @@ class AdmissionController {
   /// Same as GetStalenessDetail() except caller must hold 'admission_ctrl_lock_'.
   std::string GetStalenessDetailLocked(const std::string& prefix,
       int64_t* ms_since_last_update = nullptr);
+
+  /// Returns the topic key for the pool at this backend, i.e. a string of the
+  /// form: "<pool_name><delimiter><backend_id>".
+  static string MakePoolTopicKey(const string& pool_name, const string& backend_id);
+
+  FRIEND_TEST(AdmissionControllerTest, Simple);
+  friend class AdmissionControllerTest;
 };
 
 } // namespace impala

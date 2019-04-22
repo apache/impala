@@ -219,16 +219,6 @@ static inline bool ParsePoolTopicKey(const string& topic_key, string* pool_name,
   return true;
 }
 
-// Returns the topic key for the pool at this backend, i.e. a string of the
-// form: "<pool_name><delimiter><backend_id>".
-static inline string MakePoolTopicKey(const string& pool_name,
-    const string& backend_id) {
-  // Ensure the backend_id does not contain the delimiter to ensure that the topic key
-  // can be parsed properly by finding the last instance of the delimiter.
-  DCHECK_EQ(backend_id.find(TOPIC_KEY_DELIMITER), string::npos);
-  return Substitute("$0$1$2", pool_name, TOPIC_KEY_DELIMITER, backend_id);
-}
-
 // Return a debug string for the pool stats.
 static string DebugPoolStats(const TPoolStats& stats) {
   stringstream ss;
@@ -1323,5 +1313,13 @@ void AdmissionController::PopulatePerHostMemReservedAndAdmitted(
   for (const auto& elem: host_mem_reserved_) {
     (*mem_map)[elem.first] = make_pair(elem.second, host_mem_admitted_[elem.first]);
   }
+}
+
+string AdmissionController::MakePoolTopicKey(
+    const string& pool_name, const string& backend_id) {
+  // Ensure the backend_id does not contain the delimiter to ensure that the topic key
+  // can be parsed properly by finding the last instance of the delimiter.
+  DCHECK_EQ(backend_id.find(TOPIC_KEY_DELIMITER), string::npos);
+  return Substitute("$0$1$2", pool_name, TOPIC_KEY_DELIMITER, backend_id);
 }
 }

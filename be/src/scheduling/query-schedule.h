@@ -157,6 +157,10 @@ class QuerySchedule {
       const TQueryOptions& query_options, RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
 
+  /// For testing only: build a QuerySchedule object but do not run Init().
+  QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
+      const TQueryOptions& query_options, RuntimeProfile* summary_profile);
+
   /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
   /// - all fragments have a FragmentExecParams
   /// - all scan ranges are assigned

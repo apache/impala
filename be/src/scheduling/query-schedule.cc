@@ -26,9 +26,9 @@
 #include "util/container-util.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
-#include "util/uid-util.h"
-#include "util/debug-util.h"
 #include "util/parse-util.h"
+#include "util/test-info.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 
@@ -49,6 +49,18 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     num_scan_ranges_(0),
     next_instance_id_(query_id) {
   Init();
+}
+
+QuerySchedule::QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
+    const TQueryOptions& query_options, RuntimeProfile* summary_profile)
+  : query_id_(query_id),
+    request_(request),
+    query_options_(query_options),
+    summary_profile_(summary_profile),
+    num_scan_ranges_(0),
+    next_instance_id_(query_id) {
+  // Init() is not called, this constructor is for white box testing only.
+  DCHECK(TestInfo::is_test());
 }
 
 void QuerySchedule::Init() {
