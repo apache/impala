@@ -3739,7 +3739,7 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestShowGrantPrincipal() {
-    for (String type: new String[]{"ROLE", "USER"}) {
+    for (String type: new String[]{"ROLE", "USER", "GROUP"}) {
       // Show all grants on a particular principal type.
       ParsesOk(String.format("SHOW GRANT %s foo", type));
 
@@ -3748,12 +3748,15 @@ public class ParserTest extends FrontendTestBase {
       ParsesOk(String.format("SHOW GRANT %s foo ON DATABASE foo", type));
       ParsesOk(String.format("SHOW GRANT %s foo ON TABLE foo", type));
       ParsesOk(String.format("SHOW GRANT %s foo ON TABLE foo.bar", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON COLUMN bar.baz", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON COLUMN foo.bar.baz", type));
       ParsesOk(String.format("SHOW GRANT %s foo ON URI '/abc/123'", type));
 
       ParserError(String.format("SHOW GRANT %s", type));
       ParserError(String.format("SHOW GRANT %s foo ON SERVER foo", type));
       ParserError(String.format("SHOW GRANT %s foo ON DATABASE", type));
       ParserError(String.format("SHOW GRANT %s foo ON TABLE", type));
+      ParserError(String.format("SHOW GRANT %s foo ON COLUMN", type));
       ParserError(String.format("SHOW GRANT %s foo ON URI abc", type));
     }
     ParserError("SHOW GRANT FOO bar");

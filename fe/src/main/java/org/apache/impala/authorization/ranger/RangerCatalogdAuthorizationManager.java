@@ -217,18 +217,18 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       // is common to other resources, we need to grant that privilege to those
       // resources.
       if (p.getColumn_name() != null || p.getTable_name() != null) {
-        requests.add(createRequest.apply(createColumnResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
       } else if (p.getUri() != null) {
-        requests.add(createRequest.apply(createUriResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createUriResource(p)));
       } else if (p.getDb_name() != null) {
         // DB is used by column and function resources.
-        requests.add(createRequest.apply(createColumnResource(p)));
-        requests.add(createRequest.apply(createFunctionResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
       } else {
         // Server is used by column, function, and URI resources.
-        requests.add(createRequest.apply(createColumnResource(p)));
-        requests.add(createRequest.apply(createFunctionResource(p)));
-        requests.add(createRequest.apply(createUriResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
+        requests.add(createRequest.apply(RangerUtil.createUriResource(p)));
       }
     }
 
@@ -259,37 +259,5 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     }
 
     return request;
-  }
-
-  private static Map<String, String> createColumnResource(TPrivilege privilege) {
-    Map<String, String> resource = new HashMap<>();
-
-    resource.put(RangerImpalaResourceBuilder.DATABASE, getOrAll(privilege.getDb_name()));
-    resource.put(RangerImpalaResourceBuilder.TABLE, getOrAll(privilege.getTable_name()));
-    resource.put(RangerImpalaResourceBuilder.COLUMN,
-        getOrAll(privilege.getColumn_name()));
-
-    return resource;
-  }
-
-  private static Map<String, String> createUriResource(TPrivilege privilege) {
-    Map<String, String> resource = new HashMap<>();
-    String uri = privilege.getUri();
-    resource.put(RangerImpalaResourceBuilder.URL, uri == null ? "*" : uri);
-
-    return resource;
-  }
-
-  private static Map<String, String> createFunctionResource(TPrivilege privilege) {
-    Map<String, String> resource = new HashMap<>();
-
-    resource.put(RangerImpalaResourceBuilder.DATABASE, getOrAll(privilege.getDb_name()));
-    resource.put(RangerImpalaResourceBuilder.UDF, "*");
-
-    return resource;
-  }
-
-  private static String getOrAll(String resource) {
-    return (resource == null) ? "*" : resource;
   }
 }

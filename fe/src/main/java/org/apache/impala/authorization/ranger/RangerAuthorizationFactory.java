@@ -80,7 +80,7 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
       Supplier<? extends AuthorizationChecker> authzChecker) {
     Preconditions.checkArgument(authzChecker.get() instanceof RangerAuthorizationChecker);
 
-    return new RangerCatalogdAuthorizationManager(() ->
+    return new RangerImpaladAuthorizationManager(() ->
         ((RangerAuthorizationChecker) authzChecker.get()).getRangerImpalaPlugin());
   }
 

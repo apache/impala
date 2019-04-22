@@ -170,6 +170,21 @@ public abstract class Principal extends CatalogObjectImpl {
   public TPrincipalType getPrincipalType() { return principal_.getPrincipal_type(); }
 
   public static String toString(TPrincipalType type) {
-    return type == TPrincipalType.ROLE ? "Role" : "User";
+    String principal;
+    switch (type) {
+      case ROLE:
+        principal = "Role";
+        break;
+      case USER:
+        principal = "User";
+        break;
+      case GROUP:
+        principal = "Group";
+        break;
+      default:
+        throw new IllegalStateException(String.format("Unsupported principal type " +
+            "%s.", type));
+    }
+    return principal;
   }
 }

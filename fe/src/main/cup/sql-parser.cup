@@ -960,6 +960,14 @@ show_grant_principal_stmt ::=
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createTableScopedPriv(TPrivilegeLevel.ALL, tbl_name));
   :}
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_COLUMN
+  column_name:col_name
+  {:
+    RESULT = new ShowGrantPrincipalStmt(name, type,
+        PrivilegeSpec.createColumnScopedPriv(TPrivilegeLevel.SELECT,
+            col_name.getTableName(),
+            Collections.singletonList(col_name.getColumnName())));
+  :}
   | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON uri_ident:uri_kw
     STRING_LITERAL:uri
   {:
@@ -1060,6 +1068,8 @@ privilege ::=
 principal_type ::=
   KW_ROLE
   {: RESULT = TPrincipalType.ROLE; :}
+  | KW_GROUP
+  {: RESULT = TPrincipalType.GROUP; :}
   | IDENT:user
   {:
     parser.checkIdentKeyword("USER", user);

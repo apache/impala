@@ -57,29 +57,25 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
           "empty.", Principal.toString(principalType_),
           Principal.toString(principalType_).toUpperCase()));
     }
-    principal_ = analyzer.getCatalog().getAuthPolicy().getPrincipal(name_,
-        principalType_);
 
-    // If it's a role, we can determine if it doesn't exist here. For a user
-    // it's considered non-existent if it doesn't have any groups, but we cannot
-    // access the group information from analysis. The group check for a user
-    // is done in AuthorizationPolicy.getPrincipalPrivileges
-    if (principal_ == null) {
-      switch (principalType_) {
-        case ROLE:
-          throw new AnalysisException(String.format("%s '%s' does not exist.",
-              Principal.toString(principalType_), name_));
-        case USER:
-          // Create a user object here because it's possible the user does not exist in
-          // Sentry, but still exists according to the OS, or Hadoop, or other custom
-          // group mapping provider.
-          principal_ = Principal.newInstance(name_, principalType_, new HashSet<>());
-          break;
-        default:
-          throw new AnalysisException(String.format("Unexpected TPrincipalType: %s",
-              Principal.toString(principalType_)));
-      }
+    switch(principalType_) {
+      case ROLE:
+        principal_ = analyzer.getCatalog().getAuthPolicy().getPrincipal(name_,
+            principalType_);
+        if (principal_ == null) {
+          throw new AnalysisException(String.format("%s '%s' " +
+              "does not exist.", Principal.toString(principalType_), name_));
+        }
+        break;
+      case USER:
+      case GROUP:
+        principal_ = Principal.newInstance(name_, principalType_, new HashSet<>());
+        break;
+      default:
+        throw new AnalysisException(String.format("Unexpected TPrincipalType %s",
+            principalType_.name()));
     }
+
     if (privilegeSpec_ != null) privilegeSpec_.analyze(analyzer);
   }
 

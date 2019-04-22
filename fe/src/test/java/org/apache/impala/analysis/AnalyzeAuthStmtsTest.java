@@ -101,11 +101,12 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
 
   @Test
   public void AnalyzeShowGrantPrincipal() {
-    for (String type: new String[]{"ROLE myRole", "USER myUser"}) {
+    for (String type: new String[]{"ROLE myRole", "USER myUser", "GROUP myGroup"}) {
       AnalyzesOk(String.format("SHOW GRANT %s", type));
       AnalyzesOk(String.format("SHOW GRANT %s ON SERVER", type));
       AnalyzesOk(String.format("SHOW GRANT %s ON DATABASE functional", type));
       AnalyzesOk(String.format("SHOW GRANT %s ON TABLE functional.alltypes", type));
+      AnalyzesOk(String.format("SHOW GRANT %s ON COLUMN functional.alltypes.year", type));
       AnalyzesOk(String.format("SHOW GRANT %s ON URI 'hdfs:////test-warehouse//foo'",
           type));
 
@@ -117,6 +118,7 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
     }
     AnalysisError("SHOW GRANT ROLE does_not_exist",
         "Role 'does_not_exist' does not exist.");
+
     AnalysisError("SHOW GRANT ROLE does_not_exist ON SERVER",
         "Role 'does_not_exist' does not exist.");
 
