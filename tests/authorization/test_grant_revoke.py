@@ -347,10 +347,10 @@ class TestGrantRevoke(SentryCacheTestSuite):
                     "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE_OO),
       sentry_config=SENTRY_CONFIG_FILE_OO)
-  def test_same_name_for_role_and_user_invalidate_metadata(self, testid_checksum):
+  def test_same_name_for_role_and_user_invalidate_metadata(self, unique_name):
     """IMPALA-7729: Tests running invalidate metadata with for the same name for both
     user and role should not cause Impala query to hang."""
-    db_prefix = testid_checksum
+    db_prefix = unique_name
     role_name = "foobar"
     # Use two different clients so that the sessions will use two different user names.
     foobar_impalad_client = self.create_impala_client()
@@ -380,3 +380,46 @@ class TestGrantRevoke(SentryCacheTestSuite):
       self.client.execute("drop database {0}_db1".format(db_prefix))
       self.client.execute("drop database {0}_db2".format(db_prefix))
       self.client.execute("drop role {0}".format(role_name))
+
+  @pytest.mark.execute_serially
+  @SentryCacheTestSuite.with_args(
+      impalad_args="--server_name=server1",
+      catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+      sentry_config=SENTRY_CONFIG_FILE)
+  def test_uri_privilege_case_sensitive(self, unique_role):
+    """Tests that revoking on a granted URI with a different case should not be
+       allowed."""
+    try:
+      self.client.execute("create role {0}".format(unique_role))
+      self.client.execute("grant role {0} to group `{1}`"
+                          .format(unique_role, grp.getgrnam(getuser()).gr_name))
+      self.client.execute("grant refresh on server to {0}".format(unique_role))
+      self.client.execute("grant all on uri '/test-warehouse/FOO' to {0}"
+                          .format(unique_role))
+      self.client.execute("grant all on uri '/test-warehouse/foo' to {0}"
+                          .format(unique_role))
+      result = self.client.execute("show grant role {0}".format(unique_role))
+
+      # Both URIs should exist.
+      assert any("/test-warehouse/FOO" in x for x in result.data)
+      assert any("/test-warehouse/foo" in x for x in result.data)
+
+      self.client.execute("refresh authorization")
+      # After refresh authorization, we should expect both URIs to still exist.
+      assert any("/test-warehouse/FOO" in x for x in result.data)
+      assert any("/test-warehouse/foo" in x for x in result.data)
+
+      self.client.execute("revoke all on uri '/test-warehouse/foo' from {0}"
+                          .format(unique_role))
+
+      result = self.client.execute("show grant role {0}".format(unique_role))
+      # Only one URI should exist.
+      assert any("/test-warehouse/FOO" in x for x in result.data)
+      assert not any("/test-warehouse/foo" in x for x in result.data)
+
+      self.client.execute("refresh authorization")
+      # After refresh authorization, the one URI should still exist.
+      assert any("/test-warehouse/FOO" in x for x in result.data)
+      assert not any("/test-warehouse/foo" in x for x in result.data)
+    finally:
+      self.client.execute("drop role {0}".format(unique_role))

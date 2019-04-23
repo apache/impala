@@ -17,8 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import java.util.List;
-
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -28,9 +26,7 @@ import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.log4j.Logger;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a privilege that has been granted to a principal in an authorization policy.
@@ -38,11 +34,8 @@ import com.google.common.collect.Lists;
  */
 public class PrincipalPrivilege extends CatalogObjectImpl {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
-  // These Joiners are used to build principal names. For simplicity, the principal name
-  // we use can also be sent to the Sentry library to perform authorization checks
-  // so we build them in the same format.
-  private static final Joiner AUTHORIZABLE_JOINER = Joiner.on("->");
-  private static final Joiner KV_JOINER = Joiner.on("=");
+  private static final String AUTHORIZABLE_SEPARATOR = "->";
+  private static final String KV_SEPARATOR = "=";
   private final TPrivilege privilege_;
 
   private PrincipalPrivilege(TPrivilege privilege) {
@@ -61,70 +54,89 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
    * [ServerName=value]->[DbName=value]->[TableName=value]->[ColumnName=value]->[Action Granted=value]->[Grant Option=value]
    */
   public static String buildPrivilegeName(TPrivilege privilege) {
-    List<String> authorizable = Lists.newArrayListWithExpectedSize(4);
-    try {
-      Preconditions.checkNotNull(privilege);
-      TPrivilegeScope scope = privilege.getScope();
-      Preconditions.checkNotNull(scope);
-      switch (scope) {
-        case SERVER: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
-              toLowerCase()));
-          break;
-        }
-        case URI: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
-              toLowerCase()));
-          // (IMPALA-2695) URIs are case sensitive
-          authorizable.add(KV_JOINER.join("uri", privilege.getUri()));
-          break;
-        }
-        case DATABASE: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
-              toLowerCase()));
-          break;
-        }
-        case TABLE: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("table", privilege.getTable_name().
-              toLowerCase()));
-          break;
-        }
-        case COLUMN: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("table", privilege.getTable_name().
-              toLowerCase()));
-          authorizable.add(KV_JOINER.join("column", privilege.getColumn_name().
-              toLowerCase()));
-          break;
-        }
-        default: {
-          throw new UnsupportedOperationException(
-              "Unknown privilege scope: " + scope.toString());
-        }
+    StringBuilder privilegeName = new StringBuilder();
+    Preconditions.checkNotNull(privilege);
+    TPrivilegeScope scope = privilege.getScope();
+    Preconditions.checkNotNull(scope);
+    switch (scope) {
+      case SERVER: {
+        privilegeName.append("server")
+            .append(KV_SEPARATOR)
+            .append(privilege.getServer_name().toLowerCase());
+        break;
       }
-
-      // The ALL privilege is always implied and does not need to be included as part
-      // of the name.
-      if (privilege.getPrivilege_level() != TPrivilegeLevel.ALL) {
-        authorizable.add(KV_JOINER.join("action",
-            privilege.getPrivilege_level().toString()));
+      case URI: {
+        privilegeName.append("server")
+            .append(KV_SEPARATOR)
+            .append(privilege.getServer_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        // (IMPALA-2695) URIs are case sensitive
+        privilegeName.append("uri")
+            .append(KV_SEPARATOR)
+            .append(privilege.getUri());
+        break;
       }
-      authorizable.add(KV_JOINER.join("grantoption", privilege.isHas_grant_opt()));
-      return AUTHORIZABLE_JOINER.join(authorizable);
-    } catch (Exception e) {
-      // Should never make it here unless the privilege is malformed.
-      LOG.error("ERROR: ", e);
-      return null;
+      case DATABASE: {
+        privilegeName.append("server")
+            .append(KV_SEPARATOR)
+            .append(privilege.getServer_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("db")
+            .append(KV_SEPARATOR)
+            .append(privilege.getDb_name().toLowerCase());
+        break;
+      }
+      case TABLE: {
+        privilegeName.append("server")
+            .append(KV_SEPARATOR)
+            .append(privilege.getServer_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("db")
+            .append(KV_SEPARATOR)
+            .append(privilege.getDb_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("table")
+            .append(KV_SEPARATOR)
+            .append(privilege.getTable_name().toLowerCase());
+        break;
+      }
+      case COLUMN: {
+        privilegeName.append("server")
+            .append(KV_SEPARATOR)
+            .append(privilege.getServer_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("db")
+            .append(KV_SEPARATOR)
+            .append(privilege.getDb_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("table")
+            .append(KV_SEPARATOR)
+            .append(privilege.getTable_name().toLowerCase());
+        privilegeName.append(AUTHORIZABLE_SEPARATOR);
+        privilegeName.append("column")
+            .append(KV_SEPARATOR)
+            .append(privilege.getColumn_name().toLowerCase());
+        break;
+      }
+      default: {
+        throw new UnsupportedOperationException(
+            "Unknown privilege scope: " + scope.toString());
+      }
     }
+
+    // The ALL privilege is always implied and does not need to be included as part
+    // of the name.
+    if (privilege.getPrivilege_level() != TPrivilegeLevel.ALL) {
+      privilegeName.append(AUTHORIZABLE_SEPARATOR);
+      privilegeName.append("action")
+          .append(KV_SEPARATOR)
+          .append(privilege.getPrivilege_level().toString().toLowerCase());
+    }
+    privilegeName.append(AUTHORIZABLE_SEPARATOR);
+    privilegeName.append("grantoption")
+        .append(KV_SEPARATOR)
+        .append(privilege.isHas_grant_opt());
+    return privilegeName.toString();
   }
 
   /**

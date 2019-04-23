@@ -20,7 +20,6 @@ package org.apache.impala.authorization.sentry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
 import org.apache.sentry.core.common.ActiveRoleSet;
@@ -53,7 +52,7 @@ public class SentryAuthorizationPolicy implements PrivilegeCache {
    * Returns a set of privilege strings in Sentry format.
    */
   @Override
-  public synchronized Set<String> listPrivileges(Set<String> groups,
+  public Set<String> listPrivileges(Set<String> groups,
       ActiveRoleSet roleSet) {
     Set<String> privileges = Sets.newHashSet();
     if (roleSet != ActiveRoleSet.ALL) {
@@ -64,16 +63,7 @@ public class SentryAuthorizationPolicy implements PrivilegeCache {
     for (String groupName: groups) {
       List<Role> grantedRoles = authzPolicy_.getGrantedRoles(groupName);
       for (Role role: grantedRoles) {
-        for (PrincipalPrivilege privilege: role.getPrivileges()) {
-          String authorizable = privilege.getName();
-          if (authorizable == null) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
-            }
-            continue;
-          }
-          privileges.add(authorizable);
-        }
+        privileges.addAll(role.getPrivilegeNames());
       }
     }
     return privileges;
@@ -83,22 +73,13 @@ public class SentryAuthorizationPolicy implements PrivilegeCache {
    * Returns a set of privilege strings in Sentry format.
    */
   @Override
-  public synchronized Set<String> listPrivileges(Set<String> groups, Set<String> users,
+  public Set<String> listPrivileges(Set<String> groups, Set<String> users,
       ActiveRoleSet roleSet) {
     Set<String> privileges = listPrivileges(groups, roleSet);
     for (String userName: users) {
       User user = authzPolicy_.getUser(userName);
       if (user != null) {
-        for (PrincipalPrivilege privilege: user.getPrivileges()) {
-          String authorizable = privilege.getName();
-          if (authorizable == null) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
-            }
-            continue;
-          }
-          privileges.add(authorizable);
-        }
+        privileges.addAll(user.getPrivilegeNames());
       }
     }
     return privileges;

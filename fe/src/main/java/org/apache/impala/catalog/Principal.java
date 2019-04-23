@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,9 +39,9 @@ public abstract class Principal extends CatalogObjectImpl {
   private final TPrincipal principal_;
   // The last principal ID assigned, starts at 0.
   private static AtomicInteger principalId_ = new AtomicInteger(0);
-
+  // URIs are case sensitive, so we need to store privilege names in a case sensitive way.
   private final CatalogObjectCache<PrincipalPrivilege> principalPrivileges_ =
-      new CatalogObjectCache<>();
+      new CatalogObjectCache<>(false);
 
   protected Principal(String principalName, TPrincipalType type,
       Set<String> grantGroups) {
@@ -68,7 +70,7 @@ public abstract class Principal extends CatalogObjectImpl {
    * principal, an empty list is returned.
    */
   public List<PrincipalPrivilege> getPrivileges() {
-    return Lists.newArrayList(principalPrivileges_.getValues());
+    return new ArrayList<>(principalPrivileges_.getValues());
   }
 
   /**
@@ -76,7 +78,7 @@ public abstract class Principal extends CatalogObjectImpl {
    * granted to the principal.
    */
   public Set<String> getPrivilegeNames() {
-    return Sets.newHashSet(principalPrivileges_.keySet());
+    return new HashSet<>(principalPrivileges_.keySet());
   }
 
   /**

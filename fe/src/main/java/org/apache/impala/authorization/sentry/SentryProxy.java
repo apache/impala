@@ -337,7 +337,7 @@ public class SentryProxy {
       TPrivilege thriftPriv =
           SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv, principal);
       String privilegeName = PrincipalPrivilege.buildPrivilegeName(thriftPriv);
-      privilegesToRemove.remove(privilegeName.toLowerCase());
+      privilegesToRemove.remove(privilegeName);
       PrincipalPrivilege existingPrincipalPriv = principal.getPrivilege(privilegeName);
       // We already know about this privilege (privileges cannot be modified).
       if (existingPrincipalPriv != null &&

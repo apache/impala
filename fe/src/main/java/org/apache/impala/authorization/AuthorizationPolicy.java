@@ -162,28 +162,6 @@ public class AuthorizationPolicy {
   }
 
   /**
-   * Removes a privilege from the policy mapping to the role specified by the principal ID
-   * in the privilege. Throws a CatalogException if no role with a corresponding ID exists
-   * in the catalog. Returns null if no matching privilege is found in this principal.
-   */
-  public synchronized PrincipalPrivilege removePrivilege(PrincipalPrivilege privilege)
-      throws CatalogException {
-    Principal principal = getPrincipal(privilege.getPrincipalId(),
-        privilege.getPrincipalType());
-    if (principal == null) {
-      throw new CatalogException(String.format("Error removing privilege: %s. %s ID " +
-          "'%d' does not exist.", privilege.getName(),
-          Principal.toString(privilege.getPrincipalType()), privilege.getPrincipalId()));
-    }
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Removing privilege: " + privilege.getName() + " from " +
-          Principal.toString(privilege.getPrincipalType()).toLowerCase() + ": " +
-          principal.getName() + " with ID: " + principal.getId());
-    }
-    return principal.removePrivilege(privilege.getName());
-  }
-
-  /**
    * Returns all roles in the policy. Returns an empty list if no roles exist.
    */
   public synchronized List<Role> getAllRoles() {

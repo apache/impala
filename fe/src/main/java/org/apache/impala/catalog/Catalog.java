@@ -579,9 +579,8 @@ public abstract class Catalog implements AutoCloseable {
         // The combination of privilege name + principal ID + principal type is
         // guaranteed to be unique.
         return "PRIVILEGE:" +
-            PrincipalPrivilege.buildPrivilegeName(catalogObject.getPrivilege())
-                .toLowerCase() + "." +
-            Integer.toString(catalogObject.getPrivilege().getPrincipal_id()) + "." +
+            PrincipalPrivilege.buildPrivilegeName(catalogObject.getPrivilege()) + "." +
+            catalogObject.getPrivilege().getPrincipal_id() + "." +
             catalogObject.getPrivilege().getPrincipal_type();
       case HDFS_CACHE_POOL:
         return "HDFS_CACHE_POOL:" +
