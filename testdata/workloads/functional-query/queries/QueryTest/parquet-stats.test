@@ -376,6 +376,60 @@ aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumStatsFilteredRowGroups): 3
 ====
 ---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col < '0001-06-21';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col <= '0001-06-21';
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col = '0001-06-21';
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col > '2018-12-31';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col >= '2018-12-31';
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col = '2018-12-31';
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
 select count(*) from functional_parquet.decimal_tbl where d1 < 1234
 ---- RESULTS
 0

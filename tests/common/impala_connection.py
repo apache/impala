@@ -282,10 +282,20 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING):
     handle = self.execute_async(sql_stmt, user)
+    r = None
     try:
-      return self.__fetch_results(handle, profile_format=profile_format)
+      r = self.__fetch_results(handle, profile_format=profile_format)
     finally:
-      self.close_query(handle)
+      if r is None:
+        # Try to close the query handle but ignore any exceptions not to replace the
+        # original exception raised by '__fetch_results'.
+        try:
+          self.close_query(handle)
+        except Exception:
+          pass
+      else:
+        self.close_query(handle)
+        return r
 
   def execute_async(self, sql_stmt, user=None):
     LOG.info("-- executing: {0}\n{1};\n".format(self.__host_port, sql_stmt))

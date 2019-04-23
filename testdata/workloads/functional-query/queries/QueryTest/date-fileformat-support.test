@@ -1,0 +1,96 @@
+====
+---- QUERY
+# Inserting into parquet table works.
+insert into $DATABASE.parquet_date_tbl
+values ('2011-05-06'), ('9999-12-31'), ('0000-01-01');
+---- RESULTS
+: 3
+====
+---- QUERY
+# Querying parquet table written by Parquet-MR and Impala works.
+select * from $DATABASE.parquet_date_tbl;
+---- RESULTS
+1970-02-12
+1970-04-11
+1972-09-27
+2011-05-06
+9999-12-31
+0000-01-01
+---- TYPES
+DATE
+====
+---- QUERY
+# Querying avro table is not supported
+select * from $DATABASE.avro_date_tbl;
+---- CATCH
+NotImplementedException: Scanning DATE values in table '$DATABASE.avro_date_tbl' is not supported for fileformat AVRO
+====
+---- QUERY
+# Inserting text partitions to $DATABASE.date_tbl is OK
+insert into $DATABASE.date_tbl partition (date_part)
+select date_col, date_part from functional.date_tbl;
+---- RESULTS
+date_part=0001-01-01/: 7
+date_part=1399-06-27/: 3
+date_part=2017-11-27/: 10
+date_part=9999-12-31/: 2
+====
+---- QUERY
+# Inserting into parquet partition is supported
+insert into $DATABASE.date_tbl partition(date_part='1899-12-31')
+select date_col from functional_parquet.date_tbl where date_part = '1399-06-27';
+---- RESULTS
+date_part=1899-12-31/: 3
+====
+---- QUERY
+# Querying all the partitions fails because of the one avro partition
+select * from $DATABASE.date_tbl;
+---- CATCH
+NotImplementedException: Scanning DATE values in table '$DATABASE.date_tbl' is not supported for fileformat AVRO
+====
+---- QUERY
+# Querying text and parquet partitions is OK
+select date_part, date_col
+from $DATABASE.date_tbl
+where date_part != '1999-12-31';
+---- RESULTS
+0001-01-01,0001-01-01
+0001-01-01,0001-12-31
+0001-01-01,0002-01-01
+0001-01-01,1399-12-31
+0001-01-01,2017-11-28
+0001-01-01,9999-12-31
+0001-01-01,NULL
+1399-06-27,2017-11-28
+1399-06-27,NULL
+1399-06-27,2018-12-31
+2017-11-27,0001-06-21
+2017-11-27,0001-06-22
+2017-11-27,0001-06-23
+2017-11-27,0001-06-24
+2017-11-27,0001-06-25
+2017-11-27,0001-06-26
+2017-11-27,0001-06-27
+2017-11-27,0001-06-28
+2017-11-27,0001-06-29
+2017-11-27,2017-11-28
+9999-12-31,9999-12-01
+9999-12-31,9999-12-31
+1899-12-31,1970-02-12
+1899-12-31,1970-04-11
+1899-12-31,1972-09-27
+1899-12-31,2011-05-06
+1899-12-31,9999-12-31
+1899-12-31,0000-01-01
+1899-12-31,2017-11-28
+1899-12-31,NULL
+1899-12-31,2018-12-31
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Querying avro partition fails.
+select date_part, date_col from $DATABASE.date_tbl where date_part='1999-12-31';
+---- CATCH
+NotImplementedException: Scanning DATE values in table '$DATABASE.date_tbl' is not supported for fileformat AVRO
+====

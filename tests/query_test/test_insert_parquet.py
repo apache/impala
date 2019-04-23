@@ -20,7 +20,7 @@
 import os
 
 from collections import namedtuple
-from datetime import datetime
+from datetime import (datetime, date)
 from decimal import Decimal
 from subprocess import check_call
 from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, ConvertedType
@@ -64,6 +64,17 @@ class TimeStamp():
   def __eq__(self, other_timetuple):
     """Compares this objects's value to another timetuple."""
     return self.timetuple == other_timetuple
+
+
+class Date():
+  """Class to compare dates specified as year-month-day to dates specified as days since
+  epoch.
+  """
+  def __init__(self, year, month, day):
+    self.days_since_epoch = (date(year, month, day) - date(1970, 1, 1)).days
+
+  def __eq__(self, other_days_since_eopch):
+    return self.days_since_epoch == other_days_since_eopch
 
 
 ColumnStats = namedtuple('ColumnStats', ['name', 'min', 'max', 'null_count'])
@@ -633,6 +644,21 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
                                       "functional.alltypes", expected_min_max_values)
+
+  def test_write_statistics_date(self, vector, unique_database, tmpdir):
+    """Test that writing Date values to a parquet file populates the rowgroup statistics
+    with the correct values.
+    Date column statistics are tested separately as Date type is not supported across
+    all file formats, therefore we couldn't add a Date column to 'alltypes' table yet.
+    """
+    expected_min_max_values = [
+        ColumnStats('id_col', 0, 31, 0),
+        ColumnStats('date_col', Date(1, 1, 1), Date(9999, 12, 31), 2),
+        ColumnStats('date_part', Date(1, 1, 1), Date(9999, 12, 31), 0),
+    ]
+
+    self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
+                                      "functional.date_tbl", expected_min_max_values)
 
   def test_write_statistics_decimal(self, vector, unique_database, tmpdir):
     """Test that writing a parquet file populates the rowgroup statistics with the correct

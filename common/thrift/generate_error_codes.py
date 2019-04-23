@@ -403,7 +403,11 @@ error_codes = (
 
   ("UNRESPONSIVE_BACKEND", 133,
    "Query $0 cancelled due to unresponsive backend: $1 has not sent a report in $2ms "
-   "(max allowed lag is $3ms)")
+   "(max allowed lag is $3ms)"),
+
+  ("PARQUET_DATE_OUT_OF_RANGE", 134,
+   "Parquet file '$0' column '$1' contains an out of range date. "
+   "The valid date range is 0000-01-01..9999-12-31."),
 )
 
 import sys

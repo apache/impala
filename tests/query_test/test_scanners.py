@@ -344,6 +344,22 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/out-of-range-timestamp-abort-on-error',
         vector, unique_database)
 
+  def test_date_out_of_range(self, vector, unique_database):
+    """Test scanning parquet files with an out of range date."""
+    create_table_from_parquet(self.client, unique_database, "out_of_range_date")
+
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/out-of-range-date', new_vector, unique_database)
+
+  def test_pre_gregorian_date(self, vector, unique_database):
+    """Test date interoperability issues between Impala and Hive 2.1.1 when scanning
+       a parquet table that contains dates that precede the introduction of Gregorian
+       calendar in 1582-10-15.
+    """
+    create_table_from_parquet(self.client, unique_database, "hive2_pre_gregorian")
+    self.run_test_case('QueryTest/hive2-pre-gregorian-date', vector, unique_database)
+
   def test_zero_rows(self, vector, unique_database):
     """IMPALA-3943: Tests that scanning files with num_rows=0 in the file footer
     succeeds without errors."""

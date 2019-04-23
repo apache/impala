@@ -26,6 +26,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "rpc/thrift-util.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
@@ -1046,6 +1047,9 @@ Status HdfsParquetTableWriter::Init() {
           default:
             DCHECK(false);
         }
+        break;
+      case TYPE_DATE:
+        writer = new ColumnWriter<DateValue>(this, output_expr_evals_[i], codec);
         break;
       default:
         DCHECK(false);

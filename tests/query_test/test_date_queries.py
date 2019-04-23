@@ -39,9 +39,9 @@ class TestDateQueries(ImpalaTestSuite):
         'batch_size': [0, 1],
         'disable_codegen': ['false', 'true'],
         'disable_codegen_rows_threshold': [0]}))
-    # DATE type is only supported for text fileformat on HDFS and HBASE.
+    # DATE type is only supported for text & parquet fileformat on HDFS and HBASE.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('text', 'hbase'))
+        v.get_value('table_format').file_format in ('text', 'hbase', 'parquet'))
 
     # Run these queries through both beeswax and HS2 to get coverage of date returned
     # via both protocols.
@@ -63,7 +63,7 @@ class TestDateQueries(ImpalaTestSuite):
   @SkipIfABFS.qualified_path
   @SkipIfADLS.qualified_path
   @SkipIfLocal.qualified_path
-  def test_text_only_support(self, vector, unique_database):
+  def test_fileformat_support(self, vector, unique_database):
     """ Test that scanning and writing DATE is supported for text tables only."""
     # This test specifies databases and locations explicitly. No need to execute it for
     # anything other than text fileformat on HDFS.
@@ -83,7 +83,7 @@ class TestDateQueries(ImpalaTestSuite):
         ["/testdata/data/date_tbl.avro"])
     # Partitioned table with parquet and avro partitions
     TABLE_NAME = "date_tbl"
-    CREATE_SQL = """CREATE TABLE {0}.{1} (id_col INT, date_col DATE)
+    CREATE_SQL = """CREATE TABLE {0}.{1} (date_col DATE)
         PARTITIONED BY (date_part DATE)""".format(unique_database, TABLE_NAME)
     self.client.execute(CREATE_SQL)
     # Add partitions
@@ -102,4 +102,5 @@ class TestDateQueries(ImpalaTestSuite):
         SET FILEFORMAT AVRO""".format(unique_database, TABLE_NAME)
     self.client.execute(SET_PART_FF_SQL)
     # Test scanning/writing tables with different fileformats.
-    self.run_test_case('QueryTest/date-text-only-support', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/date-fileformat-support', vector,
+        use_db=unique_database)

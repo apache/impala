@@ -297,6 +297,11 @@ class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
         tmpdir)
 
     # Test that writing a parquet file populates the rowgroup indexes with the correct
+    # values, using date types.
+    self._ctas_table_and_verify_index(vector, unique_database, "functional.date_tbl",
+        tmpdir)
+
+    # Test that writing a parquet file populates the rowgroup indexes with the correct
     # values, using char types.
     self._ctas_table_and_verify_index(vector, unique_database, "functional.chars_formats",
         tmpdir)

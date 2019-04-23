@@ -22,6 +22,7 @@
 #include <type_traits>
 
 #include "exec/parquet/parquet-common.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-buffer.h"
 #include "runtime/timestamp-value.h"
@@ -50,6 +51,8 @@ namespace impala {
 /// - Strings are ordered using bytewise, unsigned comparison.
 ///
 /// - Timestamps are compared by numerically comparing the points in time they represent.
+///
+/// - Dates are compared by numerically comparing the days since epoch values.
 ///
 /// NULL values are not considered for min/max statistics, and if a column consists only
 /// of NULL values, then no min/max statistics are written.
@@ -166,7 +169,8 @@ class ColumnStats : public ColumnStatsBase {
         || std::is_same<TimestampValue, T>::value
         || std::is_same<Decimal4Value, T>::value
         || std::is_same<Decimal8Value, T>::value
-        || std::is_same<Decimal16Value, T>::value,
+        || std::is_same<Decimal16Value, T>::value
+        || std::is_same<DateValue, T>::value,
       T>::type;
 
  public:
@@ -201,7 +205,7 @@ class ColumnStats : public ColumnStatsBase {
 
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the
   /// buffer pointed to by 'slot'. Returns true if decoding was successful, false
-  /// otherwise. For timestamps, an additional validation will be performed.
+  /// otherwise. For timestamps and dates an additional validation will be performed.
   static bool DecodePlainValue(const std::string& buffer, void* slot,
       parquet::Type::type parquet_type);
 

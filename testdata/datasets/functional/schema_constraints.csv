@@ -226,8 +226,9 @@ table_name:table_with_header_insert, constraint:restrict_to, table_format:text/g
 # property, so we test parquet format as well.
 table_name:table_with_header_insert, constraint:restrict_to, table_format:parquet/none/none
 
-# IMPALA-7368 adds DATE support for text file-format only.
+# IMPALA-7368/IMPALA-7370 adds DATE support for text, hbase and parquet.
 # Other file-formats will be introduced later.
+table_name:date_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:hbase/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block

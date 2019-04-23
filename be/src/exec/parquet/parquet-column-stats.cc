@@ -121,6 +121,8 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
               element_.type);
         }
       DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
+    case TYPE_DATE:
+      return ColumnStats<DateValue>::DecodePlainValue(*stat_value, slot, element_.type);
     default:
       DCHECK(false) << col_type_.DebugString();
   }

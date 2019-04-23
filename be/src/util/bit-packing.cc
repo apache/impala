@@ -17,6 +17,7 @@
 
 #include "util/bit-packing.inline.h"
 
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
@@ -52,6 +53,7 @@ INSTANTIATE_UNPACK_AND_DECODE(Decimal8Value);
 INSTANTIATE_UNPACK_AND_DECODE(Decimal16Value);
 INSTANTIATE_UNPACK_AND_DECODE(StringValue);
 INSTANTIATE_UNPACK_AND_DECODE(TimestampValue);
+INSTANTIATE_UNPACK_AND_DECODE(DateValue);
 
 // Required for bit-packing-benchmark.cc.
 template

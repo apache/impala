@@ -698,9 +698,9 @@ bool HdfsParquetScanner::IsDictFilterable(BaseScalarColumnReader* col_reader) {
   // in converted form in the dictionary.
   if (col_reader->NeedsConversion()) return false;
 
-  // Certain datatypes (timestamps) need to validate the value, as certain bit
-  // combinations are not valid. The dictionary values are not validated, so
-  // skip these datatypes for now.
+  // Certain datatypes (timestamps, date) need to validate the value, as certain bit
+  // combinations are not valid. The dictionary values are not validated, so skip
+  // these datatypes for now.
   // TODO: This should be pushed into dictionary construction.
   if (col_reader->NeedsValidation()) return false;
 

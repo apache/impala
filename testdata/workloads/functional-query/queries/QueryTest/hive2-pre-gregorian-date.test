@@ -1,0 +1,30 @@
+====
+---- QUERY
+# Query a table created by Hive 2.1.1 containig ithe following dates:
+# 1582-10-04, 1582-10-05, 1582-10-06, 1582-10-15, 1582-10-16.
+# Impala will incorrectly read back the dates that precede the introduction of Gregorian
+# calendar (1582-10-15).
+SELECT * FROM $DATABASE.hive2_pre_gregorian;
+---- TYPES
+DATE
+---- RESULTS
+1582-10-14
+1582-10-15
+1582-10-16
+1582-10-15
+1582-10-16
+====
+---- QUERY
+# Impala uses proleptic Gregorian calendar.
+CREATE TABLE $DATABASE.impala_pre_gregorian (v DATE) STORED AS PARQUET;
+INSERT INTO $DATABASE.impala_pre_gregorian VALUES ('1582-10-04'), ('1582-10-05'), ('1582-10-06'), ('1582-10-15'), ('1582-10-16'); 
+SELECT * FROM $DATABASE.impala_pre_gregorian;
+---- TYPES
+DATE
+---- RESULTS
+1582-10-04
+1582-10-05
+1582-10-06
+1582-10-15
+1582-10-16
+====

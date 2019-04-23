@@ -491,25 +491,11 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
           new HdfsTextTableWriter(
               this, state, output_partition, &partition_descriptor, table_desc_));
       break;
-    case THdfsFileFormat::PARQUET: {
-        // Writing DATE columns to PARQUET is not supported yet.
-        int num_clustering_cols = table_desc_->num_clustering_cols();
-        int num_cols = table_desc_->num_cols() - num_clustering_cols;
-        for (int i = 0; i < num_cols; ++i) {
-          const ColumnType& type = output_expr_evals_[i]->root().type();
-          if (type.type == TYPE_DATE) {
-            ColumnDescriptor col_desc = table_desc_->col_descs()[num_clustering_cols + i];
-            stringstream error_msg;
-            error_msg << "Cannot write DATE column '" << col_desc.name()
-                      << "' to a PARQUET table.";
-            return Status(error_msg.str());
-          }
-        }
-        output_partition->writer.reset(
-            new HdfsParquetTableWriter(
-                this, state, output_partition, &partition_descriptor, table_desc_));
-        break;
-      }
+    case THdfsFileFormat::PARQUET:
+      output_partition->writer.reset(
+          new HdfsParquetTableWriter(
+              this, state, output_partition, &partition_descriptor, table_desc_));
+      break;
     default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =

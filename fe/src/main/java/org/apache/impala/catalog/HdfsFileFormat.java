@@ -43,33 +43,33 @@ public enum HdfsFileFormat {
   RC_FILE("org.apache.hadoop.hive.ql.io.RCFileInputFormat",
       "org.apache.hadoop.hive.ql.io.RCFileOutputFormat",
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe",
-      false, true),
+      false, true, false),
   TEXT("org.apache.hadoop.mapred.TextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
-      false, false),
+      false, false, true),
   LZO_TEXT("com.hadoop.mapred.DeprecatedLzoTextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      "", false, false),
+      "", false, false, true),
   SEQUENCE_FILE("org.apache.hadoop.mapred.SequenceFileInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat",
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", false,
-      true),
+      true, false),
   AVRO("org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat",
       "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat",
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe",
-      false, false),
+      false, false, false),
   PARQUET("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
-      true, true),
+      true, true, true),
   ORC("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat",
       "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat",
       "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
-      true, true),
+      true, true, false),
   KUDU("org.apache.kudu.mapreduce.KuduTableInputFormat",
       "org.apache.kudu.mapreduce.KuduTableOutputFormat",
-      "", false, false);
+      "", false, false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -83,13 +83,18 @@ public enum HdfsFileFormat {
   // TODO: Remove this once we support complex types for all file formats.
   private final boolean canSkipColumnTypes_;
 
+  // Indicates whether we support scanning DATE type for this file format.
+  private final boolean isDateTypeSupported_;
+
   HdfsFileFormat(String inputFormat, String outputFormat, String serializationLib,
-      boolean isComplexTypesSupported, boolean canSkipColumnTypes) {
+      boolean isComplexTypesSupported, boolean canSkipColumnTypes,
+      boolean isDateTypeSupported) {
     inputFormat_ = inputFormat;
     outputFormat_ = outputFormat;
     serializationLib_ = serializationLib;
     isComplexTypesSupported_ = isComplexTypesSupported;
     canSkipColumnTypes_ = canSkipColumnTypes;
+    isDateTypeSupported_ = isDateTypeSupported;
   }
 
   public String inputFormat() { return inputFormat_; }
@@ -117,6 +122,7 @@ public enum HdfsFileFormat {
       .put(PARQUET_LEGACY_INPUT_FORMATS[2], PARQUET)
       .put(KUDU.inputFormat(), KUDU)
       .put(ORC.inputFormat(), ORC).build();
+
 
   /**
    * Returns true if the string describes an input format class that we support.
@@ -230,6 +236,12 @@ public enum HdfsFileFormat {
    * only scalar typed columns.
    */
   public boolean canSkipComplexTypes() { return canSkipColumnTypes_; }
+
+  /**
+   * Returns true if Impala supports scanning DATE typed columns from a table/partition of
+   * this file format
+   */
+  public boolean isDateTypeSupported() { return isDateTypeSupported_; }
 
   /**
    * Returns a list with all formats for which isComplexTypesSupported() is true.

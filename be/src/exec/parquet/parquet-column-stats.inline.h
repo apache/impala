@@ -141,20 +141,33 @@ inline int64_t ColumnStats<bool>::BytesNeeded(const bool& v) const {
   return 1;
 }
 
+namespace {
+/// Decodes the plain encoded stats value from 'buffer' and writes the result into
+/// 'result'. Returns true if decoding was successful, false otherwise. Doesn't perform
+/// any validation.
+/// Used as a helper function for decoding values that need additional custom validation.
+template <typename T, parquet::Type::type ParquetType>
+inline bool DecodePlainValueNoValidation(const string& buffer, T* result) {
+  int size = buffer.size();
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
+  return ParquetPlainEncoder::Decode<T, ParquetType>(
+      data, data + size, size, result) != -1;
+}
+
+}
+
 /// Timestamp values need validation.
 template <>
 inline bool ColumnStats<TimestampValue>::DecodePlainValue(
     const std::string& buffer, void* slot, parquet::Type::type parquet_type) {
-  TimestampValue* result = reinterpret_cast<TimestampValue*>(slot);
-  int size = buffer.size();
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
-  if (parquet_type == parquet::Type::INT96) {
-    if (ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(data,
-        data + size, size, result) == -1) {
-      return false;
-    }
-  } else {
+  if (UNLIKELY(parquet_type != parquet::Type::INT96)) {
     DCHECK(false);
+    return false;
+  }
+
+  TimestampValue* result = reinterpret_cast<TimestampValue*>(slot);
+  if (!DecodePlainValueNoValidation<TimestampValue, parquet::Type::INT96>(buffer,
+      result)) {
     return false;
   }
 
@@ -162,6 +175,18 @@ inline bool ColumnStats<TimestampValue>::DecodePlainValue(
   // If this function were not static, then it would be possible to store the information
   // needed for timezone conversion in the object and do the conversion here.
   return TimestampValue::IsValidDate(result->date());
+}
+
+/// Date values need validation.
+template <>
+inline bool ColumnStats<DateValue>::DecodePlainValue(
+    const std::string& buffer, void* slot, parquet::Type::type parquet_type) {
+  DateValue* result = reinterpret_cast<DateValue*>(slot);
+  if (!DecodePlainValueNoValidation<DateValue, parquet::Type::INT32>(buffer, result)) {
+    return false;
+  }
+
+  return result->IsValid();
 }
 
 /// parquet::Statistics stores string values directly and does not use plain encoding.

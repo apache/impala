@@ -22,6 +22,7 @@
 #include "common/compiler-util.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/parquet_types.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.inline.h"
@@ -70,6 +71,7 @@ class ParquetPlainEncoder {
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT:
+      case TYPE_DATE:
       case TYPE_FLOAT:
         return 4;
       case TYPE_BIGINT:
@@ -360,6 +362,17 @@ template <>
 inline void ParquetPlainEncoder::DecodeNoBoundsCheck<double, parquet::Type::FLOAT>(
     const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, double* v) {
   DecodeWithConversion<float, double>(buffer, buffer_end, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<DateValue, parquet::Type::type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, DateValue* v) {
+  int32_t val;
+  if (UNLIKELY(buffer_end - buffer < sizeof(val))) return -1;
+  memcpy(&val, buffer, sizeof(val));
+  // DateValue constructor validates int32_t date value
+  *v = DateValue(val);
+  return sizeof(val);
 }
 
 template<typename T>

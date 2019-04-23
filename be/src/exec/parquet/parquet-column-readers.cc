@@ -945,6 +945,27 @@ bool ScalarColumnReader<TimestampValue, parquet::Type::INT64, true>::ValidateVal
   return true;
 }
 
+template <>
+inline bool ScalarColumnReader<DateValue, parquet::Type::INT32, true>
+::NeedsValidationInline() const {
+  return true;
+}
+
+template <>
+bool ScalarColumnReader<DateValue, parquet::Type::INT32, true>::ValidateValue(
+    DateValue* val) const {
+  // The range was already checked during the int32_t->DateValue conversion, which
+  // sets the date to invalid if it was out of range.
+  if (UNLIKELY(!val->IsValid())) {
+    ErrorMsg msg(TErrorCode::PARQUET_DATE_OUT_OF_RANGE,
+        filename(), node_.element->name);
+    Status status = parent_->state_->LogOrReturnError(msg);
+    if (!status.ok()) parent_->parse_status_ = status;
+    return false;
+  }
+  return true;
+}
+
 // In 1.1, we had a bug where the dictionary page metadata was not set. Returns true
 // if this matches those versions and compatibility workarounds need to be used.
 static bool RequiresSkippedDictionaryHeaderCheck(
@@ -1578,6 +1599,9 @@ ParquetColumnReader* ParquetColumnReader::Create(const SchemaNode& node,
         }
       case TYPE_TIMESTAMP:
         return CreateTimestampColumnReader(node, slot_desc, parent);
+      case TYPE_DATE:
+        return new ScalarColumnReader<DateValue, parquet::Type::INT32, true>(parent, node,
+            slot_desc);
       case TYPE_STRING:
       case TYPE_VARCHAR:
       case TYPE_CHAR:

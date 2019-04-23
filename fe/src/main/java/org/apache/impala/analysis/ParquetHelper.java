@@ -279,6 +279,11 @@ class ParquetHelper {
       return Type.TIMESTAMP;
     }
 
+    if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32 &&
+        logicalType instanceof DateLogicalTypeAnnotation) {
+      return Type.DATE;
+    }
+
     if ((prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32
         || prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64)
         && logicalType instanceof IntLogicalTypeAnnotation

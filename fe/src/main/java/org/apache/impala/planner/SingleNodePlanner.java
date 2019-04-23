@@ -1264,10 +1264,11 @@ public class SingleNodePlanner {
     analyzer.materializeSlots(conjuncts);
 
     // TODO: Remove this section, once DATE type is supported across all fileformats.
-    // Right now, scanning DATE values is only supported for TEXT fileformat.
-    // Check if there are any non-text partitions.
-    if (containsNonTextFsPartition(partitions)) {
+    // Check if there are any partitions for which DATE is not supported.
+    FeFsPartition part = findUnsupportedDateFsPartition(partitions);
+    if (part != null) {
       FeFsTable table = (FeFsTable)hdfsTblRef.getTable();
+      HdfsFileFormat ff = part.getInputFormatDescriptor().getFileFormat();
       // Throw an exception if tupleDesc contains a non-clustering, materialized
       // DATE slot.
       for (SlotDescriptor slotDesc: tupleDesc.getMaterializedSlots()) {
@@ -1276,7 +1277,7 @@ public class SingleNodePlanner {
             && slotDesc.getType() == ScalarType.DATE) {
           throw new NotImplementedException(
               "Scanning DATE values in table '" + table.getFullName() +
-              "' is not supported for non-text fileformats");
+              "' is not supported for fileformat " + ff);
         }
       }
     }
@@ -1328,16 +1329,19 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Returns true iff, 'partitions' contains a filesystem-based partition with non-text
-   * fileformat.
+   * Looks for a filesystem-based partition in 'partitions' with no DATE support and
+   * returns the first one it finds. Right now, scanning DATE values is only supported for
+   * TEXT and PARQUET fileformats.
+   *
+   * Returns null otherwise.
    */
-  private boolean containsNonTextFsPartition(List<? extends FeFsPartition> partitions) {
+  private FeFsPartition findUnsupportedDateFsPartition(
+      List<? extends FeFsPartition> partitions) {
     for (FeFsPartition part: partitions) {
-      if (part.getInputFormatDescriptor().getFileFormat() != HdfsFileFormat.TEXT) {
-        return true;
-      }
+      HdfsFileFormat ff = part.getInputFormatDescriptor().getFileFormat();
+      if (!ff.isDateTypeSupported()) return part;
     }
-    return false;
+    return null;
   }
 
   /**

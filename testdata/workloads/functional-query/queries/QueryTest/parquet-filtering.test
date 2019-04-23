@@ -222,6 +222,27 @@ aggregation(SUM, NumRowGroups): 24
 aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
+# date_col: All values pass
+# Filters 0/4 row groups
+select count(*) from functional_parquet.date_tbl where date_col > '2017-12-31';
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# date_col: No values pass
+# Note: dictionary filtering currently does not work on dates (see IMPALA-4994)
+# Filters 0/4 row groups
+select count(*) from functional_parquet.date_tbl where date_col = '2017-12-31';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
 # TPC-H lineitem.l_orderkey has high cardinality (1500000)
 # It always uses mixed encoding (PLAIN_DICTIONARY + PLAIN)
 # Verify that no dictionary filtering is used even for a predicate

@@ -56,7 +56,7 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
         parquet::Type::DOUBLE}},
     {PrimitiveType::TYPE_TIMESTAMP, {parquet::Type::INT96, parquet::Type::INT64}},
     {PrimitiveType::TYPE_STRING, {parquet::Type::BYTE_ARRAY}},
-    {PrimitiveType::TYPE_DATE, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_DATE, {parquet::Type::INT32}},
     {PrimitiveType::TYPE_DATETIME, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_BINARY, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_DECIMAL, {parquet::Type::INT32, parquet::Type::INT64,
@@ -107,6 +107,14 @@ void SetIntLogicalType(int bitwidth, parquet::SchemaElement* col_schema) {
   int_type.__set_isSigned(true);
   parquet::LogicalType logical_type;
   logical_type.__set_INTEGER(int_type);
+  col_schema->__set_logicalType(logical_type);
+}
+
+/// Sets logical and converted types in 'col_schema' to DATE.
+void SetDateLogicalType(parquet::SchemaElement* col_schema) {
+  col_schema->__set_converted_type(parquet::ConvertedType::DATE);
+  parquet::LogicalType logical_type;
+  logical_type.__set_DATE(parquet::DateType());
   col_schema->__set_logicalType(logical_type);
 }
 
@@ -185,7 +193,7 @@ const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
   parquet::Type::DOUBLE,
   parquet::Type::INT96,       // Timestamp
   parquet::Type::BYTE_ARRAY,  // String
-  parquet::Type::BYTE_ARRAY,  // Date, NYI
+  parquet::Type::INT32,       // Date
   parquet::Type::BYTE_ARRAY,  // DateTime, NYI
   parquet::Type::BYTE_ARRAY,  // Binary NYI
   parquet::Type::FIXED_LEN_BYTE_ARRAY, // Decimal
@@ -424,6 +432,9 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
       break;
     case TYPE_TIMESTAMP:
       SetTimestampLogicalType(query_options, col_schema);
+      break;
+    case TYPE_DATE:
+      SetDateLogicalType(col_schema);
       break;
     case TYPE_BOOLEAN:
     case TYPE_FLOAT:
