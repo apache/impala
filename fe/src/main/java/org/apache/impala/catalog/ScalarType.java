@@ -307,6 +307,14 @@ public class ScalarType extends Type {
     return isValid() && !getUnsupportedTypes().contains(this);
   }
 
+  /**
+   *  Returns true if this type is internal and not exposed externally in SQL.
+   */
+  public boolean isInternalType() {
+    return type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE
+        || type_ == PrimitiveType.NULL_TYPE;
+  }
+
   @Override
   public boolean supportsTablePartitioning() {
     if (!isSupported() || isComplexType() || type_ == PrimitiveType.TIMESTAMP) {

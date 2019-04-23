@@ -128,6 +128,35 @@ public abstract class Type {
   }
 
   /**
+   * Returns the static ScalarType members. The ScalarTypes which require additional
+   * metadata (such as CHAR, DECIMAL, FIXED_UDA_INTERMEDIATE) must be created using
+   * proper create functions defined in ScalarType class.
+   */
+  public static ScalarType getDefaultScalarType(PrimitiveType ptype) {
+    switch (ptype) {
+      case INVALID_TYPE: return INVALID;
+      case NULL_TYPE: return NULL;
+      case BOOLEAN: return BOOLEAN;
+      case TINYINT: return TINYINT;
+      case SMALLINT: return SMALLINT;
+      case INT: return INT;
+      case BIGINT: return BIGINT;
+      case FLOAT: return FLOAT;
+      case DOUBLE: return DOUBLE;
+      case DATE: return DATE;
+      case DATETIME: return DATETIME;
+      case TIMESTAMP: return TIMESTAMP;
+      case STRING: return STRING;
+      case VARCHAR: return VARCHAR;
+      case BINARY: return BINARY;
+      case DECIMAL: return DECIMAL;
+      case CHAR: return CHAR;
+      case FIXED_UDA_INTERMEDIATE: return FIXED_UDA_INTERMEDIATE;
+      default: return INVALID;
+    }
+  }
+
+  /**
    * The output of this is stored directly in the hive metastore as the column type.
    * The string must match exactly.
    */

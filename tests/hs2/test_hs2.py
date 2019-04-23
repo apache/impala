@@ -536,3 +536,26 @@ class TestHS2(HS2TestSuite):
     execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp, TCLIService.TStatusCode.ERROR_STATUS)
+
+  @needs_session()
+  def test_get_type_info(self):
+    get_type_info_req = TCLIService.TGetTypeInfoReq()
+    get_type_info_req.sessionHandle = self.session_handle
+    get_type_info_resp = self.hs2_client.GetTypeInfo(get_type_info_req)
+    TestHS2.check_response(get_type_info_resp)
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = get_type_info_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+    results = fetch_results_resp.results
+    types = ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'DATE',
+             'TIMESTAMP', 'STRING', 'VARCHAR', 'DECIMAL', 'CHAR', 'ARRAY', 'MAP',
+             'STRUCT']
+    assert self.get_num_rows(results) == len(types)
+    # Validate that each type description (result row) has the required 18 fields as
+    # described in the DatabaseMetaData.getTypeInfo() documentation.
+    assert len(results.columns) == 18
+    typed_col = getattr(results.columns[0], 'stringVal')
+    for colType in types:
+      assert typed_col.values.count(colType) == 1

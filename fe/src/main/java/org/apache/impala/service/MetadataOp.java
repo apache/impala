@@ -26,14 +26,17 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.ImpalaException;
@@ -42,6 +45,7 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.util.PatternMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -608,40 +612,66 @@ public class MetadataOp {
   }
 
   /**
-   * Fills the GET_TYPEINFO_RESULTS with supported primitive types.
+   * Return result row corresponding to the input type.
+   */
+  private static TResultRow createGetTypeInfoResult(String typeName, Type type) {
+    TResultRow row = new TResultRow();
+    row.colVals = Lists.newArrayList();
+    row.colVals.add(createTColumnValue(typeName)); // TYPE_NAME
+    row.colVals.add(createTColumnValue(type.getJavaSqlType())); // DATA_TYPE
+    row.colVals.add(createTColumnValue(type.getPrecision())); // PRECISION
+    row.colVals.add(NULL_COL_VAL); // LITERAL_PREFIX
+    row.colVals.add(NULL_COL_VAL); // LITERAL_SUFFIX
+    row.colVals.add(NULL_COL_VAL); // CREATE_PARAMS
+    row.colVals.add(createTColumnValue(DatabaseMetaData.typeNullable)); // NULLABLE
+    row.colVals.add(createTColumnValue(type.isStringType())); // CASE_SENSITIVE
+    row.colVals.add(createTColumnValue(DatabaseMetaData.typeSearchable)); // SEARCHABLE
+    row.colVals.add(createTColumnValue(!type.isNumericType())); // UNSIGNED_ATTRIBUTE
+    row.colVals.add(createTColumnValue(false)); // FIXED_PREC_SCALE
+    row.colVals.add(createTColumnValue(false)); // AUTO_INCREMENT
+    row.colVals.add(NULL_COL_VAL); // LOCAL_TYPE_NAME
+    row.colVals.add(createTColumnValue(0)); // MINIMUM_SCALE
+    row.colVals.add(createTColumnValue(0)); // MAXIMUM_SCALE
+    row.colVals.add(NULL_COL_VAL); // SQL_DATA_TYPE
+    row.colVals.add(NULL_COL_VAL); // SQL_DATETIME_SUB
+    row.colVals.add(createTColumnValue(type.getNumPrecRadix())); // NUM_PREC_RADIX
+    return row;
+  }
+
+  /**
+   * Fills the GET_TYPEINFO_RESULTS with externally supported primitive types.
+   */
+  private static void createGetPrimitiveTypeInfoResults() {
+    for (PrimitiveType ptype: PrimitiveType.values()) {
+      ScalarType type = Type.getDefaultScalarType(ptype);
+      if (type.isInternalType() || !type.isSupported()) continue;
+      TResultRow row = createGetTypeInfoResult(ptype.name(), type);
+      GET_TYPEINFO_RESULTS.add(row);
+    }
+  }
+
+  /**
+   * Fills the GET_TYPEINFO_RESULTS with externally supported types.
    */
   private static void createGetTypeInfoResults() {
-    for (PrimitiveType ptype: PrimitiveType.values()) {
-      if (ptype.equals(PrimitiveType.INVALID_TYPE) ||
-          ptype.equals(PrimitiveType.DATE) ||
-          ptype.equals(PrimitiveType.DATETIME) ||
-          ptype.equals(PrimitiveType.DECIMAL) ||
-          ptype.equals(PrimitiveType.CHAR) ||
-          ptype.equals(PrimitiveType.VARCHAR) ||
-          ptype.equals(PrimitiveType.FIXED_UDA_INTERMEDIATE)) {
+    // Loop through the types included in the TTypeNodeType enum so that all the types
+    // (both existing and any new ones which get added) are accounted for.
+    for (TTypeNodeType nodeType : TTypeNodeType.values()) {
+      Type type = null;
+      if (nodeType == TTypeNodeType.SCALAR) {
+        createGetPrimitiveTypeInfoResults();
         continue;
+      } else if (nodeType == TTypeNodeType.ARRAY) {
+        type = new ArrayType(ScalarType.createType(PrimitiveType.INT));
+      } else if (nodeType == TTypeNodeType.MAP) {
+        type = new MapType(ScalarType.createType(PrimitiveType.INT),
+            ScalarType.createType(PrimitiveType.INT));
+      } else if (nodeType == TTypeNodeType.STRUCT) {
+        type = new StructType();
       }
-      Type type = ScalarType.createType(ptype);
-      TResultRow row = new TResultRow();
-      row.colVals = Lists.newArrayList();
-      row.colVals.add(createTColumnValue(ptype.name())); // TYPE_NAME
-      row.colVals.add(createTColumnValue(type.getJavaSqlType()));  // DATA_TYPE
-      row.colVals.add(createTColumnValue(type.getPrecision()));  // PRECISION
-      row.colVals.add(NULL_COL_VAL); // LITERAL_PREFIX
-      row.colVals.add(NULL_COL_VAL); // LITERAL_SUFFIX
-      row.colVals.add(NULL_COL_VAL); // CREATE_PARAMS
-      row.colVals.add(createTColumnValue(DatabaseMetaData.typeNullable));  // NULLABLE
-      row.colVals.add(createTColumnValue(type.isStringType())); // CASE_SENSITIVE
-      row.colVals.add(createTColumnValue(DatabaseMetaData.typeSearchable));  // SEARCHABLE
-      row.colVals.add(createTColumnValue(!type.isNumericType())); // UNSIGNED_ATTRIBUTE
-      row.colVals.add(createTColumnValue(false));  // FIXED_PREC_SCALE
-      row.colVals.add(createTColumnValue(false));  // AUTO_INCREMENT
-      row.colVals.add(NULL_COL_VAL); // LOCAL_TYPE_NAME
-      row.colVals.add(createTColumnValue(0));  // MINIMUM_SCALE
-      row.colVals.add(createTColumnValue(0));  // MAXIMUM_SCALE
-      row.colVals.add(NULL_COL_VAL); // SQL_DATA_TYPE
-      row.colVals.add(NULL_COL_VAL); // SQL_DATETIME_SUB
-      row.colVals.add(createTColumnValue(type.getNumPrecRadix()));  // NUM_PREC_RADIX
+
+      if (!type.isSupported()) continue;
+      TResultRow row = createGetTypeInfoResult(nodeType.name(), type);
       GET_TYPEINFO_RESULTS.add(row);
     }
   }

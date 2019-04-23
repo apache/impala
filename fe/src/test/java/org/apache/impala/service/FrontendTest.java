@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -33,13 +34,16 @@ import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TTypeNodeType;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
@@ -65,10 +69,27 @@ public class FrontendTest extends FrontendTestBase {
     // DatabaseMetaData.getTypeInfo has 18 columns.
     assertEquals(18, resp.schema.columns.size());
     assertEquals(18, resp.rows.get(0).colVals.size());
-    // All primitives types, except INVALID_TYPE, DATE, DATETIME, DECIMAL, CHAR,
-    // VARCHAR, and FIXED_UDA_INTERMEDIATE should be returned.
-    // Therefore #supported types =  PrimitiveType.values().length - 7.
-    assertEquals(PrimitiveType.values().length - 7, resp.rows.size());
+    // Validate the supported types
+    List<String> supportedTypes = new ArrayList<>();
+    for (ScalarType stype : Type.getSupportedTypes()) {
+      if (stype.isSupported() && !stype.isInternalType()) {
+        supportedTypes.add(stype.getPrimitiveType().name());
+      }
+    }
+    supportedTypes.add("ARRAY");
+    supportedTypes.add("MAP");
+    supportedTypes.add("STRUCT");
+    assertEquals(supportedTypes.size(), resp.rows.size());
+    for (TResultRow row : resp.rows) {
+      boolean foundType = false;
+      String typeName = row.colVals.get(0).getString_val();
+      if (supportedTypes.contains(typeName)) {
+        supportedTypes.remove(typeName);
+        foundType = true;
+      }
+      assertTrue(foundType);
+    }
+    assertEquals(supportedTypes.size(), 0);
   }
 
   @Test
