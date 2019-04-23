@@ -204,6 +204,11 @@ class SkipIfHive3:
       reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
 
 
+class SkipIfHive2:
+  acid = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
+      reason="Acid tables are only supported with Hive 3.")
+
+
 class SkipIfCatalogV2:
   """Expose decorators as methods so that is_catalog_v2_cluster() can be evaluated lazily
   when needed, instead of whenever this module is imported."""

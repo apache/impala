@@ -51,6 +51,7 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 
@@ -118,7 +119,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // impalad.
   protected long lastUsedTime_;
 
-  // Valid write id list for this table
+  // Valid write id list for this table.
+  // null in the case that this table is not transactional.
+  // TODO(todd) this should probably be a ValidWriteIdList in memory instead of a String.
   protected String validWriteIds_ = null;
 
   // maximum number of catalog versions to store for in-flight events for this table
@@ -303,8 +306,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   protected void loadValidWriteIdList(IMetaStoreClient client)
       throws TableLoadingException {
-    if (MetastoreShim.getMajorVersion() > 2) {
+    Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
+    if (MetastoreShim.getMajorVersion() > 2 &&
+        AcidUtils.isTransactionalTable(msTable_.getParameters())) {
       validWriteIds_ = fetchValidWriteIds(client);
+    } else {
+      validWriteIds_ = null;
     }
   }
 

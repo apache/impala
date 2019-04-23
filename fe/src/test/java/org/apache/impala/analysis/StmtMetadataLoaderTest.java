@@ -30,6 +30,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.util.EventSequence;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -92,8 +93,8 @@ public class StmtMetadataLoaderTest {
   }
 
   private void validateTablesWriteIds(StmtTableCache stmtTableCache) {
+    Assert.assertTrue(stmtTableCache.tables.size() > 0);
     for (FeTable t: stmtTableCache.tables.values()) {
-      //TODO may check if it is acid table in the future
       Assert.assertTrue(t.isLoaded());
       Assert.assertTrue(t.getValidWriteIds() != null);
       Assert.assertTrue(MetastoreShim.getValidWriteIdListFromString(t.getValidWriteIds())
@@ -227,15 +228,9 @@ public class StmtMetadataLoaderTest {
         new String[] {"default", "functional"}, new String[] {"functional.alltypes"});
   }
 
-  @Ignore
   @Test
   public void testTableWriteID() throws ImpalaException {
-    if (MetastoreShim.getMajorVersion() == 2)
-      return;
-    // ToDo this assumes the acid tables have been created.
-    // They will be available after IMPALA-8439 is checked in.
-    // Ignore the test for now.
-    testLoadAcidTables("select * from acid.insert_only_no_partitions");
-    testLoadAcidTables("select * from acid.insert_only_with_partitions");
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() >= 3);
+    testLoadAcidTables("select * from functional.insert_only_transactional_table");
   }
 }

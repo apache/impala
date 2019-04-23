@@ -94,8 +94,9 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   # (ex. planner, data error)
   section_names = valid_section_names
   if section_names is None:
-    section_names = ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP', 'CATCH', 'ERRORS',
-        'USER', 'RUNTIME_PROFILE', 'SHELL', 'DML_RESULTS', 'DBAPI_RESULTS', 'HS2_TYPES']
+    section_names = ['QUERY', 'HIVE_QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP',
+        'CATCH', 'ERRORS', 'USER', 'RUNTIME_PROFILE', 'SHELL', 'DML_RESULTS',
+        'DBAPI_RESULTS', 'HS2_TYPES']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 

@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -54,6 +55,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -560,13 +562,16 @@ public class HdfsTable extends Table implements FeFsTable {
           .add(p);
     }
 
+    ValidWriteIdList writeIds = validWriteIds_ != null
+        ? MetastoreShim.getValidWriteIdListFromString(validWriteIds_) : null;
+
     // Create a FileMetadataLoader for each path.
     Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
     for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
           Utils.shouldRecursivelyListPartitions(this),
-          oldFds, hostIndex_);
+          oldFds, hostIndex_, writeIds);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.

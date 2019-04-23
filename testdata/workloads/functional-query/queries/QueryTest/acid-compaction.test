@@ -1,0 +1,39 @@
+====
+---- HIVE_QUERY
+use $DATABASE;
+create table tt (x int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+
+insert into tt values (1);
+insert into tt values (2);
+insert into tt values (3);
+====
+---- QUERY
+invalidate metadata tt;
+select * from tt;
+---- RESULTS
+1
+2
+3
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table tt compact 'major' and wait;
+====
+---- QUERY
+refresh tt;
+select * from tt
+---- RESULTS
+1
+2
+3
+====
+---- QUERY
+show files in tt;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B',''
+---- TYPES
+STRING,STRING,STRING

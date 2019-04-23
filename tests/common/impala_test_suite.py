@@ -35,7 +35,6 @@ from functools import wraps
 from getpass import getuser
 from random import choice
 from subprocess import check_call
-
 from tests.common.base_test_suite import BaseTestSuite
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
@@ -119,6 +118,7 @@ SET_PATTERN = re.compile(
     COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
 METRICS_URL = 'http://localhost:25000/metrics?json'
 
+GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -197,11 +197,13 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hs2_client.close()
 
   @classmethod
-  def create_impala_client(cls, host_port=None, protocol='beeswax'):
+  def create_impala_client(cls, host_port=None, protocol='beeswax',
+      is_hive=False):
     if host_port is None:
       host_port = cls.__get_default_host_port(protocol)
     client = create_connection(host_port=host_port,
-        use_kerberos=pytest.config.option.use_kerberos, protocol=protocol)
+        use_kerberos=pytest.config.option.use_kerberos, protocol=protocol,
+        is_hive=is_hive)
     client.connect()
     return client
 
@@ -329,6 +331,36 @@ class ImpalaTestSuite(BaseTestSuite):
         return int(m['value'])
     assert False, "Could not find metric: %s" % name
 
+  def __do_replacements(self, s, use_db=None, extra=None):
+    globs = globals()
+    repl = dict(('$' + k, globs[k]) for k in [
+        "FILESYSTEM_PREFIX",
+        "FILESYSTEM_NAME",
+        "GROUP_NAME",
+        "NAMENODE",
+        "IMPALA_HOME",
+        "INTERNAL_LISTEN_HOST",
+        "INTERNAL_LISTEN_IP"])
+    repl.update({
+        '$SECONDARY_FILESYSTEM': os.environ.get("SECONDARY_FILESYSTEM", ""),
+        '$USER': getuser()})
+
+    if use_db:
+      repl['$DATABASE'] = use_db
+    elif '$DATABASE' in s:
+      raise AssertionError("Query contains $DATABASE but no use_db specified")
+
+    if extra:
+      for k, v in extra.iteritems():
+        if k in repl:
+          raise RuntimeError("Key {0} is reserved".format(k))
+        repl[k] = v
+
+    for k, v in repl.iteritems():
+      s = s.replace(k, v)
+    return s
+
+
   def __verify_exceptions(self, expected_strs, actual_str, use_db):
     """
     Verifies that at least one of the strings in 'expected_str' is either:
@@ -339,14 +371,9 @@ class ImpalaTestSuite(BaseTestSuite):
     for expected_str in expected_strs:
       # In error messages, some paths are always qualified and some are not.
       # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
-      expected_str = expected_str.strip() \
-          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
-          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
-          .replace('$NAMENODE', NAMENODE) \
-          .replace('$IMPALA_HOME', IMPALA_HOME) \
-          .replace('$INTERNAL_LISTEN_HOST', INTERNAL_LISTEN_HOST)\
-          .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP)
-      if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
+      expected_str = self.__do_replacements(expected_str.strip(), use_db=use_db)
+      # Remove comments
+      expected_str = re.sub(COMMENT_LINES_REGEX, '', expected_str)
       # Strip newlines so we can split error message into multiple lines
       expected_str = expected_str.replace('\n', '')
       expected_regex = try_compile_regex(expected_str)
@@ -421,10 +448,6 @@ class ImpalaTestSuite(BaseTestSuite):
     exec_options = vector.get_value('exec_option')
     protocol = vector.get_value('protocol')
 
-    # Resolve the current user's primary group name.
-    group_id = pwd.getpwnam(getuser()).pw_gid
-    group_name = grp.getgrgid(group_id).gr_name
-
     target_impalad_clients = list()
     if multiple_impalad:
       target_impalad_clients =\
@@ -444,94 +467,105 @@ class ImpalaTestSuite(BaseTestSuite):
           table_format_info, use_db, pytest.config.option.scale_factor)
       impalad_client.set_configuration(exec_options)
 
-    sections = self.load_query_test_file(self.get_workload(), test_file_name,
-        encoding=encoding)
-    for test_section in sections:
-      if 'SHELL' in test_section:
-        assert len(test_section) == 1, \
-          "SHELL test sections can't contain other sections"
-        cmd = test_section['SHELL']\
-          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)\
-          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)\
-          .replace('$IMPALA_HOME', IMPALA_HOME)
-        if use_db: cmd = cmd.replace('$DATABASE', use_db)
-        LOG.info("Shell command: " + cmd)
-        check_call(cmd, shell=True)
-        continue
-
-      if 'QUERY' not in test_section:
-        assert 0, 'Error in test file %s. Test cases require a -- QUERY section.\n%s' %\
-            (test_file_name, pprint.pformat(test_section))
-
-      if 'SETUP' in test_section:
-        self.execute_test_case_setup(test_section['SETUP'], table_format_info)
-
-      # TODO: support running query tests against different scale factors
-      query = QueryTestSectionReader.build_query(test_section['QUERY']
-          .replace('$GROUP_NAME', group_name)
-          .replace('$IMPALA_HOME', IMPALA_HOME)
-          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
-          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME)
-          .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str())
-          .replace('$USER', getuser())
-          .replace('$INTERNAL_LISTEN_HOST', INTERNAL_LISTEN_HOST)
-          .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP))
-      if use_db: query = query.replace('$DATABASE', use_db)
-
-      reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$FILESYSTEM_NAME",
-                           "$GROUP_NAME", "$IMPALA_HOME", "$NAMENODE", "$QUERY",
-                           "$SECONDARY_FILESYSTEM", "$USER"]
-
-      if test_file_vars:
-        for key, value in test_file_vars.iteritems():
-          if key in reserved_keywords:
-            raise RuntimeError("Key {0} is reserved".format(key))
-          query = query.replace(key, value)
-
-      if 'QUERY_NAME' in test_section:
-        LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
-
+    def __exec_in_impala(query, user=None):
+      """
+      Helper to execute a query block in Impala, restoring any custom
+      query options after the completion of the set of queries.
+      """
       # Support running multiple queries within the same test section, only verifying the
       # result of the final query. The main use case is to allow for 'USE database'
       # statements before a query executes, but it is not limited to that.
       # TODO: consider supporting result verification of all queries in the future
       result = None
       target_impalad_client = choice(target_impalad_clients)
+      if user:
+        # Create a new client so the session will use the new username.
+        target_impalad_client = self.create_impala_client(protocol=protocol)
       query_options_changed = []
       try:
-        user = None
-        if 'USER' in test_section:
-          # Create a new client so the session will use the new username.
-          user = test_section['USER'].strip()
-          target_impalad_client = self.create_impala_client(protocol=protocol)
         for query in query.split(';'):
           set_pattern_match = SET_PATTERN.match(query)
-          if set_pattern_match != None:
+          if set_pattern_match:
             query_options_changed.append(set_pattern_match.groups()[0])
             assert set_pattern_match.groups()[0] not in vector.get_value("exec_option"), \
                 "%s cannot be set in  the '.test' file since it is in the test vector. " \
                 "Consider deepcopy()-ing the vector and removing this option in the " \
                 "python test." % set_pattern_match.groups()[0]
           result = self.__execute_query(target_impalad_client, query, user=user)
+      finally:
+        if len(query_options_changed) > 0:
+          self.__restore_query_options(query_options_changed, target_impalad_client)
+      return result
+
+    def __exec_in_hive(query, user=None):
+      """
+      Helper to execute a query block in Hive. No special handling of query
+      options is done, since we use a separate session for each block.
+      """
+      h = ImpalaTestSuite.create_impala_client(HIVE_HS2_HOST_PORT, protocol='hs2',
+              is_hive=True)
+      try:
+        result = None
+        for query in query.split(';'):
+          result = h.execute(query, user=user)
+        return result
+      finally:
+        h.close()
+
+    sections = self.load_query_test_file(self.get_workload(), test_file_name,
+        encoding=encoding)
+    for test_section in sections:
+      if 'SHELL' in test_section:
+        assert len(test_section) == 1, \
+            "SHELL test sections can't contain other sections"
+        cmd = self.__do_replacements(test_section['SHELL'], use_db=use_db,
+            extra=test_file_vars)
+        LOG.info("Shell command: " + cmd)
+        check_call(cmd, shell=True)
+        continue
+
+      if 'QUERY' in test_section:
+        query_section = test_section['QUERY']
+        exec_fn = __exec_in_impala
+      elif 'HIVE_QUERY' in test_section:
+        query_section = test_section['HIVE_QUERY']
+        exec_fn = __exec_in_hive
+      else:
+        assert 0, ('Error in test file %s. Test cases require a ' +
+            '-- QUERY or HIVE_QUERY section.\n%s') %\
+            (test_file_name, pprint.pformat(test_section))
+
+      if 'SETUP' in test_section:
+        self.execute_test_case_setup(test_section['SETUP'], table_format_info)
+
+      # TODO: support running query tests against different scale factors
+      query = QueryTestSectionReader.build_query(
+          self.__do_replacements(query_section, use_db=use_db, extra=test_file_vars))
+
+      if 'QUERY_NAME' in test_section:
+        LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
+
+      result = None
+      try:
+        result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
+        user = None
+        if 'USER' in test_section:
+          user = test_section['USER'].strip()
       except Exception as e:
         if 'CATCH' in test_section:
           self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
           continue
         raise
-      finally:
-        if len(query_options_changed) > 0:
-          self.__restore_query_options(query_options_changed, target_impalad_client)
 
       if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
-        expected_str = " or ".join(test_section['CATCH']).strip() \
-          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
-          .replace('$FILESYSTEM_NAME', FILESYSTEM_NAME) \
-          .replace('$NAMENODE', NAMENODE) \
-          .replace('$IMPALA_HOME', IMPALA_HOME)
-        assert False, "Expected exception: %s" % expected_str
+        expected_str = self.__do_replacements(" or ".join(test_section['CATCH']).strip(),
+              use_db=use_db,
+              extra=test_file_vars)
+        assert False, "Expected exception: {0}\n\nwhen running:\n\n{1}".format(
+            expected_str, query)
 
       assert result is not None
-      assert result.success
+      assert result.success, "Query failed: {0}".format(result.data)
 
       # Decode the results read back if the data is stored with a specific encoding.
       if encoding: result.data = [row.decode(encoding) for row in result.data]
@@ -548,10 +582,12 @@ class ImpalaTestSuite(BaseTestSuite):
         assert 'ERRORS' not in test_section,\
           "'ERRORS' sections must have accompanying 'RESULTS' sections"
       # If --update_results, then replace references to the namenode URI with $NAMENODE.
+      # TODO(todd) consider running do_replacements in reverse, though that may cause
+      # some false replacements for things like username.
       if pytest.config.option.update_results and 'RESULTS' in test_section:
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace(NAMENODE, '$NAMENODE') \
-            .replace('$IMPALA_HOME', IMPALA_HOME) \
+            .replace(IMPALA_HOME, '$IMPALA_HOME') \
             .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
             .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
       rt_profile_info = None
@@ -575,7 +611,7 @@ class ImpalaTestSuite(BaseTestSuite):
         # test files that are checking the contents of tables larger than that anyways.
         dml_results_query = "select * from %s limit 1000" % \
             test_section['DML_RESULTS_TABLE']
-        dml_result = self.__execute_query(target_impalad_client, dml_results_query)
+        dml_result = exec_fn(dml_results_query)
         verify_raw_results(test_section, dml_result,
             vector.get_value('table_format').file_format, result_section='DML_RESULTS',
             update_section=pytest.config.option.update_results)
@@ -780,7 +816,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   # TODO(todd) make this use Thrift to connect to HS2 instead of shelling
   # out to beeline for better performance
-  def run_stmt_in_hive(self, stmt, username=getuser()):
+  def run_stmt_in_hive(self, stmt, username=None):
     """
     Run a statement in Hive, returning stdout if successful and throwing
     RuntimeError(stderr) if not.
@@ -814,7 +850,7 @@ class ImpalaTestSuite(BaseTestSuite):
           ['beeline',
            '--outputformat=csv2',
            '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
-           '-n', username,
+           '-n', username or getuser(),
            '-e', stmt] + beeline_opts,
           stdout=subprocess.PIPE,
           stderr=subprocess.PIPE,

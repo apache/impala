@@ -234,7 +234,7 @@ class ImpylaHS2Connection(ImpalaConnection):
   plus Impala-specific extensions, e.g. for fetching runtime profiles.
   TODO: implement support for kerberos, SSL, etc.
   """
-  def __init__(self, host_port, use_kerberos=False):
+  def __init__(self, host_port, use_kerberos=False, is_hive=False):
     self.__host_port = host_port
     if use_kerberos:
       raise NotImplementedError("Kerberos support not yet implemented")
@@ -246,6 +246,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     self.__cursor = None
     # Query options to send along with each query.
     self.__query_options = {}
+    self._is_hive = is_hive
 
   def set_configuration_option(self, name, value):
     self.__query_options[name] = str(value)
@@ -261,15 +262,19 @@ class ImpylaHS2Connection(ImpalaConnection):
   def connect(self):
     LOG.info("-- connecting to {0} with impyla".format(self.__host_port))
     host, port = self.__host_port.split(":")
-    self.__impyla_conn = impyla.connect(host=host, port=int(port))
+    conn_kwargs = {}
+    if self._is_hive:
+      conn_kwargs['auth_mechanism'] = 'PLAIN'
+    self.__impyla_conn = impyla.connect(host=host, port=int(port), **conn_kwargs)
     # Get the default query options for the session before any modifications are made.
     self.__cursor = self.__impyla_conn.cursor()
-    self.__cursor.execute("set all")
     self.__default_query_options = {}
-    for name, val, _ in self.__cursor:
-      self.__default_query_options[name] = val
-    self.__cursor.close_operation()
-    LOG.debug("Default query options: {0}".format(self.__default_query_options))
+    if not self._is_hive:
+      self.__cursor.execute("set all")
+      for name, val, _ in self.__cursor:
+        self.__default_query_options[name] = val
+      self.__cursor.close_operation()
+      LOG.debug("Default query options: {0}".format(self.__default_query_options))
 
   def close(self):
     LOG.info("-- closing connection to: {0}".format(self.__host_port))
@@ -297,7 +302,8 @@ class ImpylaHS2Connection(ImpalaConnection):
         return r
 
   def execute_async(self, sql_stmt, user=None):
-    LOG.info("-- executing: {0}\n{1};\n".format(self.__host_port, sql_stmt))
+    LOG.info("-- executing against {0} at {1}\n{2};\n".format(
+        self._is_hive and 'Hive' or 'Impala', self.__host_port, sql_stmt))
     if user is not None:
       raise NotImplementedError("Not yet implemented for HS2 - authentication")
     try:
@@ -376,8 +382,17 @@ class ImpylaHS2Connection(ImpalaConnection):
         result_tuples = cursor.fetchall()
       else:
         result_tuples = cursor.fetchmany(max_rows)
-    log = self.get_log(handle)
-    profile = self.get_runtime_profile(handle, profile_format=profile_format)
+    elif self._is_hive:
+      # For Hive statements that have no result set (eg USE), they may still be
+      # running, and we need to wait for them to finish before we can proceed.
+      cursor._wait_to_finish()
+
+    if not self._is_hive:
+      log = self.get_log(handle)
+      profile = self.get_runtime_profile(handle, profile_format=profile_format)
+    else:
+      log = None
+      profile = None
     return ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
                               column_labels=column_labels, column_types=column_types,
                               query=handle.sql_stmt(), log=log, profile=profile)
@@ -416,12 +431,14 @@ class ImpylaHS2ResultSet(object):
       return str(val)
 
 
-def create_connection(host_port, use_kerberos=False, protocol='beeswax'):
+def create_connection(host_port, use_kerberos=False, protocol='beeswax',
+    is_hive=False):
   if protocol == 'beeswax':
     c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
   else:
     assert protocol == 'hs2'
-    c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos)
+    c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
+        is_hive=is_hive)
 
   # A hook in conftest sets tests.common.current_node.
   if hasattr(tests.common, "current_node"):

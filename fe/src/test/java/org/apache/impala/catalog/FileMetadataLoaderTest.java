@@ -42,7 +42,7 @@ public class FileMetadataLoaderTest {
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
-        /* oldFds = */Collections.emptyList(), hostIndex);
+        /* oldFds = */Collections.emptyList(), hostIndex, null);
     fml.load();
     assertEquals(24, fml.getStats().loadedFiles);
     assertEquals(24, fml.getLoadedFds().size());
@@ -56,7 +56,7 @@ public class FileMetadataLoaderTest {
 
     // Test that refreshing is properly incremental if no files changed.
     FileMetadataLoader refreshFml = new FileMetadataLoader(tablePath, /* recursive=*/true,
-        /* oldFds = */fml.getLoadedFds(), hostIndex);
+        /* oldFds = */fml.getLoadedFds(), hostIndex, null);
     refreshFml.load();
     assertEquals(24, refreshFml.getStats().skippedFiles);
     assertEquals(0, refreshFml.getStats().loadedFiles);
@@ -69,7 +69,7 @@ public class FileMetadataLoaderTest {
     fs.setTimes(filePath, fd.getModificationTime() + 1, /* atime= */-1);
 
     refreshFml = new FileMetadataLoader(tablePath, /* recursive=*/true,
-        /* oldFds = */fml.getLoadedFds(), hostIndex);
+        /* oldFds = */fml.getLoadedFds(), hostIndex, null);
     refreshFml.load();
     assertEquals(1, refreshFml.getStats().loadedFiles);
   }
@@ -80,9 +80,12 @@ public class FileMetadataLoaderTest {
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();
       Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/does-not-exist/");
       FileMetadataLoader fml = new FileMetadataLoader(tablePath, recursive,
-          /* oldFds = */Collections.emptyList(), hostIndex);
+          /* oldFds = */Collections.emptyList(), hostIndex, null);
       fml.load();
       assertEquals(0, fml.getLoadedFds().size());
     }
   }
+
+  // TODO(todd) add unit tests for loading ACID tables once we have some ACID
+  // tables with data loaded in the functional test DBs.
 }

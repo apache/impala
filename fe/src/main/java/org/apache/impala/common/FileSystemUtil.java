@@ -17,15 +17,8 @@
 
 package org.apache.impala.common;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Stack;
-import java.util.UUID;
-
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -35,10 +28,10 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
-import org.apache.hadoop.fs.adl.AdlFileSystem;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
@@ -46,8 +39,14 @@ import org.apache.impala.catalog.HdfsCompression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Stack;
+import java.util.UUID;
 
 /**
  * Common utility functions for operating on FileSystem objects.
@@ -540,6 +539,9 @@ public class FileSystemUtil {
    * the path does not exist. This helps simplify the caller code in cases where
    * the file does not exist and also saves an RPC as the caller need not do a separate
    * exists check for the path. Returns null if the path does not exist.
+   *
+   * If 'recursive' is true, all underlying files and directories will be yielded.
+   * Note that the order (breadth-first vs depth-first, sorted vs not) is undefined.
    */
   public static RemoteIterator<? extends FileStatus> listStatus(FileSystem fs, Path p,
       boolean recursive) throws IOException {
@@ -597,16 +599,29 @@ public class FileSystemUtil {
   }
 
   /**
-   * Iterator which recursively visits directories on a FileSystem, yielding
-   * files in an unspecified order. Only files are yielded -- not directories.
+   * Return the path of 'path' relative to the startPath. This may
+   * differ from simply the file name in the case of recursive listings.
    */
-  private static class RecursingIterator implements RemoteIterator<FileStatus> {
+  public static String relativizePath(Path path, Path startPath) {
+    URI relUri = startPath.toUri().relativize(path.toUri());
+    if (relUri.isAbsolute() || relUri.getPath().startsWith("/")) {
+      throw new RuntimeException("FileSystem returned an unexpected path " +
+          path + " for a file within " + startPath);
+    }
+    return relUri.getPath();
+  }
+
+  /**
+   * Iterator which recursively visits directories on a FileSystem, yielding
+   * files in an unspecified order.
+   */
+  static class RecursingIterator implements RemoteIterator<FileStatus> {
     private final FileSystem fs_;
     private final Stack<RemoteIterator<FileStatus>> iters_ = new Stack<>();
     private RemoteIterator<FileStatus> curIter_;
     private FileStatus curFile_;
 
-    private RecursingIterator(FileSystem fs, Path startPath) throws IOException {
+    RecursingIterator(FileSystem fs, Path startPath) throws IOException {
       this.fs_ = Preconditions.checkNotNull(fs);
       curIter_ = fs.listStatusIterator(Preconditions.checkNotNull(startPath));
     }
@@ -641,12 +656,13 @@ public class FileSystemUtil {
      * @throws IOException if any IO error occurs
      */
     private void handleFileStat(FileStatus fileStatus) throws IOException {
-      if (fileStatus.isFile()) { // file
+      if (fileStatus.isFile()) {
         curFile_ = fileStatus;
-      } else { // directory
-        iters_.push(curIter_);
-        curIter_ = fs_.listStatusIterator(fileStatus.getPath());
+        return;
       }
+      iters_.push(curIter_);
+      curIter_ = fs_.listStatusIterator(fileStatus.getPath());
+      curFile_ = fileStatus;
     }
 
     @Override

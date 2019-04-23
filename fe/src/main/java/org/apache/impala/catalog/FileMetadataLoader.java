@@ -16,11 +16,10 @@
 // under the License.
 package org.apache.impala.catalog;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -28,19 +27,23 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Nullable;
 
 /**
  * Utility for loading file metadata within a partition directory.
@@ -53,6 +56,8 @@ public class FileMetadataLoader {
   private final boolean recursive_;
   private final ImmutableMap<String, FileDescriptor> oldFdsByRelPath_;
   private final ListMap<TNetworkAddress> hostIndex_;
+  @Nullable
+  private final ValidWriteIdList writeIds_;
 
   private boolean forceRefreshLocations = false;
 
@@ -65,13 +70,22 @@ public class FileMetadataLoader {
    * @param oldFds any pre-existing file descriptors loaded for this table, used
    *   to optimize refresh if available.
    * @param hostIndex the host index with which to associate the file descriptors
+   * @param writeIds if non-null, a write-id list which will filter the returned
+   *   file descriptors to only include those indicated to be valid.
+   *   TODO(todd) we also likely need to pass an open transaction list here to deal
+   *   with ignoring in-progress (not-yet-visible) compactions.
    */
   public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
-      ListMap<TNetworkAddress> hostIndex) {
+      ListMap<TNetworkAddress> hostIndex, @Nullable ValidWriteIdList writeIds) {
     partDir_ = Preconditions.checkNotNull(partDir);
     recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
     oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
+    writeIds_ = writeIds;
+
+    if (writeIds_ != null) {
+      Preconditions.checkArgument(recursive_, "ACID tables must be listed recursively");
+    }
   }
 
   /**
@@ -147,13 +161,27 @@ public class FileMetadataLoader {
       if (fileStatuses == null) return;
 
       Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
+
+      List<FileStatus> stats = new ArrayList<>();
       while (fileStatuses.hasNext()) {
-        FileStatus fileStatus = fileStatuses.next();
+        stats.add(fileStatuses.next());
+      }
+
+      if (writeIds_ != null) {
+        stats = AcidUtils.filterFilesForAcidState(stats, partDir_, writeIds_,
+            loadStats_);
+      }
+
+      for (FileStatus fileStatus : stats) {
+        if (fileStatus.isDirectory()) {
+          continue;
+        }
+
         if (!FileSystemUtil.isValidDataFile(fileStatus)) {
           ++loadStats_.hiddenFiles;
           continue;
         }
-        String relPath = relativizePath(fileStatus.getPath());
+        String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partDir_);
         FileDescriptor fd = oldFdsByRelPath_.get(relPath);
         if (listWithLocations || forceRefreshLocations ||
             hasFileChanged(fd, fileStatus)) {
@@ -169,19 +197,6 @@ public class FileMetadataLoader {
         LOG.trace(loadStats_.debugString());
       }
     }
-  }
-
-  /**
-   * Return the path of 'path' relative to the partition dir being listed. This may
-   * differ from simply the file name in the case of recursive listings.
-   */
-  private String relativizePath(Path path) {
-    URI relUri = partDir_.toUri().relativize(path.toUri());
-    if (relUri.isAbsolute() || relUri.getPath().startsWith("/")) {
-      throw new RuntimeException("FileSystem returned an unexpected path " +
-          path + " for a file within " + partDir_);
-    }
-    return relUri.getPath();
   }
 
   /**
@@ -217,6 +232,15 @@ public class FileMetadataLoader {
 
   // File/Block metadata loading stats for a single HDFS path.
   public class LoadStats {
+    /** Number of files skipped because they pertain to an uncommitted ACID transaction */
+    public int uncommittedAcidFilesSkipped = 0;
+
+    /**
+     * Number of files skipped because they pertain to ACID directories superceded
+     * by later base data.
+     */
+    public int filesSupercededByNewerBase = 0;
+
     // Number of files for which the metadata was loaded.
     public int loadedFiles = 0;
 
@@ -232,12 +256,23 @@ public class FileMetadataLoader {
 
     // Number of unknown disk IDs encountered while loading block
     // metadata for this path.
-    public long unknownDiskIds = 0;
+    public int unknownDiskIds = 0;
 
     public String debugString() {
-      return String.format("Path: %s: Loaded files: %s Hidden files: %s " +
-          "Skipped files: %s Unknown diskIDs: %s", partDir_, loadedFiles, hiddenFiles,
-          skippedFiles, unknownDiskIds);
+      return Objects.toStringHelper("")
+        .add("path", partDir_)
+        .add("loaded files", loadedFiles)
+        .add("hidden files", nullIfZero(hiddenFiles))
+        .add("skipped files", nullIfZero(skippedFiles))
+        .add("uncommited files", nullIfZero(uncommittedAcidFilesSkipped))
+        .add("superceded files", nullIfZero(filesSupercededByNewerBase))
+        .add("unknown diskIds", nullIfZero(unknownDiskIds))
+        .omitNullValues()
+        .toString();
+    }
+
+    private Integer nullIfZero(int x) {
+      return x > 0 ? x : null;
     }
   }
 }

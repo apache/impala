@@ -20,7 +20,7 @@ package org.apache.hadoop.hive.common;
  * ValidWriteIdList is not supported in Hive 2
  */
 public class ValidWriteIdList {
-  enum RangeResponse {NONE, SOME, ALL};
+  public enum RangeResponse {NONE, SOME, ALL};
 
   public boolean isWriteIdValid(long writeId) {
     throw new UnsupportedOperationException("isWriteIdValid not supported for "

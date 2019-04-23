@@ -287,10 +287,13 @@ class DirectMetaProvider implements MetaProvider {
     Path partDir = new Path(msPartition.getSd().getLocation());
     // TODO(todd): The table property to disable recursive loading is not supported
     // by this code path. However, DirectMetaProvider is not yet a supported feature.
+    // TODO(todd) this code path would have to change to handle ACID tables -- we don't
+    // have the write ID list passed down at this point in the code.
     FileMetadataLoader fml = new FileMetadataLoader(partDir,
         /* recursive= */BackendConfig.INSTANCE.recursivelyListPartitions(),
         /* oldFds= */Collections.emptyList(),
-        hostIndex);
+        hostIndex,
+        /* writeIds=*/null);
 
     try {
       fml.load();

@@ -1,0 +1,22 @@
+====
+---- QUERY
+insert into functional.insert_only_transactional_table values (1);
+---- CATCH
+AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
+====
+---- QUERY
+alter table functional.insert_only_transactional_table change column x y bigint;
+---- CATCH
+AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
+====
+---- QUERY
+compute stats functional.insert_only_transactional_table;
+---- CATCH
+AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
+====
+---- QUERY
+select * from functional_orc_def.full_transactional_table;
+---- CATCH
+AnalysisException: Table functional_orc_def.full_transactional_table not supported. Transactional (ACID) tables are only supported when they are configured as insert_only.
+====
+
