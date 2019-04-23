@@ -23,11 +23,11 @@
 #  CYRUS_SASL_LIB_DEPS other libraries that SASL depends on
 #  CYRUS_SASL_FOUND, whether Cyrus SASL and its plugins have been found
 #
-# N.B: we do _not_ include sasl in thirdparty, for a fairly subtle reason. The
+# N.B: we do _not_ include sasl in the toolchain, for a fairly subtle reason. The
 # TLDR version is that newer versions of cyrus-sasl (>=2.1.26) have a bug fix
 # for https://bugzilla.cyrusimap.org/show_bug.cgi?id=3590, but that bug fix
 # relied on a change both on the plugin side and on the library side. If you
-# then try to run the new version of sasl (e.g from our thirdparty tree) with
+# then try to run the new version of sasl (e.g from our toolchain) with
 # an older version of a plugin (eg from RHEL6 install), you'll get a SASL_NOMECH
 # error due to this bug.
 #

@@ -26,15 +26,9 @@
 #  GFLAGS_STATIC_LIB, path to libgflags.a
 #  GFLAGS_SHARED_LIB, path to libgflags.so
 
-set(GFLAGS_SEARCH_HEADER_PATHS
-  ${GFLAGS_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
-)
+set(GFLAGS_SEARCH_HEADER_PATHS ${GFLAGS_ROOT}/include)
 
-set(GFLAGS_SEARCH_LIB_PATH
-  ${GFLAGS_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
-)
+set(GFLAGS_SEARCH_LIB_PATH ${GFLAGS_ROOT}/lib)
 
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
   ${GFLAGS_SEARCH_HEADER_PATHS}

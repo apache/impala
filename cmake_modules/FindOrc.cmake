@@ -22,13 +22,9 @@
 #  ORC_INCLUDE_DIR, directory containing headers
 #  ORC_STATIC_LIB, path to liborc.a
 #  ORC_FOUND
-set(ORC_SEARCH_HEADER_PATHS
-  ${ORC_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/orc-$ENV{IMPALA_ORC_VERSION}/build/include)
+set(ORC_SEARCH_HEADER_PATHS ${ORC_ROOT}/include)
 
-set(ORC_SEARCH_LIB_PATH
-  ${ORC_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/orc-$ENV{IMPALA_ORC_VERSION}/build/lib)
+set(ORC_SEARCH_LIB_PATH ${ORC_ROOT}/lib)
 
 find_path(ORC_INCLUDE_DIR NAMES orc/OrcFile.hh OrcFile.hh PATHS
   ${ORC_SEARCH_HEADER_PATHS}

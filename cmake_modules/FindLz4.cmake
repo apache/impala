@@ -25,15 +25,9 @@
 # LZ4_LIBS, directory containing lz4 libraries
 # LZ4_STATIC_LIB, path to liblz4.a
 
-set(LZ4_SEARCH_LIB_PATH
-  ${LZ4_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/lz4
-)
+set(LZ4_SEARCH_LIB_PATH ${LZ4_ROOT}/lib)
 
-set(LZ4_SEARCH_INCLUDE_DIR
-  ${LZ4_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/lz4
-)
+set(LZ4_SEARCH_INCLUDE_DIR ${LZ4_ROOT}/include)
 
 find_path(LZ4_INCLUDE_DIR lz4.h
   PATHS ${LZ4_SEARCH_INCLUDE_DIR}

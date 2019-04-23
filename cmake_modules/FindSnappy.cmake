@@ -27,15 +27,9 @@
 #  SNAPPY_FOUND, whether gflags has been found
 #  snappy - imported static library
 
-set(SNAPPY_SEARCH_HEADER_PATHS
-  ${SNAPPY_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/include
-)
+set(SNAPPY_SEARCH_HEADER_PATHS ${SNAPPY_ROOT}/include)
 
-set(SNAPPY_SEARCH_LIB_PATH
-  ${SNAPPY_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
-)
+set(SNAPPY_SEARCH_LIB_PATH ${SNAPPY_ROOT}/lib)
 
 find_path(SNAPPY_INCLUDE_DIR
   NAMES snappy.h

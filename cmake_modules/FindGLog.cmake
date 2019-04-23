@@ -25,16 +25,8 @@
 #  GLOG_LIBS, directory containing glog libraries
 #  GLOG_STATIC_LIB, path to libglog.a
 
-set(THIRDPARTY $ENV{IMPALA_HOME}/thirdparty)
-
-set(GLOG_SEARCH_HEADER_PATHS
-  ${GLOG_ROOT}/include
-  ${THIRDPARTY}/glog-$ENV{IMPALA_GLOG_VERSION}/src
-)
-set(GLOG_SEARCH_LIB_PATH
-  ${GLOG_ROOT}/lib
-  ${THIRDPARTY}/glog-$ENV{IMPALA_GLOG_VERSION}/.libs
-)
+set(GLOG_SEARCH_HEADER_PATHS ${GLOG_ROOT}/include)
+set(GLOG_SEARCH_LIB_PATH ${GLOG_ROOT}/lib)
 
 find_path(GLOG_INCLUDE_DIR glog/logging.h PATHS
   ${GLOG_SEARCH_HEADER_PATHS}

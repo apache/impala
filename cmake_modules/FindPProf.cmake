@@ -26,15 +26,9 @@
 #  PPROF_STATIC_LIB, path to libprofiler.a
 #  tcmallocstatic, pprofstatic
 
-set(PPROF_SEARCH_HEADER_PATHS
-  ${GPERFTOOLS_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/gperftools-$ENV{IMPALA_GPERFTOOLS_VERSION}/src
-)
+set(PPROF_SEARCH_HEADER_PATHS ${GPERFTOOLS_ROOT}/include)
 
-set(PPROF_SEARCH_LIB_PATH
-  ${GPERFTOOLS_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/gperftools-$ENV{IMPALA_GPERFTOOLS_VERSION}/.libs
-)
+set(PPROF_SEARCH_LIB_PATH ${GPERFTOOLS_ROOT}/lib)
 
 find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS
   ${PPROF_SEARCH_HEADER_PATHS}

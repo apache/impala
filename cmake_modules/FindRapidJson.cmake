@@ -21,10 +21,7 @@
 # RAPIDJSON_ROOT hints the location
 # This module defines RAPIDJSON_INCLUDE_DIR, the directory containing headers
 
-set(RAPIDJSON_SEARCH_HEADER_PATHS
-  ${RAPIDJSON_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/rapidjson/include/
-)
+set(RAPIDJSON_SEARCH_HEADER_PATHS ${RAPIDJSON_ROOT}/include)
 
 find_path(RAPIDJSON_INCLUDE_DIR rapidjson/rapidjson.h HINTS
   ${RAPIDJSON_SEARCH_HEADER_PATHS})

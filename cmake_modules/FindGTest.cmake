@@ -34,21 +34,18 @@ set(GTEST_H gtest/gtest.h)
 
 find_path(GTEST_INCLUDE_DIR ${GTEST_H}
   PATHS ${GTEST_ROOT}/include
-        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}/include
         NO_DEFAULT_PATH
   DOC   "Path to the ${GTEST_H} file"
 )
 
 find_library(GTEST_STATIC_LIB NAMES libgtest.a
   PATHS ${GTEST_ROOT}/lib
-        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest)"
 )
 
 find_library(GTEST_MAIN_LIBRARY NAMES libgtest_main.a
   PATHS ${GTEST_ROOT}/lib
-        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest_main)"
 )

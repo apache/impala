@@ -22,13 +22,9 @@
 #  AVRO_INCLUDE_DIR, directory containing headers
 #  AVRO_STATIC_LIB, path to libavrocpp_s.a
 #  AVRO_FOUND
-set(AVRO_SEARCH_HEADER_PATHS
-  ${AVRO_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
+set(AVRO_SEARCH_HEADER_PATHS ${AVRO_ROOT}/include)
 
-set(AVRO_SEARCH_LIB_PATH
-  ${AVRO_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
+set(AVRO_SEARCH_LIB_PATH ${AVRO_ROOT}/lib)
 
 find_path(AVRO_INCLUDE_DIR NAMES avro/schema.h schema.h PATHS
   ${AVRO_SEARCH_HEADER_PATHS}

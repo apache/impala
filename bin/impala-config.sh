@@ -250,14 +250,10 @@ export IMPALA_MAVEN_OPTIONS=${IMPALA_MAVEN_OPTIONS-}
 # If enabled, debug symbols are added to cross-compiled IR.
 export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 
-if [ -d "$IMPALA_HOME/thirdparty" ]; then
-  NO_THIRDPARTY=false
-else
-  NO_THIRDPARTY=true
-fi
-# If true, download and use the CDH components from S3 instead of the ones
-# in $IMPALA_HOME/thirdparty.
-export DOWNLOAD_CDH_COMPONENTS=${DOWNLOAD_CDH_COMPONENTS-"$NO_THIRDPARTY"}
+# Download and use the CDH components from S3. It can be useful to set this to false if
+# building against a custom local build using HIVE_SRC_DIR_OVERRIDE,
+# HADOOP_INCLUDE_DIR_OVERRIDE, and HADOOP_LIB_DIR_OVERRIDE.
+export DOWNLOAD_CDH_COMPONENTS=${DOWNLOAD_CDH_COMPONENTS-true}
 
 export IS_OSX="$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)"
 
@@ -487,11 +483,7 @@ export PATH="$IMPALA_TOOLCHAIN/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
 export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
 
 # The directory in which all the thirdparty CDH components live.
-if [ "${DOWNLOAD_CDH_COMPONENTS}" = true ]; then
-  export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
-else
-  export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
-fi
+export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 
 # The directory in which all the thirdparty CDP components live.
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"

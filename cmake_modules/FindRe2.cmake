@@ -23,15 +23,9 @@
 #  RE2_INCLUDE_DIR, directory containing headers
 #  RE2_STATIC_LIB, path to libsnappy.a
 
-set(RE2_SEARCH_HEADER_PATHS
-  ${RE2_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/re2
-)
+set(RE2_SEARCH_HEADER_PATHS ${RE2_ROOT}/include)
 
-set(RE2_SEARCH_LIB_PATHS
-  ${RE2_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/re2/obj
-)
+set(RE2_SEARCH_LIB_PATHS ${RE2_ROOT}/lib)
 
 find_path(RE2_INCLUDE_DIR re2/re2.h
   PATHS ${RE2_SEARCH_HEADER_PATHS}
