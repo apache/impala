@@ -70,6 +70,3 @@ for glob_pattern in [os.path.join(IMPALA_HOME, "fe/target/dependency/*.jar"),
 os.symlink(os.path.join(IMPALA_HOME, "www"), os.path.join(OUTPUT_DIR, "www"))
 # Scripts
 symlink_file_into_dir(os.path.join(IMPALA_HOME, "docker/daemon_entrypoint.sh"), BIN_DIR)
-# Minicluster configs
-os.symlink(os.path.join(IMPALA_HOME, "fe/src/test/resources"),
-    os.path.join(OUTPUT_DIR, "conf"))

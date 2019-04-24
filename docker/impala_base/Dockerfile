@@ -28,9 +28,10 @@ RUN apt-get update && \
 # Copy build artifacts required for the daemon processes.
 # Need to have multiple copy commands to preserve directory structure.
 COPY bin /opt/impala/bin
-COPY conf /opt/impala/conf
 COPY lib /opt/impala/lib
 COPY www /opt/impala/www
-copy kudu /opt/kudu
+COPY kudu /opt/kudu
+# Create conf directory for later config injection.
+RUN mkdir /opt/impala/conf
 
 WORKDIR /opt/impala/
