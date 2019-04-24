@@ -65,15 +65,28 @@ import org.slf4j.Logger;
  */
 public class MetastoreEvents {
 
-  // key to be used for catalog version in table properties for detecting self-events
-  public static final String CATALOG_VERSION_PROP_KEY = "impala.events.catalogVersion";
-  // key to be used for catalog service id for detecting self-events
-  public static final String CATALOG_SERVICE_ID_PROP_KEY =
-      "impala.events.catalogServiceId";
-  // flag to be set in the table/database parameters to disable event based metadata sync
-  // Note the this is a user-facing property. Any changes to this key name
-  // will break backwards compatibility
-  public static final String DISABLE_EVENT_HMS_SYNC_KEY = "impala.disableHmsSync";
+  /**
+   * This enum contains keys for parameters added in Metastore entities, relevant for
+   * event processing. When eventProcessor is instantiated, we make sure during config
+   * validation that these parameters are not filtered out through the Metastore config
+   * EVENT_NOTIFICATION_PARAMETERS_EXCLUDE_PATTERNS.
+   */
+  public enum MetastoreEventPropertyKey {
+    // key to be used for catalog version in table properties for detecting self-events
+    CATALOG_VERSION("impala.events.catalogVersion"),
+    // key to be used for catalog service id for detecting self-events
+    CATALOG_SERVICE_ID("impala.events.catalogServiceId"),
+    // flag to be set in the table/database parameters to disable event based metadata
+    // sync. Note the this is a user-facing property. Any changes to this key name
+    // will break backwards compatibility
+    DISABLE_EVENT_HMS_SYNC("impala.disableHmsSync");
+
+    private String key_;
+
+    MetastoreEventPropertyKey(String key) { this.key_ = key; }
+
+    public String getKey() { return key_; }
+  }
 
   public enum MetastoreEventType {
     CREATE_TABLE("CREATE_TABLE"),
@@ -505,9 +518,9 @@ public class MetastoreEvents {
      * level property.f
      *
      * @return Boolean value of the table property with the key
-     *     <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. Else, returns the database property
-     *     which is associated with this table. Returns false if neither of the properties
-     *     are set.
+     *     <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code>. Else,
+     *     returns the database property which is associated with this table. Returns
+     *     false if neither of the properties are set.
      */
     @Override
     protected boolean isEventProcessingDisabled() {
@@ -515,16 +528,21 @@ public class MetastoreEvents {
       Boolean tblProperty = getHmsSyncProperty(msTbl_);
       if (tblProperty != null) {
         infoLog("Found table level flag {} is set to {} for table {}",
-            DISABLE_EVENT_HMS_SYNC_KEY, tblProperty.toString(), getFullyQualifiedTblName());
+            MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+            tblProperty.toString(),
+            getFullyQualifiedTblName());
         return tblProperty;
       }
       // if the tbl property is not set check at db level
-      String dbFlagVal = catalog_.getDbProperty(dbName_, DISABLE_EVENT_HMS_SYNC_KEY);
+      String dbFlagVal = catalog_.getDbProperty(dbName_,
+          MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
       if (dbFlagVal != null) {
         // no need to spew unnecessary logs. Most tables/databases are expected to not
         // have this flag set when event based HMS polling is enabled
         debugLog("Table level flag is not set. Db level flag {} is {} for "
-            + "database {}", DISABLE_EVENT_HMS_SYNC_KEY, dbFlagVal, dbName_);
+                + "database {}",
+            MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+            dbFlagVal, dbName_);
       }
       // flag value of null also returns false
       return Boolean.valueOf(dbFlagVal);
@@ -532,15 +550,19 @@ public class MetastoreEvents {
 
     /**
      * Gets the value of the parameter with the key
-     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> from the given table
+     * <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code> from the given
+     * table
      *
      * @return the Boolean value of the property with the key
-     *     <code>DISABLE_EVENT_HMS_SYNC_KEY</code> if it is available else returns null
+     *     <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code> if it is
+     *     available else returns null
      */
     public static Boolean getHmsSyncProperty(
         org.apache.hadoop.hive.metastore.api.Table tbl) {
       if (!tbl.isSetParameters()) return null;
-      String val = tbl.getParameters().get(DISABLE_EVENT_HMS_SYNC_KEY);
+      String val =
+          tbl.getParameters()
+              .get(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
       if (val == null || val.isEmpty()) return null;
       return Boolean.valueOf(val);
     }
@@ -559,7 +581,8 @@ public class MetastoreEvents {
 
     /**
      * Even though there is a database level property
-     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code> it is only used for tables within that
+     * <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code> it is only used
+     * for tables within that
      * database. As such this property does not control if the database level DDLs are
      * skipped or not.
      *
@@ -817,15 +840,18 @@ public class MetastoreEvents {
       eventSyncBeforeFlag_ = getHmsSyncProperty(msTbl_);
       eventSyncAfterFlag_ = getHmsSyncProperty(tableAfter_);
       dbFlagVal =
-          Boolean.valueOf(catalog_.getDbProperty(dbName_, DISABLE_EVENT_HMS_SYNC_KEY));
+          Boolean.valueOf(catalog_.getDbProperty(dbName_,
+              MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey()));
     }
 
     @Override
     protected void initSelfEventIdentifiersFromEvent() {
       versionNumberFromEvent_ = Long.parseLong(
-          getStringProperty(tableAfter_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+          getStringProperty(tableAfter_.getParameters(),
+              MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
       serviceIdFromEvent_ =
-          getStringProperty(tableAfter_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+          getStringProperty(tableAfter_.getParameters(),
+              MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
       try {
         if (isRename_) {
           //if this is rename event then identifiers will be in tableAfter
@@ -932,7 +958,8 @@ public class MetastoreEvents {
     /**
      * In case of alter table events, it is possible that the alter event is generated
      * because user changed the value of the parameter
-     * <code>DISABLE_EVENT_HMS_SYNC_KEY</code>. If the parameter is unchanged, it doesn't
+     * <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code>. If the
+     * parameter is unchanged, it doesn't
      * matter if you use the before or after table object here since the eventual action
      * is going be invalidate or rename. If however, the parameter is changed, couple of
      * things could happen. The flag changes from unset/false to true or it changes from
@@ -1125,9 +1152,11 @@ public class MetastoreEvents {
     @Override
     protected void initSelfEventIdentifiersFromEvent() {
       versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          alteredDatabase_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+          alteredDatabase_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
       serviceIdFromEvent_ = getStringProperty(
-          alteredDatabase_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+          alteredDatabase_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
       try {
         pendingVersionNumbersFromCatalog_ =
             catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
@@ -1286,9 +1315,11 @@ public class MetastoreEvents {
     @Override
     protected void initSelfEventIdentifiersFromEvent() {
       versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          lastAddedPartition_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+          lastAddedPartition_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
       serviceIdFromEvent_ = getStringProperty(
-          lastAddedPartition_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+          lastAddedPartition_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
       try {
         pendingVersionNumbersFromCatalog_ =
             catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
@@ -1334,9 +1365,11 @@ public class MetastoreEvents {
     @Override
     protected void initSelfEventIdentifiersFromEvent() {
       versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          partitionAfter_.getParameters(), CATALOG_VERSION_PROP_KEY, "-1"));
+          partitionAfter_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
       serviceIdFromEvent_ = getStringProperty(
-          partitionAfter_.getParameters(), CATALOG_SERVICE_ID_PROP_KEY, "");
+          partitionAfter_.getParameters(),
+          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
       try {
         pendingVersionNumbersFromCatalog_ =
             catalog_.getInFlightVersionsForEvents(dbName_, tblName_);

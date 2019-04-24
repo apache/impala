@@ -18,6 +18,10 @@
 package org.apache.impala.catalog.events;
 
 import static java.lang.Thread.sleep;
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.DEFAULT_METASTORE_CONFIG_VALUE;
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.METASTORE_PARAMETER_EXCLUDE_PATTERNS;
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.validateMetastoreConfigs;
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.validateMetastoreEventParameters;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.ALTER_TABLE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_DATABASE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_DATABASE;
@@ -28,6 +32,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -43,9 +48,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -71,9 +78,12 @@ import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.events.EventProcessorConfigValidator.MetastoreEventConfigsToValidate;
+import org.apache.impala.catalog.events.EventProcessorConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.common.FileSystemUtil;
@@ -120,6 +130,7 @@ import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -131,6 +142,7 @@ import org.junit.Test;
 
 import com.google.common.collect.Lists;
 
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,6 +162,33 @@ public class MetastoreEventsProcessorTest {
   private static CatalogServiceCatalog catalog_;
   private static CatalogOpExecutor catalogOpExecutor_;
   private static MetastoreEventsProcessor eventsProcessor_;
+
+  // This enum contains incorrect config values for each key, to test that event processor
+  // fails when incorrect value is set in Metastore for the required configs. It also
+  // has the correct value to verify the case that event processor does not fail with
+  // correct config values.
+  private enum TestIncorrectMetastoreEventConfigs {
+    ADD_THRIFT_OBJECTS("hive.metastore.notifications.add.thrift.objects", "true",
+        "false"),
+    ALTER_NOTIFICATIONS_BASIC("hive.metastore.alter.notifications.basic", "false",
+        "true"),
+    FIRE_EVENTS_FOR_DML("hive.metastore.dml.events", "true", "false");
+
+    private String conf_, correctValue_, incorrectValue_;
+
+    TestIncorrectMetastoreEventConfigs(String conf, String correctValue,
+        String incorrectValue) {
+      this.conf_ = conf;
+      this.correctValue_ = correctValue;
+      this.incorrectValue_ = incorrectValue;
+    }
+
+    @Override
+    public String toString() {
+      return "Config : " + conf_ + ", Expected Value : " + correctValue_;
+    }
+  }
+
   private static final Logger LOG =
       LoggerFactory.getLogger(MetastoreEventsProcessorTest.class);
 
@@ -219,6 +258,132 @@ public class MetastoreEventsProcessorTest {
   @After
   public void afterTest() {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+  }
+
+  /**
+   * Test each Metastore config required for event processing. This test just validates
+   * that if event processor starts, the required configs are set.
+   */
+  @Test
+  public void testConfigValidation() throws TException {
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+
+    IMetaStoreClient metaStoreClient = catalog_.getMetaStoreClient().getHiveClient();
+    for (MetastoreEventConfigsToValidate config : MetastoreEventConfigsToValidate
+        .values()) {
+      assertEquals(config.getExpectedValue(),
+          MetaStoreUtil.getMetastoreConfigValue(metaStoreClient, config.getConf(),
+              DEFAULT_METASTORE_CONFIG_VALUE));
+    }
+  }
+
+  /**
+   * Mock the eventsProcessor#getConfigValueFromMetastore method and make it return
+   * incorrect values for the required configs for event processing. Verify that the
+   * incorrect config leads to invalid result for each config.
+   */
+  @Test
+  public void testConfigValidationWithIncorrectValues() throws TException {
+    MetastoreEventsProcessor mockEventsProcessor =
+        Mockito.mock(MetastoreEventsProcessor.class);
+    for (TestIncorrectMetastoreEventConfigs config :
+        TestIncorrectMetastoreEventConfigs.values()) {
+      when(mockEventsProcessor.getConfigValueFromMetastore(config.conf_,
+          DEFAULT_METASTORE_CONFIG_VALUE))
+          .thenReturn(config.incorrectValue_);
+      ValidationResult testResult =
+          validateMetastoreConfigs(mockEventsProcessor);
+      assertFalse(testResult.isValid());
+      assertTrue(testResult.getReason().isPresent());
+      assertEquals(String.format("Incorrect configuration for %s. "
+              + "Found : %s", config.toString(), config.incorrectValue_),
+          testResult.getReason().get());
+
+      when(mockEventsProcessor.getConfigValueFromMetastore(config.conf_,
+          DEFAULT_METASTORE_CONFIG_VALUE))
+          .thenReturn(config.correctValue_);
+    }
+  }
+
+  /**
+   * Test that when HiveConf.METASTORE_PARAMETER_EXCLUDE_PATTERNS contains a regex
+   * that filters out any parameter required for event processing, the config
+   * validation fails. Config validation should succeed when the regex does not match
+   * any of the required parameters.
+   */
+  @Test
+  public void testParameterFilterValidation() throws TException {
+    MetastoreEventsProcessor mockEventsProcessor =
+        Mockito.mock(MetastoreEventsProcessor.class);
+
+    //Regex to filter all parameters starting with impala
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("^impala");
+    ValidationResult testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertFalse(testResult.isValid());
+    assertTrue(testResult.getReason().isPresent());
+
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("impala*");
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertFalse(testResult.isValid());
+    assertTrue(testResult.getReason().isPresent());
+
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("");
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertTrue(testResult.isValid());
+    assertFalse(testResult.getReason().isPresent());
+
+    // Test with default return value
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE))
+        .thenReturn(DEFAULT_METASTORE_CONFIG_VALUE);
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertTrue(testResult.isValid());
+    assertFalse(testResult.getReason().isPresent());
+
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("randomString1, impala"
+        + ".disableHmsSync, randomString2");
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertFalse(testResult.isValid());
+    assertTrue(testResult.getReason().isPresent());
+
+    //Test when a required parameter is given as regex
+    String requiredParameter = MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey();
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS, DEFAULT_METASTORE_CONFIG_VALUE))
+        .thenReturn(requiredParameter);
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertFalse(testResult.isValid());
+    assertTrue(testResult.getReason().isPresent());
+    // Verify that the error message is correct
+    assertEquals(String.format("Failed config validation. "
+            + "Required Impala parameter %s is"
+            + " filtered out using the Hive configuration %s=%s", requiredParameter,
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS, requiredParameter),
+        testResult.getReason().get());
+
+    when(mockEventsProcessor.getConfigValueFromMetastore(
+        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("^impala.events"
+        + ".catalogServiceId");
+    testResult =
+        validateMetastoreEventParameters(mockEventsProcessor);
+    assertFalse(testResult.isValid());
+    assertTrue(testResult.getReason().isPresent());
   }
 
   /**
@@ -814,7 +979,8 @@ public class MetastoreEventsProcessorTest {
   private static class HMSFetchNotificationsEventProcessor
       extends MetastoreEventsProcessor {
     HMSFetchNotificationsEventProcessor(
-        CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec) {
+        CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec)
+        throws CatalogException {
       super(catalog, startSyncFromId, pollingFrequencyInSec);
     }
 
@@ -1086,13 +1252,13 @@ public class MetastoreEventsProcessorTest {
 
   /**
    * Test checks if the events are processed or ignored when the value of parameter
-   * <code>MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY</code> is changed. Currently,
-   * this test only changes the flags for at the table level, since alter_database
-   * events are not supported currently. In order to confirm that the event processing
-   * happens as expected, this test generates a alter_table event using a mock
-   * notificationEvent and a mock catalog which returns the dbFlag flag as expected.
-   * Then it makes sure that the <code>isEventProcessingDisabled</code> method of the
-   * AlterTableEvent returns the expected result, given the flags. And then
+   * <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code> is changed.
+   * Currently, this test only changes the flags for at the table level, since
+   * alter_database events are not supported currently. In order to confirm that the
+   * event processing happens as expected, this test generates a alter_table event
+   * using a mock notificationEvent and a mock catalog which returns the dbFlag flag as
+   * expected. Then it makes sure that the <code>isEventProcessingDisabled</code>
+   * method of the AlterTableEvent returns the expected result, given the flags. And then
    * generates a additional alter table event to make sure that the subsequent event is
    * processed/skipped based on the new flag values
    */
@@ -1149,11 +1315,12 @@ public class MetastoreEventsProcessorTest {
       for (Pair<String, String> tblTransition : tblFlagTransitions) {
         Map<String, String> dbParams = new HashMap<>(1);
         if (dbFlag != null) {
-          dbParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, dbFlag);
+          dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), dbFlag);
         }
         Map<String, String> tblParams = new HashMap<>(1);
         if (tblTransition.first != null) {
-          tblParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblTransition.first);
+          tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+              tblTransition.first);
         }
         createDatabase(TEST_DB_NAME, dbParams);
         createTable(TEST_DB_NAME, testTblName, tblParams, false);
@@ -1162,7 +1329,8 @@ public class MetastoreEventsProcessorTest {
         assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
         // now turn on the flag
         alterTableAddParameter(testTblName,
-            MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblTransition.second);
+            MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+            tblTransition.second);
         eventsProcessor_.processEvents();
         assertEquals(EventProcessorStatus.NEEDS_INVALIDATE, eventsProcessor_.getStatus());
         // issue a catalog reset to make sure that table comes back again and event
@@ -1226,7 +1394,7 @@ public class MetastoreEventsProcessorTest {
     }
 
     private static final List<String> TABLE_SYNC_PROPERTYLIST =
-        Arrays.asList(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY);
+        Arrays.asList(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
 
     @Override
     public List<String> getTableProperties(
@@ -1252,14 +1420,16 @@ public class MetastoreEventsProcessorTest {
     beforeParams.put(Table.TBL_PROP_LAST_DDL_TIME, String.valueOf(1000));
     if (tblFlagTransition.first != null) {
       beforeParams
-          .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblFlagTransition.first);
+          .put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+              tblFlagTransition.first);
     }
 
     Map<String, String> afterParams = new HashMap<>(2);
     afterParams.put(Table.TBL_PROP_LAST_DDL_TIME, String.valueOf(1001));
     if (tblFlagTransition.second != null) {
       afterParams
-          .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, tblFlagTransition.second);
+          .put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+              tblFlagTransition.second);
     }
 
     org.apache.hadoop.hive.metastore.api.Table tableBefore =
@@ -1269,7 +1439,7 @@ public class MetastoreEventsProcessorTest {
 
     Map<String, String> dbParams = new HashMap<>(1);
     if (dbFlag != null) {
-      dbParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, dbFlag);
+      dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), dbFlag);
     }
 
     CatalogServiceCatalog fakeCatalog = FakeCatalogServiceCatalogForFlagTests.create();
@@ -1342,7 +1512,7 @@ public class MetastoreEventsProcessorTest {
     // event 1
     createDatabase(TEST_DB_NAME, null);
     Map<String, String> tblParams = new HashMap<>(1);
-    tblParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, "true");
+    tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), "true");
     // event 2
     createTable(TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
     // event 3
@@ -1450,15 +1620,17 @@ public class MetastoreEventsProcessorTest {
     Map<String, String> tblParams = new HashMap<>(1);
     if (dbFlag == null) {
       // if null, remove the flag
-      dbParams.remove(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY);
+      dbParams.remove(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
     } else {
-      dbParams.put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, String.valueOf(dbFlag));
+      dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+          String.valueOf(dbFlag));
     }
     if (tblFlag == null) {
-      tblParams.remove(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY);
+      tblParams.remove(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
     } else {
       tblParams
-          .put(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, String.valueOf(tblFlag));
+          .put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+              String.valueOf(tblFlag));
     }
 
     final String testTblName = "runDDLTestsWithFlags";
@@ -1664,7 +1836,8 @@ public class MetastoreEventsProcessorTest {
     final String testTblName = "testAlterDisableFlagFromDb";
     eventsProcessor_.processEvents();
     Database alteredDb = catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().deepCopy();
-    alteredDb.putToParameters(MetastoreEvents.DISABLE_EVENT_HMS_SYNC_KEY, "true");
+    alteredDb.putToParameters(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+        "true");
     alterDatabase(alteredDb);
 
     createTable(testTblName, false);

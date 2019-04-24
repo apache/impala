@@ -17,6 +17,9 @@
 
 package org.apache.impala.catalog.events;
 
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.hasValidMetastoreConfigs;
+import static org.apache.impala.catalog.events.EventProcessorConfigValidator.verifyParametersNotFiltered;
+
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -28,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
@@ -36,11 +40,13 @@ import org.apache.hadoop.hive.metastore.messaging.json.ExtendedJSONMessageFactor
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.events.EventProcessorConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -202,7 +208,6 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // metric name for number of tables which are invalidated by event processor so far
   public static final String NUMBER_OF_TABLE_INVALIDATES = "tables-invalidated";
 
-
   // possible status of event processor
   public enum EventProcessorStatus {
     PAUSED, // event processor is paused because catalog is being reset concurrently
@@ -241,9 +246,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   @VisibleForTesting
   MetastoreEventsProcessor(CatalogServiceCatalog catalog, long startSyncFromId,
-      long pollingFrequencyInSec) {
+      long pollingFrequencyInSec) throws CatalogException {
     Preconditions.checkState(pollingFrequencyInSec > 0);
     this.catalog_ = Preconditions.checkNotNull(catalog);
+    ValidationResult result =
+        hasValidMetastoreConfigs().and(verifyParametersNotFiltered()).apply(this);
+    if (!result.isValid()) {
+      throw new CatalogException(result.getReason().orElse("Event Processor "
+          + "initialization failed during validation check."));
+    }
     lastSyncedEventId_.set(startSyncFromId);
     metastoreEventFactory_ = new MetastoreEventFactory(catalog_, metrics_);
     pollingFrequencyInSec_ = pollingFrequencyInSec;
@@ -288,6 +299,19 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     return eventProcessorStatus_;
   }
 
+  /**
+   * Returns the value for a given config key from Hive Metastore.
+   * @param config Hive configuration name
+   * @param defaultVal Default value to return if config not present in Hive
+   */
+  @VisibleForTesting
+  public String getConfigValueFromMetastore(String config, String defaultVal)
+      throws TException {
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      IMetaStoreClient iMetaStoreClient = metaStoreClient.getHiveClient();
+      return MetaStoreUtil.getMetastoreConfigValue(iMetaStoreClient, config, defaultVal);
+    }
+  }
   /**
    * returns the current value of LastSyncedEventId. This method is not thread-safe and
    * only to be used for testing purposes
@@ -592,7 +616,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    *     instantiated
    */
   public static synchronized ExternalEventsProcessor getInstance(
-      CatalogServiceCatalog catalog, long startSyncFromId, long eventPollingInterval) {
+      CatalogServiceCatalog catalog, long startSyncFromId, long eventPollingInterval)
+      throws CatalogException {
     if (instance != null) {
       return instance;
     }

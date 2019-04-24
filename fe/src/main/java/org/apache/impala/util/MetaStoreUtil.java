@@ -112,6 +112,14 @@ public class MetaStoreUtil {
   }
 
   /**
+   * Return the value set for the given config in the metastore.
+   */
+  public static String getMetastoreConfigValue(
+      IMetaStoreClient client, String config, String defaultVal) throws TException {
+    return client.getConfigValue(config, defaultVal);
+  }
+
+  /**
    * Fetches all partitions for a table in batches, with each batch containing at most
    * 'maxPartsPerRpc' partitions. Returns a List containing all fetched Partitions.
    * Will throw a MetaException if existing partitions are dropped while a fetch is in

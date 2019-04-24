@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.events;
 
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 
 /**
@@ -25,7 +26,8 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
  */
 public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcessor {
   SynchronousHMSEventProcessorForTests(
-      CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec) {
+      CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec)
+          throws CatalogException {
     super(catalog, startSyncFromId, pollingFrequencyInSec);
   }
 

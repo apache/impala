@@ -90,6 +90,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -881,8 +882,11 @@ public class CatalogOpExecutor {
       long newCatalogVersion) {
     if (!catalog_.isExternalEventProcessingEnabled()) return;
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
-    msTbl.putToParameters(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY, catalogServiceId);
-    msTbl.putToParameters(MetastoreEvents.CATALOG_VERSION_PROP_KEY,
+    msTbl.putToParameters(
+        MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+        catalogServiceId);
+    msTbl.putToParameters(
+        MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
         String.valueOf(newCatalogVersion));
   }
 
@@ -3090,17 +3094,21 @@ public class CatalogOpExecutor {
     Preconditions.checkState(msTbl.isSetParameters());
     Map<String, String> tblParams = msTbl.getParameters();
     Preconditions
-        .checkState(tblParams.containsKey(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY),
+        .checkState(tblParams.containsKey(
+            MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey()),
             "Table parameters must have catalog service identifier before "
                 + "adding it to partition parameters");
     Preconditions
-        .checkState(tblParams.containsKey(MetastoreEvents.CATALOG_VERSION_PROP_KEY),
+        .checkState(tblParams.containsKey(
+            MetastoreEventPropertyKey.CATALOG_VERSION.getKey()),
             "Table parameters must contain catalog version before adding "
                 + "it to partition parameters");
-    partition.putToParameters(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY,
-        tblParams.get(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY));
-    partition.putToParameters(MetastoreEvents.CATALOG_VERSION_PROP_KEY,
-        tblParams.get(MetastoreEvents.CATALOG_VERSION_PROP_KEY));
+    partition.putToParameters(
+        MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+        tblParams.get(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey()));
+    partition.putToParameters(
+        MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+        tblParams.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey()));
   }
 
   /**
@@ -3955,16 +3963,17 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Adds the catalog service id and the given catalog version to the database
-   * parameters. No-op if event processing is disabled
+   * Adds the catalog service id and the given catalog version to the database parameters.
+   * No-op if event processing is disabled
    */
   private void addCatalogServiceIdentifiers(
       Db db, String catalogServiceId, long newCatalogVersion) {
     if (!catalog_.isExternalEventProcessingEnabled()) return;
     org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
-    msDb.putToParameters(MetastoreEvents.CATALOG_SERVICE_ID_PROP_KEY, catalogServiceId);
-    msDb.putToParameters(
-        MetastoreEvents.CATALOG_VERSION_PROP_KEY, String.valueOf(newCatalogVersion));
+    msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+        catalogServiceId);
+    msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+        String.valueOf(newCatalogVersion));
   }
 
   private void addDbToCatalogUpdate(Db db, TCatalogUpdateResult result) {
