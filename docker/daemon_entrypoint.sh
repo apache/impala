@@ -18,10 +18,10 @@
 
 # Wrapper script that runs the command-line provided as its arguments after
 # setting up the environment required for the daemon processes to run.
-
-# Set -x for easy of debugging.
-# TODO: remove to reduce verbosity once things are more stable.
-set -x
+#
+# Supported environment variables:
+# JAVA_TOOL_OPTIONS: additional options passed to any embedded JVMs. Can be used, e.g.
+#                    to set a max heap size with JAVA_TOOL_OPTIONS="-Xmx4g".
 
 export IMPALA_HOME=/opt/impala
 

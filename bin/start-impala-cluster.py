@@ -528,7 +528,6 @@ class DockerMiniClusterOperations(object):
                    for src, dst in port_map.iteritems()]
     # Impersonate the current user for operations against the minicluster. This is
     # necessary because the user name inside the container is "root".
-    # TODO: pass in the actual options
     env_args = ["-e", "HADOOP_USER_NAME={0}".format(getpass.getuser()),
                 "-e", "JAVA_TOOL_OPTIONS={0}".format(
                     build_java_tool_options(DEFAULT_IMPALAD_JVM_DEBUG_PORT))]
