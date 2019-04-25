@@ -262,7 +262,6 @@ class ImpylaHS2Connection(ImpalaConnection):
     LOG.info("-- connecting to {0} with impyla".format(self.__host_port))
     host, port = self.__host_port.split(":")
     self.__impyla_conn = impyla.connect(host=host, port=int(port))
-    LOG.info("Conn {0}".format(self.__impyla_conn))
     # Get the default query options for the session before any modifications are made.
     self.__cursor = self.__impyla_conn.cursor()
     self.__cursor.execute("set all")

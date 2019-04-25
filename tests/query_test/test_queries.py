@@ -22,7 +22,7 @@ import re
 from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfDockerizedCluster
+from tests.common.skip import SkipIfEC, SkipIfCatalogV2
 from tests.common.test_dimensions import (
     create_uncompressed_text_dimension, extend_exec_option_dimension,
     create_beeswax_hs2_dimension, hs2_parquet_constraint)
@@ -170,6 +170,7 @@ class TestQueriesTextTables(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/strict-mode-abort', vector)
 
+  @SkipIfCatalogV2.data_sources_unsupported()
   def test_data_source_tables(self, vector):
     self.run_test_case('QueryTest/data-source-tables', vector)
 

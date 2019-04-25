@@ -28,4 +28,4 @@ EXPOSE 25000
 ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
      "-abort_on_config_error=false", "-state_store_host=statestored",\
      "-catalog_service_host=catalogd", "-is_executor=false", \
-     "-mem_limit_includes_jvm=true"]
+     "-mem_limit_includes_jvm=true", "-use_local_catalog=true"]

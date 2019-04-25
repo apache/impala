@@ -473,15 +473,19 @@ public class JdbcTest {
     addTestTable("create table default.jdbc_column_comments_test (" +
          "a int comment 'column comment') comment 'table comment'");
 
-    // If a table is not yet loaded before getTables(), then the 'remarks' field
-    // is left empty. getColumns() loads the table metadata, so later getTables()
-    // calls will return 'remarks' correctly.
     ResultSet rs = con_.getMetaData().getTables(
         null, "default", "jdbc_column_comments_test", null);
     assertTrue(rs.next());
     assertEquals("Incorrect table name", "jdbc_column_comments_test",
         rs.getString("TABLE_NAME"));
-    assertEquals("Incorrect table comment", "", rs.getString("REMARKS"));
+
+    String remarks = rs.getString("REMARKS");
+    // IMPALA-7587: with catalog V2, if a table is not yet loaded before
+    // getTables(), then the 'remarks' field is left empty. getColumns()
+    // loads the table metadata, so later getTables() calls will return
+    // 'remarks' correctly.
+    assertTrue("Incorrect table comment: " + remarks,
+        remarks.equals("") || remarks.equals("table comment"));
 
     rs = con_.getMetaData().getColumns(
         null, "default", "jdbc_column_comments_test", null);

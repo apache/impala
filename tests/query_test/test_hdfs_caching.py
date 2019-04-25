@@ -26,7 +26,7 @@ from tests.common.environ import build_flavor_timeout, IS_DOCKERIZED_TEST_CLUSTE
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-    SkipIfLocal, SkipIfEC, SkipIfDockerizedCluster)
+    SkipIfLocal, SkipIfEC, SkipIfDockerizedCluster, SkipIfCatalogV2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
@@ -179,6 +179,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 @SkipIfADLS.caching
 @SkipIfIsilon.caching
 @SkipIfLocal.caching
+@SkipIfCatalogV2.hdfs_caching_ddl_unsupported()
 class TestHdfsCachingDdl(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

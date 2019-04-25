@@ -213,3 +213,53 @@ class SkipIfCatalogV2:
     return pytest.mark.skipif(
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="Test is specific to old implementation of catalog.")
+
+  # TODO: IMPALA-8486: fix invalidation or update tests to reflect expected behaviour.
+  @classmethod
+  def lib_cache_invalidation_broken(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-8486: LibCache isn't invalidated by function DDL.")
+
+  # TODO: IMPALA-8458: fix bug or update tests to reflect expected behaviour.
+  @classmethod
+  def alter_column_stats_broken(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-8458: setting column stats without setting NDV is no-op.")
+
+  # TODO: IMPALA-7131: add support or update tests to reflect expected behaviour.
+  @classmethod
+  def data_sources_unsupported(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-7131: data sources not supported.")
+
+  # TODO: IMPALA-7538: add support or update tests to reflect expected behaviour.
+  @classmethod
+  def hdfs_caching_ddl_unsupported(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-7538: HDFS caching DDL not supported.")
+
+  # TODO: IMPALA-8489: fix this bug.
+  @classmethod
+  def impala_8489(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-8489: TestRecoverPartitions.test_post_invalidate "
+             "IllegalStateException.")
+
+  # TODO: IMPALA-8459: fix this bug.
+  @classmethod
+  def impala_8459(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-8459: some kudu DDL is broken for local catalog")
+
+  # TODO: IMPALA-7539: fix this bug.
+  @classmethod
+  def impala_7539(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="IMPALA-7539: support HDFS permission checks for LocalCatalog")

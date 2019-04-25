@@ -19,7 +19,7 @@
 
 import os
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal, SkipIfS3
+from tests.common.skip import SkipIfLocal, SkipIfS3, SkipIfCatalogV2
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_S3
@@ -246,6 +246,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "duplicate partition key values." % FQ_TBL_NAME
 
   @SkipIfLocal.hdfs_client
+  @SkipIfCatalogV2.impala_8489()
   def test_post_invalidate(self, vector, unique_database):
     """Test that RECOVER PARTITIONS works correctly after invalidate."""
     TBL_NAME = "test_recover_partitions"

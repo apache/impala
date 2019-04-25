@@ -22,4 +22,5 @@ FROM impala_base
 EXPOSE 25020
 
 ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/catalogd",\
-     "-abort_on_config_error=false", "-state_store_host=statestored"]
+     "-abort_on_config_error=false", "-state_store_host=statestored",\
+     "-catalog_topic_mode=minimal", "-hms_event_polling_interval_s=1"]

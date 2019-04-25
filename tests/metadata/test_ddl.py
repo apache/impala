@@ -25,7 +25,8 @@ from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal
+from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
+                               SkipIfCatalogV2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import (
     WAREHOUSE,
@@ -420,12 +421,16 @@ class TestDdlStatements(TestDdlBase):
         file_data='1984')
     self.run_test_case('QueryTest/alter-table', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
-    # The following tests require HDFS caching which is supported only in the HDFS
-    # filesystem.
-    if IS_HDFS:
-      self.run_test_case('QueryTest/alter-table-hdfs-caching', vector,
-          use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
+  @SkipIf.not_hdfs
+  @SkipIfLocal.hdfs_client
+  @SkipIfCatalogV2.hdfs_caching_ddl_unsupported()
+  @UniqueDatabase.parametrize(sync_ddl=True, num_dbs=2)
+  def test_alter_table_hdfs_caching(self, vector, unique_database):
+    self.run_test_case('QueryTest/alter-table-hdfs-caching', vector,
+        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+
+  @SkipIfCatalogV2.alter_column_stats_broken()
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_alter_set_column_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
@@ -797,6 +802,7 @@ class TestLibCache(TestDdlBase):
   # Run serially because this test inspects global impalad metrics.
   # TODO: The metrics checks could be relaxed to enable running this test in
   # parallel, but that might need a more general wait_for_metric_value().
+  @SkipIfCatalogV2.data_sources_unsupported()
   @pytest.mark.execute_serially
   def test_create_drop_data_src(self, vector, unique_database):
     """This will create, run, and drop the same data source repeatedly, exercising

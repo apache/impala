@@ -84,13 +84,17 @@ class TestDdlBase(ImpalaTestSuite):
     match = False
     properties = dict()
     for row in result.data:
-      if section_name in row:
-        match = True
-      elif match:
-        row = row.split('\t')
-        if row[1] == 'NULL':
+      fields = row.split("\t")
+      if fields[0] != '':
+        # Start of new section.
+        if match:
+          # Finished processing matching section.
           break
-        properties[row[1].rstrip()] = row[2].rstrip()
+        match = section_name in fields[0]
+      elif match:
+        if fields[1] == 'NULL':
+          break
+        properties[fields[1].rstrip()] = fields[2].rstrip()
     return properties
 
   def _get_property(self, property_name, name, is_db=False):

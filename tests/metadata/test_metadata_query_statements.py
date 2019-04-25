@@ -23,7 +23,8 @@ import re
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfIsilon, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal
+from tests.common.skip import (SkipIfIsilon, SkipIfS3, SkipIfABFS, SkipIfADLS,
+                               SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -134,6 +135,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         compare=compare_describe_formatted)
 
   @pytest.mark.execute_serially # due to data src setup/teardown
+  @SkipIfCatalogV2.data_sources_unsupported()
   def test_show_data_sources(self, vector):
     try:
       self.__create_data_sources()

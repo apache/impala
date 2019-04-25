@@ -919,7 +919,25 @@ class ImpalaTestSuite(BaseTestSuite):
       except Exception:
         time.sleep(0.2)
         continue
-    raise Exception("Table {0} didn't show up after {1}s", db_name, timeout_s)
+    raise Exception("DB {0} didn't show up after {1}s", db_name, timeout_s)
+
+  def wait_for_table_to_appear(self, db_name, table_name, timeout_s):
+    """Wait until the table with 'table_name' in 'db_name' is present in the
+    impalad's local catalog. Fail after timeout_s if the doesn't appear."""
+    start_time = time.time()
+    while time.time() - start_time < timeout_s:
+      try:
+        # This will throw an exception if the table is not present.
+        self.client.execute("describe `{db_name}`.`{table_name}`".format(
+                            db_name=db_name, table_name=table_name))
+        return
+      except Exception, ex:
+        print str(ex)
+        time.sleep(0.2)
+        continue
+    raise Exception("Table {0}.{1} didn't show up after {2}s", db_name, table_name,
+                    timeout_s)
+
 
   def assert_impalad_log_contains(self, level, line_regex, expected_count=1):
     """

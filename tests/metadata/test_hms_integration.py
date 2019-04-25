@@ -84,9 +84,13 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     # Creating a table with the same name using 'IF NOT EXISTS' in Impala should
     # not fail
     self.client.execute("create table if not exists hms_sanity_db.test_tbl (a int)")
-    # The table should not appear in the catalog unless invalidate metadata is
-    # executed
-    assert 'test_tbl' not in self.client.execute("show tables in hms_sanity_db").data
+    # The table should not appear in the catalog for catalog_v1 unless invalidate
+    # metadata is executed.
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      self.wait_for_table_to_appear("hms_sanity_db", "test_tbl", 10)
+      assert 'test_tbl' in self.client.execute("show tables in hms_sanity_db").data
+    else:
+      assert 'test_tbl' not in self.client.execute("show tables in hms_sanity_db").data
     self.client.execute("invalidate metadata hms_sanity_db.test_tbl")
     assert 'test_tbl' in self.client.execute("show tables in hms_sanity_db").data
 

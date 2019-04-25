@@ -24,7 +24,7 @@ from subprocess import call, check_call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfCatalogV2
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
@@ -49,7 +49,7 @@ class TestUdfBase(ImpalaTestSuite):
     for impalad in impala_cluster.impalads:
       client = impalad.service.create_beeswax_client()
       result = self.execute_query_expect_success(client, query, exec_options)
-      assert result.data == expected
+      assert result.data == expected, impalad
 
   def _load_functions(self, template, vector, database, location):
     queries = template.format(database=database, location=location)
@@ -507,6 +507,7 @@ class TestUdfTargeted(TestUdfBase):
   def test_libs_with_same_filenames(self, vector, unique_database):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector, use_db=unique_database)
 
+  @SkipIfCatalogV2.lib_cache_invalidation_broken()
   def test_udf_update_via_drop(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Dropping
     the function should remove the binary from the local cache."""
@@ -540,6 +541,7 @@ class TestUdfTargeted(TestUdfBase):
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self._run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
 
+  @SkipIfCatalogV2.lib_cache_invalidation_broken()
   def test_udf_update_via_create(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Creating a new function
     from the library should refresh the cache."""

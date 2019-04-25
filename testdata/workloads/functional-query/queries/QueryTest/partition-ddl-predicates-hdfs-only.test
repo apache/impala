@@ -16,23 +16,23 @@ alter table p1_hdfs add partition (j=NULL,k=NULL);
 insert into p1_hdfs partition (j, k) values (100, 1, "a"), (200, 1, "b"), (300, 1, "c");
 ====
 ---- QUERY
-alter table p1_hdfs partition (j<2, k in ("b", "c")) set cached in 'testPool'
+alter table p1_hdfs partition (j<2, k in ("b", "c")) set fileformat parquet
 ---- RESULTS
-'Cached 2 partition(s).'
+'Updated 2 partition(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-alter table p1_hdfs partition (j<2, j>0, k<>"d") set uncached
+alter table p1_hdfs partition (j<2, j>0, k<>"d") set fileformat avro
 ---- RESULTS
-'Uncached 2 partition(s).'
+'Updated 3 partition(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-alter table p1_hdfs partition (j=3 or j=2, k like "%") set uncached
+alter table p1_hdfs partition (j=3 or j=2, k like "%") set fileformat parquet
 ---- RESULTS
-'Uncached 0 partition(s).'
+'Updated 3 partition(s).'
 ---- TYPES
 STRING
 ====

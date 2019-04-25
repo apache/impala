@@ -37,9 +37,10 @@ import time
 from datetime import datetime
 from pytz import utc
 
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfCatalogV2
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -185,11 +186,14 @@ class TestKuduOperations(KuduTestSuite):
       session.apply(op)
     session.flush()
 
-    # Scanning should result in an error
+    # Scanning should result in an error with Catalog V1, since the metadata is cached.
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert False
+      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
+      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is type INT but Impala expected STRING. The table "\
           "metadata in Impala may be outdated and need to be refreshed."
       assert expected_error in str(e)
@@ -229,8 +233,11 @@ class TestKuduOperations(KuduTestSuite):
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert False
+      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
+      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is nullable but Impala expected it to be "\
           "not nullable. The table metadata in Impala may be outdated and need to be "\
           "refreshed."
@@ -271,8 +278,11 @@ class TestKuduOperations(KuduTestSuite):
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert False
+      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
+      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+          "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is not nullable but Impala expected it to be "\
           "nullable. The table metadata in Impala may be outdated and need to be "\
           "refreshed."
@@ -305,12 +315,16 @@ class TestKuduOperations(KuduTestSuite):
     session.apply(op)
     session.flush()
 
-    # Only the first col is visible to Impala. Impala will not know about the missing
-    # column, so '*' is expanded to known columns. This doesn't have a separate check
-    # because the query can proceed and checking would need to fetch metadata from the
-    # Kudu master, which is what REFRESH is for.
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-    assert cursor.fetchall() == [(0, )]
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      # Changes in Kudu should be immediately visible to Impala with Catalog V2.
+      assert cursor.fetchall() == [(0, 0)]
+    else:
+      # Only the first col is visible to Impala. Impala will not know about the missing
+      # column, so '*' is expanded to known columns. This doesn't have a separate check
+      # because the query can proceed and checking would need to fetch metadata from the
+      # Kudu master, which is what REFRESH is for.
+      assert cursor.fetchall() == [(0, )]
 
     # After a REFRESH both cols should be visible
     cursor.execute("REFRESH %s.foo" % (unique_database))
@@ -1062,6 +1076,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
              ("c", "string", "", "false", "true", "", "AUTO_ENCODING",
               "DEFAULT_COMPRESSION", "0")]
 
+  @SkipIfCatalogV2.impala_8459()
   def test_delete_external_kudu_table(self, cursor, kudu_client):
     """Check that Impala can recover from the case where the underlying Kudu table of
         an external table is dropped using the Kudu client.
@@ -1088,6 +1103,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("SHOW TABLES")
       assert (impala_table_name,) not in cursor.fetchall()
 
+  @SkipIfCatalogV2.impala_8459()
   def test_delete_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table
         has been dropped externally."""
