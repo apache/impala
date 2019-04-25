@@ -285,8 +285,10 @@ class DirectMetaProvider implements MetaProvider {
   private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
     Path partDir = new Path(msPartition.getSd().getLocation());
+    // TODO(todd): The table property to disable recursive loading is not supported
+    // by this code path. However, DirectMetaProvider is not yet a supported feature.
     FileMetadataLoader fml = new FileMetadataLoader(partDir,
-        /* recursive= */false,
+        /* recursive= */BackendConfig.INSTANCE.recursivelyListPartitions(),
         /* oldFds= */Collections.emptyList(),
         hostIndex);
 

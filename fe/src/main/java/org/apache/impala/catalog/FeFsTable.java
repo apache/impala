@@ -210,6 +210,21 @@ public interface FeFsTable extends FeTable {
     }
 
     /**
+     * Returns true if the file contents within a partition should be recursively listed.
+     * Reconciles the Impalad-wide --recursively_list_partitions and the
+     * TBL_PROP_DISABLE_RECURSIVE_LISTING table property
+     */
+    public static boolean shouldRecursivelyListPartitions(FeFsTable table) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+      String propVal = msTbl.getParameters().get(
+          HdfsTable.TBL_PROP_DISABLE_RECURSIVE_LISTING);
+      if (propVal == null) return BackendConfig.INSTANCE.recursivelyListPartitions();
+      // TODO(todd): we should detect if this flag is set on an ACID table and
+      // give some kind of error (we _must_ recursively list such tables)
+      return !Boolean.parseBoolean(propVal);
+    }
+
+    /**
      * Returns an estimated row count for the given number of file bytes. The row count is
      * extrapolated using the table-level row count and file bytes statistics.
      * Returns zero only if the given file bytes is zero.

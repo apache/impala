@@ -273,6 +273,9 @@ DEFINE_bool_hidden(enable_parquet_page_index_writing_debug_only, false, "If true
 DEFINE_bool_hidden(unlock_mt_dop, false,
     "(Experimental) If true, allow specifying mt_dop for all queries.");
 
+DEFINE_bool_hidden(recursively_list_partitions, true,
+    "If true, recursively list the content of partition directories.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

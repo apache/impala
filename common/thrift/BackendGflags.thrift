@@ -127,4 +127,6 @@ struct TBackendGflags {
   50: required string ranger_app_id
 
   51: required string authorization_provider
+
+  52: required bool recursively_list_partitions
 }

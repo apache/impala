@@ -127,6 +127,13 @@ public class HdfsTable extends Table implements FeFsTable {
   public static final String TBL_PROP_ENABLE_STATS_EXTRAPOLATION =
       "impala.enable.stats.extrapolation";
 
+  // Similar to above: a table property that overwrites --recursively_list_partitions
+  // for a specific table. This is an escape hatch in case it turns out that someone
+  // was relying on the previous non-recursive behavior, even though it's known to
+  // be inconsistent with modern versions of Spark, Hive, etc.
+  public static final String TBL_PROP_DISABLE_RECURSIVE_LISTING =
+      "impala.disable.recursive.listing";
+
   // Average memory requirements (in bytes) for storing the metadata of a partition.
   private static final long PER_PARTITION_MEM_USAGE_BYTES = 2048;
 
@@ -560,7 +567,8 @@ public class HdfsTable extends Table implements FeFsTable {
     Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
     for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
-      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(), /*recursive=*/false,
+      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
+          Utils.shouldRecursivelyListPartitions(this),
           oldFds, hostIndex_);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.

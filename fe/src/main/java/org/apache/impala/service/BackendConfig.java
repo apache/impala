@@ -145,6 +145,10 @@ public class BackendConfig {
     return backendCfg_.unlock_mt_dop;
   }
 
+  public boolean recursivelyListPartitions() {
+    return backendCfg_.recursively_list_partitions;
+  }
+
   public String getRangerServiceType() {
     return backendCfg_.getRanger_service_type();
   }
