@@ -7,3 +7,32 @@ datasets/
 
 Where SF is the scale factor controlling data size. This allows for scaling the same schema to
 different sizes based on the target test environment.
+
+The schema template SQL files have the following format:
+
+  The goal is to provide a single place to define a table + data files
+  and have the schema and data load statements generated for each combination of file
+  format, compression, etc. The way this works is by specifying how to create a
+  'base table'. The base table can be used to generate tables in other file formats
+  by performing the defined INSERT / SELECT INTO statement. Each new table using the
+  file format/compression combination needs to have a unique name, so all the
+  statements are pameterized on table name.
+  The template file is read in by the 'generate_schema_statements.py' script to
+  to generate all the schema for the Imapla benchmark tests.
+
+  Each table is defined as a new section in the file with the following format:
+  ====
+  --- DATASET <- Start new section
+  Data set name - Used to group sets of tables together
+  ---- <- End sub-section
+  Base table name
+  ---- <- End sub-section
+  CREATE TABLE statement - Statement to drop and create a table
+  ---- <- End sub-section
+  INSERT/SELECT * - The INSERT/SELECT * command for loading from the base table
+  ---- <- End sub-section
+  Parquet loading code executed by bash.
+  ---- <- End sub-section
+  LOAD from LOCAL - How to load data for the the base table
+  ---- <- End sub-section
+  ANALYZE TABLE ... COMPUTE STATISTICS - Compute statistics statement for table

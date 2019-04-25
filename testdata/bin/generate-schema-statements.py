@@ -119,7 +119,7 @@ parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
                   default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
 parser.add_option("-w", "--workload", dest="workload",
-                  help="The workload to generate schema for: tpch, hive-benchmark, ...")
+                  help="The workload to generate schema for: tpch, tpcds, ...")
 parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
                   help="An optional scale factor to generate the schema for")
 parser.add_option("-f", "--force_reload", dest="force_reload", action="store_true",
@@ -622,15 +622,12 @@ def generate_statements(output_name, test_vectors, sections,
           file_format == 'kudu'
 
       hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
-      # hdfs file names for hive-benchmark and functional datasets are stored
+      # hdfs file names for functional datasets are stored
       # directly under /test-warehouse
       # TODO: We should not need to specify the hdfs file path in the schema file.
       # This needs to be done programmatically.
-      if data_set in ['hive-benchmark', 'functional']:
+      if data_set == 'functional':
         hdfs_location = hdfs_location.split('.')[-1]
-      # hive does not allow hyphenated table names.
-      if data_set == 'hive-benchmark':
-        db_name = '{0}{1}'.format('hivebenchmark', options.scale_factor)
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       # Empty tables (tables with no "LOAD" sections) are assumed to be used for insert

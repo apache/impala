@@ -1,4 +1,0 @@
-file_format: text,seq,rc,avro
-dataset: hive-benchmark
-compression_codec: none,def,gzip,bzip,snap,lzo
-compression_type: none,block,record

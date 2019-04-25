@@ -1,3 +1,0 @@
-# Manually created file.
-file_format: text, dataset: hive-benchmark, compression_codec: none, compression_type: none
-file_format: seq, dataset: hive-benchmark, compression_codec: snap, compression_type: block

@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# For details on this file format please see hive-benchmark_schema_template.sql
+# For details on this file format please see ../README
 ====
 ---- DATASET
 tpcds
