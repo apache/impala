@@ -21,6 +21,7 @@ import pytest
 import re
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfIsilon, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import ALL_NODES_ONLY
@@ -154,7 +155,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
-  @pytest.mark.execute_serially # because of invalidate metadata
+  @pytest.mark.execute_serially  # because of use of hardcoded database
   def test_describe_db(self, vector):
     self.__test_describe_db_cleanup()
     try:
@@ -167,8 +168,12 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                           "location \"" + get_fs_path("/test2.db") + "\"")
       self.run_stmt_in_hive("create database hive_test_desc_db comment 'test comment' "
                            "with dbproperties('pi' = '3.14', 'e' = '2.82')")
-      self.run_stmt_in_hive("alter database hive_test_desc_db set owner user test")
-      self.client.execute("invalidate metadata")
+      if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+        # Using local catalog + HMS event processor - wait until the database shows up.
+        self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
+      else:
+        # Using traditional catalog - need to invalidate to pick up hive-created db.
+        self.client.execute("invalidate metadata")
       self.run_test_case('QueryTest/describe-db', vector)
     finally:
       self.__test_describe_db_cleanup()

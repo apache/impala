@@ -58,16 +58,15 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
     # Make sure the metastore is running even if the test aborts somewhere unexpected
     # before restarting the metastore itself.
     cls.run_hive_server()
-    cls.client.execute("invalidate metadata")
     super(TestHiveMetaStoreFailure, cls).teardown_class()
 
   @pytest.mark.execute_serially
   def test_hms_service_dies(self, vector):
     """Regression test for IMPALA-823 to verify the catalog service works properly when
     HMS connections fail"""
-    # Force all the tables to be reloaded and then kill the hive metastore.
+    # Force the tables to be uncached and then kill the hive metastore.
     tbl_name = "functional.alltypes"
-    self.client.execute("invalidate metadata")
+    self.client.execute("invalidate metadata %s" % tbl_name)
     kill_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/kill-hive-server.sh')
     check_call([kill_cmd], close_fds=True)
 

@@ -29,6 +29,7 @@ import random
 import string
 from subprocess import call
 
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
@@ -62,7 +63,12 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     self.run_stmt_in_hive("drop database if exists hms_sanity_db cascade")
     self.run_stmt_in_hive("create database hms_sanity_db")
     # Make sure Impala's metadata is in sync.
-    self.client.execute("invalidate metadata")
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      # Using local catalog + HMS event processor - wait until the database shows up.
+      self.wait_for_db_to_appear("hms_sanity_db", timeout_s=30)
+    else:
+      # Using traditional catalog - need to invalidate to pick up hive-created db.
+      self.client.execute("invalidate metadata")
     # Creating a database with the same name using 'IF NOT EXISTS' in Impala should
     # not fail
     self.client.execute("create database if not exists hms_sanity_db")

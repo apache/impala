@@ -196,3 +196,19 @@ class SkipIfDockerizedCluster:
       reason="IMPALA-4865: JVM hits OOM for large string. Heap is smaller in docker.")
   insert_acls = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
       reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")
+
+
+class SkipIfCatalogV2:
+  """Expose decorators as methods so that is_catalog_v2_cluster() can be evaluated lazily
+  when needed, instead of whenever this module is imported."""
+  @classmethod
+  def stats_pulling_disabled(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="Local catalog does not use incremental stats pulling.")
+
+  @classmethod
+  def catalog_v1_test(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="Test is specific to old implementation of catalog.")

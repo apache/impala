@@ -26,6 +26,9 @@ test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
 IMPALA_HOME = os.environ.get("IMPALA_HOME", "")
 IMPALA_REMOTE_URL = os.environ.get("IMPALA_REMOTE_URL", "")
 
+# Default web UI URL for local test cluster
+DEFAULT_LOCAL_WEB_UI_URL = "http://localhost:25000"
+
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.
 build_type_arg_regex = re.compile(r'--build_type=(\w+)', re.I)
@@ -118,7 +121,7 @@ class ImpalaTestClusterFlagsDetector:
       LOG.debug("Unable to read .cmake_build_type file, fetching build flags from " +
               "web ui on localhost")
       build_type, build_shared_libs = ImpalaTestClusterFlagsDetector.detect_using_web_ui(
-          "http://localhost:25000")
+          DEFAULT_LOCAL_WEB_UI_URL)
 
     library_link_type = LinkTypes.STATIC if build_shared_libs == "off"\
                    else LinkTypes.DYNAMIC
@@ -186,6 +189,7 @@ class ImpalaTestClusterProperties(object):
     self._build_flavor = build_flavor
     self._library_link_type = library_link_type
     self._local_or_remote_build = local_or_remote_build
+    self._runtime_flags = None  # Lazily populated to avoid unnecessary web UI calls.
 
   @property
   def build_flavor(self):
@@ -261,13 +265,37 @@ class ImpalaTestClusterProperties(object):
     """
     return self._local_or_remote_build == REMOTE_BUILD
 
+  def _get_flags_from_web_ui(self, impala_url):
+    if self._runtime_flags is not None:
+      return self._runtime_flags
+    """Return the command line flags from the impala web UI. Returns a Python map with
+    the flag name as the key and a dictionary of flag properties as the value."""
+    response = requests.get(impala_url + "/varz?json")
+    assert response.status_code == requests.codes.ok,\
+            "Offending url: " + impala_url
+    assert "application/json" in response.headers['Content-Type']
+    self._runtime_flags = {}
+    for flag_dict in json.loads(response.text)["flags"]:
+      self._runtime_flags[flag_dict["name"]] = flag_dict
+    return self._runtime_flags
+
+  def is_catalog_v2_cluster(self):
+    """Whether we use CATALOG_V2 options, including local catalog and HMS notifications.
+    For now, assume that --use_local_catalog=true implies that the others are enabled."""
+    flags = self._get_flags_from_web_ui(web_ui_url)
+    key = "use_local_catalog"
+    # --use_local_catalog is hidden so does not appear in JSON if disabled.
+    return key in flags and flags[key]["current"] == "true"
+
 
 if IMPALA_REMOTE_URL:
+  web_ui_url = IMPALA_REMOTE_URL
   build_flavor, link_type =\
       ImpalaTestClusterFlagsDetector.detect_using_web_ui(IMPALA_REMOTE_URL)
   IMPALA_TEST_CLUSTER_PROPERTIES =\
       ImpalaTestClusterProperties(build_flavor, link_type, REMOTE_BUILD)
 else:
+  web_ui_url = DEFAULT_LOCAL_WEB_UI_URL
   build_flavor, link_type =\
       ImpalaTestClusterFlagsDetector.detect_using_build_root_or_web_ui(IMPALA_HOME)
   IMPALA_TEST_CLUSTER_PROPERTIES =\

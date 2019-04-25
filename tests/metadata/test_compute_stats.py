@@ -18,9 +18,11 @@
 import pytest
 from subprocess import check_call
 
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
+    SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -47,9 +49,28 @@ class TestComputeStats(ImpalaTestSuite):
   @SkipIfS3.eventually_consistent
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats', vector, unique_database)
+
+  @SkipIfLocal.hdfs_blocks
+  @SkipIfS3.eventually_consistent
+  def test_compute_stats_avro(self, vector, unique_database):
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      # IMPALA-7308: changed behaviour of various Avro edge cases significantly in the
+      # local catalog - the expected behaviour is different.
+      self.run_test_case('QueryTest/compute-stats-avro-catalog-v2', vector,
+                         unique_database)
+    else:
+      self.run_test_case('QueryTest/compute-stats-avro', vector, unique_database)
+
+  @SkipIfLocal.hdfs_blocks
+  @SkipIfS3.eventually_consistent
+  def test_compute_stats_decimal(self, vector, unique_database):
     # Test compute stats on decimal columns separately so we can vary between platforms
     # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
+
+  @SkipIfLocal.hdfs_blocks
+  @SkipIfS3.eventually_consistent
+  def test_compute_stats_date(self, vector, unique_database):
     # Test compute stats on date columns separately.
     self.run_test_case('QueryTest/compute-stats-date', vector, unique_database)
 
@@ -142,6 +163,7 @@ class TestComputeStats(ImpalaTestSuite):
     assert("1\tpval\t8" in show_result.data[0])
 
   @SkipIfS3.eventually_consistent
+  @SkipIfCatalogV2.stats_pulling_disabled()
   def test_pull_stats_profile(self, vector, unique_database):
     """Checks that the frontend profile includes metrics when computing
        incremental statistics.

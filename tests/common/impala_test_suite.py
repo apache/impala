@@ -883,6 +883,20 @@ class ImpalaTestSuite(BaseTestSuite):
                     actual_state))
     return actual_state
 
+  def wait_for_db_to_appear(self, db_name, timeout_s):
+    """Wait until the database with 'db_name' is present in the impalad's local catalog.
+    Fail after timeout_s if the doesn't appear."""
+    start_time = time.time()
+    while time.time() - start_time < timeout_s:
+      try:
+        # This will throw an exception if the database is not present.
+        self.client.execute("describe database `{db_name}`".format(db_name=db_name))
+        return
+      except Exception:
+        time.sleep(0.2)
+        continue
+    raise Exception("Table {0} didn't show up after {1}s", db_name, timeout_s)
+
   def assert_impalad_log_contains(self, level, line_regex, expected_count=1):
     """
     Convenience wrapper around assert_log_contains for impalad logs.

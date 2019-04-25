@@ -21,7 +21,7 @@ describe database extended hive_test_desc_db
 ---- RESULTS
 'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
 'Parameter: ','',''
-'','test','USER'
+'','$USER','USER'
 'Owner: ','',''
 '','e','2.82'
 '','pi','3.14'

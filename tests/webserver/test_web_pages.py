@@ -15,8 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
-from tests.common.environ import ImpalaTestClusterFlagsDetector
+from tests.common.environ import (IMPALA_TEST_CLUSTER_PROPERTIES,
+    ImpalaTestClusterFlagsDetector)
 from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -53,6 +53,7 @@ class TestWebPage(ImpalaTestSuite):
   # one with it.
   TEST_PORTS_WITHOUT_SS = ["25000", "25020"]
   TEST_PORTS_WITH_SS = ["25000", "25010", "25020"]
+  IMPALAD_TEST_PORT = ["25000"]
   CATALOG_TEST_PORT = ["25020"]
 
   def test_get_root_url(self):
@@ -287,14 +288,22 @@ class TestWebPage(ImpalaTestSuite):
   def __test_catalog_object(self, db_name, tbl_name):
     """Tests the /catalog_object endpoint for the given db/table. Runs
     against an unloaded as well as a loaded table."""
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      impalad_expected_str = \
+          "UnsupportedOperationException: LocalCatalog.getTCatalogObject"
+    else:
+      impalad_expected_str = tbl_name
+    obj_url = self.CATALOG_OBJECT_URL + \
+        "?object_type=TABLE&object_name={0}.{1}".format(db_name, tbl_name)
     self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
-    self.get_and_check_status(self.CATALOG_OBJECT_URL +
-      "?object_type=TABLE&object_name=%s.%s" % (db_name, tbl_name), tbl_name,
-      ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+    self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+    self.get_and_check_status(obj_url, impalad_expected_str,
+        ports_to_test=self.IMPALAD_TEST_PORT)
     self.client.execute("select count(*) from %s.%s" % (db_name, tbl_name))
-    self.get_and_check_status(self.CATALOG_OBJECT_URL +
-      "?object_type=TABLE&object_name=%s.%s" % (db_name, tbl_name), tbl_name,
-      ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+
+    self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+    self.get_and_check_status(obj_url, impalad_expected_str,
+        ports_to_test=self.IMPALAD_TEST_PORT)
 
   def __test_table_metrics(self, db_name, tbl_name, metric):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))

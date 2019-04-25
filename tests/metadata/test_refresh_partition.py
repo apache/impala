@@ -14,6 +14,7 @@
 from subprocess import check_call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -133,7 +134,11 @@ class TestRefreshPartition(ImpalaTestSuite):
         % table_name)
     # Make sure its still shows the same result before refreshing
     result = self.client.execute("select count(*) from %s" % table_name)
-    assert result.data == [str('0')]
+    valid_counts = [0]
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      # HMS notifications may pick up added partition racily.
+      valid_counts.append(1)
+    assert int(result.data[0]) in valid_counts
 
     self.client.execute('refresh %s partition (y=333, z=5309)' % table_name)
     assert '2\t333\t5309' == self.client.execute(
