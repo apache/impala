@@ -118,9 +118,6 @@ public class HdfsTable extends Table implements FeFsTable {
   // Number of times to retry fetching the partitions from the HMS should an error occur.
   private final static int NUM_PARTITION_FETCH_RETRIES = 5;
 
-  // Table property key for skip.header.line.count
-  public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
-
   // Table property key for overriding the Impalad-wide --enable_stats_extrapolation
   // setting for a specific table. By default, tables do not have the property set and
   // rely on the Impalad-wide --enable_stats_extrapolation flag.
@@ -1123,45 +1120,6 @@ public class HdfsTable extends Table implements FeFsTable {
         p.setNumRows(getNumRows());
       }
     }
-  }
-
-  /**
-   * Returns whether the table has the 'skip.header.line.count' property set.
-   */
-  private boolean hasSkipHeaderLineCount() {
-    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
-    if (msTbl == null) return false;
-    return msTbl.getParameters().containsKey(TBL_PROP_SKIP_HEADER_LINE_COUNT);
-  }
-
-  @Override // FeTable
-  public int parseSkipHeaderLineCount(StringBuilder error) {
-    if (!hasSkipHeaderLineCount()) return 0;
-    return parseSkipHeaderLineCount(getMetaStoreTable().getParameters(), error);
-  }
-
-  /**
-   * Parses and returns the value of the 'skip.header.line.count' table property. The
-   * caller must ensure that the property is contained in the 'tblProperties' map. If
-   * parsing fails or a value < 0 is found, the error parameter is updated to contain an
-   * error message.
-   */
-  public static int parseSkipHeaderLineCount(Map<String, String> tblProperties,
-      StringBuilder error) {
-    Preconditions.checkState(tblProperties != null);
-    Preconditions.checkState(tblProperties.containsKey(TBL_PROP_SKIP_HEADER_LINE_COUNT));
-    // Try to parse.
-    String string_value = tblProperties.get(TBL_PROP_SKIP_HEADER_LINE_COUNT);
-    int skipHeaderLineCount = 0;
-    String error_msg = String.format("Invalid value for table property %s: %s (value " +
-        "must be an integer >= 0)", TBL_PROP_SKIP_HEADER_LINE_COUNT, string_value);
-    try {
-      skipHeaderLineCount = Integer.parseInt(string_value);
-    } catch (NumberFormatException exc) {
-      error.append(error_msg);
-    }
-    if (skipHeaderLineCount < 0) error.append(error_msg);
-    return skipHeaderLineCount;
   }
 
   /**

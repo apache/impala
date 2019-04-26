@@ -520,12 +520,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public int parseSkipHeaderLineCount(StringBuilder error) {
-    // TODO Auto-generated method stub
-    return 0;
-  }
-
-  @Override
   public ListMap<TNetworkAddress> getHostIndex() {
     return hostIndex_;
   }

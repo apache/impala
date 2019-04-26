@@ -182,13 +182,13 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    */
   public static void analyzeSkipHeaderLineCount(FeTable table,
       Map<String, String> tblProperties) throws AnalysisException {
-    if (tblProperties.containsKey(HdfsTable.TBL_PROP_SKIP_HEADER_LINE_COUNT)) {
+    if (tblProperties.containsKey(FeFsTable.Utils.TBL_PROP_SKIP_HEADER_LINE_COUNT)) {
       if (table != null && !(table instanceof FeFsTable)) {
         throw new AnalysisException(String.format("Table property " +
             "'skip.header.line.count' is only supported for HDFS tables."));
       }
       StringBuilder error = new StringBuilder();
-      HdfsTable.parseSkipHeaderLineCount(tblProperties, error);
+      FeFsTable.Utils.parseSkipHeaderLineCount(tblProperties, error);
       if (error.length() > 0) throw new AnalysisException(error.toString());
     }
   }

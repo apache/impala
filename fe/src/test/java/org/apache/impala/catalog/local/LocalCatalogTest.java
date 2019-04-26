@@ -330,4 +330,22 @@ public class LocalCatalogTest {
     assertEquals(t.getColumn("tinyint_col").getType(), Type.INT);
     assertTrue(t.usesAvroSchemaOverride());
   }
+
+  /**
+   * Test handling of skip.header.line.count property for text tables.
+   */
+  @Test
+  public void testSkipHeaderLine() throws Exception {
+    // Table without header.
+    FeFsTable alltypes = (FeFsTable)catalog_.getTable("functional", "alltypes");
+    StringBuilder error = new StringBuilder();
+    assertEquals(alltypes.parseSkipHeaderLineCount(error), 0);
+    assertEquals(error.length(), 0);
+
+    // Table with header.
+    FeFsTable table_with_header =
+        (FeFsTable)catalog_.getTable("functional", "table_with_header");
+    assertEquals(table_with_header.parseSkipHeaderLineCount(error), 1);
+    assertEquals(error.length(), 0);
+  }
 }
