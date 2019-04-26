@@ -55,7 +55,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
    * Takes an {@link AuthorizationFactory} to bootstrap the backing CatalogServiceCatalog.
    */
   public ImpaladTestCatalog(AuthorizationFactory authzFactory) {
-    super("127.0.0.1");
+    super("127.0.0.1", null);
     CatalogServiceCatalog catalogServerCatalog =
         CatalogServiceTestCatalog.createWithAuth(authzFactory);
     authPolicy_ = catalogServerCatalog.getAuthPolicy();
@@ -68,7 +68,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
    * Creates ImpaladTestCatalog backed by a given catalog instance.
    */
   public ImpaladTestCatalog(CatalogServiceCatalog catalog) {
-    super("127.0.0.1");
+    super("127.0.0.1", null);
     srcCatalog_ = Preconditions.checkNotNull(catalog);
     authPolicy_ = srcCatalog_.getAuthPolicy();
     setIsReady(true);

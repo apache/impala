@@ -350,6 +350,9 @@ public class FrontendTestBase extends AbstractFrontendTest {
               List<PrivilegeRequest> privilegeRequests)
               throws AuthorizationException, InternalException {
           }
+
+          @Override
+          public void invalidateAuthorizationCache() {}
         };
       }
 

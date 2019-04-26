@@ -266,6 +266,12 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       }
       break;
     }
+    case TCatalogObjectType::AUTHZ_CACHE_INVALIDATION: {
+      catalog_object->__set_type(object_type);
+      catalog_object->__set_authz_cache_invalidation(TAuthzCacheInvalidation());
+      catalog_object->authz_cache_invalidation.__set_marker_name(object_name);
+      break;
+    }
     case TCatalogObjectType::CATALOG:
     case TCatalogObjectType::UNKNOWN:
     default:

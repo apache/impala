@@ -39,6 +39,8 @@ enum TCatalogObjectType {
   PRINCIPAL = 7
   PRIVILEGE = 8
   HDFS_CACHE_POOL = 9
+  // A catalog object type as a marker for authorization cache invalidation.
+  AUTHZ_CACHE_INVALIDATION = 10
 }
 
 enum TTableType {
@@ -586,6 +588,14 @@ struct THdfsCachePool {
   // the pool limits, pool owner, etc.
 }
 
+// Thrift representation of an TAuthzCacheInvalidation. This catalog object does not
+// contain any authorization data and it's used as marker to perform an authorization
+// cache invalidation.
+struct TAuthzCacheInvalidation {
+  // Name of the authorization cache marker.
+  1: required string marker_name
+}
+
 // Represents state associated with the overall catalog.
 struct TCatalog {
   // The CatalogService service ID.
@@ -623,4 +633,7 @@ struct TCatalogObject {
 
   // Set iff object type is HDFS_CACHE_POOL
   10: optional THdfsCachePool cache_pool
+
+  // Set iff object type is AUTHZ_CACHE_INVALIDATION
+  11: optional TAuthzCacheInvalidation authz_cache_invalidation
 }

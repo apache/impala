@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -37,10 +38,13 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.AuthzCacheInvalidation;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogObjectCache;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
@@ -264,6 +268,10 @@ public class CatalogdMetaProvider implements MetaProvider {
    * StateStore. Currently this is _not_ "fetch-on-demand".
    */
   private final AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
+  // Cache of authorization refresh markers.
+  private final CatalogObjectCache<AuthzCacheInvalidation> authzCacheInvalidation_ =
+      new CatalogObjectCache<>();
+  private AtomicReference<? extends AuthorizationChecker> authzChecker_;
 
   public CatalogdMetaProvider(TBackendGflags flags) {
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());
@@ -303,6 +311,11 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public boolean isReady() {
     return lastSeenCatalogVersion_.get() > Catalog.INITIAL_CATALOG_VERSION;
+  }
+
+  public void setAuthzChecker(
+      AtomicReference<? extends AuthorizationChecker> authzChecker) {
+    authzChecker_ = authzChecker;
   }
 
   /**
@@ -909,7 +922,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       // may be cross-referential. So, just add them to the sequencer which ensures
       // we handle them in the right order later.
       if (obj.type == TCatalogObjectType.PRINCIPAL ||
-          obj.type == TCatalogObjectType.PRIVILEGE) {
+          obj.type == TCatalogObjectType.PRIVILEGE ||
+          obj.type == TCatalogObjectType.AUTHZ_CACHE_INVALIDATION) {
         authObjectSequencer.add(obj, isDelete);
       }
 
@@ -999,6 +1013,19 @@ public class CatalogdMetaProvider implements MetaProvider {
       } else {
         authPolicy_.removePrivilegeIfLowerVersion(obj.getPrivilege(),
             obj.getCatalog_version());
+      }
+      break;
+      case AUTHZ_CACHE_INVALIDATION:
+      if (!isDelete) {
+        AuthzCacheInvalidation authzCacheInvalidation = new AuthzCacheInvalidation(
+            obj.getAuthz_cache_invalidation());
+        authzCacheInvalidation.setCatalogVersion(obj.getCatalog_version());
+        authzCacheInvalidation_.add(authzCacheInvalidation);
+        Preconditions.checkState(authzChecker_ != null);
+        authzChecker_.get().invalidateAuthorizationCache();
+      } else {
+        authzCacheInvalidation_.remove(obj.getAuthz_cache_invalidation()
+            .getMarker_name());
       }
       break;
     default:

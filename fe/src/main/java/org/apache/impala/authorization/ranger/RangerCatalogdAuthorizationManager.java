@@ -22,6 +22,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.AuthzCacheInvalidation;
+import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -55,12 +57,17 @@ import java.util.function.Supplier;
  * Operations not supported by Ranger will throw an {@link UnsupportedOperationException}.
  */
 public class RangerCatalogdAuthorizationManager implements AuthorizationManager {
+  private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
+
   private final RangerDefaultAuditHandler auditHandler_;
   private final Supplier<RangerImpalaPlugin> plugin_;
+  private final CatalogServiceCatalog catalog_;
 
-  public RangerCatalogdAuthorizationManager(Supplier<RangerImpalaPlugin> pluginSupplier) {
+  public RangerCatalogdAuthorizationManager(Supplier<RangerImpalaPlugin> pluginSupplier,
+      CatalogServiceCatalog catalog) {
     auditHandler_ = new RangerDefaultAuditHandler();
     plugin_ = pluginSupplier;
+    catalog_ = catalog;
   }
 
   @Override
@@ -119,6 +126,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         plugin_.get().getClusterName(), params.getPrivileges());
 
     grantPrivilege(requests);
+    refreshAuthorization(response);
   }
 
   @Override
@@ -129,6 +137,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         plugin_.get().getClusterName(), params.getPrivileges());
 
     revokePrivilege(requests);
+    refreshAuthorization(response);
   }
 
   @Override
@@ -140,6 +149,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         plugin_.get().getClusterName(), params.getPrivileges());
 
     grantPrivilege(requests);
+    refreshAuthorization(response);
   }
 
   @Override
@@ -151,6 +161,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         plugin_.get().getClusterName(), params.getPrivileges());
 
     revokePrivilege(requests);
+    // Update the authorization refresh marker so that the Impalads can refresh their
+    // Ranger caches.
+    refreshAuthorization(response);
   }
 
   @VisibleForTesting
@@ -196,8 +209,22 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
   @Override
   public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
-    // TODO: IMPALA-8293 (part 2)
-    return new AuthorizationDelta();
+    // Add a single AUTHZ_CACHE_INVALIDATION catalog object called "ranger" and increment
+    // its version to indicate a new cache invalidation request.
+    AuthorizationDelta authzDelta = new AuthorizationDelta();
+    AuthzCacheInvalidation authzCacheInvalidation =
+        catalog_.incrementAuthzCacheInvalidationVersion(AUTHZ_CACHE_INVALIDATION_MARKER);
+    authzDelta.addCatalogObjectAdded(authzCacheInvalidation.toTCatalogObject());
+    return authzDelta;
+  }
+
+  private void refreshAuthorization(TDdlExecResponse response) {
+    // Update the authorization cache invalidation marker so that the Impalads can
+    // invalidate their Ranger caches. This is needed for usability reason to make sure
+    // what's updated in Ranger via grant/revoke is automatically reflected to the
+    // Impalad Ranger plugins.
+    AuthorizationDelta authzDelta = refreshAuthorization(false);
+    response.result.setUpdated_catalog_objects(authzDelta.getCatalogObjectsAdded());
   }
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,

@@ -127,4 +127,9 @@ public abstract class AuthorizationChecker {
   public abstract void authorizeRowFilterAndColumnMask(User user,
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException;
+
+  /**
+   * Invalidates an authorization cache.
+   */
+  public abstract void invalidateAuthorizationCache();
 }

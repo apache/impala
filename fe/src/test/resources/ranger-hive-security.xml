@@ -44,7 +44,7 @@
 
   <property>
     <name>ranger.plugin.hive.policy.pollIntervalMs</name>
-    <value>5000</value>
+    <value>30000</value>
     <description>
       Polling interval in milliseconds to poll for changes in policies.
     </description>

@@ -36,6 +36,8 @@ import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResult;
 import org.apache.ranger.plugin.policyengine.RangerPolicyEngine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -50,6 +52,9 @@ import java.util.Set;
  * Ranger plugin uses its own cache.
  */
 public class RangerAuthorizationChecker extends AuthorizationChecker {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      RangerAuthorizationChecker.class);
+
   // These are Ranger access types (privileges).
   public static final String UPDATE_ACCESS_TYPE = "update";
   public static final String REFRESH_ACCESS_TYPE = "read";
@@ -171,6 +176,17 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
               request.getAuthorizable().getTableName());
         }
       }
+    }
+  }
+
+  @Override
+  public void invalidateAuthorizationCache() {
+    long startTime = System.currentTimeMillis();
+    try {
+      plugin_.refreshPoliciesAndTags();
+    } finally {
+      LOG.debug("Refreshing Ranger policies took {} ms",
+          (System.currentTimeMillis() - startTime));
     }
   }
 

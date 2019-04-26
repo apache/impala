@@ -3276,7 +3276,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private abstract class WithRanger implements WithPrincipal {
     private final List<GrantRevokeRequest> requests = new ArrayList<>();
     private final RangerCatalogdAuthorizationManager authzManager =
-        new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_);
+        new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_, null);
 
     @Override
     public void init(TPrivilege[]... privileges) throws ImpalaException {

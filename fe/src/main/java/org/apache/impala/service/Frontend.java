@@ -263,6 +263,7 @@ public class Frontend {
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
     }
+    catalogManager_.setAuthzChecker(authzChecker_);
     authzManager_ = authzFactory.newAuthorizationManager(catalogManager_,
         authzChecker_::get);
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(

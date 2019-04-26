@@ -90,6 +90,6 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
     RangerImpalaPlugin plugin = new RangerImpalaPlugin(config.getServiceType(),
         config.getAppId());
     plugin.init();
-    return new RangerCatalogdAuthorizationManager(() -> plugin);
+    return new RangerCatalogdAuthorizationManager(() -> plugin, catalog);
   }
 }

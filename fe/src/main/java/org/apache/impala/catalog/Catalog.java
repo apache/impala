@@ -84,6 +84,10 @@ public abstract class Catalog implements AutoCloseable {
   protected final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
       new CatalogObjectCache<HdfsCachePool>(false);
 
+  // Cache of authorization cache invalidation markers.
+  protected final CatalogObjectCache<AuthzCacheInvalidation> authzCacheInvalidation_ =
+      new CatalogObjectCache<>();
+
   /**
    * Creates a new instance of Catalog backed by a given MetaStoreClientPool.
    */
@@ -320,6 +324,13 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
+   * Gets the {@link AuthzCacheInvalidation} for a given marker name.
+   */
+  public AuthzCacheInvalidation getAuthzCacheInvalidation(String markerName) {
+    return authzCacheInvalidation_.get(Preconditions.checkNotNull(markerName));
+  }
+
+  /**
    * Release the Hive Meta Store Client resources. Can be called multiple times
    * (additional calls will be no-ops).
    */
@@ -533,6 +544,19 @@ public abstract class Catalog implements AutoCloseable {
         throw new CatalogException(String.format("%s '%s' does not contain " +
             "privilege: '%s'", Principal.toString(tmpPrincipal.getPrincipalType()),
             tmpPrincipal.getName(), privilegeName));
+      case AUTHZ_CACHE_INVALIDATION:
+        AuthzCacheInvalidation authzCacheInvalidation = getAuthzCacheInvalidation(
+            objectDesc.getAuthz_cache_invalidation().getMarker_name());
+        if (authzCacheInvalidation == null) {
+          // Authorization cache invalidation requires a single catalog object and it
+          // needs to exist.
+          throw new CatalogException("Authz cache invalidation not found: " +
+              objectDesc.getAuthz_cache_invalidation().getMarker_name());
+        }
+        result.setType(authzCacheInvalidation.getCatalogObjectType());
+        result.setCatalog_version(authzCacheInvalidation.getCatalogVersion());
+        result.setAuthz_cache_invalidation(authzCacheInvalidation.toThrift());
+        break;
       default: throw new IllegalStateException(
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }
@@ -587,6 +611,9 @@ public abstract class Catalog implements AutoCloseable {
             catalogObject.getCache_pool().getPool_name().toLowerCase();
       case DATA_SOURCE:
         return "DATA_SOURCE:" + catalogObject.getData_source().getName().toLowerCase();
+      case AUTHZ_CACHE_INVALIDATION:
+        return "AUTHZ_CACHE_INVALIDATION:" + catalogObject.getAuthz_cache_invalidation()
+            .getMarker_name().toLowerCase();
       case CATALOG:
         return "CATALOG_SERVICE_ID";
       default:

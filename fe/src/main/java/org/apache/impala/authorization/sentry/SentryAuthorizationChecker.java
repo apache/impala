@@ -80,6 +80,11 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
       throws AuthorizationException, InternalException {
   }
 
+  @Override
+  public void invalidateAuthorizationCache() {
+    // Authorization refresh in Sentry is done by updating {@link AuthorizationPolicy}.
+  }
+
   /*
    * Creates a new ResourceAuthorizationProvider based on the given configuration.
    */

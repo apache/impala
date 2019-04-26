@@ -638,6 +638,7 @@ public class CatalogServiceCatalog extends Catalog {
         return obj;
       case PRIVILEGE:
       case PRINCIPAL:
+      case AUTHZ_CACHE_INVALIDATION:
         // The caching of this data on the impalad side is somewhat complex
         // and this code is also under some churn at the moment. So, we'll just publish
         // the full information rather than doing fetch-on-demand.
@@ -686,6 +687,9 @@ public class CatalogServiceCatalog extends Catalog {
     }
     for (User user: getAllUsers()) {
       addPrincipalToCatalogDelta(user, ctx);
+    }
+    for (AuthzCacheInvalidation authzCacheInvalidation: getAllAuthzCacheInvalidation()) {
+      addAuthzCacheInvalidationToCatalogDelta(authzCacheInvalidation, ctx);
     }
     // Identify the catalog objects that were removed from the catalog for which their
     // versions are in range ('ctx.fromVersion', 'ctx.toVersion']. We need to make sure
@@ -889,6 +893,18 @@ public class CatalogServiceCatalog extends Catalog {
     versionLock_.readLock().lock();
     try {
       return ImmutableList.copyOf(authPolicy_.getAllUsers());
+    } finally {
+      versionLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Get a snapshot view of all authz cache invalidation markers in the catalog.
+   */
+  private List<AuthzCacheInvalidation> getAllAuthzCacheInvalidation() {
+    versionLock_.readLock().lock();
+    try {
+      return ImmutableList.copyOf(authzCacheInvalidation_);
     } finally {
       versionLock_.readLock().unlock();
     }
@@ -1178,6 +1194,22 @@ public class CatalogServiceCatalog extends Catalog {
         new TCatalogObject(TCatalogObjectType.PRIVILEGE, privVersion);
     privilege.setPrivilege(priv.toThrift());
     ctx.addCatalogObject(privilege, false);
+  }
+
+  /**
+   * Adds an authz cache invalidation to the topic update if its version is in the range
+   * ('ctx.fromVersion', 'ctx.toVersion'].
+   */
+  private void addAuthzCacheInvalidationToCatalogDelta(
+      AuthzCacheInvalidation authzCacheInvalidation, GetCatalogDeltaContext ctx)
+      throws TException  {
+    long authzCacheInvalidationVersion = authzCacheInvalidation.getCatalogVersion();
+    if (authzCacheInvalidationVersion <= ctx.fromVersion ||
+        authzCacheInvalidationVersion > ctx.toVersion) return;
+    TCatalogObject catalogObj = new TCatalogObject(
+        TCatalogObjectType.AUTHZ_CACHE_INVALIDATION, authzCacheInvalidationVersion);
+    catalogObj.setAuthz_cache_invalidation(authzCacheInvalidation.toThrift());
+    ctx.addCatalogObject(catalogObj, false);
   }
 
   /**
@@ -2365,6 +2397,42 @@ public class CatalogServiceCatalog extends Catalog {
       return principal.getPrivilege(privilegeName);
     } finally {
       versionLock_.readLock().unlock();
+    }
+  }
+
+  @Override
+  public AuthzCacheInvalidation getAuthzCacheInvalidation(String markerName) {
+    versionLock_.readLock().lock();
+    try {
+      return authzCacheInvalidation_.get(markerName);
+    } finally {
+      versionLock_.readLock().unlock();;
+    }
+  }
+
+  /**
+   * Gets the {@link AuthzCacheInvalidation} for a given marker name or creates a new
+   * {@link AuthzCacheInvalidation} if it does not exist and increment the catalog
+   * version of {@link AuthzCacheInvalidation}. A catalog version update indicates a
+   * an authorization cache invalidation notification.
+   *
+   * @param markerName the authorization cache invalidation marker name
+   * @return the updated {@link AuthzCacheInvalidation} instance
+   */
+  public AuthzCacheInvalidation incrementAuthzCacheInvalidationVersion(
+      String markerName) {
+    versionLock_.writeLock().lock();
+    try {
+      AuthzCacheInvalidation authzCacheInvalidation = getAuthzCacheInvalidation(
+          markerName);
+      if (authzCacheInvalidation == null) {
+        authzCacheInvalidation = new AuthzCacheInvalidation(markerName);
+        authzCacheInvalidation_.add(authzCacheInvalidation);
+      }
+      authzCacheInvalidation.setCatalogVersion(incrementAndGetCatalogVersion());
+      return authzCacheInvalidation;
+    } finally {
+      versionLock_.writeLock().unlock();
     }
   }
 

@@ -21,7 +21,6 @@ import grp
 import json
 import pytest
 import requests
-import time
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -45,7 +44,8 @@ class TestRanger(CustomClusterTestSuite):
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_grant_revoke_with_catalog_v1(self, unique_name):
     """Tests grant/revoke with catalog v1."""
-    self._test_grant_revoke(unique_name)
+    self._test_grant_revoke(unique_name, [None, "invalidate metadata",
+                                          "refresh authorization"])
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -55,9 +55,10 @@ class TestRanger(CustomClusterTestSuite):
                                    "--catalog_topic_mode=minimal"))
   def test_grant_revoke_with_local_catalog(self, unique_name):
     """Tests grant/revoke with catalog v2 (local catalog)."""
-    self._test_grant_revoke(unique_name)
+    # Catalog v2 does not support global invalidate metadata.
+    self._test_grant_revoke(unique_name, [None, "refresh authorization"])
 
-  def _test_grant_revoke(self, unique_name):
+  def _test_grant_revoke(self, unique_name, refresh_statements):
     user = getuser()
     admin_client = self.create_impala_client()
     unique_database = unique_name + "_db"
@@ -65,42 +66,41 @@ class TestRanger(CustomClusterTestSuite):
     group = grp.getgrnam(getuser()).gr_name
     test_data = [(user, "USER"), (group, "GROUP")]
 
-    for data in test_data:
-      ident = data[0]
-      kw = data[1]
+    for refresh_stmt in refresh_statements:
+      for data in test_data:
+        ident = data[0]
+        kw = data[1]
+        try:
+          # Set-up temp database/table
+          admin_client.execute("drop database if exists {0} cascade"
+                               .format(unique_database), user=ADMIN)
+          admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+          admin_client.execute("create table {0}.{1} (x int)"
+                               .format(unique_database, unique_table), user=ADMIN)
 
-      try:
-        # Set-up temp database/table
-        admin_client.execute("drop database if exists {0} cascade"
-                             .format(unique_database), user=ADMIN)
-        admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
-        admin_client.execute("create table {0}.{1} (x int)"
-                             .format(unique_database, unique_table), user=ADMIN)
-
-        self.execute_query_expect_success(admin_client,
-                                          "grant select on database {0} to {1} {2}"
-                                          .format(unique_database, kw, ident), user=ADMIN)
-        # TODO: IMPALA-8293 use refresh authorization
-        time.sleep(10)
-        result = self.execute_query("show grant {0} {1} on database {2}"
-                                    .format(kw, ident, unique_database))
-        TestRanger._check_privileges(result, [
-          [kw, ident, unique_database, "", "", "", "*", "select", "false"],
-          [kw, ident, unique_database, "*", "*", "", "", "select", "false"]])
-        self.execute_query_expect_success(admin_client,
-                                          "revoke select on database {0} from {1} "
-                                          "{2}".format(unique_database, kw, ident),
-                                          user=ADMIN)
-        # TODO: IMPALA-8293 use refresh authorization
-        time.sleep(10)
-        result = self.execute_query("show grant {0} {1} on database {2}"
-                                    .format(kw, ident, unique_database))
-        TestRanger._check_privileges(result, [])
-      finally:
-        admin_client.execute("revoke select on database {0} from {1} {2}"
-                             .format(unique_database, kw, ident), user=ADMIN)
-        admin_client.execute("drop database if exists {0} cascade"
-                             .format(unique_database), user=ADMIN)
+          self.execute_query_expect_success(admin_client,
+                                            "grant select on database {0} to {1} {2}"
+                                            .format(unique_database, kw, ident),
+                                            user=ADMIN)
+          self._refresh_authorization(admin_client, refresh_stmt)
+          result = self.execute_query("show grant {0} {1} on database {2}"
+                                      .format(kw, ident, unique_database))
+          TestRanger._check_privileges(result, [
+            [kw, ident, unique_database, "", "", "", "*", "select", "false"],
+            [kw, ident, unique_database, "*", "*", "", "", "select", "false"]])
+          self.execute_query_expect_success(admin_client,
+                                            "revoke select on database {0} from {1} "
+                                            "{2}".format(unique_database, kw, ident),
+                                            user=ADMIN)
+          self._refresh_authorization(admin_client, refresh_stmt)
+          result = self.execute_query("show grant {0} {1} on database {2}"
+                                      .format(kw, ident, unique_database))
+          TestRanger._check_privileges(result, [])
+        finally:
+          admin_client.execute("revoke select on database {0} from {1} {2}"
+                               .format(unique_database, kw, ident), user=ADMIN)
+          admin_client.execute("drop database if exists {0} cascade"
+                               .format(unique_database), user=ADMIN)
 
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
@@ -123,8 +123,7 @@ class TestRanger(CustomClusterTestSuite):
                                         "grant select on database {0} to user {1} with "
                                         "grant option".format(unique_database, user1),
                                         user=ADMIN)
-      # TODO: IMPALA-8293 use refresh authorization
-      time.sleep(10)
+
       # Verify user 1 has with_grant privilege on unique_database
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
@@ -136,8 +135,7 @@ class TestRanger(CustomClusterTestSuite):
       self.execute_query_expect_success(admin_client, "revoke grant option for select "
                                                       "on database {0} from user {1}"
                                         .format(unique_database, user1), user=ADMIN)
-      # TODO: IMPALA-8293 use refresh authorization
-      time.sleep(10)
+
       # User 1 can no longer grant privileges on unique_database
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
@@ -196,7 +194,6 @@ class TestRanger(CustomClusterTestSuite):
 
       admin_client.execute("grant select on database {0} to group {1}"
                            .format(unique_db, group))
-      time.sleep(10)
       result = self.client.execute("show grant user {0} on database {1}"
                                    .format(user, unique_db))
       TestRanger._check_privileges(result, [
@@ -211,7 +208,6 @@ class TestRanger(CustomClusterTestSuite):
     try:
       for privilege in privileges:
         admin_client.execute("grant {0} on server to user {1}".format(privilege, user))
-      time.sleep(10)
       result = self.client.execute("show grant user {0} on server".format(user))
       TestRanger._check_privileges(result, [
         ["USER", user, "", "", "", "*", "", "alter", "false"],
@@ -231,7 +227,6 @@ class TestRanger(CustomClusterTestSuite):
         ["USER", user, "*", "*", "*", "", "", "select", "false"]])
 
       admin_client.execute("grant all on server to user {0}".format(user))
-      time.sleep(10)
       result = self.client.execute("show grant user {0} on server".format(user))
       TestRanger._check_privileges(result, [
         ["USER", user, "", "", "", "*", "", "all", "false"],
@@ -246,7 +241,6 @@ class TestRanger(CustomClusterTestSuite):
     try:
       # Grant server privileges and verify
       admin_client.execute("grant all on server to {0} {1}".format(kw, id), user=ADMIN)
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on server".format(kw, id))
       TestRanger._check_privileges(result, [
         [kw, id, "", "", "", "*", "", "all", "false"],
@@ -255,14 +249,12 @@ class TestRanger(CustomClusterTestSuite):
 
       # Revoke server privileges and verify
       admin_client.execute("revoke all on server from {0} {1}".format(kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on server".format(kw, id))
       TestRanger._check_privileges(result, [])
 
       # Grant uri privileges and verify
       admin_client.execute("grant all on uri '{0}' to {1} {2}"
                            .format(uri, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on uri '{2}'"
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [
@@ -271,7 +263,6 @@ class TestRanger(CustomClusterTestSuite):
       # Revoke uri privileges and verify
       admin_client.execute("revoke all on uri '{0}' from {1} {2}"
                            .format(uri, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on uri '{2}'"
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [])
@@ -279,7 +270,6 @@ class TestRanger(CustomClusterTestSuite):
       # Grant database privileges and verify
       admin_client.execute("grant select on database {0} to {1} {2}"
                            .format(unique_database, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on database {2}"
                                    .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [
@@ -289,7 +279,6 @@ class TestRanger(CustomClusterTestSuite):
       # Revoke database privileges and verify
       admin_client.execute("revoke select on database {0} from {1} {2}"
                            .format(unique_database, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on database {2}"
                                    .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [])
@@ -297,7 +286,6 @@ class TestRanger(CustomClusterTestSuite):
       # Grant table privileges and verify
       admin_client.execute("grant select on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
@@ -306,7 +294,6 @@ class TestRanger(CustomClusterTestSuite):
       # Revoke table privileges and verify
       admin_client.execute("revoke select on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [])
@@ -314,7 +301,6 @@ class TestRanger(CustomClusterTestSuite):
       # Grant column privileges and verify
       admin_client.execute("grant select(x) on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
@@ -323,7 +309,6 @@ class TestRanger(CustomClusterTestSuite):
       # Revoke column privileges and verify
       admin_client.execute("revoke select(x) on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
-      time.sleep(10)
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [])
@@ -359,3 +344,7 @@ class TestRanger(CustomClusterTestSuite):
       return cols[0:len(cols) - 1]
 
     assert map(columns, result.data) == expected
+
+  def _refresh_authorization(self, client, statement):
+    if statement is not None:
+      self.execute_query_expect_success(client, statement)

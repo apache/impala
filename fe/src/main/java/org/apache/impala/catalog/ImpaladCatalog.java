@@ -21,12 +21,15 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TAuthzCacheInvalidation;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
@@ -92,9 +95,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   // The addresses of the Kudu masters to use if no Kudu masters were explicitly provided.
   // Used during table creation.
   private final String defaultKuduMasterHosts_;
+  private final AtomicReference<? extends AuthorizationChecker> authzChecker_;
 
-  public ImpaladCatalog(String defaultKuduMasterHosts) {
+  public ImpaladCatalog(String defaultKuduMasterHosts,
+      AtomicReference<? extends AuthorizationChecker> authzChecker) {
     super();
+    authzChecker_ = authzChecker;
     addDb(BuiltinsDb.getInstance());
     defaultKuduMasterHosts_ = defaultKuduMasterHosts;
     // Ensure the contents of the CatalogObjectVersionSet instance are cleared when a
@@ -142,7 +148,8 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       return catalogObject.getType() == TCatalogObjectType.DATABASE ||
           catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
           catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
-          catalogObject.getType() == TCatalogObjectType.PRINCIPAL;
+          catalogObject.getType() == TCatalogObjectType.PRINCIPAL ||
+          catalogObject.getType() == TCatalogObjectType.AUTHZ_CACHE_INVALIDATION;
     }
   }
 
@@ -312,6 +319,13 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         cachePool.setCatalogVersion(catalogObject.getCatalog_version());
         hdfsCachePools_.add(cachePool);
         break;
+      case AUTHZ_CACHE_INVALIDATION:
+        AuthzCacheInvalidation authzCacheInvalidation = new AuthzCacheInvalidation(
+            catalogObject.getAuthz_cache_invalidation());
+        authzCacheInvalidation.setCatalogVersion(catalogObject.getCatalog_version());
+        authzCacheInvalidation_.add(authzCacheInvalidation);
+        authzChecker_.get().invalidateAuthorizationCache();
+        break;
       default:
         throw new IllegalStateException(
             "Unexpected TCatalogObjectType: " + catalogObject.getType());
@@ -353,6 +367,10 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         if (existingItem.getCatalogVersion() <= catalogObject.getCatalog_version()) {
           hdfsCachePools_.remove(catalogObject.getCache_pool().getPool_name());
         }
+        break;
+      case AUTHZ_CACHE_INVALIDATION:
+        removeAuthzCacheInvalidation(catalogObject.getAuthz_cache_invalidation(),
+            dropCatalogVersion);
         break;
       default:
         throw new IllegalStateException(
@@ -474,6 +492,15 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       db.removeFunction(thriftFn.getSignature());
       CatalogObjectVersionSet.INSTANCE.removeVersion(
           fn.getCatalogVersion());
+    }
+  }
+
+  private void removeAuthzCacheInvalidation(
+      TAuthzCacheInvalidation authzCacheInvalidation, long dropCatalogVersion) {
+    AuthzCacheInvalidation existingItem = authzCacheInvalidation_.get(
+        authzCacheInvalidation.getMarker_name());
+    if (existingItem != null && existingItem.getCatalogVersion() < dropCatalogVersion) {
+      authzCacheInvalidation_.remove(authzCacheInvalidation.getMarker_name());
     }
   }
 

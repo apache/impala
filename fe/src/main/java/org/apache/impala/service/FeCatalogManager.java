@@ -18,6 +18,8 @@ package org.apache.impala.service;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
+import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.ImpaladCatalog;
@@ -39,6 +41,8 @@ public abstract class FeCatalogManager {
   private static String DEFAULT_KUDU_MASTER_HOSTS =
       BackendConfig.INSTANCE.getBackendCfg().kudu_master_hosts;
 
+  protected AtomicReference<? extends AuthorizationChecker> authzChecker_;
+
   /**
    * @return the appropriate implementation based on the current backend
    * configuration.
@@ -57,6 +61,11 @@ public abstract class FeCatalogManager {
    */
   public static FeCatalogManager createForTests(FeCatalog testCatalog) {
     return new TestImpl(testCatalog);
+  }
+
+  public void setAuthzChecker(
+      AtomicReference<? extends AuthorizationChecker> authzChecker) {
+    authzChecker_ = Preconditions.checkNotNull(authzChecker);
   }
 
   /**
@@ -119,7 +128,7 @@ public abstract class FeCatalogManager {
     }
 
     private ImpaladCatalog createNewCatalog() {
-      return new ImpaladCatalog(DEFAULT_KUDU_MASTER_HOSTS);
+      return new ImpaladCatalog(DEFAULT_KUDU_MASTER_HOSTS, authzChecker_);
     }
   }
 
@@ -133,6 +142,7 @@ public abstract class FeCatalogManager {
 
     @Override
     public FeCatalog getOrCreateCatalog() {
+      PROVIDER.setAuthzChecker(authzChecker_);
       return new LocalCatalog(PROVIDER, DEFAULT_KUDU_MASTER_HOSTS);
     }
 

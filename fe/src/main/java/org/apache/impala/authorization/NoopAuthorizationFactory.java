@@ -199,6 +199,9 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
           List<PrivilegeRequest> privilegeRequests)
           throws AuthorizationException, InternalException {
       }
+
+      @Override
+      public void invalidateAuthorizationCache() {}
     };
   }
 
