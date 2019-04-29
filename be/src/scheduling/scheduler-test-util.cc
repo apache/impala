@@ -580,7 +580,7 @@ void SchedulerWrapper::InitializeScheduler() {
   scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id,
       &metrics_, nullptr, nullptr));
   const Status status = scheduler_->Init(scheduler_backend_address,
-      scheduler_krpc_address, scheduler_host.ip);
+      scheduler_krpc_address, scheduler_host.ip, /* admit_mem_limit */ 0L);
   DCHECK(status.ok()) << "Scheduler init failed in test";
   // Initialize the scheduler backend maps.
   SendFullMembershipMap();

@@ -48,6 +48,7 @@ CLUSTER_SIZE = "cluster_size"
 # other impala daemon arguments to allow merging multiple defaults into a single list.
 DEFAULT_QUERY_OPTIONS = 'default_query_options'
 IMPALA_LOG_DIR = 'impala_log_dir'
+NUM_EXCLUSIVE_COORDINATORS = 'num_exclusive_coordinators'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -99,7 +100,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
       start_args=None, sentry_config=None, default_query_options=None,
-      impala_log_dir=None, sentry_log_dir=None, cluster_size=None):
+      impala_log_dir=None, sentry_log_dir=None, cluster_size=None,
+      num_exclusive_coordinators=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -124,6 +126,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[IMPALA_LOG_DIR] = impala_log_dir
       if cluster_size is not None:
         func.func_dict[CLUSTER_SIZE] = cluster_size
+      if num_exclusive_coordinators is not None:
+        func.func_dict[NUM_EXCLUSIVE_COORDINATORS] = num_exclusive_coordinators
       return func
     return decorate
 
@@ -143,12 +147,19 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if CLUSTER_SIZE in method.func_dict:
       cluster_size = method.func_dict[CLUSTER_SIZE]
 
+    use_exclusive_coordinators = False
+    num_coordinators = cluster_size
+    if NUM_EXCLUSIVE_COORDINATORS in method.func_dict:
+      num_coordinators = method.func_dict[NUM_EXCLUSIVE_COORDINATORS]
+      use_exclusive_coordinators = True
+
     # Start a clean new cluster before each test
     kwargs = {
       "cluster_size": cluster_size,
-      "num_coordinators": cluster_size,
+      "num_coordinators": num_coordinators,
       "expected_num_executors": cluster_size,
-      "default_query_options": method.func_dict.get(DEFAULT_QUERY_OPTIONS)
+      "default_query_options": method.func_dict.get(DEFAULT_QUERY_OPTIONS),
+      "use_exclusive_coordinators": use_exclusive_coordinators
     }
     if IMPALA_LOG_DIR in method.func_dict:
       kwargs["impala_log_dir"] = method.func_dict[IMPALA_LOG_DIR]

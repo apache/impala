@@ -169,6 +169,8 @@ class ExecEnv {
   Status GetKuduClient(const std::vector<std::string>& master_addrs,
       kudu::client::KuduClient** client) WARN_UNUSED_RESULT;
 
+  int64_t admit_mem_limit() const { return admit_mem_limit_; }
+
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
@@ -252,6 +254,11 @@ class ExecEnv {
   /// Map for sharing KuduClients across the ExecEnv. This map requires that the master
   /// address lists be identical in order to share a KuduClient.
   KuduClientMap kudu_client_map_;
+
+  /// Return the bytes of memory available for queries to execute with - i.e.
+  /// mem_tracker()->limit() with any overhead that can't be used subtracted out,
+  /// such as the JVM if --mem_limit_includes_jvm=true. Set in Init().
+  int64_t admit_mem_limit_;
 
   /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
   /// the memory available to the daemon process. Returns an error if the memory limit is

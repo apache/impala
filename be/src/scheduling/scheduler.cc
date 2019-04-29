@@ -49,6 +49,10 @@ using namespace apache::thrift;
 using namespace org::apache::impala::fb;
 using namespace strings;
 
+DECLARE_bool(is_coordinator);
+DECLARE_bool(is_executor);
+DECLARE_bool(mem_limit_includes_jvm);
+
 namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
@@ -68,19 +72,13 @@ Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
 }
 
 Status Scheduler::Init(const TNetworkAddress& backend_address,
-    const TNetworkAddress& krpc_address, const IpAddr& ip) {
+    const TNetworkAddress& krpc_address, const IpAddr& ip,
+    int64_t admit_mem_limit) {
   LOG(INFO) << "Starting scheduler";
-  local_backend_descriptor_.address = backend_address;
-  // Store our IP address so that each subscriber doesn't have to resolve
-  // it on every heartbeat. May as well do it up front to avoid frequent DNS
-  // requests.
-  local_backend_descriptor_.ip_address = ip;
-  LOG(INFO) << "Scheduler using " << ip << " as IP address";
-  // KRPC relies on resolved IP address.
-  DCHECK(IsResolvedAddress(krpc_address));
-  DCHECK_EQ(krpc_address.hostname, ip);
-  local_backend_descriptor_.__set_krpc_address(krpc_address);
-
+  local_backend_descriptor_ = BuildLocalBackendDescriptor(webserver_, backend_address,
+      krpc_address, ip, admit_mem_limit);
+  LOG(INFO) << "Scheduler using " << local_backend_descriptor_.ip_address
+            << " as IP address";
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
   if (statestore_subscriber_ != nullptr) {
@@ -105,20 +103,35 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
     initialized_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
     num_fragment_instances_metric_ = metrics_->AddGauge(NUM_BACKENDS_KEY, num_backends);
   }
-
-  if (statestore_subscriber_ != nullptr) {
-    if (webserver_ != nullptr) {
-      const TNetworkAddress& webserver_address = webserver_->http_address();
-      if (IsWildcardAddress(webserver_address.hostname)) {
-        local_backend_descriptor_.__set_debug_http_address(
-            MakeNetworkAddress(ip, webserver_address.port));
-      } else {
-        local_backend_descriptor_.__set_debug_http_address(webserver_address);
-      }
-      local_backend_descriptor_.__set_secure_webserver(webserver_->IsSecure());
-    }
-  }
   return Status::OK();
+}
+
+TBackendDescriptor Scheduler::BuildLocalBackendDescriptor(
+    Webserver* webserver, const TNetworkAddress& backend_address,
+    const TNetworkAddress& krpc_address, const IpAddr& ip, int64_t admit_mem_limit) {
+  TBackendDescriptor local_backend_descriptor;
+  local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
+  local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
+  local_backend_descriptor.__set_address(backend_address);
+  // Store our IP address so that each subscriber doesn't have to resolve
+  // it on every heartbeat. May as well do it up front to avoid frequent DNS
+  // requests.
+  local_backend_descriptor.__set_ip_address(ip);
+  local_backend_descriptor.__set_admit_mem_limit(admit_mem_limit);
+  DCHECK(IsResolvedAddress(krpc_address)) << "KRPC relies on resolved IP address.";
+  DCHECK_EQ(krpc_address.hostname, local_backend_descriptor.ip_address);
+  local_backend_descriptor.__set_krpc_address(krpc_address);
+  if (webserver != nullptr) {
+    const TNetworkAddress& webserver_address = webserver->http_address();
+    if (IsWildcardAddress(webserver_address.hostname)) {
+      local_backend_descriptor.__set_debug_http_address(
+          MakeNetworkAddress(ip, webserver_address.port));
+    } else {
+      local_backend_descriptor.__set_debug_http_address(webserver_address);
+    }
+    local_backend_descriptor.__set_secure_webserver(webserver->IsSecure());
+  }
+  return local_backend_descriptor;
 }
 
 void Scheduler::UpdateLocalBackendAddrForBeTest() {
@@ -229,9 +242,8 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
     const BackendConfig& executor_config, const TNetworkAddress& host) {
   const TBackendDescriptor* desc = executor_config.LookUpBackendDesc(host);
   if (desc == nullptr) {
-    // Local host may not be in executor_config if it's a dedicated coordinator.
+    // Local host may not be in executor_config if it's a dedicated coordinator
     DCHECK(host == local_backend_descriptor_.address);
-    DCHECK(!local_backend_descriptor_.is_executor);
     desc = &local_backend_descriptor_;
   }
   return *desc;

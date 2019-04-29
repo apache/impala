@@ -486,6 +486,30 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=10 * PROC_MEM_TEST_LIMIT, proc_mem_limit=PROC_MEM_TEST_LIMIT),
+      num_exclusive_coordinators=1)
+  def test_mem_limit_dedicated_coordinator(self, vector):
+    """Regression test for IMPALA-8469: coordinator fragment should be admitted on
+    dedicated coordinator"""
+    query = "select * from functional.alltypesagg limit 1"
+    exec_options = vector.get_value('exec_option')
+    # Test both single-node and distributed plans
+    for num_nodes in [0, 1]:
+      # Memory just fits in memory limits
+      exec_options['mem_limit'] = self.PROC_MEM_TEST_LIMIT
+      exec_options['num_nodes'] = num_nodes
+      self.execute_query_expect_success(self.client, query, exec_options)
+
+      # A bit too much memory to run on coordinator.
+      exec_options['mem_limit'] = long(self.PROC_MEM_TEST_LIMIT * 1.1)
+      ex = self.execute_query_expect_failure(self.client, query, exec_options)
+      assert ("Rejected query from pool default-pool: request memory needed "
+              "1.10 GB per node is greater than memory available for admission 1.00 GB" in
+              str(ex)), str(ex)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=2, max_queued=1,
       pool_max_mem=10 * PROC_MEM_TEST_LIMIT,
       queue_wait_timeout_ms=2 * STATESTORE_RPC_FREQUENCY_MS),

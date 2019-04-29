@@ -57,7 +57,6 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
@@ -75,7 +74,6 @@
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/lineage-util.h"
-#include "util/memory-metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/parse-util.h"
@@ -125,7 +123,6 @@ DECLARE_string(authorized_proxy_group_config);
 DECLARE_string(authorized_proxy_group_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
-DECLARE_bool(mem_limit_includes_jvm);
 DECLARE_bool(use_local_catalog);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
@@ -1890,23 +1887,11 @@ void ImpalaServer::AddLocalBackendToStatestore(
     return;
   }
 
-  TBackendDescriptor local_backend_descriptor;
-  local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
-  local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
-  local_backend_descriptor.__set_address(exec_env_->GetThriftBackendAddress());
-  local_backend_descriptor.ip_address = exec_env_->ip_address();
-  int64_t admit_mem_limit = exec_env_->process_mem_tracker()->limit();
-  if (FLAGS_mem_limit_includes_jvm) {
-    // Memory used by JVM heap cannot be admitted to. Other categories of JVM memory
-    // consumption are much smaller and dynamic so it is simpler not to
-    // include them here.
-    admit_mem_limit -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
-  }
-  local_backend_descriptor.__set_admit_mem_limit(admit_mem_limit);
+  TBackendDescriptor local_backend_descriptor =
+      Scheduler::BuildLocalBackendDescriptor(exec_env_->webserver(),
+          exec_env_->GetThriftBackendAddress(), exec_env_->krpc_address(),
+          exec_env_->ip_address(), exec_env_->admit_mem_limit());
   local_backend_descriptor.__set_is_quiescing(is_quiescing);
-  const TNetworkAddress& krpc_address = exec_env_->krpc_address();
-  DCHECK(IsResolvedAddress(krpc_address));
-  local_backend_descriptor.__set_krpc_address(krpc_address);
 
   subscriber_topic_updates->emplace_back(TTopicDelta());
   TTopicDelta& update = subscriber_topic_updates->back();

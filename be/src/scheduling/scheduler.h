@@ -85,9 +85,10 @@ class Scheduler {
   /// on failure. 'backend_address' is the address of thrift based ImpalaInternalService
   /// of this backend. If FLAGS_use_krpc is true, 'krpc_address' contains IP-address:port
   /// on which KRPC based ImpalaInternalService is exported. 'ip' is the resolved
-  /// IP address of this backend.
-  Status Init(const TNetworkAddress& backend_address,
-      const TNetworkAddress& krpc_address, const IpAddr& ip);
+  /// IP address of this backend. 'admit_mem_limit' is the ExecEnv::admit_mem_limit()
+  /// value or a dummy value provided by scheduler tests.
+  Status Init(const TNetworkAddress& backend_address, const TNetworkAddress& krpc_address,
+      const IpAddr& ip, int64_t admit_mem_limit);
 
   /// Test helper that updates the local backend address to reflect whatever
   /// ephemeral port was assigned during server startup. Should only be called
@@ -98,6 +99,12 @@ class Scheduler {
   /// Populates given query schedule and assigns fragments to hosts based on scan
   /// ranges in the query exec request.
   Status Schedule(QuerySchedule* schedule);
+
+  /// Build a backend descriptor for this Impala daemon. Fills out all metadata using
+  /// the provided arguments, except does not set 'is_quiescing'.
+  static TBackendDescriptor BuildLocalBackendDescriptor(Webserver* webserver,
+      const TNetworkAddress& backend_address, const TNetworkAddress& krpc_address,
+      const IpAddr& ip, int64_t admit_mem_limit);
 
  private:
   /// Map from a host's IP address to the next executor to be round-robin scheduled for

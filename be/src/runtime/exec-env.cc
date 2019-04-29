@@ -243,17 +243,17 @@ Status ExecEnv::Init() {
   }
   // The bytes limit we want to size everything else as a fraction of, excluding the
   // JVM.
-  int64_t post_jvm_bytes_limit = bytes_limit;
+  admit_mem_limit_ = bytes_limit;
   if (FLAGS_mem_limit_includes_jvm) {
     // The JVM max heap size is static and therefore known at this point. Other categories
     // of JVM memory consumption are much smaller and dynamic so it is simpler not to
     // include them here.
-    post_jvm_bytes_limit -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
+    admit_mem_limit_ -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
   }
 
   bool is_percent;
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
-      &is_percent, post_jvm_bytes_limit);
+      &is_percent, admit_mem_limit_);
   if (buffer_pool_limit <= 0) {
     return Status(Substitute("Invalid --buffer_pool_limit value, must be a percentage or "
           "positive bytes value or percentage: $0", FLAGS_buffer_pool_limit));
@@ -338,7 +338,7 @@ Status ExecEnv::Init() {
 
   if (scheduler_ != nullptr) {
     RETURN_IF_ERROR(scheduler_->Init(
-          configured_backend_address_, krpc_address_, ip_address_));
+          configured_backend_address_, krpc_address_, ip_address_, admit_mem_limit_));
   }
   RETURN_IF_ERROR(admission_controller_->Init());
 
