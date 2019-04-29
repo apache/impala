@@ -275,14 +275,15 @@ Examples of common tasks:
   shift;
 done
 
+declare -a CMAKE_BUILD_TYPE_LIST
 # Adjust CMAKE_BUILD_TYPE for ASAN and code coverage, if necessary.
 if [[ ${CODE_COVERAGE} -eq 1 ]]; then
   case ${CMAKE_BUILD_TYPE} in
     Debug)
-      CMAKE_BUILD_TYPE=CODE_COVERAGE_DEBUG
+      CMAKE_BUILD_TYPE_LIST+=(CODE_COVERAGE_DEBUG)
       ;;
     Release)
-      CMAKE_BUILD_TYPE=CODE_COVERAGE_RELEASE
+      CMAKE_BUILD_TYPE_LIST+=(CODE_COVERAGE_RELEASE)
       ;;
   esac
 fi
@@ -293,19 +294,26 @@ if [[ ${BUILD_ASAN} -eq 1 ]]; then
     echo "Address sanitizer build not supported for build type: ${CMAKE_BUILD_TYPE}"
     exit 1
   fi
-  CMAKE_BUILD_TYPE=ADDRESS_SANITIZER
+  CMAKE_BUILD_TYPE_LIST+=(ADDRESS_SANITIZER)
 fi
 if [[ ${BUILD_TIDY} -eq 1 ]]; then
-  CMAKE_BUILD_TYPE=TIDY
+  CMAKE_BUILD_TYPE_LIST+=(TIDY)
 fi
 if [[ ${BUILD_UBSAN} -eq 1 ]]; then
-  CMAKE_BUILD_TYPE=UBSAN
+  CMAKE_BUILD_TYPE_LIST+=(UBSAN)
 fi
 if [[ ${BUILD_UBSAN_FULL} -eq 1 ]]; then
-  CMAKE_BUILD_TYPE=UBSAN_FULL
+  CMAKE_BUILD_TYPE_LIST+=(UBSAN_FULL)
 fi
 if [[ ${BUILD_TSAN} -eq 1 ]]; then
-  CMAKE_BUILD_TYPE=TSAN
+  CMAKE_BUILD_TYPE_LIST+=(TSAN)
+fi
+if [[ -v CMAKE_BUILD_TYPE_LIST ]]; then
+  if [[ ${#CMAKE_BUILD_TYPE_LIST[@]} -gt 1 ]]; then
+    echo "ERROR: more than one CMake build type defined: ${CMAKE_BUILD_TYPE_LIST[@]}"
+    exit 1
+  fi
+  CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE_LIST[0]}
 fi
 
 # If we aren't kerberized then we certainly don't need to talk about
