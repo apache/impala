@@ -319,7 +319,6 @@ inline int DecodeWithConversion(const uint8_t* buffer, const uint8_t* buffer_end
 /// double         | DOUBLE
 /// Decimal4Value  | INT32
 /// Decimal8Value  | INT64
-/// TimestampValue | INT96
 template <typename InternalType, parquet::Type::type PARQUET_TYPE>
 void ParquetPlainEncoder::DecodeNoBoundsCheck(const uint8_t* buffer,
     const uint8_t* buffer_end, int fixed_len_size, InternalType* v) {
@@ -330,6 +329,19 @@ void ParquetPlainEncoder::DecodeNoBoundsCheck(const uint8_t* buffer,
   /// narrowing integer conversions (e.g. int32_t to int16_t or int8_t) where copying the
   /// lower bytes is the correct conversion.
   memcpy(v, buffer, sizeof(InternalType));
+}
+
+template <>
+inline void ParquetPlainEncoder::
+DecodeNoBoundsCheck<TimestampValue, parquet::Type::INT96>(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, TimestampValue* v) {
+  int byte_size = EncodedByteSize(parquet::Type::INT96, -1);
+  DCHECK_GE(buffer_end - buffer, byte_size);
+
+  /// We copy only 12 bytes from the input buffer but the destination is 16 bytes long
+  /// because of padding. The most significant 4 bits remain uninitialized as they are not
+  /// used.
+  memcpy(v, buffer, byte_size);
 }
 
 template <>
