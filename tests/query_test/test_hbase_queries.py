@@ -85,8 +85,8 @@ class TestHBaseQueries(ImpalaTestSuite):
     del_table = "DROP TABLE IF EXISTS {0}".format(table_name)
 
     try:
-      self.run_stmt_in_hive(cr_table)
-      self.run_stmt_in_hive(add_data)
+      self.run_stmt_in_hive(cr_table, username='hdfs')
+      self.run_stmt_in_hive(add_data, username='hdfs')
       self.client.execute("invalidate metadata {0}".format(table_name))
       self.run_test_case('QueryTest/hbase-col-filter', vector, unique_database)
     finally:
