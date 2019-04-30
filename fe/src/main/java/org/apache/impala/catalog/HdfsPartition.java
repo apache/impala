@@ -865,7 +865,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     // Fully qualified file names.
     String location = getLocation();
     for (FileDescriptor fd : fdList) {
-      fileNames.add(location + Path.SEPARATOR + fd.getFileName());
+      fileNames.add(location + Path.SEPARATOR + fd.getRelativePath());
     }
     return fileNames;
   }
