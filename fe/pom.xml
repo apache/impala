@@ -492,8 +492,11 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>2.10</version>
+        <version>3.1.1</version>
         <executions>
+          <!-- TODO(todd): consider removing this execution or moving it to
+               some kind of 'dist' profile. No need to copy all of these jars
+               on every build of the FE! -->
           <execution>
             <id>copy-dependencies</id>
             <phase>package</phase>
@@ -504,6 +507,21 @@ under the License.
               <excludeTypes>pom</excludeTypes>
               <includeScope>runtime</includeScope>
               <silent>true</silent>
+            </configuration>
+          </execution>
+          <!--
+            Write the runtime classpath to a file in the target directory
+            so it can be picked up by bin/set-classpath.sh
+          -->
+          <execution>
+            <id>write-classpath</id>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.directory}/build-classpath.txt</outputFile>
+              <includeScope>runtime</includeScope>
+              <excludeTypes>pom</excludeTypes>
             </configuration>
           </execution>
         </executions>

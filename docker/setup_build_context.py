@@ -60,11 +60,15 @@ for lib in ["libstdc++", "libgcc"]:
         symlink_file_into_dir(so, LIB_DIR)
 os.symlink(os.environ["IMPALA_KUDU_HOME"], os.path.join(OUTPUT_DIR, "kudu"))
 
-# Impala jars and dependencies.
-for glob_pattern in [os.path.join(IMPALA_HOME, "fe/target/dependency/*.jar"),
-    os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar")]:
-  for jar in glob.glob(glob_pattern):
-      symlink_file_into_dir(jar, LIB_DIR)
+# Impala dependencies.
+dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
+for jar in dep_classpath.split(":"):
+  assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
+  symlink_file_into_dir(jar, LIB_DIR)
+
+# Impala jars.
+for jar in glob.glob(os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar")):
+  symlink_file_into_dir(jar, LIB_DIR)
 
 # Templates for debug web pages.
 os.symlink(os.path.join(IMPALA_HOME, "www"), os.path.join(OUTPUT_DIR, "www"))
