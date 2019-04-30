@@ -121,6 +121,16 @@ public class LocalCatalog implements FeCatalog {
   }
 
   @Override
+  public FeTable getTableNoThrow(String dbName, String tableName) {
+    try {
+      return getTable(dbName, tableName);
+    } catch (Exception e) {
+      // pass
+    }
+    return null;
+  }
+
+  @Override
   public TCatalogObject getTCatalogObject(TCatalogObject objectDesc)
       throws CatalogException {
     // TODO(todd): this probably makes the /catalog page not load with an error.

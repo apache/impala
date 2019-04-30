@@ -22,8 +22,10 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -36,7 +38,11 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TMetadataOpcode;
+import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -52,12 +58,14 @@ import com.google.common.collect.Iterables;
 public class LocalCatalogTest {
   private CatalogdMetaProvider provider_;
   private LocalCatalog catalog_;
+  private Frontend fe_;
 
   @Before
-  public void setupCatalog() {
+  public void setupCatalog() throws Exception {
     FeSupport.loadLibrary();
     provider_ = new CatalogdMetaProvider(BackendConfig.INSTANCE.getBackendCfg());
     catalog_ = new LocalCatalog(provider_, /*defaultKuduMasterHosts=*/null);
+    fe_ = new Frontend(new NoopAuthorizationFactory(), catalog_);
   }
 
   @Test
@@ -347,5 +355,20 @@ public class LocalCatalogTest {
         (FeFsTable)catalog_.getTable("functional", "table_with_header");
     assertEquals(table_with_header.parseSkipHeaderLineCount(error), 1);
     assertEquals(error.length(), 0);
+  }
+
+  /**
+   * Test GET_TABLES request on an Impala incompatible table. It should be silently
+   * ignored.
+   */
+  @Test
+  public void testGetTables() throws Exception {
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    req.get_tables_req.setTableName("bad_serde");
+    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
+    assertEquals(0, resp.rows.size());
   }
 }

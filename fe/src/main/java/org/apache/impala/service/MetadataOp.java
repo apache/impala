@@ -301,8 +301,11 @@ public class MetadataOp {
         List<String> tableComments = Lists.newArrayList();
         List<String> tableTypes = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
-          FeTable table = catalog.getTable(db.getName(), tabName);
-          if (table == null) continue;
+          FeTable table = catalog.getTableNoThrow(db.getName(), tabName);
+          if (table == null) {
+            result.missingTbls.add(new TableName(db.getName(), tabName));
+            continue;
+          }
 
           String comment = null;
           List<Column> columns = Lists.newArrayList();

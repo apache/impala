@@ -43,6 +43,9 @@ public interface FeCatalog {
   FeTable getTable(String db_name, String table_name)
       throws DatabaseNotFoundException;
 
+  /** @see Catalog#getTableNoThrow(String, String) */
+  FeTable getTableNoThrow(String db_name, String table_name);
+
   /** @see Catalog#getTCatalogObject(TCatalogObject) */
   TCatalogObject getTCatalogObject(TCatalogObject objectDesc)
       throws CatalogException;
