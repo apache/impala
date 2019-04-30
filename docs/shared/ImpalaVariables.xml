@@ -25,13 +25,13 @@ under the License.
       <prodinfo audience="PDF" id="prodinfo_for_html">
         <prodname>Impala</prodname>
         <vrmlist>
-          <vrm version="Impala 3.2.x"/>
+          <vrm version="Impala 3.3.x"/>
         </vrmlist>
       </prodinfo>
       <prodinfo audience="HTML" id="prodinfo_for_pdf">
         <prodname></prodname>
         <vrmlist>
-          <vrm version="Impala 3.2.x"/>
+          <vrm version="Impala 3.3.x"/>
         </vrmlist>
       </prodinfo>
     </metadata>
@@ -42,6 +42,7 @@ under the License.
        The docs included with a distro can refer to the distro release number by
        editing the values here.
        <ul>
+        <li><ph id="impala33">Impala 3.3</ph></li>
         <li><ph id="impala32">Impala 3.2</ph></li>
         <li><ph id="impala31">Impala 3.1</ph></li>
         <li><ph id="impala30">Impala 3.0</ph></li>
@@ -58,11 +59,11 @@ under the License.
         <li><ph id="impala13">Impala 1.3</ph></li>
       </ul>
     </p>
-    <p>Release Version Variable - <ph id="ReleaseVersion">Impala 3.2.x</ph></p>
+    <p>Release Version Variable - <ph id="ReleaseVersion">Impala 3.3.x</ph></p>
     <p>Banner for examples showing shell version -<ph id="ShellBanner">(Shell
-      build version: Impala Shell v3.2.x (<varname>hash</varname>) built on
+      build version: Impala Shell v3.3.x (<varname>hash</varname>) built on
       <varname>date</varname>)</ph></p>
-    <p>Banner for examples showing impalad version -<ph id="ImpaladBanner">Server version: impalad version 3.2.x (build
+    <p>Banner for examples showing impalad version -<ph id="ImpaladBanner">Server version: impalad version 3.3.x (build
       x.y.z)</ph></p>
     <data name="version-message" id="version-message">
       <foreign>

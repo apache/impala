@@ -136,7 +136,7 @@ under the License.
       </p>
 
       <note>
-        This is a preview feature in <keyword keyref="impala32_full"/> and not generally
+        This is a preview feature in <keyword keyref="impala33_full"/> and not generally
         available.
       </note>
 
@@ -155,6 +155,35 @@ under the License.
         <li>
           Removes the tables from <codeph>catalogd</codeph> when it receives the <codeph>DROP
           TABLE</codeph> or <codeph>DROP DATABASE</codeph> events.
+        </li>
+
+        <li>
+          Changes the database and updates <codeph>catalogd</codeph> when it receives the
+          <codeph>ALTER DATABASE</codeph> events. The following changes are supported. This
+          event does not invalidate the tables in the database.
+          <ul>
+            <li>
+              Change the database properties
+            </li>
+
+            <li>
+              Change the comment on the database
+            </li>
+
+            <li>
+              Change the owner of the database
+            </li>
+
+            <li>
+              Change the default location of the database
+              <p>
+                Changing the default location of the database does not move the tables of that
+                database to the new location. Only the new tables which are created subsequently
+                use the default location of the database in case it is not provided in the
+                create table statement.
+              </p>
+            </li>
+          </ul>
         </li>
       </ul>
 
@@ -182,10 +211,6 @@ under the License.
           <p>
             Only new tables and partitions are synced.
           </p>
-        </li>
-
-        <li>
-          The <codeph>ALTER DATABASE</codeph> events are not supported and currently ignored.
         </li>
       </ul>
 
@@ -298,7 +323,8 @@ under the License.
     <concept id="event_processor_metrics">
 
       <title>Metrics for Event Based Automatic Metadata Sync</title>
-      <!--AR 3/29/2019 Incorporate this section to the web UI doc when this feature goes GA.-->
+
+<!--AR 3/29/2019 Incorporate this section to the web UI doc when this feature goes GA.-->
 
       <conbody>
 
