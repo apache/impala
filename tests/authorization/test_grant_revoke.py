@@ -340,11 +340,11 @@ class TestGrantRevoke(SentryCacheTestSuite):
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
                    "--authorization_policy_provider_class="
-                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                    .format(SENTRY_CONFIG_FILE_OO),
       catalogd_args="--sentry_config={0} "
                     "--authorization_policy_provider_class="
-                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE_OO),
       sentry_config=SENTRY_CONFIG_FILE_OO)
   def test_same_name_for_role_and_user_invalidate_metadata(self, unique_name):

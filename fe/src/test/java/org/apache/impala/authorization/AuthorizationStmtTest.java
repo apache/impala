@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.analysis;
+package org.apache.impala.authorization;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -33,13 +33,8 @@ import java.util.stream.Collectors;
 
 import com.sun.jersey.api.client.ClientResponse;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationFactory;
-import org.apache.impala.authorization.AuthorizationProvider;
-import org.apache.impala.authorization.PrivilegeRequest;
-import org.apache.impala.authorization.User;
-import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.ranger.RangerAuthorizationChecker;
 import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
 import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;

@@ -103,11 +103,11 @@ class TestAuthorization(CustomClusterTestSuite):
       impalad_args="--server_name=server1 "
                    "--sentry_config={0} "
                    "--authorization_policy_provider_class="
-                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                    .format(SENTRY_CONFIG_FILE),
       catalogd_args="--sentry_config={0} "
                     "--authorization_policy_provider_class="
-                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE),
       sentry_config=SENTRY_CONFIG_FILE)
   def test_custom_authorization_provider(self, unique_role):

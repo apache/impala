@@ -118,11 +118,11 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
                    "--authorization_policy_provider_class="
-                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                    .format(SENTRY_CONFIG_FILE_OO),
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
                     "--authorization_policy_provider_class="
-                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE_OO, SENTRY_LONG_POLLING_FREQUENCY_S),
       sentry_config=SENTRY_CONFIG_FILE_OO,
       sentry_log_dir="{0}/test_owner_privileges_with_grant".format(SENTRY_BASE_LOG_DIR))
@@ -236,10 +236,10 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
                    "--authorization_policy_provider_class="
-                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                    .format(SENTRY_CONFIG_FILE_NO_OO),
       catalogd_args="--sentry_config={0} --authorization_policy_provider_class="
-                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE_NO_OO),
       sentry_config=SENTRY_CONFIG_FILE_NO_OO,
       sentry_log_dir="{0}/test_owner_privileges_disabled".format(SENTRY_BASE_LOG_DIR))
@@ -295,11 +295,11 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
                    "--authorization_policy_provider_class="
-                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                    .format(SENTRY_CONFIG_FILE_OO_NOGRANT),
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
                     "--authorization_policy_provider_class="
-                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                     .format(SENTRY_CONFIG_FILE_OO_NOGRANT,
                             SENTRY_LONG_POLLING_FREQUENCY_S),
       sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT,
@@ -368,11 +368,11 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config={0} "
                  "--authorization_policy_provider_class="
-                 "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                 "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                  .format(SENTRY_CONFIG_FILE_OO),
     catalogd_args="--sentry_config={0} "
                   "--authorization_policy_provider_class="
-                  "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                  "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
                   .format(SENTRY_CONFIG_FILE_OO),
     sentry_config=SENTRY_CONFIG_FILE_OO,
     sentry_log_dir="{0}/test_owner_privileges_different_cases"

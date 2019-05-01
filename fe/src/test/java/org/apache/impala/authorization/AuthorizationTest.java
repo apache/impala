@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.analysis;
+package org.apache.impala.authorization;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL;
 import static org.junit.Assert.assertEquals;
@@ -32,11 +32,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationFactory;
-import org.apache.impala.authorization.User;
+import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeDb;
@@ -46,8 +43,8 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.service.CustomClusterGroupMapper;
-import org.apache.impala.service.CustomClusterResourceAuthorizationProvider;
+import org.apache.impala.testutil.TestSentryGroupMapper;
+import org.apache.impala.testutil.TestSentryResourceAuthorizationProvider;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TMetadataOpRequest;
@@ -122,13 +119,13 @@ public class AuthorizationTest extends FrontendTestBase {
         false);
     Role role = catalog.addRole(role_);
     addRolePrivilege(catalog, privilege, role);
-    catalog.addRoleGrantGroup(role_, CustomClusterGroupMapper.SERVER_ADMIN);
+    catalog.addRoleGrantGroup(role_, TestSentryGroupMapper.SERVER_ADMIN);
 
     // Create test users
     Set<String> groups = new HashSet<>(Arrays.asList(
         USER.getName(),
-        CustomClusterGroupMapper.AUTH_TO_LOCAL,
-        CustomClusterGroupMapper.TEST_USER));
+        TestSentryGroupMapper.AUTH_TO_LOCAL,
+        TestSentryGroupMapper.TEST_USER));
       role_ = "testRole";
       role = catalog.addRole(role_);
 
@@ -470,7 +467,7 @@ public class AuthorizationTest extends FrontendTestBase {
     //   </property>
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
        AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
-        CustomClusterResourceAuthorizationProvider.class.getName());
+        TestSentryResourceAuthorizationProvider.class.getName());
     SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
         authzConfig);
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
@@ -625,7 +622,7 @@ public class AuthorizationTest extends FrontendTestBase {
     // CustomClusterResourceAuthorizationProvider.
     SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
         AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
-        CustomClusterResourceAuthorizationProvider.class.getName());
+        TestSentryResourceAuthorizationProvider.class.getName());
     SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
       setupImpalaCatalog(catalog);

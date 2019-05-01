@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.service;
+package org.apache.impala.testutil;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -30,7 +30,7 @@ import java.util.Set;
  * This class is used for testing complex privileges where we don't create
  * users and groups on the system.
  */
-public class CustomClusterGroupMapper implements GroupMappingService {
+public class TestSentryGroupMapper implements GroupMappingService {
   private final Map<String, Set<String>> groupsMap_ = Maps.newHashMap();
 
   public static final String SERVER_ADMIN = "server_admin";
@@ -38,11 +38,11 @@ public class CustomClusterGroupMapper implements GroupMappingService {
   public static final String AUTH_TO_LOCAL = "auth_to_local_group";
 
   // Needed for sentry service to lookup groups.
-  public CustomClusterGroupMapper(Configuration conf, String resource) {
+  public TestSentryGroupMapper(Configuration conf, String resource) {
     this();
   }
 
-  public CustomClusterGroupMapper() {
+  public TestSentryGroupMapper() {
     // Need to make sure we can resolve the dev user.
     String devUser = System.getProperty("user.name");
     groupsMap_.put(devUser, Sets.newHashSet(devUser));

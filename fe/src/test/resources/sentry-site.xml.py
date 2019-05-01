@@ -58,7 +58,7 @@ if variant is not None:
    'sentry.hive.testing.mode': 'true',
    'sentry.policy.store.plugins': 'org.apache.sentry.hdfs.SentryPlugin',
    # Custom group mapping for custom cluster tests .
-   'sentry.store.group.mapping': 'org.apache.impala.service.CustomClusterGroupMapper',
+   'sentry.store.group.mapping': 'org.apache.impala.testutil.TestSentryGroupMapper',
    'sentry.service.processor.factories': '${SENTRY_PROCESSOR_FACTORIES}',
   })
 

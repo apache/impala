@@ -15,22 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.service;
+package org.apache.impala.testutil;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.sentry.core.common.Model;
 import org.apache.sentry.policy.common.PolicyEngine;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 
-public class CustomClusterResourceAuthorizationProvider
+public class TestSentryResourceAuthorizationProvider
     extends ResourceAuthorizationProvider {
-  public CustomClusterResourceAuthorizationProvider(String resource, PolicyEngine policy,
+  public TestSentryResourceAuthorizationProvider(String resource, PolicyEngine policy,
       Model model) {
-    super(policy, new CustomClusterGroupMapper(), model);
+    super(policy, new TestSentryGroupMapper(), model);
   }
 
-  public CustomClusterResourceAuthorizationProvider(Configuration conf, String resource,
+  public TestSentryResourceAuthorizationProvider(Configuration conf, String resource,
       PolicyEngine policy, Model model) {
-    super(policy, new CustomClusterGroupMapper(), model);
+    super(policy, new TestSentryGroupMapper(), model);
   }
 }
