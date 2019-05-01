@@ -227,11 +227,6 @@ under the License.
             href="impala_resource_trace_ratio.xml#resource_trace_ratio"
             >RESOURCE_TRACE_RATIO</xref></codeph> query option.</p>
       <ul>
-        <li>For each host that participates in the query execution it adds the
-          read and write bandwidth across all disks. This includes all data read
-          or written by the host as part of the execution of a query (spilling),
-          by the HDFS data node, and by other processes running on the same
-          system.</li>
         <li><codeph>CpuIoWaitPercentage</codeph>
         </li>
         <li><codeph>CpuSysPercentage</codeph></li>
