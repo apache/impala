@@ -55,7 +55,7 @@ class TestAuthorizationProvider(CustomClusterTestSuite):
     # parse log file for expected exception
     assert_file_in_dir_contains(TestAuthorizationProvider.LOG_DIR,
                                 "InternalException: Could not parse "
-                                "authorization_provider flag: {}"
+                                "authorization_provider flag: {0}"
                                 .format(TestAuthorizationProvider.BAD_FLAG))
 
   def setup_method(self, method):
