@@ -161,21 +161,18 @@ fi
 export IMPALA_TOOLCHAIN_HOST
 export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=1055188
-export CDP_BUILD_NUMBER=1013201
+export CDP_BUILD_NUMBER=1056671
 export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export IMPALA_RANGER_VERSION=1.2.0.6.0.99.0-45
+export IMPALA_RANGER_VERSION=1.2.0.6.0.99.0-147
 export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
 export CDH_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
-# This is a custom build of Hive which includes patches for HIVE-21586
-# HIVE-21077, HIVE-21526, HIVE-21561
-# TODO Use a official once these patches are merged
-export CDP_HIVE_VERSION=3.1.0.6.0.99.0-38-0e7f6337a50
+export CDP_HIVE_VERSION=3.1.0.6.0.99.0-147
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -202,15 +199,7 @@ if $USE_CDP_HIVE; then
   # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
   # the minicluster
   export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
-  # Temporary version of Tez, patched with the fix for TEZ-1348:
-  # https://github.com/apache/tez/pull/40
-  # We'll switch to a non-"todd" version of Tez once that fix is integrated.
-  # For now, if you're bumping the CDP build number, you'll need to download
-  # this tarball from an earlier build and re-upload it to the new directory
-  # in the toolchain bucket.
-  #
-  # TODO(todd) switch to an official build.
-  export IMPALA_TEZ_VERSION=0.10.0-todd-6fcc41e5798b.1
+  export IMPALA_TEZ_VERSION=0.9.1.6.0.99.0-147
 else
   # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
   # false
@@ -311,8 +300,8 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
 if $USE_CDP_HIVE; then
   export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
-  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/apache-hive-\
-${IMPALA_HIVE_VERSION}-src"}
+  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-\
+${IMPALA_HIVE_VERSION}"}
   # Set the path to the hive_metastore.thrift which is used to build thrift code
   export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
   # It is likely that devs will want to work with both the versions of metastore
