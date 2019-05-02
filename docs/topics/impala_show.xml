@@ -33,16 +33,10 @@ under the License.
   </prolog>
 
   <conbody>
-
-    <p>
-      <indexterm audience="hidden">SHOW statement</indexterm>
-      The <codeph>SHOW</codeph> statement is a flexible way to get information about different types of Impala
-      objects.
-    </p>
-
+    <p> The <codeph>SHOW</codeph> statement is a flexible way to get information
+      about different types of Impala objects. </p>
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
-
-<codeblock>SHOW DATABASES [[LIKE] '<varname>pattern</varname>']
+    <codeblock>SHOW DATABASES [[LIKE] '<varname>pattern</varname>']
 SHOW SCHEMAS [[LIKE] '<varname>pattern</varname>'] - an alias for SHOW DATABASES
 SHOW TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']
 <ph rev="1.2.0">SHOW [AGGREGATE | ANALYTIC] FUNCTIONS [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']</ph>
@@ -56,39 +50,47 @@ SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> <
 
 <ph rev="2.0.0">SHOW ROLES
 SHOW CURRENT ROLES
-SHOW ROLE GRANT GROUP <varname>group_name</varname>
-SHOW GRANT ROLE <varname>role_name</varname></ph>
+SHOW ROLE GRANT GROUP <varname>group_name</varname></ph>
 
-<ph rev="3.1.0">SHOW GRANT USER <varname>user_name</varname>
-SHOW GRANT USER <varname>user_name</varname> ON SERVER
+<ph rev="3.1.0">SHOW GRANT USER <varname>user_name</varname> ON SERVER
 SHOW GRANT USER <varname>user_name</varname> ON DATABASE <varname>database_name</varname>
-SHOW GRANT USER <varname>user_name</varname> ON TABLE <varname>table_name</varname>
+SHOW GRANT USER <varname>user_name</varname> ON TABLE <varname>database_name.table_name</varname>
 SHOW GRANT USER <varname>user_name</varname> ON URI <varname>uri</varname></ph>
-</codeblock>
+SHOW GRANT USER <varname>user_name</varname> ON COLUMN <varname>database_name.table_name.column_name</varname></codeblock>
+    <p>The following statements are supported only when Impala uses Sentry to
+      manage authorization.</p>
+    <codeblock>SHOW GRANT USER <varname>user_name</varname>
 
-    <p>
-      Issue a <codeph>SHOW <varname>object_type</varname></codeph> statement to see the appropriate objects in the
-      current database, or <codeph>SHOW <varname>object_type</varname> IN <varname>database_name</varname></codeph>
-      to see objects in a specific database.
-    </p>
-
-    <p>
-      The optional <varname>pattern</varname> argument is a quoted string literal, using Unix-style
-      <codeph>*</codeph> wildcards and allowing <codeph>|</codeph> for alternation. The preceding
-      <codeph>LIKE</codeph> keyword is also optional. All object names are stored in lowercase, so use all
-      lowercase letters in the pattern string. For example:
-    </p>
-
-<codeblock>show databases 'a*';
-show databases like 'a*';
-show tables in some_db like '*fact*';
-use some_db;
-show tables '*dim*|*fact*';</codeblock>
-
+SHOW GRANT ROLE <varname>role_name</varname>
+SHOW GRANT ROLE <varname>role_name</varname> ON SERVER
+SHOW GRANT ROLE <varname>role_name</varname> ON DATABASE <varname>database_name</varname>
+SHOW GRANT ROLE <varname>role_name</varname> ON TABLE <varname>database_name.table_name</varname>
+SHOW GRANT ROLE <varname>role_name</varname> ON URI <varname>uri</varname>
+SHOW GRANT ROLE <varname>role_name</varname> ON COLUMN <varname>database_name.table_name.column_name</varname></codeblock>
+    <p rev="3.3">The following statements are supported only when Impala uses
+      Ranger to manage authorization.</p>
+    <codeblock>SHOW GRANT GROUP <varname>group_name</varname> ON SERVER
+SHOW GRANT GROUP <varname>group_name</varname> ON DATABASE <varname>database_name</varname>
+SHOW GRANT GROUP <varname>group_name</varname> ON TABLE <varname>database_name.table_name</varname>
+SHOW GRANT GROUP <varname>group_name</varname> ON URI <varname>uri</varname>
+SHOW GRANT GROUP <varname>group_name</varname> ON COLUMN <varname>database_name.table_name.column_name</varname></codeblock>
+    <p> Issue a <codeph>SHOW <varname>object_type</varname></codeph> statement
+      to see the appropriate objects in the current database, or <codeph>SHOW
+          <varname>object_type</varname> IN
+        <varname>database_name</varname></codeph> to see objects in a specific
+      database. </p>
+    <p> The optional <varname>pattern</varname> argument is a quoted string
+      literal, using Unix-style <codeph>*</codeph> wildcards and allowing
+        <codeph>|</codeph> for alternation. The preceding <codeph>LIKE</codeph>
+      keyword is also optional. All object names are stored in lowercase, so use
+      all lowercase letters in the pattern string. For example: </p>
+    <codeblock>SHOW DATABASES 'a*';
+SHOW DATABASES LIKE 'a*';
+SHOW TABLES IN some_db LIKE '*fact*';
+USE some_db;
+SHOW TABLES '*dim*|*fact*';</codeblock>
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
-
     <p outputclass="toc inpage"/>
-
   </conbody>
 
   <concept rev="2.2.0" id="show_files">
