@@ -104,7 +104,7 @@ class Package(object):
 
 
 class CdpComponent(object):
-  def __init__(self, basename, makedir=False):
+  def __init__(self, basename, makedir=False, pkg_directory=None):
     """
     basename: the name of the file to be downloaded, without its .tar.gz suffix
     makedir: if false, it is assumed that the downloaded tarball will expand
@@ -115,6 +115,12 @@ class CdpComponent(object):
     """
     self.basename = basename
     self.makedir = makedir
+    cdp_components_home = os.environ.get("CDP_COMPONENTS_HOME")
+    if cdp_components_home is None:
+      raise Exception("CDP_COMPONENTS_HOME is not set. Cannot determine the "
+                      "component package directory")
+    self.pkg_directory = "{0}/{1}".format(cdp_components_home,
+                            pkg_directory if pkg_directory else basename)
 
 
 def try_get_platform_release_label():
@@ -449,8 +455,8 @@ def download_cdp_components(cdp_components, url_prefix):
     os.makedirs(cdp_components_home)
 
   def download(component):
-    pkg_directory = "{0}/{1}".format(cdp_components_home, component.basename)
-    if os.path.isdir(pkg_directory): return
+
+    if os.path.isdir(component.pkg_directory): return
     file_name = "{0}.tar.gz".format(component.basename)
     download_path = "{0}/{1}".format(url_prefix, file_name)
     dst = cdp_components_home
@@ -461,14 +467,14 @@ def download_cdp_components(cdp_components, url_prefix):
       wget_and_unpack_package(download_path, file_name, dst, False)
     except:  # noqa
       # Clean up any partially-unpacked result.
-      if os.path.isdir(pkg_directory):
-        shutil.rmtree(pkg_directory)
+      if os.path.isdir(component.pkg_directory):
+        shutil.rmtree(component.pkg_directory)
       # Clean up any temp directory if we made one
       if component.makedir:
         shutil.rmtree(dst)
       raise
     if component.makedir:
-      os.rename(dst, pkg_directory)
+      os.rename(dst, component.pkg_directory)
 
   execute_many(download, cdp_components)
 
@@ -570,10 +576,10 @@ if __name__ == "__main__":
   ]
   use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
   if use_cdp_hive:
-    cdp_components.append(CdpComponent("hive-{0}-source"
-                          .format(os.environ.get("IMPALA_HIVE_VERSION")))),
-    cdp_components.append(CdpComponent("apache-hive-{0}-bin"
-                          .format(os.environ.get("IMPALA_HIVE_VERSION")))),
+    hive_version = os.environ.get("IMPALA_HIVE_VERSION")
+    cdp_components.append(CdpComponent("hive-{0}-source".format(hive_version),
+                          pkg_directory="hive-{0}".format(hive_version))),
+    cdp_components.append(CdpComponent("apache-hive-{0}-bin".format(hive_version))),
     cdp_components.append(CdpComponent(
         "tez-{0}-minimal".format(os.environ.get("IMPALA_TEZ_VERSION")),
         makedir=True))
