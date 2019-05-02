@@ -27,6 +27,7 @@ import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -50,9 +51,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
+
+import static org.apache.impala.thrift.TPrincipalType.ROLE;
 
 /**
  * An implementation of {@link AuthorizationManager} for Impalad that uses Sentry.
@@ -95,7 +99,18 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
 
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
-    if (params.isIs_admin_op()) {
+    Set<String> groups = authzChecker_.get()
+        .getUserGroups(new User(params.requesting_user));
+
+    // Check if the user is part of the group (case-sensitive) this SHOW ROLES
+    // statement is targeting. If they are already a member of the group,
+    // the admin requirement can be removed.
+    // If the the statement is SHOW CURRENT ROLES, the admin requirement can also be
+    // removed.
+    boolean adminOp =
+        !(groups.contains(params.getGrant_group()) || params.is_show_current_roles);
+
+    if (adminOp) {
       validateSentryAdmin(params.getRequesting_user());
     }
 
@@ -187,7 +202,17 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
-    if (params.isIs_admin_op()) {
+    Principal principal = (params.principal_type == ROLE) ?
+        catalog_.getOrCreateCatalog().getAuthPolicy().getPrincipal(params.getName(),
+            params.getPrincipal_type()) :
+        Principal.newInstance(params.name, params.principal_type, new HashSet<>());
+
+    if (principal == null) {
+      throw new AuthorizationException(String.format("%s '%s' does not exist.",
+          Principal.toString(params.principal_type), params.name));
+    }
+
+    if (isAdminOp(params, principal, authzChecker_.get())) {
       validateSentryAdmin(params.getRequesting_user());
     }
 
@@ -203,6 +228,21 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
       default:
         throw new InternalException(String.format("Unexpected TPrincipalType: %s",
             params.getPrincipal_type()));
+    }
+  }
+
+  private static boolean isAdminOp(TShowGrantPrincipalParams params, Principal principal,
+      SentryAuthorizationChecker authzChecker) throws ImpalaException {
+    Set<String> groupNames = authzChecker.getUserGroups(new User(params.requesting_user));
+
+    switch (params.principal_type) {
+      case USER:
+        return !principal.getName().equals(params.requesting_user);
+      case GROUP:
+      case ROLE:
+        return Sets.intersection(groupNames, principal.getGrantGroups()).isEmpty();
+      default:
+        return false;
     }
   }
 

@@ -51,11 +51,5 @@ public class CreateDropRoleStmt extends AuthorizationStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Role existingRole = analyzer.getCatalog().getAuthPolicy().getRole(roleName_);
-    if (isDropRole_ && existingRole == null) {
-      throw new AnalysisException(String.format("Role '%s' does not exist.", roleName_));
-    } else if (!isDropRole_ && existingRole != null) {
-      throw new AnalysisException(String.format("Role '%s' already exists.", roleName_));
-    }
   }
 }

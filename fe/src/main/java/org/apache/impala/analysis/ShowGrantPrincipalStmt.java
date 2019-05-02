@@ -37,9 +37,6 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
   private final String name_;
   private final TPrincipalType principalType_;
 
-  // Set/modified during analysis.
-  private Principal principal_;
-
   public ShowGrantPrincipalStmt(String name, TPrincipalType principalType,
       PrivilegeSpec privilegeSpec) {
     Preconditions.checkNotNull(name);
@@ -56,24 +53,6 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
       throw new AnalysisException(String.format("%s name in SHOW GRANT %s cannot be " +
           "empty.", Principal.toString(principalType_),
           Principal.toString(principalType_).toUpperCase()));
-    }
-
-    switch(principalType_) {
-      case ROLE:
-        principal_ = analyzer.getCatalog().getAuthPolicy().getPrincipal(name_,
-            principalType_);
-        if (principal_ == null) {
-          throw new AnalysisException(String.format("%s '%s' " +
-              "does not exist.", Principal.toString(principalType_), name_));
-        }
-        break;
-      case USER:
-      case GROUP:
-        principal_ = Principal.newInstance(name_, principalType_, new HashSet<>());
-        break;
-      default:
-        throw new AnalysisException(String.format("Unexpected TPrincipalType %s",
-            principalType_.name()));
     }
 
     if (privilegeSpec_ != null) privilegeSpec_.analyze(analyzer);
@@ -118,10 +97,7 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
     params.setRequesting_user(requestingUser_.getShortName());
     if (privilegeSpec_ != null) {
       params.setPrivilege(privilegeSpec_.toThrift().get(0));
-      params.getPrivilege().setPrincipal_id(principal_.getId());
     }
     return params;
   }
-
-  public Principal getPrincipal() { return principal_; }
 }

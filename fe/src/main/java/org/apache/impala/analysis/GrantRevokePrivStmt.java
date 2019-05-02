@@ -33,8 +33,8 @@ import com.google.common.base.Strings;
  * All privilege checks on catalog objects are skipped when executing
  * GRANT/REVOKE statements. This is because we need to be able to create
  * privileges on an object before any privileges actually exist.
- * The GRANT/REVOKE statement itself will be authorized (currently by
- * the Sentry Service).
+ * The GRANT/REVOKE statement itself will be authorized by the loaded
+ * authorization provider.
  */
 public class GrantRevokePrivStmt extends AuthorizationStmt {
   private final PrivilegeSpec privilegeSpec_;
@@ -42,10 +42,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
   private final boolean isGrantPrivStmt_;
   private final boolean hasGrantOpt_;
   private final TPrincipalType principalType_;
-
-  // Set/modified during analysis
-  // TODO: This will need to be cleaned up when Ranger supports RBAC
-  private Role role_;
 
   public GrantRevokePrivStmt(String roleName, PrivilegeSpec privilegeSpec,
       boolean isGrantPrivStmt, boolean hasGrantOpt, TPrincipalType principalType) {
@@ -64,9 +60,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     params.setIs_grant(isGrantPrivStmt_);
     List<TPrivilege> privileges = privilegeSpec_.toThrift();
     for (TPrivilege privilege: privileges) {
-      if (principalType_ == TPrincipalType.ROLE && role_ != null) {
-        privilege.setPrincipal_id(role_.getId());
-      }
       privilege.setPrincipal_type(principalType_);
       privilege.setHas_grant_opt(hasGrantOpt_);
     }
@@ -102,9 +95,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
           "empty.");
     }
 
-    if (principalType_ == TPrincipalType.ROLE) {
-      role_ = analyzer.getCatalog().getAuthPolicy().getRole(principalName_);
-    }
     privilegeSpec_.analyze(analyzer);
   }
 }

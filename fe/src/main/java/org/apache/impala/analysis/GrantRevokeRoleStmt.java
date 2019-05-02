@@ -57,9 +57,6 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (analyzer.getCatalog().getAuthPolicy().getRole(roleName_) == null) {
-      throw new AnalysisException(String.format("Role '%s' does not exist.", roleName_));
-    }
     if (Strings.isNullOrEmpty(roleName_)) {
       throw new AnalysisException("Role name in GRANT/REVOKE ROLE cannot be empty.");
     }

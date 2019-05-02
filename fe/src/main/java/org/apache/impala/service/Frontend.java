@@ -499,24 +499,12 @@ public class Frontend {
       ResetMetadataStmt resetMetadataStmt = (ResetMetadataStmt) analysis.getStmt();
       TResetMetadataRequest req = resetMetadataStmt.toThrift();
       ddl.setReset_metadata_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
+      metadata.setColumns(Collections.emptyList());
     } else if (analysis.isShowRolesStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_ROLES;
       ShowRolesStmt showRolesStmt = (ShowRolesStmt) analysis.getStmt();
       ddl.setShow_roles_params(showRolesStmt.toThrift());
       Preconditions.checkState(getAuthzChecker() instanceof SentryAuthorizationChecker);
-      Set<String> groupNames = getAuthzChecker().getUserGroups(
-          analysis.getAnalyzer().getUser());
-      // Check if the user is part of the group (case-sensitive) this SHOW ROLE
-      // statement is targeting. If they are already a member of the group,
-      // the admin requirement can be removed.
-      // If the the statement is SHOW CURRENT ROLES, the admin requirement can also be
-      // removed.
-      Preconditions.checkState(ddl.getShow_roles_params().isSetIs_admin_op());
-      ddl.getShow_roles_params().setIs_admin_op(!(
-          (ddl.getShow_roles_params().isSetGrant_group() &&
-              groupNames.contains(ddl.getShow_roles_params().getGrant_group())) ||
-              ddl.getShow_roles_params().isIs_show_current_roles()));
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
     } else if (analysis.isShowGrantPrincipalStmt()) {
@@ -524,22 +512,7 @@ public class Frontend {
       ShowGrantPrincipalStmt showGrantPrincipalStmt =
           (ShowGrantPrincipalStmt) analysis.getStmt();
       ddl.setShow_grant_principal_params(showGrantPrincipalStmt.toThrift());
-      Set<String> groupNames = getAuthzChecker().getUserGroups(
-          analysis.getAnalyzer().getUser());
-      // User must be an admin to execute this operation if they have not been granted
-      // this principal, or the same user as the request.
-      boolean requiresAdmin;
-      if (showGrantPrincipalStmt.getPrincipal().getPrincipalType()
-          == TPrincipalType.USER) {
-        requiresAdmin = !showGrantPrincipalStmt.getPrincipal().getName().equals(
-            analysis.getAnalyzer().getUser().getShortName());
-      } else {
-        requiresAdmin = Sets.intersection(groupNames, showGrantPrincipalStmt
-            .getPrincipal().getGrantGroups()).isEmpty();
-      }
-      ddl.getShow_grant_principal_params().setIs_admin_op(requiresAdmin);
-      metadata.setColumns(Arrays.asList(
-          new TColumn("name", Type.STRING.toThrift())));
+      metadata.setColumns(Arrays.asList(new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isCreateDropRoleStmt()) {
       CreateDropRoleStmt createDropRoleStmt = (CreateDropRoleStmt) analysis.getStmt();
       TCreateDropRoleParams params = createDropRoleStmt.toThrift();

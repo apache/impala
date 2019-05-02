@@ -264,7 +264,7 @@ struct TShowRolesParams {
   // True if this opertion requires admin privileges on the Sentry Service. This is
   // needed to check for the case where an operation is_user_scope, but the user does
   // not belong to the specified grant_group.
-  2: required bool is_admin_op
+  // REMOVED: 2: required bool is_admin_op
 
   // True if the statement is "SHOW CURRENT ROLES".
   3: required bool is_show_current_roles
@@ -292,7 +292,7 @@ struct TShowGrantPrincipalParams {
 
   // True if this operation requires admin privileges on the Sentry Service (when
   // the requesting user has not been granted the target role name).
-  4: required bool is_admin_op
+  // REMOVED: 4: required bool is_admin_op
 
   // An optional filter to show grants that match a specific privilege spec.
   5: optional CatalogObjects.TPrivilege privilege

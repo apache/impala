@@ -116,11 +116,6 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
       AnalysisError("SHOW GRANT ROLE myRole ON SERVER", authDisabledCtx,
           "Authorization is not enabled.");
     }
-    AnalysisError("SHOW GRANT ROLE does_not_exist",
-        "Role 'does_not_exist' does not exist.");
-
-    AnalysisError("SHOW GRANT ROLE does_not_exist ON SERVER",
-        "Role 'does_not_exist' does not exist.");
 
     // Determining if a user exists on the system is done in the AuthorizationPolicy and
     // these tests run with authorization disabled. The SHOW GRANT USER will be tested
@@ -132,12 +127,8 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
     AnalyzesOk("DROP ROLE myRole");
     AnalyzesOk("CREATE ROLE doesNotExist");
 
-    AnalysisError("DROP ROLE doesNotExist", "Role 'doesNotExist' does not exist.");
-    AnalysisError("CREATE ROLE myRole", "Role 'myRole' already exists.");
-
     // Role names are case-insensitive
     AnalyzesOk("DROP ROLE MYrole");
-    AnalysisError("CREATE ROLE MYrole", "Role 'MYrole' already exists.");
 
     AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
     AnalysisError("DROP ROLE myRole", authDisabledCtx,
@@ -150,10 +141,6 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
   public void AnalyzeGrantRevokeRole() throws AnalysisException {
     AnalyzesOk("GRANT ROLE myrole TO GROUP abc");
     AnalyzesOk("REVOKE ROLE myrole FROM GROUP abc");
-    AnalysisError("GRANT ROLE doesNotExist TO GROUP abc",
-        "Role 'doesNotExist' does not exist.");
-    AnalysisError("REVOKE ROLE doesNotExist FROM GROUP abc",
-        "Role 'doesNotExist' does not exist.");
 
     AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
     AnalysisError("GRANT ROLE myrole TO GROUP abc", authDisabledCtx,

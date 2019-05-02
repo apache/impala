@@ -21,9 +21,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogObject;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
@@ -51,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * An implementation of {@link AuthorizationManager} for Catalogd that uses Sentry.
@@ -90,7 +93,13 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
-    Role role = sentryProxy_.createRole(requestingUser, params.getRole_name());
+    Role role = catalog_.getAuthPolicy().getRole(params.getRole_name());
+    if (role != null) {
+      throw new AuthorizationException(String.format("Role '%s' already exists.",
+          params.getRole_name()));
+    }
+
+    role = sentryProxy_.createRole(requestingUser, params.getRole_name());
     Preconditions.checkNotNull(role);
 
     TCatalogObject catalogObject = new TCatalogObject();
@@ -106,7 +115,13 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
       TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
-    Role role = sentryProxy_.dropRole(requestingUser, params.getRole_name());
+    Role role = catalog_.getAuthPolicy().getRole(params.getRole_name());
+    if (role == null) {
+      throw new AuthorizationException(String.format("Role '%s' does not exist.",
+          params.getRole_name()));
+    }
+
+    role = sentryProxy_.dropRole(requestingUser, params.getRole_name());
     if (role == null) {
       // Nothing was removed from the catalogd's cache.
       response.result.setVersion(catalog_.getCatalogVersion());
@@ -135,15 +150,16 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     Preconditions.checkArgument(!params.getGroup_names().isEmpty());
     verifySentryServiceEnabled();
 
+    if (catalog_.getAuthPolicy().getRole(params.getRole_names().get(0)) == null) {
+      throw new AuthorizationException(String.format("Role '%s' does not exist.",
+          params.getRole_names().get(0)));
+    }
+
     String roleName = params.getRole_names().get(0);
     String groupName = params.getGroup_names().get(0);
     Role role = sentryProxy_.grantRoleGroup(requestingUser, roleName, groupName);
     Preconditions.checkNotNull(role);
-    TCatalogObject catalogObject = new TCatalogObject();
-    catalogObject.setType(role.getCatalogObjectType());
-    catalogObject.setPrincipal(role.toThrift());
-    catalogObject.setCatalog_version(role.getCatalogVersion());
-    response.result.addToUpdated_catalog_objects(catalogObject);
+    response.result.addToUpdated_catalog_objects(createRoleObject(role));
     response.result.setVersion(role.getCatalogVersion());
   }
 
@@ -154,16 +170,26 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     Preconditions.checkArgument(!params.getGroup_names().isEmpty());
     verifySentryServiceEnabled();
 
+    if (catalog_.getAuthPolicy().getRole(params.getRole_names().get(0)) == null) {
+      throw new AuthorizationException(String.format("Role '%s' does not exist.",
+          params.getRole_names().get(0)));
+    }
+
     String roleName = params.getRole_names().get(0);
     String groupName = params.getGroup_names().get(0);
     Role role = sentryProxy_.revokeRoleGroup(requestingUser, roleName, groupName);
+    response.result.addToUpdated_catalog_objects(createRoleObject(role));
+    response.result.setVersion(role.getCatalogVersion());
+  }
+
+  private static TCatalogObject createRoleObject(Role role) {
     Preconditions.checkNotNull(role);
+
     TCatalogObject catalogObject = new TCatalogObject();
     catalogObject.setType(role.getCatalogObjectType());
     catalogObject.setPrincipal(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
-    response.result.addToUpdated_catalog_objects(catalogObject);
-    response.result.setVersion(role.getCatalogVersion());
+    return catalogObject;
   }
 
   @Override
@@ -174,11 +200,13 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     String roleName = params.getPrincipal_name();
     Role role = catalog_.getAuthPolicy().getRole(roleName);
     if (role == null) {
-      throw new InternalException(String.format("Role '%s' does not exists.",
+      throw new AuthorizationException(String.format("Role '%s' does not exist.",
           roleName));
     }
 
-    List<TPrivilege> privileges = params.getPrivileges();
+    List<TPrivilege> privileges = params.getPrivileges().stream()
+        .peek(p -> p.setPrincipal_id(role.getId()))
+        .collect(Collectors.toList());
     List<PrincipalPrivilege> removedGrantOptPrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
     List<PrincipalPrivilege> addedRolePrivileges =
@@ -216,8 +244,18 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     verifySentryServiceEnabled();
     Preconditions.checkArgument(!params.getPrivileges().isEmpty());
 
+    Role role = catalog_.getAuthPolicy().getRole(params.principal_name);
+    if (role == null) {
+      throw new AuthorizationException(String.format("Role '%s' does not exist.",
+          params.getPrincipal_name()));
+    }
+
     String roleName = params.getPrincipal_name();
-    List<TPrivilege> privileges = params.getPrivileges();
+    List<TPrivilege> privileges = params.getPrivileges().stream()
+        .peek(p -> {
+          if (role != null) p.setPrincipal_id(role.getId());
+        }).collect(Collectors.toList());
+
     // If this is a revoke of a privilege that contains the grant option, the privileges
     // with the grant option will be revoked and new privileges without the grant option
     // will be added.  The privilege in the catalog cannot simply be updated since the
