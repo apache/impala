@@ -25,10 +25,12 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.util.EventSequence;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class StmtMetadataLoaderTest {
@@ -56,6 +58,19 @@ public class StmtMetadataLoaderTest {
     }
   }
 
+  private void testLoadAcidTables(String stmtStr)
+      throws ImpalaException {
+    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
+      Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
+      StatementBase stmt = Parser.parse(stmtStr);
+      EventSequence timeline = new EventSequence("Test Timeline");
+      StmtMetadataLoader mdLoader =
+          new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline);
+      StmtTableCache stmtTableCache = mdLoader.loadTables(stmt);
+      validateTablesWriteIds(stmtTableCache);
+    }
+  }
+
   private void validateDbs(StmtTableCache stmtTableCache, String[] expectedDbs) {
     String[] actualDbs = new String[stmtTableCache.dbs.size()];
     actualDbs = stmtTableCache.dbs.toArray(actualDbs);
@@ -75,6 +90,17 @@ public class StmtMetadataLoaderTest {
     Arrays.sort(actualTables);
     Assert.assertArrayEquals(expectedTables, actualTables);
   }
+
+  private void validateTablesWriteIds(StmtTableCache stmtTableCache) {
+    for (FeTable t: stmtTableCache.tables.values()) {
+      //TODO may check if it is acid table in the future
+      Assert.assertTrue(t.isLoaded());
+      Assert.assertTrue(t.getValidWriteIds() != null);
+      Assert.assertTrue(MetastoreShim.getValidWriteIdListFromString(t.getValidWriteIds())
+          .isWriteIdValid(t.getWriteId()));
+    }
+  }
+
 
   private void validateUncached(StatementBase stmt, Frontend fe,
       int expectedNumLoadRequests, int expectedNumCatalogUpdates,
@@ -199,5 +225,17 @@ public class StmtMetadataLoaderTest {
     // This stmt requires the table to be loaded.
     testLoadTables("refresh functional.alltypes partition (year=2009, month=1)", 1, 1,
         new String[] {"default", "functional"}, new String[] {"functional.alltypes"});
+  }
+
+  @Ignore
+  @Test
+  public void testTableWriteID() throws ImpalaException {
+    if (MetastoreShim.getMajorVersion() == 2)
+      return;
+    // ToDo this assumes the acid tables have been created.
+    // They will be available after IMPALA-8439 is checked in.
+    // Ignore the test for now.
+    testLoadAcidTables("select * from acid.insert_only_no_partitions");
+    testLoadAcidTables("select * from acid.insert_only_with_partitions");
   }
 }

@@ -303,6 +303,9 @@ struct THdfsPartition {
   // Set to true if partition_stats contain intermediate column stats computed via
   // incremental statistics, false otherwise.
   19: optional bool has_incremental_stats
+
+  // For acid table, store last committed write id.
+  20: optional i64 write_id
 }
 
 // Constant partition ID used for THdfsPartition.prototype_partition below.
@@ -472,6 +475,12 @@ struct TTable {
 
   // Set iff this a kudu table
   13: optional TKuduTable kudu_table
+
+  // Set iff this is an acid table. The valid write ids list.
+  // The string is assumed to be created by ValidWriteIdList.writeToString
+  // For example ValidReaderWriteIdList object's format is:
+  // <table_name>:<highwatermark>:<minOpenWriteId>:<open_writeids>:<abort_writeids>
+  14: optional string valid_write_ids
 }
 
 // Represents a database.

@@ -41,6 +41,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
@@ -613,6 +614,10 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   // True if partitionStats_ has intermediate_col_stats populated.
   private boolean hasIncrementalStats_ ;
 
+  // The last committed write ID which modified this partition.
+  // -1 means writeId_ is irrelevant(not supported).
+  private long writeId_ = -1L;
+
   private HdfsPartition(HdfsTable table,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
@@ -641,6 +646,9 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     extractAndCompressPartStats();
     // Intern parameters after removing the incremental stats
     hmsParameters_ = CatalogInterners.internParameters(hmsParameters_);
+    if (MetastoreShim.getMajorVersion() > 2 && msPartition != null) {
+      writeId_ = MetastoreShim.getWriteIdFromMSPartition(msPartition);
+    }
   }
 
   public HdfsPartition(HdfsTable table,
@@ -1014,6 +1022,9 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       partition.partitionStats_ = thriftPartition.getPartition_stats();
     }
 
+    partition.writeId_ = thriftPartition.isSetWrite_id() ?
+        thriftPartition.getWrite_id() : -1L;
+
     return partition;
   }
 
@@ -1053,5 +1064,10 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       if (cmp != 0) return cmp;
     }
     return 0;
+  }
+
+  @Override
+  public long getWriteId() {
+    return writeId_;
   }
 }

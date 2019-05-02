@@ -26,6 +26,8 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -57,9 +59,11 @@ import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.thrift.TException;
 
+import com.google.common.base.Preconditions;
+
 /**
  * A wrapper around some of Hive's Metastore API's to abstract away differences
- * between major versions of Hive. This implements the shimmed methods for Hive 2.
+ * between major versions of Hive. This implements the shimmed methods for Hive 3.
  */
 public class MetastoreShim {
   /**
@@ -363,5 +367,52 @@ public class MetastoreShim {
       }
       return sb.toString();
     }
+  }
+  /**
+   * Get valid write ids from HMS for the acid table
+   * @param client the client to access HMS
+   * @param tableFullName the name for the table
+   * @return ValidWriteIdList object
+   */
+  public static ValidWriteIdList fetchValidWriteIds(IMetaStoreClient client,
+      String tableFullName) throws TException {
+    return client.getValidWriteIds(tableFullName);
+  }
+
+  /**
+   * Get ValidWriteIdList object by given string
+   * @param validWriteIds ValidWriteIdList object in String
+   * @return ValidWriteIdList object
+   */
+  public static ValidWriteIdList getValidWriteIdListFromString(String validWriteIds) {
+    Preconditions.checkNotNull(validWriteIds);
+    return new ValidReaderWriteIdList(validWriteIds);
+  }
+
+  /**
+   * Wrapper around HMS Partition object to get writeID
+   * WriteID is introduced in ACID 2
+   * It is used to detect changes of the partition
+   */
+  public static long getWriteIdFromMSPartition(Partition partition) {
+    Preconditions.checkNotNull(partition);
+    return partition.getWriteId();
+  }
+
+  /**
+   * Wrapper around HMS Table object to get writeID
+   * Per table writeId is introduced in ACID 2
+   * It is used to detect changes of the table
+   */
+  public static long getWriteIdFromMSTable(Table msTbl) {
+    Preconditions.checkNotNull(msTbl);
+    return msTbl.getWriteId();
+  }
+
+  /**
+   * @return the shim major version
+   */
+  public static long getMajorVersion() {
+    return 3;
   }
 }

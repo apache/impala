@@ -34,6 +34,7 @@ import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TPartitionStats;
@@ -217,5 +218,10 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public Map<String, String> getParameters() {
     return msPartition_.getParameters();
+  }
+
+  @Override
+  public long getWriteId() {
+    return MetastoreShim.getWriteIdFromMSPartition(msPartition_);
   }
 }

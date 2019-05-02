@@ -330,6 +330,8 @@ public abstract class FeCatalogUtils {
         sd.getBlockSize());
     thriftHdfsPart.setId(part.getId());
     thriftHdfsPart.setLocation(part.getLocationAsThrift());
+    if (part.getWriteId() >= 0)
+      thriftHdfsPart.setWrite_id(part.getWriteId());
     if (type == ThriftObjectType.FULL) {
       thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
       thriftHdfsPart.setAccess_level(part.getAccessLevel());

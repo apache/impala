@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -221,5 +222,44 @@ public class MetastoreShim {
    */
   public static String unescapeSQLString(String normalizedStringLiteral) {
     return BaseSemanticAnalyzer.unescapeSQLString(normalizedStringLiteral);
+  }
+
+  /**
+   * This is Hive-3 only function
+   */
+  public static ValidWriteIdList fetchValidWriteIds(IMetaStoreClient client,
+      String tableFullName) {
+    throw new UnsupportedOperationException("fetchValidWriteIds not supported");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static ValidWriteIdList getValidWriteIdListFromString(String validWriteIds) {
+    throw new UnsupportedOperationException(
+        "getValidWriteIdListFromString not supported");
+  }
+
+  /**
+   * Hive-3 only function
+   * -1 means undefined
+   */
+  public static long getWriteIdFromMSPartition(Partition partition) {
+    return -1L;
+  }
+
+  /**
+   *  Hive-3 only function
+   *  -1 means undefined
+   */
+  public static long getWriteIdFromMSTable(Table msTbl) {
+    return -1L;
+  }
+
+  /**
+   * @return the shim version.
+   */
+  public static long getMajorVersion() {
+    return 2;
   }
 }

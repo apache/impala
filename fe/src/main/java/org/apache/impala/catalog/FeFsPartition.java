@@ -167,4 +167,11 @@ public interface FeFsPartition {
    * getPartitionStatsCompressed().
    */
   Map<String, String> getParameters();
+
+  /**
+   * @return the writeId stored in hms for the partition
+   * -1 means write Id is undefined.
+   */
+  long getWriteId();
+
 }

@@ -921,6 +921,8 @@ public class HdfsTable extends Table implements FeFsTable {
                 MetaStoreUtil.getNullPartitionKeyValue(client).intern();
             loadSchema(msTbl);
             loadAllColumnStats(client);
+            //TODO writeIDs may also be loaded in other code paths.
+            loadValidWriteIdList(client);
         }
         // Load partition and file metadata
         if (reuseMetadata) {

@@ -24,7 +24,6 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
@@ -106,6 +105,16 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
   public static boolean isSupportedColumnType(Type colType) {
     Preconditions.checkNotNull(colType);
     return isSupportedPrimitiveType(colType.getPrimitiveType());
+  }
+
+  @Override
+  public long getWriteId() {
+    return -1;
+  }
+
+  @Override
+  public String getValidWriteIds() {
+    return null;
   }
 
   /**

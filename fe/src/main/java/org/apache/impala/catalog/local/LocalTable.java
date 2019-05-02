@@ -247,6 +247,16 @@ abstract class LocalTable implements FeTable {
     return tableStats_;
   }
 
+  @Override
+  public long getWriteId() {
+    return -1l;
+  }
+
+  @Override
+  public String getValidWriteIds() {
+    return null;
+  }
+
   protected void loadColumnStats() {
     try {
       List<ColumnStatisticsObj> stats = db_.getCatalog().getMetaProvider()
@@ -324,7 +334,6 @@ abstract class LocalTable implements FeTable {
     public List<String> getColumnNames() {
       return Column.toColumnNames(colsByPos_);
     }
-
 
     private static StructType columnsToStructType(List<Column> cols) {
       List<StructField> fields = Lists.newArrayListWithCapacity(cols.size());

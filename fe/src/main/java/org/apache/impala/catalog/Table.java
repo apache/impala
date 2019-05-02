@@ -27,12 +27,14 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
@@ -115,6 +117,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // CatalogdTableInvalidator.nanoTime(). This is only set in catalogd and not used by
   // impalad.
   protected long lastUsedTime_;
+
+  // Valid write id list for this table
+  protected String validWriteIds_ = null;
 
   // maximum number of catalog versions to store for in-flight events for this table
   private static final int MAX_NUMBER_OF_INFLIGHT_EVENTS = 10;
@@ -269,6 +274,41 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   /**
+   * Get valid write ids for the acid table.
+   * @param client the client to access HMS
+   * @return the list of valid write IDs for the table
+   */
+  protected String fetchValidWriteIds(IMetaStoreClient client)
+      throws TableLoadingException {
+    String tblFullName = getFullName();
+    if (LOG.isTraceEnabled()) LOG.trace("Get valid writeIds for table: " + tblFullName);
+    String writeIds = null;
+    try {
+      ValidWriteIdList validWriteIds = MetastoreShim.fetchValidWriteIds(client,
+          tblFullName);
+      writeIds = validWriteIds == null ? null : validWriteIds.writeToString();
+    } catch (Exception e) {
+      throw new TableLoadingException(String.format("Error loading ValidWriteIds for " +
+          "table '%s'", getName()), e);
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Valid writeIds: " + writeIds);
+    }
+    return writeIds;
+  }
+
+  /**
+   * Set ValistWriteIdList with stored writeId
+   * @param client the client to access HMS
+   */
+  protected void loadValidWriteIdList(IMetaStoreClient client)
+      throws TableLoadingException {
+    if (MetastoreShim.getMajorVersion() > 2) {
+      validWriteIds_ = fetchValidWriteIds(client);
+    }
+  }
+
+  /**
    * Creates a table of the appropriate type based on the given hive.metastore.api.Table
    * object.
    */
@@ -347,6 +387,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         TAccessLevel.READ_WRITE;
 
     storedInImpaladCatalogCache_ = true;
+    validWriteIds_ = thriftTable.isSetValid_write_ids() ?
+        thriftTable.getValid_write_ids() : null;
   }
 
   /**
@@ -396,6 +438,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
     table.setMetastore_table(getMetaStoreTable());
     table.setTable_stats(tableStats_);
+    if (validWriteIds_ != null) {
+      table.setValid_write_ids(validWriteIds_);
+    }
     return table;
   }
 
@@ -645,5 +690,15 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     }
     versionsForInflightEvents_.add(versionNumber);
     return true;
+  }
+
+  @Override
+  public long getWriteId() {
+    return MetastoreShim.getWriteIdFromMSTable(msTable_);
+  }
+
+  @Override
+  public String getValidWriteIds() {
+    return validWriteIds_;
   }
 }

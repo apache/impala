@@ -136,4 +136,14 @@ public interface FeTable {
    */
   TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions);
 
+  /**
+   * @return the write id for this table
+   */
+  long getWriteId();
+
+  /**
+   * @return the valid write id list for this table
+   */
+  String getValidWriteIds();
+
 }

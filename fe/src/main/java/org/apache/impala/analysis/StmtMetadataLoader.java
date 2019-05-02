@@ -26,9 +26,13 @@ import java.util.Set;
 
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TUniqueIdUtil;
@@ -227,8 +231,21 @@ public class StmtMetadataLoader {
           "loaded-tables=%d/%d load-requests=%d catalog-updates=%d",
           requestedTbls.size(), loadedTbls_.size(), numLoadRequestsSent_,
           numCatalogUpdatesReceived_));
+
+      if (MetastoreShim.getMajorVersion() > 2) {
+        StringBuilder validIdsBuf = new StringBuilder("Loaded ValidWriteIdLists: ");
+        for (FeTable iTbl : loadedTbls_.values()) {
+          validIdsBuf.append("\n");
+          validIdsBuf.append("           ");
+          validIdsBuf.append(iTbl.getValidWriteIds());
+        }
+        validIdsBuf.append("\n");
+        validIdsBuf.append("             ");
+        timeline_.markEvent(validIdsBuf.toString());
+      }
     }
     fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
+
     return new StmtTableCache(catalog, dbs_, loadedTbls_);
   }
 
