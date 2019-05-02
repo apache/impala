@@ -121,12 +121,6 @@ under the License.
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-audit</artifactId>
       <version>${ranger.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>*</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <!-- this is needed by ranger-plugins-audit -->
     <dependency>
