@@ -162,7 +162,8 @@ export IMPALA_TOOLCHAIN_HOST
 export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=1055188
 export CDP_BUILD_NUMBER=1056671
-export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
+export CDH_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
+export CDP_HADOOP_VERSION=3.1.1.6.0.99.0-147
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_RANGER_VERSION=1.2.0.6.0.99.0-147
@@ -200,10 +201,14 @@ if $USE_CDP_HIVE; then
   # the minicluster
   export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
   export IMPALA_TEZ_VERSION=0.9.1.6.0.99.0-147
+  export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
+  export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${CDP_HADOOP_VERSION}/"
 else
   # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
   # false
   export IMPALA_HIVE_VERSION=${CDH_HIVE_VERSION}
+  export IMPALA_HADOOP_VERSION=${CDH_HADOOP_VERSION}
+  export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 fi
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -510,9 +515,6 @@ export IMPALA_COMMON_DIR="$IMPALA_HOME/common"
 export PATH="$IMPALA_TOOLCHAIN/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
 export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
 
-# Typically we build against a snapshot build of Hadoop that includes everything we need
-# for building Impala and running a minicluster.
-export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 # The include and lib paths are needed to pick up hdfs.h and libhdfs.*
 # Allow overriding in case we want to point to a package/install with a different layout.

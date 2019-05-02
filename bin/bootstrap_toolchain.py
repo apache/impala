@@ -553,10 +553,10 @@ if __name__ == "__main__":
   toolchain_host = os.environ["IMPALA_TOOLCHAIN_HOST"]
   cdh_build_number = os.environ["CDH_BUILD_NUMBER"]
 
-  cdh_components = map(Package, ["hadoop", "hbase", "sentry"])
+  cdh_components = map(Package, ["hbase", "sentry"])
   use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
   if not use_cdp_hive:
-    cdh_components += [Package("hive")]
+    cdh_components += [Package("hive"), Package("hadoop")]
 
   if use_cdh_kudu:
     if not try_get_platform_release_label() or not try_get_platform_release_label().cdh:
@@ -580,12 +580,13 @@ if __name__ == "__main__":
   cdp_components = [
     CdpComponent("ranger-{0}-admin".format(os.environ.get("IMPALA_RANGER_VERSION"))),
   ]
-  use_cdp_hive = os.getenv("USE_CDP_HIVE") == "true"
   if use_cdp_hive:
     hive_version = os.environ.get("IMPALA_HIVE_VERSION")
     cdp_components.append(CdpComponent("hive-{0}-source".format(hive_version),
                           pkg_directory="hive-{0}".format(hive_version))),
     cdp_components.append(CdpComponent("apache-hive-{0}-bin".format(hive_version))),
+    cdp_components.append(CdpComponent("hadoop-{0}"
+                          .format(os.environ.get("IMPALA_HADOOP_VERSION")))),
     cdp_components.append(CdpComponent(
         "tez-{0}-minimal".format(os.environ.get("IMPALA_TEZ_VERSION")),
         makedir=True))

@@ -34,6 +34,11 @@ setup_report_build_error
 : ${IMPALA_KERBERIZE=}
 : ${INCLUDE_YARN=}
 
+# For Hive 3, we require Yarn for Tez support.
+if [[ $USE_CDP_HIVE ]]; then
+  INCLUDE_YARN=1
+fi
+
 while getopts vky OPT; do
   case $OPT in
     v) set -x;;
@@ -54,6 +59,7 @@ NODE_PREFIX=node-
 COMMON_NODE_TEMPLATE="$DIR/node_templates/common"
 NODE_TEMPLATE="$DIR/node_templates/cdh$CDH_MAJOR_VERSION"
 TEMPLATE_SUFFIX=".tmpl"
+PY_TEMPLATE_SUFFIX=".xml.py"
 
 # Each process should be marked with this so a "pkill -f" can be done to nuke everything.
 export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
@@ -237,6 +243,9 @@ function create_cluster {
       # Remove master role scripts from slave nodes
       rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager} \
             "$NODE_DIR/etc/init.d/"{kms,kudu-master}
+      # Only run one YARN nodemanager (more memory-efficient to scale up a
+      # single NM than run several)
+      rm -f "$NODE_DIR/etc/init.d/yarn-nodemanager"
     fi
     for EMPTY_NODE_DIR in $EMPTY_NODE_DIRS; do
       mkdir -p "$NODE_DIR/$EMPTY_NODE_DIR"
@@ -301,6 +310,13 @@ function create_cluster {
         chmod u+x "$ACTUAL_PATH"
       fi
       rm "$TEMPLATE_PATH" "$ACTUAL_PATH.1"
+    done
+    # Substitute python-templated XML files.
+    # TODO(todd): move over all the XML templates to be Python-based.
+    for TEMPLATE_PATH in $(find "$NODE_DIR" -name "*$PY_TEMPLATE_SUFFIX"); do
+      ACTUAL_PATH="${TEMPLATE_PATH%$PY_TEMPLATE_SUFFIX}".xml
+      $IMPALA_HOME/bin/generate_xml_config.py $TEMPLATE_PATH $ACTUAL_PATH
+      rm $TEMPLATE_PATH
     done
   done
 }

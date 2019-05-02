@@ -80,6 +80,8 @@ def dump_config(d, source_path, out):
   print >>out, dedent(header)
   for k, v in sorted(d.iteritems()):
     try:
+      if isinstance(v, int):
+        v = str(v)
       v = _substitute_env_vars(v)
     except KeyError, e:
       raise Exception("failed environment variable substitution for value {k}: {e}"
@@ -98,7 +100,11 @@ def main():
     sys.exit(1)
 
   _, in_path, out_path = sys.argv
-  mod = imp.load_source('template', in_path)
+  try:
+    mod = imp.load_source('template', in_path)
+  except:  # noqa
+    print >>sys.stderr, "Unable to load template: %s" % in_path
+    raise
   conf = mod.__dict__.get('CONFIG')
   if not isinstance(conf, dict):
     raise Exception("module in '{path}' should define a dict named CONFIG"

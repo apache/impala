@@ -51,7 +51,6 @@ the same dependencies
           <artifactSet>
             <includes>
               <include>org.apache.hive:hive-exec</include>
-              <include>org.apache.hadoop:hadoop-mapreduce-client</include>
             </includes>
           </artifactSet>
           <relocations>

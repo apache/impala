@@ -17,7 +17,7 @@
 
 package org.apache.impala.analysis;
 
-import avro.shaded.com.google.common.collect.Sets;
+import com.google.common.collect.Sets;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSDataOutputStream;

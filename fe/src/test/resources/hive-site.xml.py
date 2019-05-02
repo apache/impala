@@ -81,7 +81,10 @@ if hive_major_version >= 3:
   CONFIG.update({
    'hive.tez.container.size': '512',
    'hive.txn.manager': 'org.apache.hadoop.hive.ql.lockmgr.DbTxnManager',
-   'tez.local.mode': 'true'})
+   # We run YARN with Tez on the classpath directly
+   'tez.ignore.lib.uris': 'true',
+   'tez.use.cluster.hadoop-libs': 'true',
+  })
 else:
   CONFIG.update({
    # TODO(vihang) Disabled for HMS3.

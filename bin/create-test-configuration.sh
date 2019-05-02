@@ -174,12 +174,12 @@ if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then
   popd
 fi
 
-echo "Linking core-site.xml from local cluster"
+echo "Linking common conf files from local cluster:"
 CLUSTER_HADOOP_CONF_DIR=$(${CLUSTER_DIR}/admin get_hadoop_client_conf_dir)
-ln -s ${CLUSTER_HADOOP_CONF_DIR}/core-site.xml
-
-echo "Linking hdfs-site.xml from local cluster"
-ln -s ${CLUSTER_HADOOP_CONF_DIR}/hdfs-site.xml
+for file in core-site.xml hdfs-site.xml yarn-site.xml ; do
+  echo ... $file
+  ln -s ${CLUSTER_HADOOP_CONF_DIR}/$file
+done
 
 if ${CLUSTER_DIR}/admin is_kerberized; then
   # KERBEROS TODO: Without this, the yarn daemons can see these
@@ -190,7 +190,6 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
   # kerberos principals. Obviously this has to be sorted out before
   # a kerberized cluster can load data.
   echo "Linking yarn and mapred from local cluster"
-  ln -s ${CLUSTER_HADOOP_CONF_DIR}/yarn-site.xml
   ln -s ${CLUSTER_HADOOP_CONF_DIR}/mapred-site.xml
 fi
 
