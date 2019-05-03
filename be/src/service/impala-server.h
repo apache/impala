@@ -29,14 +29,18 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <unordered_map>
 
-#include "gen-cpp/ImpalaService.h"
+#include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/ImpalaService.h"
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
-#include "common/status.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/types.h"
+#include "scheduling/query-schedule.h"
 #include "service/query-options.h"
+#include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/container-util.h"
 #include "util/runtime-profile.h"
@@ -44,9 +48,6 @@
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
 #include "util/time.h"
-#include "runtime/timestamp-value.h"
-#include "runtime/types.h"
-#include "statestore/statestore-subscriber.h"
 
 namespace impala {
 using kudu::ThreadSafeRandom;
@@ -442,6 +443,12 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Returns a current snapshot of the local backend descriptor.
   std::shared_ptr<const TBackendDescriptor> GetLocalBackendDescriptor();
 
+  /// Adds the query_id to the map from backend to the list of queries running or expected
+  /// to run there (query_locations_). After calling this function, the server will cancel
+  /// a query with an error if one of its backends fail.
+  void RegisterQueryLocations(
+      const PerBackendExecParams& per_backend_params, const TUniqueId& query_id);
+
   /// Takes a set of network addresses of active backends and cancels all the queries
   /// running on failed ones (that is, addresses not in the active set).
   void CancelQueriesOnFailedBackends(
@@ -474,6 +481,10 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// The prefix of audit event log filename.
   static const string AUDIT_EVENT_LOG_FILE_PREFIX;
+
+  /// The default executor group name for executors that do not explicitly belong to a
+  /// specific executor group.
+  static const string DEFAULT_EXECUTOR_GROUP_NAME;
 
   /// Per-session state.  This object is reference counted using shared_ptrs.  There
   /// is one ref count in the SessionStateMap for as long as the session is active.
@@ -1240,7 +1251,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Protects query_locations_. Not held in conjunction with other locks.
   boost::mutex query_locations_lock_;
 
-  /// A map from backend to the list of queries currently running or scheduled to run
+  /// A map from backend to the list of queries currently running or expected to run
   /// there.
   typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId>>
       QueryLocations;

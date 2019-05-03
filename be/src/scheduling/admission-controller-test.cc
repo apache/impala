@@ -23,7 +23,9 @@
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "runtime/test-env.h"
+#include "scheduling/query-schedule.h"
 #include "service/fe-support.h"
+#include "service/impala-server.h"
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
 #include "util/metrics.h"
@@ -90,6 +92,7 @@ class AdmissionControllerTest : public testing::Test {
     TQueryOptions* query_options = pool_.Add(new TQueryOptions());
     QuerySchedule* query_schedule =
         pool_.Add(new QuerySchedule(*query_id, *request, *query_options, profile));
+    query_schedule->set_executor_group(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
     query_schedule->UpdateMemoryRequirements(config);
 
     SetHostsInQuerySchedule(*query_schedule, num_hosts);
@@ -251,9 +254,10 @@ TEST_F(AdmissionControllerTest, Simple) {
 
   // Create a QuerySchedule to run on QUEUE_C.
   QuerySchedule* query_schedule = MakeQuerySchedule(QUEUE_C, config_c, 1, 64L * MEGABYTE);
+  query_schedule->UpdateMemoryRequirements(config_c);
 
   // Check that the AdmissionController initially has no data about other hosts.
-  ASSERT_EQ(0, admission_controller->host_mem_reserved_.size());
+  ASSERT_EQ(0, admission_controller->host_stats_.size());
 
   // Check that the query can be admitted.
   string not_admitted_reason;
@@ -287,9 +291,9 @@ TEST_F(AdmissionControllerTest, Simple) {
   admission_controller->UpdatePoolStats(incoming_topic_deltas, &outgoing_topic_updates);
 
   // Check that the AdmissionController has aggregated the remote stats.
-  ASSERT_EQ(3, admission_controller->host_mem_reserved_.size());
-  ASSERT_EQ(6000, admission_controller->host_mem_reserved_[HOST_1]);
-  ASSERT_EQ(5000, admission_controller->host_mem_reserved_[HOST_2]);
+  ASSERT_EQ(3, admission_controller->host_stats_.size());
+  ASSERT_EQ(6000, admission_controller->host_stats_[HOST_1].mem_reserved);
+  ASSERT_EQ(5000, admission_controller->host_stats_[HOST_2].mem_reserved);
 
   // Check the PoolStats for QUEUE_C.
   AdmissionController::PoolStats* pool_stats =
@@ -426,8 +430,9 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
       "with 0.5 queries)");
 }
 
-/// Test RejectImmediately using scalable parameters.
-TEST_F(AdmissionControllerTest, RejectImmediately) {
+/// Tests that query rejection works as expected by calling RejectForSchedule() and
+/// RejectForCluster() directly.
+TEST_F(AdmissionControllerTest, QueryRejection) {
   // Pass the paths of the configuration files as command line flags.
   FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
   FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
@@ -450,10 +455,10 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   QuerySchedule* query_schedule =
       MakeQuerySchedule(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
 
-  // Check messages from RejectImmediately().
+  // Check messages from RejectForSchedule().
   string rejected_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_d, host_count, &rejected_reason));
+  ASSERT_TRUE(admission_controller->RejectForSchedule(
+      *query_schedule, config_d, host_count, host_count, &rejected_reason));
   EXPECT_STR_CONTAINS(rejected_reason,
       "request memory needed 500.00 MB is greater than pool max mem resources 400.00 MB "
       "(calculated as 10 backends each with 40.00 MB)");
@@ -462,8 +467,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   // This will be rejected immediately as minimum memory reservation is too high.
   SetHostsInQuerySchedule(*query_schedule, host_count, 45L * MEGABYTE);
   string rejected_reserved_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_d, host_count, &rejected_reserved_reason));
+  ASSERT_TRUE(admission_controller->RejectForSchedule(
+      *query_schedule, config_d, host_count, host_count, &rejected_reserved_reason));
   EXPECT_STR_CONTAINS(rejected_reserved_reason,
       "minimum memory reservation needed is greater than pool max mem resources. Pool "
       "max mem resources: 400.00 MB (calculated as 10 backends each with 40.00 MB). "
@@ -475,8 +480,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   config_d.min_query_mem_limit = 600L * MEGABYTE;
   config_d.max_query_mem_limit = 700L * MEGABYTE;
   string rejected_invalid_config_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_d, host_count, &rejected_invalid_config_reason));
+  ASSERT_TRUE(admission_controller->RejectForCluster(QUEUE_D, config_d,
+      /* admit_from_queue=*/false, host_count, &rejected_invalid_config_reason));
   EXPECT_STR_CONTAINS(rejected_invalid_config_reason,
       "The min_query_mem_limit 629145600 is greater than the current max_mem_resources "
       "419430400 (calculated as 10 backends each with 40.00 MB); queries will not be "
@@ -485,8 +490,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   TPoolConfig config_disabled_queries;
   config_disabled_queries.max_requests = 0;
   string rejected_queries_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_disabled_queries, host_count, &rejected_queries_reason));
+  ASSERT_TRUE(admission_controller->RejectForCluster(QUEUE_D, config_disabled_queries,
+      /* admit_from_queue=*/false, host_count, &rejected_queries_reason));
   EXPECT_STR_CONTAINS(rejected_queries_reason, "disabled by requests limit set to 0");
 
   TPoolConfig config_disabled_memory;
@@ -494,8 +499,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   config_disabled_memory.max_mem_resources = 0;
   config_disabled_memory.max_memory_multiple = 0;
   string rejected_mem_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_disabled_memory, host_count, &rejected_mem_reason));
+  ASSERT_TRUE(admission_controller->RejectForCluster(QUEUE_D, config_disabled_memory,
+      /* admit_from_queue=*/false, host_count, &rejected_mem_reason));
   EXPECT_STR_CONTAINS(rejected_mem_reason, "disabled by pool max mem resources set to 0");
 
   TPoolConfig config_queue_small;
@@ -504,8 +509,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   config_queue_small.max_mem_resources = 600 * MEGABYTE;
   pool_stats->agg_num_queued_ = 3;
   string rejected_queue_length_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_queue_small, host_count, &rejected_queue_length_reason));
+  ASSERT_TRUE(admission_controller->RejectForCluster(QUEUE_D, config_queue_small,
+      /* admit_from_queue=*/false, host_count, &rejected_queue_length_reason));
   EXPECT_STR_CONTAINS(rejected_queue_length_reason,
       "queue full, limit=3 (configured statically), num_queued=3.");
 
@@ -513,8 +518,8 @@ TEST_F(AdmissionControllerTest, RejectImmediately) {
   // queries that can run be queued.
   config_queue_small.max_queued_queries_multiple = 0.3;
   string rejected_queue_multiple_reason;
-  ASSERT_TRUE(admission_controller->RejectImmediately(
-      *query_schedule, config_queue_small, host_count, &rejected_queue_multiple_reason));
+  ASSERT_TRUE(admission_controller->RejectForCluster(QUEUE_D, config_queue_small,
+      /* admit_from_queue=*/false, host_count, &rejected_queue_multiple_reason));
   EXPECT_STR_CONTAINS(rejected_queue_multiple_reason,
       "queue full, limit=3 (calculated as 10 backends each with 0.3 queries), "
       "num_queued=3.");
@@ -651,10 +656,10 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   CheckPoolStatsEmpty(pool_stats);
 
   // Show that Queue and Dequeue leave stats at zero.
-  pool_stats->Queue(*query_schedule);
+  pool_stats->Queue();
   ASSERT_EQ(1, pool_stats->agg_num_queued());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_queued->GetValue());
-  pool_stats->Dequeue(*query_schedule, false);
+  pool_stats->Dequeue(false);
   CheckPoolStatsEmpty(pool_stats);
 
   // Show that Admit and Release leave stats at zero.
@@ -680,4 +685,3 @@ TEST_F(AdmissionControllerTest, PoolDisabled) {
 }
 
 } // end namespace impala
-

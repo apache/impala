@@ -61,7 +61,7 @@ class ResourcePoolConfig(object):
     metric_key = "admission-controller.{0}.root.{1}".format(metric_str, pool_name)
     start_time = time()
     while (time() - start_time < timeout):
-      handle = client.execute_async("select 1")
+      handle = client.execute_async("select 'wait_for_config_change'")
       client.close_query(handle)
       current_val = str(self.impala_service.get_metric_value(metric_key))
       if current_val == target_val:

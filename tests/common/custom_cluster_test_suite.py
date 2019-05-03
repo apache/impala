@@ -234,8 +234,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             cluster_size=DEFAULT_CLUSTER_SIZE,
                             num_coordinators=NUM_COORDINATORS,
                             use_exclusive_coordinators=False,
+                            add_executors=False,
                             log_level=1,
                             expected_num_executors=DEFAULT_CLUSTER_SIZE,
+                            expected_subscribers=0,
                             default_query_options=None,
                             statestored_timeout_s=60,
                             impalad_timeout_s=60):
@@ -251,6 +253,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if use_exclusive_coordinators:
       cmd.append("--use_exclusive_coordinators")
+
+    if add_executors:
+      cmd.append("--add_executors")
 
     if pytest.config.option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")
@@ -281,7 +286,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     # The number of statestore subscribers is
     # cluster_size (# of impalad) + 1 (for catalogd).
-    expected_subscribers = cluster_size + 1
+    if expected_subscribers == 0:
+      expected_subscribers = expected_num_executors + 1
 
     statestored.service.wait_for_live_subscribers(expected_subscribers,
                                                   timeout=statestored_timeout_s)

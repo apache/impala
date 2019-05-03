@@ -96,7 +96,7 @@ class ImpalaCluster(object):
     else:
       self.__impalads, self.__statestoreds, self.__catalogd =\
           self.__find_docker_containers()
-    LOG.info("Found %d impalad/%d statestored/%d catalogd process(es)" %
+    LOG.debug("Found %d impalad/%d statestored/%d catalogd process(es)" %
         (len(self.__impalads), len(self.__statestoreds), 1 if self.__catalogd else 0))
 
   @property

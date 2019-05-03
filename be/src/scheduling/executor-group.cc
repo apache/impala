@@ -26,8 +26,15 @@ namespace impala {
 // TODO: This can be tuned further with real world tests
 static const uint32_t NUM_HASH_RING_REPLICAS = 25;
 
-ExecutorGroup::ExecutorGroup()
-  : executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS) {}
+ExecutorGroup::ExecutorGroup(string name) : ExecutorGroup(name, 1) {}
+
+ExecutorGroup::ExecutorGroup(string name, int64_t min_size)
+  : name_(name), min_size_(min_size), executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS) {
+    DCHECK_GT(min_size_, 0);
+  }
+
+ExecutorGroup::ExecutorGroup(const TExecutorGroupDesc& desc)
+  : ExecutorGroup(desc.name, desc.min_size) {}
 
 const ExecutorGroup::Executors& ExecutorGroup::GetExecutorsForHost(
     const IpAddr& ip) const {
@@ -38,7 +45,7 @@ const ExecutorGroup::Executors& ExecutorGroup::GetExecutorsForHost(
 
 ExecutorGroup::IpAddrs ExecutorGroup::GetAllExecutorIps() const {
   IpAddrs ips;
-  ips.reserve(NumExecutors());
+  ips.reserve(NumHosts());
   for (auto& it: executor_map_) ips.push_back(it.first);
   return ips;
 }
@@ -65,6 +72,11 @@ void ExecutorGroup::AddExecutor(const TBackendDescriptor& be_desc) {
   if (find_if(be_descs.begin(), be_descs.end(), eq) != be_descs.end()) {
     LOG(DFATAL) << "Tried to add existing backend to executor group: "
         << be_desc.krpc_address;
+    return;
+  }
+  if (!CheckConsistencyOrWarn(be_desc)) {
+    LOG(WARNING) << "Ignoring inconsistent backend for executor group: "
+                 << be_desc.krpc_address;
     return;
   }
   if (be_descs.empty()) {
@@ -126,6 +138,40 @@ const TBackendDescriptor* ExecutorGroup::LookUpBackendDesc(
     }
   }
   return nullptr;
+}
+
+int ExecutorGroup::NumExecutors() const {
+  int count = 0;
+  for (const auto& executor_list : executor_map_) count += executor_list.second.size();
+  return count;
+}
+
+bool ExecutorGroup::IsHealthy() const {
+  int num_executors = NumExecutors();
+  if (num_executors < min_size_) {
+    LOG(WARNING) << "Executor group " << name_ << " is unhealthy: " << num_executors
+                 << " out of " << min_size_ << " are available.";
+    return false;
+  }
+  return true;
+}
+
+bool ExecutorGroup::CheckConsistencyOrWarn(const TBackendDescriptor& be_desc) const {
+  // Check if the executor's group configuration matches this group.
+  for (const TExecutorGroupDesc& desc : be_desc.executor_groups) {
+    if (desc.name == name_) {
+      if (desc.min_size == min_size_) {
+        return true;
+      } else {
+        LOG(WARNING) << "Backend " << be_desc << " is configured for executor group "
+                     << desc << " but group has minimum size " << min_size_;
+        return false;
+      }
+    }
+  }
+  // If the backend does not mention the group we consider it consistent to allow backends
+  // to be added to unrelated groups, e.g. for the coordinator-only scheuduling.
+  return true;
 }
 
 }  // end ns impala

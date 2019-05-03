@@ -17,29 +17,31 @@
 
 #include "service/impala-server.h"
 
+#include <netdb.h>
+#include <unistd.h>
 #include <algorithm>
 #include <exception>
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/bind.hpp>
-#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/unordered_set.hpp>
 #include <gperftools/malloc_extension.h>
+#include <gutil/strings/numbers.h>
+#include <gutil/strings/split.h>
 #include <gutil/strings/substitute.h>
 #include <gutil/walltime.h>
-#include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
+#include <sys/types.h>
 
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
@@ -125,6 +127,7 @@ DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_string(authorized_proxy_group_config);
 DECLARE_string(authorized_proxy_group_config_delimiter);
+DECLARE_string(debug_actions);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(enable_ldap_auth);
@@ -239,6 +242,8 @@ DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and co
     "queries from clients. If false, it will refuse client connections.");
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
     "fragments.");
+DEFINE_string(executor_groups, "", "List of executor groups, separated by comma. "
+    "Currently only a single group may be specified.");
 
 // TODO: can we automatically choose a startup grace period based on the max admission
 // control queue timeout + some margin for error?
@@ -274,6 +279,36 @@ DEFINE_int32(query_event_hook_nthreads, 1, "Number of threads to use for "
 
 DECLARE_bool(compact_catalog_topic);
 
+namespace {
+using namespace impala;
+
+vector<impala::TExecutorGroupDesc> GetExecutorGroups(const string& flag) {
+  vector<impala::TExecutorGroupDesc> result;
+  vector<StringPiece> groups;
+  groups = Split(flag, ",", SkipEmpty());
+  if (groups.empty()) groups.push_back(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
+  DCHECK_EQ(1, groups.size());
+  // Name and optional minimum group size are separated by ':'.
+  for (const StringPiece& group : groups) {
+    int colon_idx = group.find_first_of(':');
+    TExecutorGroupDesc group_desc;
+    group_desc.name = group.substr(0, colon_idx).as_string();
+    group_desc.min_size = 1;
+    if (colon_idx != StringPiece::npos) {
+      StringParser::ParseResult result;
+      group_desc.min_size = StringParser::StringToInt<int64_t>(
+          group.data() + colon_idx + 1, group.length() - colon_idx - 1, &result);
+      if (result != StringParser::PARSE_SUCCESS) {
+        LOG(FATAL) << "Failed to parse minimum executor group size from group: "
+                     << group.ToString();
+      }
+    }
+    result.push_back(group_desc);
+  }
+  return result;
+}
+} // end anonymous namespace
+
 namespace impala {
 
 // Prefix of profile, event and lineage log filenames. The version number is
@@ -293,6 +328,8 @@ const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 const string BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string HS2_SERVER_NAME = "hiveserver2-frontend";
 const string HS2_HTTP_SERVER_NAME = "hiveserver2-http-frontend";
+
+const string ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME = "default";
 
 const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
@@ -1071,19 +1108,6 @@ Status ImpalaServer::ExecuteInternal(
   if (!status.ok()) {
     VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetDetail();
   }
-
-  if ((*request_state)->schedule() != nullptr) {
-    const PerBackendExecParams& per_backend_params =
-        (*request_state)->schedule()->per_backend_exec_params();
-    if (!per_backend_params.empty()) {
-      lock_guard<mutex> l(query_locations_lock_);
-      for (const auto& entry : per_backend_params) {
-        const TNetworkAddress& host = entry.first;
-        query_locations_[host].insert((*request_state)->query_id());
-      }
-    }
-  }
-
   return Status::OK();
 }
 
@@ -1829,6 +1853,18 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
   return Status::OK();
 }
 
+void ImpalaServer::RegisterQueryLocations(
+    const PerBackendExecParams& per_backend_params, const TUniqueId& query_id) {
+  VLOG_QUERY << "Registering query locations";
+  if (!per_backend_params.empty()) {
+    lock_guard<mutex> l(query_locations_lock_);
+    for (const auto& entry : per_backend_params) {
+      const TNetworkAddress& host = entry.first;
+      query_locations_[host].insert(query_id);
+    }
+  }
+}
+
 void ImpalaServer::CancelQueriesOnFailedBackends(
     const std::unordered_set<TNetworkAddress>& current_membership) {
   // Maps from query id (to be cancelled) to a list of failed Impalads that are
@@ -1936,7 +1972,9 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_de
   be_desc->__set_krpc_address(krpc_address);
 
   be_desc->__set_admit_mem_limit(exec_env_->admit_mem_limit());
+  be_desc->__set_admit_num_queries_limit(exec_env_->admit_num_queries_limit());
   be_desc->__set_is_quiescing(is_quiescing);
+  be_desc->executor_groups = GetExecutorGroups(FLAGS_executor_groups);
 }
 
 ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& request_state,
@@ -2606,6 +2644,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
     RETURN_IF_ERROR(beeswax_server_->Start());
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_server_->port();
   }
+  RETURN_IF_ERROR(DebugAction(FLAGS_debug_actions, "IMPALA_SERVER_END_OF_START"));
   services_started_ = true;
   ImpaladMetrics::IMPALA_SERVER_READY->SetValue(true);
   LOG(INFO) << "Impala has started.";

@@ -94,6 +94,10 @@ class ClusterMembershipMgr {
     BackendIdMap current_backends;
     /// A map of executor groups by their names.
     ExecutorGroups executor_groups;
+
+    /// The version of this Snapshot. It is incremented every time the cluster membership
+    /// changes.
+    int64_t version = 0;
   };
 
   /// An immutable shared membership snapshot.
@@ -147,9 +151,6 @@ class ClusterMembershipMgr {
   /// but it may point to an empty Snapshot, depending on the arrival of statestore
   /// updates and the status of the local backend.
   SnapshotPtr GetSnapshot() const;
-
-  /// The default executor group name.
-  static const std::string DEFAULT_EXECUTOR_GROUP;
 
   /// Handler for statestore updates, called asynchronously when an update is received
   /// from the subscription manager. This method processes incoming updates from the

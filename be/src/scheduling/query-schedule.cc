@@ -286,4 +286,9 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   }
 }
 
+void QuerySchedule::set_executor_group(string executor_group) {
+  DCHECK(executor_group_.empty());
+  executor_group_ = std::move(executor_group);
+}
+
 }

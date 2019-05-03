@@ -32,7 +32,6 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/exec-env.h"
-#include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/hash-ring.h"
 #include "statestore/statestore-subscriber.h"
 #include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
@@ -57,10 +56,8 @@ static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.to
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 
-Scheduler::Scheduler(ClusterMembershipMgr* cluster_membership_mgr,
-    MetricGroup* metrics, RequestPoolService* request_pool_service)
+Scheduler::Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_service)
   : metrics_(metrics->GetOrCreateChildGroup("scheduler")),
-    cluster_membership_mgr_(cluster_membership_mgr),
     request_pool_service_(request_pool_service) {
   LOG(INFO) << "Starting scheduler";
   if (metrics_ != nullptr) {
@@ -75,10 +72,9 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
   const TBackendDescriptor* desc = executor_config.group.LookUpBackendDesc(host);
   if (desc == nullptr) {
     // Local host may not be in executor_config's executor group if it's a dedicated
-    // coordinator.
+    // coordinator, or if it is configured to be in a different executor group.
     const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
     DCHECK(host == local_be_desc.address);
-    DCHECK(!local_be_desc.is_executor);
     desc = &local_be_desc;
   }
   return *desc;
@@ -456,7 +452,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   bool random_replica = query_options.schedule_random_replica || node_random_replica;
 
   // TODO: Build this one from executor_group
-  ExecutorGroup coord_only_executor_group;
+  ExecutorGroup coord_only_executor_group("coordinator-only-group");
   const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
   coord_only_executor_group.AddExecutor(local_be_desc);
   VLOG_QUERY << "Exec at coord is " << (exec_at_coord ? "true" : "false");
@@ -647,49 +643,16 @@ void Scheduler::GetScanHosts(const TBackendDescriptor& local_be_desc, TPlanNodeI
   }
 }
 
-Status Scheduler::Schedule(QuerySchedule* schedule) {
-  // Use a snapshot of the cluster membership state upfront to avoid using inconsistent
-  // views throughout scheduling.
-  ClusterMembershipMgr::SnapshotPtr membership_snapshot =
-      cluster_membership_mgr_->GetSnapshot();
-  if (membership_snapshot->local_be_desc.get() == nullptr) {
-    // This can happen in the short time period after the ImpalaServer has finished
-    // starting up (which makes the local backend available) and the next statestore
-    // update that pulls the local backend descriptor into the membership snapshot.
-    return Status("Local backend has not been registered in the cluster membership");
-  }
-  const string& group_name = ClusterMembershipMgr::DEFAULT_EXECUTOR_GROUP;
-  VLOG_QUERY << "Scheduling query " << PrintId(schedule->query_id())
-      << " on executor group: " << group_name;
-
-  auto it = membership_snapshot->executor_groups.find(group_name);
-  if (it == membership_snapshot->executor_groups.end()) {
-    return Status(Substitute("Unknown executor group: $0", group_name));
-  }
-
-  const ExecutorGroup& executor_group = it->second;
-  if (executor_group.NumExecutors() == 0) {
-    return Status(Substitute("No executors registered in group: $0", group_name));
-  }
-
-  ExecutorConfig executor_config =
-      {executor_group, *membership_snapshot->local_be_desc};
+Status Scheduler::Schedule(
+    const ExecutorConfig& executor_config, QuerySchedule* schedule) {
+  RETURN_IF_ERROR(DebugAction(schedule->query_options(), "SCHEDULER_SCHEDULE"));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(executor_config, schedule));
   ComputeFragmentExecParams(executor_config, schedule);
   ComputeBackendExecParams(executor_config, schedule);
 #ifndef NDEBUG
   schedule->Validate();
 #endif
-
-  // TODO: Move to admission control, it doesn't need to be in the Scheduler.
-  string resolved_pool;
-  // Re-resolve the pool name to propagate any resolution errors now that this request
-  // is known to require a valid pool.
-  RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
-          schedule->request().query_ctx, &resolved_pool));
-  // Resolved pool name should have been set in the TQueryCtx and shouldn't have changed.
-  DCHECK_EQ(resolved_pool, schedule->request_pool());
-  schedule->summary_profile()->AddInfoString("Request Pool", schedule->request_pool());
+  schedule->set_executor_group(executor_config.group.name());
   return Status::OK();
 }
 
@@ -718,6 +681,8 @@ void Scheduler::ComputeBackendExecParams(
     const TNetworkAddress& host = backend.first;
     backend.second.admit_mem_limit =
         LookUpBackendDesc(executor_config, host).admit_mem_limit;
+    backend.second.admit_num_queries_limit =
+        LookUpBackendDesc(executor_config, host).admit_num_queries_limit;
     largest_min_reservation =
         max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
   }
@@ -831,8 +796,8 @@ const IpAddr* Scheduler::AssignmentCtx::SelectRemoteExecutor() {
   } else {
     // Pick next executor from assignment_heap. All executors must have been inserted into
     // the heap at this point.
-    DCHECK_GT(executor_group_.NumExecutors(), 0);
-    DCHECK_EQ(executor_group_.NumExecutors(), assignment_heap_.size());
+    DCHECK_GT(executor_group_.NumHosts(), 0);
+    DCHECK_EQ(executor_group_.NumHosts(), assignment_heap_.size());
     candidate_ip = &(assignment_heap_.top().ip);
   }
   DCHECK(candidate_ip != nullptr);

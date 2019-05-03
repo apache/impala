@@ -291,5 +291,10 @@ class TestCoordinators(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1, num_exclusive_coordinators=1)
   def test_dedicated_coordinator_without_executors(self):
+    """This test verifies that a query gets queued and times out when no executors are
+    present."""
     result = self.execute_query_expect_failure(self.client, "select 2")
-    assert "No executors registered in group: default" in str(result)
+    expected_error = "Query aborted:Admission for query exceeded timeout 60000ms in " \
+                     "pool default-pool. Queued reason: No healthy executor groups " \
+                     "found for pool default-pool."
+    assert expected_error in str(result)

@@ -26,6 +26,7 @@
 #include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/scheduler.h"
 #include "util/hash-util.h"
+#include "service/impala-server.h"
 
 using namespace impala;
 using namespace impala::test;
@@ -99,6 +100,9 @@ ClusterMembershipMgr::BeDescSharedPtr BuildBackendDescriptor(const Host& host) {
   be_desc->__set_is_coordinator(host.is_coordinator);
   be_desc->__set_is_executor(host.is_executor);
   be_desc->is_quiescing = false;
+  be_desc->executor_groups.push_back(TExecutorGroupDesc());
+  be_desc->executor_groups.back().name = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+  be_desc->executor_groups.back().min_size = 1;
   return be_desc;
 }
 
@@ -633,11 +637,11 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
       cluster_membership_mgr_->GetSnapshot();
   auto it = membership_snapshot->executor_groups.find(
-      ClusterMembershipMgr::DEFAULT_EXECUTOR_GROUP);
+      ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
   // If a group does not exist (e.g. no executors are registered), we pass an empty group
   // to the scheduler to exercise its error handling logic.
   bool no_executor_group = it == membership_snapshot->executor_groups.end();
-  ExecutorGroup empty_group;
+  ExecutorGroup empty_group("empty-group");
   DCHECK(membership_snapshot->local_be_desc.get() != nullptr);
   Scheduler::ExecutorConfig executor_config =
       {no_executor_group ? empty_group : it->second, *membership_snapshot->local_be_desc};
@@ -696,7 +700,7 @@ void SchedulerWrapper::InitializeScheduler() {
   });
   Status status = cluster_membership_mgr_->Init();
   DCHECK(status.ok()) << "Cluster membership manager init failed in test";
-  scheduler_.reset(new Scheduler(cluster_membership_mgr_.get(), &metrics_, nullptr));
+  scheduler_.reset(new Scheduler(&metrics_, nullptr));
   // Initialize the cluster membership manager
   SendFullMembershipMap();
 }

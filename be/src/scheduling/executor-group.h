@@ -37,11 +37,16 @@ namespace impala {
 /// getter methods return references and the membership must not be changed while client
 /// code holds those references.
 ///
+/// Executor groups can optionally have a target size assigned to them and will be
+/// considered unhealthy if less than that number of executors are added.
+///
 /// Note that only during tests objects of this class will store more than one backend per
 /// host/IP address.
 class ExecutorGroup {
  public:
-  ExecutorGroup();
+  explicit ExecutorGroup(std::string name);
+  explicit ExecutorGroup(std::string name, int64_t min_size);
+  explicit ExecutorGroup(const TExecutorGroupDesc& desc);
   ExecutorGroup(const ExecutorGroup& other) = default;
 
   /// List of backends, in this case they're all executors.
@@ -60,7 +65,11 @@ class ExecutorGroup {
   Executors GetAllExecutorDescriptors() const;
 
   /// Adds an executor to the group. If it already exists, it is ignored. Backend
-  /// descriptors are identified by their IP address and port.
+  /// descriptors are identified by their IP address and port. Backends that fail the
+  /// consistency check (CheckConsistencyOrWarn()) are ignored. Note that executors can be
+  /// added to an executor group even if they don't have a matching TExecutorGroupDesc in
+  /// their 'executor_groups' list. This is required when building the coordinator-only
+  /// group during scheduling.
   void AddExecutor(const TBackendDescriptor& be_desc);
 
   /// Removes an executor from the group if it exists. Otherwise does nothing. Backend
@@ -86,10 +95,32 @@ class ExecutorGroup {
   const HashRing* GetHashRing() const { return &executor_ip_hash_ring_; }
 
   /// Returns the number of executor hosts in this group. During tests, hosts can run
-  /// multiple executor backend descriptors.
-  int NumExecutors() const { return executor_map_.size(); }
+  /// multiple executor backend descriptors, but will only be counted here once.
+  int NumHosts() const { return executor_map_.size(); }
+
+  /// Returns the number of executors (backend descriptors) in this group. Multiple
+  /// executors running on the same host (e.g. during tests) are counted individually.
+  int NumExecutors() const;
+
+  /// Returns true if the group is healthy, i.e. contains at least 'min_size_' executors.
+  /// Returns false otherwise.
+  bool IsHealthy() const;
+
+  const string& name() const { return name_; }
+  int64_t min_size() const { return min_size_; }
 
  private:
+  /// Finds the first executor group in 'be_desc.executor_groups' and validates its target
+  /// size. Returns true if a group is found and its min size matches, or if no group is
+  /// found. Returns false and logs a warning otherwise.
+  bool CheckConsistencyOrWarn(const TBackendDescriptor& be_desc) const;
+
+  const std::string name_;
+
+  /// The minimum number of executors in this group to be considered healthy. A group must
+  /// not be empty to be considered healthy and this value must be non-zero.
+  int64_t min_size_;
+
   /// Map from a host's IP address to a list of executors running on that node.
   typedef std::unordered_map<IpAddr, Executors> ExecutorMap;
   ExecutorMap executor_map_;

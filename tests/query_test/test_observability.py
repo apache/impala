@@ -627,3 +627,10 @@ class TestObservability(ImpalaTestSuite):
     query = "select count (*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_executor_group(self):
+    """Test that the profile contains an info string with the executor group that was
+    picked by admission control."""
+    query = "select count (*) from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    assert "Executor Group:" in runtime_profile

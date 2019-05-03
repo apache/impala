@@ -377,8 +377,11 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       execute_statement_req.sessionHandle = open_session_resp.sessionHandle
       execute_statement_req.statement = "select count(1) from functional.alltypes"
       execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-      TestAdmissionController.check_response(execute_statement_resp,
-          TCLIService.TStatusCode.ERROR_STATUS, "User must be specified")
+      self.wait_for_operation_state(execute_statement_resp.operationHandle,
+                                    TCLIService.TOperationState.ERROR_STATE)
+      get_operation_status_resp = self.get_operation_status(
+          execute_statement_resp.operationHandle)
+      assert "User must be specified" in get_operation_status_resp.errorMessage
     finally:
       close_req = TCLIService.TCloseSessionReq()
       close_req.sessionHandle = open_session_resp.sessionHandle
@@ -553,25 +556,32 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.clear_configuration()
 
       client.set_configuration_option("debug_action", "CRS_BEFORE_ADMISSION:SLEEP@2000")
-      handle = client.execute_async("select 1")
+      handle = client.execute_async("select 2")
       sleep(1)
       client.close_query(handle)
       self.assert_impalad_log_contains('INFO',
           "Ready to be Admitted immediately but already cancelled, query id=")
 
       client.set_configuration_option("debug_action",
-          "CRS_AFTER_COORD_STARTS:SLEEP@2000")
-      handle = client.execute_async("select 1")
+          "CRS_BEFORE_COORD_STARTS:SLEEP@2000")
+      handle = client.execute_async("select 3")
       sleep(1)
       client.close_query(handle)
       self.assert_impalad_log_contains('INFO',
           "Cancelled right after starting the coordinator query id=")
 
+      client.set_configuration_option("debug_action", "CRS_AFTER_COORD_STARTS:SLEEP@2000")
+      handle = client.execute_async("select 4")
+      sleep(1)
+      client.close_query(handle)
+      self.assert_impalad_log_contains('INFO',
+          "Cancelled right after starting the coordinator query id=", 2)
+
       client.clear_configuration()
       handle = client.execute_async("select sleep(10000)")
       client.set_configuration_option("debug_action",
           "AC_AFTER_ADMISSION_OUTCOME:SLEEP@2000")
-      queued_query_handle = client.execute_async("select 1")
+      queued_query_handle = client.execute_async("select 5")
       sleep(1)
       assert client.get_state(queued_query_handle) == QueryState.COMPILED
       assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
@@ -587,7 +597,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.clear_configuration()
 
       handle = client.execute_async("select sleep(10000)")
-      queued_query_handle = client.execute_async("select 1")
+      queued_query_handle = client.execute_async("select 6")
       sleep(1)
       assert client.get_state(queued_query_handle) == QueryState.COMPILED
       assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
@@ -600,7 +610,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert self.cluster.impalads[0].service.get_metric_value(
         "admission-controller.agg-num-running.default-pool") == 0
       assert self.cluster.impalads[0].service.get_metric_value(
-        "admission-controller.total-admitted.default-pool") == 3
+        "admission-controller.total-admitted.default-pool") == 4
       assert self.cluster.impalads[0].service.get_metric_value(
         "admission-controller.total-queued.default-pool") == 2
     finally:
@@ -695,9 +705,11 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     handle_running = self.client.execute_async(query)
     self.client.wait_for_admission_control(handle_running)
     handle_queued = self.client.execute_async(query)
+    self.client.wait_for_admission_control(handle_queued)
     self.impalad_test_service.wait_for_metric_value(
       "admission-controller.total-queued.default-pool", 1)
-    self.__assert_num_queries_accounted(2)
+    # Queued queries don't show up on backends
+    self.__assert_num_queries_accounted(1, 1)
     # First close the queued query
     self.close_query(handle_queued)
     self.close_query(handle_running)
@@ -708,15 +720,16 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.execute_query_expect_failure(self.client, query, exec_options)
     self.__assert_num_queries_accounted(0)
 
-  def __assert_num_queries_accounted(self, expected_num):
+  def __assert_num_queries_accounted(self, num_running, num_queued=0):
     """Checks if the num of queries accounted by query_locations and in-flight are as
     expected"""
     # Wait for queries to start/un-register.
-    assert self.impalad_test_service.wait_for_num_in_flight_queries(expected_num)
+    num_inflight = num_running + num_queued
+    assert self.impalad_test_service.wait_for_num_in_flight_queries(num_inflight)
     query_locations = self.impalad_test_service.get_query_locations()
     for host, num_q in query_locations.items():
-      assert num_q == expected_num, "There should be {0} running queries on either " \
-                                    "impalads: {0}".format(query_locations)
+      assert num_q == num_running, "There should be {0} running queries on either " \
+                                   "impalads: {0}".format(query_locations)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -743,9 +756,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       additional_args="-default_pool_max_requests 1", make_copy=True),
     statestored_args=_STATESTORED_ARGS)
   def test_pool_config_change_while_queued(self, vector):
-    """Tests if the invalid checks work even if the query is queued. Makes sure the query
-    is not dequeued if the config is invalid and is promptly dequeued when it goes back
-    to being valid"""
+    """Tests that the invalid checks work even if the query is queued. Makes sure that a
+    queued query is dequeued and rejected if the config is invalid."""
     pool_name = "invalidTestPool"
     config_str = "max-query-mem-limit"
     self.client.set_configuration_option('request_pool', pool_name)
@@ -754,7 +766,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.wait_for_admission_control(sleep_query_handle)
     self.__wait_for_change_to_profile(sleep_query_handle,
                                       "Admission result: Admitted immediately")
-    queued_query_handle = self.client.execute_async("select 1")
+    queued_query_handle = self.client.execute_async("select 2")
     self.__wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
     # Change config to be invalid.
@@ -764,16 +776,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Close running query so the queued one gets a chance.
     self.client.close_query(sleep_query_handle)
 
-    # Check latest queued reason changed
-    queued_reason = "Latest admission queue reason: Invalid pool config: the " \
-                    "min_query_mem_limit is greater than the max_query_mem_limit" \
-                    " (26214400 > 1)"
-    self.__wait_for_change_to_profile(queued_query_handle, queued_reason)
-
-    # Now change the config back to valid value and make sure the query is allowed to run.
-    config.set_config_value(pool_name, config_str, 0)
-    self.client.wait_for_finished_timeout(queued_query_handle, 20)
+    # Observe that the queued query fails.
+    self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
     self.close_query(queued_query_handle)
+
+    # Change the config back to a valid value
+    config.set_config_value(pool_name, config_str, 0)
 
     # Now do the same thing for change to pool.max-query-mem-limit such that it can no
     # longer accommodate the largest min_reservation.
@@ -788,18 +796,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     config.set_config_value(pool_name, config_str, 25 * 1024 * 1024)
     # Close running query so the queued one gets a chance.
     self.client.close_query(sleep_query_handle)
-    # Check latest queued reason changed
-    queued_reason = "minimum memory reservation is greater than memory available to " \
-                    "the query for buffer reservations. Memory reservation needed given" \
-                    " the current plan: 88.00 KB. Adjust either the mem_limit or the" \
-                    " pool config (max-query-mem-limit, min-query-mem-limit) for the" \
-                    " query to allow the query memory limit to be at least 32.09 MB."
-    self.__wait_for_change_to_profile(queued_query_handle, queued_reason, 5)
-    # Now change the config back to a reasonable value.
-    config.set_config_value(pool_name, config_str, 0)
-    self.client.wait_for_finished_timeout(queued_query_handle, 20)
-    self.__wait_for_change_to_profile(queued_query_handle,
-                                      "Admission result: Admitted (queued)")
+
+    # Observe that the queued query fails.
+    self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
     self.close_query(queued_query_handle)
 
   def __wait_for_change_to_profile(self, query_handle, search_string, timeout=20):
@@ -1089,6 +1088,47 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         assert len(query_statuses) == 1, profile
         rejected_reasons_return.append(query_statuses[0])
     return num_rejected, rejected_reasons_return
+
+  @pytest.mark.execute_serially
+  def test_impala_server_startup_delay(self):
+    """This test verifies that queries get queued when the coordinator has already started
+    accepting client connections during startup, but the local backend descriptor is not
+    yet available."""
+    server_start_delay_s = 20
+    # We need to start the cluster here instead of during setup_method() so we can launch
+    # it from a separate thread.
+
+    def start_cluster():
+      LOG.info("Starting cluster")
+      impalad_args = "--debug_actions=IMPALA_SERVER_END_OF_START:SLEEP@%s" % (
+          1000 * server_start_delay_s)
+      self._start_impala_cluster(['--impalad_args=%s' % impalad_args])
+
+    # Initiate the cluster start
+    start_cluster_thread = threading.Thread(target=start_cluster)
+    start_cluster_thread.start()
+
+    # Wait some time to arrive at IMPALA_SERVER_END_OF_START
+    sleep(server_start_delay_s)
+
+    # With a new client, execute a query and observe that it gets queued and ultimately
+    # succeeds.
+    client = self.create_impala_client()
+    result = self.execute_query_expect_success(client, "select 1")
+    start_cluster_thread.join()
+    profile = result.runtime_profile
+    reasons = self.__extract_init_queue_reasons([profile])
+    assert len(reasons) == 1
+    assert "Local backend has not started up yet." in reasons[0]
+
+  @pytest.mark.execute_serially
+  def test_scheduler_error(self):
+    """This test verifies that the admission controller handles scheduler errors
+    correctly."""
+    client = self.create_impala_client()
+    client.set_configuration_option("debug_action", "SCHEDULER_SCHEDULE:FAIL")
+    result = self.execute_query_expect_failure(client, "select 1")
+    assert "Error during scheduling" in str(result)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):

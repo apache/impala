@@ -42,14 +42,13 @@
 #include "util/runtime-profile.h"
 
 namespace impala {
-class ClusterMembershipMgr;
 
 namespace test {
 class SchedulerWrapper;
 }
 
-/// Performs simple scheduling by matching between a list of executor backends that it
-/// retrieves from the cluster membership manager, and a list of target data locations.
+/// Performs simple scheduling by matching between a list of executor backends that is
+/// supplied by the users of this class, and a list of target data locations.
 ///
 /// TODO: Track assignments (assignment_ctx in ComputeScanRangeAssignment) per query
 ///       instead of per plan node?
@@ -61,20 +60,19 @@ class SchedulerWrapper;
 ///           configuration.
 class Scheduler {
  public:
-  Scheduler(ClusterMembershipMgr* cluster_membership_mgr, MetricGroup* metrics,
-      RequestPoolService* request_pool_service);
+  Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_service);
 
-  /// Populates given query schedule and assigns fragments to hosts based on scan
-  /// ranges in the query exec request.
-  Status Schedule(QuerySchedule* schedule);
-
- private:
   /// Current snapshot of executors to be used for scheduling a scan.
   struct ExecutorConfig {
     const ExecutorGroup& group;
     const TBackendDescriptor& local_be_desc;
   };
 
+  /// Populates given query schedule and assigns fragments to hosts based on scan
+  /// ranges in the query exec request.
+  Status Schedule(const ExecutorConfig& executor_config, QuerySchedule* schedule);
+
+ private:
   /// Map from a host's IP address to the next executor to be round-robin scheduled for
   /// that host (needed for setups with multiple executors on a single host)
   typedef boost::unordered_map<IpAddr, ExecutorGroup::Executors::const_iterator>
@@ -248,11 +246,6 @@ class Scheduler {
 
   /// MetricGroup subsystem access
   MetricGroup* metrics_;
-
-  /// Pointer to the cluster membership manager. It provides information about backends
-  /// and executors in the cluster that the scheduler uses to assign fragment instances to
-  /// backends.
-  ClusterMembershipMgr* cluster_membership_mgr_;
 
   /// Locality metrics
   IntCounter* total_assignments_ = nullptr;

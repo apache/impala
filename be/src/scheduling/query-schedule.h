@@ -76,6 +76,9 @@ struct BackendExecParams {
   // admission controller. Obtained from the scheduler's executors configuration
   // which is updated by membership updates from the statestore.
   int64_t admit_mem_limit = 0;
+
+  // The maximum number of queries that this backend can execute concurrently.
+  int64_t admit_num_queries_limit = 0;
 };
 
 /// Map from an impalad host address to the list of assigned fragment instance params.
@@ -261,6 +264,10 @@ class QuerySchedule {
   /// GetClusterMemoryToAdmit().
   void UpdateMemoryRequirements(const TPoolConfig& pool_cfg);
 
+  const string& executor_group() const { return executor_group_; }
+
+  void set_executor_group(string executor_group);
+
  private:
   /// These references are valid for the lifetime of this query schedule because they
   /// are all owned by the enclosing QueryExecState.
@@ -308,6 +315,10 @@ class QuerySchedule {
   /// Set by the admission controller with a value that is only valid if it was admitted
   /// successfully.
   int64_t per_backend_mem_to_admit_ = 0;
+
+  /// The name of the executor group that this schedule was computed for. Set by the
+  /// Scheduler and only valid after scheduling completes successfully.
+  string executor_group_;
 
   /// Populate fragment_exec_params_ from request_.plan_exec_info.
   /// Sets is_coord_fragment and input_fragments.

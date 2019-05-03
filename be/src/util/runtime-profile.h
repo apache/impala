@@ -144,7 +144,7 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// structures owned by the profile are allocated from 'pool'.
   /// If 'is_averaged_profile' is true, the counters in this profile will be derived
   /// averages (of unit AveragedCounter) from other profiles, so the counter map will
-  /// be left empty Otherwise, the counter map is initialized with a single entry for
+  /// be left empty. Otherwise, the counter map is initialized with a single entry for
   /// TotalTime.
   static RuntimeProfile* Create(ObjectPool* pool, const std::string& name,
       bool is_averaged_profile = false);

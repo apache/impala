@@ -17,15 +17,17 @@
 
 #include "service/impala-http-handler.h"
 
+#include <algorithm>
 #include <sstream>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread/mutex.hpp>
-#include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
-#include <gutil/strings/substitute.h>
+#include <rapidjson/stringbuffer.h>
 
 #include "catalog/catalog-util.h"
 #include "gen-cpp/beeswax_types.h"
+#include "gutil/strings/join.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -869,9 +871,9 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
 
 void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Document* document) {
-  std::unordered_map<string, pair<int64_t, int64_t>> host_mem_map;
+  AdmissionController::PerHostStats host_stats;
   ExecEnv::GetInstance()->admission_controller()->PopulatePerHostMemReservedAndAdmitted(
-      &host_mem_map);
+      &host_stats);
   Value backends_list(kArrayType);
   ClusterMembershipMgr* cluster_membership_mgr =
       ExecEnv::GetInstance()->cluster_membership_mgr();
@@ -895,14 +897,23 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit).c_str(),
         document->GetAllocator());
     backend_obj.AddMember("admit_mem_limit", admit_mem_limit, document->GetAllocator());
-    // If the host address does not exist in the 'host_mem_map', this would ensure that a
+    // If the host address does not exist in the 'host_stats', this would ensure that a
     // value of zero is used for those addresses.
-    Value mem_reserved(PrettyPrinter::PrintBytes(host_mem_map[address].first).c_str(),
-        document->GetAllocator());
+    Value mem_reserved(PrettyPrinter::PrintBytes(
+        host_stats[address].mem_reserved).c_str(), document->GetAllocator());
     backend_obj.AddMember("mem_reserved", mem_reserved, document->GetAllocator());
-    Value mem_admitted(PrettyPrinter::PrintBytes(host_mem_map[address].second).c_str(),
-        document->GetAllocator());
+    Value mem_admitted(PrettyPrinter::PrintBytes(
+        host_stats[address].mem_admitted).c_str(), document->GetAllocator());
     backend_obj.AddMember("mem_admitted", mem_admitted, document->GetAllocator());
+    backend_obj.AddMember("admit_num_queries_limit", backend.admit_num_queries_limit,
+        document->GetAllocator());
+    backend_obj.AddMember("num_admitted", host_stats[address].num_admitted,
+        document->GetAllocator());
+    vector<string> group_names;
+    for (const auto& group : backend.executor_groups) group_names.push_back(group.name);
+    Value executor_groups(JoinStrings(group_names, ", ").c_str(),
+        document->GetAllocator());
+    backend_obj.AddMember("executor_groups", executor_groups, document->GetAllocator());
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());

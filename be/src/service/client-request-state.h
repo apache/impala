@@ -183,7 +183,7 @@ class ClientRequestState {
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }
   bool eos() const { return eos_; }
-  QuerySchedule* schedule() { return schedule_.get(); }
+  const QuerySchedule* schedule() const { return schedule_.get(); }
 
   /// Returns the Coordinator for 'QUERY' and 'DML' requests once Coordinator::Exec()
   /// completes successfully. Otherwise returns null.
@@ -338,7 +338,7 @@ protected:
   std::shared_ptr<ImpalaServer::SessionState> session_;
 
   /// Resource assignment determined by scheduler. Owned by obj_pool_.
-  boost::scoped_ptr<QuerySchedule> schedule_;
+  std::unique_ptr<QuerySchedule> schedule_;
 
   /// Thread for asynchronously running the admission control code-path and starting
   /// execution in the following cases:
@@ -439,8 +439,8 @@ protected:
   /// To get access to UpdateCatalog, LOAD, and DDL methods. Not owned.
   Frontend* frontend_;
 
-  /// The parent ImpalaServer; called to wait until the the impalad has processed a
-  /// catalog update request. Not owned.
+  /// The parent ImpalaServer; called to wait until the impalad has processed a catalog
+  /// update request. Not owned.
   ImpalaServer* parent_server_;
 
   /// Start/end time of the query, in Unix microseconds.

@@ -481,13 +481,6 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
     lock_guard<mutex> l(lock_);
     // Don't start executing the query if Cancel() was called concurrently with Exec().
     if (is_cancelled_) return Status::CANCELLED;
-    schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
-        exec_request_.query_options, summary_profile_, query_events_));
-  }
-  Status status = exec_env_->scheduler()->Schedule(schedule_.get());
-  {
-    lock_guard<mutex> l(lock_);
-    RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
   RETURN_IF_ERROR(Thread::Create("query-exec-state", "async-exec-thread",
       &ClientRequestState::FinishExecQueryOrDmlRequest, this, &async_exec_thread_, true));
@@ -495,16 +488,31 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
 }
 
 void ClientRequestState::FinishExecQueryOrDmlRequest() {
-  DebugActionNoFail(schedule_->query_options(), "CRS_BEFORE_ADMISSION");
+  DebugActionNoFail(exec_request_.query_options, "CRS_BEFORE_ADMISSION");
 
   DCHECK(exec_env_->admission_controller() != nullptr);
+  DCHECK(exec_request_.__isset.query_exec_request);
   Status admit_status =
       ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
-          schedule_.get(), &admit_outcome_);
+          {query_id(), exec_request_.query_exec_request, exec_request_.query_options,
+              summary_profile_, query_events_},
+          &admit_outcome_, &schedule_);
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;
   }
+  DCHECK(schedule_.get() != nullptr);
+  DCHECK_EQ(schedule_->query_id(), query_id());
+  // Note that we don't need to check for cancellation between admission and query
+  // startup. The query was not cancelled right before being admitted and the window here
+  // is small enough to not require special handling. Instead we start the query and then
+  // cancel it through the check below if necessary.
+  DebugActionNoFail(schedule_->query_options(), "CRS_BEFORE_COORD_STARTS");
+  // Register the query with the server to support cancellation. This happens after
+  // admission because now the set of executors is fixed and an executor failure will
+  // cause a query failure.
+  parent_server_->RegisterQueryLocations(
+      schedule_->per_backend_exec_params(), query_id());
   coord_.reset(new Coordinator(this, *schedule_, query_events_));
   Status exec_status = coord_->Exec();
 
@@ -523,7 +531,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
       coord_exec_called_.Store(true);
     } else {
       VLOG_QUERY << "Cancelled right after starting the coordinator query id="
-                 << PrintId(schedule_->query_id());
+                 << PrintId(query_id());
       discard_result(UpdateQueryStatus(Status::CANCELLED));
     }
   }

@@ -29,52 +29,76 @@ using namespace impala::test;
 
 /// Test adding multiple backends on different hosts.
 TEST(ExecutorGroupTest, AddExecutors) {
-  ExecutorGroup executor_group;
-  executor_group.AddExecutor(MakeBackendDescriptor(1));
-  executor_group.AddExecutor(MakeBackendDescriptor(2));
-  ASSERT_EQ(2, executor_group.NumExecutors());
+  ExecutorGroup group1("group1");
+  group1.AddExecutor(MakeBackendDescriptor(1, group1));
+  group1.AddExecutor(MakeBackendDescriptor(2, group1));
+  ASSERT_EQ(2, group1.NumExecutors());
   IpAddr backend_ip;
-  ASSERT_TRUE(executor_group.LookUpExecutorIp("host_1", &backend_ip));
+  ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
-  ASSERT_TRUE(executor_group.LookUpExecutorIp("host_2", &backend_ip));
+  ASSERT_TRUE(group1.LookUpExecutorIp("host_2", &backend_ip));
   EXPECT_EQ("10.0.0.2", backend_ip);
 }
 
 /// Test adding multiple backends on the same host.
 TEST(ExecutorGroupTest, MultipleExecutorsOnSameHost) {
-  ExecutorGroup executor_group;
-  executor_group.AddExecutor(MakeBackendDescriptor(1, /* port_offset=*/0));
-  executor_group.AddExecutor(MakeBackendDescriptor(1, /* port_offset=*/1));
+  ExecutorGroup group1("group1");
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0));
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
   IpAddr backend_ip;
-  ASSERT_TRUE(executor_group.LookUpExecutorIp("host_1", &backend_ip));
+  ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
-  const ExecutorGroup::Executors& backend_list =
-      executor_group.GetExecutorsForHost("10.0.0.1");
+  const ExecutorGroup::Executors& backend_list = group1.GetExecutorsForHost("10.0.0.1");
   EXPECT_EQ(2, backend_list.size());
 }
 
 /// Test removing a backend.
 TEST(ExecutorGroupTest, RemoveExecutor) {
-  ExecutorGroup executor_group;
-  executor_group.AddExecutor(MakeBackendDescriptor(1));
-  executor_group.AddExecutor(MakeBackendDescriptor(2));
-  executor_group.RemoveExecutor(MakeBackendDescriptor(2));
+  ExecutorGroup group1("group1");
+  group1.AddExecutor(MakeBackendDescriptor(1, group1));
+  group1.AddExecutor(MakeBackendDescriptor(2, group1));
+  group1.RemoveExecutor(MakeBackendDescriptor(2, group1));
   IpAddr backend_ip;
-  ASSERT_TRUE(executor_group.LookUpExecutorIp("host_1", &backend_ip));
+  ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
-  ASSERT_FALSE(executor_group.LookUpExecutorIp("host_2", &backend_ip));
+  ASSERT_FALSE(group1.LookUpExecutorIp("host_2", &backend_ip));
 }
 
 /// Test removing one of multiple backends on the same host (IMPALA-3944).
 TEST(ExecutorGroupTest, RemoveExecutorOnSameHost) {
-  ExecutorGroup executor_group;
-  executor_group.AddExecutor(MakeBackendDescriptor(1, /* port_offset=*/0));
-  executor_group.AddExecutor(MakeBackendDescriptor(1, /* port_offset=*/1));
-  executor_group.RemoveExecutor(MakeBackendDescriptor(1, /* port_offset=*/1));
+  ExecutorGroup group1("group1");
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/0));
+  group1.AddExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
+  group1.RemoveExecutor(MakeBackendDescriptor(1, group1, /* port_offset=*/1));
   IpAddr backend_ip;
-  ASSERT_TRUE(executor_group.LookUpExecutorIp("host_1", &backend_ip));
+  ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
-  const ExecutorGroup::Executors& backend_list =
-      executor_group.GetExecutorsForHost("10.0.0.1");
+  const ExecutorGroup::Executors& backend_list = group1.GetExecutorsForHost("10.0.0.1");
   EXPECT_EQ(1, backend_list.size());
+}
+
+/// Test that exercises the size-based group health check.
+TEST(ExecutorGroupTest, HealthCheck) {
+  ExecutorGroup group1("group1", 2);
+  group1.AddExecutor(MakeBackendDescriptor(1, group1));
+  ASSERT_FALSE(group1.IsHealthy());
+  group1.AddExecutor(MakeBackendDescriptor(2, group1));
+  ASSERT_TRUE(group1.IsHealthy());
+  group1.RemoveExecutor(MakeBackendDescriptor(2, group1));
+  ASSERT_FALSE(group1.IsHealthy());
+}
+
+/// Tests that adding an inconsistent backend to a group fails.
+TEST(ExecutorGroupTest, TestAddInconsistent) {
+  ExecutorGroup group1("group1", 2);
+  group1.AddExecutor(MakeBackendDescriptor(1, group1));
+  // Backend for a group with a matching name but mismatching size is not allowed.
+  ExecutorGroup group_size_mismatch("group1", 3);
+  group1.AddExecutor(MakeBackendDescriptor(3, group_size_mismatch));
+  ASSERT_EQ(1, group1.NumExecutors());
+  // Backend for a group with a mismatching name can be added (See AddExecutor() for
+  // details).
+  ExecutorGroup group_name_mismatch("group_name_mismatch", 2);
+  group1.AddExecutor(MakeBackendDescriptor(2, group_name_mismatch));
+  ASSERT_EQ(2, group1.NumExecutors());
 }

@@ -44,6 +44,15 @@ struct TPoolStats {
   3: required i64 backend_mem_reserved;
 }
 
+// Structure to describe an executor group. We use this to configure the executor group
+// for backends during startup and during cluster membership management.
+struct TExecutorGroupDesc {
+  // The name of the executor group.
+  1: required string name;
+  // The minimum size of the executor group to be considered healthy.
+  2: required i64 min_size;
+}
+
 // Structure serialised in the Impala backend topic. Each Impalad
 // constructs one TBackendDescriptor, and registers it in the cluster-membership
 // topic. Impalads subscribe to this topic to learn of the location of
@@ -78,6 +87,13 @@ struct TBackendDescriptor {
   // True if fragment instances should not be scheduled on this daemon because the
   // daemon has been quiescing, e.g. if it shutting down.
   9: required bool is_quiescing;
+
+  // The list of executor groups that this backend belongs to. Only valid if is_executor
+  // is set, and currently must contain exactly one entry.
+  10: required list<TExecutorGroupDesc> executor_groups;
+
+  // The number of queries that can be admitted to this backend.
+  11: required i64 admit_num_queries_limit;
 }
 
 // Description of a single entry in a topic

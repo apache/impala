@@ -54,6 +54,7 @@
 #include "service/impala-server.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/cgroup-util.h"
+#include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
@@ -65,8 +66,8 @@
 #include "util/parse-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
-#include "util/test-info.h"
 #include "util/system-state-info.h"
+#include "util/test-info.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 
@@ -85,6 +86,10 @@ DEFINE_int32(state_store_subscriber_port, 23000,
     "port where StatestoreSubscriberService should be exported");
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
+DEFINE_int32(max_concurrent_queries, 0,
+    "(Advanced) The maximum number of queries to run on this backend concurrently "
+    "(defaults to number of cores / -num_cores for executors, and 8x that value for "
+    "dedicated coordinators).");
 
 DEFINE_bool_hidden(use_local_catalog, false,
     "Use experimental implementation of a local catalog. If this is set, "
@@ -116,6 +121,7 @@ DECLARE_string(buffer_pool_limit);
 DECLARE_string(buffer_pool_clean_pages_limit);
 DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
+DECLARE_bool(is_executor);
 DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 
@@ -140,6 +146,11 @@ DEFINE_int32(catalog_client_rpc_retry_interval_ms, 10000, "(Advanced) The time t
     "before retrying when the catalog RPC client fails to connect to catalogd.");
 
 const static string DEFAULT_FS = "fs.defaultFS";
+
+// The multiplier for how many queries a dedicated coordinator can run compared to an
+// executor. This is only effective when using non-default settings for executor groups
+// and the absolute value can be overridden by the '--max_concurrent_queries' flag.
+const static int COORDINATOR_CONCURRENCY_MULTIPLIER = 8;
 
 namespace impala {
 
@@ -197,17 +208,16 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
       Substitute("impalad@$0", TNetworkAddressToString(configured_backend_address_)),
       subscriber_address, statestore_address, metrics_.get()));
 
-  cluster_membership_mgr_.reset(new ClusterMembershipMgr(statestore_subscriber_->id(),
-      statestore_subscriber_.get()));
-
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
     exec_rpc_thread_pool_.reset(new CallableThreadPool("exec-rpc-pool", "worker",
         FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max()));
-    scheduler_.reset(new Scheduler(cluster_membership_mgr_.get(), metrics_.get(),
-        request_pool_service_.get()));
+    scheduler_.reset(new Scheduler(metrics_.get(), request_pool_service_.get()));
   }
+
+  cluster_membership_mgr_.reset(new ClusterMembershipMgr(
+      statestore_subscriber_->id(), statestore_subscriber_.get()));
 
   admission_controller_.reset(
       new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
@@ -274,6 +284,15 @@ Status ExecEnv::Init() {
         FLAGS_buffer_pool_clean_pages_limit));
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
+
+  admit_num_queries_limit_ = CpuInfo::num_cores();
+  if (FLAGS_max_concurrent_queries > 0) {
+    admit_num_queries_limit_ = FLAGS_max_concurrent_queries;
+  } else if (FLAGS_is_coordinator && !FLAGS_is_executor) {
+    // By default we assume that dedicated coordinators can handle more queries than
+    // executors.
+    admit_num_queries_limit_ *= COORDINATOR_CONCURRENCY_MULTIPLIER;
+  }
 
   InitSystemStateInfo();
 

@@ -297,8 +297,8 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     before_shutdown_handle = self.__exec_and_wait_until_running(QUERY)
 
     # Run this query which simulates getting stuck in admission control until after
-    # the shutdown grace period expires. This exercises the code path where the
-    # coordinator terminates the query before it has started up.
+    # the shutdown grace period expires. This demonstrates that queries don't get
+    # cancelled if the cluster membership changes while they're waiting for admission.
     before_shutdown_admission_handle = self.execute_query_async(QUERY,
         {'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@30000'})
 
@@ -332,8 +332,9 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     assert self.__fetch_and_get_num_backends(
         QUERY, before_shutdown_handle, delay_s=fetch_delay_s) == 3
 
-    # Confirm that the query stuck in admission failed.
-    self.__check_deadline_expired(QUERY, before_shutdown_admission_handle)
+    # Confirm that the query stuck in admission succeeded.
+    assert self.__fetch_and_get_num_backends(
+        QUERY, before_shutdown_admission_handle, timeout_s=30) == 2
 
     # Start the impalad back up and run another query, which should be scheduled on it
     # again.
@@ -475,11 +476,11 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
                 self.client.QUERY_STATES['RUNNING'], timeout=20)
     return handle
 
-  def __fetch_and_get_num_backends(self, query, handle, delay_s=0):
+  def __fetch_and_get_num_backends(self, query, handle, delay_s=0, timeout_s=20):
     """Fetch the results of 'query' from the beeswax handle 'handle', close the
     query and return the number of backends obtained from the profile."""
     self.impalad_test_service.wait_for_query_state(self.client, handle,
-                self.client.QUERY_STATES['FINISHED'], timeout=20)
+                self.client.QUERY_STATES['FINISHED'], timeout=timeout_s)
     if delay_s > 0:
       LOG.info("sleeping for {0}s".format(delay_s))
       time.sleep(delay_s)

@@ -392,7 +392,7 @@ Status Coordinator::FinishBackendStartup() {
     }
     if (backend_state->rpc_latency() > max_latency) {
       // Find the backend that takes the most time to acknowledge to
-      // the ExecQueryFinstances() RPC.
+      // the ExecQueryFInstances() RPC.
       max_latency = backend_state->rpc_latency();
       max_latency_host = TNetworkAddressToString(backend_state->impalad_address());
     }

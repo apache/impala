@@ -172,6 +172,7 @@ class ExecEnv {
       kudu::client::KuduClient** client) WARN_UNUSED_RESULT;
 
   int64_t admit_mem_limit() const { return admit_mem_limit_; }
+  int64_t admit_num_queries_limit() const { return admit_num_queries_limit_; }
 
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
@@ -262,6 +263,9 @@ class ExecEnv {
   /// mem_tracker()->limit() with any overhead that can't be used subtracted out,
   /// such as the JVM if --mem_limit_includes_jvm=true. Set in Init().
   int64_t admit_mem_limit_;
+
+  /// The maximum number of queries that this host can run concurrently.
+  int64_t admit_num_queries_limit_;
 
   /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
   /// the memory available to the daemon process. Returns an error if the memory limit is

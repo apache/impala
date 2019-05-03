@@ -76,6 +76,10 @@ parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true"
                   " the running impalads and the statestored.")
 parser.add_option("--force_kill", dest="force_kill", action="store_true", default=False,
                   help="Force kill impalad and statestore processes.")
+parser.add_option("-a", "--add_executors", dest="add_executors",
+                  action="store_true", default=False,
+                  help="Start additional impalad processes. The executor group name must "
+                  "be specified using --impalad_args")
 parser.add_option("-r", "--restart_impalad_only", dest="restart_impalad_only",
                   action="store_true", default=False,
                   help="Restarts only the impalad processes")
@@ -267,7 +271,7 @@ def build_catalogd_arg_list():
 
 
 def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordinators,
-    remap_ports):
+    remap_ports, start_idx=0):
   """Build the argument lists for impala daemons in the cluster. Returns a list of
   argument lists, one for each impala daemon in the cluster. Each argument list is
   a list of strings. 'num_coordinators' and 'use_exclusive_coordinators' allow setting
@@ -295,7 +299,7 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
 
   # Build args for each each impalad instance.
   impalad_args = []
-  for i in range(cluster_size):
+  for i in range(start_idx, start_idx + cluster_size):
     service_name = impalad_service_name(i)
 
     impala_port_args = ""
@@ -431,7 +435,8 @@ class MiniClusterOperations(object):
       raise RuntimeError("Unable to start catalogd. Check log or file permissions"
                          " for more details.")
 
-  def start_impalads(self, cluster_size, num_coordinators, use_exclusive_coordinators):
+  def start_impalads(self, cluster_size, num_coordinators, use_exclusive_coordinators,
+                     start_idx=0):
     """Start 'cluster_size' impalad instances. The first 'num_coordinator' instances will
       act as coordinators. 'use_exclusive_coordinators' specifies whether the coordinators
       will only execute coordinator fragments."""
@@ -439,16 +444,21 @@ class MiniClusterOperations(object):
       # No impalad instances should be started.
       return
 
+    # The current TCP port allocation of the minicluster allows up to 10 impalads before
+    # the backend port (25000 + idx) will collide with the statestore (25010).
+    assert start_idx + cluster_size <= 10, "Must not start more than 10 impalads"
+
     impalad_arg_lists = build_impalad_arg_lists(
-        cluster_size, num_coordinators, use_exclusive_coordinators, remap_ports=True)
+        cluster_size, num_coordinators, use_exclusive_coordinators, remap_ports=True,
+        start_idx=start_idx)
     assert cluster_size == len(impalad_arg_lists)
-    for i in xrange(cluster_size):
+    for i in xrange(start_idx, start_idx + cluster_size):
       service_name = impalad_service_name(i)
       LOG.info("Starting Impala Daemon logging to {log_dir}/{service_name}.INFO".format(
           log_dir=options.log_dir, service_name=service_name))
       output_file = os.path.join(
           options.log_dir, "{service_name}-out.log".format(service_name=service_name))
-      run_daemon_with_options("impalad", impalad_arg_lists[i],
+      run_daemon_with_options("impalad", impalad_arg_lists[i - start_idx],
           jvm_debug_port=DEFAULT_IMPALAD_JVM_DEBUG_PORT + i, output_file=output_file)
 
 
@@ -548,6 +558,7 @@ class DockerMiniClusterOperations(object):
                    for src, dst in port_map.iteritems()]
     # Impersonate the current user for operations against the minicluster. This is
     # necessary because the user name inside the container is "root".
+    # TODO: pass in the actual options
     env_args = ["-e", "HADOOP_USER_NAME={0}".format(getpass.getuser()),
                 "-e", "JAVA_TOOL_OPTIONS={0}".format(
                     build_java_tool_options(DEFAULT_IMPALAD_JVM_DEBUG_PORT))]
@@ -618,9 +629,9 @@ def validate_options():
     LOG.error("Please specify a cluster size >= 0")
     sys.exit(1)
 
-  if options.num_coordinators <= 0:
-    LOG.error("Please specify a valid number of coordinators > 0")
-    sys.exit(1)
+  if (options.use_exclusive_coordinators and
+      options.num_coordinators >= options.cluster_size):
+    LOG.info("Starting impala cluster without executors")
 
   if not os.path.isdir(options.log_dir):
     LOG.error("Log dir does not exist or is not a directory: {log_dir}".format(
@@ -629,10 +640,12 @@ def validate_options():
 
   restart_only_count = len([opt for opt in [options.restart_impalad_only,
                                             options.restart_statestored_only,
-                                            options.restart_catalogd_only] if opt])
+                                            options.restart_catalogd_only,
+                                            options.add_executors] if opt])
   if restart_only_count > 1:
-    LOG.error("--restart_impalad_only, --restart_catalogd_only, and "
-              "--restart_statestored_only options are mutually exclusive")
+    LOG.error("--restart_impalad_only, --restart_catalogd_only, "
+              "--restart_statestored_only, and --add_executors options are mutually "
+              "exclusive")
     sys.exit(1)
   elif restart_only_count == 1:
     if options.inprocess:
@@ -665,6 +678,8 @@ if __name__ == "__main__":
     cluster_ops.kill_catalogd(force=options.force_kill)
   elif options.restart_statestored_only:
     cluster_ops.kill_statestored(force=options.force_kill)
+  elif options.add_executors:
+    pass
   else:
     cluster_ops.kill_all_daemons(force=options.force_kill)
 
@@ -678,6 +693,9 @@ if __name__ == "__main__":
           "Restarting entire cluster.")
       options.restart_impalad_only = False
 
+  existing_cluster_size = len(cluster_ops.get_cluster().impalads)
+  expected_cluster_size = options.cluster_size
+  num_coordinators = options.num_coordinators
   try:
     if options.restart_catalogd_only:
       cluster_ops.start_catalogd()
@@ -685,12 +703,18 @@ if __name__ == "__main__":
       cluster_ops.start_statestore()
     elif options.restart_impalad_only:
       cluster_ops.start_impalads(options.cluster_size, options.num_coordinators,
-                              options.use_exclusive_coordinators)
+                                 options.use_exclusive_coordinators)
+    elif options.add_executors:
+      num_coordinators = 0
+      use_exclusive_coordinators = False
+      cluster_ops.start_impalads(options.cluster_size, num_coordinators,
+                                 use_exclusive_coordinators, existing_cluster_size)
+      expected_cluster_size += existing_cluster_size
     else:
       cluster_ops.start_statestore()
       cluster_ops.start_catalogd()
       cluster_ops.start_impalads(options.cluster_size, options.num_coordinators,
-                              options.use_exclusive_coordinators)
+                                 options.use_exclusive_coordinators)
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.
     sleep(3)
 
@@ -700,8 +724,8 @@ if __name__ == "__main__":
       for delay in options.catalog_init_delays.split(","):
         if int(delay.strip()) != 0: expected_catalog_delays += 1
     # Check for the cluster to be ready.
-    impala_cluster.wait_until_ready(options.cluster_size,
-        options.cluster_size - expected_catalog_delays)
+    impala_cluster.wait_until_ready(expected_cluster_size,
+        expected_cluster_size - expected_catalog_delays)
   except Exception, e:
     LOG.exception("Error starting cluster")
     sys.exit(1)
@@ -713,5 +737,5 @@ if __name__ == "__main__":
   LOG.info(("Impala Cluster Running with {num_nodes} nodes "
       "({num_coordinators} coordinators, {num_executors} executors).").format(
           num_nodes=options.cluster_size,
-          num_coordinators=min(options.cluster_size, options.num_coordinators),
+          num_coordinators=min(options.cluster_size, num_coordinators),
           num_executors=executors))

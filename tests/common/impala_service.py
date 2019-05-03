@@ -19,6 +19,7 @@
 # programatically interact with the services and perform operations such as querying
 # the debug webpage, getting metric values, or creating client connections.
 
+from collections import defaultdict
 import json
 import logging
 import re
@@ -163,16 +164,37 @@ class ImpaladService(BaseImpalaService):
     self.be_port = be_port
     self.hs2_port = hs2_port
 
-  def get_num_known_live_backends(self, timeout=30, interval=1,
+  def get_num_known_live_executors(self, timeout=30, interval=1,
       include_shutting_down=True):
-    LOG.info("Getting num_known_live_backends from %s:%s" %
+    return self.get_num_known_live_backends(include_shutting_down=include_shutting_down,
+                                            only_executors=True)
+
+  def get_num_known_live_backends(self, timeout=30, interval=1,
+      include_shutting_down=True, only_coordinators=False, only_executors=False):
+    LOG.debug("Getting num_known_live_backends from %s:%s" %
         (self.hostname, self.webserver_port))
     result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
     count = 0
     for backend in result['backends']:
-      if include_shutting_down or not backend['is_quiescing']:
-        count += 1
+      if backend['is_quiescing'] and not include_shutting_down:
+        continue
+      if only_coordinators and not backend['is_coordinator']:
+        continue
+      if only_executors and not backend['is_executor']:
+        continue
+      count += 1
     return count
+
+  def get_executor_groups(self, timeout=30, interval=1):
+    """Returns a mapping from executor group name to a list of all KRPC endpoints of a
+    group's executors."""
+    LOG.debug("Getting executor groups from %s:%s" %
+        (self.hostname, self.webserver_port))
+    result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
+    groups = defaultdict(list)
+    for backend in result['backends']:
+      groups[backend['executor_groups']].append(backend['krpc_address'])
+    return groups
 
   def get_query_locations(self):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
@@ -184,6 +206,31 @@ class ImpaladService(BaseImpalaService):
   def get_in_flight_queries(self, timeout=30, interval=1):
     result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
     return result['in_flight_queries']
+
+  def _get_pool_counter(self, pool_name, counter_name, timeout=30, interval=1):
+    """Returns the value of the field 'counter_name' in pool 'pool_name' or 0 if the pool
+    doesn't exist."""
+    result = json.loads(self.read_debug_webpage('admission?json', timeout, interval))
+    pools = result['resource_pools']
+    for pool in pools:
+      if pool['pool_name'] == pool_name:
+        return pool[counter_name]
+    return 0
+
+  def get_num_queued_queries(self, pool_name, timeout=30, interval=1):
+    """Returns the number of queued queries in pool 'pool_name' or 0 if the pool doesn't
+    exist."""
+    return self._get_pool_counter(pool_name, 'agg_num_queued', timeout, interval)
+
+  def get_total_admitted_queries(self, pool_name, timeout=30, interval=1):
+    """Returns the total number of queries that have been admitted to pool 'pool_name' or
+    0 if the pool doesn't exist."""
+    return self._get_pool_counter(pool_name, 'total_admitted', timeout, interval)
+
+  def get_num_running_queries(self, pool_name, timeout=30, interval=1):
+    """Returns the number of queries currently running in pool 'pool_name' or 0 if the
+    pool doesn't exist."""
+    return self._get_pool_counter(pool_name, 'agg_num_running', timeout, interval)
 
   def get_num_in_flight_queries(self, timeout=30, interval=1):
     LOG.info("Getting num_in_flight_queries from %s:%s" %

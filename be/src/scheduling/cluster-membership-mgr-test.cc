@@ -23,6 +23,7 @@
 #include "gen-cpp/StatestoreService_types.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/cluster-membership-test-util.h"
+#include "service/impala-server.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
 
@@ -55,6 +56,12 @@ class ClusterMembershipMgrTest : public testing::Test {
 
  protected:
   ClusterMembershipMgrTest() {}
+
+  /// Returns the size of the default executor group of the current membership in 'cmm'.
+  int GetDefaultGroupSize(const ClusterMembershipMgr& cmm) const {
+    const string& group_name = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+    return cmm.GetSnapshot()->executor_groups.find(group_name)->second.NumExecutors();
+  }
 
   /// A struct to hold information related to a simulated backend during the test.
   struct Backend {
@@ -309,20 +316,17 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   // The mgr will return its changed TBackendDescriptor
   ASSERT_EQ(1, returned_topic_deltas.size());
   // It will also remove itself from the executor group (but not the current backends).
-  ASSERT_EQ(1,
-      cmm1.GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+  ASSERT_EQ(1, GetDefaultGroupSize(cmm1));
   ASSERT_EQ(2, cmm1.GetSnapshot()->current_backends.size());
 
   // Propagate the quiescing to the 2nd mgr
   *ss_topic_delta = returned_topic_deltas[0];
   returned_topic_deltas.clear();
-  ASSERT_EQ(2,
-      cmm2.GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+  ASSERT_EQ(2, GetDefaultGroupSize(cmm2));
   cmm2.UpdateMembership(topic_delta_map, &returned_topic_deltas);
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(2, cmm2.GetSnapshot()->current_backends.size());
-  ASSERT_EQ(1,
-      cmm2.GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+  ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
 
   // Delete the 1st backend from the 2nd one
   ASSERT_EQ(1, ss_topic_delta->topic_entries.size());
@@ -330,9 +334,7 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   cmm2.UpdateMembership(topic_delta_map, &returned_topic_deltas);
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(1, cmm2.GetSnapshot()->current_backends.size());
-  ASSERT_EQ(1,
-      cmm2.GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
-
+  ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
 }
 
 // This test runs a group of 20 backends through their full lifecycle, validating that
@@ -357,8 +359,7 @@ TEST_F(ClusterMembershipMgrTest, FullLifecycleMultipleBackends) {
   // group.
   for (Backend* be : running_) {
     EXPECT_EQ(running_.size(), be->cmm->GetSnapshot()->current_backends.size());
-    EXPECT_EQ(running_.size(),
-        be->cmm->GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+    EXPECT_EQ(running_.size(), GetDefaultGroupSize(*be->cmm));
   }
 
   // Quiesce half of the backends.
@@ -367,12 +368,10 @@ TEST_F(ClusterMembershipMgrTest, FullLifecycleMultipleBackends) {
     // All backends must still remain online
     EXPECT_EQ(NUM_BACKENDS, be->cmm->GetSnapshot()->current_backends.size());
 
-    EXPECT_EQ(NUM_BACKENDS - i,
-        be->cmm->GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+    EXPECT_EQ(NUM_BACKENDS - i, GetDefaultGroupSize(*be->cmm));
     QuiesceBackend(be);
     // Make sure that the numbers drop
-    EXPECT_EQ(NUM_BACKENDS - i - 1,
-        be->cmm->GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+    EXPECT_EQ(NUM_BACKENDS - i - 1, GetDefaultGroupSize(*be->cmm));
   }
   int num_still_running = NUM_BACKENDS - quiescing_.size();
   ASSERT_EQ(num_still_running, running_.size());
@@ -382,8 +381,7 @@ TEST_F(ClusterMembershipMgrTest, FullLifecycleMultipleBackends) {
     // All backends are still registered
     EXPECT_EQ(backends_.size(), be->cmm->GetSnapshot()->current_backends.size());
     // Executor groups now show half of the backends remaining
-    EXPECT_EQ(num_still_running,
-        be->cmm->GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+    EXPECT_EQ(num_still_running, GetDefaultGroupSize(*be->cmm));
   }
 
   // Delete half of the backends and make sure that the other half learned about it.
@@ -408,8 +406,7 @@ TEST_F(ClusterMembershipMgrTest, FullLifecycleMultipleBackends) {
   while (!running_.empty()) QuiesceBackend(running_.front());
   for (auto& be : backends_) {
     // Executor groups now are empty
-    EXPECT_EQ(0,
-        be->cmm->GetSnapshot()->executor_groups.find("default")->second.NumExecutors());
+    EXPECT_EQ(0, GetDefaultGroupSize(*be->cmm));
   }
 }
 

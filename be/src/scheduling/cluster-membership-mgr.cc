@@ -21,11 +21,28 @@
 #include "common/names.h"
 #include "util/test-info.h"
 
-namespace impala {
+namespace {
+using namespace impala;
 
-const string ClusterMembershipMgr::DEFAULT_EXECUTOR_GROUP = "default";
-static const vector<string> DEFAULT_EXECUTOR_GROUPS =
-    {ClusterMembershipMgr::DEFAULT_EXECUTOR_GROUP};
+/// Looks for an executor group with name 'name' in 'executor_groups' and returns it. If
+/// the group doesn't exist yet, it creates a new one and inserts it into
+/// 'executor_groups'.
+ExecutorGroup* FindOrInsertExecutorGroup(const TExecutorGroupDesc& group,
+    ClusterMembershipMgr::ExecutorGroups* executor_groups) {
+  auto it = executor_groups->find(group.name);
+  if (it != executor_groups->end()) {
+    DCHECK_EQ(group.name, it->second.name());
+    return &it->second;
+  }
+  bool inserted;
+  tie(it, inserted) = executor_groups->emplace(group.name, ExecutorGroup(group));
+  DCHECK(inserted);
+  return &it->second;
+}
+
+}
+
+namespace impala {
 
 ClusterMembershipMgr::ClusterMembershipMgr(string local_backend_id,
     StatestoreSubscriber* subscriber) :
@@ -152,6 +169,7 @@ void ClusterMembershipMgr::UpdateMembership(
     }
   }
   if (local_be_desc.get() != nullptr) new_state->local_be_desc = local_be_desc;
+  new_state->version += 1;
 
   // Process removed, new, and updated entries from the topic update and apply the changes
   // to the new backend map and executor groups.
@@ -163,11 +181,11 @@ void ClusterMembershipMgr::UpdateMembership(
       if (new_backend_map->find(item.key) != new_backend_map->end()) {
         const TBackendDescriptor& be_desc = (*new_backend_map)[item.key];
         if (be_desc.is_executor && !be_desc.is_quiescing) {
-          const vector<string>& groups = DEFAULT_EXECUTOR_GROUPS;
-          for (const string& group : groups) {
+          for (const auto& group : be_desc.executor_groups) {
             VLOG(1) << "Removing backend " << item.key << " from group " << group
                     << " (deleted)";
-            (*new_executor_groups)[group].RemoveExecutor(be_desc);
+            FindOrInsertExecutorGroup(
+                group, new_executor_groups)->RemoveExecutor(be_desc);
           }
         }
         new_backend_map->erase(item.key);
@@ -220,11 +238,10 @@ void ClusterMembershipMgr::UpdateMembership(
       TBackendDescriptor& existing = it->second;
       if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor) {
         // Executor needs to be removed from its groups
-        const vector<string>& groups = DEFAULT_EXECUTOR_GROUPS;
-        for (const string& group : groups) {
+        for (const auto& group : be_desc.executor_groups) {
           VLOG(1) << "Removing backend " << item.key << " from group " << group
                   << " (quiescing)";
-          (*new_executor_groups)[group].RemoveExecutor(be_desc);
+          FindOrInsertExecutorGroup(group, new_executor_groups)->RemoveExecutor(be_desc);
         }
       }
       existing = be_desc;
@@ -232,10 +249,9 @@ void ClusterMembershipMgr::UpdateMembership(
       // Create
       new_backend_map->insert(make_pair(item.key, be_desc));
       if (!be_desc.is_quiescing && be_desc.is_executor) {
-        const vector<string>& groups = DEFAULT_EXECUTOR_GROUPS;
-        for (const string& group : groups) {
+        for (const auto& group : be_desc.executor_groups) {
           VLOG(1) << "Adding backend " << item.key << " to group " << group;
-          (*new_executor_groups)[group].AddExecutor(be_desc);
+          FindOrInsertExecutorGroup(group, new_executor_groups)->AddExecutor(be_desc);
         }
       }
     }
@@ -246,19 +262,16 @@ void ClusterMembershipMgr::UpdateMembership(
   // in case it was reset to empty above.
   if (NeedsLocalBackendUpdate(*new_state, local_be_desc)) {
     // We need to update both the new membership state and the statestore
-    new_state->current_backends[local_backend_id_] = *local_be_desc;
-    const vector<string>& groups = DEFAULT_EXECUTOR_GROUPS;
-    for (const string& group : groups) {
+    (*new_backend_map)[local_backend_id_] = *local_be_desc;
+    for (const auto& group : local_be_desc->executor_groups) {
       if (local_be_desc->is_quiescing) {
         VLOG(1) << "Removing local backend from group " << group;
-        (*new_executor_groups)[group].RemoveExecutor(*local_be_desc);
+        FindOrInsertExecutorGroup(
+            group, new_executor_groups)->RemoveExecutor(*local_be_desc);
       } else if (local_be_desc->is_executor) {
         VLOG(1) << "Adding local backend to group " << group;
-        (*new_executor_groups)[group].AddExecutor(*local_be_desc);
-      } else {
-        //TODO(IMPALA-8484): Remove this when it's no longer needed
-        VLOG(1) << "Creating empty default executor group";
-        new_executor_groups->emplace(group, ExecutorGroup());
+        FindOrInsertExecutorGroup(
+            group, new_executor_groups)->AddExecutor(*local_be_desc);
       }
     }
     AddLocalBackendToStatestore(*local_be_desc, subscriber_topic_updates);

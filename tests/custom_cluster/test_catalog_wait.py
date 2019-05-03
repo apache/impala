@@ -47,7 +47,8 @@ class TestCatalogWait(CustomClusterTestSuite):
 
     # On startup, expect only two executors to be registered.
     self._start_impala_cluster(["--catalog_init_delays=0,0,200000"],
-                               expected_num_executors=2)
+                               expected_num_executors=2,
+                               expected_subscribers=4)
 
     # Expect that impalad[2] is not ready.
     self.cluster.impalads[2].service.wait_for_metric_value('impala-server.ready', 0);
