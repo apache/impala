@@ -214,16 +214,19 @@ class TestRanger(CustomClusterTestSuite):
         ["USER", user, "", "", "", "*", "", "create", "false"],
         ["USER", user, "", "", "", "*", "", "drop", "false"],
         ["USER", user, "", "", "", "*", "", "insert", "false"],
+        ["USER", user, "", "", "", "*", "", "refresh", "false"],
         ["USER", user, "", "", "", "*", "", "select", "false"],
         ["USER", user, "*", "", "", "", "*", "alter", "false"],
         ["USER", user, "*", "", "", "", "*", "create", "false"],
         ["USER", user, "*", "", "", "", "*", "drop", "false"],
         ["USER", user, "*", "", "", "", "*", "insert", "false"],
+        ["USER", user, "*", "", "", "", "*", "refresh", "false"],
         ["USER", user, "*", "", "", "", "*", "select", "false"],
         ["USER", user, "*", "*", "*", "", "", "alter", "false"],
         ["USER", user, "*", "*", "*", "", "", "create", "false"],
         ["USER", user, "*", "*", "*", "", "", "drop", "false"],
         ["USER", user, "*", "*", "*", "", "", "insert", "false"],
+        ["USER", user, "*", "*", "*", "", "", "refresh", "false"],
         ["USER", user, "*", "*", "*", "", "", "select", "false"]])
 
       admin_client.execute("grant all on server to user {0}".format(user))

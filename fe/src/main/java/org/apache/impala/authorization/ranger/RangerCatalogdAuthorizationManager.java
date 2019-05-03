@@ -277,10 +277,6 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
     if (level == TPrivilegeLevel.INSERT) {
       request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
-    } else if (level == TPrivilegeLevel.REFRESH) {
-      // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
-      // service definition.
-      request.getAccessTypes().add(RangerAuthorizationChecker.REFRESH_ACCESS_TYPE);
     } else {
       request.getAccessTypes().add(level.name().toLowerCase());
     }

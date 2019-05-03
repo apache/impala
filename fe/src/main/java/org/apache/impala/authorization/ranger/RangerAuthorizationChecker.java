@@ -57,7 +57,6 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
 
   // These are Ranger access types (privileges).
   public static final String UPDATE_ACCESS_TYPE = "update";
-  public static final String REFRESH_ACCESS_TYPE = "read";
   public static final String SELECT_ACCESS_TYPE = "select";
 
   private final RangerDefaultAuditHandler auditHandler_;
@@ -266,10 +265,6 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
     } else if (privilege == Privilege.INSERT) {
       // Ranger plugin for Hive considers INSERT to be UPDATE.
       accessType = UPDATE_ACCESS_TYPE;
-    } else if (privilege == Privilege.REFRESH) {
-      // TODO: this is a hack. It will need to be fixed once refresh is added into Hive
-      // service definition.
-      accessType = REFRESH_ACCESS_TYPE;
     } else {
       accessType = privilege.name().toLowerCase();
     }
