@@ -24,6 +24,7 @@ import requests
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.hdfs_util import NAMENODE
 
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
@@ -261,7 +262,7 @@ class TestRanger(CustomClusterTestSuite):
       result = self.client.execute("show grant {0} {1} on uri '{2}'"
                                    .format(kw, id, uri))
       TestRanger._check_privileges(result, [
-        [kw, id, "", "", "", "hdfs://localhost:20500" + uri, "", "all", "false"]])
+        [kw, id, "", "", "", "{0}{1}".format(NAMENODE, uri), "", "all", "false"]])
 
       # Revoke uri privileges and verify
       admin_client.execute("revoke all on uri '{0}' from {1} {2}"
