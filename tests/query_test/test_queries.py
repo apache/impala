@@ -204,7 +204,6 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     return 'functional-query'
 
   @SkipIfEC.oom
-  @SkipIfDockerizedCluster.jvm_oom_large_string
   @pytest.mark.execute_serially
   def test_very_large_strings(self, vector):
     """Regression test for IMPALA-1619. Doesn't need to be run on all file formats.

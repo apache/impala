@@ -219,12 +219,11 @@ from (
 select cast(fnv_hash(concat(l_comment, 'a')) as string) as h from tpch_parquet.lineitem union all
 select cast(fnv_hash(concat(l_comment, 'b')) as string) as h from tpch_parquet.lineitem union all
 select cast(fnv_hash(concat(l_comment, 'c')) as string) as h from tpch_parquet.lineitem union all
-select cast(fnv_hash(concat(l_comment, 'd')) as string) as h from tpch_parquet.lineitem union all
-select cast(fnv_hash(concat(l_comment, 'e')) as string) as h from tpch_parquet.lineitem) a;
+select cast(fnv_hash(concat(l_comment, 'd')) as string) as h from tpch_parquet.lineitem) a;
 ---- TYPES
 INT,INT
 ---- RESULTS
-611468161,611468161
+489174530,489174530
 =====
 ---- QUERY
 select repeat('the quick brown fox', 1024 * 1024 * 100)

@@ -80,7 +80,6 @@ class TestInsertQueries(ImpalaTestSuite):
             v.get_value('compression_codec') == 'none'))
 
   @pytest.mark.execute_serially
-  @SkipIfDockerizedCluster.jvm_oom_large_string
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
     if "-Xcheck:jni" in os.environ.get("LIBHDFS_OPTS", ""):

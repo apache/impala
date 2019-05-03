@@ -192,8 +192,6 @@ class SkipIfDockerizedCluster:
       IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon logs not exposed in host.")
   accesses_host_filesystem = pytest.mark.skipif(
       IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon would need to access host filesystem.")
-  jvm_oom_large_string = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
-      reason="IMPALA-4865: JVM hits OOM for large string. Heap is smaller in docker.")
   insert_acls = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
       reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")
 
