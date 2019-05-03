@@ -85,19 +85,6 @@ class TestUdfPersistence(CustomClusterTestSuite):
        % self.HIVE_IMPALA_INTEGRATION_DB)
     shutil.rmtree(self.LOCAL_LIBRARY_DIR, ignore_errors=True)
 
-  def run_stmt_in_hive(self, stmt):
-    """
-    Run a statement in Hive, returning stdout if successful and throwing
-    RuntimeError(stderr) if not.
-    """
-    call = subprocess.Popen(
-        ['hive', '-e', stmt], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = call.communicate()
-    call.wait()
-    if call.returncode != 0:
-      raise RuntimeError(stderr)
-    return stdout
-
   def __load_drop_functions(self, template, database, location):
     queries = template.format(database=database, location=location)
     # Split queries and remove empty lines
@@ -160,6 +147,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
         db=self.HIVE_IMPALA_INTEGRATION_DB))
     assert stdout is not None and result in str(stdout.data)
 
+  def __describe_udf_in_hive(self, udf, db=HIVE_IMPALA_INTEGRATION_DB):
+    """ Describe the specified function, returning stdout. """
+    # Hive 2+ caches UDFs, so we have to explicitly invalidate the UDF if
+    # we've made changes on the Impala side.
+    stmt = "RELOAD FUNCTION ; DESCRIBE FUNCTION {0}.{1}".format(db, udf)
+    return self.run_stmt_in_hive(stmt)
+
   @SkipIfIsilon.hive
   @SkipIfS3.hive
   @SkipIfABFS.hive
@@ -203,21 +197,22 @@ class TestUdfPersistence(CustomClusterTestSuite):
     # Hive has bug that doesn't display the permanent function in show functions
     # statement. So this test relies on describe function statement which prints
     # a message if the function is not present.
-    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+    udfs_to_test = list(self.SAMPLE_JAVA_UDFS)
+    if int(os.environ['IMPALA_HIVE_MAJOR_VERSION']) == 2:
+      udfs_to_test += self.SAMPLE_JAVA_UDFS_HIVE2_ONLY
+    for (fn, fn_symbol) in udfs_to_test:
       self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
           db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
       self.client.execute(self.CREATE_JAVA_UDF_TEMPLATE.format(
           db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
           location=self.HIVE_UDF_JAR, symbol=fn_symbol))
-      hive_stdout = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
-        % (self.HIVE_IMPALA_INTEGRATION_DB, fn))
+      hive_stdout = self.__describe_udf_in_hive(fn)
       assert "does not exist" not in hive_stdout
       self.__verify_udf_in_hive(fn)
       # Drop the function from Impala and check if it reflects in Hive.
       self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
           db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
-      hive_stdout = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
-        % (self.HIVE_IMPALA_INTEGRATION_DB, fn))
+      hive_stdout = self.__describe_udf_in_hive(fn)
       assert "does not exist" in hive_stdout
 
     # Create the same set of functions from Hive and make sure they are visible
@@ -226,12 +221,12 @@ class TestUdfPersistence(CustomClusterTestSuite):
     REFRESH_COMMANDS = ["INVALIDATE METADATA",
         "REFRESH FUNCTIONS {0}".format(self.HIVE_IMPALA_INTEGRATION_DB)]
     for refresh_command in REFRESH_COMMANDS:
-      for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+      for (fn, fn_symbol) in udfs_to_test:
         self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
             db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
             location=self.HIVE_UDF_JAR, symbol=fn_symbol))
       self.client.execute(refresh_command)
-      for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+      for (fn, fn_symbol) in udfs_to_test:
         result = self.client.execute("SHOW FUNCTIONS IN {0}".format(
             self.HIVE_IMPALA_INTEGRATION_DB))
         assert result is not None and len(result.data) > 0 and\
@@ -456,15 +451,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
     assert "No compatible function signatures" in str(result)
     self.verify_function_count(
         "SHOW FUNCTIONS IN %s like 'badudf*'" % self.JAVA_FN_TEST_DB, 0)
-    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
-        % (self.JAVA_FN_TEST_DB, "badudf"))
+    result = self.__describe_udf_in_hive('badudf', db=self.JAVA_FN_TEST_DB)
     assert "does not exist" in str(result)
     # Create the same function from hive and make sure Impala doesn't load any signatures.
     self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
         db=self.JAVA_FN_TEST_DB, function="badudf",
         location=self.JAVA_UDF_JAR, symbol="org.apache.impala.IncompatibleUdfTest"))
-    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
-        % (self.JAVA_FN_TEST_DB, "badudf"))
+    result = self.__describe_udf_in_hive('badudf', db=self.JAVA_FN_TEST_DB)
     assert "does not exist" not in str(result)
     self.client.execute("INVALIDATE METADATA")
     self.verify_function_count(
@@ -477,8 +470,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     # Drop the function and make sure the function if dropped from hive
     self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
         db=self.JAVA_FN_TEST_DB, function="badudf"))
-    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
-        % (self.JAVA_FN_TEST_DB, "badudf"))
+    result = self.__describe_udf_in_hive('badudf', db=self.JAVA_FN_TEST_DB)
     assert "does not exist" in str(result)
 
   # Create sample UDA functions in {database} from library {location}
@@ -505,17 +497,16 @@ class TestUdfPersistence(CustomClusterTestSuite):
       ('udfbin', 'org.apache.hadoop.hive.ql.udf.UDFBin'),
       ('udfhex', 'org.apache.hadoop.hive.ql.udf.UDFHex'),
       ('udfconv', 'org.apache.hadoop.hive.ql.udf.UDFConv'),
-      # TODO UDFHour was moved from UDF to GenericUDF in Hive 3
-      # This test will fail when running against HMS-3 unless we add
-      # support for GenericUDFs to handle such cases
-      ('udfhour', 'org.apache.hadoop.hive.ql.udf.UDFHour'),
       ('udflike', 'org.apache.hadoop.hive.ql.udf.UDFLike'),
       ('udfsign', 'org.apache.hadoop.hive.ql.udf.UDFSign'),
-      # TODO UDFYear moved to GenericUDF in Hive 3
-      # This test will fail when running against HMS-3 unless we add
-      # support for GenericUDFs
-      ('udfyear', 'org.apache.hadoop.hive.ql.udf.UDFYear'),
       ('udfascii','org.apache.hadoop.hive.ql.udf.UDFAscii')
+  ]
+
+  # These UDFs are available in Hive 2 but in Hive 3 are now implemented
+  # using a new GenericUDF interface that we don't support.
+  SAMPLE_JAVA_UDFS_HIVE2_ONLY = [
+      ('udfhour', 'org.apache.hadoop.hive.ql.udf.UDFHour'),
+      ('udfyear', 'org.apache.hadoop.hive.ql.udf.UDFYear'),
   ]
 
   # Simple tests to verify java udfs in SAMPLE_JAVA_UDFS

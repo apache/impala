@@ -775,6 +775,8 @@ class ImpalaTestSuite(BaseTestSuite):
     # This should never happen.
     assert 0, 'Unable to get location for table: ' + table_name
 
+  # TODO(todd) make this use Thrift to connect to HS2 instead of shelling
+  # out to beeline for better performance
   def run_stmt_in_hive(self, stmt, username=getuser()):
     """
     Run a statement in Hive, returning stdout if successful and throwing
