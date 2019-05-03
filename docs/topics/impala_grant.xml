@@ -71,12 +71,9 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (initially, a predefined set of users specified in the Sentry
-      service configuration file) can use this statement.
-    </p>
-
-    <p>
-      Only Sentry administrative users can grant roles to a group.
+      Only Sentry administrative users, users who belong to the groups defined
+      in <codeph>sentry.service.admin.group</codeph> of the Sentry configuration
+      can grant roles to a group.
     </p>
 
     <p>

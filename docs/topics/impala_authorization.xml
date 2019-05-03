@@ -99,45 +99,16 @@ under the License.
 
       <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
-      <p>
-        Originally, privileges were encoded in a policy file, stored in HDFS. This mode of
-        operation is still an option, but the emphasis of privilege management is moving towards
-        being SQL-based. The mode of operation with <codeph>GRANT</codeph> and
-        <codeph>REVOKE</codeph> statements instead of the policy file requires that a special
-        Sentry service be enabled; this service stores, retrieves, and manipulates privilege
-        information stored inside the metastore database.
-      </p>
+      <p> Privileges are managed via the <codeph>GRANT</codeph> and
+          <codeph>REVOKE</codeph> SQL statements that requires the Sentry
+        service enabled. The Sentry service stores, retrieves, and manipulates
+        privilege information stored inside the Sentry database. </p>
 
-      <note>
-        <p>
-          Although this document refers to the <codeph>ALL</codeph> privilege, currently if you
-          use the policy file mode, you do not use the actual keyword <codeph>ALL</codeph> in
-          the policy file. When you code role entries in the policy file:
-        </p>
-        <ul>
-          <li>
-            To specify the <codeph>ALL</codeph> privilege for a server, use a role like
-            <codeph>server=<varname>server_name</varname></codeph>.
-          </li>
-
-          <li>
-            To specify the <codeph>ALL</codeph> privilege for a database, use a role like
-            <codeph>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname></codeph>.
-          </li>
-
-          <li>
-            To specify the <codeph>ALL</codeph> privilege for a table, use a role like
-            <codeph>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=*</codeph>.
-          </li>
-        </ul>
-      </note>
-
-      <p>
-        If you change privileges in Sentry, e.g. adding a user, removing a user, modifying
-        privileges, you must clear the Impala Catalog server cache by running the
-        <codeph>INVALIDATE METADATA</codeph> statement. <codeph>INVALIDATE METADATA</codeph> is
-        not required if you make the changes to privileges within Impala.
-      </p>
+      <p> If you change privileges outside of Impala, e.g. adding a user,
+        removing a user, modifying privileges, you must clear the Impala Catalog
+        server cache by running the <codeph>REFRESH AUTHORIZATION</codeph>
+        statement. <codeph>REFRESH AUTHORIZATION</codeph> is not required if you
+        make the changes to privileges within Impala. </p>
 
     </conbody>
 
@@ -167,11 +138,6 @@ under the License.
           authorization rules refer to a symbolic server name, and you specify the same name to
           use as the argument to the <codeph>-server_name</codeph> option for all
           <cmdname>impalad</cmdname> nodes in the cluster.
-          <p>
-            Starting in Impala 1.4.0 and higher, if you specify just
-            <codeph>-server_name</codeph> without <codeph>-authorization_policy_file</codeph>,
-            Impala uses the Sentry service for authorization.
-          </p>
         </li>
 
         <li>
@@ -179,33 +145,14 @@ under the License.
           <codeph>sentry-site.xml</codeph> configuration file. This setting is required to
           enable authorization.
         </li>
-
-        <li>
-          <codeph>-authorization_policy_file</codeph>: Specifies the HDFS path to the policy
-          file that defines the privileges on schema objects. Prior to Impala 1.4.0, or if you
-          want to continue storing privilege rules in the policy file, specify the
-          <codeph>-authorization_policy_file</codeph> option to make Impala read privilege
-          information from a policy file, rather than from the metastore database.
-        </li>
       </ul>
 
       <p rev="1.4.0">
         For example, you might adapt your <filepath>/etc/default/impala</filepath> configuration
-        to contain lines like the following. To use the Sentry service rather than the policy
-        file:
+        to contain lines like the following. To use the Sentry service:
       </p>
 
 <codeblock rev="1.4.0">IMPALA_SERVER_ARGS=" \
--server_name=server1 \
-...
-</codeblock>
-
-      <p>
-        Or to use the policy file, as in releases prior to Impala 1.4:
-      </p>
-
-<codeblock>IMPALA_SERVER_ARGS=" \
--authorization_policy_file=/user/hive/warehouse/auth-policy.ini \
 -server_name=server1 \
 ...
 </codeblock>
@@ -512,198 +459,6 @@ GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
 
   </concept>
 
-  <concept id="security_policy_file">
-
-    <title>Using Impala with the Sentry Policy File</title>
-
-    <conbody>
-
-      <p>
-        The policy file is a file that you put in a designated location in HDFS, and is read
-        during the startup of the <cmdname>impalad</cmdname> daemon when you specify both the
-        <codeph>-server_name</codeph> and <codeph>-authorization_policy_file</codeph> startup
-        options. It controls which objects (databases, tables, and HDFS directory paths) can be
-        accessed by the user who connects to <cmdname>impalad</cmdname>, and what operations
-        that user can perform on the objects.
-      </p>
-
-      <note rev="1.4.0">
-        The policy-file based authorization was deprecated in <keyword keyref="impala26"/>. We
-        recommend managing privileges through SQL statements as described in
-        <xref
-          href="impala_authorization.xml#sentry_service"/>. If you are still using
-        policy files, plan to migrate to the new approach some time in the future.
-      </note>
-
-      <p>
-        The location of the policy file is listed in the <filepath>auth-site.xml</filepath>
-        configuration file.
-      </p>
-
-      <p>
-        When authorization is enabled, Impala uses the policy file as a <i>whitelist</i>,
-        representing every privilege available to any user on any object. That is, only
-        operations specified for the appropriate combination of object, role, group, and user
-        are allowed. All other operations are not allowed. If a group or role is defined
-        multiple times in the policy file, the last definition takes precedence.
-      </p>
-
-      <p>
-        To understand the notion of whitelisting, set up a minimal policy file that does not
-        provide any privileges for any object. When you connect to an Impala node where this
-        policy file is in effect, you get no results for <codeph>SHOW DATABASES</codeph>, and an
-        error when you issue any <codeph>SHOW TABLES</codeph>, <codeph>USE
-        <varname>database_name</varname></codeph>, <codeph>DESCRIBE
-        <varname>table_name</varname></codeph>, <codeph>SELECT</codeph>, and or other statements
-        that expect to access databases or tables, even if the corresponding databases and
-        tables exist.
-      </p>
-
-      <p>
-        The contents of the policy file are cached, to avoid a performance penalty for each
-        query. The policy file is re-checked by each <cmdname>impalad</cmdname> node every 5
-        minutes. When you make a non-time-sensitive change such as adding new privileges or new
-        users, you can let the change take effect automatically a few minutes later. If you
-        remove or reduce privileges, and want the change to take effect immediately, restart the
-        <cmdname>impalad</cmdname> daemon on all nodes, again specifying the
-        <codeph>-server_name</codeph> and <codeph>-authorization_policy_file</codeph> options so
-        that the rules from the updated policy file are applied.
-      </p>
-
-    </conbody>
-
-    <concept id="security_policy_file_details">
-
-      <title>Policy File Format</title>
-
-      <conbody>
-
-        <p>
-          The policy file uses the familiar <codeph>.ini</codeph> format, divided into the major
-          sections <codeph>[groups]</codeph> and <codeph>[roles]</codeph>.
-        </p>
-
-        <p>
-          There is also an optional <codeph>[databases]</codeph> section, which allows you to
-          specify a specific policy file for a particular database, as explained in
-          <xref href="#security_multiple_policy_files"
-          />.
-        </p>
-
-        <p>
-          Another optional section, <codeph>[users]</codeph>, allows you to override the
-          OS-level mapping of users to groups; that is an advanced technique primarily for
-          testing and debugging, and is beyond the scope of this document.
-        </p>
-
-        <p>
-          In the <codeph>[groups]</codeph> section, you define various categories of users and
-          select which roles are associated with each category. The group and usernames
-          correspond to Linux groups and users on the server where the
-          <cmdname>impalad</cmdname> daemon runs.
-        </p>
-
-        <p>
-          The group and usernames in the <codeph>[groups]</codeph> section correspond to Hadoop
-          groups and users on the server where the <cmdname>impalad</cmdname> daemon runs. When
-          you access Impala through the <cmdname>impalad</cmdname> interpreter, for purposes of
-          authorization, the user is the logged-in Linux user and the groups are the Linux
-          groups that user is a member of. When you access Impala through the ODBC or JDBC
-          interfaces, the user and password specified through the connection string are used as
-          login credentials for the Linux server, and authorization is based on that username
-          and the associated Linux group membership.
-        </p>
-
-        <p>
-          In the <codeph>[roles]</codeph> section, you a set of roles. For each role, you
-          specify precisely the set of privileges is available. That is, which objects users
-          with that role can access, and what operations they can perform on those objects. This
-          is the lowest-level category of security information; the other sections in the policy
-          file map the privileges to higher-level divisions of groups and users. In the
-          <codeph>[groups]</codeph> section, you specify which roles are associated with which
-          groups. The group and usernames correspond to Linux groups and users on the server
-          where the <cmdname>impalad</cmdname> daemon runs. The privileges are specified using
-          patterns like:
-<codeblock>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=SELECT
-server=<varname>server_name</varname>->db=<varname>database_name</varname>->table=t<varname>able_name</varname>->action=CREATE
-server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=ALL
-</codeblock>
-          For the <varname>server_name</varname> value, substitute the same symbolic name you
-          specify with the <cmdname>impalad</cmdname> <codeph>-server_name</codeph> option. You
-          can use <codeph>*</codeph> wildcard characters at each level of the privilege
-          specification to allow access to all such objects. For example:
-<codeblock>server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=SELECT
-server=impala-host.example.com->db=*->table=*->action=CREATE
-server=impala-host.example.com-&gt;db=*-&gt;table=audit_log-&gt;action=SELECT
-server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=*
-</codeblock>
-        </p>
-
-      </conbody>
-
-    </concept>
-
-    <concept id="security_multiple_policy_files">
-
-      <title>Using Multiple Policy Files for Different Databases</title>
-
-      <conbody>
-
-        <p>
-          For an Impala cluster with many databases being accessed by many users and
-          applications, it might be cumbersome to update the security policy file for each
-          privilege change or each new database, table, or view. You can allow security to be
-          managed separately for individual databases, by setting up a separate policy file for
-          each database:
-        </p>
-
-        <ul>
-          <li>
-            Add the optional <codeph>[databases]</codeph> section to the main policy file.
-          </li>
-
-          <li>
-            Add entries in the <codeph>[databases]</codeph> section for each database that has
-            its own policy file.
-          </li>
-
-          <li>
-            For each listed database, specify the HDFS path of the appropriate policy file.
-          </li>
-        </ul>
-
-        <p>
-          For example:
-        </p>
-
-<codeblock>[databases]
-# Defines the location of the per-DB policy files for the 'customers' and 'sales' databases.
-customers = hdfs://ha-nn-uri/etc/access/customers.ini
-sales = hdfs://ha-nn-uri/etc/access/sales.ini
-</codeblock>
-
-        <p>
-          To enable URIs in per-DB policy files, the Java configuration option
-          <codeph>sentry.allow.uri.db.policyfile</codeph> must be set to <codeph>true</codeph>.
-          For example:
-        </p>
-
-<codeblock>JAVA_TOOL_OPTIONS="-Dsentry.allow.uri.db.policyfile=true"
-</codeblock>
-
-        <note type="important">
-          Enabling URIs in per-DB policy files introduces a security risk by allowing the owner
-          of the db-level policy file to grant himself/herself load privileges to anything the
-          <codeph>impala</codeph> user has read permissions for in HDFS (including data in other
-          databases controlled by different db-level policy files).
-        </note>
-
-      </conbody>
-
-    </concept>
-
-  </concept>
-
   <concept id="security_schema">
 
     <title>Setting Up Schema Objects for a Secure Impala Deployment</title>
@@ -727,19 +482,6 @@ sales = hdfs://ha-nn-uri/etc/access/sales.ini
 
   </concept>
 
-  <concept id="sentry_debug">
-
-    <title><ph conref="../shared/impala_common.xml#common/title_sentry_debug"
-      /></title>
-
-    <conbody>
-
-      <p conref="../shared/impala_common.xml#common/sentry_debug"/>
-
-    </conbody>
-
-  </concept>
-
   <concept id="sec_ex_default">
 
     <title>The DEFAULT Database in a Secure Deployment</title>
@@ -749,10 +491,10 @@ sales = hdfs://ha-nn-uri/etc/access/sales.ini
       <p>
         Because of the extra emphasis on granular access controls in a secure deployment, you
         should move any important or sensitive information out of the <codeph>DEFAULT</codeph>
-        database into a named database whose privileges are specified in the policy file.
-        Sometimes you might need to give privileges on the <codeph>DEFAULT</codeph> database for
-        administrative reasons; for example, as a place you can reliably specify with a
-        <codeph>USE</codeph> statement when preparing to drop a database.
+        database into a named database. Sometimes you might need to give privileges on the
+        <codeph>DEFAULT</codeph> database for administrative reasons, for example, as a place
+        you can reliably specify with a <codeph>USE</codeph> statement when preparing to drop a
+        database.
       </p>
 
     </conbody>

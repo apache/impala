@@ -334,10 +334,11 @@ where id between 1 and 1000000;
     <conbody>
 
       <p>
-        The <codeph>SHOW ROLES</codeph> statement displays roles. This syntax is available in <keyword keyref="impala20_full"/> and later
-        only, when you are using the Sentry authorization framework along with the Sentry service, as described in
-        <xref href="impala_authorization.xml#sentry_service"/>. It does not apply when you use the Sentry framework
-        with privileges defined in a policy file.
+        The <codeph>SHOW ROLES</codeph> statement displays roles. This syntax
+        is available in <keyword keyref="impala20_full"/> and later only, when
+        you are using the Sentry authorization framework along with the Sentry
+        service, as described in <xref
+          href="impala_authorization.xml#sentry_service"/>.
       </p>
 
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
@@ -386,10 +387,11 @@ where id between 1 and 1000000;
     <conbody>
 
       <p rev="2.0.0">
-        The <codeph>SHOW CURRENT ROLE</codeph> statement displays roles assigned to the current user. This syntax
-        is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization framework along with
-        the Sentry service, as described in <xref href="impala_authorization.xml#sentry_service"/>. It does not
-        apply when you use the Sentry framework with privileges defined in a policy file.
+        The <codeph>SHOW CURRENT ROLE</codeph> statement displays
+        roles assigned to the current user. This syntax is available in <keyword
+          keyref="impala20_full"/> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <xref href="impala_authorization.xml#sentry_service"/>.
       </p>
 
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
@@ -436,13 +438,14 @@ where id between 1 and 1000000;
     <conbody>
 
       <p rev="2.0.0">
-<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-        The <codeph>SHOW ROLE GRANT</codeph> statement lists all the roles assigned to the specified group. This
-        statement is only allowed for Sentry administrative users and others users that are part of the specified
-        group. This syntax is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization
-        framework along with the Sentry service, as described in
-        <xref href="impala_authorization.xml#sentry_service"/>. It does not apply when you use the Sentry framework
-        with privileges defined in a policy file.
+        <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
+        The <codeph>SHOW ROLE GRANT</codeph> statement lists all the roles
+        assigned to the specified group. This statement is only allowed for
+        Sentry administrative users and others users that are part of the
+        specified group. This syntax is available in <keyword
+          keyref="impala20_full"/> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <xref href="impala_authorization.xml#sentry_service"/>.
       </p>
 
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
@@ -478,12 +481,14 @@ where id between 1 and 1000000;
     <conbody>
 
       <p>
-<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-        The <codeph>SHOW GRANT ROLE</codeph> statement list all the grants for the given role name. This statement
-        is only allowed for Sentry administrative users and other users that have been granted the specified role.
-        This syntax is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization framework
-        along with the Sentry service, as described in <xref href="impala_authorization.xml#sentry_service"/>. It
-        does not apply when you use the Sentry framework with privileges defined in a policy file.
+        <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
+        The <codeph>SHOW GRANT ROLE</codeph> statement list all the grants for
+        the given role name. This statement is only allowed for Sentry
+        administrative users and other users that have been granted the
+        specified role. This syntax is available in <keyword
+          keyref="impala20_full"/> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <xref href="impala_authorization.xml#sentry_service"/>.
       </p>
 
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
@@ -513,16 +518,18 @@ where id between 1 and 1000000;
       </metadata>
     </prolog>
     <conbody>
-      <p> The <codeph>SHOW GRANT USER</codeph> statement shows the list of
+      <p>
+        The <codeph>SHOW GRANT USER</codeph> statement shows the list of
         privileges for a given user. This statement is only allowed for Sentry
         administrative users. However, the current user can run <codeph>SHOW
-          GRANT USER</codeph> for themselves. </p>
-      <p>This syntax is available in <keyword keyref="impala31_full"/> and later
+          GRANT USER</codeph> for themselves.
+      </p>
+      <p>
+        This syntax is available in <keyword keyref="impala31_full"/> and later
         only, when you are using the Sentry authorization framework along with
         the Sentry service, as described in <xref
-          href="impala_authorization.xml#sentry_service"/>. It does not apply
-        when you use the Sentry framework with privileges defined in a policy
-        file. </p>
+          href="impala_authorization.xml#sentry_service"/>.
+      </p>
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
       <p conref="../shared/impala_common.xml#common/show_security"/>
       <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>

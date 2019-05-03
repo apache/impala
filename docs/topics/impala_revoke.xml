@@ -106,12 +106,9 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</codeblock>
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (those with <codeph>ALL</codeph> privileges on the server,
-      defined in the Sentry policy file) can use this statement.
-    </p>
-
-    <p>
-      Only Sentry administrative users can revoke the role from a group.
+      Only Sentry administrative users, users who belong to the groups defined in
+      <codeph>sentry.service.admin.group</codeph> of the Sentry configuration can revoke a role
+      from a group.
     </p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
