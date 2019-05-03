@@ -28,9 +28,6 @@ src/test/resources/hbase-site.xml
 # Generated core-site.xml file
 src/test/resources/core-site.xml
 
-# Generated authorization policy file
-src/test/resources/authz-policy.ini
-
 # Generated minicluster config
 src/test/resources/minicluster-conf.xml
 

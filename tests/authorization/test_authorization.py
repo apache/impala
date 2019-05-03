@@ -41,7 +41,6 @@ from tests.common.file_utils import assert_file_in_dir_contains,\
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 from tests.util.filesystem_utils import WAREHOUSE
 
-AUTH_POLICY_FILE = "%s/authz-policy.ini" % WAREHOUSE
 SENTRY_CONFIG_DIR = os.getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_CONFIG_FILE = SENTRY_CONFIG_DIR + 'sentry-site.xml'
 
@@ -230,11 +229,10 @@ class TestAuthorization(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
-        --authorization_policy_file=%s\
         --authorized_proxy_user_config=foo=bar\
         --authorized_proxy_group_config=foo=bar\
         --abort_on_failed_audit_event=false\
-        --audit_event_log_dir=%s" % (AUTH_POLICY_FILE, AUDIT_LOG_DIR))
+        --audit_event_log_dir=%s" % (AUDIT_LOG_DIR))
   def test_no_matching_user_and_group_impersonation(self):
     open_session_req = TCLIService.TOpenSessionReq()
     open_session_req.username = 'hue'
@@ -387,7 +385,7 @@ class TestAuthorization(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=%s" % (AUTH_POLICY_FILE),
+      --authorization_policy_file=ignored_file",
       impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_",
       dir=os.getenv("LOG_DIR")))
   def test_deprecated_flags(self):

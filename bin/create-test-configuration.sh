@@ -196,7 +196,6 @@ fi
 
 generate_config log4j.properties.template log4j.properties
 generate_config hbase-site.xml.template hbase-site.xml
-generate_config authz-policy.ini.template authz-policy.ini
 
 $IMPALA_HOME/bin/generate_xml_config.py sentry-site.xml.py sentry-site.xml
 for SENTRY_VARIANT in oo oo_nogrant no_oo ; do
