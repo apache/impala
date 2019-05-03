@@ -78,6 +78,7 @@ import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.DisjointSet;
 import org.apache.impala.util.Graph.RandomAccessibleGraph;
 import org.apache.impala.util.Graph.SccCondensedGraph;
@@ -134,6 +135,12 @@ public class Analyzer {
       "Data source does not exist: ";
   public final static String DATA_SRC_ALREADY_EXISTS_ERROR_MSG =
       "Data source already exists: ";
+  private static final String INSERT_ONLY_ACID_TABLE_SUPPORTED_ERROR_MSG =
+      "Table %s not supported. Transactional (ACID) tables are " +
+      "only supported when they are configured as insert_only.";
+  private static final String TRANSACTIONAL_TABLE_NOT_SUPPORTED =
+      "Table %s not supported. Transactional (ACID) tables are " +
+      "only supported for read.";
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
@@ -186,6 +193,39 @@ public class Analyzer {
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
   public void setHasWithClause() { hasWithClause_ = true; }
   public boolean hasWithClause() { return hasWithClause_; }
+
+
+  /**
+   * @param tblProperties Table properties that are used to check transactional nature
+   * @param tableName Table name to be reported in exception message
+   * @throws AnalysisException If table is full acid table.
+   */
+  public static void ensureTableNotFullAcid(Map<String, String> tblProperties,
+                                            String tableName)
+      throws AnalysisException {
+    if (AcidUtils.isFullAcidTable(tblProperties)) {
+      throw new AnalysisException(String.format(
+          INSERT_ONLY_ACID_TABLE_SUPPORTED_ERROR_MSG, tableName));
+    }
+  }
+
+  /**
+   * @param table Table whose properties need to be checked.
+   * @throws AnalysisException If table is full acid table.
+   */
+  public static void ensureTableNotFullAcid(FeTable table)
+      throws AnalysisException {
+    ensureTableNotFullAcid(table.getMetaStoreTable().getParameters(),
+        table.getFullName());
+  }
+
+  public static void ensureTableNotTransactional(FeTable table)
+      throws AnalysisException {
+    if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+      throw new AnalysisException(String.format(TRANSACTIONAL_TABLE_NOT_SUPPORTED,
+          table.getFullName()));
+    }
+  }
 
   // State shared between all objects of an Analyzer tree. We use LinkedHashMap and
   // LinkedHashSet where applicable to preserve the iteration order and make the class

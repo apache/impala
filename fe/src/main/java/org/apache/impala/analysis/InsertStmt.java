@@ -425,6 +425,8 @@ public class InsertStmt extends StatementBase {
               .build());
     }
 
+    analyzer.ensureTableNotTransactional(table_);
+
     // We do not support (in|up)serting into views.
     if (table_ instanceof FeView) {
       throw new AnalysisException(

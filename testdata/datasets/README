@@ -74,3 +74,11 @@ The schema template SQL files have the following format:
   DEPENDENT_LOAD_HIVE
       Statements to be executed during the "dependent load" phase. These statements
       are run after the initial (base table) load is complete.
+
+  HIVE_MAJOR_VERSION
+       The required major version of Hive for this table. If the major version
+       of Hive at runtime does not exactly match the version specified in this section,
+       the table will be skipped.
+
+       NOTE: this is not a _minimum_ version -- if HIVE_MAJOR_VERSION specifies '2',
+                   the table will _not_ be loaded/created on Hive 3.

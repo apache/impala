@@ -244,8 +244,34 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
                                        hdfs_location=hdfs_location)
   return create_stmt
 
+
+def parse_table_properties(file_format, table_properties):
+  """
+  Read the properties specified in the TABLE_PROPERTIES section.
+  The table properties can be restricted to a file format or are applicable
+  for all formats.
+  For specific format the syntax is <fileformat>:<key>=<val>
+  """
+  tblproperties = {}
+  TABLE_PROPERTY_RE = re.compile(
+      # Optional '<data-format>:' prefix, capturing just the 'data-format' part.
+      r'(?:(\w+):)?' +
+      # Required key=value, capturing the key and value
+      r'(.+?)=(.*)')
+  for table_property in filter(None, table_properties.split("\n")):
+    m = TABLE_PROPERTY_RE.match(table_property)
+    if not m:
+      raise Exception("Invalid table property line: {0}", format(table_property))
+    only_format, key, val = m.groups()
+    if only_format is not None and only_format != file_format:
+      continue
+    tblproperties[key] = val
+
+  return tblproperties
+
+
 def build_table_template(file_format, columns, partition_columns, row_format,
-                         avro_schema_dir, table_name, table_properties):
+                         avro_schema_dir, table_name, tblproperties):
   if file_format == 'hbase':
     return build_hbase_create_stmt_in_hive(columns, partition_columns, table_name)
 
@@ -262,9 +288,8 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   file_format_string = "STORED AS {file_format}"
 
   tblproperties_clause = "TBLPROPERTIES (\n{0}\n)"
-  tblproperties = {}
 
-  external = "EXTERNAL"
+  external = "" if is_transactional(tblproperties) else "EXTERNAL"
 
   if file_format == 'avro':
     # TODO Is this flag ever used?
@@ -286,15 +311,6 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     # Kudu's test tables are managed.
     external = ""
 
-  # Read the properties specified in the TABLE_PROPERTIES section. When the specified
-  # properties have the same key as a default property, the value for the specified
-  # property is used.
-  if table_properties:
-    for table_property in table_properties.split("\n"):
-      format_prop = table_property.split(":")
-      if format_prop[0] == file_format:
-        key_val = format_prop[1].split("=")
-        tblproperties[key_val[0]] = key_val[1]
 
   all_tblproperties = []
   for key, value in tblproperties.iteritems():
@@ -564,10 +580,17 @@ def generate_statements(output_name, test_vectors, sections,
         print 'Skipping table: %s.%s, table is not in specified table list' % (db, table_name)
         continue
 
+      # Check Hive version requirement, if present.
+      if section['HIVE_MAJOR_VERSION'] and \
+         section['HIVE_MAJOR_VERSION'].strip() != \
+         os.environ['IMPALA_HIVE_MAJOR_VERSION'].strip():
+        print "Skipping table '{0}.{1}': wrong Hive major version".format(db, table_name)
+        continue
+
       if table_format in schema_only_constraints and \
          table_name.lower() not in schema_only_constraints[table_format]:
         print ('Skipping table: %s.%s, \'only\' constraint for format did not '
-               'include this table.') % (db, table_name)
+              'include this table.') % (db, table_name)
         continue
 
       if schema_include_constraints[table_name.lower()] and \
@@ -636,11 +659,15 @@ def generate_statements(output_name, test_vectors, sections,
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:
           create_file_format = 'text'
 
+      tblproperties = parse_table_properties(create_file_format, table_properties)
+
       output = impala_create
       if create_hive or file_format == 'hbase':
         output = hive_output
       elif codec == 'lzo':
         # Impala CREATE TABLE doesn't allow INPUTFORMAT.
+        output = hive_output
+      elif is_transactional(tblproperties):
         output = hive_output
 
       # TODO: Currently, Kudu does not support partitioned tables via Impala.
@@ -667,7 +694,7 @@ def generate_statements(output_name, test_vectors, sections,
         avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
         table_template = build_table_template(
           create_file_format, columns, partition_columns,
-          row_format, avro_schema_dir, table_name, table_properties)
+          row_format, avro_schema_dir, table_name, tblproperties)
         # Write Avro schema to local file
         if file_format == 'avro':
           if not os.path.exists(avro_schema_dir):
@@ -768,12 +795,17 @@ def generate_statements(output_name, test_vectors, sections,
     hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
   impala_invalidate.write_to_file("invalidate-" + output_name + "-impala-generated.sql")
 
+
+def is_transactional(table_properties):
+  return table_properties.get('transactional', "").lower() == 'true'
+
+
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
                          'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
-                         'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS']
+                         'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":

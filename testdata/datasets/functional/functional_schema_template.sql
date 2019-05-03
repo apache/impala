@@ -2122,6 +2122,36 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/table_missing_columns.csv /test-w
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+insert_only_transactional_table
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE_HIVE
+---- COLUMNS
+col1 int
+---- TABLE_PROPERTIES
+transactional=true
+transactional_properties=insert_only
+---- LOAD
+-- TODO(todd) we need an empty load section with a comment in it here.
+-- This works around some "logic" in generate-schema-statements.py that
+-- says that, if a table has no LOAD section, it shouldn't be in non-text
+-- formats.
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+full_transactional_table
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE_HIVE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col1 int)
+STORED AS ORC
+TBLPROPERTIES('transactional'='true');
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 testescape_16_lf
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (

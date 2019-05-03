@@ -360,6 +360,9 @@ public class ComputeStatsStmt extends StatementBase {
           "COMPUTE STATS not supported for nested collection: %s", tableName_));
     }
     table_ = analyzer.getTable(tableName_, Privilege.ALTER, Privilege.SELECT);
+    // Adding the check here instead of tableRef.analyze because tableRef is
+    // used at multiple places and will even disallow select.
+    analyzer.ensureTableNotTransactional(table_);
 
     if (!(table_ instanceof FeFsTable)) {
       if (partitionSet_ != null) {

@@ -28,8 +28,11 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.util.FunctionUtils;
 import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -528,6 +531,88 @@ public class AnalyzerTest extends FrontendTestBase {
         "Table does not exist: functional.not_a_table");
     AnalysisError("show create table doesnt_exist",
         "Table does not exist: default.doesnt_exist");
+  }
+
+  @Test
+  public void TestAnalyzeTransactional() {
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() > 2);
+    String errorMsg =
+      "Table functional_orc_def.full_transactional_table not supported. Transactional (ACID)" +
+          " tables are only supported when they are configured as insert_only.";
+
+    String insertOnlyErrorMsg =
+      "Table functional.insert_only_transactional_table not supported. " +
+          "Transactional (ACID) tables are only supported for read.";
+
+    String insertOnlyErrorForFullMsg =
+      "Table functional_orc_def.full_transactional_table not supported. " +
+          "Transactional (ACID) tables are only supported for read.";
+
+    AnalysisError(
+        "create table test as select * from functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalyzesOk(
+        "create table test as select * from functional.insert_only_transactional_table");
+
+    AnalysisError(
+        "create table test like functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalyzesOk("create table test like functional.insert_only_transactional_table");
+
+    AnalysisError(
+        "insert into test select * from functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalyzesOk("insert into functional.testtbl select *,'test',1 " +
+            "from functional.insert_only_transactional_table");
+
+    AnalysisError(
+        "insert into functional.insert_only_transactional_table select * " +
+          "from functional.insert_only_transactional_table",
+        insertOnlyErrorMsg);
+
+    AnalysisError(
+        "compute stats functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalysisError(
+        "compute stats functional.insert_only_transactional_table",
+        insertOnlyErrorMsg);
+
+    AnalysisError(
+        "select * from functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalyzesOk("select * from functional.insert_only_transactional_table");
+
+    AnalysisError(
+        "drop table functional_orc_def.full_transactional_table",
+        insertOnlyErrorForFullMsg);
+    AnalysisError("drop table functional.insert_only_transactional_table",
+        insertOnlyErrorMsg);
+
+    AnalysisError(
+        "truncate table functional_orc_def.full_transactional_table",
+        insertOnlyErrorForFullMsg);
+    AnalysisError("truncate table functional.insert_only_transactional_table",
+        insertOnlyErrorMsg);
+
+    AnalysisError(
+        "alter table functional_orc_def.full_transactional_table " +
+        "add columns (col2 string)",
+        errorMsg);
+    AnalysisError(
+        "alter table functional.insert_only_transactional_table " +
+            "add columns (col2 string)",
+        insertOnlyErrorMsg);
+
+    AnalysisError(
+        "drop stats functional_orc_def.full_transactional_table",
+        errorMsg);
+    AnalyzesOk("drop stats functional.insert_only_transactional_table");
+
+    AnalyzesOk("describe functional.insert_only_transactional_table");
+    AnalyzesOk("describe functional_orc_def.full_transactional_table");
+
+    AnalyzesOk("show column stats functional_orc_def.full_transactional_table");
+    AnalyzesOk("show column stats functional.insert_only_transactional_table");
   }
 
   private Function createFunction(boolean hasVarArgs, Type... args) {

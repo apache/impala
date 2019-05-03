@@ -222,6 +222,8 @@ class TableDef {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     fqTableName_ = analyzer.getFqTableName(getTblName());
     fqTableName_.analyze();
+    // Disallow creation of full ACID table.
+    analyzer.ensureTableNotFullAcid(options_.tblProperties, fqTableName_.toString());
     analyzeColumnDefs(analyzer);
     analyzePrimaryKeys();
 

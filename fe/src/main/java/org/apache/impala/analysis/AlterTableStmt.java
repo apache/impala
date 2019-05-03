@@ -90,6 +90,7 @@ public abstract class AlterTableStmt extends StatementBase {
     }
     Preconditions.checkState(tableRef instanceof BaseTableRef);
     table_ = tableRef.getTable();
+    analyzer.ensureTableNotTransactional(table_);
     if (table_ instanceof FeDataSourceTable
         && !(this instanceof AlterTableSetColumnStats)) {
       throw new AnalysisException(String.format(

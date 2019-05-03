@@ -109,6 +109,7 @@ public class LoadDataStmt extends StatementBase {
       throw new AnalysisException("LOAD DATA only supported for HDFS tables: " +
           dbName_ + "." + getTbl());
     }
+    analyzer.ensureTableNotTransactional(table);
 
     // Analyze the partition spec, if one was specified.
     if (partitionSpec_ != null) {

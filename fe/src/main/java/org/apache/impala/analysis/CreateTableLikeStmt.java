@@ -164,6 +164,9 @@ public class CreateTableLikeStmt extends StatementBase {
 
     // Make sure the source table exists and the user has permission to access it.
     FeTable srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
+
+    analyzer.ensureTableNotFullAcid(srcTable);
+
     if (KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
       throw new AnalysisException("Cloning a Kudu table using CREATE TABLE LIKE is " +
           "not supported.");

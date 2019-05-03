@@ -103,6 +103,7 @@ public class DropTableOrViewStmt extends StatementBase {
       FeTable table = analyzer.getTable(tableName_, /* add access event */ true,
           /* add column-level privilege */ false, Privilege.DROP);
       Preconditions.checkNotNull(table);
+      analyzer.ensureTableNotTransactional(table);
       if (table instanceof FeView && dropTable_) {
         throw new AnalysisException(String.format(
             "DROP TABLE not allowed on a view: %s.%s", dbName_, getTbl()));
