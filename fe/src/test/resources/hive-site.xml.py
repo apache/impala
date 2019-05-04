@@ -84,11 +84,28 @@ if hive_major_version >= 3:
    # We run YARN with Tez on the classpath directly
    'tez.ignore.lib.uris': 'true',
    'tez.use.cluster.hadoop-libs': 'true',
+
    # Some of the tests change the columns in a incompatible manner
    # (eg. string to timestamp) this is disallowed by default in Hive-3 which causes
    # these tests to fail. We disable this behavior in minicluster to keep running the
    # same tests on both hms-2 and hms-3
-   'hive.metastore.disallow.incompatible.col.type.changes': 'false'
+   'hive.metastore.disallow.incompatible.col.type.changes': 'false',
+
+   # Group input splits to run in a small number of mappers, and merge small
+   # files at the end of jobs if necessary, to be more similar to the legacy
+   # MR execution defaults. This helps ensure that we produce the same
+   # dataload results with Hive2-MR vs Hive3-Tez.
+   #
+   # NOTE: This currently doesn't seem to take effect on our pseudo-distributed
+   # test cluster, because the hostname is 'localhost' and some Tez code path
+   # gets triggered which ignores the min-size parameter. See TEZ-3310.
+   'tez.grouping.min-size': 256 * 1024 * 1024,
+
+   # Instead, we use post-process merging to make sure that we merge files
+   # where possible at the end of jobs.
+   # TODO(todd) re-evaluate whether this is necessary once TEZ-3310 is fixed
+   # (see above).
+   'hive.merge.tezfiles': 'true',
   })
 else:
   CONFIG.update({

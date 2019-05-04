@@ -106,11 +106,5 @@ TBLPROPERTIES ('avro.schema.literal'='{"type":"record",
 
 ---- Unsupported Impala table types
 USE functional;
-CREATE VIEW IF NOT EXISTS hive_view AS SELECT 1 AS int_col FROM alltypes limit 1;
-
-USE functional;
-DROP INDEX IF EXISTS hive_index ON alltypes;
-CREATE INDEX hive_index ON TABLE alltypes (int_col)
-AS 'org.apache.hadoop.hive.ql.index.compact.CompactIndexHandler'
-WITH DEFERRED REBUILD IN TABLE hive_index_tbl;
-
+DROP VIEW IF EXISTS hive_view;
+CREATE VIEW hive_view AS SELECT 1 AS int_col FROM alltypes limit 1;

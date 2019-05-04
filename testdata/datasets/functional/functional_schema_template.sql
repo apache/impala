@@ -993,15 +993,17 @@ functional
 alltypes_hive_view
 ---- CREATE_HIVE
 -- Test that Impala can handle incorrect column metadata created by Hive (IMPALA-994).
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
 -- Beeline cannot handle the stmt below when broken up into multiple lines.
-CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name} AS SELECT * FROM {db_name}{db_suffix}.alltypes;
+CREATE VIEW {db_name}{db_suffix}.{table_name} AS SELECT * FROM {db_name}{db_suffix}.alltypes;
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypes_view_sub
 ---- CREATE
-CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name} (x, y, z)
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE VIEW {db_name}{db_suffix}.{table_name} (x, y, z)
 AS SELECT int_col, string_col, timestamp_col FROM {db_name}{db_suffix}.alltypes;
 ---- LOAD
 ====

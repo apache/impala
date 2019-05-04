@@ -390,6 +390,11 @@ function copy-and-load-dependent-tables {
   # TODO: Find a good way to integrate this with the normal data loading scripts
   beeline -n $USER -u "${JDBC_URL}" -f\
     ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql
+
+  if [[ "$IMPALA_HIVE_MAJOR_VERSION" == "2" ]]; then
+    beeline -n $USER -u "${JDBC_URL}" -f\
+      ${IMPALA_HOME}/testdata/bin/load-dependent-tables-hive2.sql
+  fi
 }
 
 function create-internal-hbase-table {
