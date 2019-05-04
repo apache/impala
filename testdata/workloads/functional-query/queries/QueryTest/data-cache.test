@@ -9,6 +9,8 @@ row_regex: .*DataCacheMissCount: 64 \(64\).*
 ====
 ---- QUERY
 select count(*) from tpch_parquet.lineitem t1, test_parquet t2 where t1.l_orderkey = t2.l_orderkey;
+---- RESULTS
+30012985
 ---- RUNTIME_PROFILE
 # Exepct cache hits for t1 and cache misses for t2.
 row_regex: .*DataCacheHitCount: 6 \(6\).*
@@ -36,7 +38,7 @@ row_regex: .*DataCachePartialHitCount: 0 \(0\).*
 insert overwrite test_parquet select * from tpch_parquet.lineitem where l_shipmode = 'AIR';
 ====
 ---- QUERY
-# Verifies that stale data from the cache is not used due to change in mtime.
+# Verifies that stale data from the cache is not used.
 select count(distinct l_orderkey) from test_parquet;
 ---- RESULTS
 652393
