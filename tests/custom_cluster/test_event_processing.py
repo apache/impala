@@ -18,7 +18,6 @@
 import pytest
 import json
 import time
-from datetime import datetime
 from tests.common.environ import build_flavor_timeout
 import requests
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
@@ -110,11 +109,11 @@ class TestEventProcessing(CustomClusterTestSuite):
     """
     new_event_id = self.get_last_synced_event_id()
     success = True
-    start_time = datetime.now()
+    start_time = time.time()
     while new_event_id - previous_event_id < 2:
       new_event_id = self.get_last_synced_event_id()
       # Prevent infinite loop
-      time_delta = (datetime.now() - start_time).total_seconds()
+      time_delta = time.time() - start_time
       if time_delta > 10:
         success = False
         break
