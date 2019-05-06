@@ -30,8 +30,8 @@ from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_POR
 from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_beeswax_dimension
 from time import sleep, time
-from util import get_impalad_host_port
-from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
+from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
+                  ImpalaShell, IMPALA_SHELL_EXECUTABLE)
 from contextlib import closing
 
 DEFAULT_QUERY = 'select 1'
@@ -707,7 +707,7 @@ class TestImpalaShell(ImpalaTestSuite):
   def _validate_expected_socket_connected(self, vector, args, sock):
     # Building an one-off shell command instead of using Util::ImpalaShell since we need
     # to customize the impala daemon socket.
-    shell_cmd = ["{0}/bin/impala-shell.sh".format(os.environ['IMPALA_HOME'])]
+    shell_cmd = [IMPALA_SHELL_EXECUTABLE]
     expected_output = "PingImpalaService"
     with open(os.devnull, 'w') as devnull:
       try:

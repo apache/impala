@@ -25,8 +25,23 @@ import shlex
 import time
 from subprocess import Popen, PIPE
 
+from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
+                                  IMPALA_TEST_CLUSTER_PROPERTIES)
 from tests.common.impala_test_suite import IMPALAD_BEESWAX_HOST_PORT
+
+
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
+IMPALA_HOME = os.environ['IMPALA_HOME']
+
+if IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster():
+  # With remote cluster testing, we cannot assume that the shell was built locally.
+  IMPALA_SHELL_EXECUTABLE = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
+else:
+  # Test the locally built shell distribution.
+  IMPALA_SHELL_EXECUTABLE = os.path.join(
+      IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
+      "impala-shell")
+
 
 def assert_var_substitution(result):
   assert_pattern(r'\bfoo_number=.*$', 'foo_number= 123123', result.stdout, \
@@ -129,8 +144,10 @@ def get_impalad_port(vector):
 def get_shell_cmd(vector):
   """Get the basic shell command to start the shell, given the provided test vector.
   Returns the command as a list of string arguments."""
-  return [os.path.join(os.environ['IMPALA_HOME'], "bin/impala-shell.sh"),
-          "-i{0}".format(get_impalad_host_port(vector))]
+  # Use impala-shell build instead of bin/impala-shell.sh so that we test with the
+  # system python, not the toolchain python and in a configuration close to what
+  # we will distribute.
+  return [IMPALA_SHELL_EXECUTABLE, "-i{0}".format(get_impalad_host_port(vector))]
 
 
 def get_open_sessions_metric(vector):
@@ -206,5 +223,10 @@ class ImpalaShell(object):
     cmd = get_shell_cmd(vector)
     if args is not None: cmd += args
     if not env: env = os.environ
+    # Don't inherit PYTHONPATH - the shell launch script should set up PYTHONPATH
+    # to include dependencies. Copy 'env' to avoid mutating argument or os.environ.
+    env = dict(env)
+    if "PYTHONPATH" in env:
+      del env["PYTHONPATH"]
     return Popen(cmd, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
                  env=env)

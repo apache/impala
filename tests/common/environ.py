@@ -29,6 +29,18 @@ IMPALA_REMOTE_URL = os.environ.get("IMPALA_REMOTE_URL", "")
 # Default web UI URL for local test cluster
 DEFAULT_LOCAL_WEB_UI_URL = "http://localhost:25000"
 
+# Find the local build version. May be None if Impala wasn't built locally.
+IMPALA_LOCAL_BUILD_VERSION = None
+IMPALA_LOCAL_VERSION_INFO = os.path.join(IMPALA_HOME, "bin/version.info")
+if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
+  with open(IMPALA_LOCAL_VERSION_INFO) as f:
+    for line in f:
+      match = re.match("VERSION: ([^\s]*)\n", line)
+      if match:
+        IMPALA_LOCAL_BUILD_VERSION = match.group(1)
+  if IMPALA_LOCAL_BUILD_VERSION is None:
+    raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
+
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.
 build_type_arg_regex = re.compile(r'--build_type=(\w+)', re.I)
