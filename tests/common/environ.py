@@ -49,6 +49,16 @@ IS_DOCKERIZED_TEST_CLUSTER = docker_network is not None
 impalad_basedir = \
     os.path.realpath(os.path.join(IMPALA_HOME, 'be/build', build_type_dir)).rstrip('/')
 
+# Detects if the platform is a version of Centos6 which may be affected by KUDU-1508.
+# Default to the minimum kernel version which isn't affected by KUDU-1508 and parses
+# the output of `uname -a` for the actual kernel version.
+kernel_version = [2, 6, 32, 674]
+kernel_release = os.uname()[2]
+kernel_version_regex = re.compile(r'(\d+)\.(\d+)\.(\d+)\-(\d+).*')
+kernel_version_match = kernel_version_regex.match(kernel_release)
+if kernel_version_match is not None and len(kernel_version_match.groups()) == 4:
+  kernel_version = map(lambda x: int(x), list(kernel_version_match.groups()))
+IS_BUGGY_EL6_KERNEL = 'el6' in kernel_release and kernel_version < [2, 6, 32, 674]
 
 class ImpalaBuildFlavors:
   """

@@ -18,10 +18,13 @@
 #include "filesystem-util.h"
 
 #include <boost/filesystem.hpp>
+#include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include "common/logging.h"
 #include "testutil/gtest-util.h"
+#include "util/scope-exit-trigger.h"
 #include "util/test-info.h"
 
 #include "common/names.h"
@@ -126,8 +129,28 @@ TEST(FilesystemUtil, DirEntryTypes) {
   path subdir = dir / "impala-subdir";
   path file = dir / "impala-file";
 
+  // Always cleanup on exit.
+  auto remove_dir = MakeScopeExitTrigger([&dir]() { filesystem::remove_all(dir); });
+
+  // Create the test directory and file.
   ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(subdir.string()));
   ASSERT_OK(FileSystemUtil::CreateFile(file.string()));
+
+  // Check if the system supports listing directory entries' types for 'impala-dir'.
+  // Some filesystem may not have full support for it on older platforms.
+  DIR* dir_stream = opendir(dir.c_str());
+  ASSERT_TRUE(dir_stream != nullptr);
+  auto close_dir = MakeScopeExitTrigger([&dir_stream]() { closedir(dir_stream); });
+  const dirent* dir_entry;
+  while ((dir_entry = readdir(dir_stream)) != nullptr) {
+    const char* entry_name = dir_entry->d_name;
+    if ((strcmp(entry_name, "impala-subdir") == 0 && dir_entry->d_type != DT_DIR) ||
+        (strcmp(entry_name, "impala-file") == 0 && dir_entry->d_type != DT_REG)) {
+      LOG(WARNING) << Substitute("readdir() failed to list directory entry types of $0. "
+          "Skipping DirEntryType test.", dir.string());
+      return;
+    }
+  }
 
   // Verify that all directory entires are listed with the default parameters.
   vector<string> entries;
@@ -138,19 +161,16 @@ TEST(FilesystemUtil, DirEntryTypes) {
   }
 
   // Verify that only directory type entries are listed with DIR_ENTRY_DIR.
-  entries.resize(0);
+  entries.clear();
   ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
       FileSystemUtil::Directory::DIR_ENTRY_DIR));
   ASSERT_EQ(entries.size(), 1);
   EXPECT_TRUE(entries[0] == "impala-subdir");
 
   // Verify that only file type entries are listed with DIR_ENTRY_REG.
-  entries.resize(0);
+  entries.clear();
   ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
       FileSystemUtil::Directory::DIR_ENTRY_REG));
   ASSERT_EQ(entries.size(), 1);
   EXPECT_TRUE(entries[0] == "impala-file");
-
-  // Cleanup.
-  filesystem::remove_all(dir);
 }

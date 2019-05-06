@@ -32,18 +32,19 @@
 
 #include "common/names.h"
 
-#define TEMP_BUFFER_SIZE   (4096)
-#define TEST_BUFFER_SIZE   (8192)
+#define BASE_CACHE_DIR     "/tmp"
+#define DEFAULT_CACHE_SIZE (4 * 1024 * 1024)
+#define FNAME              ("foobar")
 #define NUM_TEST_DIRS      (16)
 #define NUM_THREADS        (18)
-#define FNAME              ("foobar")
 #define MTIME              (12345)
-#define DEFAULT_CACHE_SIZE (4 * 1024 * 1024)
+#define TEMP_BUFFER_SIZE   (4096)
+#define TEST_BUFFER_SIZE   (8192)
 
+DECLARE_bool(cache_force_single_shard);
 DECLARE_int64(data_cache_file_max_size_bytes);
 DECLARE_int32(data_cache_max_opened_files);
 DECLARE_int32(data_cache_write_concurrency);
-DECLARE_bool(cache_force_single_shard);
 
 namespace impala {
 namespace io {
@@ -118,7 +119,7 @@ class DataCacheTest : public testing::Test {
     flag_saver_.reset(new google::FlagSaver());
     ASSERT_OK(test_env_->Init());
     for (int i = 0; i < NUM_TEST_DIRS; ++i) {
-      const string& path = Substitute("/tmp/data-cache-test.$0", i);
+      const string& path = Substitute("$0/data-cache-test.$1", BASE_CACHE_DIR, i);
       ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(path));
       data_cache_dirs_.push_back(path);
     }
@@ -485,5 +486,10 @@ int main(int argc, char **argv) {
   int rand_seed = time(NULL);
   LOG(INFO) << "rand_seed: " << rand_seed;
   srand(rand_seed);
+  // Skip if the platform is affected by KUDU-1508.
+  if (!impala::FileSystemUtil::CheckForBuggyExtFS(BASE_CACHE_DIR).ok()) {
+    LOG(WARNING) << "Skipping data-cache-test due to KUDU-1508.";
+    return 0;
+  }
   return RUN_ALL_TESTS();
 }

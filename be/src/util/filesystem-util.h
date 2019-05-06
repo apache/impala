@@ -85,11 +85,12 @@ class FileSystemUtil {
   static bool GetRelativePath(const std::string& path, const std::string& start,
       std::string* relpath);
 
-  /// Ext4 on certain El6 releases may result in inconsistent metadata after punching
-  /// holes in files. The filesystem may require fsck repair on next reboot. See KUDU-1508
-  /// for details. This function returns true iff the kernel version Impala is running on
-  /// is vulnerable to KUDU-1508.
-  static bool IsBuggyEl6Kernel(const string& kernel_release);
+  /// Ext filesystem on certain kernel versions may result in inconsistent metadata after
+  /// punching holes in files. The filesystem may require fsck repair on next reboot.
+  /// See KUDU-1508 for details. This function checks if the filesystem at 'path' resides
+  /// in a ext filesystem and the kernel version is affected by KUDU-1058. If so, return
+  /// error status; Returns OK otherwise.
+  static Status CheckForBuggyExtFS(const std::string& path);
 
   /// Checks if the filesystem at the directory 'path' supports hole punching (i.e.
   /// calling fallocate with FALLOC_FL_PUNCH_HOLE).
@@ -102,7 +103,7 @@ class FileSystemUtil {
   /// - reading the test file's size failed.
   ///
   /// Returns OK otherwise.
-  static Status CheckHolePunch(const string& path);
+  static Status CheckHolePunch(const std::string& path);
 
   class Directory {
    public:
@@ -122,9 +123,10 @@ class FileSystemUtil {
     ~Directory();
 
     /// Reads the next directory entry and sets 'entry_name' to the entry name.
-    /// Returns 'false' if an error occured or no more entries were found in the
-    /// directory. If 'type' is specified, only entries of 'type' will be included.
-    /// Return 'true' on success.
+    /// Returns false if an error occured or no more entries were found in the directory.
+    /// If 'type' is specified and filesystem supports returning the types of directory
+    /// entries, only entries of 'type' will be included. Otherwise, it may return
+    /// entries of all types. Return 'true' on success.
     bool GetNextEntryName(std::string* entry_name, EntryType type = DIR_ENTRY_ANY);
 
     /// Returns the status of the previous directory operation.
@@ -133,7 +135,9 @@ class FileSystemUtil {
     /// Reads no more than 'max_result_size' directory entries from 'path' and returns
     /// their names in 'entry_names' vector. If 'max_result_size' <= 0, every directory
     /// entry is returned. Directory entries "." and ".." will be skipped. If 'type' is
-    /// specified, only entries of 'type' will be included.
+    /// specified and filesystem of 'path' supports returning type of directory entries,
+    /// only entries of 'type' will be included in 'entry_names'. Otherwise, it will
+    /// include entries of all types.
     static Status GetEntryNames(const string& path, std::vector<std::string>* entry_names,
         int max_result_size = 0, EntryType type = DIR_ENTRY_ANY);
 
@@ -146,6 +150,12 @@ class FileSystemUtil {
     Directory(const Directory&);
     Directory& operator=(const Directory&);
   };
+
+ private:
+
+  /// This function returns true iff the kernel version Impala is running on
+  /// is affected by KUDU-1508.
+  static bool IsBuggyEl6Kernel();
 };
 
 }

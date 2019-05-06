@@ -22,6 +22,7 @@ from tests.common.skip import SkipIf, SkipIfEC
 
 
 @SkipIf.not_hdfs
+@SkipIf.is_buggy_el6_kernel
 @SkipIfEC.scheduling
 class TestDataCache(CustomClusterTestSuite):
   """ This test enables the data cache and verfies that cache hit and miss counts

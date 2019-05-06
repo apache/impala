@@ -305,7 +305,8 @@ Status FileSystemUtil::Directory::GetEntryNames(const string& path,
 }
 
 // Copied and pasted from Kudu source: src/kudu/fs/log_block_manager.cc
-bool FileSystemUtil::IsBuggyEl6Kernel(const string& kernel_release) {
+bool FileSystemUtil::IsBuggyEl6Kernel() {
+  const string& kernel_release = kudu::Env::Default()->GetKernelRelease();
   autodigit_less lt;
 
   // Only el6 is buggy.
@@ -324,17 +325,20 @@ bool FileSystemUtil::IsBuggyEl6Kernel(const string& kernel_release) {
   return lt(kernel_release, "2.6.32-674");
 }
 
-Status FileSystemUtil::CheckHolePunch(const string& path) {
-  kudu::Env* env = kudu::Env::Default();
-
-  // Check if the filesystem of 'path' is vulnerable to to KUDU-1508.
+Status FileSystemUtil::CheckForBuggyExtFS(const string& path) {
   bool is_on_ext;
-  KUDU_RETURN_IF_ERROR(env->IsOnExtFilesystem(path, &is_on_ext),
+  KUDU_RETURN_IF_ERROR(kudu::Env::Default()->IsOnExtFilesystem(path, &is_on_ext),
       Substitute("Failed to check filesystem type at $0", path));
-  if (is_on_ext && IsBuggyEl6Kernel(env->GetKernelRelease())) {
-    return Status(Substitute("Data dir $0 is on an ext4 filesystem vulnerable to "
+  if (is_on_ext && IsBuggyEl6Kernel()) {
+    return Status(Substitute("Data dir $0 is on an ext filesystem which is affected by "
         "KUDU-1508.", path));
   }
+  return Status::OK();
+}
+
+Status FileSystemUtil::CheckHolePunch(const string& path) {
+  // Check if the filesystem of 'path' is affected by KUDU-1508.
+  RETURN_IF_ERROR(CheckForBuggyExtFS(path));
 
   // Open the test file.
   string filename = JoinPathSegments(path, PrintId(GenerateUUID()));
@@ -358,7 +362,7 @@ Status FileSystemUtil::CheckHolePunch(const string& path) {
 
   const off_t init_file_size = buffer_size * 4;
   uint64_t sz;
-  KUDU_RETURN_IF_ERROR(env->GetFileSizeOnDisk(filename, &sz),
+  KUDU_RETURN_IF_ERROR(kudu::Env::Default()->GetFileSizeOnDisk(filename, &sz),
       "Failed to get pre-punch file size");
   if (sz != init_file_size) {
     return Status(Substitute("Unexpected pre-punch file size for $0: expected $1 but "
@@ -372,7 +376,7 @@ Status FileSystemUtil::CheckHolePunch(const string& path) {
       "Failed to punch hole");
 
   const int final_file_size = init_file_size - hole_size;
-  KUDU_RETURN_IF_ERROR(env->GetFileSizeOnDisk(filename, &sz),
+  KUDU_RETURN_IF_ERROR(kudu::Env::Default()->GetFileSizeOnDisk(filename, &sz),
       "Failed to get post-punch file size");
   if (sz != final_file_size) {
     return Status(Substitute("Unexpected post-punch file size for $0: expected $1 but "
