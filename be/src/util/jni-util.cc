@@ -21,6 +21,7 @@
 #include <sstream>
 
 #include "common/status.h"
+#include "gutil/once.h"
 #include "rpc/jni-thrift-util.h"
 
 #include "common/names.h"
@@ -69,6 +70,7 @@ bool JniScopedArrayCritical::Create(JNIEnv* env, jbyteArray jarr,
 }
 
 bool JniUtil::jvm_inited_ = false;
+__thread JNIEnv* JniUtil::tls_env_ = nullptr;
 jclass JniUtil::jni_util_cl_ = NULL;
 jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
@@ -127,8 +129,10 @@ Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global
 }
 
 Status JniUtil::Init() {
+  InitLibhdfs();
+
   // Get the JNIEnv* corresponding to current thread.
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
   // Find JniUtil class and create a global ref.
   jclass local_jni_util_cl = env->FindClass("org/apache/impala/common/JniUtil");
@@ -212,8 +216,36 @@ void JniUtil::InitLibhdfs() {
   hdfsDisconnect(fs);
 }
 
+namespace {
+JavaVM* g_vm;
+GoogleOnceType g_vm_once = GOOGLE_ONCE_INIT;
+
+void FindJavaVMOrDie() {
+  int num_vms;
+  int rv = JNI_GetCreatedJavaVMs(&g_vm, 1, &num_vms);
+  CHECK_EQ(rv, 0) << "Could not find any created Java VM. Must init libhdfs first";
+  CHECK_EQ(num_vms, 1) << "No VMs returned";
+}
+
+} // anonymous namespace
+
+JNIEnv* JniUtil::GetJNIEnvSlowPath() {
+  DCHECK(!tls_env_) << "Call GetJNIEnv() fast path";
+
+  GoogleOnceInit(&g_vm_once, &FindJavaVMOrDie);
+  int rc = g_vm->GetEnv(reinterpret_cast<void**>(&tls_env_), JNI_VERSION_1_6);
+  if (rc == JNI_EDETACHED) {
+    // Make a dummy call to attach libhdfs.
+    int junk;
+    hdfsConfGetInt("x", &junk);
+    rc = g_vm->GetEnv(reinterpret_cast<void**>(&tls_env_), JNI_VERSION_1_6);
+  }
+  CHECK_EQ(rc, 0) << "Unable to get JVM";
+  return CHECK_NOTNULL(tls_env_);
+}
+
 Status JniUtil::InitJvmPauseMonitor() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (!env) return Status("Failed to get/create JVM.");
   if (!jni_util_cl_) return Status("JniUtil::Init() not called.");
   jmethodID init_jvm_pm_method;

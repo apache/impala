@@ -39,7 +39,7 @@ Status HBaseTableFactory::GetConnection(jobject* connection) {
   }
 
   // Get the JNIEnv* corresponding to current thread.
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error creating JNIEnv");
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(env));
@@ -86,7 +86,7 @@ Status HBaseTableFactory::GetConnection(jobject* connection) {
 }
 
 HBaseTableFactory::~HBaseTableFactory() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
 
   // Clean up the global refs and stop the threads.
   lock_guard<mutex> lock(connection_lock_);

@@ -51,7 +51,7 @@ void HBaseTable::Close(RuntimeState* state) {
   // If this has already been closed then return out early.
   if (table_ == NULL) return;
 
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) {
     state->LogError(ErrorMsg(
         TErrorCode::GENERAL, "HBaseTable::Close(): Error creating JNIEnv"));
@@ -66,7 +66,7 @@ void HBaseTable::Close(RuntimeState* state) {
 }
 
 Status HBaseTable::Init() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(env));
   if (env == NULL) return Status("Error creating JNIEnv");
@@ -92,7 +92,7 @@ Status HBaseTable::Init() {
 }
 
 Status HBaseTable::InitJNI() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }
@@ -137,7 +137,7 @@ Status HBaseTable::InitJNI() {
 
 Status HBaseTable::GetResultScanner(const jobject& scan,
                                     jobject* result_scanner) {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error creating JNIEnv");
 
   (*result_scanner) = env->CallObjectMethod(table_,
@@ -147,7 +147,7 @@ Status HBaseTable::GetResultScanner(const jobject& scan,
 }
 
 Status HBaseTable::Put(const jobject& puts_list) {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error creating JNIEnv");
 
   env->CallObjectMethod(table_, table_put_id_, puts_list);

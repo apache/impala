@@ -65,7 +65,7 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
         " one column in addition to the row key.");
   }
 
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error getting JNIEnv.");
   output_exprs_byte_sizes_.resize(num_col);
   cf_arrays_.reserve(num_col - 1);
@@ -92,7 +92,7 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
 }
 
 Status HBaseTableWriter::InitJNI() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   RETURN_IF_ERROR(
@@ -115,7 +115,7 @@ Status HBaseTableWriter::InitJNI() {
 }
 
 Status HBaseTableWriter::AppendRows(RowBatch* batch) {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   int limit = batch->num_rows();
@@ -201,7 +201,7 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
 }
 
 Status HBaseTableWriter::CleanUpJni() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   if (put_list_ != NULL) {

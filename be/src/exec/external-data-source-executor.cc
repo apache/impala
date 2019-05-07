@@ -56,7 +56,7 @@ class ExternalDataSourceExecutor::JniState {
       {"getNext", "([B)[B", &get_next_id_},
       {"close", "([B)[B", &close_id_}};
 
-    JNIEnv* env = getJNIEnv();
+    JNIEnv* env = JniUtil::GetJNIEnv();
 
     JniLocalFrame jni_frame;
     RETURN_IF_ERROR(jni_frame.push(env));
@@ -88,7 +88,7 @@ class ExternalDataSourceExecutor::JniState {
   /// ExternalDataSourceExecutor.
   Status UpdateClassCacheMetrics() const {
     DCHECK(executor_class_ != NULL) << "JniState was not initialized.";
-    JNIEnv* env = getJNIEnv();
+    JNIEnv* env = JniUtil::GetJNIEnv();
     int64_t num_cache_hits = env->CallStaticLongMethod(executor_class_,
         get_num_cache_hits_id_);
     RETURN_ERROR_IF_EXC(env);
@@ -142,7 +142,7 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   // check (-1).
   RETURN_IF_ERROR(LibCache::instance()->GetLocalPath(
       jar_path, LibCache::TYPE_JAR, -1, &handle, &local_jar_path));
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
 
   // Add a scoped cleanup jni reference object. This cleans up local refs made below.
   JniLocalFrame jni_frame;
@@ -174,7 +174,7 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
 template <typename T, typename R>
 Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg,
     R* response) {
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   jbyteArray request_bytes;
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
@@ -205,7 +205,7 @@ Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
   const JniState& s = JniState::GetInstance();
   Status status = CallJniMethod(executor_, s.close_id_, params,
       result);
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (executor_ != NULL) env->DeleteGlobalRef(executor_);
   is_initialized_ = false;
   return status;

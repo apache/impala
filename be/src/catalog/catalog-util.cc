@@ -43,7 +43,7 @@ Status TPrivilegeLevelFromObjectName(const std::string& object_name,
     TPrivilegeLevel::type* privilege_level);
 
 Status JniCatalogCacheUpdateIterator::InitJNI() {
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/impala/common/Pair", &pair_cl));

@@ -74,7 +74,7 @@ Catalog::Catalog() {
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
   };
 
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   // Create an instance of the java class JniCatalog
   catalog_class_ = jni_env->FindClass("org/apache/impala/service/JniCatalog");
   ABORT_IF_EXC(jni_env);
@@ -103,7 +103,7 @@ Status Catalog::GetPartialCatalogObject(const TGetPartialCatalogObjectRequest& r
 }
 
 Status Catalog::GetCatalogVersion(long* version) {
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   *version = jni_env->CallLongMethod(catalog_, get_catalog_version_id_);

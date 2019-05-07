@@ -121,7 +121,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
     {"resolveRequestPool", "([B)[B", &resolve_request_pool_id_},
     {"getPoolConfig", "([B)[B", &get_pool_config_id_}};
 
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   request_pool_service_class_ =
     jni_env->FindClass("org/apache/impala/util/RequestPoolService");
   ABORT_IF_EXC(jni_env);

@@ -124,7 +124,7 @@ Status HBaseScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
 
   // No need to initialize hbase_scanner_ if there are no scan ranges.
   if (scan_range_vector_.size() == 0) return Status::OK();
@@ -174,7 +174,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   bool error_in_row = false;
 
   // Indicates whether there are more rows to process. Set in hbase_scanner_.Next().
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   bool has_next = false;
   while (true) {
     RETURN_IF_CANCELLED(state);
@@ -277,7 +277,7 @@ void HBaseScanNode::Close(RuntimeState* state) {
   runtime_profile_->StopPeriodicCounters();
 
   if (hbase_scanner_.get() != NULL) {
-    JNIEnv* env = getJNIEnv();
+    JNIEnv* env = JniUtil::GetJNIEnv();
     hbase_scanner_->Close(env);
   }
   ScanNode::Close(state);

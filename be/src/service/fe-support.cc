@@ -786,7 +786,7 @@ static JNINativeMethod native_methods[] = {
 
 void InitFeSupport(bool disable_codegen) {
   fe_support_disable_codegen = disable_codegen;
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   jclass native_backend_cl = env->FindClass("org/apache/impala/service/FeSupport");
   env->RegisterNatives(native_backend_cl, native_methods,
       sizeof(native_methods) / sizeof(native_methods[0]));

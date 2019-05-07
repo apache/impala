@@ -121,7 +121,7 @@ HBaseTableScanner::HBaseTableScanner(
 
 Status HBaseTableScanner::Init() {
   // Get the JNIEnv* corresponding to current thread.
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }

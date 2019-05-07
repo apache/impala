@@ -80,7 +80,7 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   DCHECK(jni_ctx != NULL);
 
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) {
     stringstream ss;
     ss << "Hive UDF path=" << fn_.hdfs_location << " class=" << fn_.scalar_fn.symbol
@@ -158,7 +158,7 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
 
 Status HiveUdfCall::InitEnv() {
   DCHECK(executor_cl_ == NULL) << "Init() already called!";
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, EXECUTOR_CLASS, &executor_cl_));
   executor_ctor_id_ = env->GetMethodID(
@@ -198,7 +198,7 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   JniContext* jni_ctx = new JniContext;
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, jni_ctx);
 
-  JNIEnv* env = getJNIEnv();
+  JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
 
   // Add a scoped cleanup jni reference object. This cleans up local refs made below.
@@ -250,7 +250,7 @@ void HiveUdfCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
         fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
 
     if (jni_ctx != NULL) {
-      JNIEnv* env = getJNIEnv();
+      JNIEnv* env = JniUtil::GetJNIEnv();
       if (jni_ctx->executor != NULL) {
         env->CallNonvirtualVoidMethodA(
             jni_ctx->executor, executor_cl_, executor_close_id_, NULL);

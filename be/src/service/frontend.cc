@@ -111,7 +111,7 @@ Frontend::Frontend() {
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
   };
 
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   JniLocalFrame jni_frame;
   ABORT_IF_ERROR(jni_frame.push(jni_env));
 
@@ -269,7 +269,7 @@ bool Frontend::IsAuthorizationError(const Status& status) {
 }
 
 void Frontend::SetCatalogIsReady() {
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   jni_env->CallVoidMethod(fe_, set_catalog_is_ready_id_);
   ABORT_IF_EXC(jni_env);
 }
@@ -280,7 +280,7 @@ void Frontend::WaitForCatalog() {
     SleepForMs(FLAGS_stress_catalog_init_delay_ms);
   }
 #endif
-  JNIEnv* jni_env = getJNIEnv();
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
   jni_env->CallVoidMethod(fe_, wait_for_catalog_id_);
   ABORT_IF_EXC(jni_env);
 }

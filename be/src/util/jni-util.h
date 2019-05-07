@@ -65,9 +65,6 @@
     if (!s.ok()) CLEAN_EXIT_WITH_ERROR(s.GetDetail()); \
   } while (false)
 
-/// C linkage for helper functions in hdfsJniHelper.h
-extern  "C" { extern JNIEnv* getJNIEnv(void); }
-
 namespace impala {
 
 class Status;
@@ -212,11 +209,7 @@ class JniCall {
   Status Call(T* result) WARN_UNUSED_RESULT;
 
  private:
-  explicit JniCall(jmethodID method)
-    : method_(method),
-      env_(getJNIEnv()) {
-    status_ = frame_.push(env_);
-  }
+  explicit JniCall(jmethodID method);
 
   explicit JniCall(jmethodID method, jclass cls) : JniCall(method) {
     class_ = DCHECK_NOTNULL(cls);
@@ -261,11 +254,18 @@ class JniCall {
 ///    to explicitly create a global reference to them.
 class JniUtil {
  public:
+  /// Init JniUtil. This should be called prior to any other calls.
+  static Status Init() WARN_UNUSED_RESULT;
+
   /// Call this prior to any libhdfs calls.
   static void InitLibhdfs();
 
-  /// Find JniUtil class, and get JniUtil.throwableToString method id
-  static Status Init() WARN_UNUSED_RESULT;
+  /// Returns the JNIEnv attached to the current thread, attaching it
+  /// if necessary. Always returns a valid non-NULL value.
+  static JNIEnv* GetJNIEnv() {
+    if (tls_env_) return tls_env_;
+    return GetJNIEnvSlowPath();
+  }
 
   /// Initializes the JvmPauseMonitor.
   static Status InitJvmPauseMonitor() WARN_UNUSED_RESULT;
@@ -378,6 +378,9 @@ class JniUtil {
       R* response) WARN_UNUSED_RESULT;
 
  private:
+  // Slow-path for GetJNIEnv, used on the first call by any thread.
+  static JNIEnv* GetJNIEnvSlowPath();
+
   // Set in Init() once the JVM is initialized.
   static bool jvm_inited_;
   static jclass jni_util_cl_;
@@ -387,6 +390,9 @@ class JniUtil {
   static jmethodID get_jvm_metrics_id_;
   static jmethodID get_jvm_threads_id_;
   static jmethodID get_jmx_json_;
+
+  // Thread-local cache of the JNIEnv for this thread.
+  static __thread JNIEnv* tls_env_;
 };
 
 /// Convert a C++ primitive to a JNI 'jvalue' union.
@@ -428,6 +434,12 @@ template <typename R>
 inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
     R* response) {
   return JniCall::instance_method(obj, method).Call(response);
+}
+
+inline JniCall::JniCall(jmethodID method)
+  : method_(method),
+    env_(JniUtil::GetJNIEnv()) {
+  status_ = frame_.push(env_);
 }
 
 template<class T>
