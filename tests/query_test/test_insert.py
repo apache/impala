@@ -150,7 +150,7 @@ class TestInsertQueries(ImpalaTestSuite):
     verifiers = [MetricVerifier(i.service)
                  for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     for v in verifiers:
-      v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=60)
+      v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=180)
 
   @pytest.mark.execute_serially
   @SkipIfS3.eventually_consistent
