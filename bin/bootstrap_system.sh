@@ -189,7 +189,7 @@ echo ">>> Installing build tools"
 ubuntu apt-get update
 ubuntu apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
         krb5-admin-server krb5-kdc krb5-user libsasl2-dev libsasl2-modules \
-        libsasl2-modules-gssapi-mit libssl-dev make maven ninja-build ntp \
+        libsasl2-modules-gssapi-mit libssl-dev make ninja-build ntp \
         ntpdate python-dev python-setuptools postgresql ssh wget vim-common psmisc \
         lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
 
@@ -235,16 +235,22 @@ redhat sudo yum install -y ccache
 # Clean up yum caches
 redhat sudo yum clean all
 
-# Download ant and mvn for centos
+# Download ant for centos
 redhat sudo wget -nv \
-  https://www-us.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz \
   https://www-us.apache.org/dist/ant/binaries/apache-ant-1.9.13-bin.tar.gz
-redhat sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86  apache-maven-3.5.4-bin.tar.gz'
 redhat sha512sum -c - <<< 'c8321aa223f70d7e64d3d0274263000cfffb46fbea61488534e26f9f0245d99e9872d0888e35cd3274416392a13f80c748c07750caaeffa5f9cae1220020715f  apache-ant-1.9.13-bin.tar.gz'
-redhat sudo tar -C /usr/local -xzf apache-maven-3.5.4-bin.tar.gz
 redhat sudo tar -C /usr/local -xzf apache-ant-1.9.13-bin.tar.gz
-redhat sudo ln -s /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
 redhat sudo ln -s /usr/local/apache-ant-1.9.13/bin/ant /usr/local/bin
+
+# Download maven for all OSes, since the OS-packaged version can be
+# pretty old.
+if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
+  sudo wget -nv \
+    https://www-us.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz
+  sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86 apache-maven-3.5.4-bin.tar.gz'
+  sudo tar -C /usr/local -xzf apache-maven-3.5.4-bin.tar.gz
+  sudo ln -s /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
+fi
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
 then

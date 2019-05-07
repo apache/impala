@@ -31,7 +31,7 @@ set -euxo pipefail
 
 # Install non-java dependencies:
 sudo apt-get update
-sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make maven \
+sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make \
     python-dev python-setuptools libffi-dev libkrb5-dev
 
 
@@ -44,5 +44,14 @@ then
 fi
 sudo apt-get --yes install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
 export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
+
+# Download Maven since the packaged version is pretty old.
+if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
+  sudo wget -nv \
+    https://www-us.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz
+  sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86 apache-maven-3.5.4-bin.tar.gz'
+  sudo tar -C /usr/local -xzf apache-maven-3.5.4-bin.tar.gz
+  sudo ln -s /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
+fi
 
 ./buildall.sh -notests -so
