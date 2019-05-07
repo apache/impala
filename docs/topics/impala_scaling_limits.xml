@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_scaling_limits">
+
+  <title>Scaling Limits and Guidelines</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Scalability"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      This topic lists the <i>scalability</i> limitation in Impala. For a given functional
+      feature, it is recommended that you respect these limitations to achieve optimal
+      scalability and performance. For example, you might be able to create a table with 2000
+      columns, you will experience performance problems while querying the table. This topic
+      does not cover functional limitations in Impala.
+    </p>
+
+    <p>
+      Unless noted otherwise, the limits were tested and certified.
+    </p>
+
+    <p>
+      The limits noted as "<i>generally safe</i>" are not certified, but recommended as
+      generally safe. A safe range is not a hard limit as unforeseen errors or troubles in your
+      particular environment can affect the range.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="deployment_limits">
+
+    <title>Deployment Limits</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Number of Impalad Executors
+          <ul>
+            <li>
+              80 nodes in CDH 5.14 and lower
+            </li>
+
+            <li>
+              150 nodes in CDH 5.15 and higher
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          Number of Impalad Coordinators: 1 coordinator for at most every 50 executors
+          <p>
+            See
+            <xref
+              href="https://www.cloudera.com/documentation/enterprise/6/6.2/topics/impala_dedicated_coordinator.html#concept_vhv_4b1_n2b"
+              format="html" scope="external">Dedicated
+            Coordinators</xref> for details.
+          </p>
+        </li>
+
+        <li audience="hidden">
+          Max memory
+        </li>
+
+        <li audience="hidden">
+          Max number of CPU cores
+        </li>
+
+        <li audience="hidden">
+          Max number of disks
+        </li>
+      </ul>
+
+      <ul>
+        <li>
+          The number of Impala clusters per deployment
+          <ul>
+            <li>
+              1 Impala cluster in Impala 3.1 and lower
+            </li>
+
+            <li>
+              Multiple clusters in Impala 3.2 and higher is <i>generally safe</i>.
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="data_storage_limits">
+
+    <title>Data Storage Limits</title>
+
+    <conbody>
+
+      <p>
+        There are no hard limits for the following, but you will experience gradual performance
+        degradation as you increase these numbers.
+      </p>
+
+      <ul>
+        <li>
+          Number of databases
+        </li>
+
+        <li>
+          Number of tables - total, per database
+        </li>
+
+        <li>
+          Number of partitions - total, per table
+        </li>
+
+        <li>
+          Number of files - total, per table, per table per partition
+        </li>
+
+        <li>
+          Number of views - total, per database
+        </li>
+
+        <li>
+          Number of user-defined functions - total, per database
+        </li>
+
+        <li>
+          Parquet
+          <ul>
+            <li>
+              Number of columns per row group
+            </li>
+
+            <li>
+              Number of row groups per block
+            </li>
+
+            <li>
+              Number of HDFS blocks per file
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="schema_design_limits">
+
+    <title>Schema Design Limits</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Number of columns
+          <ul>
+            <li>
+              300 for Kudu tables
+              <p>
+                See
+                <xref
+                  href="https://www.cloudera.com/documentation/enterprise/latest/topics/kudu_limitations.html"
+                  format="html" scope="external">Kudu
+                Usage Limitations</xref> for more information.
+              </p>
+            </li>
+
+            <li>
+              1000 for other types of tables
+            </li>
+          </ul>
+        </li>
+
+        <li audience="hidden">
+          Table and column name length
+        </li>
+
+        <li audience="hidden">
+          Maximum cell size
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="security_limits">
+
+    <title>Security Limits</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Number of roles: 10,000 for Sentry
+        </li>
+
+        <li audience="hidden">
+          Number of columns used in column level ACL
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="ddl_limits" audience="hidden">
+
+    <title>Ingestion and DDL Limits</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Number of DDL operations per minutes
+        </li>
+
+        <li>
+          Number of concurrent DDL operations
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="query_compile_limits">
+
+    <title>Query Limits - Compile Time</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Maximum number of columns in a query, included in a <codeph>SELECT</codeph> list,
+          <codeph>INSERT</codeph>, and in an expression: no limit
+        </li>
+
+        <li>
+          Number of tables referenced: no limit
+        </li>
+
+        <li>
+          Number of plan nodes: no limit
+        </li>
+
+        <li>
+          Number of plan fragments: no limit
+        </li>
+
+        <li>
+          Depth of expression tree: 1000 hard limit
+        </li>
+
+        <li>
+          Width of expression tree: 10,000 hard limit
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="query_runtime_limits">
+
+    <title>Query Limits - Runtime Time</title>
+
+    <conbody>
+
+      <ul>
+        <li audience="hidden">
+          Number of Fragment and fragment instances
+        </li>
+
+        <li>
+          Codegen
+          <ul>
+            <li>
+              Very deeply nested expressions within queries can exceed internal Impala limits,
+              leading to excessive memory usage. Setting the query option
+              <codeph>disable_codegen=true</codeph> may reduce the impact, at a cost of longer
+              query runtime.
+            </li>
+          </ul>
+        </li>
+
+        <li audience="hidden">
+          Runtime Filter
+          <ul>
+            <li>
+              Max #filter
+            </li>
+
+            <li>
+              Max filter size
+            </li>
+          </ul>
+        </li>
+
+        <li audience="hidden">
+          Query Operators
+          <ul>
+            <li>
+              Scan
+            </li>
+
+            <li>
+              Join
+            </li>
+
+            <li>
+              Exchange
+            </li>
+
+            <li>
+              Agg
+            </li>
+
+            <li>
+              Sort
+            </li>
+
+            <li>
+              Merge
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+</concept>

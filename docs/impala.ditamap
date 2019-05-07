@@ -297,6 +297,7 @@ under the License.
     <topicref audience="hidden" href="topics/impala_perf_ddl.xml"/>
   </topicref>
   <topicref href="topics/impala_scalability.xml">
+    <topicref href="topics/impala_scaling_limits.xml"/>
     <topicref href="topics/impala_dedicated_coordinator.xml"/>
     <topicref href="topics/impala_metadata.xml"/>
   </topicref>
