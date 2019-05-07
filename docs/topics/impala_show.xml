@@ -376,7 +376,7 @@ where id between 1 and 1000000;
 
   <concept rev="2.0.0" id="show_current_role">
 
-    <title>SHOW CURRENT ROLE</title>
+    <title>SHOW CURRENT ROLES</title>
   <prolog>
     <metadata>
       <data name="Category" value="Sentry"/>
@@ -426,7 +426,7 @@ where id between 1 and 1000000;
 
   <concept id="show_role_grant">
 
-    <title>SHOW ROLE GRANT Statement</title>
+    <title>SHOW ROLE GRANT GROUP Statement</title>
   <prolog>
     <metadata>
       <data name="Category" value="Sentry"/>
@@ -438,11 +438,10 @@ where id between 1 and 1000000;
     <conbody>
 
       <p rev="2.0.0">
-        <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-        The <codeph>SHOW GRANT ROLE</codeph> statement lists all the roles
-        assigned to the specified group. This statement is only allowed for
-        Sentry administrative users and others users that are part of the
-        specified group. This syntax is available in <keyword
+        The <codeph>SHOW ROLE GRANT GROUP</codeph> statement lists
+        all the roles assigned to the specified group. This statement is only
+        allowed for Sentry administrative users and others users that are part
+        of the specified group. This syntax is available in <keyword
           keyref="impala20_full"/> and later only, when you are using the Sentry
         authorization framework along with the Sentry service, as described in
           <xref href="impala_authorization.xml#sentry_service"/>.
@@ -451,11 +450,6 @@ where id between 1 and 1000000;
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
 
       <p conref="../shared/impala_common.xml#common/show_security"/>
-
-<!--
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>To do: construct example for SHOW ROLE GRANT</codeblock>
--->
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
