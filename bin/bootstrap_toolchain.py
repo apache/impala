@@ -50,6 +50,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 
 from collections import namedtuple
 
@@ -412,27 +413,32 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
     os.makedirs(cdh_components_home)
 
   def download(component):
-    pkg_directory = package_directory(cdh_components_home, component.name,
-        component.version)
-    if os.path.isdir(pkg_directory):
-      return
+    try:
+      pkg_directory = package_directory(cdh_components_home, component.name,
+          component.version)
+      if os.path.isdir(pkg_directory):
+        return
 
-    platform_label = ""
-    # Kudu is the only component that's platform dependent.
-    if component.name == "kudu":
-      platform_label = "-%s" % get_platform_release_label().cdh
-    # Download the package if it doesn't exist
-    file_name = "{0}-{1}{2}.tar.gz".format(
-        component.name, component.version, platform_label)
+      platform_label = ""
+      # Kudu is the only component that's platform dependent.
+      if component.name == "kudu":
+        platform_label = "-%s" % get_platform_release_label().cdh
+      # Download the package if it doesn't exist
+      file_name = "{0}-{1}{2}.tar.gz".format(
+          component.name, component.version, platform_label)
 
-    if component.url is None:
-      download_path = url_prefix + file_name
-    else:
-      download_path = component.url
-      if "%(platform_label)" in component.url:
-        download_path = \
-            download_path.replace("%(platform_label)", get_platform_release_label().cdh)
-    wget_and_unpack_package(download_path, file_name, cdh_components_home, False)
+      if component.url is None:
+        download_path = url_prefix + file_name
+      else:
+        download_path = component.url
+        if "%(platform_label)" in component.url:
+          download_path = \
+              download_path.replace("%(platform_label)", get_platform_release_label().cdh)
+      wget_and_unpack_package(download_path, file_name, cdh_components_home, False)
+    except Exception:
+      # IMPALA-8517: print backtrace to help debug flaky failures.
+      traceback.print_exc()
+      raise
 
   execute_many(download, cdh_components)
 
