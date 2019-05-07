@@ -84,10 +84,14 @@ if hive_major_version >= 3:
    # We run YARN with Tez on the classpath directly
    'tez.ignore.lib.uris': 'true',
    'tez.use.cluster.hadoop-libs': 'true',
+   # Some of the tests change the columns in a incompatible manner
+   # (eg. string to timestamp) this is disallowed by default in Hive-3 which causes
+   # these tests to fail. We disable this behavior in minicluster to keep running the
+   # same tests on both hms-2 and hms-3
+   'hive.metastore.disallow.incompatible.col.type.changes': 'false'
   })
 else:
   CONFIG.update({
-   # TODO(vihang) Disabled for HMS3.
    'hive.metastore.event.listeners': 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener',
   })
 

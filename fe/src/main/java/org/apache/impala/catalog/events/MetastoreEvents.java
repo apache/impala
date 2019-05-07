@@ -289,7 +289,8 @@ public class MetastoreEvents {
       this.event_ = event;
       this.eventId_ = event_.getEventId();
       this.eventType_ = MetastoreEventType.from(event.getEventType());
-      this.dbName_ = Preconditions.checkNotNull(event.getDbName());
+      // certain event types in Hive-3 like COMMIT_TXN may not have dbName set
+      this.dbName_ = event.getDbName();
       this.tblName_ = event.getTableName();
       this.metastoreNotificationEvent_ = event;
       this.metrics_ = metrics;
@@ -483,6 +484,7 @@ public class MetastoreEvents {
     private MetastoreTableEvent(CatalogServiceCatalog catalogServiceCatalog,
         Metrics metrics, NotificationEvent event) {
       super(catalogServiceCatalog, metrics, event);
+      Preconditions.checkNotNull(dbName_, debugString("Database name cannot be null"));
       tblName_ = Preconditions.checkNotNull(event.getTableName());
       debugLog("Creating event {} of type {} on table {}", eventId_, eventType_,
           getFullyQualifiedTblName());
@@ -607,6 +609,7 @@ public class MetastoreEvents {
     MetastoreDatabaseEvent(CatalogServiceCatalog catalogServiceCatalog, Metrics metrics,
         NotificationEvent event) {
       super(catalogServiceCatalog, metrics, event);
+      Preconditions.checkNotNull(dbName_, debugString("Database name cannot be null"));
       debugLog("Creating event {} of type {} on database {}", eventId_,
               eventType_, dbName_);
     }
