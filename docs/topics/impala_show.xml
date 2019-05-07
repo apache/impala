@@ -387,7 +387,7 @@ where id between 1 and 1000000;
     <conbody>
 
       <p rev="2.0.0">
-        The <codeph>SHOW CURRENT ROLE</codeph> statement displays
+        The <codeph>SHOW CURRENT ROLES</codeph> statement displays
         roles assigned to the current user. This syntax is available in <keyword
           keyref="impala20_full"/> and later only, when you are using the Sentry
         authorization framework along with the Sentry service, as described in
@@ -439,7 +439,7 @@ where id between 1 and 1000000;
 
       <p rev="2.0.0">
         <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-        The <codeph>SHOW ROLE GRANT</codeph> statement lists all the roles
+        The <codeph>SHOW GRANT ROLE</codeph> statement lists all the roles
         assigned to the specified group. This statement is only allowed for
         Sentry administrative users and others users that are part of the
         specified group. This syntax is available in <keyword
