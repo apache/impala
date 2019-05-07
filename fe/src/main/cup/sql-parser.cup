@@ -170,7 +170,8 @@ parser code {:
   // that parse() has been called and threw an exception
   public String getErrorMsg(String stmt) {
     if (errorToken_ == null || stmt == null) return null;
-    String[] lines = stmt.split("\n");
+    // IMPALA-8497: Fix ArrayIndexOutOfBoundsException for queries that end with '\n'
+    String[] lines = stmt.split("\n", -1);
     StringBuffer result = new StringBuffer();
     result.append(getErrorTypeMessage(errorToken_.sym) + " in line ");
     result.append(errorToken_.left);

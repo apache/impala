@@ -3435,6 +3435,24 @@ public class ParserTest extends FrontendTestBase {
          "       ^\n" +
          "Encountered: EOF\n" +
          "Expected: =\n");
+
+    // End with \n
+    ParserError("SELECT\n",
+         "Syntax error in line 2:\n" +
+         "\n" +
+         "^\n" +
+         "Encountered: EOF\n" +
+         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, " +
+         "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
+         "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
+    ParserError("SELECT\n\n",
+         "Syntax error in line 3:\n" +
+         "\n" +
+         "^\n" +
+         "Encountered: EOF\n" +
+         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, " +
+         "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
+         "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
   }
 
   @Test
@@ -3969,5 +3987,32 @@ public class ParserTest extends FrontendTestBase {
 
     ParserError("select * from .123_bar");
     ParserError("select * from . 123_bar");
+  }
+
+  @Test
+  public void TestLineBreakEnd() {
+    ParserError("--test\n");
+    ParserError("--test\n  ");
+    ParserError("SELECT\n");
+    ParserError("SELECT\n  ");
+    ParserError("SHOW\n");
+    ParserError("SHOW\n  ");
+    ParserError("INSERT\n");
+    ParserError("INSERT\n  ");
+    ParserError("DROP\n");
+    ParserError("DROP\n  ");
+    ParserError("  \n");
+    ParserError("\n  ");
+    ParserError("\n");
+
+    ParserError("SELECT\n\n");
+    ParserError("SELECT\n\n\n");
+    ParserError("SELECT\n\n \n");
+    ParserError("SELECT\n \n\n");
+    ParserError("SELECT\n\n  ");
+    ParserError("SELECT  \n\n");
+
+    ParsesOk("--test\nSELECT 1\n");
+    ParsesOk("--test\nSELECT 1\n  ");
   }
 }
