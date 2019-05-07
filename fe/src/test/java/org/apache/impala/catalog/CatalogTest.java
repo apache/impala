@@ -56,6 +56,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
@@ -67,6 +68,7 @@ import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TTableName;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -699,18 +701,26 @@ public class CatalogTest {
   }
 
   @Test
-  public void testLoadingUnsupportedTableTypes() throws CatalogException {
+  public void testLoadingUnsupportedTblTypesOnHive2() throws CatalogException {
+    // run the test only when it is running against Hive-2 since index tables are
+    // skipped during data-load against Hive-3
+    Assume.assumeTrue(
+        "Skipping this test since it is only supported when running against Hive-2",
+        TestUtils.getHiveMajorVersion() == 2);
     Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
     assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
         incompleteTable.getCause().getMessage());
+  }
 
+  @Test
+  public void testLoadingUnsupportedTableTypes() throws CatalogException {
     // Table with unsupported SerDe library.
-    table = catalog_.getOrLoadTable("functional", "bad_serde");
+    Table table = catalog_.getOrLoadTable("functional", "bad_serde");
     assertTrue(table instanceof IncompleteTable);
-    incompleteTable = (IncompleteTable) table;
+    IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
     assertEquals("Impala does not support tables of this type. REASON: SerDe" +
         " library 'org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe' " +

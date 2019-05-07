@@ -55,6 +55,16 @@ public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
   // using embedded HMS
   private static final String DEFAULT_PARTITION_EXPRESSION_PROXY_CLASS = "org.apache"
       + ".hadoop.hive.metastore.DefaultPartitionExpressionProxy";
+  // In HMS-3 the default value of "metastore.task.thread.always is set to some classes
+  // which are present in hive-exec. We don't need this for our tests as of 05/07/2019
+  // Setting this to default EventCleanerTask avoid pulling in unnecessary dependencies
+  // from hive-exec for running these tests. Note that this config key is not available
+  // in HMS-2. But adding this is still okay since it only print a warning of unknown
+  // config with no other side-effects
+  private static final String METASTORE_TASK_THREAD_ALWAYS_KEY = "metastore.task"
+      + ".threads.always";
+  private static final String DEFAULT_EVENT_CLEANER_TASK_CLASS = "org.apache.hadoop"
+      + ".hive.metastore.events.EventCleanerTask";
 
   /**
    * Generates the HiveConf required to connect to an embedded metastore backed by
@@ -76,6 +86,7 @@ public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
         String.format(CONNECTION_URL_TEMPLATE, dbStorePath.toString()));
     conf.set(ConfVars.METASTORE_EXPRESSION_PROXY_CLASS.varname,
         DEFAULT_PARTITION_EXPRESSION_PROXY_CLASS);
+    conf.set(METASTORE_TASK_THREAD_ALWAYS_KEY, DEFAULT_EVENT_CLEANER_TASK_CLASS);
     // Disabling notification event listeners
     conf.set(ConfVars.METASTORE_TRANSACTIONAL_EVENT_LISTENERS.varname, "");
     return conf;

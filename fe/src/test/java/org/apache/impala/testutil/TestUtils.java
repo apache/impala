@@ -17,6 +17,7 @@
 
 package org.apache.impala.testutil;
 
+import com.google.common.base.Preconditions;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
@@ -382,5 +383,14 @@ public class TestUtils {
 
   public static void assumeKuduIsSupported() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+  }
+
+  /**
+   * Returns the hive major version from environment
+   */
+  public static int getHiveMajorVersion() {
+    String hiveMajorVersion = Preconditions.checkNotNull(System.getenv(
+        "IMPALA_HIVE_MAJOR_VERSION"));
+    return Integer.parseInt(hiveMajorVersion);
   }
 }

@@ -33,17 +33,17 @@ import org.apache.hive.service.rpc.thrift.TGetInfoReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
-import org.apache.impala.thrift.TTypeNodeType;
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
@@ -226,15 +226,25 @@ public class FrontendTest extends FrontendTestBase {
         assertEquals(null, row.colVals.get(11).string_val);
       }
     }
+  }
+
+  @Test
+  public void TestGetTablesWithCommentsOnHive2() throws ImpalaException {
+    // run the test only when it is running against Hive-2 since index tables are
+    // skipped during data-load against Hive-3
+    Assume.assumeTrue(
+        "Skipping this test since it is only supported when running against Hive-2",
+        TestUtils.getHiveMajorVersion() == 2);
 
     // IMPALA-5579: GetTables() should succeed and display the available information for
     // tables that cannot be loaded.
+    TMetadataOpRequest req = new TMetadataOpRequest();
     req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
     req.get_tables_req = new TGetTablesReq();
     req.get_tables_req.setSchemaName("functional");
     req.get_tables_req.setTableName("hive_index_tbl");
-    resp = execMetadataOp(req);
+    TResultSet resp = execMetadataOp(req);
     assertEquals(1, resp.rows.size());
   }
 

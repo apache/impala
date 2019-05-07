@@ -1019,6 +1019,14 @@ under the License.
             </exclusion>
           </exclusions>
         </dependency>
+        <!-- Needed by tests like TestCaseLoader instantiate HMS in embedded mode which
+        needs datanucleus as test dependency-->
+        <dependency>
+          <groupId>org.datanucleus</groupId>
+          <artifactId>javax.jdo</artifactId>
+          <version>3.2.0-m3</version>
+          <scope>test</scope>
+        </dependency>
       </dependencies>
     </profile>
 

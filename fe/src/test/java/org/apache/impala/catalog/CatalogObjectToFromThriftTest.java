@@ -27,6 +27,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.SqlCastException;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THBaseTable;
@@ -36,6 +37,7 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableType;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -209,13 +211,21 @@ public class CatalogObjectToFromThriftTest {
   }
 
   @Test
-  public void TestTableLoadingErrors() throws ImpalaException {
+  public void TestTableLoadingErrorsForHive2() throws ImpalaException {
+    // run the test only when it is running against Hive-2 since index tables are
+    // skipped during data-load against Hive-3
+    Assume.assumeTrue(
+        "Skipping this test since it is only supported when running against Hive-2",
+        TestUtils.getHiveMajorVersion() == 2);
     Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "hive_index_tbl");
     Assert.assertEquals(thriftTable.db_name, "functional");
+  }
 
-    table = catalog_.getOrLoadTable("functional", "alltypes");
+  @Test
+  public void TestTableLoadingErrors() throws ImpalaException {
+    Table table = catalog_.getOrLoadTable("functional", "alltypes");
     HdfsTable hdfsTable = (HdfsTable) table;
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
