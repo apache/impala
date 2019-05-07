@@ -142,7 +142,8 @@ echo "REMOTE_LOAD=${REMOTE_LOAD:-}"
 
 function start-impala {
   : ${START_CLUSTER_ARGS=""}
-  START_CLUSTER_ARGS_INT=""
+  # Use a fast statestore update so that DDL operations run faster.
+  START_CLUSTER_ARGS_INT="--state_store_args=--statestore_update_frequency_ms=50"
   if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
     START_CLUSTER_ARGS_INT+=("--impalad_args=--abort_on_config_error=false -s 1")
   else
