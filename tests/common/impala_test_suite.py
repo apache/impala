@@ -735,7 +735,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""
-    for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
+    for partition in self.hive_client.get_partition_names(db_name, table_name, -1):
       assert self.hive_client.drop_partition_by_name(db_name, table_name, \
           partition, True), 'Could not drop partition: %s' % partition
 

@@ -24,6 +24,7 @@ import logging
 import os
 
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from tests.common.environ import HIVE_MAJOR_VERSION
 import tests.comparison.cli_options as cli_options
 
 
@@ -292,27 +293,48 @@ def load():
   # Hive is used to convert the data into parquet/orc and drop all the temp tables.
   # The Hive SET values are necessary to prevent Impala remote reads of parquet files.
   # These values are taken from http://blog.cloudera.com/blog/2014/12/the-impala-cookbook.
-  with cluster.hive.cursor(db_name=target_db) as hive:
-    LOG.info("Converting temp tables")
-    for stmt in """
-        SET mapred.min.split.size=1073741824;
-        SET parquet.block.size=10737418240;
-        SET dfs.block.size=1073741824;
+  create_final_tables_sql = """
+      SET mapred.min.split.size=1073741824;
+      SET parquet.block.size=10737418240;
+      SET dfs.block.size=1073741824;
 
+      CREATE TABLE region
+      STORED AS {file_format}
+      TBLPROPERTIES('{compression_key}'='{compression_value}')
+      AS SELECT * FROM tmp_region;
+
+      CREATE TABLE supplier
+      STORED AS {file_format}
+      TBLPROPERTIES('{compression_key}'='{compression_value}')
+      AS SELECT * FROM tmp_supplier;"""
+
+  # A simple CTAS for tpch_nested_parquet.customer would create 3 files with Hive3 vs
+  # 4 files with Hive2. This difference would break several tests, and it seemed
+  # easier to hack the loading of the table than to add Hive version specific behavior
+  # for each affected test. A small part of the table is inserted in a separate statement
+  # to generate the +1 file (needs hive.merge.tezfiles to avoid creating +3 files).
+  # TODO: find a less hacky way to ensure a fix number of files
+  if HIVE_MAJOR_VERSION >= 3 and file_format == "parquet":
+    create_final_tables_sql += """
         CREATE TABLE customer
         STORED AS {file_format}
         TBLPROPERTIES('{compression_key}'='{compression_value}')
-        AS SELECT * FROM tmp_customer;
+        AS SELECT * FROM tmp_customer
+        WHERE c_custkey >= 10;
 
-        CREATE TABLE region
+        INSERT INTO customer
+        SELECT * FROM tmp_customer
+        WHERE c_custkey < 10;"""
+  else:
+    create_final_tables_sql += """
+        CREATE TABLE customer
         STORED AS {file_format}
         TBLPROPERTIES('{compression_key}'='{compression_value}')
-        AS SELECT * FROM tmp_region;
+        AS SELECT * FROM tmp_customer;"""
 
-        CREATE TABLE supplier
-        STORED AS {file_format}
-        TBLPROPERTIES('{compression_key}'='{compression_value}')
-        AS SELECT * FROM tmp_supplier;""".format(**sql_params).split(";"):
+  with cluster.hive.cursor(db_name=target_db) as hive:
+    LOG.info("Converting temp tables")
+    for stmt in create_final_tables_sql.format(**sql_params).split(";"):
       if not stmt.strip():
         continue
       LOG.info("Executing: {0}".format(stmt))

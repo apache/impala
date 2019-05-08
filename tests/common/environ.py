@@ -57,6 +57,8 @@ if docker_network_search_result is not None:
   docker_network = docker_network_search_result.groups()[0]
 IS_DOCKERIZED_TEST_CLUSTER = docker_network is not None
 
+HIVE_MAJOR_VERSION = int(os.environ.get("IMPALA_HIVE_MAJOR_VERSION"))
+
 # Resolve any symlinks in the path.
 impalad_basedir = \
     os.path.realpath(os.path.join(IMPALA_HOME, 'be/build', build_type_dir)).rstrip('/')
