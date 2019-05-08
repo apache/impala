@@ -64,6 +64,11 @@ under the License.
   </properties>
 
   <repositories>
+    <!--
+    Blacklist Apache repositories that tend to cause timeouts - see IMPALA-8516.
+    These are pulled in via transitive deps, e.g. Sentry. Other repositories contain
+    mirrored versions of these dependencies but don't have the same timeout issues.
+    -->
     <repository>
       <id>apache.snapshots</id>
       <name>Apache Development Snapshot Repository</name>
@@ -72,7 +77,31 @@ under the License.
         <enabled>false</enabled>
       </releases>
       <snapshots>
-        <enabled>true</enabled>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>apache</id>
+      <name>Apache Repository</name>
+      <url>https://repository.apache.org/content/repositories/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <!--
+      This is a transitive dependency from Sentry. Disable downloading snapshots from here
+      since we only want to consume actual releases and we can save Maven from reaching
+      out to this repo unnecessarily to look for snapshot versions.
+      -->
+      <id>glassfish-repo-archive.repo</id>
+      <name>Glassfish repository - Transitive from Sentry</name>
+      <url>https://mvnrepository.com/artifact/org.glassfish/javax.el/</url>
+      <snapshots>
+        <enabled>false</enabled>
       </snapshots>
     </repository>
     <repository>
@@ -112,6 +141,10 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <!--
+      The Maven repository for the CDP build identified by CDP_BUILD_NUMBER.
+      CDP does not use maven SNAPSHOT versions - every build has a version number.
+      -->
       <id>impala.cdp.repo</id>
       <url>https://${env.IMPALA_TOOLCHAIN_HOST}/build/cdp_components/${env.CDP_BUILD_NUMBER}/maven</url>
       <name>Impala CDP Repository</name>
@@ -120,6 +153,10 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <!--
+      The Maven repository for the CDH build identified by CDH_BUILD_NUMBER.
+      CDH uses maven SNAPSHOT versions for non-released versions of components.
+      -->
       <id>impala.cdh.repo</id>
       <url>https://${env.IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${env.CDH_BUILD_NUMBER}/maven</url>
       <name>Impala CDH Repository</name>
@@ -152,14 +189,6 @@ under the License.
       <name>Cloudera Third Party Repository</name>
       <snapshots>
         <enabled>false</enabled>
-      </snapshots>
-    </pluginRepository>
-    <pluginRepository>
-      <id>cloudera.snapshot.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-      <name>Cloudera Snapshot Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
