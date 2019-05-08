@@ -554,7 +554,7 @@ class DockerMiniClusterOperations(object):
     container_name = self.__gen_container_name__(daemon, instance)
     # Mount configuration into container so that we don't need to rebuild container
     # for config changes to take effect.
-    conf_dir = os.path.join(IMPALA_HOME, "fe/target/test-classes")
+    conf_dir = os.path.join(IMPALA_HOME, "fe/src/test/resources/")
     mount_args = ["--mount", "type=bind,src={0},dst=/opt/impala/conf".format(conf_dir)]
 
     # Allow loading LZO plugin, if built.
