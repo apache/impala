@@ -111,7 +111,7 @@ class TestCompressedFormats(ImpalaTestSuite):
     hive_cmd = drop_cmd + 'CREATE TABLE %s LIKE %s;' % (dest_table, src_table)
 
     # Create the table
-    call(["hive", "-e", hive_cmd]);
+    self.run_stmt_in_hive(hive_cmd)
     call(["hadoop", "fs", "-cp", src_file, dest_file])
     # Try to read the compressed file with extension
     query = 'select count(*) from %s' % dest_table
@@ -128,7 +128,7 @@ class TestCompressedFormats(ImpalaTestSuite):
         print "Unexpected error:\n%s", error_msg
         raise
     finally:
-      call(["hive", "-e", drop_cmd]);
+      self.run_stmt_in_hive(drop_cmd)
 
 class TestUnsupportedTableWriters(ImpalaTestSuite):
   @classmethod

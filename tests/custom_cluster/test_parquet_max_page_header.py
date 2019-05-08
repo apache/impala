@@ -73,8 +73,7 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
         .format(self.PARQUET_TABLE_NAME, self.TEXT_TABLE_NAME)
     # Impala parquet-writer doesn't write/use page statistics. So we use hive
     # to write these files
-    hive_cmd = "hive -e " + insert_cmd
-    subprocess.call(hive_cmd, shell=True)
+    self.run_stmt_in_hive(insert_cmd)
 
   def __generate_test_data(self, dir, file):
     """Creates a file in HDFS containing two MAX_STRING_LENGTH lines."""

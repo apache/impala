@@ -135,7 +135,7 @@ class TestComputeStats(ImpalaTestSuite):
       insert overwrite table {0}.{1} partition (p1=1, p2="pval")
       select id from functional.alltypestiny;
     """.format(unique_database, table_name)
-    check_call(["hive", "-e", create_load_data_stmts])
+    self.run_stmt_in_hive(create_load_data_stmts)
 
     # Make the table visible in Impala.
     self.execute_query("invalidate metadata %s.%s" % (unique_database, table_name))
