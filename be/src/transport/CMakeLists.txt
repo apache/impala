@@ -24,6 +24,8 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/transport")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/transport")
 
 add_library(ThriftSaslTransport
+    THttpServer.cpp
+    THttpTransport.cpp
     TSaslClientTransport.cpp
     TSasl.cpp
     TSaslServerTransport.cpp
