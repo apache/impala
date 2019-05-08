@@ -20,9 +20,9 @@ package org.apache.impala.authorization.sentry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.impala.authorization.Authorizable.Type;
-import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.BaseAuthorizationChecker;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
@@ -41,7 +41,7 @@ import java.util.Set;
 /**
  * An implementation of AuthorizationChecker that uses Sentry.
  */
-public class SentryAuthorizationChecker extends AuthorizationChecker {
+public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
   private final ResourceAuthorizationProvider provider_;
   private final SentryAuthorizableServer server_;
 
@@ -75,7 +75,7 @@ public class SentryAuthorizationChecker extends AuthorizationChecker {
   }
 
   @Override
-  public void authorizeRowFilterAndColumnMask(User user,
+  protected void authorizeRowFilterAndColumnMask(User user,
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
   }

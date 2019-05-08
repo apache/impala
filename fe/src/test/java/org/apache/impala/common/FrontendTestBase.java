@@ -40,6 +40,7 @@ import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.authorization.BaseAuthorizationChecker;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
@@ -333,7 +334,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
       public AuthorizationChecker newAuthorizationChecker(
           AuthorizationPolicy authzPolicy) {
         AuthorizationConfig authzConfig = getAuthorizationConfig();
-        return new AuthorizationChecker(authzConfig) {
+        return new BaseAuthorizationChecker(authzConfig) {
           @Override
           protected boolean authorize(User user, PrivilegeRequest request)
               throws InternalException {
@@ -346,7 +347,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
           }
 
           @Override
-          public void authorizeRowFilterAndColumnMask(User user,
+          protected void authorizeRowFilterAndColumnMask(User user,
               List<PrivilegeRequest> privilegeRequests)
               throws AuthorizationException, InternalException {
           }

@@ -20,25 +20,18 @@ package org.apache.impala.analysis;
 import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
-import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationFactory;
-import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.catalog.FeCatalog;
-import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.InternalException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TAccessEvent;
@@ -50,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -426,7 +418,7 @@ public class AnalysisContext {
     // collected during analysis.
     AuthorizationException authException = null;
     try {
-      authorize(authzChecker);
+      authzChecker.authorize(analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;
     }
@@ -511,176 +503,6 @@ public class AnalysisContext {
     }
     if (isExplain) analysisResult_.stmt_.setIsExplain();
     Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
-  }
-
-  /**
-   * Authorize an analyzed statement.
-   * analyze() must have already been called. Throws an AuthorizationException if the
-   * user doesn't have sufficient privileges to run this statement.
-   */
-  private void authorize(AuthorizationChecker authzChecker)
-      throws AuthorizationException, InternalException {
-    Preconditions.checkNotNull(analysisResult_);
-    Analyzer analyzer = getAnalyzer();
-    // Authorize statements that may produce several hierarchical privilege requests.
-    // Such a statement always has a corresponding table-level privilege request if it
-    // has column-level privilege request. The hierarchical nature requires special
-    // logic to process correctly and efficiently.
-    if (analysisResult_.isHierarchicalAuthStmt()) {
-      // Map of table name to a list of privilege requests associated with that table.
-      // These include both table-level and column-level privilege requests. We use a
-      // LinkedHashMap to preserve the order in which requests are inserted.
-      Map<String, List<PrivilegeRequest>> tablePrivReqs = new LinkedHashMap<>();
-      // Privilege requests that are not column or table-level.
-      List<PrivilegeRequest> otherPrivReqs = new ArrayList<>();
-      // Group the registered privilege requests based on the table they reference.
-      for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
-        String tableName = privReq.getAuthorizable().getFullTableName();
-        if (tableName == null) {
-          otherPrivReqs.add(privReq);
-        } else {
-          List<PrivilegeRequest> requests = tablePrivReqs.get(tableName);
-          if (requests == null) {
-            requests = new ArrayList<>();
-            tablePrivReqs.put(tableName, requests);
-          }
-          // The table-level SELECT must be the first table-level request, and it
-          // must precede all column-level privilege requests.
-          Preconditions.checkState((requests.isEmpty() ||
-              !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN)) ||
-              (requests.get(0).getAuthorizable().getType() == Authorizable.Type.TABLE &&
-              requests.get(0).getPrivilege() == Privilege.SELECT));
-          requests.add(privReq);
-        }
-      }
-
-      // Check any non-table, non-column privilege requests first.
-      for (PrivilegeRequest request: otherPrivReqs) {
-        authorizePrivilegeRequest(authzChecker, request);
-      }
-
-      // Authorize table accesses, one table at a time, by considering both table and
-      // column-level privilege requests.
-      for (Map.Entry<String, List<PrivilegeRequest>> entry: tablePrivReqs.entrySet()) {
-        authorizeTableAccess(authzChecker, entry.getValue());
-      }
-    } else {
-      for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
-        Preconditions.checkState(
-            !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN) ||
-            analysisResult_.isSingleColumnPrivStmt());
-        authorizePrivilegeRequest(authzChecker, privReq);
-      }
-    }
-
-    // Check all masked requests. If a masked request has an associated error message,
-    // an AuthorizationException is thrown if authorization fails. Masked requests with no
-    // error message are used to check if the user can access the runtime profile.
-    // These checks don't result in an AuthorizationException but set the
-    // 'user_has_profile_access' flag in queryCtx_.
-    for (Pair<PrivilegeRequest, String> maskedReq: analyzer.getMaskedPrivilegeReqs()) {
-      try {
-        authorizePrivilegeRequest(authzChecker, maskedReq.first);
-      } catch (AuthorizationException e) {
-        analysisResult_.setUserHasProfileAccess(false);
-        if (!Strings.isNullOrEmpty(maskedReq.second)) {
-          throw new AuthorizationException(maskedReq.second);
-        }
-        break;
-      }
-    }
-  }
-
-  /**
-   * Authorize a privilege request.
-   * Throws an AuthorizationException if the user doesn't have sufficient privileges for
-   * this request. Also, checks if the request references a system database.
-   */
-  private void authorizePrivilegeRequest(AuthorizationChecker authzChecker,
-      PrivilegeRequest request) throws AuthorizationException, InternalException {
-    Preconditions.checkNotNull(request);
-    String dbName = null;
-    if (request.getAuthorizable() != null) {
-      dbName = request.getAuthorizable().getDbName();
-    }
-    // If this is a system database, some actions should always be allowed
-    // or disabled, regardless of what is in the auth policy.
-    if (dbName != null && checkSystemDbAccess(dbName, request.getPrivilege())) {
-      return;
-    }
-    authzChecker.checkAccess(getAnalyzer().getUser(), request);
-  }
-
-  /**
-   * Authorize a list of privilege requests associated with a single table.
-   * It checks if the user has sufficient table-level privileges and if that is
-   * not the case, it falls back on checking column-level privileges, if any. This
-   * function requires 'SELECT' requests to be ordered by table and then by column
-   * privilege requests. Throws an AuthorizationException if the user doesn't have
-   * sufficient privileges.
-   */
-  private void authorizeTableAccess(AuthorizationChecker authzChecker,
-      List<PrivilegeRequest> requests) throws AuthorizationException, InternalException {
-    Preconditions.checkState(!requests.isEmpty());
-    Analyzer analyzer = getAnalyzer();
-    // We need to temporarily deny access when column masking or row filtering feature is
-    // enabled until Impala has full implementation of column masking and row filtering.
-    // This is to prevent data leak since we do not want Impala to show any information
-    // when Hive has column masking and row filtering enabled.
-    authzChecker.authorizeRowFilterAndColumnMask(getAnalyzer().getUser(), requests);
-
-    boolean hasTableSelectPriv = true;
-    boolean hasColumnSelectPriv = false;
-    for (PrivilegeRequest request: requests) {
-      if (request.getAuthorizable().getType() == Authorizable.Type.TABLE) {
-        try {
-          authorizePrivilegeRequest(authzChecker, request);
-        } catch (AuthorizationException e) {
-          // Authorization fails if we fail to authorize any table-level request that is
-          // not a SELECT privilege (e.g. INSERT).
-          if (request.getPrivilege() != Privilege.SELECT) throw e;
-          hasTableSelectPriv = false;
-        }
-      } else {
-        Preconditions.checkState(
-            request.getAuthorizable().getType() == Authorizable.Type.COLUMN);
-        if (hasTableSelectPriv) continue;
-        if (authzChecker.hasAccess(analyzer.getUser(), request)) {
-          hasColumnSelectPriv = true;
-          continue;
-        }
-        // Make sure we don't reveal any column names in the error message.
-        throw new AuthorizationException(String.format("User '%s' does not have " +
-          "privileges to execute '%s' on: %s", analyzer.getUser().getName(),
-          request.getPrivilege().toString(),
-          request.getAuthorizable().getFullTableName()));
-      }
-    }
-    if (!hasTableSelectPriv && !hasColumnSelectPriv) {
-       throw new AuthorizationException(String.format("User '%s' does not have " +
-          "privileges to execute 'SELECT' on: %s", analyzer.getUser().getName(),
-          requests.get(0).getAuthorizable().getFullTableName()));
-    }
-  }
-
-  /**
-   * Throws an AuthorizationException if the dbName is a system db
-   * and the user is trying to modify it.
-   * Returns true if this is a system db and the action is allowed.
-   */
-  private boolean checkSystemDbAccess(String dbName, Privilege privilege)
-      throws AuthorizationException {
-    FeDb db = catalog_.getDb(dbName);
-    if (db != null && db.isSystemDb()) {
-      switch (privilege) {
-        case VIEW_METADATA:
-        case ANY:
-          return true;
-        default:
-          throw new AuthorizationException("Cannot modify system database.");
-      }
-    }
-    return false;
   }
 
   public Analyzer getAnalyzer() { return analysisResult_.getAnalyzer(); }

@@ -25,6 +25,7 @@ import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.BaseAuthorizationChecker;
 import org.apache.impala.authorization.DefaultAuthorizableFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -51,7 +52,7 @@ import java.util.Set;
  * The Ranger implementation does not use catalog to cache the authorization policy.
  * Ranger plugin uses its own cache.
  */
-public class RangerAuthorizationChecker extends AuthorizationChecker {
+public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   private static final Logger LOG = LoggerFactory.getLogger(
       RangerAuthorizationChecker.class);
 
@@ -159,7 +160,7 @@ public class RangerAuthorizationChecker extends AuthorizationChecker {
   }
 
   @Override
-  public void authorizeRowFilterAndColumnMask(User user,
+  protected void authorizeRowFilterAndColumnMask(User user,
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
     for (PrivilegeRequest request : privilegeRequests) {

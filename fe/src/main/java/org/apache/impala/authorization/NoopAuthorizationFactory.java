@@ -182,7 +182,7 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
 
   @Override
   public AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy) {
-    return new AuthorizationChecker(authzConfig_) {
+    return new BaseAuthorizationChecker(authzConfig_) {
       @Override
       protected boolean authorize(User user, PrivilegeRequest request)
           throws InternalException {
@@ -195,7 +195,7 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
       }
 
       @Override
-      public void authorizeRowFilterAndColumnMask(User user,
+      protected void authorizeRowFilterAndColumnMask(User user,
           List<PrivilegeRequest> privilegeRequests)
           throws AuthorizationException, InternalException {
       }
