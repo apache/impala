@@ -1,6 +1,9 @@
+[impala]
+Q=DEFAULT_FILE_FORMAT=avro
 [impala.query_options]
 EXPLAIN_LEVEL=1
 explain_LEVEL=2
 MT_DOP=2
 invalid_query_option=1
+DEFAULT_FILE_FORMAT=parquet
 

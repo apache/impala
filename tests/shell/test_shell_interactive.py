@@ -431,6 +431,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert "\tEXPLAIN_LEVEL: 2" in result.stdout
     assert "INVALID_QUERY_OPTION is not supported for the impalad being connected to, "\
            "ignoring." in result.stdout
+    # Verify that query options under [impala] override those under [impala.query_options]
+    assert "\tDEFAULT_FILE_FORMAT: avro" in result.stdout
 
   def test_source_file(self, vector):
     cwd = os.getcwd()

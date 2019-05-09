@@ -24,6 +24,8 @@ import signal
 import socket
 import tempfile
 
+from shell.impala_shell import ImpalaShell as ImpalaShellClass
+
 from subprocess import call, Popen
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
@@ -474,15 +476,49 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'UnicodeDecodeError' not in result.stderr
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
-  @pytest.mark.execute_serially  # This tests invalidates metadata, and must run serially
+  def test_global_config_file(self, vector):
+    """Test global and user configuration files."""
+    args = []
+    # shell uses shell options in global config
+    env = {
+      ImpalaShellClass.GLOBAL_CONFIG_FILE: '{0}/good_impalarc2'.format(QUERY_FILE_PATH)}
+    result = run_impala_shell_cmd(vector, args, env=env)
+    assert 'WARNING:' not in result.stderr, \
+      "A valid config file should not trigger any warning: {0}".format(result.stderr)
+    assert 'Query: select 2' in result.stderr
+
+    # shell uses query options in global config
+    args = ['-q', 'set;']
+    result = run_impala_shell_cmd(vector, args, env=env)
+    assert 'DEFAULT_FILE_FORMAT: avro' in result.stdout
+
+    # shell options and query options in global config get overriden
+    # by options in user config
+    args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH),
+            """--query=select '${VAR:msg1}'; set"""]
+    result = run_impala_shell_cmd(vector, args, env=env)
+    assert 'Query: select \'hello\'' in result.stderr
+    assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
+
+    # command line options override options in global config
+    args = ['--query_option=DEFAULT_FILE_FORMAT=text',
+            """--query=select '${VAR:msg1}'; set"""]
+    result = run_impala_shell_cmd(vector, args, env=env)
+    assert 'Query: select \'test\'' in result.stderr
+    assert 'DEFAULT_FILE_FORMAT: text' in result.stdout
+
+    # specified global config file does not exist
+    env = {ImpalaShellClass.GLOBAL_CONFIG_FILE: '/does_not_exist'}
+    run_impala_shell_cmd(vector, args, env=env, expect_success=False)
+
   def test_config_file(self, vector):
     """Test the optional configuration file."""
     # Positive tests
     args = ['--config_file=%s/good_impalarc' % QUERY_FILE_PATH]
     result = run_impala_shell_cmd(vector, args)
-    assert 'WARNING:' not in result.stderr
+    assert 'WARNING:' not in result.stderr, \
+      "A valid config file should not trigger any warning: {0}".format(result.stderr)
     assert 'Query: select 1' in result.stderr
-
     # override option in config file through command line
     args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH), '--query=select 2']
     result = run_impala_shell_cmd(vector, args)
@@ -773,7 +809,7 @@ class TestImpalaShell(ImpalaTestSuite):
     try:
       args = ['-q', '-f', sql_path, '-d', unique_database]
       start_time = time()
-      run_impala_shell_cmd(vector, args, False)
+      run_impala_shell_cmd(vector, args, expect_success=False)
       end_time = time()
       time_limit_s = 10
       actual_time_s = end_time - start_time

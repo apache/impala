@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# defaults for OptionParser options stored in dict
+# default options used by the Impala shell stored in a dict
 
 import getpass
 import os
@@ -52,4 +52,5 @@ impala_shell_defaults = {
             'version': False,
             'write_delimited': False,
             'client_connect_timeout_ms': 60000,
-            }
+            'global_config_default_path': '/etc/impalarc',
+    }

@@ -1,0 +1,7 @@
+[impala]
+query=select 2
+keyval=msg1=test
+verbose=true
+Q=DEFAULT_FILE_FORMAT=avro
+[impala.query_options]
+DEFAULT_FILE_FORMAT=text

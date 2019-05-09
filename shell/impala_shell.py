@@ -153,6 +153,8 @@ class ImpalaShell(object, cmd.Cmd):
 
   # Minimum time in seconds between two calls to get the exec summary.
   PROGRESS_UPDATE_INTERVAL = 1.0
+  # Environment variable used to source a global config file
+  GLOBAL_CONFIG_FILE = "IMPALA_SHELL_GLOBAL_CONFIG_FILE"
 
   def __init__(self, options, query_options):
     cmd.Cmd.__init__(self)
@@ -1608,34 +1610,58 @@ def get_intro(options):
 
 if __name__ == "__main__":
   """
-  There are two types of options: shell options and query_options. Both can be set in the
-  command line, which override the options set in config file (.impalarc). The default
-  shell options come from impala_shell_config_defaults.py. Query options have no defaults
-  within the impala-shell, but they do have defaults on the server. Query options can be
-  also changed in impala-shell with the 'set' command.
+  There are two types of options: shell options and query_options. Both can be set on the
+  command line, which override default options. Specifically, if there exists a global
+  config file (default path: /etc/impalarc) then options are loaded from that file. If
+  there exists a user config file (~/.impalarc), then options are loaded in from that
+  file and override any options already loaded from the global impalarc. The default shell
+  options come from impala_shell_config_defaults.py. Query options have no defaults within
+  the impala-shell, but they do have defaults on the server. Query options can be also
+  changed in impala-shell with the 'set' command.
   """
   # pass defaults into option parser
   parser = get_option_parser(impala_shell_defaults)
   options, args = parser.parse_args()
-  # use path to file specified by user in config_file option
-  user_config = os.path.expanduser(options.config_file);
-  # by default, use the .impalarc in the home directory
-  config_to_load = impala_shell_defaults.get("config_file")
-  # verify user_config, if found
-  if os.path.isfile(user_config) and user_config != config_to_load:
-    if options.verbose:
-      print_to_stderr("Loading in options from config file: %s \n" % user_config)
-    # Command line overrides loading ~/.impalarc
-    config_to_load = user_config
-  elif user_config != config_to_load:
-    print_to_stderr('%s not found.\n' % user_config)
-    sys.exit(1)
 
-  # default shell options loaded in from impala_shell_config_defaults.py
-  # options defaults overwritten by those in config file
+  # by default, use the impalarc in the user's home directory
+  # and superimpose it on the global impalarc config
+  global_config = os.path.expanduser(
+    os.environ.get(ImpalaShell.GLOBAL_CONFIG_FILE,
+                   impala_shell_defaults['global_config_default_path']))
+  if os.path.isfile(global_config):
+    # Always output the source of the global config if verbose
+    if options.verbose:
+      print_to_stderr(
+        "Loading in options from global config file: %s \n" % global_config)
+  elif global_config != impala_shell_defaults['global_config_default_path']:
+    print_to_stderr('%s not found.\n' % global_config)
+    sys.exit(1)
+  # Override the default user config by a custom config if necessary
+  user_config = impala_shell_defaults.get("config_file")
+  input_config = os.path.expanduser(options.config_file)
+  # verify input_config, if found
+  if input_config != user_config:
+    if os.path.isfile(input_config):
+      if options.verbose:
+        print_to_stderr("Loading in options from config file: %s \n" % input_config)
+      # command line overrides loading ~/.impalarc
+      user_config = input_config
+    else:
+      print_to_stderr('%s not found.\n' % input_config)
+      sys.exit(1)
+  configs_to_load = [global_config, user_config]
+
+  # load shell and query options from the list of config files
+  # in ascending order of precedence
   try:
-    loaded_shell_options, query_options = get_config_from_file(config_to_load,
-                                                               parser.option_list)
+    loaded_shell_options = {}
+    query_options = {}
+    for config_file in configs_to_load:
+      s_options, q_options = get_config_from_file(config_file,
+                                                  parser.option_list)
+      loaded_shell_options.update(s_options)
+      query_options.update(q_options)
+
     impala_shell_defaults.update(loaded_shell_options)
   except Exception, e:
     print_to_stderr(e)

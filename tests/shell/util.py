@@ -98,14 +98,14 @@ def assert_pattern(pattern, result, text, message):
   assert m and m.group(0) == result, message
 
 
-def run_impala_shell_cmd(vector, shell_args, expect_success=True, stdin_input=None,
-                         wait_until_connected=True):
+def run_impala_shell_cmd(vector, shell_args, env=None, expect_success=True,
+                         stdin_input=None, wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
-  result = run_impala_shell_cmd_no_expect(vector, shell_args, stdin_input,
+  result = run_impala_shell_cmd_no_expect(vector, shell_args, env, stdin_input,
                                           expect_success and wait_until_connected)
   if expect_success:
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (shell_args,
@@ -115,7 +115,7 @@ def run_impala_shell_cmd(vector, shell_args, expect_success=True, stdin_input=No
   return result
 
 
-def run_impala_shell_cmd_no_expect(vector, shell_args, stdin_input=None,
+def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=None,
                                    wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
@@ -124,7 +124,7 @@ def run_impala_shell_cmd_no_expect(vector, shell_args, stdin_input=None,
 
   Does not assert based on success or failure of command.
   """
-  p = ImpalaShell(vector, shell_args, wait_until_connected=wait_until_connected)
+  p = ImpalaShell(vector, shell_args, env=env, wait_until_connected=wait_until_connected)
   result = p.get_result(stdin_input)
   return result
 

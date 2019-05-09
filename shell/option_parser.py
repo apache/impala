@@ -30,7 +30,7 @@
 import ConfigParser
 import sys
 from impala_shell_config_defaults import impala_shell_defaults
-from optparse import OptionParser
+from optparse import OptionParser, SUPPRESS_HELP
 
 
 class ConfigFileFormatError(Exception):
@@ -285,8 +285,8 @@ def get_option_parser(defaults):
     # (print quiet is false since verbose is true)
     if option == parser.get_option('--quiet'):
       option.help += " [default: %s]" % (not defaults['verbose'])
-    elif option != parser.get_option('--help'):
-      # don't want to print default value for help
+    elif option != parser.get_option('--help') and option.help is not SUPPRESS_HELP:
+      # don't want to print default value for help or options without help text
       option.help += " [default: %default]"
 
   parser.set_defaults(**defaults)

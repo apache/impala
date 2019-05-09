@@ -133,6 +133,7 @@ testdata/tzdb_tiny/*
 tests/pytest.ini
 tests/shell/bad_impalarc
 tests/shell/good_impalarc
+tests/shell/good_impalarc2
 tests/shell/impalarc_with_error
 tests/shell/impalarc_with_query_options
 tests/shell/impalarc_with_warnings
