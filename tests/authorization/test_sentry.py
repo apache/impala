@@ -100,3 +100,25 @@ class TestSentry(CustomClusterTestSuite):
     finally:
       self.client.execute("drop database {0}".format(unique_name))
       self.client.execute("drop role {0}".format(role_name))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 --sentry_config={0}".format(SENTRY_CONFIG_FILE),
+      catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE))
+  def test_unsupported_sql(self):
+    """Tests unsupported SQL statements when running with Sentry."""
+    user = getuser()
+    impala_client = self.create_impala_client()
+    error_msg = "UnsupportedFeatureException: {0} is not supported by Sentry."
+    statements = [("grant select on database functional to user foo",
+                   error_msg.format("GRANT <privilege> TO USER")),
+                  ("grant select on database functional to group foo",
+                   error_msg.format("GRANT <privilege> TO GROUP")),
+                  ("revoke select on database functional from user foo",
+                   error_msg.format("REVOKE <privilege> FROM USER")),
+                  ("revoke select on database functional from group foo",
+                   error_msg.format("REVOKE <privilege> FROM GROUP")),
+                  ("show grant group foo", error_msg.format("SHOW GRANT GROUP"))]
+    for statement in statements:
+      result = self.execute_query_expect_failure(impala_client, statement[0], user=user)
+      assert statement[1] in str(result)

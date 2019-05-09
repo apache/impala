@@ -31,9 +31,9 @@ import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Reference;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
@@ -63,8 +63,7 @@ import java.util.stream.Collectors;
  * performed by {@link SentryProxy}. Any update to authorization metadata will then be
  * broadcasted to all Impalads.
  *
- * Other non-Catalogd operations, such as SHOW ROLES, SHOW GRANT will throw
- * {@link UnsupportedOperationException}.
+ * Operations not supported by Sentry will throw an {@link UnsupportedFeatureException}.
  */
 public class SentryCatalogdAuthorizationManager implements AuthorizationManager {
   private static final Logger LOG =
@@ -306,29 +305,29 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
   @Override
   public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "GRANT <privilege> TO USER is not supported by Sentry.");
   }
 
   @Override
   public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "REVOKE <privilege> FROM USER is not supported by Sentry.");
   }
 
   @Override
   public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "GRANT <privilege> TO GROUP is not supported by Sentry.");
   }
 
   @Override
   public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "REVOKE <privilege> FROM GROUP is not supported by Sentry.");
   }
 
   @Override

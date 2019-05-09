@@ -352,3 +352,24 @@ class TestRanger(CustomClusterTestSuite):
   def _refresh_authorization(self, client, statement):
     if statement is not None:
       self.execute_query_expect_success(client, statement)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_unsupported_sql(self):
+    """Tests unsupported SQL statements when running with Ranger."""
+    user = "admin"
+    impala_client = self.create_impala_client()
+    error_msg = "UnsupportedFeatureException: {0} is not supported by Ranger."
+    for statement in [("show roles", error_msg.format("SHOW ROLES")),
+                      ("show current roles", error_msg.format("SHOW CURRENT ROLES")),
+                      ("create role foo", error_msg.format("CREATE ROLE")),
+                      ("drop role foo", error_msg.format("DROP ROLE")),
+                      ("grant select on database functional to role foo",
+                       error_msg.format("GRANT <privilege> TO ROLE")),
+                      ("revoke select on database functional from role foo",
+                       error_msg.format("REVOKE <privilege> FROM ROLE")),
+                      ("show grant role foo", error_msg.format("SHOW GRANT ROLE")),
+                      ("show role grant group foo",
+                       error_msg.format("SHOW ROLE GRANT GROUP"))]:
+      result = self.execute_query_expect_failure(impala_client, statement[0], user=user)
+      assert statement[1] in str(result)

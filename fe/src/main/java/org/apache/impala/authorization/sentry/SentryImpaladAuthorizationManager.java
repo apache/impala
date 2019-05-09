@@ -32,6 +32,7 @@ import org.apache.impala.catalog.Role;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
@@ -64,8 +65,7 @@ import static org.apache.impala.thrift.TPrincipalType.ROLE;
  * The methods here use the authorization data stored in Impalad catalog via
  * {@link org.apache.impala.authorization.AuthorizationPolicy}.
  *
- * Other non-Impalad operations, such as GRANT, REVOKE will throw
- * {@link UnsupportedOperationException}.
+ * Operations not supported by Sentry will throw an {@link UnsupportedFeatureException}.
  */
 public class SentryImpaladAuthorizationManager implements AuthorizationManager {
   private static final Logger LOG =
@@ -225,6 +225,9 @@ public class SentryImpaladAuthorizationManager implements AuthorizationManager {
       case ROLE:
         return catalog_.getOrCreateCatalog().getAuthPolicy().getRolePrivileges(
             params.getName(), params.getPrivilege());
+      case GROUP:
+        throw new UnsupportedFeatureException(
+            "SHOW GRANT GROUP is not supported by Sentry.");
       default:
         throw new InternalException(String.format("Unexpected TPrincipalType: %s",
             params.getPrincipal_type()));

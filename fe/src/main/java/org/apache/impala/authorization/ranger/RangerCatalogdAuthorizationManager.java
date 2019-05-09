@@ -26,6 +26,7 @@ import org.apache.impala.catalog.AuthzCacheInvalidation;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -42,7 +43,6 @@ import org.apache.ranger.plugin.util.GrantRevokeRequest;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -54,7 +54,7 @@ import java.util.function.Supplier;
  * Operations here make requests to Ranger via the {@link RangerImpalaPlugin} to
  * manage privileges for users.
  *
- * Operations not supported by Ranger will throw an {@link UnsupportedOperationException}.
+ * Operations not supported by Ranger will throw an {@link UnsupportedFeatureException}.
  */
 public class RangerCatalogdAuthorizationManager implements AuthorizationManager {
   private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
@@ -73,15 +73,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   @Override
   public void createRole(User requestingUser, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException("CREATE ROLE is not supported by Ranger.");
   }
 
   @Override
   public void dropRole(User requestingUser, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException("DROP ROLE is not supported by Ranger.");
   }
 
   @Override
@@ -93,29 +91,29 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   @Override
   public void grantRoleToGroup(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "GRANT ROLE TO GROUP is not supported by Ranger.");
   }
 
   @Override
   public void revokeRoleFromGroup(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "REVOKE ROLE FROM GROUP is not supported by Ranger.");
   }
 
   @Override
   public void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "GRANT <privilege> TO ROLE is not supported by Ranger.");
   }
 
   @Override
   public void revokePrivilegeFromRole(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+    throw new UnsupportedFeatureException(
+        "REVOKE <privilege> FROM ROLE is not supported by Ranger.");
   }
 
   @Override

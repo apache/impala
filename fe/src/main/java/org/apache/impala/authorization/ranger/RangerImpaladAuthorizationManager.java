@@ -25,6 +25,7 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
@@ -68,7 +69,7 @@ import java.util.stream.Collectors;
  * Operations here make requests to Ranger via the {@link RangerImpalaPlugin} to
  * manage privileges for users.
  *
- * Operations not supported by Ranger will throw an {@link UnsupportedOperationException}.
+ * Operations not supported by Ranger will throw an {@link UnsupportedFeatureException}.
  */
 public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   private static final String ANY = "*";
@@ -97,8 +98,13 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
-    throw new UnsupportedOperationException(String.format(
-        "%s is not supported in Impalad", ClassUtil.getMethodName()));
+    if (params.getGrant_group() != null) {
+      throw new UnsupportedFeatureException(
+          "SHOW ROLE GRANT GROUP is not supported by Ranger.");
+    }
+    throw new UnsupportedFeatureException(
+        String.format("SHOW %sROLES is not supported by Ranger.",
+            params.is_show_current_roles ? "CURRENT " : ""));
   }
 
   @Override
@@ -299,6 +305,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
+    if (params.principal_type == TPrincipalType.ROLE) {
+      throw new UnsupportedFeatureException(
+          "SHOW GRANT ROLE is not supported by Ranger.");
+    }
+
     List<RangerAccessRequest> requests = buildAccessRequests(params.privilege);
     Set<TResultRow> resultSet = new TreeSet<>();
     TResultSet result = new TResultSet();
