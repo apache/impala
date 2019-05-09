@@ -81,6 +81,21 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <!--
+       Hadoop defines the same repo with this name. We need to include it here to
+      effectively blacklist it.
+      -->
+      <id>apache.snapshots.https</id>
+      <name>Apache Development Snapshot Repository</name>
+      <url>https://repository.apache.org/content/repositories/snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>apache</id>
       <name>Apache Repository</name>
       <url>https://repository.apache.org/content/repositories/</url>
