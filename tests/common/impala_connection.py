@@ -278,6 +278,12 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def close(self):
     LOG.info("-- closing connection to: {0}".format(self.__host_port))
+    try:
+      # Explicitly close the cursor so that it will close the session.
+      self.__cursor.close()
+    except Exception, e:
+      # The session may no longer be valid if the impalad was restarted during the test.
+      LOG.exception(e)
     self.__impyla_conn.close()
 
   def close_query(self, operation_handle):

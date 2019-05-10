@@ -408,6 +408,9 @@ error_codes = (
   ("PARQUET_DATE_OUT_OF_RANGE", 134,
    "Parquet file '$0' column '$1' contains an out of range date. "
    "The valid date range is 0000-01-01..9999-12-31."),
+
+  ("DISCONNECTED_SESSION_CLOSED", 135,
+   "Session closed because it has no active connections"),
 )
 
 import sys

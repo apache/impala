@@ -209,6 +209,9 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
     "before it is cancelled. If 0, idle queries are never expired. The query option "
     "QUERY_TIMEOUT_S overrides this setting, but, if set, --idle_query_timeout represents"
     " the maximum allowable timeout.");
+DEFINE_int32(disconnected_session_timeout, 15 * 60, "The time, in seconds, that a "
+    "hiveserver2 session will be maintained after the last connection that it has been "
+    "used over is disconnected.");
 
 DEFINE_int32(status_report_interval_ms, 5000, "(Advanced) Interval between profile "
     "reports in milliseconds. If set to <= 0, periodic reporting is disabled and only "
@@ -412,8 +415,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize a session expiry thread which blocks indefinitely until the first session
   // with non-zero timeout value is opened. Note that a session which doesn't specify any
   // idle session timeout value will use the default value FLAGS_idle_session_timeout.
-  ABORT_IF_ERROR(Thread::Create("impala-server", "session-expirer",
-      bind<void>(&ImpalaServer::ExpireSessions, this), &session_timeout_thread_));
+  ABORT_IF_ERROR(Thread::Create("impala-server", "session-maintenance",
+      bind<void>(&ImpalaServer::SessionMaintenance, this), &session_maintenance_thread_));
 
   ABORT_IF_ERROR(Thread::Create("impala-server", "query-expirer",
       bind<void>(&ImpalaServer::ExpireQueries, this), &query_expiration_thread_));
@@ -1382,7 +1385,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     // TODO: deal with an error status
     discard_result(UnregisterQuery(query_id, false, &status));
   }
-  // Reconfigure the poll period of session_timeout_thread_ if necessary.
+  // Reconfigure the poll period of session_maintenance_thread_ if necessary.
   UnregisterSessionTimeout(session_state->session_timeout);
   VLOG_QUERY << "Closed session: " << PrintId(session_id);
   return Status::OK();
@@ -2046,6 +2049,7 @@ void ImpalaServer::ConnectionStart(
     session_state->network_address = connection_context.network_address;
     session_state->server_default_query_options = &default_query_options_;
     session_state->kudu_latest_observed_ts = 0;
+    session_state->connections.insert(connection_context.connection_id);
 
     // If the username was set by a lower-level transport, use it.
     if (!connection_context.username.empty()) {
@@ -2062,7 +2066,7 @@ void ImpalaServer::ConnectionStart(
     }
     {
       lock_guard<mutex> l(connection_to_sessions_map_lock_);
-      connection_to_sessions_map_[connection_context.connection_id].push_back(session_id);
+      connection_to_sessions_map_[connection_context.connection_id].insert(session_id);
     }
     ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS->Increment(1L);
   }
@@ -2070,8 +2074,7 @@ void ImpalaServer::ConnectionStart(
 
 void ImpalaServer::ConnectionEnd(
     const ThriftServer::ConnectionContext& connection_context) {
-
-  vector<TUniqueId> sessions_to_close;
+  set<TUniqueId> disconnected_sessions;
   {
     unique_lock<mutex> l(connection_to_sessions_map_lock_);
     ConnectionToSessionMap::iterator it =
@@ -2082,20 +2085,39 @@ void ImpalaServer::ConnectionEnd(
 
     // We don't expect a large number of sessions per connection, so we copy it, so that
     // we can drop the map lock early.
-    sessions_to_close = it->second;
+    disconnected_sessions = std::move(it->second);
     connection_to_sessions_map_.erase(it);
   }
 
+  bool close = connection_context.server_name == BEESWAX_SERVER_NAME
+      || FLAGS_disconnected_session_timeout <= 0;
   LOG(INFO) << "Connection from client "
             << TNetworkAddressToString(connection_context.network_address)
-            << " closed, closing " << sessions_to_close.size()
+            << " to server " << connection_context.server_name << " closed."
+            << (close ? " Closing " : " Disconnecting ") << disconnected_sessions.size()
             << " associated session(s)";
 
-  for (const TUniqueId& session_id: sessions_to_close) {
-    Status status = CloseSessionInternal(session_id, true);
-    if (!status.ok()) {
-      LOG(WARNING) << "Error closing session " << PrintId(session_id) << ": "
-                   << status.GetDetail();
+  if (close) {
+    for (const TUniqueId& session_id : disconnected_sessions) {
+      Status status = CloseSessionInternal(session_id, true);
+      if (!status.ok()) {
+        LOG(WARNING) << "Error closing session " << PrintId(session_id) << ": "
+                     << status.GetDetail();
+      }
+    }
+  } else {
+    DCHECK_EQ(connection_context.server_name, HS2_SERVER_NAME);
+    for (const TUniqueId& session_id : disconnected_sessions) {
+      shared_ptr<SessionState> state;
+      Status status = GetSessionState(session_id, &state);
+      // The session may not exist if it was explicitly closed.
+      if (!status.ok()) continue;
+      lock_guard<mutex> state_lock(state->lock);
+      state->connections.erase(connection_context.connection_id);
+      if (state->connections.empty()) {
+        state->disconnected_ms = UnixMillis();
+        RegisterSessionTimeout(FLAGS_disconnected_session_timeout);
+      }
     }
   }
 }
@@ -2118,54 +2140,87 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
   }
 }
 
-[[noreturn]] void ImpalaServer::ExpireSessions() {
+[[noreturn]] void ImpalaServer::SessionMaintenance() {
   while (true) {
     {
       unique_lock<mutex> timeout_lock(session_timeout_lock_);
       if (session_timeout_set_.empty()) {
         session_timeout_cv_.Wait(timeout_lock);
       } else {
-        // Sleep for a second before checking whether an active session can be expired.
+        // Sleep for a second before doing maintenance.
         session_timeout_cv_.WaitFor(timeout_lock, MICROS_PER_SEC);
       }
     }
 
     int64_t now = UnixMillis();
     int expired_cnt = 0;
-    VLOG(3) << "Session expiration thread waking up";
+    VLOG(3) << "Session maintenance thread waking up";
     {
       // TODO: If holding session_state_map_lock_ for the duration of this loop is too
       // expensive, consider a priority queue.
       lock_guard<mutex> map_lock(session_state_map_lock_);
-      for (SessionStateMap::value_type& session_state: session_state_map_) {
+      vector<TUniqueId> sessions_to_remove;
+      for (SessionStateMap::value_type& map_entry : session_state_map_) {
+        const TUniqueId& session_id = map_entry.first;
+        std::shared_ptr<SessionState> session_state = map_entry.second;
         unordered_set<TUniqueId> inflight_queries;
+        Status query_cancel_status;
         {
-          lock_guard<mutex> state_lock(session_state.second->lock);
-          if (session_state.second->ref_count > 0) continue;
+          lock_guard<mutex> state_lock(session_state->lock);
+          if (session_state->ref_count > 0) continue;
           // A session closed by other means is in the process of being removed, and it's
           // best not to interfere.
-          if (session_state.second->closed || session_state.second->expired) continue;
-          if (session_state.second->session_timeout == 0) continue;
+          if (session_state->closed) continue;
 
-          int64_t last_accessed_ms = session_state.second->last_accessed_ms;
-          int64_t session_timeout_ms = session_state.second->session_timeout * 1000;
-          if (now - last_accessed_ms <= session_timeout_ms) continue;
-          LOG(INFO) << "Expiring session: " << PrintId(session_state.first) << ", user: "
-                    << session_state.second->connected_user << ", last active: "
-                    << ToStringFromUnixMillis(last_accessed_ms);
-          session_state.second->expired = true;
-          ++expired_cnt;
-          ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
-          // Since expired is true, no more queries will be added to the inflight list.
-          inflight_queries.insert(session_state.second->inflight_queries.begin(),
-              session_state.second->inflight_queries.end());
+          if (session_state->connections.size() == 0
+              && (now - session_state->disconnected_ms)
+                  >= FLAGS_disconnected_session_timeout * 1000L) {
+            // This session has no active connections and is past the disconnected session
+            // timeout, so close it.
+            DCHECK_ENUM_EQ(session_state->session_type, TSessionType::HIVESERVER2);
+            LOG(INFO) << "Closing session: " << PrintId(session_id)
+                      << ", user: " << session_state->connected_user
+                      << ", because it no longer  has any open connections. The last "
+                      << "connection was closed at: "
+                      << ToStringFromUnixMillis(session_state->disconnected_ms);
+            session_state->closed = true;
+            sessions_to_remove.push_back(session_id);
+            ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(-1L);
+            UnregisterSessionTimeout(FLAGS_disconnected_session_timeout);
+            query_cancel_status =
+                Status::Expected(TErrorCode::DISCONNECTED_SESSION_CLOSED);
+          } else {
+            // Check if the session should be expired.
+            if (session_state->expired || session_state->session_timeout == 0) {
+              continue;
+            }
+
+            int64_t last_accessed_ms = session_state->last_accessed_ms;
+            int64_t session_timeout_ms = session_state->session_timeout * 1000;
+            if (now - last_accessed_ms <= session_timeout_ms) continue;
+            LOG(INFO) << "Expiring session: " << PrintId(session_id)
+                      << ", user: " << session_state->connected_user
+                      << ", last active: " << ToStringFromUnixMillis(last_accessed_ms);
+            session_state->expired = true;
+            ++expired_cnt;
+            ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
+            query_cancel_status = Status::Expected(TErrorCode::INACTIVE_SESSION_EXPIRED);
+          }
+
+          // Since either expired or closed is true no more queries will be added to the
+          // inflight list.
+          inflight_queries.insert(session_state->inflight_queries.begin(),
+              session_state->inflight_queries.end());
         }
         // Unregister all open queries from this session.
-        Status status = Status::Expected(TErrorCode::INACTIVE_SESSION_EXPIRED);
         for (const TUniqueId& query_id : inflight_queries) {
           cancellation_thread_pool_->Offer(
-              CancellationWork::TerminatedByServer(query_id, status, true));
+              CancellationWork::TerminatedByServer(query_id, query_cancel_status, true));
         }
+      }
+      // Remove any sessions that were closed from the map.
+      for (const TUniqueId& session_id : sessions_to_remove) {
+        session_state_map_.erase(session_id);
       }
     }
     LOG_IF(INFO, expired_cnt > 0) << "Expired sessions. Count: " << expired_cnt;

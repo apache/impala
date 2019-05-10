@@ -239,6 +239,9 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
 // connection state such as the connection identifier and the username.
 __thread ThriftServer::ConnectionContext* __connection_context__;
 
+bool ThriftServer::HasThreadConnectionContext() {
+  return __connection_context__ != nullptr;
+}
 
 const TUniqueId& ThriftServer::GetThreadConnectionId() {
   return __connection_context__->connection_id;

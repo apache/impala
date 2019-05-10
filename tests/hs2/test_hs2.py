@@ -245,6 +245,12 @@ class TestHS2(HS2TestSuite):
       assert num_expired_sessions == self.impalad_test_service.get_metric_value(
           "impala-server.num-sessions-expired")
 
+    # Close the remaining sessions.
+    for session_handle in session_handles:
+      if session_handle is not None:
+        close_session_req = TCLIService.TCloseSessionReq(session_handle)
+        TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
+
   @needs_session()
   def test_get_operation_status(self):
     """Tests that GetOperationStatus returns a valid result for a running query"""
@@ -347,23 +353,6 @@ class TestHS2(HS2TestSuite):
     assert err_msg in get_result_set_metadata_resp.status.errorMessage
 
   @pytest.mark.execute_serially
-  def test_socket_close_forces_session_close(self):
-    """Test that closing the underlying socket forces the associated session to close.
-    See IMPALA-564"""
-    open_session_req = TCLIService.TOpenSessionReq()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-    num_sessions = self.impalad_test_service.get_metric_value(
-        "impala-server.num-open-hiveserver2-sessions")
-
-    assert num_sessions > 0
-
-    self.socket.close()
-    self.socket = None
-    self.impalad_test_service.wait_for_metric_value(
-        "impala-server.num-open-hiveserver2-sessions", num_sessions - 1)
-
-  @pytest.mark.execute_serially
   def test_multiple_sessions(self):
     """Test that multiple sessions on the same socket connection are allowed"""
     num_sessions = self.impalad_test_service.get_metric_value(
@@ -380,8 +369,11 @@ class TestHS2(HS2TestSuite):
     self.impalad_test_service.wait_for_metric_value(
         "impala-server.num-open-hiveserver2-sessions", num_sessions + 5)
 
-    self.socket.close()
-    self.socket = None
+    for session_id in session_ids:
+      close_session_req = TCLIService.TCloseSessionReq(session_id)
+      resp = self.hs2_client.CloseSession(close_session_req)
+      TestHS2.check_response(resp)
+
     self.impalad_test_service.wait_for_metric_value(
         "impala-server.num-open-hiveserver2-sessions", num_sessions)
 
@@ -616,3 +608,30 @@ class TestHS2(HS2TestSuite):
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     TestHS2.check_response(fetch_results_resp)
     return fetch_results_resp
+
+  def test_close_connection(self):
+    """Tests that an hs2 session remains valid even after the connection is dropped."""
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp)
+    self.session_handle = open_session_resp.sessionHandle
+    # Ren a query, which should succeed.
+    self.execute_statement("select 1")
+
+    # Reset the connection.
+    self.teardown()
+    self.setup()
+
+    # Run another query with the same session handle. It should succeed even though it's
+    # on a new connection, since disconnected_session_timeout (default of 1 hour) will not
+    # have been hit.
+    self.execute_statement("select 2")
+
+    # Close the session.
+    close_session_req = TCLIService.TCloseSessionReq()
+    close_session_req.sessionHandle = self.session_handle
+    TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
+
+    # Run another query, which should fail since the session is closed.
+    self.execute_statement("select 3", expected_error_prefix="Invalid session id",
+        expected_status_code=TCLIService.TStatusCode.ERROR_STATUS)

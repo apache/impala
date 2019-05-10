@@ -87,6 +87,7 @@ const TProtocolVersion::type MAX_SUPPORTED_HS2_VERSION =
 DECLARE_string(hostname);
 DECLARE_int32(webserver_port);
 DECLARE_int32(idle_session_timeout);
+DECLARE_int32(disconnected_session_timeout);
 
 namespace impala {
 
@@ -360,16 +361,17 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       FLAGS_hostname, FLAGS_webserver_port));
   return_val.configuration.insert(make_pair("http_addr", http_addr));
 
+  {
+    lock_guard<mutex> l(connection_to_sessions_map_lock_);
+    const TUniqueId& connection_id = ThriftServer::GetThreadConnectionId();
+    connection_to_sessions_map_[connection_id].insert(session_id);
+    state->connections.insert(connection_id);
+  }
+
   // Put the session state in session_state_map_
   {
     lock_guard<mutex> l(session_state_map_lock_);
     session_state_map_.insert(make_pair(session_id, state));
-  }
-
-  {
-    lock_guard<mutex> l(connection_to_sessions_map_lock_);
-    const TUniqueId& connection_id = ThriftServer::GetThreadConnectionId();
-    connection_to_sessions_map_[connection_id].push_back(session_id);
   }
 
   ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(1);
@@ -940,5 +942,20 @@ void ImpalaServer::RenewDelegationToken(TRenewDelegationTokenResp& return_val,
   return_val.status.__set_errorMessage("Not implemented");
 }
 
+void ImpalaServer::AddSessionToConnection(
+    const TUniqueId& session_id, SessionState* session) {
+  const TUniqueId& connection_id = ThriftServer::GetThreadConnectionId();
+  {
+    boost::lock_guard<boost::mutex> l(connection_to_sessions_map_lock_);
+    connection_to_sessions_map_[connection_id].insert(session_id);
+  }
 
+  boost::lock_guard<boost::mutex> session_lock(session->lock);
+  if (session->connections.empty()) {
+    // This session was previously disconnected but now has an associated
+    // connection. It should no longer be considered for the disconnected timeout.
+    UnregisterSessionTimeout(FLAGS_disconnected_session_timeout);
+  }
+  session->connections.insert(connection_id);
+}
 }

@@ -110,6 +110,9 @@ class ThriftServer {
     connection_handler_ = connection;
   }
 
+  /// Returns true if the current thread has a connection context set on it.
+  static bool HasThreadConnectionContext();
+
   /// Returns a unique identifier for the current connection. A connection is
   /// identified with the lifetime of a socket connection to this server.
   /// It is only safe to call this method during a Thrift processor RPC

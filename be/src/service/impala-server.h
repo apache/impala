@@ -512,6 +512,10 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Time the session was last accessed, in ms since epoch (UTC).
     int64_t last_accessed_ms;
 
+    /// If this session has no open connections, this is the time in UTC when the last
+    /// connection was closed.
+    int64_t disconnected_ms;
+
     /// The latest Kudu timestamp observed after DML operations executed within this
     /// session.
     uint64_t kudu_latest_observed_ts;
@@ -526,6 +530,9 @@ class ImpalaServer : public ImpalaServiceIf,
     /// It can be overridden with the query option "idle_session_timeout" when opening a
     /// HS2 session, or using the SET command.
     int32_t session_timeout = 0;
+
+    /// The connection ids of any connections that this session has been used over.
+    std::set<TUniqueId> connections;
 
     /// Updates the session timeout based on the query option idle_session_timeout.
     /// It registers/unregisters the session timeout to the Impala server.
@@ -893,11 +900,15 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Unregister timeout value.
   void UnregisterSessionTimeout(int32_t timeout);
 
-  /// To be run in a thread which wakes up every second. This function checks all
-  /// sessions for their last-idle times. Those that have been idle for longer than
-  /// their configured timeout values are 'expired': they will no longer accept queries
-  /// and any running queries associated with those sessions are unregistered.
-  [[noreturn]] void ExpireSessions();
+  /// To be run in a thread which wakes up every second if there are registered sesions
+  /// timeouts. This function checks all sessions for:
+  /// - Last-idle times. Those that have been idle for longer than their configured
+  ///   timeout values are 'expired': they will no longer accept queries.
+  /// - Disconnected times. Those that have had no active connections for longer than
+  ///   FLAGS_disconnected_session_timeout are closed: they are removed from the session
+  ///   state map and can no longer be accessed by clients.
+  /// For either case any running queries associated with those sessions are unregistered.
+  [[noreturn]] void SessionMaintenance();
 
   /// Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
   /// idle (i.e. no client input and no time spent processing locally) for
@@ -974,11 +985,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// avoid blocking the statestore callback.
   boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
 
-  /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
-  /// which are idle for more their timeout values.
-  std::unique_ptr<Thread> session_timeout_thread_;
+  /// Thread that runs SessionMaintenance. It will wake up periodically to check for
+  /// sessions which are idle for more their timeout values.
+  std::unique_ptr<Thread> session_maintenance_thread_;
 
-  /// Contains all the non-zero idle session timeout values.
+  /// Contains all the non-zero idle or disconnected session timeout values.
   std::multiset<int32_t> session_timeout_set_;
 
   /// The lock for protecting the session_timeout_set_.
@@ -1013,6 +1024,24 @@ class ImpalaServer : public ImpalaServiceIf,
     /// object goes out of scope. Returns OK unless there is an error in GetSessionState.
     /// Must only be called once per ScopedSessionState.
     Status WithSession(const TUniqueId& session_id,
+        std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
+      DCHECK(session_.get() == NULL);
+      RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
+      if (session != NULL) (*session) = session_;
+
+      // We won't have a connection context in the case of ChildQuery, which calls into
+      // hiveserver2 functions directly without going through the Thrift stack.
+      if (ThriftServer::HasThreadConnectionContext()) {
+        // Try adding the session id to the connection's set of sessions in case this is
+        // the first time this session has been used on this connection.
+        impala_->AddSessionToConnection(session_id, session_.get());
+      }
+      return Status::OK();
+    }
+
+    /// Same as WithSession(), except does not update the session/connection mapping, as
+    /// beeswax sessions can only be used over a single connection.
+    Status WithBeeswaxSession(const TUniqueId& session_id,
         std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
       DCHECK(session_.get() == NULL);
       RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
@@ -1054,8 +1083,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// closed when the connection ends. HS2 allows for multiplexing several sessions across
   /// a single connection. If a session has already been closed (only possible via HS2) it
   /// is not removed from this map to avoid the cost of looking it up.
-  typedef boost::unordered_map<TUniqueId, std::vector<TUniqueId>>
-    ConnectionToSessionMap;
+  typedef boost::unordered_map<TUniqueId, std::set<TUniqueId>> ConnectionToSessionMap;
   ConnectionToSessionMap connection_to_sessions_map_;
 
   /// Returns session state for given session_id.
@@ -1074,6 +1102,10 @@ class ImpalaServer : public ImpalaServiceIf,
     --session->ref_count;
     session->last_accessed_ms = UnixMillis();
   }
+
+  /// Associate the current connection context with the given session in
+  /// 'connection_to_sessions_map_' and 'SessionState::connections'.
+  void AddSessionToConnection(const TUniqueId& session_id, SessionState* session);
 
   /// Protects query_locations_. Not held in conjunction with other locks.
   boost::mutex query_locations_lock_;
