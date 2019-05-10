@@ -370,8 +370,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
   @Override
   public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
-    // TODO: IMPALA-8293 (part 2)
-    return new AuthorizationDelta();
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   private static class RangerResultRow {

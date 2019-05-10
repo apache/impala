@@ -184,8 +184,8 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
   public AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy) {
     return new BaseAuthorizationChecker(authzConfig_) {
       @Override
-      protected boolean authorize(User user, PrivilegeRequest request)
-          throws InternalException {
+      protected boolean authorizeResource(AuthorizationContext authzCtx, User user,
+          PrivilegeRequest request) throws InternalException {
         return true;
       }
 
@@ -202,6 +202,11 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
 
       @Override
       public void invalidateAuthorizationCache() {}
+
+      @Override
+      public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+        return new AuthorizationContext();
+      }
     };
   }
 

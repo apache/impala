@@ -22,6 +22,7 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
+import org.apache.impala.authorization.ranger.RangerBufferAuditHandler.AutoFlush;
 import org.apache.impala.catalog.AuthzCacheInvalidation;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
@@ -38,7 +39,6 @@ import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
-import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 
 import java.util.ArrayList;
@@ -59,13 +59,11 @@ import java.util.function.Supplier;
 public class RangerCatalogdAuthorizationManager implements AuthorizationManager {
   private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
 
-  private final RangerDefaultAuditHandler auditHandler_;
   private final Supplier<RangerImpalaPlugin> plugin_;
   private final CatalogServiceCatalog catalog_;
 
   public RangerCatalogdAuthorizationManager(Supplier<RangerImpalaPlugin> pluginSupplier,
       CatalogServiceCatalog catalog) {
-    auditHandler_ = new RangerDefaultAuditHandler();
     plugin_ = pluginSupplier;
     catalog_ = catalog;
   }
@@ -168,7 +166,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void grantPrivilege(List<GrantRevokeRequest> requests) throws ImpalaException {
     try {
       for (GrantRevokeRequest request : requests) {
-        plugin_.get().grantAccess(request, auditHandler_);
+        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush()) {
+          plugin_.get().grantAccess(request, auditHandler);
+        }
       }
     } catch (Exception e) {
       throw new InternalException(e.getMessage());
@@ -179,7 +179,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void revokePrivilege(List<GrantRevokeRequest> requests) throws ImpalaException {
     try {
       for (GrantRevokeRequest request : requests) {
-        plugin_.get().revokeAccess(request, auditHandler_);
+        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush()) {
+          plugin_.get().revokeAccess(request, auditHandler);
+        }
       }
     } catch (Exception e) {
       throw new InternalException(e.getMessage());

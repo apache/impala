@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.AuthorizationException;
@@ -417,10 +418,16 @@ public class AnalysisContext {
     // Authorize statement and record exception. Authorization relies on information
     // collected during analysis.
     AuthorizationException authException = null;
+    AuthorizationContext authzCtx = null;
     try {
-      authzChecker.authorize(analysisResult_, catalog_);
+      authzCtx = authzChecker.createAuthorizationContext(true);
+      authzChecker.authorize(authzCtx, analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;
+    } finally {
+      if (authzCtx != null) {
+        authzChecker.postAuthorize(authzCtx);
+      }
     }
 
     // AuthorizationExceptions take precedence over AnalysisExceptions so as not

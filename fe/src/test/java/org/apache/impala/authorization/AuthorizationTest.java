@@ -438,8 +438,6 @@ public class AuthorizationTest extends FrontendTestBase {
     for (User user: users) {
       AnalysisContext ctx = createAnalysisCtx(
           new SentryAuthorizationFactory(AUTHZ_CONFIG), user.getName());
-//    for (User user : users) {
-//      AnalysisContext ctx = createAnalysisCtx(AUTHZ_CONFIG, user.getName());
 
       // Can select from table that user has privileges on.
       AuthzOk(ctx, "select * from functional.alltypesagg");

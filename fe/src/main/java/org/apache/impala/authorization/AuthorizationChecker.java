@@ -35,12 +35,26 @@ public interface AuthorizationChecker {
   boolean hasAccess(User user, PrivilegeRequest request) throws InternalException;
 
   /**
+   * Creates a a new {@link AuthorizationContext}. {@link AuthorizationContext} gets
+   * created per authorization execution.
+   *
+   * @param doAudits a flag whether or not to do the audits
+   */
+  AuthorizationContext createAuthorizationContext(boolean doAudits);
+
+  /**
    * Authorize an analyzed statement.
    *
    * @throws AuthorizationException thrown if the user doesn't have sufficient privileges
    *                                to run this statement.
    */
-  void authorize(AnalysisResult analysisResult, FeCatalog catalog)
+  void authorize(AuthorizationContext authzCtx, AnalysisResult analysisResult,
+      FeCatalog catalog) throws AuthorizationException, InternalException;
+
+  /**
+   * This method is to be executed after an authorization check has occurred.
+   */
+  void postAuthorize(AuthorizationContext authzCtx)
       throws AuthorizationException, InternalException;
 
   /**

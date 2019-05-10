@@ -20,18 +20,21 @@ package org.apache.impala.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.BaseAuthorizationChecker;
 import org.apache.impala.authorization.DefaultAuthorizableFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.InternalException;
-import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
+import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -45,6 +48,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * An implementation of {@link AuthorizationChecker} that uses Ranger.
@@ -60,24 +64,24 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   public static final String UPDATE_ACCESS_TYPE = "update";
   public static final String SELECT_ACCESS_TYPE = "select";
 
-  private final RangerDefaultAuditHandler auditHandler_;
   private final RangerImpalaPlugin plugin_;
 
   public RangerAuthorizationChecker(AuthorizationConfig authzConfig) {
     super(authzConfig);
     Preconditions.checkArgument(authzConfig instanceof RangerAuthorizationConfig);
     RangerAuthorizationConfig rangerConfig = (RangerAuthorizationConfig) authzConfig;
-    auditHandler_ = new RangerDefaultAuditHandler();
     plugin_ = new RangerImpalaPlugin(
         rangerConfig.getServiceType(), rangerConfig.getAppId());
     plugin_.init();
   }
 
   @Override
-  protected boolean authorize(User user, PrivilegeRequest request)
-      throws InternalException {
+  protected boolean authorizeResource(AuthorizationContext authzCtx, User user,
+      PrivilegeRequest request) throws InternalException {
+    Preconditions.checkArgument(authzCtx instanceof RangerAuthorizationContext);
     Preconditions.checkNotNull(user);
     Preconditions.checkNotNull(request);
+    RangerAuthorizationContext rangerAuthzCtx = (RangerAuthorizationContext) authzCtx;
     List<RangerAccessResourceImpl> resources = new ArrayList<>();
     Authorizable authorizable = request.getAuthorizable();
     switch (authorizable.getType()) {
@@ -144,19 +148,30 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
     for (RangerAccessResourceImpl resource: resources) {
       if (request.getPrivilege() == Privilege.ANY) {
-        if (!authorize(resource, user, request.getPrivilege())) {
+        if (!authorizeResource(rangerAuthzCtx, resource, user, request.getPrivilege())) {
           return false;
         }
       } else {
         boolean authorized = request.getPrivilege().hasAnyOf() ?
-            authorizeAny(resource, user, request.getPrivilege().getImpliedPrivileges()) :
-            authorizeAll(resource, user, request.getPrivilege().getImpliedPrivileges());
+            authorizeAny(rangerAuthzCtx, resource, user,
+                request.getPrivilege().getImpliedPrivileges()) :
+            authorizeAll(rangerAuthzCtx, resource, user,
+                request.getPrivilege().getImpliedPrivileges());
         if (!authorized) {
           return false;
         }
       }
     }
     return true;
+  }
+
+  @Override
+  public void postAuthorize(AuthorizationContext authzCtx) {
+    Preconditions.checkArgument(authzCtx instanceof RangerAuthorizationContext);
+    super.postAuthorize(authzCtx);
+    RangerBufferAuditHandler auditHandler =
+        ((RangerAuthorizationContext) authzCtx).getAuditHandler();
+    auditHandler.flush();
   }
 
   @Override
@@ -190,6 +205,51 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
   }
 
+  @Override
+  public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+    RangerAuthorizationContext authzCtx = new RangerAuthorizationContext();
+    if (doAudits) {
+      // Any statement that goes through {@link authorize} will need to have audit logs.
+      authzCtx.setAuditHandler(new RangerBufferAuditHandler());
+    }
+    return authzCtx;
+  }
+
+  @Override
+  protected void authorizeTableAccess(AuthorizationContext authzCtx,
+      AnalysisResult analysisResult, FeCatalog catalog, List<PrivilegeRequest> requests)
+      throws AuthorizationException, InternalException {
+    RangerAuthorizationContext originalCtx = (RangerAuthorizationContext) authzCtx;
+    // case 1: table (select) OK --> add the table event
+    // case 2: table (non-select) ERROR --> add the table event
+    // case 3: table (select) ERROR, columns (select) OK -> only add the column events
+    // case 4: table (select) ERROR, columns (select) ERROR --> only add the first column
+    //                                                          event
+    RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext();
+    tmpCtx.setAuditHandler(new RangerBufferAuditHandler());
+    try {
+      super.authorizeTableAccess(tmpCtx, analysisResult, catalog, requests);
+    } catch (AuthorizationException e) {
+      tmpCtx.getAuditHandler().getAuthzEvents().stream()
+          .filter(evt ->
+              // case 2: get the first failing non-select table
+              (!"select".equals(evt.getAccessType()) &&
+                  "@table".equals(evt.getResourceType())) ||
+              // case 4: get the first failing column
+              ("@column".equals(evt.getResourceType()) && evt.getAccessResult() == 0))
+          .findFirst()
+          .ifPresent(evt -> originalCtx.getAuditHandler().getAuthzEvents().add(evt));
+      throw e;
+    } finally {
+      // case 1 & 4: we only add the successful events. The first table-level access
+      // check is only for the short-circuit, we don't want to add an event for that.
+      List<AuthzAuditEvent> events = tmpCtx.getAuditHandler().getAuthzEvents().stream()
+          .filter(evt -> evt.getAccessResult() != 0)
+          .collect(Collectors.toList());
+      originalCtx.getAuditHandler().getAuthzEvents().addAll(events);
+    }
+  }
+
   /**
    * This method checks if column mask is enabled on the given columns and deny access
    * when column mask is enabled by throwing an {@link AuthorizationException}. This is
@@ -204,7 +264,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .build();
     RangerAccessRequest req = new RangerAccessRequestImpl(resource,
         SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
-    if (plugin_.evalDataMaskPolicies(req, auditHandler_).isMaskEnabled()) {
+    if (plugin_.evalDataMaskPolicies(req, null).isMaskEnabled()) {
       throw new AuthorizationException(String.format(
           "Impala does not support column masking yet. Column masking is enabled on " +
               "column: %s.%s.%s", dbName, tableName, columnName));
@@ -224,7 +284,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .build();
     RangerAccessRequest req = new RangerAccessRequestImpl(resource,
         SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
-    if (plugin_.evalRowFilterPolicies(req, auditHandler_).isRowFilterEnabled()) {
+    if (plugin_.evalRowFilterPolicies(req, null).isRowFilterEnabled()) {
       throw new AuthorizationException(String.format(
           "Impala does not support row filtering yet. Row filtering is enabled " +
               "on table: %s.%s", dbName, tableName));
@@ -237,29 +297,31 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     return new HashSet<>(ugi.getGroups());
   }
 
-  private boolean authorizeAny(RangerAccessResourceImpl resource, User user,
-      EnumSet<Privilege> privileges) throws InternalException {
+  private boolean authorizeAny(RangerAuthorizationContext authzCtx,
+      RangerAccessResourceImpl resource, User user, EnumSet<Privilege> privileges)
+      throws InternalException {
     for (Privilege privilege: privileges) {
-      if (authorize(resource, user, privilege)) {
+      if (authorizeResource(authzCtx, resource, user, privilege)) {
         return true;
       }
     }
     return false;
   }
 
-  private boolean authorizeAll(RangerAccessResourceImpl resource, User user,
-      EnumSet<Privilege> privileges)
+  private boolean authorizeAll(RangerAuthorizationContext authzCtx,
+      RangerAccessResourceImpl resource, User user, EnumSet<Privilege> privileges)
       throws InternalException {
     for (Privilege privilege: privileges) {
-      if (!authorize(resource, user, privilege)) {
+      if (!authorizeResource(authzCtx, resource, user, privilege)) {
         return false;
       }
     }
     return true;
   }
 
-  private boolean authorize(RangerAccessResourceImpl resource, User user,
-      Privilege privilege) throws InternalException {
+  private boolean authorizeResource(RangerAuthorizationContext authzCtx,
+      RangerAccessResourceImpl resource, User user, Privilege privilege)
+      throws InternalException {
     String accessType;
     if (privilege == Privilege.ANY) {
       accessType = RangerPolicyEngine.ANY_ACCESS;
@@ -271,7 +333,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
     RangerAccessRequest request = new RangerAccessRequestImpl(resource,
         accessType, user.getShortName(), getUserGroups(user));
-    RangerAccessResult result = plugin_.isAccessAllowed(request);
+    RangerAccessResult result = plugin_.isAccessAllowed(request,
+        authzCtx.getAuditHandler());
     return result != null && result.getIsAllowed();
   }
 

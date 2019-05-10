@@ -36,6 +36,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
@@ -336,8 +337,8 @@ public class FrontendTestBase extends AbstractFrontendTest {
         AuthorizationConfig authzConfig = getAuthorizationConfig();
         return new BaseAuthorizationChecker(authzConfig) {
           @Override
-          protected boolean authorize(User user, PrivilegeRequest request)
-              throws InternalException {
+          protected boolean authorizeResource(AuthorizationContext authzCtx, User user,
+              PrivilegeRequest request) throws InternalException {
             return authorized;
           }
 
@@ -354,6 +355,11 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
           @Override
           public void invalidateAuthorizationCache() {}
+
+          @Override
+          public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+            return new AuthorizationContext();
+          }
         };
       }
 

@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.impala.authorization.Authorizable.Type;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.authorization.BaseAuthorizationChecker;
 import org.apache.impala.authorization.Privilege;
@@ -85,6 +86,11 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
     // Authorization refresh in Sentry is done by updating {@link AuthorizationPolicy}.
   }
 
+  @Override
+  public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+    return new AuthorizationContext();
+  }
+
   /*
    * Creates a new ResourceAuthorizationProvider based on the given configuration.
    */
@@ -94,7 +100,8 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
-  public boolean authorize(User user, PrivilegeRequest request) throws InternalException {
+  public boolean authorizeResource(AuthorizationContext authzCtx, User user,
+      PrivilegeRequest request) throws InternalException {
     EnumSet<ImpalaAction> actions = ImpalaAction.from(request.getPrivilege());
 
     List<DBModelAuthorizable> authorizables = Lists.newArrayList(

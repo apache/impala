@@ -1,0 +1,727 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+package org.apache.impala.authorization;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
+import com.sun.jersey.api.client.ClientResponse;
+import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.authorization.ranger.RangerAuthorizationChecker;
+import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
+import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
+import org.apache.impala.authorization.ranger.RangerCatalogdAuthorizationManager;
+import org.apache.impala.authorization.ranger.RangerImpalaPlugin;
+import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
+import org.apache.impala.authorization.sentry.SentryPolicyService;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.Frontend;
+import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TPrincipalType;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TTableName;
+import org.apache.ranger.plugin.util.GrantRevokeRequest;
+import org.apache.ranger.plugin.util.RangerRESTClient;
+import org.apache.ranger.plugin.util.RangerRESTUtils;
+
+import javax.ws.rs.core.Response.Status.Family;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+/**
+ * Base class for authorization tests.
+ */
+public abstract class AuthorizationTestBase extends FrontendTestBase {
+  protected static final String RANGER_ADMIN_URL = "http://localhost:6080";
+  protected static final String RANGER_USER = "admin";
+  protected static final String RANGER_PASSWORD = "admin";
+  protected static final String SERVER_NAME = "server1";
+  protected static final User USER = new User(System.getProperty("user.name"));
+  protected static final String RANGER_SERVICE_TYPE = "hive";
+  protected static final String RANGER_SERVICE_NAME = "test_impala";
+  protected static final String RANGER_APP_ID = "impala";
+  protected static final User RANGER_ADMIN = new User("admin");
+
+  protected final AuthorizationConfig authzConfig_;
+  protected final AuthorizationFactory authzFactory_;
+  protected final AuthorizationProvider authzProvider_;
+  protected final AnalysisContext authzCtx_;
+  protected final SentryPolicyService sentryService_;
+  protected final ImpaladTestCatalog authzCatalog_;
+  protected final Frontend authzFrontend_;
+  protected final RangerImpalaPlugin rangerImpalaPlugin_;
+  protected final RangerRESTClient rangerRestClient_;
+
+  public AuthorizationTestBase(AuthorizationProvider authzProvider)
+      throws ImpalaException {
+    authzProvider_ = authzProvider;
+    switch (authzProvider) {
+      case SENTRY:
+        authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
+            "server1",
+            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+        authzFactory_ = createAuthorizationFactory(authzProvider);
+        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
+        authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
+        sentryService_ = new SentryPolicyService(
+            ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
+        rangerImpalaPlugin_ = null;
+        rangerRestClient_ = null;
+        break;
+      case RANGER:
+        authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
+            SERVER_NAME);
+        authzFactory_ = createAuthorizationFactory(authzProvider);
+        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
+        authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
+        rangerImpalaPlugin_ =
+            ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
+                .getRangerImpalaPlugin();
+        sentryService_ = null;
+        rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null);
+        rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
+        break;
+      default:
+        throw new IllegalArgumentException(String.format(
+            "Unsupported authorization provider: %s", authzProvider));
+    }
+  }
+
+  protected AuthorizationFactory createAuthorizationFactory(
+      AuthorizationProvider authzProvider) {
+    return authzProvider == AuthorizationProvider.SENTRY ?
+        new SentryAuthorizationFactory(authzConfig_) :
+        new RangerAuthorizationFactory(authzConfig_);
+  }
+
+  protected interface WithPrincipal {
+    void init(TPrivilege[]... privileges) throws ImpalaException;
+    void cleanUp() throws ImpalaException;
+    String getName();
+  }
+
+  protected abstract class WithSentryPrincipal implements WithPrincipal {
+    protected final String role_ = "authz_test_role";
+    protected final String user_ = USER.getName();
+
+    protected void createRole(TPrivilege[]... privileges) throws ImpalaException {
+      Role role = authzCatalog_.addRole(role_);
+      authzCatalog_.addRoleGrantGroup(role_, USER.getName());
+      for (TPrivilege[] privs: privileges) {
+        for (TPrivilege privilege: privs) {
+          privilege.setPrincipal_id(role.getId());
+          privilege.setPrincipal_type(TPrincipalType.ROLE);
+          authzCatalog_.addRolePrivilege(role_, privilege);
+        }
+      }
+    }
+
+    protected void createUser(TPrivilege[]... privileges) throws ImpalaException {
+      org.apache.impala.catalog.User user = authzCatalog_.addUser(user_);
+      for (TPrivilege[] privs: privileges) {
+        for (TPrivilege privilege: privs) {
+          privilege.setPrincipal_id(user.getId());
+          privilege.setPrincipal_type(TPrincipalType.USER);
+          authzCatalog_.addUserPrivilege(user_, privilege);
+        }
+      }
+    }
+
+    protected void dropRole() throws ImpalaException {
+      authzCatalog_.removeRole(role_);
+    }
+
+    protected void dropUser() throws ImpalaException {
+      authzCatalog_.removeUser(user_);
+    }
+  }
+
+  public class WithSentryUser extends WithSentryPrincipal {
+    @Override
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      createUser(privileges);
+    }
+
+    @Override
+    public void cleanUp() throws ImpalaException { dropUser(); }
+
+    @Override
+    public String getName() { return user_; }
+  }
+
+  public class WithSentryRole extends WithSentryPrincipal {
+    @Override
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      createRole(privileges);
+    }
+
+    @Override
+    public void cleanUp() throws ImpalaException { dropRole(); }
+
+    @Override
+    public String getName() { return role_; }
+  }
+
+  protected abstract class WithRanger implements WithPrincipal {
+    private final List<GrantRevokeRequest> requests = new ArrayList<>();
+    private final RangerCatalogdAuthorizationManager authzManager =
+        new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_, null);
+
+    @Override
+    public void init(TPrivilege[]... privileges) throws ImpalaException {
+      for (TPrivilege[] privilege : privileges) {
+        requests.addAll(buildRequest(Arrays.asList(privilege))
+            .stream()
+            .peek(r -> {
+              r.setResource(updateUri(r.getResource()));
+              if (r.getAccessTypes().contains("owner")) {
+                r.getAccessTypes().remove("owner");
+                r.getAccessTypes().add("all");
+              }
+            }).collect(Collectors.toList()));
+      }
+
+      authzManager.grantPrivilege(requests);
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
+    }
+
+    /**
+     * Create the {@link GrantRevokeRequest}s used for granting and revoking privileges.
+     */
+    protected abstract List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges);
+
+    @Override
+    public void cleanUp() throws ImpalaException {
+      authzManager.revokePrivilege(requests);
+    }
+
+    @Override
+    public String getName() { return USER.getName(); }
+  }
+
+  public class WithRangerUser extends WithRanger {
+    @Override
+    protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
+      return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
+          RANGER_ADMIN.getName(), USER.getName(), Collections.emptyList(),
+          rangerImpalaPlugin_.getClusterName(), privileges);
+    }
+  }
+
+  public class WithRangerGroup extends WithRanger {
+    @Override
+    protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
+      List<String> groups = Collections.singletonList(System.getProperty("user.name"));
+
+      return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
+          RANGER_ADMIN.getName(), null, groups,
+          rangerImpalaPlugin_.getClusterName(), privileges);
+    }
+  }
+
+  private static Map<String, String> updateUri(Map<String, String> resources) {
+    String uri = resources.get(RangerImpalaResourceBuilder.URL);
+    if (uri != null && uri.startsWith("/")) {
+      uri = "hdfs://localhost:20500" + uri;
+    }
+    resources.put(RangerImpalaResourceBuilder.URL, uri);
+
+    return resources;
+  }
+
+  protected class DescribeOutput {
+    private String[] excludedStrings_ = new String[0];
+    private String[] includedStrings_ = new String[0];
+    private final TDescribeOutputStyle outputStyle_;
+
+    public DescribeOutput(TDescribeOutputStyle style) {
+      outputStyle_ = style;
+    }
+
+    /**
+     * Indicates which strings must not appear in the output of the describe statement.
+     * During validation, if one of these strings exists, an assertion is thrown.
+     *
+     * @param excluded - Array of strings that must not exist in the output.
+     * @return DescribeOutput instance.
+     */
+    public DescribeOutput excludeStrings(String[] excluded) {
+      excludedStrings_ = excluded;
+      return this;
+    }
+
+    /**
+     * Indicates which strings are required to appear in the output of the describe
+     * statement.  During validation, if any one of these strings does not exist, an
+     * assertion is thrown.
+     *
+     * @param included - Array of strings that must exist in the output.
+     * @return DescribeOutput instance.
+     */
+    public DescribeOutput includeStrings(String[] included) {
+      includedStrings_ = included;
+      return this;
+    }
+
+    public void validate(TTableName table) throws ImpalaException {
+      Preconditions.checkArgument(includedStrings_.length != 0 ||
+              excludedStrings_.length != 0,
+          "One or both of included or excluded strings must be defined.");
+      List<String> result = resultToStringList(authzFrontend_.describeTable(table,
+          outputStyle_, USER));
+      for (String str: includedStrings_) {
+        assertTrue(String.format("\"%s\" is not in the describe output.\n" +
+                "Expected : %s\n Actual   : %s", str, Arrays.toString(includedStrings_),
+            result), result.contains(str));
+      }
+      for (String str: excludedStrings_) {
+        assertTrue(String.format("\"%s\" should not be in the describe output.", str),
+            !result.contains(str));
+      }
+    }
+  }
+
+  protected DescribeOutput describeOutput(TDescribeOutputStyle style) {
+    return new DescribeOutput(style);
+  }
+
+  protected List<WithPrincipal> buildWithPrincipals() {
+    List<WithPrincipal> withPrincipals = new ArrayList<>();
+    switch (authzProvider_) {
+      case SENTRY:
+        withPrincipals.add(new WithSentryRole());
+        withPrincipals.add(new WithSentryUser());
+        break;
+      case RANGER:
+        withPrincipals.add(new WithRangerUser());
+        withPrincipals.add(new WithRangerGroup());
+        break;
+      default:
+        throw new IllegalArgumentException(String.format(
+            "Unsupported authorization provider: %s", authzProvider_));
+    }
+    return withPrincipals;
+  }
+
+  protected class AuthzTest {
+    private final AnalysisContext context_;
+    private final String stmt_;
+
+    public AuthzTest(String stmt) {
+      this(null, stmt);
+    }
+
+    public AuthzTest(AnalysisContext context, String stmt) {
+      Preconditions.checkNotNull(stmt);
+      context_ = context;
+      stmt_ = stmt;
+    }
+
+    /**
+     * This method runs with the specified privileges.
+     */
+    public AuthzTest ok(TPrivilege[]... privileges)
+        throws ImpalaException {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
+        try {
+          withPrincipal.init(privileges);
+          if (context_ != null) {
+            authzOk(context_, stmt_, withPrincipal);
+          } else {
+            authzOk(stmt_, withPrincipal);
+          }
+        } finally {
+          withPrincipal.cleanUp();
+        }
+      }
+      return this;
+    }
+
+    /**
+     * This method runs with the specified privileges.
+     */
+    public AuthzTest okDescribe(TTableName table, DescribeOutput output,
+        TPrivilege[]... privileges) throws ImpalaException {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
+        try {
+          withPrincipal.init(privileges);
+          if (context_ != null) {
+            authzOk(context_, stmt_, withPrincipal);
+          } else {
+            authzOk(stmt_, withPrincipal);
+          }
+          output.validate(table);
+        } finally {
+          withPrincipal.cleanUp();
+        }
+      }
+      return this;
+    }
+
+    /**
+     * This method runs with the specified privileges.
+     */
+    public AuthzTest error(String expectedError, TPrivilege[]... privileges)
+        throws ImpalaException {
+      for (WithPrincipal withPrincipal: buildWithPrincipals()) {
+        try {
+          withPrincipal.init(privileges);
+          if (context_ != null) {
+            authzError(context_, stmt_, expectedError, withPrincipal);
+          } else {
+            authzError(stmt_, expectedError, withPrincipal);
+          }
+        } finally {
+          withPrincipal.cleanUp();
+        }
+      }
+      return this;
+    }
+  }
+
+  protected AuthzTest authorize(String stmt) {
+    return new AuthzTest(stmt);
+  }
+
+  protected AuthzTest authorize(AnalysisContext ctx, String stmt) {
+    return new AuthzTest(ctx, stmt);
+  }
+
+  protected TPrivilege[] onServer(TPrivilegeLevel... levels) {
+    return onServer(false, levels);
+  }
+
+  protected TPrivilege[] onServer(boolean grantOption, TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.SERVER, false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
+  protected TPrivilege[] onDatabase(String db, TPrivilegeLevel... levels) {
+    return onDatabase(false, db, levels);
+  }
+
+  protected TPrivilege[] onDatabase(boolean grantOption, String db,
+      TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.DATABASE, false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setDb_name(db);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
+  protected TPrivilege[] onTable(String db, String table, TPrivilegeLevel... levels) {
+    return onTable(false, db, table, levels);
+  }
+
+  protected TPrivilege[] onTable(boolean grantOption, String db, String table,
+      TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.TABLE, false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setDb_name(db);
+      privileges[i].setTable_name(table);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
+  protected TPrivilege[] onColumn(String db, String table, String column,
+      TPrivilegeLevel... levels) {
+    return onColumn(db, table, new String[]{column}, levels);
+  }
+
+  protected TPrivilege[] onColumn(boolean grantOption, String db, String table,
+      String column, TPrivilegeLevel... levels) {
+    return onColumn(grantOption, db, table, new String[]{column}, levels);
+  }
+
+  protected TPrivilege[] onColumn(String db, String table, String[] columns,
+      TPrivilegeLevel... levels) {
+    return onColumn(false, db, table, columns, levels);
+  }
+
+  protected TPrivilege[] onColumn(boolean grantOption, String db, String table,
+      String[] columns, TPrivilegeLevel... levels) {
+    int size = columns.length * levels.length;
+    TPrivilege[] privileges = new TPrivilege[size];
+    int idx = 0;
+    for (int i = 0; i < levels.length; i++) {
+      for (String column: columns) {
+        privileges[idx] = new TPrivilege(levels[i], TPrivilegeScope.COLUMN, false);
+        privileges[idx].setServer_name(SERVER_NAME);
+        privileges[idx].setDb_name(db);
+        privileges[idx].setTable_name(table);
+        privileges[idx].setColumn_name(column);
+        privileges[idx].setHas_grant_opt(grantOption);
+        idx++;
+      }
+    }
+    return privileges;
+  }
+
+  protected TPrivilege[] onUri(String uri, TPrivilegeLevel... levels) {
+    return onUri(false, uri, levels);
+  }
+
+  protected TPrivilege[] onUri(boolean grantOption, String uri,
+      TPrivilegeLevel... levels) {
+    TPrivilege[] privileges = new TPrivilege[levels.length];
+    for (int i = 0; i < levels.length; i++) {
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.URI, false);
+      privileges[i].setServer_name(SERVER_NAME);
+      privileges[i].setUri(uri);
+      privileges[i].setHas_grant_opt(grantOption);
+    }
+    return privileges;
+  }
+
+  private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
+    authzOk(authzCtx_, stmt, withPrincipal);
+  }
+
+  private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal)
+      throws ImpalaException {
+    try {
+      parseAndAnalyze(stmt, context, authzFrontend_);
+    } catch (AuthorizationException e) {
+      // Because the same test can be called from multiple statements
+      // it is useful to know which statement caused the exception.
+      throw new AuthorizationException(String.format(
+          "\nPrincipal: %s\nStatement: %s\nError: %s", withPrincipal.getName(),
+          stmt, e.getMessage(), e));
+    }
+  }
+
+  /**
+   * Verifies that a given statement fails authorization and the expected error
+   * string matches.
+   */
+  private void authzError(String stmt, String expectedError,
+      WithPrincipal withPrincipal) throws ImpalaException {
+    authzError(authzCtx_, stmt, expectedError, startsWith(), withPrincipal);
+  }
+
+  private void authzError(AnalysisContext context, String stmt, String expectedError,
+      WithPrincipal withPrincipal) throws ImpalaException {
+    authzError(context, stmt, expectedError, startsWith(), withPrincipal);
+  }
+
+  @FunctionalInterface
+  private interface Matcher {
+    boolean match(String actual, String expected);
+  }
+
+  private static Matcher exact() {
+    return (actual, expected) -> actual.equals(expected);
+  }
+
+  private static Matcher startsWith() {
+    return (actual, expected) -> actual.startsWith(expected);
+  }
+
+  private void authzError(AnalysisContext ctx, String stmt,
+      String expectedErrorString, Matcher matcher, WithPrincipal withPrincipal)
+      throws ImpalaException {
+    Preconditions.checkNotNull(expectedErrorString);
+    try {
+      parseAndAnalyze(stmt, ctx, authzFrontend_);
+    } catch (AuthorizationException e) {
+      // Insert the username into the error.
+      expectedErrorString = String.format(expectedErrorString, ctx.getUser());
+      String errorString = e.getMessage();
+      assertTrue(
+          "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
+          matcher.match(errorString, expectedErrorString));
+      return;
+    }
+    fail(String.format("Statement did not result in authorization error.\n" +
+        "Principal: %s\nStatement: %s", withPrincipal.getName(), stmt));
+  }
+
+  protected void createRangerPolicy(String policyName, String json) {
+    ClientResponse response = rangerRestClient_
+        .getResource("/service/public/v2/api/policy")
+        .accept(RangerRESTUtils.REST_MIME_TYPE_JSON)
+        .type(RangerRESTUtils.REST_MIME_TYPE_JSON)
+        .post(ClientResponse.class, json);
+    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
+      throw new RuntimeException(
+          String.format("Unable to create a Ranger policy: %s.", policyName));
+    }
+  }
+
+  protected void deleteRangerPolicy(String policyName) {
+    ClientResponse response = rangerRestClient_
+        .getResource("/service/public/v2/api/policy")
+        .queryParam("servicename", RANGER_SERVICE_NAME)
+        .queryParam("policyname", policyName)
+        .delete(ClientResponse.class);
+    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
+      throw new RuntimeException(
+          String.format("Unable to delete Ranger policy: %s.", policyName));
+    }
+  }
+
+  // Convert TDescribeResult to list of strings.
+  private static List<String> resultToStringList(TDescribeResult result) {
+    List<String> list = new ArrayList<>();
+    for (TResultRow row: result.getResults()) {
+      for (TColumnValue col: row.getColVals()) {
+        list.add(col.getString_val() == null ? "NULL": col.getString_val().trim());
+      }
+    }
+    return list;
+  }
+
+  protected static String selectError(String object) {
+    return "User '%s' does not have privileges to execute 'SELECT' on: " + object;
+  }
+
+  protected static String insertError(String object) {
+    return "User '%s' does not have privileges to execute 'INSERT' on: " + object;
+  }
+
+  protected static String createError(String object) {
+    return "User '%s' does not have privileges to execute 'CREATE' on: " + object;
+  }
+
+  protected static String alterError(String object) {
+    return "User '%s' does not have privileges to execute 'ALTER' on: " + object;
+  }
+
+  protected static String dropError(String object) {
+    return "User '%s' does not have privileges to execute 'DROP' on: " + object;
+  }
+
+  protected static String accessError(String object) {
+    return accessError(false, object);
+  }
+
+  protected static String accessError(boolean grantOption, String object) {
+    return "User '%s' does not have privileges" +
+        (grantOption ? " with 'GRANT OPTION'" : "") + " to access: " + object;
+  }
+
+  protected static String refreshError(String object) {
+    return "User '%s' does not have privileges to execute " +
+        "'INVALIDATE METADATA/REFRESH' on: " + object;
+  }
+
+  protected static String systemDbError() {
+    return "Cannot modify system database.";
+  }
+
+  protected static String viewDefError(String object) {
+    return "User '%s' does not have privileges to see the definition of view '" +
+        object + "'.";
+  }
+
+  protected static String createFunctionError(String object) {
+    return "User '%s' does not have privileges to CREATE functions in: " + object;
+  }
+
+  protected static String dropFunctionError(String object) {
+    return "User '%s' does not have privileges to DROP functions in: " + object;
+  }
+
+  protected static String columnMaskError(String object) {
+    return "Impala does not support column masking yet. Column masking is enabled on " +
+        "column: " + object;
+  }
+
+  protected static String rowFilterError(String object) {
+    return "Impala does not support row filtering yet. Row filtering is enabled on " +
+        "table: " + object;
+  }
+
+  protected ScalarFunction addFunction(String db, String fnName, List<Type> argTypes,
+      Type retType, String uriPath, String symbolName) {
+    ScalarFunction fn = ScalarFunction.createForTesting(db, fnName, argTypes, retType,
+        uriPath, symbolName, null, null, TFunctionBinaryType.NATIVE);
+    authzCatalog_.addFunction(fn);
+    return fn;
+  }
+
+  protected ScalarFunction addFunction(String db, String fnName) {
+    return addFunction(db, fnName, new ArrayList<>(), Type.INT, "/dummy",
+        "dummy.class");
+  }
+
+  protected void removeFunction(ScalarFunction fn) {
+    authzCatalog_.removeFunction(fn);
+  }
+
+  protected TPrivilegeLevel[] join(TPrivilegeLevel[] level1, TPrivilegeLevel... level2) {
+    TPrivilegeLevel[] levels = new TPrivilegeLevel[level1.length + level2.length];
+    int index = 0;
+    for (TPrivilegeLevel level: level1) {
+      levels[index++] = level;
+    }
+    for (TPrivilegeLevel level: level2) {
+      levels[index++] = level;
+    }
+    return levels;
+  }
+
+  protected TPrivilegeLevel[] viewMetadataPrivileges() {
+    return new TPrivilegeLevel[]{TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+        TPrivilegeLevel.SELECT, TPrivilegeLevel.INSERT, TPrivilegeLevel.REFRESH};
+  }
+
+  protected static TPrivilegeLevel[] allExcept(TPrivilegeLevel... excludedPrivLevels) {
+    Set<TPrivilegeLevel> excludedSet = Sets.newHashSet(excludedPrivLevels);
+    List<TPrivilegeLevel> privLevels = new ArrayList<>();
+    for (TPrivilegeLevel level: TPrivilegeLevel.values()) {
+      if (!excludedSet.contains(level)) {
+        privLevels.add(level);
+      }
+    }
+    return privLevels.toArray(new TPrivilegeLevel[0]);
+  }
+}

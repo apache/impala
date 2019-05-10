@@ -58,8 +58,16 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * request, false otherwise. Always returns true if authorization is disabled or the
    * given user is an admin user.
    */
-  public boolean hasAccess(User user, PrivilegeRequest request)
-      throws InternalException {
+  @Override
+  public boolean hasAccess(User user, PrivilegeRequest request) throws InternalException {
+    // We don't want to do an audit log here. This method is used by "show databases",
+    // "show tables", "describe" to filter out unauthorized database, table, or column
+    // names.
+    return hasAccess(createAuthorizationContext(false), user, request);
+  }
+
+  private boolean hasAccess(AuthorizationContext authzCtx, User user,
+      PrivilegeRequest request) throws InternalException {
     Preconditions.checkNotNull(user);
     Preconditions.checkNotNull(request);
 
@@ -68,7 +76,17 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     if (!config_.isEnabled() || user instanceof ImpalaInternalAdminUser) {
       return true;
     }
-    return authorize(user, request);
+    return authorizeResource(authzCtx, user, request);
+  }
+
+  /**
+   * Executes code after the authorization check.
+   * Override this method to add custom post-authorization check.
+   */
+  @Override
+  public void postAuthorize(AuthorizationContext authzCtx) {
+    long durationMs = System.currentTimeMillis() - authzCtx.getStartTime();
+    LOG.debug("Authorization check took {} ms", durationMs);
   }
 
   /**
@@ -76,8 +94,9 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * analyze() must have already been called. Throws an AuthorizationException if the
    * user doesn't have sufficient privileges to run this statement.
    */
-  public void authorize(AnalysisResult analysisResult, FeCatalog catalog)
-      throws AuthorizationException, InternalException {
+  @Override
+  public void authorize(AuthorizationContext authzCtx, AnalysisResult analysisResult,
+      FeCatalog catalog) throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(analysisResult);
     Analyzer analyzer = analysisResult.getAnalyzer();
     // Authorize statements that may produce several hierarchical privilege requests.
@@ -114,20 +133,20 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
 
       // Check any non-table, non-column privilege requests first.
       for (PrivilegeRequest request : otherPrivReqs) {
-        authorizePrivilegeRequest(analysisResult, catalog, request);
+        authorizePrivilegeRequest(authzCtx, analysisResult, catalog, request);
       }
 
       // Authorize table accesses, one table at a time, by considering both table and
       // column-level privilege requests.
       for (Map.Entry<String, List<PrivilegeRequest>> entry : tablePrivReqs.entrySet()) {
-        authorizeTableAccess(analysisResult, catalog, entry.getValue());
+        authorizeTableAccess(authzCtx, analysisResult, catalog, entry.getValue());
       }
     } else {
       for (PrivilegeRequest privReq : analyzer.getPrivilegeReqs()) {
         Preconditions.checkState(
             !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN) ||
                 analysisResult.isSingleColumnPrivStmt());
-        authorizePrivilegeRequest(analysisResult, catalog, privReq);
+        authorizePrivilegeRequest(authzCtx, analysisResult, catalog, privReq);
       }
     }
 
@@ -138,7 +157,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     // 'user_has_profile_access' flag in queryCtx_.
     for (Pair<PrivilegeRequest, String> maskedReq : analyzer.getMaskedPrivilegeReqs()) {
       try {
-        authorizePrivilegeRequest(analysisResult, catalog, maskedReq.first);
+        authorizePrivilegeRequest(authzCtx, analysisResult, catalog, maskedReq.first);
       } catch (AuthorizationException e) {
         analysisResult.setUserHasProfileAccess(false);
         if (!Strings.isNullOrEmpty(maskedReq.second)) {
@@ -154,8 +173,9 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * Throws an AuthorizationException if the user doesn't have sufficient privileges for
    * this request. Also, checks if the request references a system database.
    */
-  private void authorizePrivilegeRequest(AnalysisResult analysisResult, FeCatalog catalog,
-      PrivilegeRequest request) throws AuthorizationException, InternalException {
+  private void authorizePrivilegeRequest(AuthorizationContext authzCtx,
+      AnalysisResult analysisResult, FeCatalog catalog, PrivilegeRequest request)
+      throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(request);
     String dbName = null;
     if (request.getAuthorizable() != null) {
@@ -166,7 +186,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     if (dbName != null && checkSystemDbAccess(catalog, dbName, request.getPrivilege())) {
       return;
     }
-    checkAccess(analysisResult.getAnalyzer().getUser(), request);
+    checkAccess(authzCtx, analysisResult.getAnalyzer().getUser(), request);
   }
 
   /**
@@ -177,8 +197,9 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * privilege requests. Throws an AuthorizationException if the user doesn't have
    * sufficient privileges.
    */
-  private void authorizeTableAccess(AnalysisResult analysisResult, FeCatalog catalog,
-      List<PrivilegeRequest> requests) throws AuthorizationException, InternalException {
+  protected void authorizeTableAccess(AuthorizationContext authzCtx,
+      AnalysisResult analysisResult, FeCatalog catalog, List<PrivilegeRequest> requests)
+      throws AuthorizationException, InternalException {
     Preconditions.checkArgument(!requests.isEmpty());
     Analyzer analyzer = analysisResult.getAnalyzer();
     // We need to temporarily deny access when column masking or row filtering feature is
@@ -192,7 +213,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     for (PrivilegeRequest request: requests) {
       if (request.getAuthorizable().getType() == Authorizable.Type.TABLE) {
         try {
-          authorizePrivilegeRequest(analysisResult, catalog, request);
+          authorizePrivilegeRequest(authzCtx, analysisResult, catalog, request);
         } catch (AuthorizationException e) {
           // Authorization fails if we fail to authorize any table-level request that is
           // not a SELECT privilege (e.g. INSERT).
@@ -203,7 +224,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
         Preconditions.checkState(
             request.getAuthorizable().getType() == Authorizable.Type.COLUMN);
         if (hasTableSelectPriv) continue;
-        if (hasAccess(analyzer.getUser(), request)) {
+        if (hasAccess(authzCtx, analyzer.getUser(), request)) {
           hasColumnSelectPriv = true;
           continue;
         }
@@ -246,11 +267,12 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * Authorizes the PrivilegeRequest, throwing an Authorization exception if
    * the user does not have sufficient privileges.
    */
-  private void checkAccess(User user, PrivilegeRequest privilegeRequest)
+  private void checkAccess(AuthorizationContext authzCtx, User user,
+      PrivilegeRequest privilegeRequest)
       throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(privilegeRequest);
 
-    if (hasAccess(user, privilegeRequest)) return;
+    if (hasAccess(authzCtx, user, privilegeRequest)) return;
 
     Privilege privilege = privilegeRequest.getPrivilege();
     if (privilegeRequest.getAuthorizable().getType() == Type.FUNCTION) {
@@ -292,10 +314,10 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
   }
 
   /**
-   * Performs an authorization for a given user.
+   * Performs an authorization for a given user and resource.
    */
-  protected abstract boolean authorize(User user, PrivilegeRequest request)
-      throws InternalException;
+  protected abstract boolean authorizeResource(AuthorizationContext authzCtx, User user,
+      PrivilegeRequest request) throws InternalException;
 
   /**
    * Returns a set of groups for a given user.
