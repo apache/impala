@@ -58,9 +58,9 @@ REVOKE [GRANT OPTION FOR] <varname>privilege</varname> ON <varname>object_type</
   FROM [ROLE] <varname>role_name</varname>
 
 <ph rev="3.0">
-  privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
+  <varname>privilege</varname> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
 </ph>
-<ph id="priv_objs" rev="3.0">object_type ::= SERVER | URI | DATABASE | TABLE</ph></codeblock>
+<ph id="priv_objs" rev="3.0"><varname>object_type</varname> ::= SERVER | URI | DATABASE | TABLE</ph></codeblock>
 
     <p>
       <b>Usage notes:</b>

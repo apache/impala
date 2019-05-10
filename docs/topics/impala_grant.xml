@@ -58,22 +58,21 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
    TO [ROLE] <varname>roleName</varname>
    [WITH GRANT OPTION]
 
-<ph id="privileges" rev="3.0">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)</ph>
-<ph id="priv_objs" rev="3.0">object_type ::= SERVER | URI | DATABASE | TABLE</ph>
+<ph id="privileges" rev="3.0"><varname>privilege</varname> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)</ph>
+<ph id="priv_objs" rev="3.0"><varname>object_type</varname> ::= SERVER | URI | DATABASE | TABLE</ph>
 </codeblock>
 
     <p>
-      Typically, the object name is an identifier. For URIs, it is a string literal.
+      Typically, the <codeph><varname>object_name</varname></codeph> is an identifier. For URIs,
+      it is a string literal.
     </p>
-
-<!-- Turn privilege info into a conref or series of conrefs. (In both GRANT and REVOKE.) -->
 
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only Sentry administrative users, users who belong to the groups defined
-      in <codeph>sentry.service.admin.group</codeph> of the Sentry configuration
-      can grant roles to a group.
+      Only Sentry administrative users, users who belong to the groups defined in
+      <codeph>sentry.service.admin.group</codeph> of the Sentry configuration can grant roles to
+      a group.
     </p>
 
     <p>

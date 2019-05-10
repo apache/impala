@@ -164,8 +164,7 @@ under the License.
                   <b>Privileges</b>
                 </entry>
                 <entry>
-                  <b>Scope</b>
-                </entry>
+                  <b>Object Type / </b><p><b>Resource Type</b></p></entry>
               </row>
               <row>
                 <entry>
@@ -174,9 +173,7 @@ under the License.
                 <entry>
                   SELECT
                 </entry>
-                <entry>
-                  TABLE
-                </entry>
+                <entry> TABLE</entry>
               </row>
               <row>
                 <entry>
