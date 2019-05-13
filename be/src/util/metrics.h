@@ -288,6 +288,8 @@ class AtomicHighWaterMarkGauge : public ScalarMetric<int64_t, TMetricKind::GAUGE
 
  private:
   FRIEND_TEST(MetricsTest, AtomicHighWaterMarkGauge);
+  friend class TmpFileMgrTest;
+
   /// Set 'hwm_value_' to 'v' if 'v' is larger than 'hwm_value_'. The entire operation is
   /// atomic.
   void UpdateMax(int64_t v) {

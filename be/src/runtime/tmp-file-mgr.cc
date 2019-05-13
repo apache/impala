@@ -283,14 +283,14 @@ void TmpFileMgr::FileGroup::Close() {
   if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_.get());
   for (std::unique_ptr<TmpFileMgr::File>& file : tmp_files_) {
     Status status = file->Remove();
-    if (status.ok()) {
-      tmp_file_mgr_->scratch_bytes_used_metric_->Increment(
-          -1 * scratch_space_bytes_used_counter_->value());
-    } else {
+    if (!status.ok()) {
       LOG(WARNING) << "Error removing scratch file '" << file->path()
                    << "': " << status.msg().msg();
     }
   }
+  tmp_file_mgr_->scratch_bytes_used_metric_->Increment(
+      -1 * scratch_space_bytes_used_counter_->value());
+
   tmp_files_.clear();
 }
 
