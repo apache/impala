@@ -125,6 +125,12 @@ under the License.
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-audit</artifactId>
       <version>${ranger.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.kafka</groupId>
+          <artifactId>kafka_2.11</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- this is needed by ranger-plugins-audit -->
     <dependency>
