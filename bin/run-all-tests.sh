@@ -59,6 +59,10 @@ fi
 : ${RUN_TESTS_ARGS:=}
 # Extra args to pass to run-custom-cluster-tests.sh
 : ${RUN_CUSTOM_CLUSTER_TESTS_ARGS:=}
+# Data cache root directory location.
+: ${DATA_CACHE_DIR:=}
+# Data cache size.
+: ${DATA_CACHE_SIZE:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -67,6 +71,17 @@ if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   FE_TEST=false
 else
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --cluster_size=3"
+fi
+
+# Enable data cache if configured.
+if [[ -n "${DATA_CACHE_DIR}" && -n "${DATA_CACHE_SIZE}" ]]; then
+   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+       `"--data_cache_dir=${DATA_CACHE_DIR} --data_cache_size=${DATA_CACHE_SIZE}"
+   # Force use of data cache for HDFS. Data cache is only enabled for remote reads.
+   if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
+      TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+          `"--impalad_args=--always_use_data_cache=true"
+   fi
 fi
 
 if [[ "${ERASURE_CODING}" = true ]]; then
