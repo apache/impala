@@ -531,4 +531,14 @@ public class SentryPolicyService {
     privilege.setPrincipal_type(principal.getPrincipalType());
     return privilege;
   }
+
+  /**
+   * Checks if the given user is a Sentry admin.
+   */
+  public boolean isSentryAdmin(User user)
+      throws InternalException, SentryUserException {
+    try (SentryServiceClient client = new SentryServiceClient()) {
+      return client.get().isAdmin(user.getName());
+    }
+  }
 }

@@ -298,10 +298,10 @@ public class JniCatalog {
     User user = new User(request.getHeader().getRequesting_user());
     Preconditions.checkState(catalogOpExecutor_.getAuthzManager() instanceof
         SentryCatalogdAuthorizationManager);
-
     TSentryAdminCheckResponse response = new TSentryAdminCheckResponse();
-    response.setIs_admin(((SentryCatalogdAuthorizationManager)
-        catalogOpExecutor_.getAuthzManager()).isSentryAdmin(user));
+    boolean isSentryAdmin = ((SentryCatalogdAuthorizationManager)
+        catalogOpExecutor_.getAuthzManager()).isSentryAdmin(user);
+    response.setIs_admin(isSentryAdmin);
     return serializer.serialize(response);
   }
 

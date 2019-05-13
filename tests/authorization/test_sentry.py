@@ -31,16 +31,27 @@ class TestSentry(CustomClusterTestSuite):
   """This class contains Sentry specific authorization tests."""
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--server_name=server1 --sentry_config={0}".format(SENTRY_CONFIG_FILE),
-      catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE))
+      impalad_args="--server_name=server1 --sentry_config={0} "
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE),
+      catalogd_args="--sentry_config={0} "
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE).format(SENTRY_CONFIG_FILE))
+
   def test_sentry_admin(self, unique_role, unique_name):
     """
     Tests that only admin user can execute certain authorization statements.
     """
     admin = getuser()
-    non_admin = unique_name
+    # doesnot_exist user does not exist.
+    doesnot_exist = unique_name
+    # root user exists but is not a Sentry admin.
+    non_admin = "root"
     admin_client = self.create_impala_client()
-    non_admin_client = self.create_impala_client()
+    doesntexist_client = self.create_impala_client()
+    root_client = self.create_impala_client()
     try:
       self.execute_query_expect_success(admin_client,
                                         "create role {0}".format(unique_role),
@@ -48,16 +59,27 @@ class TestSentry(CustomClusterTestSuite):
 
       # show current roles is always allowed.
       self.execute_query_expect_success(admin_client, "show current roles", user=admin)
-      self.execute_query_expect_success(non_admin_client, "show current roles",
+      self.execute_query_expect_success(doesntexist_client, "show current roles",
+                                        user=doesnot_exist)
+      self.execute_query_expect_success(root_client, "show current roles",
                                         user=non_admin)
 
       for statement in ["show roles",
                         "show grant role {0}".format(unique_role)]:
         self.execute_query_expect_success(admin_client, statement, user=admin)
-        result = self.execute_query_expect_failure(non_admin_client, statement,
+        # doesnotexist user does not exist.
+        result = self.execute_query_expect_failure(doesntexist_client, statement,
+                                                   user=doesnot_exist)
+
+        assert "AuthorizationException: User '{0}' does not have privileges to access " \
+               "the requested policy metadata.".format(doesnot_exist) in str(result)
+
+        # root user exists, but is not a Sentry admin.
+        result = self.execute_query_expect_failure(root_client, statement,
                                                    user=non_admin)
         assert "AuthorizationException: User '{0}' does not have privileges to access " \
                "the requested policy metadata.".format(non_admin) in str(result)
+
     finally:
       admin_client.execute("drop role {0}".format(unique_role))
 

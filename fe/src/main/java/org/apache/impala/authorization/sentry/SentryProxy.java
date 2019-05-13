@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.impala.authorization.AuthorizationException;
+
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Principal;
@@ -40,16 +40,18 @@ import org.apache.log4j.Logger;
 import org.apache.sentry.api.service.thrift.TSentryGroup;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
-
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TPrivilege;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
 import org.apache.sentry.core.common.exception.SentryUserException;
 import org.apache.sentry.service.common.SentryOwnerPrivilegeType;
 import org.apache.sentry.service.common.ServiceConstants;
@@ -376,20 +378,18 @@ public class SentryProxy {
   }
 
   /**
-   * Checks whether this user is an admin on the Sentry Service.
+   * Checks whether the given user is an admin on the Sentry Service.
    */
-  public boolean isSentryAdmin(User requestingUser)
-      throws AuthorizationException {
-    // Check if the user has access by issuing a read-only RPC.
-    // TODO: This is not an elegant way to verify whether the user has privileges to
-    // access Sentry. This should be modified in the future when Sentry has
-    // a more robust mechanism to perform these checks.
+  public boolean isSentryAdmin(User user)
+      throws InternalException {
     try {
-      sentryPolicyService_.listAllRoles(requestingUser);
-    } catch (ImpalaException e) {
+      return sentryPolicyService_.isSentryAdmin(user);
+    } catch (SentryUserException e) {
+      // When a user is not defined in Sentry, isAdmin() will throw
+      // SentryUserException, we will consider this requesting user
+      // as a non-Sentry administrator.
       return false;
     }
-    return true;
   }
 
   /**
