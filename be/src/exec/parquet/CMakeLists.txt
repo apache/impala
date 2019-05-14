@@ -33,6 +33,8 @@ add_library(Parquet
   parquet-column-stats.cc
   parquet-level-decoder.cc
   parquet-metadata-utils.cc
+  parquet-column-chunk-reader.cc
+  parquet-page-reader.cc
   parquet-common.cc
   parquet-page-index.cc
 )

@@ -22,9 +22,7 @@
 
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-level-decoder.h"
-#include "runtime/io/request-ranges.h"
-#include "util/bit-stream-utils.h"
-#include "util/codec.h"
+#include "exec/parquet/parquet-column-chunk-reader.h"
 
 namespace impala {
 
@@ -244,7 +242,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   BaseScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
     : ParquetColumnReader(parent, node, slot_desc),
-      data_page_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
+      col_chunk_reader_(parent, node.element->name,
+        slot_desc != nullptr ? slot_desc->id() : -1, PageReaderValueMemoryType()) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
   }
 
@@ -264,7 +263,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// before any of the column data can be read (including dictionary and
   /// data pages). Returns an error status if there was an error starting the
   /// scan or allocating buffers for it.
-  Status StartScan();
+  Status StartScan() { return col_chunk_reader_.StartScan(); }
 
   /// Helper to start scans for multiple columns at once.
   static Status StartScans(const std::vector<BaseScalarColumnReader*> readers) {
@@ -274,14 +273,14 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
   virtual void Close(RowBatch* row_batch);
 
-  io::ScanRange* scan_range() const { return scan_range_; }
+  io::ScanRange* scan_range() const { return col_chunk_reader_.scan_range(); }
   int64_t total_len() const { return metadata_->total_compressed_size; }
   int col_idx() const { return node_.col_idx; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return ConvertParquetToImpalaCodec(metadata_->codec);
   }
-  void set_io_reservation(int bytes) { io_reservation_ = bytes; }
+  void set_io_reservation(int bytes) { col_chunk_reader_.set_io_reservation(bytes); }
 
   /// Reads the next definition and repetition levels for this column. Initializes the
   /// next data page if necessary.
@@ -316,6 +315,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
   friend class HdfsParquetScanner;
 
+  ParquetColumnChunkReader col_chunk_reader_;
+
   // Class members that are accessed for every column should be included up here so they
   // fit in as few cache lines as possible.
 
@@ -348,26 +349,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Metadata for the column for the current row group.
   const parquet::ColumnMetaData* metadata_ = nullptr;
 
-  boost::scoped_ptr<Codec> decompressor_;
-
-  /// The scan range for the column's data. Initialized for each row group by Reset().
-  io::ScanRange* scan_range_ = nullptr;
-
-  // Stream used to read data from 'scan_range_'. Initialized by StartScan().
-  ScannerContext::Stream* stream_ = nullptr;
-
-  /// Reservation in bytes to use for I/O buffers in 'scan_range_'/'stream_'. Must be set
-  /// with set_io_reservation() before 'stream_' is initialized. Reset for each row group
-  /// by Reset().
-  int64_t io_reservation_ = 0;
-
-  /// Pool to allocate storage for data pages from - either decompression buffers for
-  /// compressed data pages or copies of the data page with var-len data to attach to
-  /// batches.
-  boost::scoped_ptr<MemPool> data_page_pool_;
-
-  /// Header for current data page.
-  parquet::PageHeader current_page_header_;
 
   /////////////////////////////////////////
   /// BEGIN: Members used for page filtering
@@ -453,19 +434,19 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
-  /// Allocate memory for the uncompressed contents of a data page of 'size' bytes from
-  /// 'data_page_pool_'. 'err_ctx' provides context for error messages. On success,
-  /// 'buffer' points to the allocated memory. Otherwise an error status is returned.
-  Status AllocateUncompressedDataPage(
-      int64_t size, const char* err_ctx, uint8_t** buffer);
+  ParquetColumnChunkReader::ValueMemoryType PageReaderValueMemoryType() {
+    if (slot_desc_ == nullptr) {
+      return ParquetColumnChunkReader::ValueMemoryType::NO_SLOT_DESC;
+    }
 
-  /// Returns true if a data page for this column with the specified 'encoding' may
-  /// contain strings referenced by returned batches. Cases where this is not true are:
-  /// * Dictionary-compressed pages, where any string data lives in 'dictionary_pool_'.
-  /// * Fixed-length slots, where there is no string data.
-  bool PageContainsTupleData(parquet::Encoding::type page_encoding) {
-    return page_encoding != parquet::Encoding::PLAIN_DICTIONARY
-        && slot_desc_ != nullptr && slot_desc_->type().IsVarLenStringType();
+    const ColumnType& col_type = slot_desc_->type();
+    if (col_type.IsStringType()) {
+      if (col_type.IsVarLenStringType()) {
+        return ParquetColumnChunkReader::ValueMemoryType::VAR_LEN_STR;
+      }
+      return ParquetColumnChunkReader::ValueMemoryType::FIXED_LEN_STR;
+    }
+    return ParquetColumnChunkReader::ValueMemoryType::SCALAR;
   }
 
   /// Resets structures related to page filtering.
@@ -561,6 +542,9 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
   // Returns a detailed error message about unsupported encoding.
   Status GetUnsupportedDecodingError();
+
+  Status LogCorruptNumValuesInMetadataError();
+  Status HandleTooEarlyEos();
 };
 
 // Inline to allow inlining into collection and scalar column reader.

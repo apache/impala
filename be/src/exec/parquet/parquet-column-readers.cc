@@ -17,34 +17,19 @@
 
 #include "parquet-column-readers.h"
 
-#include <sstream>
 #include <string>
-#include <boost/scoped_ptr.hpp>
-#include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-bool-decoder.h"
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-metadata-utils.h"
-#include "exec/parquet/parquet-scratch-tuple-batch.h"
-#include "exec/read-write-util.h"
-#include "exec/scanner-context.inline.h"
 #include "parquet-collection-column-reader.h"
-#include "rpc/thrift-util.h"
-#include "runtime/exec-env.h"
-#include "runtime/io/disk-io-mgr.h"
-#include "runtime/io/request-context.h"
 #include "runtime/runtime-state.h"
-#include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
-#include "util/bit-util.h"
-#include "util/codec.h"
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
-#include "util/pretty-printer.h"
 #include "util/rle-encoding.h"
-#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -53,24 +38,11 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
     "be converted from UTC to local time. Writes are unaffected.");
 
-// Max dictionary page header size in bytes. This is an estimate and only needs to be an
-// upper bound.
-static const int MAX_DICT_HEADER_SIZE = 100;
-
-// Max data page header size in bytes. This is an estimate and only needs to be an upper
-// bound. It is theoretically possible to have a page header of any size due to string
-// value statistics, but in practice we'll have trouble reading string values this large.
-// Also, this limit is in place to prevent impala from reading corrupt parquet files.
-DEFINE_int32(max_page_header_size, 8*1024*1024, "max parquet page header size in bytes");
-
 using namespace impala::io;
 
 using parquet::Encoding;
 
 namespace impala {
-
-const string PARQUET_COL_MEM_LIMIT_EXCEEDED =
-    "ParquetColumnReader::$0() failed to allocate $1 bytes for $2.";
 
 // Definition of variable declared in header for use of the
 // SHOULD_TRIGGER_COL_READER_DEBUG_ACTION macro.
@@ -268,19 +240,18 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Pull out slow-path Status construction code
   void __attribute__((noinline)) SetDictDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, filename(),
-        slot_desc_->type().DebugString(), stream_->file_offset());
+        slot_desc_->type().DebugString(), col_chunk_reader_.stream()->file_offset());
   }
 
   void __attribute__((noinline)) SetPlainDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_PLAIN_VALUE, filename(),
-        slot_desc_->type().DebugString(), stream_->file_offset());
+        slot_desc_->type().DebugString(), col_chunk_reader_.stream()->file_offset());
   }
 
   void __attribute__((noinline)) SetBoolDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_BOOL_VALUE, filename(),
-        PrintThriftEnum(page_encoding_), stream_->file_offset());
+        PrintThriftEnum(page_encoding_), col_chunk_reader_.stream()->file_offset());
   }
-
 
   /// Dictionary decoder for decoding column values.
   DictDecoder<InternalType> dict_decoder_;
@@ -348,7 +319,7 @@ Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataPag
   DCHECK_GE(size, 0);
   DCHECK(slot_desc_ == nullptr || slot_desc_->type().type != TYPE_BOOLEAN)
       << "Bool has specialized impl";
-  page_encoding_ = current_page_header_.data_page_header.encoding;
+  page_encoding_ = col_chunk_reader_.encoding();
   if (page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY
       && page_encoding_ != parquet::Encoding::PLAIN) {
     return GetUnsupportedDecodingError();
@@ -381,7 +352,7 @@ Status ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::InitDataPage(
     uint8_t* data, int size) {
   // Data can be empty if the column contains all NULLs
   DCHECK_GE(size, 0);
-  page_encoding_ = current_page_header_.data_page_header.encoding;
+  page_encoding_ = col_chunk_reader_.encoding();
 
   /// Boolean decoding is delegated to 'bool_decoder_'.
   if (bool_decoder_->SetData(page_encoding_, data, size)) return Status::OK();
@@ -1040,14 +1011,6 @@ bool ScalarColumnReader<DateValue, parquet::Type::INT32, true>::ValidateValue(
   return true;
 }
 
-// In 1.1, we had a bug where the dictionary page metadata was not set. Returns true
-// if this matches those versions and compatibility workarounds need to be used.
-static bool RequiresSkippedDictionaryHeaderCheck(
-    const ParquetFileVersion& v) {
-  if (v.application != "impala") return false;
-  return v.VersionEq(1,1,0) || (v.VersionEq(1,2,0) && v.is_impala_internal);
-}
-
 void BaseScalarColumnReader::CreateSubRanges(vector<ScanRange::SubRange>* sub_ranges) {
   sub_ranges->clear();
   if (!DoesPageFiltering()) return;
@@ -1078,10 +1041,9 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
       parent_->filename(), row_group_idx, col_idx(), schema_element(),
       parent_->state_));
   num_buffered_values_ = 0;
+
   data_ = nullptr;
   data_end_ = nullptr;
-  stream_ = nullptr;
-  io_reservation_ = 0;
   metadata_ = &col_chunk.meta_data;
   num_values_read_ = 0;
   def_level_ = ParquetLevel::INVALID_LEVEL;
@@ -1089,292 +1051,62 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
   rep_level_ = max_rep_level() == 0 ? 0 : ParquetLevel::INVALID_LEVEL;
   pos_current_value_ = ParquetLevel::INVALID_POS;
 
-  if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(
-        nullptr, false, ConvertParquetToImpalaCodec(metadata_->codec), &decompressor_));
-  }
-  int64_t col_start = col_chunk.meta_data.data_page_offset;
-  if (col_chunk.meta_data.__isset.dictionary_page_offset) {
-    // Already validated in ValidateColumnOffsets()
-    DCHECK_LT(col_chunk.meta_data.dictionary_page_offset, col_start);
-    col_start = col_chunk.meta_data.dictionary_page_offset;
-  }
-  int64_t col_len = col_chunk.meta_data.total_compressed_size;
-  if (col_len <= 0) {
-    return Status(Substitute("File '$0' contains invalid column chunk size: $1",
-        filename(), col_len));
-  }
-  int64_t col_end = col_start + col_len;
-
-  // Already validated in ValidateColumnOffsets()
-  DCHECK_GT(col_end, 0);
-  DCHECK_LT(col_end, file_desc.file_length);
-  const ParquetFileVersion& file_version = parent_->file_version_;
-  if (file_version.application == "parquet-mr" && file_version.VersionLt(1, 2, 9)) {
-    // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
-    // dictionary page header size in total_compressed_size and total_uncompressed_size
-    // (see IMPALA-694). We pad col_len to compensate.
-    int64_t bytes_remaining = file_desc.file_length - col_end;
-    int64_t pad = min<int64_t>(MAX_DICT_HEADER_SIZE, bytes_remaining);
-    col_len += pad;
-    col_end += pad;
-  }
-
-  // TODO: this will need to change when we have co-located files and the columns
-  // are different files.
-  if (!col_chunk.file_path.empty() && col_chunk.file_path != filename()) {
-    return Status(Substitute("Expected parquet column file path '$0' to match "
-        "filename '$1'", col_chunk.file_path, filename()));
-  }
-
-  const ScanRange* metadata_range = parent_->metadata_range_;
-  int64_t partition_id = parent_->context_->partition_descriptor()->id();
-  const ScanRange* split_range =
-      static_cast<ScanRangeMetadata*>(metadata_range->meta_data())->original_split;
-  // Determine if the column is completely contained within a local split.
-  bool col_range_local = split_range->expected_local()
-      && col_start >= split_range->offset()
-      && col_end <= split_range->offset() + split_range->len();
   vector<ScanRange::SubRange> sub_ranges;
   CreateSubRanges(&sub_ranges);
-  scan_range_ = parent_->scan_node_->AllocateScanRange(metadata_range->fs(),
-      filename(), col_len, col_start, move(sub_ranges), partition_id,
-      split_range->disk_id(),col_range_local, split_range->is_erasure_coded(),
-      file_desc.mtime, BufferOpts(split_range->cache_options()));
+
+  RETURN_IF_ERROR(col_chunk_reader_.InitColumnChunk(
+      file_desc, col_chunk, row_group_idx, move(sub_ranges)));
+
   ClearDictionaryDecoder();
   return Status::OK();
 }
 
 void BaseScalarColumnReader::Close(RowBatch* row_batch) {
-  if (row_batch != nullptr && PageContainsTupleData(page_encoding_)) {
-    row_batch->tuple_data_pool()->AcquireData(data_page_pool_.get(), false);
-  } else {
-    data_page_pool_->FreeAll();
-  }
-  if (decompressor_ != nullptr) decompressor_->Close();
+  col_chunk_reader_.Close(row_batch == nullptr ? nullptr : row_batch->tuple_data_pool());
   DictDecoderBase* dict_decoder = GetDictionaryDecoder();
   if (dict_decoder != nullptr) dict_decoder->Close();
 }
 
-Status BaseScalarColumnReader::StartScan() {
-  DCHECK(scan_range_ != nullptr) << "Must Reset() before starting scan.";
-  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
-  ScannerContext* context = parent_->context_;
-  DCHECK_GT(io_reservation_, 0);
-  bool needs_buffers;
-  RETURN_IF_ERROR(parent_->scan_node_->reader_context()->StartScanRange(
-      scan_range_, &needs_buffers));
-  if (needs_buffers) {
-    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-        context->bp_client(), scan_range_, io_reservation_));
-  }
-  stream_ = parent_->context_->AddStream(scan_range_, io_reservation_);
-  DCHECK(stream_ != nullptr);
-  return Status::OK();
-}
-
-Status BaseScalarColumnReader::ReadPageHeader(bool peek,
-    parquet::PageHeader* next_page_header, uint32_t* next_header_size, bool* eos) {
-  DCHECK(stream_ != nullptr);
-  *eos = false;
-
-  uint8_t* buffer;
-  int64_t buffer_size;
-  RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_size));
-  // check for end of stream
-  if (buffer_size == 0) {
-    // The data pages contain fewer values than stated in the column metadata.
-    DCHECK(stream_->eosr());
-    DCHECK_LT(num_values_read_, metadata_->num_values);
-    // TODO for 2.3: node_.element->name isn't necessarily useful
-    ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID, metadata_->num_values,
-        num_values_read_, node_.element->name, filename());
-    RETURN_IF_ERROR(parent_->state_->LogOrReturnError(msg));
-    *eos = true;
-    return Status::OK();
-  }
-
-  // We don't know the actual header size until the thrift object is deserialized.  Loop
-  // until we successfully deserialize the header or exceed the maximum header size.
-  uint32_t header_size;
-  Status status;
-  while (true) {
-    header_size = buffer_size;
-    status = DeserializeThriftMsg(buffer, &header_size, true, next_page_header);
-    if (status.ok()) break;
-
-    if (buffer_size >= FLAGS_max_page_header_size) {
-      stringstream ss;
-      ss << "ParquetScanner: could not read data page because page header exceeded "
-         << "maximum size of "
-         << PrettyPrinter::Print(FLAGS_max_page_header_size, TUnit::BYTES);
-      status.AddDetail(ss.str());
-      return status;
-    }
-
-    // Didn't read entire header, increase buffer size and try again
-    int64_t new_buffer_size = max<int64_t>(buffer_size * 2, 1024);
-    status = Status::OK();
-    bool success = stream_->GetBytes(
-        new_buffer_size, &buffer, &new_buffer_size, &status, /* peek */ true);
-    if (!success) {
-      DCHECK(!status.ok());
-      return status;
-    }
-    DCHECK(status.ok());
-
-    // Even though we increased the allowed buffer size, the number of bytes
-    // read did not change. The header is not limited by the buffer space,
-    // so it must be incomplete in the file.
-    if (buffer_size == new_buffer_size) {
-      DCHECK_NE(new_buffer_size, 0);
-      return Status(TErrorCode::PARQUET_HEADER_EOF, filename());
-    }
-    DCHECK_GT(new_buffer_size, buffer_size);
-    buffer_size = new_buffer_size;
-  }
-
-  *next_header_size = header_size;
-
-  // Successfully deserialized current_page_header_
-  if (!peek && !stream_->SkipBytes(header_size, &status)) return status;
-
-  int data_size = next_page_header->compressed_page_size;
-  if (UNLIKELY(data_size < 0)) {
-    return Status(Substitute("Corrupt Parquet file '$0': negative page size $1 for "
-        "column '$2'", filename(), data_size, schema_element().name));
-  }
-  int uncompressed_size = next_page_header->uncompressed_page_size;
-  if (UNLIKELY(uncompressed_size < 0)) {
-    return Status(Substitute("Corrupt Parquet file '$0': negative uncompressed page "
-        "size $1 for column '$2'", filename(), uncompressed_size,
-        schema_element().name));
-  }
-
-  return Status::OK();
-}
-
 Status BaseScalarColumnReader::InitDictionary() {
-  // Peek at the next page header
+  // Dictionary encoding is not supported for booleans.
+  const bool is_boolean = node_.element->type == parquet::Type::BOOLEAN;
+  const bool skip_data = slot_desc_ == nullptr || is_boolean;
+
+  // TODO: maybe avoid malloc on every page?
+  ScopedBuffer uncompressed_buffer(parent_->dictionary_pool_->mem_tracker());
   bool eos;
-  parquet::PageHeader next_page_header;
-  uint32_t next_header_size;
-  DCHECK(stream_ != nullptr);
-  DCHECK(!HasDictionaryDecoder());
-
-  RETURN_IF_ERROR(ReadPageHeader(true /* peek */, &next_page_header,
-                                 &next_header_size, &eos));
-  if (eos) return Status::OK();
-  // The dictionary must be the first data page, so if the first page
-  // is not a dictionary, then there is no dictionary.
-  if (Ubsan::EnumToInt(&next_page_header.type) != parquet::PageType::DICTIONARY_PAGE) {
-    return Status::OK();
-  }
-
-  current_page_header_ = next_page_header;
-  Status status;
-  if (!stream_->SkipBytes(next_header_size, &status)) return status;
-
-  int data_size = current_page_header_.compressed_page_size;
-  if (slot_desc_ == nullptr) {
-    // Skip processing the dictionary page if we don't need to decode any values. In
-    // addition to being unnecessary, we are likely unable to successfully decode the
-    // dictionary values because we don't necessarily create the right type of scalar
-    // reader if there's no slot to read into (see CreateReader()).
-    if (!stream_->SkipBytes(data_size, &status)) return status;
-    return Status::OK();
-  }
-
-  if (node_.element->type == parquet::Type::BOOLEAN) {
+  bool is_dictionary_page;
+  int64_t data_size;
+  int num_entries;
+  RETURN_IF_ERROR(col_chunk_reader_.TryReadDictionaryPage(&is_dictionary_page, &eos,
+        skip_data, &uncompressed_buffer, &data_, &data_size, &num_entries));
+  if (eos) return HandleTooEarlyEos();
+  if (is_dictionary_page && is_boolean) {
     return Status("Unexpected dictionary page. Dictionary page is not"
-       " supported for booleans.");
+        " supported for booleans.");
   }
-
-  const parquet::DictionaryPageHeader* dict_header = nullptr;
-  if (current_page_header_.__isset.dictionary_page_header) {
-    dict_header = &current_page_header_.dictionary_page_header;
-  } else {
-    if (!RequiresSkippedDictionaryHeaderCheck(parent_->file_version_)) {
-      return Status("Dictionary page does not have dictionary header set.");
-    }
-  }
-  if (dict_header != nullptr &&
-      dict_header->encoding != Encoding::PLAIN &&
-      dict_header->encoding != Encoding::PLAIN_DICTIONARY) {
-    return Status("Only PLAIN and PLAIN_DICTIONARY encodings are supported "
-                  "for dictionary pages.");
-  }
-
-  if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
-  data_end_ = data_ + data_size;
+  if (!is_dictionary_page || skip_data) return Status::OK();
 
   // The size of dictionary can be 0, if every value is null. The dictionary still has to
   // be reset in this case.
   DictDecoderBase* dict_decoder;
-  if (current_page_header_.uncompressed_page_size == 0) {
+  if (data_size == 0) {
+    data_end_ = data_;
     return CreateDictionaryDecoder(nullptr, 0, &dict_decoder);
   }
-
-  // There are 3 different cases from the aspect of memory management:
-  // 1. If the column type is string, the dictionary will contain pointers to a buffer,
-  //    so the buffer's lifetime must be as long as any row batch that references it.
-  // 2. If the column type is not string, and the dictionary page is compressed, then a
-  //    temporary buffer is needed for the uncompressed values.
-  // 3. If the column type is not string, and the dictionary page is not compressed,
-  //    then no buffer is necessary.
-  ScopedBuffer uncompressed_buffer(parent_->dictionary_pool_->mem_tracker());
-  uint8_t* dict_values = nullptr;
-  if (decompressor_.get() != nullptr || slot_desc_->type().IsStringType()) {
-    int buffer_size = current_page_header_.uncompressed_page_size;
-    if (slot_desc_->type().IsStringType()) {
-      dict_values = parent_->dictionary_pool_->TryAllocate(buffer_size); // case 1.
-    } else if (uncompressed_buffer.TryAllocate(buffer_size)) {
-      dict_values = uncompressed_buffer.buffer(); // case 2
-    }
-    if (UNLIKELY(dict_values == nullptr)) {
-      string details = Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "InitDictionary",
-          buffer_size, "dictionary");
-      return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
-               parent_->state_, details, buffer_size);
-    }
-  } else {
-    dict_values = data_; // case 3.
+  // We cannot add data_size to data_ until we know it is not a nullptr.
+  if (data_ == nullptr) {
+    return Status("The dictionary values could not be read properly.");
   }
+  data_end_ = data_ + data_size;
 
-  if (decompressor_.get() != nullptr) {
-    int uncompressed_size = current_page_header_.uncompressed_page_size;
-    const Status& status = decompressor_->ProcessBlock32(true, data_size, data_,
-        &uncompressed_size, &dict_values);
-    if (!status.ok()) {
-      return Status(Substitute("Error decompressing parquet file '$0' column '$1'"
-               " data_page_offset $2: $3", filename(), node_.element->name,
-               metadata_->data_page_offset, status.GetDetail()));
-    }
-    VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
-    if (current_page_header_.uncompressed_page_size != uncompressed_size) {
-      return Status(Substitute("Error decompressing dictionary page in file '$0'. "
-               "Expected $1 uncompressed bytes but got $2", filename(),
-               current_page_header_.uncompressed_page_size, uncompressed_size));
-    }
-  } else {
-    if (current_page_header_.uncompressed_page_size != data_size) {
-      return Status(Substitute("Error reading dictionary page in file '$0'. "
-                               "Expected $1 bytes but got $2", filename(),
-                               current_page_header_.uncompressed_page_size, data_size));
-    }
-    if (slot_desc_->type().IsStringType()) memcpy(dict_values, data_, data_size);
-  }
-
-  RETURN_IF_ERROR(CreateDictionaryDecoder(
-      dict_values, current_page_header_.uncompressed_page_size, &dict_decoder));
-  if (dict_header != nullptr &&
-      dict_header->num_values != dict_decoder->num_entries()) {
+  RETURN_IF_ERROR(CreateDictionaryDecoder(data_, data_size, &dict_decoder));
+  if (num_entries != dict_decoder->num_entries()) {
     return Status(TErrorCode::PARQUET_CORRUPT_DICTIONARY, filename(),
-                  slot_desc_->type().DebugString(),
-                  Substitute("Expected $0 entries but data contained $1 entries",
-                             dict_header->num_values, dict_decoder->num_entries()));
+        slot_desc_->type().DebugString(),
+        Substitute("Expected $0 entries but data contained $1 entries",
+          num_entries, dict_decoder->num_entries()));
   }
-
   return Status::OK();
 }
 
@@ -1387,176 +1119,55 @@ Status BaseScalarColumnReader::InitDictionaries(
 }
 
 Status BaseScalarColumnReader::ReadDataPage() {
-  // We're about to move to the next data page.  The previous data page is
+  // We're about to move to the next data page. The previous data page is
   // now complete, free up any memory allocated for it. If the data page contained
   // strings we need to attach it to the returned batch.
-  if (PageContainsTupleData(page_encoding_)) {
-    parent_->scratch_batch_->aux_mem_pool.AcquireData(data_page_pool_.get(), false);
-  } else {
-    data_page_pool_->FreeAll();
+  col_chunk_reader_.ReleaseResourcesOfLastPage(parent_->scratch_batch_->aux_mem_pool);
+
+  DCHECK_EQ(num_buffered_values_, 0);
+  if ((DoesPageFiltering() &&
+        candidate_page_idx_ == candidate_data_pages_.size() - 1) ||
+      num_values_read_ == metadata_->num_values) {
+    // No more pages to read
+    // TODO: should we check for stream_->eosr()?
+    return Status::OK();
+  } else if (num_values_read_ > metadata_->num_values) {
+    RETURN_IF_ERROR(LogCorruptNumValuesInMetadataError());
+    return Status::OK();
   }
-  // We don't hold any pointers to earlier pages in the stream - we can safely free
-  // any I/O or boundary buffer.
-  stream_->ReleaseCompletedResources(false);
 
-  // Read the next data page, skipping page types we don't care about.
-  // We break out of this loop on the non-error case (a data page was found or we read all
-  // the pages).
-  while (true) {
-    DCHECK_EQ(num_buffered_values_, 0);
-    if ((DoesPageFiltering() &&
-         candidate_page_idx_ == candidate_data_pages_.size() - 1) ||
-        num_values_read_ == metadata_->num_values) {
-      // No more pages to read
-      // TODO: should we check for stream_->eosr()?
-      break;
-    } else if (num_values_read_ > metadata_->num_values) {
-      ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
-          metadata_->num_values, num_values_read_, node_.element->name, filename());
-      RETURN_IF_ERROR(parent_->state_->LogOrReturnError(msg));
-      return Status::OK();
-    }
-
-    bool eos;
-    uint32_t header_size;
-    RETURN_IF_ERROR(ReadPageHeader(false /* peek */, &current_page_header_,
-                                   &header_size, &eos));
-    if (eos) return Status::OK();
-
-    if (current_page_header_.type == parquet::PageType::DICTIONARY_PAGE) {
-      // Any dictionary is already initialized, as InitDictionary has already
-      // been called. There are two possibilities:
-      // 1. The parquet file has two dictionary pages
-      // OR
-      // 2. The parquet file does not have the dictionary as the first data page.
-      // Both are errors in the parquet file.
-      if (HasDictionaryDecoder()) {
-        return Status(Substitute("Corrupt Parquet file '$0': multiple dictionary pages "
-            "for column '$1'", filename(), schema_element().name));
-      } else {
-        return Status(Substitute("Corrupt Parquet file: '$0': dictionary page for "
-            "column '$1' is not the first page", filename(), schema_element().name));
-      }
-    }
-
-    Status status;
-    int data_size = current_page_header_.compressed_page_size;
-    if (current_page_header_.type != parquet::PageType::DATA_PAGE) {
-      // We can safely skip non-data pages
-      if (!stream_->SkipBytes(data_size, &status)) {
-        DCHECK(!status.ok());
-        return status;
-      }
-      continue;
-    }
-
-    // Read Data Page
-    // TODO: when we start using page statistics, we will need to ignore certain corrupt
-    // statistics. See IMPALA-2208 and PARQUET-251.
-    if (!stream_->ReadBytes(data_size, &data_, &status)) {
-      DCHECK(!status.ok());
-      return status;
-    }
-    data_end_ = data_ + data_size;
-    int num_values = current_page_header_.data_page_header.num_values;
-    if (num_values < 0) {
-      return Status(Substitute("Error reading data page in Parquet file '$0'. "
+  bool eos;
+  int data_size;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPage(&eos, &data_, &data_size));
+  if (eos) return HandleTooEarlyEos();
+  data_end_ = data_ + data_size;
+  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
+  int num_values = current_page_header.data_page_header.num_values;
+  if (num_values < 0) {
+    return Status(Substitute("Error reading data page in Parquet file '$0'. "
           "Invalid number of values in metadata: $1", filename(), num_values));
-    }
+  }
+  num_buffered_values_ = num_values;
+  num_values_read_ += num_buffered_values_;
 
-    num_buffered_values_ = num_values;
-    num_values_read_ += num_buffered_values_;
-
-    int uncompressed_size = current_page_header_.uncompressed_page_size;
-    if (decompressor_.get() != nullptr) {
-      SCOPED_TIMER(parent_->decompress_timer_);
-      uint8_t* decompressed_buffer;
-      RETURN_IF_ERROR(AllocateUncompressedDataPage(
-            uncompressed_size, "decompressed data", &decompressed_buffer));
-      const Status& status = decompressor_->ProcessBlock32(true,
-          current_page_header_.compressed_page_size, data_, &uncompressed_size,
-          &decompressed_buffer);
-      if (!status.ok()) {
-        return Status(Substitute("Error decompressing parquet file '$0' column '$1'"
-                 " data_page_offset $2: $3", filename(), node_.element->name,
-                 metadata_->data_page_offset, status.GetDetail()));
-      }
-
-      VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
-                << " to " << uncompressed_size;
-      if (current_page_header_.uncompressed_page_size != uncompressed_size) {
-        return Status(Substitute("Error decompressing data page in file '$0'. "
-            "Expected $1 uncompressed bytes but got $2", filename(),
-            current_page_header_.uncompressed_page_size, uncompressed_size));
-      }
-      data_ = decompressed_buffer;
-      data_size = current_page_header_.uncompressed_page_size;
-      data_end_ = data_ + data_size;
-      if (slot_desc() != nullptr) {
-        parent_->scan_node_->UpdateBytesRead(slot_desc()->id(), uncompressed_size,
-            current_page_header_.compressed_page_size);
-        parent_->UpdateUncompressedPageSizeCounter(uncompressed_size);
-        parent_->UpdateCompressedPageSizeCounter(
-            current_page_header_.compressed_page_size);
-      }
-    } else {
-      DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
-      if (current_page_header_.compressed_page_size != uncompressed_size) {
-        return Status(Substitute("Error reading data page in file '$0'. "
-            "Expected $1 bytes but got $2", filename(),
-            current_page_header_.compressed_page_size, uncompressed_size));
-      }
-      if (PageContainsTupleData(current_page_header_.data_page_header.encoding)) {
-        // In this case returned batches will have pointers into the data page itself.
-        // We don't transfer disk I/O buffers out of the scanner so we need to copy
-        // the page data so that it can be attached to output batches.
-        uint8_t* copy_buffer;
-        RETURN_IF_ERROR(AllocateUncompressedDataPage(
-              uncompressed_size, "uncompressed variable-length data", &copy_buffer));
-        memcpy(copy_buffer, data_, uncompressed_size);
-        data_ = copy_buffer;
-        data_end_ = data_ + uncompressed_size;
-      }
-      if (slot_desc() != nullptr) {
-        parent_->scan_node_->UpdateBytesRead(slot_desc()->id(), uncompressed_size, 0);
-        parent_->UpdateUncompressedPageSizeCounter(uncompressed_size);
-      }
-    }
-
-    // Initialize the repetition level data
-    RETURN_IF_ERROR(rep_levels_.Init(filename(),
-        &current_page_header_.data_page_header.repetition_level_encoding,
+  /// TODO: Move the level decoder initialisation to ParquetPageReader to abstract away
+  /// the differences between Parquet header V1 and V2.
+  // Initialize the repetition level data
+  RETURN_IF_ERROR(rep_levels_.Init(filename(),
+        &current_page_header.data_page_header.repetition_level_encoding,
         parent_->perm_pool_.get(), parent_->state_->batch_size(), max_rep_level(), &data_,
         &data_size));
-
-    // Initialize the definition level data
-    RETURN_IF_ERROR(def_levels_.Init(filename(),
-        &current_page_header_.data_page_header.definition_level_encoding,
+  // Initialize the definition level data
+  RETURN_IF_ERROR(def_levels_.Init(filename(),
+        &current_page_header.data_page_header.definition_level_encoding,
         parent_->perm_pool_.get(), parent_->state_->batch_size(), max_def_level(), &data_,
         &data_size));
+  // Data can be empty if the column contains all NULLs
+  RETURN_IF_ERROR(InitDataPage(data_, data_size));
+  // Skip rows if needed.
+  RETURN_IF_ERROR(StartPageFiltering());
 
-    // Data can be empty if the column contains all NULLs
-    RETURN_IF_ERROR(InitDataPage(data_, data_size));
-
-    // Skip rows if needed.
-    RETURN_IF_ERROR(StartPageFiltering());
-
-    if (parent_->candidate_ranges_.empty()) COUNTER_ADD(parent_->num_pages_counter_, 1);
-    break;
-  }
-
-  return Status::OK();
-}
-
-Status BaseScalarColumnReader::AllocateUncompressedDataPage(int64_t size,
-    const char* err_ctx, uint8_t** buffer) {
-  *buffer = data_page_pool_->TryAllocate(size);
-  if (*buffer == nullptr) {
-    string details =
-        Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "ReadDataPage", size, err_ctx);
-    return data_page_pool_->mem_tracker()->MemLimitExceeded(
-        parent_->state_, details, size);
-  }
+  if (parent_->candidate_ranges_.empty()) COUNTER_ADD(parent_->num_pages_counter_, 1);
   return Status::OK();
 }
 
@@ -1765,6 +1376,19 @@ Status BaseScalarColumnReader::GetUnsupportedDecodingError() {
   return Status(Substitute(
       "File '$0' is corrupt: unexpected encoding: $1 for data page of column '$2'.",
       filename(), PrintThriftEnum(page_encoding_), schema_element().name));
+}
+
+Status BaseScalarColumnReader::LogCorruptNumValuesInMetadataError() {
+  ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+      metadata_->num_values, num_values_read_, node_.element->name, filename());
+  return parent_->state_->LogOrReturnError(msg);
+}
+
+Status BaseScalarColumnReader::HandleTooEarlyEos() {
+  // The data pages contain fewer values than stated in the column metadata.
+  DCHECK(col_chunk_reader_.stream()->eosr());
+  DCHECK_LT(num_values_read_, metadata_->num_values);
+  return LogCorruptNumValuesInMetadataError();
 }
 
 bool BaseScalarColumnReader::NextPage() {
