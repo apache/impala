@@ -42,12 +42,21 @@ CONFIGS=(
   "-skiptests -noclean -asan"
   "-skiptests -noclean -tsan"
   "-skiptests -noclean -ubsan -so -ninja"
+  # USE_CDP_HIVE=true build:
+  "-skiptests -noclean -use_cdp_hive"
 )
 
 FAILED=""
 
 for CONFIG in "${CONFIGS[@]}"; do
-  DESCRIPTION="Options $CONFIG"
+  CONFIG2=${CONFIG/-use_cdp_hive/}
+  if [[ "$CONFIG" != "$CONFIG2" ]]; then
+    CONFIG=$CONFIG2
+    export USE_CDP_HIVE=true
+  else
+    export USE_CDP_HIVE=false
+  fi
+  DESCRIPTION="Options $CONFIG USE_CDP_HIVE=$USE_CDP_HIVE"
 
   if [[ $# == 1 && $1 == "--dryrun" ]]; then
     echo $DESCRIPTION
