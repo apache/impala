@@ -21,18 +21,56 @@ The schema template SQL files have the following format:
   to generate all the schema for the Imapla benchmark tests.
 
   Each table is defined as a new section in the file with the following format:
+
   ====
-  --- DATASET <- Start new section
-  Data set name - Used to group sets of tables together
-  ---- <- End sub-section
-  Base table name
-  ---- <- End sub-section
-  CREATE TABLE statement - Statement to drop and create a table
-  ---- <- End sub-section
-  INSERT/SELECT * - The INSERT/SELECT * command for loading from the base table
-  ---- <- End sub-section
-  Parquet loading code executed by bash.
-  ---- <- End sub-section
-  LOAD from LOCAL - How to load data for the the base table
-  ---- <- End sub-section
-  ANALYZE TABLE ... COMPUTE STATISTICS - Compute statistics statement for table
+  ---- SECTION NAME
+  section contents
+  ...
+  ---- ANOTHER SECTION
+  ... section contents
+  ---- ... more sections...
+
+  Note that tables are delimited by '====' and that even the first table in the
+  file must include this header line.
+
+  The supported section names are:
+
+  DATASET
+      Data set name - Used to group sets of tables together
+  BASE_TABLE_NAME
+      The name of the table within the database
+  CREATE
+      Explicit CREATE statement used to create the table (executed by Impala)
+  CREATE_HIVE
+      Same as the above, but will be executed by Hive instead. If specified,
+      'CREATE' must not be specified.
+  CREATE_KUDU
+      Customized CREATE TABLE statement used to create the table for Kudu-specific
+      syntax.
+
+  COLUMNS
+  PARTITION_COLUMNS
+  ROW_FORMAT
+  HBASE_COLUMN_FAMILIES
+  TABLE_PROPERTIES
+  HBASE_REGION_SPLITS
+      If no explicit CREATE statement is provided, a CREATE statement is generated
+      from these sections (see 'build_table_template' function in
+      'generate-schema-statements.py' for details)
+
+  ALTER
+      A set of ALTER statements to be executed after the table is created
+      (typically to add partitions, but may also be used for other settings that
+      cannot be specified directly in the CREATE TABLE statement).
+
+      These statements are ignored for HBase and Kudu tables.
+
+  LOAD
+      The statement used to load the base (text) form of the table. This is
+      typically a LOAD DATA statement.
+
+  DEPENDENT_LOAD
+  DEPENDENT_LOAD_KUDU
+  DEPENDENT_LOAD_HIVE
+      Statements to be executed during the "dependent load" phase. These statements
+      are run after the initial (base table) load is complete.

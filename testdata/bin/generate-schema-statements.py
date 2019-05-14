@@ -599,12 +599,6 @@ def generate_statements(output_name, test_vectors, sections,
       else:
         create_kudu = None
 
-      # For some datasets we may want to use a different load strategy when running local
-      # tests versus tests against large scale factors. The most common reason is to
-      # reduce he number of partitions for the local test environment
-      if not options.scale_factor and section['LOAD_LOCAL']:
-        load = section['LOAD_LOCAL']
-
       columns = eval_section(section['COLUMNS']).strip()
       partition_columns = section['PARTITION_COLUMNS'].strip()
       row_format = section['ROW_FORMAT'].strip()
@@ -635,7 +629,7 @@ def generate_statements(output_name, test_vectors, sections,
       # HBASE we need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
-      if not (section['LOAD'] or section['LOAD_LOCAL'] or section['DEPENDENT_LOAD'] \
+      if not (section['LOAD'] or section['DEPENDENT_LOAD']
               or section['DEPENDENT_LOAD_HIVE']):
         create_codec = 'none'
         create_file_format = file_format
@@ -778,7 +772,7 @@ def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
-                         'LOAD', 'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES',
+                         'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
                          'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
