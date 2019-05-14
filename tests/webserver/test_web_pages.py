@@ -542,3 +542,25 @@ class TestWebPage(ImpalaTestSuite):
     assert backend_row['is_executor']
     assert not backend_row['is_quiescing']
     assert len(backend_row['admit_mem_limit']) > 0
+
+  def test_download_text_profile(self):
+    """Test download text profile for a query"""
+    query = "select count(*) from functional.alltypes"
+    query_id = self.client.execute(query).query_id
+    profile_page_url = "{0}query_profile?query_id={1}".format(
+        self.ROOT_URL, query_id)
+    # Check the text download tag is there.
+    responses = self.get_and_check_status(
+        profile_page_url, "Download Text Profile",
+        ports_to_test=self.IMPALAD_TEST_PORT)
+    assert len(responses) == 1
+    download_link = "query_profile_plain_text?query_id={0}".format(
+        query_id)
+    assert download_link in responses[0].text
+    # Get the response from download link and validate it by checking
+    # the query is in the file.
+    responses = self.get_and_check_status(
+        self.ROOT_URL + download_link, query, self.IMPALAD_TEST_PORT)
+    # Check the query id is in the content of the reponse.
+    assert len(responses) == 1
+    assert query_id in responses[0].text

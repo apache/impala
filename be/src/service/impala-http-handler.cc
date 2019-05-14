@@ -124,6 +124,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   webserver->RegisterUrlCallback("/query_profile_encoded", "raw_text.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::QueryProfileEncodedHandler), false);
 
+  webserver->RegisterUrlCallback("/query_profile_plain_text", "raw_text.tmpl",
+        MakeCallback(this, &ImpalaHttpHandler::QueryProfileTextHandler), false);
+
   webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::InflightQueryIdsHandler), false);
 
@@ -239,8 +242,8 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
   document->AddMember("query_id", query_id, document->GetAllocator());
 }
 
-void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::WebRequest& req,
-    Document* document) {
+void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
+    Document* document, TRuntimeProfileFormat::type format) {
   TUniqueId unique_id;
   stringstream ss;
   Status status = ParseIdFromRequest(req, &unique_id, "query_id");
@@ -248,7 +251,7 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::WebRequest& 
     ss << status.GetDetail();
   } else {
     Status status = server_->GetRuntimeProfileOutput(
-        unique_id, "", TRuntimeProfileFormat::BASE64, &ss, nullptr);
+      unique_id, "", format, &ss, nullptr);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
@@ -257,6 +260,16 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::WebRequest& 
       document->GetAllocator());
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", profile, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  QueryProfileHelper(req, document, TRuntimeProfileFormat::BASE64);
+}
+
+void ImpalaHttpHandler::QueryProfileTextHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  QueryProfileHelper(req, document, TRuntimeProfileFormat::STRING);
 }
 
 void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::WebRequest& req,

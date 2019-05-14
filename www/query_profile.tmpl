@@ -25,8 +25,16 @@ under the License.
 {{> www/query_detail_tabs.tmpl }}
 
 <h4>
-  <a href="/query_profile_encoded?query_id={{query_id}}" download="profile_{{query_id}}">
+  <a href="/query_profile_encoded?query_id={{query_id}}"
+      download="thrift_profile_{{query_id}}">
     Download Thrift Profile
+  </a>
+</h4>
+
+<h4>
+  <a href="/query_profile_plain_text?query_id={{query_id}}"
+      download="profile_{{query_id}}">
+   Download Text Profile
   </a>
 </h4>
 

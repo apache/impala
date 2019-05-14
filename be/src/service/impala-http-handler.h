@@ -109,9 +109,18 @@ class ImpalaHttpHandler {
   void CloseSessionHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
+  /// Helper method to put query profile in 'document' with required format.
+  void QueryProfileHelper(const Webserver::WebRequest& req,
+      rapidjson::Document* document, TRuntimeProfileFormat::type format);
+
   /// Upon return, 'document' will contain the query profile as a base64 encoded object in
   /// 'contents'.
   void QueryProfileEncodedHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
+
+  /// Upon return, 'document' will contain the query profile as a utf8 string in
+  /// 'contents'.
+  void QueryProfileTextHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
   /// Produces a list of inflight query IDs printed as text in 'contents'.
