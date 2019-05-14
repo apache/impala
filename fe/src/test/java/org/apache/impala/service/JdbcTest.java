@@ -23,12 +23,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,21 +34,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.impala.analysis.CreateTableStmt;
-import org.apache.impala.analysis.Parser;
-import org.apache.impala.analysis.Parser.ParseException;
-import org.apache.impala.analysis.SqlParser;
-import org.apache.impala.analysis.SqlScanner;
-import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.testutil.ImpalaJdbcClient;
-import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.Metrics;
-import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.google.common.collect.Lists;
 
 /**
  * JdbcTest
@@ -59,82 +47,10 @@ import com.google.common.collect.Lists;
  * getTableTypes, getColumnNames.
  *
  */
-public class JdbcTest {
-  private static Connection con_;
-
-  // Test-local list of test tables. These are cleaned up in @After.
-  private final List<String> testTableNames_ = Lists.newArrayList();
-
+public class JdbcTest extends JdbcTestBase {
   @BeforeClass
   public static void setUp() throws Exception {
-    con_ = createConnection();
-  }
-
-  @AfterClass
-  public static void cleanUp() throws Exception {
-    con_.close();
-    assertTrue("Connection should be closed", con_.isClosed());
-
-    Exception expectedException = null;
-    try {
-      con_.createStatement();
-    } catch (Exception e) {
-      expectedException = e;
-    }
-
-    assertNotNull("createStatement() on closed connection should throw exception",
-        expectedException);
-  }
-
-  private static Connection createConnection() throws Exception {
-    ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
-    client.connect();
-    Connection connection = client.getConnection();
-
-    assertNotNull("Connection is null", connection);
-    assertFalse("Connection should not be closed", connection.isClosed());
-    Statement stmt = connection.createStatement();
-    assertNotNull("Statement is null", stmt);
-
-    return connection;
-  }
-
-  protected void addTestTable(String createTableSql) throws Exception {
-    // Parse the stmt to extract the table name. We do this first to ensure
-    // that we do not execute arbitrary SQL here and pollute the test setup.
-    StatementBase result = Parser.parse(createTableSql);
-    if (!(result instanceof CreateTableStmt)) {
-      throw new Exception("Given stmt is not a CREATE TABLE stmt: " + createTableSql);
-    }
-
-    // Execute the stmt.
-    Statement stmt = con_.createStatement();
-    try {
-      stmt.execute(createTableSql);
-    } finally {
-      stmt.close();
-    }
-
-    // Once the stmt was executed successfully, add the fully-qualified table name
-    // for cleanup in @After.
-    CreateTableStmt parsedStmt = (CreateTableStmt) result;
-    testTableNames_.add(parsedStmt.getTblName().toString());
-  }
-
-  protected void dropTestTable(String tableName) throws SQLException {
-    Statement stmt = con_.createStatement();
-    try {
-      stmt.execute("DROP TABLE " + tableName);
-    } finally {
-      stmt.close();
-    }
-  }
-
-  @After
-  public void testCleanUp() throws SQLException {
-    for (String tableName: testTableNames_) {
-      dropTestTable(tableName);
-    }
+    con_ = createConnection(ImpalaJdbcClient.getNoAuthConnectionStr());
   }
 
   @Test
@@ -638,7 +554,7 @@ public class JdbcTest {
     List<Long> lastTimeSessionActive = new ArrayList<>();
 
     for (int timeout : timeoutPeriods) {
-      connections.add(createConnection());
+      connections.add(createConnection(ImpalaJdbcClient.getNoAuthConnectionStr()));
     }
 
     Long numOpenSessions = (Long)metrics.getMetric(

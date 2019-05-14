@@ -195,6 +195,9 @@ do
     if [[ "$CODE_COVERAGE" == true ]]; then
       MVN_ARGS+="-DcodeCoverage"
     fi
+    # Don't run the FE custom cluster tests here since they restart Impala. We'll run them
+    # with the other custom cluster tests below.
+    MVN_ARGS+=" -Dtest=!org.apache.impala.customcluster.*Test "
     if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ${MVN_ARGS}; then
       TEST_RET_CODE=1
     fi
@@ -242,6 +245,14 @@ do
       TEST_RET_CODE=1
     fi
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
+
+    # Run the FE custom cluster tests.
+    pushd "${IMPALA_FE_DIR}"
+    MVN_ARGS=" -Dtest=org.apache.impala.customcluster.*Test "
+    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ${MVN_ARGS}; then
+      TEST_RET_CODE=1
+    fi
+    popd
   fi
 
   # Run the process failure tests.

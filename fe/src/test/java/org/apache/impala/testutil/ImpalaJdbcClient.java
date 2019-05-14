@@ -58,6 +58,8 @@ public class ImpalaJdbcClient {
   // As of Hive 0.11 'noSasl' is case sensitive. See HIVE-4232 for more details.
   private final static String NOSASL_AUTH_SPEC = ";auth=noSasl";
 
+  private final static String LDAP_AUTH_SPEC = ";user=%s;password=%s";
+
   // The default connection string connects to localhost at the default hs2_port without
   // Sasl.
   private final static String DEFAULT_CONNECTION_STRING =
@@ -137,12 +139,23 @@ public class ImpalaJdbcClient {
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {
-    return new ImpalaJdbcClient(
-        HIVE_SERVER2_DRIVER_NAME, DEFAULT_CONNECTION_STRING + NOSASL_AUTH_SPEC);
+    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr());
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {
     return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, connString);
+  }
+
+  public static String getNoAuthConnectionStr() {
+    return getConnectionStr(NOSASL_AUTH_SPEC);
+  }
+
+  public static String getLdapConnectionStr(String username, String password) {
+    return getConnectionStr(String.format(LDAP_AUTH_SPEC, username, password));
+  }
+
+  private static String getConnectionStr(String authStr) {
+    return DEFAULT_CONNECTION_STRING + authStr;
   }
 
   /**
