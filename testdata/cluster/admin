@@ -35,7 +35,7 @@ setup_report_build_error
 : ${INCLUDE_YARN=}
 
 # For Hive 3, we require Yarn for Tez support.
-if [[ $USE_CDP_HIVE ]]; then
+if "$USE_CDP_HIVE"; then
   INCLUDE_YARN=1
 fi
 

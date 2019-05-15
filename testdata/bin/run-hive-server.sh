@@ -70,7 +70,7 @@ suspend=n,address=30010"
 # CDH Hive metastore scripts do not do so. This is currently to make sure that we can run
 # all the tests including sentry tests
 # TODO: This can be removed when we move to Ranger completely
-if [[ $USE_CDP_HIVE && -n "$SENTRY_HOME" ]]; then
+if [[ "$USE_CDP_HIVE" = "true" && -n "$SENTRY_HOME" ]]; then
   for f in ${SENTRY_HOME}/lib/sentry-binding-hive*.jar; do
     FILE_NAME=$(basename $f)
     # exclude all the hive jars from being included in the classpath since Sentry
