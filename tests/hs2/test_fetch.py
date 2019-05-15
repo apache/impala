@@ -18,7 +18,8 @@
 
 import pytest
 import re
-from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
+    create_op_handle_without_secret)
 from TCLIService import TCLIService, constants
 from TCLIService.ttypes import TTypeId
 
@@ -133,6 +134,7 @@ class TestFetch(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
 
+    # Do the actual fetch with a valid request.
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 1024
@@ -257,3 +259,35 @@ class TestFetch(HS2TestSuite):
   def test_compute_stats(self):
     """Exercise the child query path"""
     self.__query_and_fetch("compute stats functional.alltypes")
+
+  @needs_session()
+  def test_invalid_secret(self):
+    """Test that the FetchResults, GetResultSetMetadata and CloseOperation APIs validate
+    the session secret."""
+    execute_req = TCLIService.TExecuteStatementReq(
+        self.session_handle, "select 'something something'")
+    execute_resp = self.hs2_client.ExecuteStatement(execute_req)
+    HS2TestSuite.check_response(execute_resp)
+
+    good_handle = execute_resp.operationHandle
+    bad_handle = create_op_handle_without_secret(good_handle)
+
+    # Fetching and closing operations with an invalid handle should be a no-op, i.e.
+    # the later operations with the good handle should succeed.
+    HS2TestSuite.check_invalid_query(self.hs2_client.FetchResults(
+        TCLIService.TFetchResultsReq(operationHandle=bad_handle, maxRows=1024)),
+        expect_legacy_err=True)
+    HS2TestSuite.check_invalid_query(self.hs2_client.GetResultSetMetadata(
+        TCLIService.TGetResultSetMetadataReq(operationHandle=bad_handle)),
+        expect_legacy_err=True)
+    HS2TestSuite.check_invalid_query(self.hs2_client.CloseOperation(
+        TCLIService.TCloseOperationReq(operationHandle=bad_handle)),
+        expect_legacy_err=True)
+
+    # Ensure that the good handle remained valid.
+    HS2TestSuite.check_response(self.hs2_client.FetchResults(
+        TCLIService.TFetchResultsReq(operationHandle=good_handle, maxRows=1024)))
+    HS2TestSuite.check_response(self.hs2_client.GetResultSetMetadata(
+        TCLIService.TGetResultSetMetadataReq(operationHandle=good_handle)))
+    HS2TestSuite.check_response(self.hs2_client.CloseOperation(
+        TCLIService.TCloseOperationReq(operationHandle=good_handle)))

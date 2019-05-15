@@ -109,7 +109,8 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   }
   ScopedSessionState scoped_session(this);
   shared_ptr<SessionState> session;
-  Status get_session_status = scoped_session.WithSession(session_id, &session);
+  Status get_session_status =
+      scoped_session.WithSession(session_id, SecretArg::Session(secret), &session);
   if (!get_session_status.ok()) {
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(get_session_status.GetDetail());
@@ -170,28 +171,15 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
   handle->__set_hasResultSet(true);
-  // TODO: create secret for operationId
+  // Secret is inherited from session.
   TUniqueId operation_id = request_state->query_id();
-  TUniqueIdToTHandleIdentifier(operation_id, operation_id, &(handle->operationId));
+  TUniqueIdToTHandleIdentifier(operation_id, secret, &(handle->operationId));
   status->__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
-    bool fetch_first, TFetchResultsResp* fetch_results) {
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state == nullptr)) {
-    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
-    VLOG(1) << err_msg;
-    return Status::Expected(err_msg);
-  }
-
-  // FetchResults doesn't have an associated session handle, so we presume that this
-  // request should keep alive the same session that orignated the query.
-  ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
-  shared_ptr<SessionState> session;
-  RETURN_IF_ERROR(session_handle.WithSession(session_id, &session));
-
+Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
+    SessionState* session, int32_t fetch_size, bool fetch_first,
+    TFetchResultsResp* fetch_results) {
   // Make sure ClientRequestState::Wait() has completed before fetching rows. Wait()
   // ensures that rows are ready to be fetched (e.g., Wait() opens
   // ClientRequestState::output_exprs_, which are evaluated in
@@ -238,7 +226,8 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     RETURN_IF_ERROR(THandleIdentifierToTUniqueId(execute_request.sessionHandle.sessionId,
         &session_id, &secret));
 
-    RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
+    RETURN_IF_ERROR(
+        GetSessionState(session_id, SecretArg::Session(secret), &session_state));
     session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
     query_ctx->client_request.query_options = session_state->QueryOptions();
@@ -277,19 +266,23 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   // Generate session ID and the secret
-  TUniqueId session_id;
+  uuid secret_uuid;
+  uuid session_uuid;
   {
     lock_guard<mutex> l(uuid_lock_);
-    uuid secret = uuid_generator_();
-    uuid session_uuid = uuid_generator_();
-    return_val.sessionHandle.sessionId.guid.assign(
-        session_uuid.begin(), session_uuid.end());
-    return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
-    DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
-    DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
-    return_val.__isset.sessionHandle = true;
-    UUIDToTUniqueId(session_uuid, &session_id);
+    secret_uuid = crypto_uuid_generator_();
+    session_uuid = crypto_uuid_generator_();
   }
+  return_val.sessionHandle.sessionId.guid.assign(
+      session_uuid.begin(), session_uuid.end());
+  return_val.sessionHandle.sessionId.secret.assign(
+      secret_uuid.begin(), secret_uuid.end());
+  DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
+  DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
+  return_val.__isset.sessionHandle = true;
+  TUniqueId session_id, secret;
+  UUIDToTUniqueId(session_uuid, &session_id);
+  UUIDToTUniqueId(secret_uuid, &secret);
 
   // DO NOT log this Thrift struct in its entirety, in case a bad client sets the
   // password.
@@ -298,9 +291,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
 
   // create a session state: initialize start time, session type, database and default
   // query options.
-  // TODO: put secret in session state map and check it
   // TODO: Fix duplication of code between here and ConnectionStart().
-  shared_ptr<SessionState> state = make_shared<SessionState>(this);
+  shared_ptr<SessionState> state = make_shared<SessionState>(this, session_id, secret);
   state->closed = false;
   state->start_time_ms = UnixMillis();
   state->session_type = TSessionType::HIVESERVER2;
@@ -394,7 +386,9 @@ void ImpalaServer::CloseSession(TCloseSessionResp& return_val,
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   HS2_RETURN_IF_ERROR(return_val,
-      CloseSessionInternal(session_id, false), SQLSTATE_GENERAL_ERROR);
+      CloseSessionInternal(
+          session_id, SecretArg::Session(secret), /* ignore_if_absent= */ false),
+      SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
@@ -409,7 +403,8 @@ void ImpalaServer::GetInfo(TGetInfoResp& return_val,
       request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Session(secret), &session),
       SQLSTATE_GENERAL_ERROR);
 
   switch (request.infoType) {
@@ -444,7 +439,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Session(secret), &session),
       SQLSTATE_GENERAL_ERROR);
   if (session == NULL) {
     string err_msg = Substitute("Invalid session id: $0", PrintId(session_id));
@@ -492,8 +488,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
   return_val.operationHandle.__set_hasResultSet(request_state->returns_result_set());
-  // TODO: create secret for operationId and store the secret in request_state
-  TUniqueIdToTHandleIdentifier(request_state->query_id(), request_state->query_id(),
+  // Secret is inherited from session.
+  TUniqueIdToTHandleIdentifier(request_state->query_id(), secret,
                                &return_val.operationHandle.operationId);
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
@@ -651,11 +647,12 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
     return;
   }
 
-  // TODO: check secret
+  // Secret is inherited from session.
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
@@ -668,7 +665,9 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(
+          session_id, SecretArg::Operation(op_secret, query_id), &session),
       SQLSTATE_GENERAL_ERROR);
 
   {
@@ -688,9 +687,10 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
 void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
     const TCancelOperationReq& request) {
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
@@ -701,7 +701,8 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
   HS2_RETURN_IF_ERROR(return_val, CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
@@ -710,9 +711,10 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
 void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
     const TCloseOperationReq& request) {
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
@@ -723,8 +725,10 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
+
   // TODO: use timeout to get rid of unwanted request_state.
   HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
       SQLSTATE_GENERAL_ERROR);
@@ -734,11 +738,11 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
 void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
     const TGetResultSetMetadataReq& request) {
   // Convert Operation id to TUniqueId and get the query exec state.
-  // TODO: check secret
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "GetResultSetMetadata(): query_id=" << PrintId(query_id);
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
@@ -750,7 +754,8 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
   {
     lock_guard<mutex> l(*request_state->lock());
@@ -786,16 +791,32 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
   bool fetch_first = request.orientation == TFetchOrientation::FETCH_FIRST;
 
   // Convert Operation id to TUniqueId and get the query exec state.
-  // TODO: check secret
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "FetchResults(): query_id=" << PrintId(query_id)
            << " fetch_size=" << request.maxRows;
 
-  // FetchInternal takes care of extending the session
-  Status status = FetchInternal(query_id, request.maxRows, fetch_first, &return_val);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+  if (UNLIKELY(request_state == nullptr)) {
+    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    VLOG(1) << err_msg;
+    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
+  }
+
+  // Validate the secret and keep the session that originated the query alive.
+  ScopedSessionState session_handle(this);
+  const TUniqueId session_id = request_state->session_id();
+  shared_ptr<SessionState> session;
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(
+          session_id, SecretArg::Operation(op_secret, query_id), &session),
+      SQLSTATE_GENERAL_ERROR);
+
+  Status status = FetchInternal(
+      request_state.get(), session.get(), request.maxRows, fetch_first, &return_val);
   VLOG_ROW << "FetchResults(): #results=" << return_val.results.rows.size()
            << " has_more=" << (return_val.hasMoreRows ? "true" : "false");
   if (!status.ok()) {
@@ -816,9 +837,10 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
 
 void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   TUniqueId query_id;
-  TUniqueId secret;
+  TUniqueId op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
@@ -831,8 +853,9 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   // should keep alive the same session that orignated the query.
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
-                      SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
+      SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
   Coordinator* coord = request_state->GetCoordinator();
@@ -870,19 +893,24 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
   TUniqueId session_id;
   TUniqueId secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.sessionHandle.sessionId, &session_id, &secret),
+      SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(
+          session_id, SecretArg::Session(secret), &session),
       SQLSTATE_GENERAL_ERROR);
   if (session == NULL) {
     HS2_RETURN_ERROR(return_val, Substitute("Invalid session id: $0",
         PrintId(session_id)), SQLSTATE_GENERAL_ERROR);
   }
 
-  TUniqueId query_id;
-  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+  TUniqueId query_id, op_secret;
+  HS2_RETURN_IF_ERROR(return_val,
+      THandleIdentifierToTUniqueId(
+          request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
 
   TExecSummary summary;
   Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &summary);
@@ -891,24 +919,27 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-void ImpalaServer::GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
-    const TGetRuntimeProfileReq& request) {
+void ImpalaServer::GetRuntimeProfile(
+    TGetRuntimeProfileResp& return_val, const TGetRuntimeProfileReq& request) {
   TUniqueId session_id;
   TUniqueId secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(
+          session_id, SecretArg::Session(secret), &session),
       SQLSTATE_GENERAL_ERROR);
   if (session == NULL) {
     HS2_RETURN_ERROR(return_val, Substitute("Invalid session id: $0",
         PrintId(session_id)), SQLSTATE_GENERAL_ERROR);
   }
 
-  TUniqueId query_id;
+  TUniqueId query_id, op_secret;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+      request.operationHandle.operationId, &query_id, &op_secret),
+      SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
   TRuntimeProfileTree thrift_profile;

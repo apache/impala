@@ -42,6 +42,7 @@
 
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
+#include "common/compiler-util.h"
 #include "common/logging.h"
 #include "common/thread-debug-info.h"
 #include "common/version.h"
@@ -293,6 +294,13 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
 // Interval between checks for query expiration.
 const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
+
+// Template to return error messages for client requests that could not be found, belonged
+// to the wrong session, or had a mismatched secret. We need to use this particular string
+// in some places because the shell has a regex for it.
+// TODO: Make consistent with "Invalid query handle: $0" template used elsewhere.
+// TODO: this should be turned into a proper error code and used throughout ImpalaServer.
+static const char* LEGACY_INVALID_QUERY_HANDLE_TEMPLATE = "Query id $0 not found.";
 
 ThreadSafeRandom ImpalaServer::rng_(GetRandomSeed32());
 
@@ -773,7 +781,8 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
     if (query_record == query_log_index_.end()) {
       // Common error, so logging explicitly and eliding Status's stack trace.
-      string err = strings::Substitute("Query id $0 not found.", PrintId(query_id));
+      string err =
+          strings::Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id));
       VLOG(1) << err;
       return Status::Expected(err);
     }
@@ -848,7 +857,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
     }
     if (is_query_missing) {
       // Common error, so logging explicitly and eliding Status's stack trace.
-      string err = strings::Substitute("Query id $0 not found.", PrintId(query_id));
+      string err =
+          strings::Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id));
       VLOG(1) << err;
       return Status::Expected(err);
     }
@@ -1105,6 +1115,9 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   // benchmarks show it to be slightly cheaper than contending for a
   // single generator under a lock (since random_generator is not
   // thread-safe).
+  // TODO: as cleanup we should consolidate this with uuid_generator_ - there's no reason
+  // to have two different methods to achieve the same end. To address the scalability
+  // concern we could shard the RNG or similar.
   query_ctx->query_id = UuidToQueryId(random_generator()());
   GetThreadDebugInfo()->SetQueryId(query_ctx->query_id);
 
@@ -1341,7 +1354,8 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflig
 }
 
 Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
-    bool ignore_if_absent) {
+    const SecretArg& secret, bool ignore_if_absent) {
+  DCHECK(secret.is_session_secret());
   VLOG_QUERY << "Closing session: " << PrintId(session_id);
 
   // Find the session_state and remove it from the map.
@@ -1349,10 +1363,15 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   {
     lock_guard<mutex> l(session_state_map_lock_);
     SessionStateMap::iterator entry = session_state_map_.find(session_id);
-    if (entry == session_state_map_.end()) {
+    if (entry == session_state_map_.end() || !secret.Validate(entry->second->secret)) {
       if (ignore_if_absent) {
         return Status::OK();
       } else {
+        if (entry != session_state_map_.end()) {
+          // Log invalid attempts to connect. Be careful not to log secret.
+          VLOG(1) << "Client tried to connect to session " << PrintId(session_id)
+                  << " with invalid secret.";
+        }
         string err_msg = Substitute("Invalid session id: $0", PrintId(session_id));
         VLOG(1) << "CloseSessionInternal(): " << err_msg;
         return Status::Expected(err_msg);
@@ -1388,13 +1407,24 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   return Status::OK();
 }
 
-Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
+Status ImpalaServer::GetSessionState(const TUniqueId& session_id, const SecretArg& secret,
     shared_ptr<SessionState>* session_state, bool mark_active) {
   lock_guard<mutex> l(session_state_map_lock_);
   SessionStateMap::iterator i = session_state_map_.find(session_id);
-  if (i == session_state_map_.end()) {
+  // TODO: consider factoring out the lookup and secret validation into a separate method.
+  // This would require rethinking the locking protocol for 'session_state_map_lock_' -
+  // it probably doesn't not need to be held for the full duration of this function.
+  if (i == session_state_map_.end() || !secret.Validate(i->second->secret)) {
+    if (i != session_state_map_.end()) {
+      // Log invalid attempts to connect. Be careful not to log secret.
+      VLOG(1) << "Client tried to connect to session " << PrintId(session_id)
+              << " with invalid "
+              << (secret.is_session_secret() ? "session" : "operation") << " secret.";
+    }
     *session_state = std::shared_ptr<SessionState>();
-    string err_msg = Substitute("Invalid session id: $0", PrintId(session_id));
+    string err_msg = secret.is_session_secret() ?
+        Substitute("Invalid session id: $0", PrintId(session_id)) :
+        Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(secret.query_id()));
     VLOG(1) << "GetSessionState(): " << err_msg;
     return Status::Expected(err_msg);
   } else {
@@ -1970,7 +2000,17 @@ void ImpalaServer::ConnectionStart(
     // Beeswax only allows for one session per connection, so we can share the session ID
     // with the connection ID
     const TUniqueId& session_id = connection_context.connection_id;
-    shared_ptr<SessionState> session_state = make_shared<SessionState>(this);
+    // Generate a secret per Beeswax session so that the HS2 secret validation mechanism
+    // prevent accessing of Beeswax sessions from HS2.
+    uuid secret_uuid;
+    {
+      lock_guard<mutex> l(uuid_lock_);
+      secret_uuid = crypto_uuid_generator_();
+    }
+    TUniqueId secret;
+    UUIDToTUniqueId(secret_uuid, &secret);
+    shared_ptr<SessionState> session_state =
+        make_shared<SessionState>(this, session_id, secret);
     session_state->closed = false;
     session_state->start_time_ms = UnixMillis();
     session_state->last_accessed_ms = UnixMillis();
@@ -2030,7 +2070,8 @@ void ImpalaServer::ConnectionEnd(
 
   if (close) {
     for (const TUniqueId& session_id : disconnected_sessions) {
-      Status status = CloseSessionInternal(session_id, true);
+      Status status = CloseSessionInternal(session_id, SecretArg::SkipSecretCheck(),
+          /* ignore_if_absent= */ true);
       if (!status.ok()) {
         LOG(WARNING) << "Error closing session " << PrintId(session_id) << ": "
                      << status.GetDetail();
@@ -2041,7 +2082,7 @@ void ImpalaServer::ConnectionEnd(
         || connection_context.server_name == HS2_HTTP_SERVER_NAME);
     for (const TUniqueId& session_id : disconnected_sessions) {
       shared_ptr<SessionState> state;
-      Status status = GetSessionState(session_id, &state);
+      Status status = GetSessionState(session_id, SecretArg::SkipSecretCheck(), &state);
       // The session may not exist if it was explicitly closed.
       if (!status.ok()) continue;
       lock_guard<mutex> state_lock(state->lock);
@@ -2548,6 +2589,24 @@ shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
   }
 }
 
+Status ImpalaServer::CheckClientRequestSession(
+    SessionState* session, const std::string& client_request_effective_user,
+    const TUniqueId& query_id) {
+  const string& session_user = GetEffectiveUser(*session);
+  // Empty session users only occur for unauthenticated sessions where no user was
+  // specified by the client, e.g. unauthenticated beeswax sessions. Skip the
+  // check in this case because no security is enabled. Some tests rely on
+  // this behaviour, e.g. to poll query status from a new beeswax connection.
+  if (!session_user.empty() && session_user != client_request_effective_user) {
+    Status err = Status::Expected(
+        Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id)));
+    VLOG(1) << err << " caused by user mismatch: '" << session_user << "' vs '"
+            << client_request_effective_user << "'";
+    return err;
+  }
+  return Status::OK();
+}
+
 void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
     const TUpdateFilterParams& params) {
   DCHECK(params.__isset.query_id);
@@ -2656,5 +2715,15 @@ Status ImpalaServer::StartShutdown(
   }
   LOG(INFO) << "Shutdown complete, going down.";
   exit(0);
+}
+
+// This should never be inlined to prevent it potentially being optimized, e.g.
+// by short-circuiting the comparisons.
+__attribute__((noinline)) int ImpalaServer::SecretArg::ConstantTimeCompare(
+    const TUniqueId& other) const {
+  // Compiles to two integer comparisons and an addition with no branches.
+  // TODO: consider replacing with CRYPTO_memcmp() once our minimum supported OpenSSL
+  // version has it.
+  return (secret_.hi != other.hi) + (secret_.lo != other.lo);
 }
 }

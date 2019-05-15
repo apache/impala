@@ -35,13 +35,14 @@ const string ChildQuery::PARENT_QUERY_OPT = "impala.parent_query_id";
 // particular the parent query's lock_) while invoking HS2 functions to avoid deadlock.
 Status ChildQuery::ExecAndFetch() {
   const TUniqueId& session_id = parent_request_state_->session_id();
+  const TUniqueId& session_secret = parent_request_state_->session()->secret;
   VLOG_QUERY << "Executing child query: " << query_ << " in session "
              << PrintId(session_id);
 
   // Create HS2 request and response structs.
   TExecuteStatementResp exec_stmt_resp;
   TExecuteStatementReq exec_stmt_req;
-  ImpalaServer::TUniqueIdToTHandleIdentifier(session_id, session_id,
+  ImpalaServer::TUniqueIdToTHandleIdentifier(session_id, session_secret,
       &exec_stmt_req.sessionHandle.sessionId);
   exec_stmt_req.__set_statement(query_);
   SetQueryOptions(parent_request_state_->exec_request().query_options, &exec_stmt_req);

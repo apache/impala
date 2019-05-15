@@ -19,6 +19,7 @@
 #define IMPALA_SERVICE_IMPALA_SERVER_H
 
 #include <atomic>
+#include <boost/random/random_device.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -137,6 +138,29 @@ class QuerySchedule;
 /// with a deadline of 1 hour, but then wants to shut down the cluster sooner, they can
 /// run the shutdown function again to set a shorter deadline. The deadline can't be
 /// increased after shutdown is started.
+///
+/// Secrets
+/// -------
+/// The HS2 protocol has a concept of a 'secret' associated with each session and
+/// client request that is returned to the client, then must be passed back along with
+/// each RPC that interacts with the session or operation. RPCs with non-matching secrets
+/// should fail. Beeswax does not have this concept - rather sessions are bound to a
+/// connection, and that session and associated requests should (generally) only be
+/// accessed from the session's connection.
+///
+/// All RPC handler functions are responsible for validating secrets when looking up
+/// client sessions or requests, with some exceptions:
+/// * Beewax sessions are tied to a connection, so it is always valid to access the
+///   session from the original connection.
+/// * Cancel() and close() Beeswax operations can cancel any query if the ID is known.
+///   Existing tools (impala-shell and administrative tools) depend on this behaviour.
+///
+/// HS2 RPC handlers should pass the client-provided secret to WithSession() before
+/// taking any action on behalf of the client. Beeswax RPC handlers should call
+/// CheckClientRequestSession() to ensure that the client request is accessible from
+/// the current session. All other functions assume that the validation was already done.
+///
+/// HTTP handlers do not have access to client secrets, so do not validate them.
 ///
 /// Locking
 /// -------
@@ -443,7 +467,9 @@ class ImpalaServer : public ImpalaServiceIf,
     /// run as children of Beeswax sessions) get results back in the expected format -
     /// child queries inherit the HS2 version from their parents, and a Beeswax session
     /// will never update the HS2 version from the default.
-    SessionState(ImpalaServer* impala_server) : impala_server(impala_server),
+    SessionState(ImpalaServer* impala_server, TUniqueId session_id, TUniqueId secret)
+      : impala_server(impala_server), session_id(std::move(session_id)),
+        secret(std::move(secret)),
         closed(false), expired(false), hs2_version(apache::hive::service::cli::thrift::
         TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), total_queries(0), ref_count(0) {
       DCHECK(this->impala_server != nullptr);
@@ -451,6 +477,14 @@ class ImpalaServer : public ImpalaServiceIf,
 
     /// Pointer to the Impala server of this session
     ImpalaServer* impala_server;
+
+    /// The unique session ID. This is also the key for session_state_map_, but
+    /// we redundantly store it here for convenience.
+    const TUniqueId session_id;
+
+    /// The session secret that client RPCs must pass back in to access the session.
+    /// This must not be printed to logs or exposed in any other way.
+    const TUniqueId secret;
 
     TSessionType::type session_type;
 
@@ -547,6 +581,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
  private:
   struct ExpirationEvent;
+  class SecretArg;
   friend class ChildQuery;
   friend class ControlService;
   friend class ImpalaHttpHandler;
@@ -564,6 +599,16 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Return exec state for given query_id, or NULL if not found.
   std::shared_ptr<ClientRequestState> GetClientRequestState(
       const TUniqueId& query_id);
+
+  /// Used in situations where the client provides a session ID and a query ID and the
+  /// caller needs to validate that the query can be accessed from the session. The two
+  /// arguments are the session obtained by looking up the session ID provided by the
+  /// RPC client and the effective user from the query. If the username doesn't match,
+  /// return an error indicating that the query was not found (since we prefer not to
+  /// leak information about the existence of queries that the user doesn't have
+  /// access to).
+  Status CheckClientRequestSession(SessionState* session,
+      const std::string& client_request_effective_user, const TUniqueId& query_id);
 
   /// Updates a set of Impalad catalog metrics including number tables/databases and
   /// some cache metrics applicable to local catalog mode (if configured). Called at
@@ -625,8 +670,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Caller should not hold any locks when calling this function.
   /// If ignore_if_absent is true, returns OK even if a session with the supplied ID does
   /// not exist.
-  Status CloseSessionInternal(const TUniqueId& session_id, bool ignore_if_absent)
-      WARN_UNUSED_RESULT;
+  Status CloseSessionInternal(const TUniqueId& session_id, const SecretArg& secret,
+      bool ignore_if_absent) WARN_UNUSED_RESULT;
 
   /// Gets the runtime profile string for a given query_id and writes it to the output
   /// stream. First searches for the query id in the map of in-flight queries. If no
@@ -827,13 +872,15 @@ class ImpalaServer : public ImpalaServiceIf,
   [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
   /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, bool start_over,
+  Status FetchInternal(ClientRequestState* request_state, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results) WARN_UNUSED_RESULT;
 
   /// Populate insert_result and clean up exec state. If the query
   /// status is an error, insert_result is not populated and the status is returned.
-  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result)
-      WARN_UNUSED_RESULT;
+  /// 'session' is RPC client's session, used to check whether the insert can
+  /// be closed via that session.
+  Status CloseInsertInternal(SessionState* session, const TUniqueId& query_id,
+      TInsertResult* insert_result) WARN_UNUSED_RESULT;
 
   /// HiveServer2 private methods (implemented in impala-hs2-server.cc)
 
@@ -852,8 +899,9 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Executes the fetch logic for HiveServer2 FetchResults. If fetch_first is true, then
   /// the query's state should be reset to fetch from the beginning of the result set.
-  /// Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size, bool fetch_first,
+  /// Doesn't clean up 'request_state' if an error occurs.
+  Status FetchInternal(ClientRequestState* request_state, SessionState* session,
+      int32_t fetch_size, bool fetch_first,
       apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results)
       WARN_UNUSED_RESULT;
 
@@ -1003,6 +1051,64 @@ class ImpalaServer : public ImpalaServiceIf,
   TQueryOptions default_query_options_;
   std::vector<beeswax::ConfigVariable> default_configs_;
 
+  // Container for a secret passed into functions for validation.
+  class SecretArg {
+   public:
+    // This should only be used if the client has not provided a secret but the caller
+    // knows that the client in fact is allowed to access the session or operation that
+    // they are accessing.
+    static SecretArg SkipSecretCheck() {
+      return SecretArg(true, true, TUniqueId(), TUniqueId());
+    }
+
+    /// Pass a session secret for validation.
+    static SecretArg Session(const TUniqueId& secret) {
+      return SecretArg(false, true, secret, TUniqueId());
+    }
+
+    /// Pass a query secret for validation. The error message will include the 'query_id',
+    /// so that must also be passed.
+    static SecretArg Operation(const TUniqueId& secret, const TUniqueId& query_id) {
+      return SecretArg(false, false, secret, query_id);
+    }
+
+    /// Return true iff the check should be skipped or the secret matches 'other'.
+    /// All validation should be done via this function to avoid subtle errors.
+    bool Validate(const TUniqueId& other) const {
+      return skip_validation_ || ConstantTimeCompare(other) == 0;
+    }
+
+    bool is_session_secret() const { return is_session_secret_; }
+    TUniqueId query_id() const {
+      DCHECK(!is_session_secret_);
+      return query_id_;
+    }
+
+   private:
+    SecretArg(bool skip_validation, bool is_session_secret, TUniqueId secret,
+        TUniqueId query_id)
+      : skip_validation_(skip_validation),
+        is_session_secret_(is_session_secret),
+        secret_(std::move(secret)),
+        query_id_(std::move(query_id)) {}
+
+    /// A comparison function for unique IDs that executes in an amount of time unrelated
+    /// to the input values. Returns the number of words that differ between id1 and id2.
+    int ConstantTimeCompare(const TUniqueId& other) const;
+
+    /// True if the caller wants to skip validation of the session.
+    const bool skip_validation_;
+
+    /// True if this is a session secret, false if this is an operation secret.
+    const bool is_session_secret_;
+
+    /// The secret to validate.
+    const TUniqueId secret_;
+
+    /// The query id, only provided if this is an operation secret.
+    const TUniqueId query_id_;
+  };
+
   /// Class that allows users of SessionState to mark a session as in-use, and therefore
   /// immune to expiration. The marking is done in WithSession() and undone in the
   /// destructor, so this class can be used to 'check-out' a session for the duration of a
@@ -1013,11 +1119,13 @@ class ImpalaServer : public ImpalaServiceIf,
 
     /// Marks a session as in-use, and saves it so that it can be unmarked when this
     /// object goes out of scope. Returns OK unless there is an error in GetSessionState.
-    /// Must only be called once per ScopedSessionState.
-    Status WithSession(const TUniqueId& session_id,
+    /// 'secret' must be provided and is validated against the stored secret for the
+    /// session. Must only be called once per ScopedSessionState.
+    Status WithSession(const TUniqueId& session_id, const SecretArg& secret,
         std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
       DCHECK(session_.get() == NULL);
-      RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
+      RETURN_IF_ERROR(impala_->GetSessionState(
+            session_id, secret, &session_, /* mark_active= */ true));
       if (session != NULL) (*session) = session_;
 
       // We won't have a connection context in the case of ChildQuery, which calls into
@@ -1039,12 +1147,17 @@ class ImpalaServer : public ImpalaServiceIf,
       return Status::OK();
     }
 
-    /// Same as WithSession(), except does not update the session/connection mapping, as
-    /// beeswax sessions can only be used over a single connection.
-    Status WithBeeswaxSession(const TUniqueId& session_id,
-        std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
+    /// Same as WithSession(), except:
+    /// * It should only be called from beeswax with a 'connection_id' obtained from
+    ///   ThriftServer::GetThreadConnectionId().
+    /// * It does not update the session/connection mapping, as beeswax sessions can
+    ///   only be used over a single connection.
+    Status WithBeeswaxSession(const TUniqueId& connection_id,
+        std::shared_ptr<SessionState>* session = NULL) {
       DCHECK(session_.get() == NULL);
-      RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
+      RETURN_IF_ERROR(
+          impala_->GetSessionState(connection_id, SecretArg::SkipSecretCheck(), &session_,
+              /* mark_active= */ true));
       if (session != NULL) (*session) = session_;
       return Status::OK();
     }
@@ -1087,10 +1200,11 @@ class ImpalaServer : public ImpalaServiceIf,
   ConnectionToSessionMap connection_to_sessions_map_;
 
   /// Returns session state for given session_id.
-  /// If not found, session_state will be NULL and an error status will be returned.
+  /// If not found or validation of 'secret' against the stored secret in the
+  /// SessionState fails, session_state will be NULL and an error status will be returned.
   /// If mark_active is true, also checks if the session is expired or closed and
   /// increments the session's reference counter if it is still alive.
-  Status GetSessionState(const TUniqueId& session_id,
+  Status GetSessionState(const TUniqueId& session_id, const SecretArg& secret,
       std::shared_ptr<SessionState>* session_state, bool mark_active = false)
       WARN_UNUSED_RESULT;
 
@@ -1121,8 +1235,9 @@ class ImpalaServer : public ImpalaServiceIf,
   std::shared_ptr<const TBackendDescriptor> local_backend_descriptor_;
   boost::mutex local_backend_descriptor_lock_;
 
-  /// Generate unique session id for HiveServer2 session
-  boost::uuids::random_generator uuid_generator_;
+  /// UUID generator for session IDs and secrets. Uses system random device to get
+  /// cryptographically secure random numbers.
+  boost::uuids::basic_random_generator<boost::random_device> crypto_uuid_generator_;
 
   /// Lock to protect uuid_generator
   boost::mutex uuid_lock_;

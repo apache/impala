@@ -470,9 +470,12 @@ class ImpalaBeeswaxClient(object):
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 
+  def close_dml(self, handle):
+    return self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
+
   def __fetch_insert_results(self, handle):
     """Executes an insert query"""
-    result = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
+    result = self.close_dml(handle)
     # The insert was successful
     num_rows = sum(map(int, result.rows_modified.values()))
     data = ["%s: %s" % row for row in result.rows_modified.iteritems()]

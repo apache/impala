@@ -63,6 +63,22 @@ def operation_id_to_query_id(operation_id):
   hi = ''.join(['%0.2X' % ord(c) for c in hi[::-1]])
   return "%s:%s" % (lo, hi)
 
+
+def create_session_handle_without_secret(session_handle):
+  """Create a HS2 session handle with the same session ID as 'session_handle' but a
+  bogus secret of the right length, i.e. 16 bytes."""
+  return TCLIService.TSessionHandle(TCLIService.THandleIdentifier(
+      session_handle.sessionId.guid, r"xxxxxxxxxxxxxxxx"))
+
+
+def create_op_handle_without_secret(op_handle):
+  """Create a HS2 operation handle with same parameters as 'op_handle' but with a bogus
+  secret of the right length, i.e. 16 bytes."""
+  op_id = TCLIService.THandleIdentifier(op_handle.operationId.guid, r"xxxxxxxxxxxxxxxx")
+  return TCLIService.TOperationHandle(
+      op_id, op_handle.operationType, op_handle.hasResultSet)
+
+
 class HS2TestSuite(ImpalaTestSuite):
   HS2_V6_COLUMN_TYPES = ['boolVal', 'stringVal', 'byteVal', 'i16Val', 'i32Val', 'i64Val',
                          'doubleVal', 'binaryVal']
@@ -87,6 +103,35 @@ class HS2TestSuite(ImpalaTestSuite):
     if expected_status_code != TCLIService.TStatusCode.SUCCESS_STATUS\
        and expected_error_prefix is not None:
       assert response.status.errorMessage.startswith(expected_error_prefix)
+
+  @staticmethod
+  def check_invalid_session(response):
+    """Checks that the HS2 API response is the correct response if the session is invalid,
+    i.e. the session doesn't exist or the secret is invalid."""
+    HS2TestSuite.check_response(response, TCLIService.TStatusCode.ERROR_STATUS,
+                                "Invalid session id:")
+
+  @staticmethod
+  def check_invalid_query(response, expect_legacy_err=False):
+    """Checks that the HS2 API response is the correct response if the query is invalid,
+    i.e. the query doesn't exist, doesn't match the session provided, or the secret is
+    invalid. """
+    if expect_legacy_err:
+      # Some operations return non-standard errors like "Query id ... not found".
+      expected_err = "Query id"
+    else:
+      # We should standardise on this error message.
+      expected_err = "Invalid query handle:"
+    HS2TestSuite.check_response(response, TCLIService.TStatusCode.ERROR_STATUS,
+                                expected_err)
+
+  @staticmethod
+  def check_profile_access_denied(response, user):
+    """Checks that the HS2 API response is the correct response if the user is not
+    authorised to access the query's profile."""
+    HS2TestSuite.check_response(response, TCLIService.TStatusCode.ERROR_STATUS,
+                                "User {0} is not authorized to access the runtime "
+                                "profile or execution summary".format(user))
 
   def close(self, op_handle):
     close_op_req = TCLIService.TCloseOperationReq()
