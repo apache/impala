@@ -431,7 +431,12 @@ under the License.
     </plugins>
   </reporting>
 
+  <properties>
+    <buildOutputDirectory>${project.build.directory}/classes</buildOutputDirectory>
+  </properties>
+
   <build>
+    <outputDirectory>${buildOutputDirectory}</outputDirectory>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -542,21 +547,7 @@ under the License.
           <trimStackTrace>false</trimStackTrace>
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
-          <argLine>-Djava.library.path=${java.library.path}:${backend.library.path} ${surefireJacocoArg}</argLine>
-          <systemProperties>
-            <property>
-              <name>testExecutionMode</name>
-              <value>${testExecutionMode}</value>
-            </property>
-            <property>
-              <name>beeswax_port</name>
-              <value>${beeswax_port}</value>
-              <name>impalad</name>
-              <value>${impalad}</value>
-              <name>use_external_impalad</name>
-              <value>${use_external_impalad}</value>
-            </property>
-          </systemProperties>
+          <argLine>${surefireJacocoArg}</argLine>
         </configuration>
       </plugin>
 
@@ -585,31 +576,6 @@ under the License.
             </configuration>
           </execution>
         </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>1.4.0</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>java</goal>
-            </goals>
-          </execution>
-        </executions>
-          <configuration>
-            <systemProperties>
-              <systemProperty>
-                <key>java.library.path</key>
-                <value>${java.library.path}:${backend.library.path}</value>
-              </systemProperty>
-              <systemProperty>
-                <key>test.hive.testdata</key>
-                <value>${project.basedir}/../testdata/target/AllTypes.txt</value>
-              </systemProperty>
-            </systemProperties>
-          </configuration>
       </plugin>
 
       <plugin>
@@ -732,17 +698,34 @@ under the License.
                     <versionRange>[2.0,)</versionRange>
                     <goals>
                       <goal>copy-dependencies</goal>
+                      <goal>build-classpath</goal>
                     </goals>
                   </pluginExecutionFilter>
                   <action>
                     <ignore></ignore>
                   </action>
                 </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>de.jflex</groupId>
+                    <artifactId>maven-jflex-plugin</artifactId>
+                    <versionRange>[1.4.3,)</versionRange>
+                    <goals>
+                      <goal>generate</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <execute></execute>
+                  </action>
+                </pluginExecution>
               </pluginExecutions>
             </lifecycleMappingMetadata>
           </configuration>
         </plugin>
-        <!-- mvn eclipse:eclipse generates Eclipse .project and .classpath files -->
+        <!-- mvn eclipse:eclipse generates Eclipse .project and .classpath files
+             NOTE: This is a deprecated Maven plugin. It's recommended to use
+             the native Eclipse "import Maven project" functionality (m2e)
+             instead -->
         <plugin>
           <groupId>org.apache.maven.plugins </groupId>
           <artifactId>maven-eclipse-plugin</artifactId>
@@ -1124,6 +1107,25 @@ under the License.
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <!-- Profile which is automatically activated when building from
+         within Eclipse based on the presence of the m2e.version
+         property -->
+    <profile>
+      <id>eclipse-m2e</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+        <!-- By default, we separate Eclipse-built files from Maven-built
+             files. Otherwise, they are both in target/classes, and Eclipse
+             and Maven may clobber each other, complicating attaching to
+             a running process. -->
+        <properties>
+          <buildOutputDirectory>${project.build.directory}/${eclipse.output.directory}</buildOutputDirectory>
+        </properties>
     </profile>
   </profiles>
 
