@@ -24,6 +24,7 @@ from os import getenv
 
 from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObject
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.skip import SkipIfHive3
 
 # Sentry long polling frequency to make Sentry refresh not run.
 SENTRY_LONG_POLLING_FREQUENCY_S = 3600
@@ -35,6 +36,7 @@ SENTRY_CONFIG_FILE_OO_NOGRANT = SENTRY_CONFIG_DIR + 'sentry-site_oo_nogrant.xml'
 SENTRY_CONFIG_FILE_NO_OO = SENTRY_CONFIG_DIR + 'sentry-site_no_oo.xml'
 
 
+@SkipIfHive3.sentry_not_supported
 class TestOwnerPrivileges(SentryCacheTestSuite):
   @classmethod
   def add_test_dimensions(cls):

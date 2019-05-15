@@ -25,7 +25,7 @@ import pytest
 from functools import partial
 
 from tests.common.environ import (IMPALA_TEST_CLUSTER_PROPERTIES,
-    IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL)
+    IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL, HIVE_MAJOR_VERSION)
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
@@ -197,6 +197,11 @@ class SkipIfDockerizedCluster:
       IS_DOCKERIZED_TEST_CLUSTER, reason="Daemon would need to access host filesystem.")
   insert_acls = pytest.mark.skipif(IS_DOCKERIZED_TEST_CLUSTER,
       reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")
+
+
+class SkipIfHive3:
+  sentry_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
+      reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
 
 
 class SkipIfCatalogV2:
