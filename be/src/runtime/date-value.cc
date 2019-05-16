@@ -19,7 +19,6 @@
 #include "runtime/date-value.h"
 
 #include <iomanip>
-
 #include "cctz/civil_time.h"
 #include "runtime/date-parse-util.h"
 
@@ -27,30 +26,31 @@
 
 namespace impala {
 
-namespace {
-const int EPOCH_YEAR = 1970;
-const cctz::civil_day EPOCH_DATE(EPOCH_YEAR, 1, 1);
-
-inline int32_t CalcDaysSinceEpoch(const cctz::civil_day& date) {
-  return date - EPOCH_DATE;
-}
-
-}
-
 using datetime_parse_util::DateTimeFormatContext;
 
-const int DateValue::MIN_YEAR = 0;
-const int DateValue::MAX_YEAR = 9999;
+const int EPOCH_YEAR = 1970;
+const int MIN_YEAR = 0;
+const int MAX_YEAR = 9999;
 
-const int32_t DateValue::MIN_DAYS_SINCE_EPOCH = CalcDaysSinceEpoch(
-    cctz::civil_day(MIN_YEAR, 1, 1));
-const int32_t DateValue::MAX_DAYS_SINCE_EPOCH = CalcDaysSinceEpoch(
-    cctz::civil_day(MAX_YEAR, 12, 31));
+const cctz::civil_day EPOCH_DATE(EPOCH_YEAR, 1, 1);
+
+const int32_t DateValue::MIN_DAYS_SINCE_EPOCH =
+    cctz::civil_day(MIN_YEAR, 1, 1) - EPOCH_DATE;
+const int32_t DateValue::MAX_DAYS_SINCE_EPOCH =
+    cctz::civil_day(MAX_YEAR, 12, 31) - EPOCH_DATE;
 
 const DateValue DateValue::MIN_DATE(MIN_DAYS_SINCE_EPOCH);
 const DateValue DateValue::MAX_DATE(MAX_DAYS_SINCE_EPOCH);
 
-DateValue::DateValue(int year, int month, int day)
+// Describes ranges for months in a non-leap year expressed as number of days since
+// January 1.
+const vector<int> MONTH_RANGES = {
+    0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 };
+// Describes ranges for months in a leap year expressed as number of days since January 1.
+const vector<int> LEAP_YEAR_MONTH_RANGES = {
+    0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 };
+
+DateValue::DateValue(int64_t year, int64_t month, int64_t day)
     : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
   DCHECK(!IsValid());
   // Check year range and whether year-month-day is a valid date.
@@ -58,7 +58,7 @@ DateValue::DateValue(int year, int month, int day)
     // Use CCTZ for validity check.
     cctz::civil_day date(year, month, day);
     if (LIKELY(year == date.year() && month == date.month() && day == date.day())) {
-      days_since_epoch_ = CalcDaysSinceEpoch(date);
+      days_since_epoch_ = date - EPOCH_DATE;
       DCHECK(IsValid());
     }
   }
@@ -85,19 +85,6 @@ int DateValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) 
   return DateParser::Format(dt_ctx, *this, len, buff);
 }
 
-bool DateValue::ToYearMonthDay(int* year, int* month, int* day) const {
-  DCHECK(year != nullptr);
-  DCHECK(month != nullptr);
-  DCHECK(day != nullptr);
-  if (UNLIKELY(!IsValid())) return false;
-
-  const cctz::civil_day cd = EPOCH_DATE + days_since_epoch_;
-  *year = cd.year();
-  *month = cd.month();
-  *day = cd.day();
-  return true;
-}
-
 namespace {
 
 inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
@@ -109,6 +96,10 @@ inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
       + ((year - EPOCH_YEAR / 4 * 4 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
       - ((year - EPOCH_YEAR / 100 * 100 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
       + ((year - EPOCH_YEAR / 400 * 400 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1);
+}
+
+inline bool IsLeapYear(int year) {
+  return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
 }
 
 }
@@ -174,7 +165,46 @@ bool DateValue::ToYear(int* year) const {
   } else {
     *year = first_year;
   }
+  DCHECK(*year >= MIN_YEAR && *year <= MAX_YEAR);
 
+  return true;
+}
+
+bool DateValue::ToYearMonthDay(int* year, int* month, int* day) const {
+  DCHECK(year != nullptr);
+  DCHECK(month != nullptr);
+  DCHECK(day != nullptr);
+  if (UNLIKELY(!IsValid())) return false;
+
+  // Uses the same method to calculate the year as DateValue::ToYear().
+  int tmp = days_since_epoch_ * 400 + 287811200;
+  int first_year = (tmp - 591) / 146097;
+  int last_year = (tmp + 288) / 146097;
+
+  int jan1_dse = CalcFirstDayOfYearSinceEpoch(last_year);
+  if (jan1_dse <= days_since_epoch_) {
+    *year = last_year;
+  } else {
+    *year = first_year;
+    jan1_dse -= IsLeapYear(first_year) ? 366 : 365;
+  }
+  DCHECK(*year >= MIN_YEAR && *year <= MAX_YEAR);
+
+  // Day of year. 0 is used for January 1.
+  int days_since_jan1 = days_since_epoch_ - jan1_dse;
+
+  // Calculate month using month ranges and the average month length.
+  const vector<int>& month_ranges = IsLeapYear(*year) ? LEAP_YEAR_MONTH_RANGES
+                                                      : MONTH_RANGES;
+  int m = static_cast<int>(days_since_jan1 / 30.5);
+  DCHECK(month_ranges[m] <= days_since_jan1);
+
+  *month = (month_ranges[m + 1] <= days_since_jan1) ? m + 2 : m + 1;
+  DCHECK(*month >= 1 && *month <= 12);
+
+  // Calculate day.
+  *day = days_since_jan1 - month_ranges[*month - 1] + 1;
+  DCHECK(*day >= 1 && *day <= 31);
   return true;
 }
 
@@ -184,16 +214,143 @@ int DateValue::WeekDay() const {
   return static_cast<int>(cctz::get_weekday(cd));
 }
 
-DateValue DateValue::AddDays(int days) const {
+int DateValue::DayOfYear() const {
+  if (UNLIKELY(!IsValid())) return -1;
+  const cctz::civil_day cd = EPOCH_DATE + days_since_epoch_;
+  return static_cast<int>(cctz::get_yearday(cd));
+}
+
+int DateValue::WeekOfYear() const {
+  if (UNLIKELY(!IsValid())) return -1;
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+
+  cctz::civil_day jan1 = cctz::civil_day(today.year(), 1, 1);
+  cctz::civil_day first_monday;
+  if (cctz::get_weekday(jan1) <= cctz::weekday::thursday) {
+    // Get the previous Monday if 'jan1' is not already a Monday.
+    first_monday = cctz::next_weekday(jan1, cctz::weekday::monday) - 7;
+  } else {
+    // Get the next Monday.
+    first_monday = cctz::next_weekday(jan1, cctz::weekday::monday);
+  }
+
+  cctz::civil_day dec31 = cctz::civil_day(today.year(), 12, 31);
+  cctz::civil_day last_sunday;
+  if (cctz::get_weekday(dec31) >= cctz::weekday::thursday) {
+    // Get the next Sunday if 'dec31' is not already a Sunday.
+    last_sunday = cctz::prev_weekday(dec31, cctz::weekday::sunday) + 7;
+  } else {
+    // Get the previous Sunday.
+    last_sunday = cctz::prev_weekday(dec31, cctz::weekday::sunday);
+  }
+
+  if (UNLIKELY(today.year() == 0 && today < first_monday)) {
+    // 0000-01-01 is Saturday in the proleptic Gregorian calendar.
+    // 0000-01-01 and 0000-01-02 belong to the previous year.
+    return 52;
+  } else if (today >= first_monday && today <= last_sunday) {
+    return (today - first_monday) / 7 + 1;
+  } else if (today > last_sunday) {
+    return 1;
+  } else {
+    // today < first_monday && today.year() > 0
+    cctz::civil_day prev_jan1 = cctz::civil_day(today.year() - 1, 1, 1);
+    cctz::civil_day prev_first_monday;
+    if (cctz::get_weekday(prev_jan1) <= cctz::weekday::thursday) {
+      // Get the previous Monday if 'prev_jan1' is not already a Monday.
+      prev_first_monday = cctz::next_weekday(prev_jan1, cctz::weekday::monday) - 7;
+    } else {
+      // Get the next Monday.
+      prev_first_monday = cctz::next_weekday(prev_jan1, cctz::weekday::monday);
+    }
+    return (today - prev_first_monday) / 7 + 1;
+  }
+}
+
+DateValue DateValue::AddDays(int64_t days) const {
   if (UNLIKELY(!IsValid())) return DateValue();
   return DateValue(days_since_epoch_ + days);
+}
+
+DateValue DateValue::AddMonths(int64_t months, bool keep_last_day) const {
+  if (UNLIKELY(!IsValid())) return DateValue();
+
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  const cctz::civil_month month = cctz::civil_month(today);
+  const cctz::civil_month result_month = month + months;
+  const cctz::civil_day last_day_of_result_month =
+      cctz::civil_day(result_month + 1) - 1;
+
+  if (keep_last_day) {
+    const cctz::civil_day last_day_of_month = cctz::civil_day(month + 1) - 1;
+    if (today == last_day_of_month) {
+      return DateValue(last_day_of_result_month.year(),
+          last_day_of_result_month.month(), last_day_of_result_month.day());
+    }
+  }
+
+  const cctz::civil_day ans_normalized = cctz::civil_day(result_month.year(),
+      result_month.month(), today.day());
+  const cctz::civil_day ans_capped = std::min(ans_normalized, last_day_of_result_month);
+  return DateValue(ans_capped.year(), ans_capped.month(), ans_capped.day());
+}
+
+DateValue DateValue::AddYears(int64_t years) const {
+  if (UNLIKELY(!IsValid())) return DateValue();
+
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  const int64_t result_year = today.year() + years;
+
+  // Feb 29 in leap years requires special attention.
+  if (UNLIKELY(today.month() == 2 && today.day() == 29)) {
+    const cctz::civil_month result_month(result_year, today.month());
+    const cctz::civil_day last_day_of_result_month =
+        cctz::civil_day(result_month + 1) - 1;
+    return DateValue(result_year, last_day_of_result_month.month(),
+        last_day_of_result_month.day());
+  }
+  return DateValue(result_year, today.month(), today.day());
 }
 
 bool DateValue::ToDaysSinceEpoch(int32_t* days) const {
   DCHECK(days != nullptr);
   if (UNLIKELY(!IsValid())) return false;
 
-  *days =  days_since_epoch_;
+  *days = days_since_epoch_;
+  return true;
+}
+
+DateValue DateValue::LastDay() const {
+  if (UNLIKELY(!IsValid())) return DateValue();
+
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  const cctz::civil_month month = cctz::civil_month(today);
+  const cctz::civil_day last_day_of_month = cctz::civil_day(month + 1) - 1;
+  return DateValue(last_day_of_month - EPOCH_DATE);
+}
+
+bool DateValue::MonthsBetween(const DateValue& other, double* months_between) const {
+  DCHECK(months_between != nullptr);
+  if (UNLIKELY(!IsValid() || !other.IsValid())) return false;
+
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  const cctz::civil_month month(today);
+  const cctz::civil_day last_day_of_month = cctz::civil_day(month + 1) - 1;
+
+  const cctz::civil_day other_date = EPOCH_DATE + other.days_since_epoch_;
+  const cctz::civil_month other_month(other_date);
+  const cctz::civil_day last_day_of_other_month = cctz::civil_day(other_month + 1) - 1;
+
+  // If both dates are last days of different months they don't contribute
+  // a fractional value to the number of months, therefore there is no need to
+  // calculate difference in their days.
+  int days_diff = 0;
+  if (today != last_day_of_month || other_date != last_day_of_other_month) {
+    days_diff = today.day() - other_date.day();
+  }
+
+  *months_between = (today.year() - other_date.year()) * 12 +
+      today.month() - other_date.month() + (static_cast<double>(days_diff) / 31.0);
   return true;
 }
 

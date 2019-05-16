@@ -28,13 +28,14 @@ import org.apache.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 /**
- * Describes the addition and subtraction of time units from timestamps.
- * Arithmetic expressions on timestamps are syntactic sugar.
+ * Describes the addition and subtraction of time units from timestamps/dates.
+ * Arithmetic expressions on timestamps/dates are syntactic sugar.
  * They are executed as function call exprs in the BE.
+ * TimestampArithmeticExpr is used for both TIMESTAMP and DATE values.
  */
 public class TimestampArithmeticExpr extends Expr {
 
-  // Time units supported in timestamp arithmetic.
+  // Time units supported in timestamp/date arithmetic.
   public static enum TimeUnit {
     YEAR("YEAR"),
     MONTH("MONTH"),
@@ -90,7 +91,7 @@ public class TimestampArithmeticExpr extends Expr {
   }
 
   // C'tor for non-function-call like arithmetic, e.g., 'a + interval b year'.
-  // e1 always refers to the timestamp to be added/subtracted from, and e2
+  // e1 always refers to the timestamp/date to be added/subtracted from, and e2
   // to the time value (even in the interval-first case).
   public TimestampArithmeticExpr(ArithmeticExpr.Operator op, Expr e1, Expr e2,
       String timeUnitIdent, boolean intervalFirst) {
@@ -125,7 +126,7 @@ public class TimestampArithmeticExpr extends Expr {
         op_ = ArithmeticExpr.Operator.SUBTRACT;
       } else {
         throw new AnalysisException("Encountered function name '" + funcName_ +
-            "' in timestamp arithmetic expression '" + toSql() + "'. " +
+            "' in timestamp/date arithmetic expression '" + toSql() + "'. " +
             "Expected function name 'DATE_ADD' or 'DATE_SUB'.");
       }
     }
@@ -133,21 +134,30 @@ public class TimestampArithmeticExpr extends Expr {
     timeUnit_ = TIME_UNITS_MAP.get(timeUnitIdent_.toUpperCase());
     if (timeUnit_ == null) {
       throw new AnalysisException("Invalid time unit '" + timeUnitIdent_ +
-          "' in timestamp arithmetic expression '" + toSql() + "'.");
+          "' in timestamp/date arithmetic expression '" + toSql() + "'.");
     }
 
-    // The first child must return a timestamp or null.
-    if (!getChild(0).getType().isTimestamp() && !getChild(0).getType().isNull()) {
+    // The first child must return a timestamp or date or null.
+    if (!getChild(0).getType().isTimestamp() && !getChild(0).getType().isDate()
+        && !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
-          "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
-          getChild(0).getType().toSql() + "'. Expected type 'TIMESTAMP'.");
+          "' of timestamp/date arithmetic expression '" + toSql() + "' returns type '" +
+          getChild(0).getType().toSql() + "'. Expected type 'TIMESTAMP' or 'DATE'.");
+    }
+
+    // If first child returns a date, time unit must be YEAR/MONTH/WEEK/DAY.
+    if (getChild(0).getType().isDate() && timeUnit_ != TimeUnit.YEAR
+        && timeUnit_ != TimeUnit.MONTH && timeUnit_ != TimeUnit.WEEK
+        && timeUnit_ != TimeUnit.DAY) {
+      throw new AnalysisException("'" + timeUnit_ + "' intervals are not allowed in " +
+          "date arithmetic expressions");
     }
 
     // The second child must be an integer type.
     if (!getChild(1).getType().isIntegerType() &&
         !getChild(1).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(1).toSql() +
-          "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
+          "' of timestamp/date arithmetic expression '" + toSql() + "' returns type '" +
           getChild(1).getType().toSql() + "'. Expected an integer type.");
     }
 
@@ -162,7 +172,8 @@ public class TimestampArithmeticExpr extends Expr {
     castForFunctionCall(false, analyzer.isDecimalV2());
 
     Preconditions.checkNotNull(fn_);
-    Preconditions.checkState(fn_.getReturnType().isTimestamp());
+    Preconditions.checkState(fn_.getReturnType().isTimestamp()
+        || fn_.getReturnType().isDate());
     type_ = fn_.getReturnType();
   }
 

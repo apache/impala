@@ -43,6 +43,7 @@
 #include "exprs/cast-functions-ir.cc"
 #include "exprs/compound-predicates-ir.cc"
 #include "exprs/conditional-functions-ir.cc"
+#include "exprs/date-functions-ir.cc"
 #include "exprs/decimal-functions-ir.cc"
 #include "exprs/decimal-operators-ir.cc"
 #include "exprs/in-predicate-ir.cc"

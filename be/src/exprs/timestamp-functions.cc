@@ -45,6 +45,17 @@ const string TimestampFunctions::MONTHNAME_ARRAY[12] = {"January", "February", "
     "April", "May", "June", "July", "August", "September", "October", "November",
     "December"};
 
+// Sunday is mapped to 0 and Saturday is mapped to 6.
+const map<string, int> TimestampFunctions::DAYNAME_MAP = {
+    {"sun", 0}, {"sunday", 0},
+    {"mon", 1}, {"monday", 1},
+    {"tue", 2}, {"tuesday", 2},
+    {"wed", 3}, {"wednesday", 3},
+    {"thu", 4}, {"thursday", 4},
+    {"fri", 5}, {"friday", 5},
+    {"sat", 6}, {"saturday", 6},
+};
+
 TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();

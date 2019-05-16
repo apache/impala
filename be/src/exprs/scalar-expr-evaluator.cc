@@ -28,6 +28,7 @@
 #include "exprs/cast-functions.h"
 #include "exprs/compound-predicates.h"
 #include "exprs/conditional-functions.h"
+#include "exprs/date-functions.h"
 #include "exprs/decimal-functions.h"
 #include "exprs/decimal-operators.h"
 #include "exprs/hive-udf-call.h"
@@ -439,6 +440,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   StringFunctions::Length(nullptr, StringVal::null());
   TimestampFunctions::Year(nullptr, TimestampVal::null());
   TimestampFunctions::UnixAndFromUnixPrepare(nullptr, FunctionContext::FRAGMENT_LOCAL);
+  DateFunctions::Year(nullptr, DateVal::null());
   UdfBuiltins::Pi(nullptr);
   UtilityFunctions::Pid(nullptr);
 }

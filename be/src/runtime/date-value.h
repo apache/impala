@@ -51,6 +51,9 @@ struct DateTimeFormatContext;
 ///   due to its limited range.
 class DateValue {
  public:
+  static const DateValue MIN_DATE;
+  static const DateValue MAX_DATE;
+
   /// Default constructor creates an invalid DateValue instance.
   DateValue() : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
     DCHECK(!IsValid());
@@ -66,7 +69,7 @@ class DateValue {
     }
   }
 
-  DateValue(int year, int month, int day);
+  DateValue(int64_t year, int64_t month, int64_t day);
 
   bool IsValid() const {
     return days_since_epoch_ != INVALID_DAYS_SINCE_EPOCH;
@@ -87,19 +90,51 @@ class DateValue {
   /// Otherwise, return false.
   bool ToYear(int* year) const WARN_UNUSED_RESULT;
 
-  /// If DateValue instance is valid, returns day-of-week in [0, 6]; 0 = Monday and
+  /// If DateValue instance is valid, returns day-of-week in [0, 6] range; 0 = Monday and
   /// 6 = Sunday.
   /// Otherwise, return -1.
   int WeekDay() const;
 
-  /// If this DateValue instance valid, add 'days' to it and return the result.
+  /// If DateValue instance is valid, returns day-of-year in [1, 366] range.
+  /// Otherwise, return -1.
+  int DayOfYear() const;
+
+  /// Returns the week corresponding to his date. Returned value is in the [1, 53] range.
+  /// Weeks start with Monday. Each week's year is the Gregorian year in which the
+  /// Thursday falls.
+  int WeekOfYear() const;
+
+  /// If this DateValue instance valid, add 'days' days to it and return the result.
   /// Otherwise, return an invalid DateValue instance.
-  DateValue AddDays(int days) const;
+  DateValue AddDays(int64_t days) const;
+
+  /// If this DateValue instance valid, add 'months' months to it and return the result.
+  /// Otherwise, return an invalid DateValue instance.
+  /// If 'keep_last_day' is set and this DateValue is the last day of a month, the
+  /// returned DateValue will fall on the last day of the target month too.
+  DateValue AddMonths(int64_t months, bool keep_last_day) const;
+
+  /// If this DateValue instance valid, add 'years' years to it and return the result.
+  /// Otherwise, return an invalid DateValue instance.
+  DateValue AddYears(int64_t years) const;
 
   /// If this DateValue instance is valid, convert it to the number of days since epoch
   /// and return true. Result is placed in 'days'.
   /// Otherwise, return false.
   bool ToDaysSinceEpoch(int32_t* days) const WARN_UNUSED_RESULT;
+
+  /// If this DateValue instance is valid, return DateValue corresponding to the last day
+  /// of the current month.
+  /// Otherwise, return an invalid DateValue instance.
+  DateValue LastDay() const;
+
+  /// If this DateValue and 'other' are both valid, set 'months_between' to the number of
+  /// months between dates and return true. Otherwise return false.
+  /// If this is later than 'other', then the result is positive. If this is earlier than
+  /// 'other', then the result is negative. If this and 'other' are either the same days
+  /// of the month or both last days of months, then the result is always an integer.
+  /// Otherwise calculate the fractional portion of the result based on a 31-day month.
+  bool MonthsBetween(const DateValue& other, double* months_between) const;
 
   /// Returns a DateVal representation in the output variable.
   /// Returns null if the DateValue instance doesn't have a valid date.
@@ -146,15 +181,9 @@ class DateValue {
   bool operator<=(const DateValue& other) const { return !(*this > other); }
   bool operator>=(const DateValue& other) const { return !(*this < other); }
 
-  static const DateValue MIN_DATE;
-  static const DateValue MAX_DATE;
-
  private:
   /// Number of days since 1970.01.01.
   int32_t days_since_epoch_;
-
-  static const int MIN_YEAR;
-  static const int MAX_YEAR;
 
   static const int32_t MIN_DAYS_SINCE_EPOCH;
   static const int32_t MAX_DAYS_SINCE_EPOCH;

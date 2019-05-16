@@ -677,6 +677,9 @@ ReturnUdfType ExtractTruncFuncTempl(FunctionContext* ctx, const UdfType& val,
   void* state = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
   if (state != NULL) {
     unit = *reinterpret_cast<UnitType*>(state);
+  } else if (unit_str.is_null) {
+    ctx->SetError(Substitute("Invalid $0 $1: NULL", func_descr, unit_descr).c_str());
+    return ReturnUdfType::null();
   } else {
     unit = to_unit(ctx, unit_str);
     if (!ALLOW_TIME_OF_DAY_UNIT && IsTimeOfDayUnit(unit)) {
@@ -712,20 +715,24 @@ void ExtractTruncFuncPrepareTempl(FunctionContext* ctx,
   // Parse the unit up front if we can, otherwise do it on the fly in trunc_templ()
   if (ctx->IsArgConstant(UNIT_IDX)) {
     StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(UNIT_IDX));
-    UnitType unit = to_unit(ctx, *unit_str);
-    if (!ALLOW_TIME_OF_DAY_UNIT && IsTimeOfDayUnit(unit)) {
-      string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
-      ctx->SetError(Substitute(
-          "Unsupported $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
-    } else if (IsInvalidUnit(unit)) {
-      string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
-      ctx->SetError(Substitute(
-          "Invalid $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+    if (unit_str == nullptr || unit_str->is_null) {
+      ctx->SetError(Substitute("Invalid $0 $1: NULL", func_descr, unit_descr).c_str());
     } else {
-      UnitType* state = ctx->Allocate<UnitType>();
-      RETURN_IF_NULL(ctx, state);
-      *state = unit;
-      ctx->SetFunctionState(scope, state);
+      UnitType unit = to_unit(ctx, *unit_str);
+      if (!ALLOW_TIME_OF_DAY_UNIT && IsTimeOfDayUnit(unit)) {
+        string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
+        ctx->SetError(Substitute(
+            "Unsupported $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+      } else if (IsInvalidUnit(unit)) {
+        string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
+        ctx->SetError(Substitute(
+            "Invalid $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+      } else {
+        UnitType* state = ctx->Allocate<UnitType>();
+        RETURN_IF_NULL(ctx, state);
+        *state = unit;
+        ctx->SetFunctionState(scope, state);
+      }
     }
   }
 }

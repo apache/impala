@@ -19,6 +19,8 @@
 #ifndef IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 #define IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 
+#include <map>
+
 #include "common/status.h"
 #include "udf/udf.h"
 
@@ -68,6 +70,15 @@ class TimestampFunctions {
   /// Static result values for ShortMonthName() function.
   /// Short month names are also used in DateParser.
   static const std::string MONTH_ARRAY[12];
+  /// Static result values for ShortDayName() and LongMonthName() functions.
+  /// These are also used in DateFunctions.
+  static const std::string DAYNAME_ARRAY[7];
+  static const std::string MONTHNAME_ARRAY[12];
+
+  /// Maps full and abbreviated lowercase names of day-of-week to an int in the 0-6 range.
+  /// Sunday is mapped to 0 and Saturday is mapped to 6.
+  /// It is used in NextDay() function.
+  static const std::map<std::string, int> DAYNAME_MAP;
 
   /// Parse and initialize format string if it is a constant. Raise error if invalid.
   static void UnixAndFromUnixPrepare(FunctionContext* context,
@@ -233,10 +244,8 @@ class TimestampFunctions {
       const StringVal& format, bool is_error);
 
  private:
-  /// Static result values for DayName(), ShortDayName() and LongMonthName() functions.
+  /// Static result values for DayName() function.
   static const std::string DAY_ARRAY[7];
-  static const std::string DAYNAME_ARRAY[7];
-  static const std::string MONTHNAME_ARRAY[12];
 };
 
 } // namespace impala

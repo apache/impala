@@ -15,7 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <iomanip>
 #include <iostream>
+#include <random>
 #include <vector>
 
 #include "cctz/civil_time.h"
@@ -26,59 +28,109 @@
 
 #include "common/names.h"
 
+using std::random_device;
+using std::mt19937;
+using std::uniform_int_distribution;
+
 using namespace impala;
 
 // Machine Info: Intel(R) Core(TM) i5-6600 CPU @ 3.30GHz
-// ToYear:             Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+// ToYearMonthDay:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                   (relative) (relative) (relative)
 // --------------------------------------------------------------------------------------------------
-//           TestToYearMonthDay              0.167    0.169    0.169         1X         1X         1X
-//                   TestToYear               4.63     4.72     4.72      27.8X      27.8X      27.8X
+//       TestCctzToYearMonthDay               0.24    0.245     0.25         1X         1X         1X
+//           TestToYearMonthDay                1.3     1.33     1.38      5.42X      5.44X      5.53X
+//                   TestToYear               8.67     8.86     9.04      36.1X      36.1X      36.2X
+
+const cctz::civil_day EPOCH_DATE(1970, 1, 1);
 
 class TestData {
 public:
-  void AddRange(const DateValue& dv_min, const DateValue& dv_max) {
+  void AddRandomRange(const DateValue& dv_min, const DateValue& dv_max) {
     DCHECK(dv_min.IsValid());
     DCHECK(dv_max.IsValid());
-    DateValue dv = dv_min;
-    while (dv < dv_max) {
-      date_.push_back(dv);
-      dv = dv.AddDays(1);
+
+    int32_t min_dse, max_dse;
+    ignore_result(dv_min.ToDaysSinceEpoch(&min_dse));
+    ignore_result(dv_max.ToDaysSinceEpoch(&max_dse));
+
+    random_device rd;
+    mt19937 gen(rd());
+    // Random values in a [min_dse..max_dse] days range.
+    uniform_int_distribution<int32_t> dis_dse(min_dse, max_dse);
+
+    // Add random DateValue values in the [dv_min, dv_max] range.
+    for (int i = 0; i <= max_dse - min_dse; ++i) {
+      DateValue dv(dis_dse(gen));
       DCHECK(dv.IsValid());
+      date_.push_back(dv);
     }
-    to_ymd_result_year_.resize(date_.size());
-    to_y_result_year_.resize(date_.size());
+    cctz_to_ymd_result_.resize(date_.size());
+    to_ymd_result_.resize(date_.size());
+    to_year_result_.resize(date_.size());
   }
 
-  void TestToYearMonthDay(int batch_size) {
-    DCHECK(date_.size() == to_ymd_result_year_.size());
-    int month, day;
+  void CctzToYearMonthDay(const DateValue& dv, int* year, int* month, int* day) const {
+    int32_t days_since_epoch;
+    ignore_result(dv.ToDaysSinceEpoch(&days_since_epoch));
+
+    const cctz::civil_day cd = EPOCH_DATE + days_since_epoch;
+    *year = cd.year();
+    *month = cd.month();
+    *day = cd.day();
+  }
+
+  void TestCctzToYearMonthDay(int batch_size) {
+    DCHECK(date_.size() == cctz_to_ymd_result_.size());
     for (int i = 0; i < batch_size; ++i) {
       int n = date_.size();
       for (int j = 0; j < n; ++j) {
-        ignore_result(date_[j].ToYearMonthDay(&to_ymd_result_year_[j], &month, &day));
+        CctzToYearMonthDay(date_[j],
+            &cctz_to_ymd_result_[j].year_,
+            &cctz_to_ymd_result_[j].month_,
+            &cctz_to_ymd_result_[j].day_);
+      }
+    }
+  }
+
+  void TestToYearMonthDay(int batch_size) {
+    DCHECK(date_.size() == to_ymd_result_.size());
+    for (int i = 0; i < batch_size; ++i) {
+      int n = date_.size();
+      for (int j = 0; j < n; ++j) {
+        ignore_result(date_[j].ToYearMonthDay(
+            &to_ymd_result_[j].year_,
+            &to_ymd_result_[j].month_,
+            &to_ymd_result_[j].day_));
       }
     }
   }
 
   void TestToYear(int batch_size) {
-    DCHECK(date_.size() == to_y_result_year_.size());
+    DCHECK(date_.size() == to_year_result_.size());
     for (int i = 0; i < batch_size; ++i) {
       int n = date_.size();
       for (int j = 0; j < n; ++j) {
-        ignore_result(date_[j].ToYear(&to_y_result_year_[j]));
+        ignore_result(date_[j].ToYear(&to_year_result_[j]));
       }
     }
   }
 
   bool CheckResults() {
-    DCHECK(to_ymd_result_year_.size() == to_y_result_year_.size());
+    DCHECK(to_ymd_result_.size() == cctz_to_ymd_result_.size());
+    DCHECK(to_year_result_.size() == cctz_to_ymd_result_.size());
     bool ok = true;
-    for (int i = 0; i < to_ymd_result_year_.size(); ++i) {
-      if (to_ymd_result_year_[i] != to_y_result_year_[i]) {
-        cerr << "Incorrect results " << date_[i] << ": "
-            << to_ymd_result_year_[i] << " != " << to_y_result_year_[i]
-            << endl;
+    for (int i = 0; i < cctz_to_ymd_result_.size(); ++i) {
+      if (to_ymd_result_[i] != cctz_to_ymd_result_[i]) {
+        cerr << "Incorrect results (ToYearMonthDay() vs CctzToYearMonthDay()): "
+             << date_[i] << ": " << to_ymd_result_[i].ToString() << " != "
+             << cctz_to_ymd_result_[i].ToString() << endl;
+        ok = false;
+      }
+      if (to_year_result_[i] != cctz_to_ymd_result_[i].year_) {
+        cerr << "Incorrect results (ToYear() vs CctzToYearMonthDay()): " << date_[i]
+             << ": " << to_year_result_[i] << " != " << cctz_to_ymd_result_[i].year_
+             << endl;
         ok = false;
       }
     }
@@ -86,10 +138,33 @@ public:
   }
 
 private:
+  struct YearMonthDayResult {
+    int year_;
+    int month_;
+    int day_;
+
+    string ToString() const {
+      stringstream ss;
+      ss << std::setfill('0') << setw(4) << year_ << "-" << setw(2) << month_ << "-"
+         << setw(2) << day_;
+      return ss.str();
+    }
+
+    bool operator!=(const YearMonthDayResult& other) const {
+      return year_ != other.year_ || month_ != other.month_ || day_ != other.day_;
+    }
+  };
+
   vector<DateValue> date_;
-  vector<int> to_ymd_result_year_;
-  vector<int> to_y_result_year_;
+  vector<YearMonthDayResult> cctz_to_ymd_result_;
+  vector<YearMonthDayResult> to_ymd_result_;
+  vector<int> to_year_result_;
 };
+
+void TestCctzToYearMonthDay(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->TestCctzToYearMonthDay(batch_size);
+}
 
 void TestToYearMonthDay(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
@@ -106,10 +181,12 @@ int main(int argc, char* argv[]) {
   cout << Benchmark::GetMachineInfo() << endl;
 
   TestData data;
-  data.AddRange(DateValue(1965, 1, 1), DateValue(2020, 12, 31));
+  data.AddRandomRange(DateValue(1965, 1, 1), DateValue(2020, 12, 31));
 
-  // Benchmark DateValue::ToYearMonthDay() vs DateValue::ToYear()
-  Benchmark suite("ToYear");
+  // Benchmark TestData::CctzToYearMonthDay(), DateValue::ToYearMonthDay() and
+  // DateValue::ToYear().
+  Benchmark suite("ToYearMonthDay");
+  suite.AddBenchmark("TestCctzToYearMonthDay", TestCctzToYearMonthDay, &data);
   suite.AddBenchmark("TestToYearMonthDay", TestToYearMonthDay, &data);
   suite.AddBenchmark("TestToYear", TestToYear, &data);
   cout << suite.Measure();
