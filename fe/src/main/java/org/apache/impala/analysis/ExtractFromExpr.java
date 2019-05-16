@@ -36,15 +36,25 @@ public class ExtractFromExpr extends FunctionCallExpr {
 
   // Behaves like an immutable linked hash set containing the TExtractFields in the same
   // order as declared.
-  private static final Set<String> EXTRACT_FIELDS;
+  private static final Set<String> TIMESTAMP_EXTRACT_FIELDS;
+  private static final Set<String> DATE_EXTRACT_FIELDS;
   static {
-    ImmutableSet.Builder<String> builder = new ImmutableSet.Builder<String>();
+    ImmutableSet.Builder<String> timestamp_builder = new ImmutableSet.Builder<String>();
+    ImmutableSet.Builder<String> date_builder = new ImmutableSet.Builder<String>();
     for (TExtractField extractField: TExtractField.values()) {
       if (extractField != TExtractField.INVALID_FIELD) {
-        builder.add(extractField.name());
+        timestamp_builder.add(extractField.name());
+
+        if (extractField != TExtractField.HOUR && extractField != TExtractField.MINUTE
+            && extractField != TExtractField.SECOND
+            && extractField != TExtractField.MILLISECOND
+            && extractField != TExtractField.EPOCH) {
+          date_builder.add(extractField.name());
+        }
       }
     }
-    EXTRACT_FIELDS = builder.build();
+    TIMESTAMP_EXTRACT_FIELDS = timestamp_builder.build();
+    DATE_EXTRACT_FIELDS = date_builder.build();
   }
 
   public ExtractFromExpr(FunctionName fnName, String extractFieldIdent, Expr e) {
@@ -83,10 +93,18 @@ public class ExtractFromExpr extends FunctionCallExpr {
     String extractFieldIdent =
         ((StringLiteral)children_.get(1)).getValueWithOriginalEscapes();
     Preconditions.checkNotNull(extractFieldIdent);
-    if (!EXTRACT_FIELDS.contains(extractFieldIdent.toUpperCase())) {
+
+    boolean isDate = children_.get(0).getType().isDate();
+    boolean isExtractFieldValid = isDate ?
+        DATE_EXTRACT_FIELDS.contains(extractFieldIdent.toUpperCase()) :
+        TIMESTAMP_EXTRACT_FIELDS.contains(extractFieldIdent.toUpperCase());
+
+    if (!isExtractFieldValid) {
+      String validExtractFields = Joiner.on(", ").join(
+          isDate ? DATE_EXTRACT_FIELDS : TIMESTAMP_EXTRACT_FIELDS);
       throw new AnalysisException("Time unit '" + extractFieldIdent + "' in expression '"
           + toSql() + "' is invalid. Expected one of "
-          + Joiner.on(", ").join(EXTRACT_FIELDS) + ".");
+          + validExtractFields + ".");
     }
   }
 
@@ -94,7 +112,7 @@ public class ExtractFromExpr extends FunctionCallExpr {
   protected String getFunctionNotFoundError(Type[] argTypes) {
     Expr e = children_.get(0);
     return "Expression '" + e.toSql() + "' in '" + toSql() + "' has a return type of "
-          + e.getType().toSql() + " but a TIMESTAMP is required.";
+          + e.getType().toSql() + " but a TIMESTAMP or DATE is required.";
   }
 
   @Override

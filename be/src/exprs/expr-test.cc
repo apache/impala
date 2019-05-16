@@ -7421,6 +7421,258 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestIsNull("unix_micros_to_utc_timestamp(253402300800000000)", TYPE_TIMESTAMP);
 }
 
+TEST_P(ExprTest, TruncForDateTest) {
+  // trunc(date, string unit)
+  // Truncate date to year
+  for (const string unit: { "SYYYY", "YYYY", "YEAR", "SYEAR", "YYY", "YY", "Y" }) {
+    const string expr = "trunc(date'2014-04-01', '" + unit + "')";
+    TestDateValue(expr, DateValue(2014, 1, 1));
+  }
+  TestDateValue("trunc(date'2000-01-01', 'Y')", DateValue(2000, 1, 1));
+
+  // Truncate date to quarter
+  TestDateValue("trunc(date'2000-01-01', 'Q')", DateValue(2000, 1, 1));
+  TestDateValue("trunc(date'2000-02-01', 'Q')", DateValue(2000, 1, 1));
+  TestDateValue("trunc(date'2000-03-01', 'Q')", DateValue(2000, 1, 1));
+  TestDateValue("trunc(date'2000-04-01', 'Q')", DateValue(2000, 4, 1));
+  TestDateValue("trunc(date'2000-05-01', 'Q')", DateValue(2000, 4, 1));
+  TestDateValue("trunc(date'2000-06-01', 'Q')", DateValue(2000, 4, 1));
+  TestDateValue("trunc(date'2000-07-01', 'Q')", DateValue(2000, 7, 1));
+  TestDateValue("trunc(date'2000-08-01', 'Q')", DateValue(2000, 7, 1));
+  TestDateValue("trunc(date'2000-09-01', 'Q')", DateValue(2000, 7, 1));
+  TestDateValue("trunc(date'2000-10-01', 'Q')", DateValue(2000, 10, 1));
+  TestDateValue("trunc(date'2000-11-01', 'Q')", DateValue(2000, 10, 1));
+  TestDateValue("trunc(date'2000-12-01', 'Q')", DateValue(2000, 10, 1));
+
+  // Truncate date to month
+  for (const string& unit: { "MONTH", "MON", "MM", "RM" }) {
+    const string expr = "trunc(date'2001-02-05', '" + unit + "')";
+    TestDateValue(expr, DateValue(2001, 2, 1));
+  }
+  TestDateValue("trunc(date'2001-01-01', 'MM')", DateValue(2001, 1, 1));
+  TestDateValue("trunc(date'2001-12-29', 'MM')", DateValue(2001, 12, 1));
+
+  // Same day of the week as the first day of the year
+  TestDateValue("trunc(date'2014-01-07', 'WW')", DateValue(2014, 1, 1));
+  TestDateValue("trunc(date'2014-01-08', 'WW')", DateValue(2014, 1, 8));
+  TestDateValue("trunc(date'2014-01-09', 'WW')", DateValue(2014, 1, 8));
+  TestDateValue("trunc(date'2014-01-14', 'WW')", DateValue(2014, 1, 8));
+
+  // Same day of the week as the first day of the month
+  TestDateValue("trunc(date'2014-01-07', 'W')", DateValue(2014, 1, 1));
+  TestDateValue("trunc(date'2014-01-08', 'W')", DateValue(2014, 1, 8));
+  TestDateValue("trunc(date'2014-01-09', 'W')", DateValue(2014, 1, 8));
+  TestDateValue("trunc(date'2014-01-14', 'W')", DateValue(2014, 1, 8));
+  TestDateValue("trunc(date'2014-02-01', 'W')", DateValue(2014, 2, 1));
+  TestDateValue("trunc(date'2014-02-02', 'W')", DateValue(2014, 2, 1));
+  TestDateValue("trunc(date'2014-02-03', 'W')", DateValue(2014, 2, 1));
+  TestDateValue("trunc(date'2014-02-07', 'W')", DateValue(2014, 2, 1));
+  TestDateValue("trunc(date'2014-02-08', 'W')", DateValue(2014, 2, 8));
+  TestDateValue("trunc(date'2014-02-24', 'W')", DateValue(2014, 2, 22));
+
+  // Truncate to day, i.e. leave the date intact
+  for (const string& unit: { "DDD", "DD", "J" }) {
+    const string expr = "trunc(date'2014-01-08', '" + unit + "')";
+    TestDateValue(expr, DateValue(2014, 1, 8));
+  }
+
+  // Truncate date to starting day of the week
+  for (const string& unit: { "DAY", "DY", "D" }) {
+    const string expr = "trunc(date'2012-09-10', '" + unit + "')";
+    TestDateValue(expr, DateValue(2012, 9, 10));
+  }
+  TestDateValue("trunc(date'2012-09-11', 'D')", DateValue(2012, 9, 10));
+  TestDateValue("trunc(date'2012-09-12', 'D')", DateValue(2012, 9, 10));
+  TestDateValue("trunc(date'2012-09-16', 'D')", DateValue(2012, 9, 10));
+
+  // Test upper limit
+  TestDateValue("trunc(date'9999-12-31', 'YYYY')", DateValue(9999, 1, 1));
+  TestDateValue("trunc(date'9999-12-31', 'Q')", DateValue(9999, 10, 1));
+  TestDateValue("trunc(date'9999-12-31', 'MONTH')", DateValue(9999, 12, 1));
+  TestDateValue("trunc(date'9999-12-31', 'W')", DateValue(9999, 12, 29));
+  TestDateValue("trunc(date'9999-12-31', 'WW')", DateValue(9999, 12, 31));
+  TestDateValue("trunc(date'9999-12-31', 'DDD')", DateValue(9999, 12, 31));
+  TestDateValue("trunc(date'9999-12-31', 'DAY')", DateValue(9999, 12, 27));
+
+  // Test lower limit
+  TestDateValue("trunc(date'0000-01-01', 'YYYY')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-01', 'Q')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-03-31', 'Q')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-01', 'MONTH')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-01', 'W')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-07', 'W')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-08', 'W')", DateValue(0, 1, 8));
+  TestDateValue("trunc(date'0000-01-01', 'WW')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-07', 'WW')", DateValue(0, 1, 1));
+  TestDateValue("trunc(date'0000-01-08', 'WW')", DateValue(0, 1, 8));
+  TestDateValue("trunc(date'0000-01-04', 'DAY')", DateValue(0, 1, 3));
+  TestDateValue("trunc(date'0000-01-03', 'DAY')", DateValue(0, 1, 3));
+  TestIsNull("trunc(date'0000-01-02', 'DAY')", TYPE_DATE);
+  TestIsNull("trunc(date'0000-01-01', 'DAY')", TYPE_DATE);
+
+  // Truncating date to hour or minute returns an error
+  for (const string& unit: { "HH", "HH12", "HH24", "MI" }) {
+    const string expr = "trunc(date'2012-09-10', '" + unit + "')";
+    TestNonOkStatus(expr);  // Unsupported Truncate Unit
+  }
+
+  // Invalid trunc unit
+  for (const string& unit: { "MIN", "XXYYZZ", "" }) {
+    const string expr = "trunc(date'2012-09-10', '" + unit + "')";
+    TestNonOkStatus(expr);  // Invalid Truncate Unit
+  }
+
+  TestIsNull("trunc(cast(NULL as date), 'DDD')", TYPE_DATE);
+  TestNonOkStatus("trunc(cast(NULL as date), NULL)");
+}
+
+TEST_P(ExprTest, DateTruncForDateTest) {
+  TestDateValue("date_trunc('MILLENNIUM', date '2016-05-08')", DateValue(2001, 1, 1));
+  TestDateValue("date_trunc('MILLENNIUM', date '3000-12-31')", DateValue(2001, 1, 1));
+  TestDateValue("date_trunc('MILLENNIUM', date '3001-01-01')", DateValue(3001, 1, 1));
+  TestDateValue("date_trunc('CENTURY', date '2016-05-08')", DateValue(2001, 1, 1));
+  TestDateValue("date_trunc('CENTURY', date '2116-05-08')", DateValue(2101, 1, 1));
+  TestDateValue("date_trunc('DECADE', date '2116-05-08')", DateValue(2110, 1, 1));
+  TestDateValue("date_trunc('YEAR', date '2016-05-08')", DateValue(2016, 1, 1));
+  TestDateValue("date_trunc('MONTH', date '2016-05-08')", DateValue(2016, 5, 1));
+  TestDateValue("date_trunc('WEEK', date '2116-05-08')", DateValue(2116, 5, 4));
+  TestDateValue("date_trunc('WEEK', date '2017-01-01')", DateValue(2016,12,26));
+  TestDateValue("date_trunc('WEEK', date '2017-01-02')", DateValue(2017, 1, 2));
+  TestDateValue("date_trunc('WEEK', date '2017-01-07')", DateValue(2017, 1, 2));
+  TestDateValue("date_trunc('WEEK', date '2017-01-08')", DateValue(2017, 1, 2));
+  TestDateValue("date_trunc('WEEK', date '2017-01-09')", DateValue(2017, 1, 9));
+  TestDateValue("date_trunc('DAY', date '1416-05-08')", DateValue(1416, 5, 8));
+
+  // Test upper limit
+  TestDateValue("date_trunc('MILLENNIUM', date '9999-12-31')", DateValue(9001, 1, 1));
+  TestDateValue("date_trunc('CENTURY', date '9999-12-31')", DateValue(9901, 1, 1));
+  TestDateValue("date_trunc('DECADE', date '9999-12-31')", DateValue(9990, 1, 1));
+  TestDateValue("date_trunc('YEAR', date '9999-12-31')", DateValue(9999, 1, 1));
+  TestDateValue("date_trunc('MONTH', date '9999-12-31')", DateValue(9999, 12, 1));
+  TestDateValue("date_trunc('WEEK', date '9999-12-31')", DateValue(9999, 12, 27));
+  TestDateValue("date_trunc('DAY', date '9999-12-31')", DateValue(9999, 12, 31));
+
+  // Test lower limit for millennium
+  TestDateValue("date_trunc('MILLENNIUM', date '1001-01-01')", DateValue(1001, 1, 1));
+  TestDateValue("date_trunc('MILLENNIUM', date '1000-01-01')", DateValue(1, 1, 1));
+  TestDateValue("date_trunc('MILLENNIUM', date '0001-01-01')", DateValue(1, 1, 1));
+  TestIsNull("date_trunc('MILLENNIUM', date '0000-01-01')", TYPE_DATE);
+
+  // Test lower limit for century
+  TestDateValue("date_trunc('CENTURY', date '0101-01-01')", DateValue(101, 1, 1));
+  TestDateValue("date_trunc('CENTURY', date '0100-01-01')", DateValue(1, 1, 1));
+  TestDateValue("date_trunc('CENTURY', date '0001-01-01')", DateValue(1, 1, 1));
+  TestIsNull("date_trunc('CENTURY', date '0000-01-01')", TYPE_DATE);
+
+  // Test lower limit for decade
+  TestDateValue("date_trunc('DECADE', date '0001-01-01')", DateValue(0, 1, 1));
+  TestDateValue("date_trunc('DECADE', date '0000-01-01')", DateValue(0, 1, 1));
+
+  // Test lower limit for year, month, day
+  TestDateValue("date_trunc('YEAR', date '0000-01-01')", DateValue(0, 1, 1));
+  TestDateValue("date_trunc('MONTH', date '0000-01-01')", DateValue(0, 1, 1));
+  TestDateValue("date_trunc('DAY', date '0000-01-01')", DateValue(0, 1, 1));
+
+  // Test lower limit for week
+  TestDateValue("date_trunc('WEEK', date '0000-01-09')", DateValue(0, 1, 3));
+  TestDateValue("date_trunc('WEEK', date '0000-01-03')", DateValue(0, 1, 3));
+  TestIsNull("date_trunc('WEEK', date '0000-01-02')", TYPE_DATE);
+  TestIsNull("date_trunc('WEEK', date '0000-01-01')", TYPE_DATE);
+
+  // Test invalid input.
+  // Truncating date to hour or minute returns an error
+  for (const string& unit: { "HOUR", "MINUTE", "SECOND", "MILLISECONDS",
+      "MICROSECONDS" }) {
+    const string expr = "date_trunc('" + unit + "', date '2012-09-10')";
+    TestNonOkStatus(expr);  // Unsupported Date Truncate Unit
+  }
+
+  // Invalid trunc unit
+  for (const string& unit: { "YEARR", "XXYYZZ", "" }) {
+    const string expr = "date_trunc('" + unit + "', date '2012-09-10')";
+    TestNonOkStatus(expr);  // Invalid Date Truncate Unit
+  }
+
+  TestIsNull("date_trunc('DAY', cast(NULL as date))", TYPE_DATE);
+  TestNonOkStatus("date_trunc(NULL, cast(NULL as date))");  // Invalid Date Truncate Unit
+}
+
+TEST_P(ExprTest, ExtractAndDatePartForDateTest) {
+  // extract as a regular function
+  TestValue("extract(date '2006-05-12', 'YEAR')", TYPE_BIGINT, 2006);
+  TestValue("extract(date '2006-05-12', 'quarter')", TYPE_BIGINT, 2);
+  TestValue("extract(date '2006-05-12', 'MoNTH')", TYPE_BIGINT, 5);
+  TestValue("extract(date '2006-05-12', 'DaY')", TYPE_BIGINT, 12);
+
+  // extract using FROM keyword
+  TestValue("extract(year from date '2006-05-12')", TYPE_BIGINT, 2006);
+  TestValue("extract(QUARTER from date '2006-05-12')", TYPE_BIGINT, 2);
+  TestValue("extract(mOnTh from date '2006-05-12')", TYPE_BIGINT, 5);
+  TestValue("extract(dAy from date '2006-05-12')", TYPE_BIGINT, 12);
+
+  // Test upper limit
+  TestValue("extract(date '9999-12-31', 'YEAR')", TYPE_BIGINT, 9999);
+  TestValue("extract(quarter from date '9999-12-31')", TYPE_BIGINT, 4);
+  TestValue("extract(date '9999-12-31', 'month')", TYPE_BIGINT, 12);
+  TestValue("extract(DAY from date '9999-12-31')", TYPE_BIGINT, 31);
+
+  // Test lower limit
+  TestValue("extract(date '0000-01-01', 'YEAR')", TYPE_BIGINT, 0);
+  TestValue("extract(quarter from date '0000-01-01')", TYPE_BIGINT, 1);
+  TestValue("extract(date '0000-01-01', 'month')", TYPE_BIGINT, 1);
+  TestValue("extract(DAY from date '0000-01-01')", TYPE_BIGINT, 1);
+
+  // Time of day extract fields are not supported
+  for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
+    const string expr = "extract(date '2012-09-10', '" + field + "')";
+    TestNonOkStatus(expr);  // Unsupported Extract Field
+  }
+
+  // Invalid extract fields
+  for (const string& field: { "foo", "SSECOND", "" }) {
+    const string expr = "extract(date '2012-09-10', '" + field + "')";
+    TestNonOkStatus(expr);  // Invalid Extract Field
+  }
+
+  TestIsNull("extract(cast(NULL as date), 'YEAR')", TYPE_BIGINT);
+  TestIsNull("extract(YEAR from cast(NULL as date))", TYPE_BIGINT);
+  TestNonOkStatus("extract(cast(NULL as date), NULL)");
+
+  // date_part, same as extract function but with arguments swapped
+  TestValue("date_part('YEAR', date '2006-05-12')", TYPE_BIGINT, 2006);
+  TestValue("date_part('QuarTer', date '2006-05-12')", TYPE_BIGINT, 2);
+  TestValue("date_part('Month', date '2006-05-12')", TYPE_BIGINT, 5);
+  TestValue("date_part('Day', date '2006-05-12')", TYPE_BIGINT, 12);
+
+  // Test upper limit
+  TestValue("date_part('YEAR', date '9999-12-31')", TYPE_BIGINT, 9999);
+  TestValue("date_part('QUARTER', '9999-12-31')", TYPE_BIGINT, 4);
+  TestValue("date_part('month', date '9999-12-31')", TYPE_BIGINT, 12);
+  TestValue("date_part('DAY', date '9999-12-31')", TYPE_BIGINT, 31);
+
+  // Test lower limit
+  TestValue("date_part('year', date '0000-01-01')", TYPE_BIGINT, 0);
+  TestValue("date_part('quarter', date '0000-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('MONTH', date '0000-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('DAY', date '0000-01-01')", TYPE_BIGINT, 1);
+
+  // Time of day extract fields are not supported
+  for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
+    const string expr = "date_part('" + field + "', date '2012-09-10')";
+    // Unsupported Date Part Field
+    TestNonOkStatus(expr);
+  }
+
+  // Invalid extract fields
+  for (const string& field: { "foo", "SSECOND", "" }) {
+    const string expr = "date_part('" + field + "', date '2012-09-10')";
+    TestNonOkStatus(expr);  // Invalid Date Part Field
+  }
+
+  TestIsNull("date_part('YEAR', cast(NULL as date))", TYPE_BIGINT);
+  TestNonOkStatus("date_part(MULL, cast(NULL as date))");  // Invalid Date Part Field
+}
+
 TEST_P(ExprTest, ConditionalFunctions) {
   // If first param evaluates to true, should return second parameter,
   // false or NULL should return the third.

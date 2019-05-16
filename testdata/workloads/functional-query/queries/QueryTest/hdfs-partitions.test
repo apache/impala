@@ -178,5 +178,5 @@ BIGINT
 select int_col from functional.alltypes
 where year=date_part('yyyyMMMdd hh:mm:ss', current_timestamp());
 ---- CATCH
-InternalException: invalid extract field: yyyyMMMdd hh:mm:ss
+InternalException: Invalid Date Part Field: yyyyMMMdd hh:mm:ss
 ====

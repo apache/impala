@@ -28,7 +28,8 @@
 namespace impala {
 
 namespace {
-const cctz::civil_day EPOCH_DATE(1970, 1, 1);
+const int EPOCH_YEAR = 1970;
+const cctz::civil_day EPOCH_DATE(EPOCH_YEAR, 1, 1);
 
 inline int32_t CalcDaysSinceEpoch(const cctz::civil_day& date) {
   return date - EPOCH_DATE;
@@ -95,6 +96,97 @@ bool DateValue::ToYearMonthDay(int* year, int* month, int* day) const {
   *month = cd.month();
   *day = cd.day();
   return true;
+}
+
+namespace {
+
+inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
+  int m400 = year % 400;
+  int m100 = m400 % 100;
+  int m4 = m100 % 4;
+
+  return (year - EPOCH_YEAR) * 365
+      + ((year - EPOCH_YEAR / 4 * 4 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
+      - ((year - EPOCH_YEAR / 100 * 100 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
+      + ((year - EPOCH_YEAR / 400 * 400 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1);
+}
+
+}
+
+bool DateValue::ToYear(int* year) const {
+  DCHECK(year != nullptr);
+  if (UNLIKELY(!IsValid())) return false;
+
+  // This function was introduced to extract year of a DateValue efficiently.
+  // It will be fast for most days of the year and only slightly slower for days around
+  // the beginning and end of the year.
+  //
+  // Here's a quick explanation. Let's use the following notation:
+  // m400 = year % 400
+  // m100 = m400 % 100
+  // m4 = m100 % 4
+  //
+  // If 'days' is the number of days between 1970-01-01 and the first day of 'year'
+  // (excluding the endpoint), then the following is true:
+  // days == (year - 1970) * 365
+  //       + ((year - 1968 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
+  //       - ((year - 1900 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
+  //       + ((year - 1600 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1)
+  //
+  // Reordering the equation we get:
+  // days * 400 == (year - 1970) * 365 * 400
+  //       + ((year - 1968) * 100 + ((m4 != 0) ? (4 - m4) * 100 : 0) - 400)
+  //       - ((year - 1900) * 4 + ((m100 != 0) ? (100 - m100) * 4 : 0) - 400)
+  //       + (year - 1600 + ((m400 != 0) ? 400 - m400 : 0) - 400)
+  //
+  // then:
+  // days * 400 == year * 146000 - 287620000
+  //       + (year * 100 - 196800 + ((m4 != 0) ? (4 - m4) * 100 : 0) - 400)
+  //       - (year * 4 - 7600 + ((m100 != 0) ? (100 - m100) * 4 : 0) - 400)
+  //       + (year - 1600 + ((m400 != 0) ? 400 - m400 : 0) - 400)
+  //
+  // which means that (A):
+  // year * 146097 == days * 400 + 287811200
+  //       - ((m4 != 0) ? (4 - m4) * 100 : 0)
+  //       + ((m100 != 0) ? (100 - m100) * 4 : 0)
+  //       - ((m400 != 0) ? 400 - m400 : 0)
+  //
+  // On the other hand, if
+  // f(year) = - ((m4 != 0) ? (4 - m4) * 100 : 0)
+  //           + ((m100 != 0) ? (100 - m100) * 4 : 0)
+  //           - ((m400 != 0) ? 400 - m400 : 0)
+  // and 'year' is in the [0, 9999] range, then it follows that (B):
+  // f(year) must fall into the [-591, 288] range.
+  //
+  // Finally, if we put (A) and (B) together we can conclude that 'year' must fall into
+  // the
+  // [ (days * 400 + 287811200 - 591) / 146097, (days * 400 + 287811200 + 288) / 146097 ]
+  // range.
+
+  int tmp = days_since_epoch_ * 400 + 287811200;
+  int first_year = (tmp - 591) / 146097;
+  int last_year = (tmp + 288) / 146097;
+
+  if (first_year == last_year) {
+    *year = first_year;
+  } else if (CalcFirstDayOfYearSinceEpoch(last_year) <= days_since_epoch_) {
+    *year = last_year;
+  } else {
+    *year = first_year;
+  }
+
+  return true;
+}
+
+int DateValue::WeekDay() const {
+  if (UNLIKELY(!IsValid())) return -1;
+  const cctz::civil_day cd = EPOCH_DATE + days_since_epoch_;
+  return static_cast<int>(cctz::get_weekday(cd));
+}
+
+DateValue DateValue::AddDays(int days) const {
+  if (UNLIKELY(!IsValid())) return DateValue();
+  return DateValue(days_since_epoch_ + days);
 }
 
 bool DateValue::ToDaysSinceEpoch(int32_t* days) const {

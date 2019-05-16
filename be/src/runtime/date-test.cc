@@ -593,6 +593,93 @@ TEST(DateTest, DateValueEdgeCases) {
   }
 }
 
+TEST(DateTest, AddDays) {
+  // Adding days to an invalid DateValue instance returns an invalid DateValue.
+  DateValue invalid_dv;
+  EXPECT_FALSE(invalid_dv.IsValid());
+  EXPECT_FALSE(invalid_dv.AddDays(1).IsValid());
+
+  // AddDays works with 0, > 0 and < 0 number of days.
+  DateValue dv(2019, 5, 16);
+  EXPECT_EQ(DateValue(2019, 5, 17), dv.AddDays(1));
+  EXPECT_EQ(DateValue(2019, 5, 15), dv.AddDays(-1));
+  // May has 31 days, April has 30 days.
+  EXPECT_EQ(DateValue(2019, 6, 16), dv.AddDays(31));
+  EXPECT_EQ(DateValue(2019, 4, 16), dv.AddDays(-30));
+  // 2019 is not a leap year, 2020 is a leap year.
+  EXPECT_EQ(DateValue(2020, 5, 16), dv.AddDays(366));
+  EXPECT_EQ(DateValue(2018, 5, 16), dv.AddDays(-365));
+
+  // Test upper limit
+  dv = DateValue(9999, 12, 20);
+  EXPECT_EQ(DateValue(9999, 12, 31), dv.AddDays(11));
+  EXPECT_FALSE(dv.AddDays(12).IsValid());
+  EXPECT_FALSE(dv.AddDays(13).IsValid());
+
+  // Test lower limit
+  dv = DateValue(0, 1, 10);
+  EXPECT_EQ(DateValue(0, 1, 1), dv.AddDays(-9));
+  EXPECT_FALSE(dv.AddDays(-10).IsValid());
+  EXPECT_FALSE(dv.AddDays(-11).IsValid());
+
+  // Test leap year
+  dv = DateValue(2000, 2, 20);
+  EXPECT_EQ(DateValue(2000, 2, 28), dv.AddDays(8));
+  EXPECT_EQ(DateValue(2000, 2, 29), dv.AddDays(9));
+  EXPECT_EQ(DateValue(2000, 3, 1), dv.AddDays(10));
+
+  // Test non-leap year
+  dv = DateValue(2001, 2, 20);
+  EXPECT_EQ(DateValue(2001, 2, 28), dv.AddDays(8));
+  EXPECT_EQ(DateValue(2001, 3, 1), dv.AddDays(9));
+}
+
+TEST(DateTest, WeekDay) {
+  // WeekDay() returns -1 for invalid dates.
+  DateValue invalid_dv;
+  EXPECT_FALSE(invalid_dv.IsValid());
+  EXPECT_EQ(-1, invalid_dv.WeekDay());
+
+  // 2019.05.01 is Wednesday.
+  DateValue dv(2019, 5, 1);
+  for (int i = 0; i <= 31; ++i) {
+    // 0 = Monday, 2 = Wednesday and 6 = Sunday.
+    EXPECT_EQ((i + 2) % 7, dv.AddDays(i).WeekDay());
+  }
+
+  // Test upper limit. 9999.12.31 is Friday.
+  EXPECT_EQ(4, DateValue(9999, 12, 31).WeekDay());
+
+  // Test lower limit.
+  // 0000.01.01 is Monday.
+  EXPECT_EQ(0, DateValue(1, 1, 1).WeekDay());
+  // 0000.01.01 is Saturday.
+  EXPECT_EQ(5, DateValue(0, 1, 1).WeekDay());
+}
+
+TEST(DateTest, ToYear) {
+  int year;
+
+  // Test that ToYear() returns false for invalid dates.
+  DateValue invalid_dv;
+  EXPECT_FALSE(invalid_dv.IsValid());
+  EXPECT_FALSE(invalid_dv.ToYear(&year));
+
+  // Test that ToYear() returns the same year as ToYearMonthDay().
+  // The following loop iterates through all valid dates:
+  DateValue dv(0, 1, 1);
+  EXPECT_TRUE(dv.IsValid());
+  do {
+    int y, m, d;
+    EXPECT_TRUE(dv.ToYearMonthDay(&y, &m, &d));
+
+    EXPECT_TRUE(dv.ToYear(&year));
+    EXPECT_EQ(y, year);
+
+    dv = dv.AddDays(1);
+  } while (dv.IsValid());
+}
+
 }
 
 IMPALA_TEST_MAIN();

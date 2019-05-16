@@ -1866,12 +1866,21 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Special cases for FROM in function call
     AnalyzesOk("select extract(year from now())");
+    AnalyzesOk("select extract(year from cast(now() as date))");
+    AnalyzesOk("select extract(year from date_col) from functional.date_tbl");
+    AnalyzesOk("select extract(hour from now())");
+    AnalysisError("select extract(hour from cast(now() as date))",
+        "Time unit 'hour' in expression 'EXTRACT(hour FROM CAST(now() AS DATE))' is " +
+        "invalid. Expected one of YEAR, QUARTER, MONTH, DAY.");
     AnalysisError("select extract(foo from now())",
         "Time unit 'foo' in expression 'EXTRACT(foo FROM now())' is invalid. Expected " +
         "one of YEAR, QUARTER, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH.");
+    AnalysisError("select extract(foo from date_col) from functional.date_tbl",
+        "Time unit 'foo' in expression 'EXTRACT(foo FROM date_col)' is " +
+        "invalid. Expected one of YEAR, QUARTER, MONTH, DAY.");
     AnalysisError("select extract(year from 0)",
         "Expression '0' in 'EXTRACT(year FROM 0)' has a return type of TINYINT but a " +
-        "TIMESTAMP is required.");
+        "TIMESTAMP or DATE is required.");
     AnalysisError("select functional.extract(year from now())",
         "Function functional.extract conflicts with the EXTRACT builtin");
     AnalysisError("select date_part(year from now())",

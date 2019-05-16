@@ -82,6 +82,20 @@ class DateValue {
   /// Otherwise, return false.
   bool ToYearMonthDay(int* year, int* month, int* day) const WARN_UNUSED_RESULT;
 
+  /// If this DateValue instance is valid, convert it to year and return true. Result is
+  /// placed in 'year'.
+  /// Otherwise, return false.
+  bool ToYear(int* year) const WARN_UNUSED_RESULT;
+
+  /// If DateValue instance is valid, returns day-of-week in [0, 6]; 0 = Monday and
+  /// 6 = Sunday.
+  /// Otherwise, return -1.
+  int WeekDay() const;
+
+  /// If this DateValue instance valid, add 'days' to it and return the result.
+  /// Otherwise, return an invalid DateValue instance.
+  DateValue AddDays(int days) const;
+
   /// If this DateValue instance is valid, convert it to the number of days since epoch
   /// and return true. Result is placed in 'days'.
   /// Otherwise, return false.

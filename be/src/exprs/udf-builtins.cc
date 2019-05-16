@@ -20,7 +20,10 @@
 
 #include "exprs/udf-builtins.h"
 
+#include <gutil/walltime.h>
+
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/date-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
@@ -61,6 +64,7 @@ enum class TruncUnit {
 
 // Put non-exported functions in anonymous namespace to encourage inlining.
 namespace {
+
 // Returns the most recent date, no later than orig_date, which is on week_day
 // week_day: 0==Sunday, 1==Monday, ...
 date GoBackToWeekday(const date& orig_date, int week_day) {
@@ -245,7 +249,7 @@ TimestampValue TruncSecond(const date& orig_date, const time_duration& orig_time
 }
 
 // Truncate parts of milliseconds
-TimestampValue TruncMilliSeconds(const date& orig_date, const time_duration& orig_time) {
+TimestampValue TruncMilliseconds(const date& orig_date, const time_duration& orig_time) {
   time_duration new_time(orig_time.hours(), orig_time.minutes(), orig_time.seconds());
   // Fractional seconds are nanoseconds because Boost is configured to use nanoseconds
   // precision.
@@ -255,7 +259,7 @@ TimestampValue TruncMilliSeconds(const date& orig_date, const time_duration& ori
 }
 
 // Truncate parts of microseconds
-TimestampValue TruncMicroSeconds(const date& orig_date, const time_duration& orig_time) {
+TimestampValue TruncMicroseconds(const date& orig_date, const time_duration& orig_time) {
   time_duration new_time(orig_time.hours(), orig_time.minutes(), orig_time.seconds());
   // Fractional seconds are nanoseconds because Boost is configured to use nanoseconds
   // precision.
@@ -264,9 +268,9 @@ TimestampValue TruncMicroSeconds(const date& orig_date, const time_duration& ori
   return TimestampValue(orig_date, new_time);
 }
 
-// used by both Trunc and DateTrunc functions to perform the truncation
+// Used by both TRUNC and DATE_TRUNC functions to perform the truncation
 TimestampVal DoTrunc(
-    const TimestampValue ts, TruncUnit trunc_unit, FunctionContext* context) {
+    const TimestampValue& ts, TruncUnit trunc_unit, FunctionContext* ctx) {
   const date& orig_date = ts.date();
   const time_duration& orig_time = ts.time();
   TimestampValue ret;
@@ -354,115 +358,528 @@ TimestampVal DoTrunc(
       ret = TruncSecond(orig_date, orig_time);
       break;
     case TruncUnit::MILLISECONDS:
-      ret = TruncMilliSeconds(orig_date, orig_time);
+      ret = TruncMilliseconds(orig_date, orig_time);
       break;
     case TruncUnit::MICROSECONDS:
-      ret = TruncMicroSeconds(orig_date, orig_time);
+      ret = TruncMicroseconds(orig_date, orig_time);
       break;
     default:
       // internal error: implies StrToTruncUnit out of sync with this switch
-      context->SetError("truncate unit not supported");
+      ctx->SetError("truncate unit not supported");
       return TimestampVal::null();
   }
 
   ret.ToTimestampVal(&ret_val);
   return ret_val;
 }
+
+// Returns the most recent date, no later than 'orig_date', which is on 'week_day'
+// 'week_day' is in [0, 6]; 0 = Monday, 6 = Sunday.
+DateValue GoBackToWeekday(const DateValue& orig_date, int week_day) {
+  DCHECK(orig_date.IsValid());
+  DCHECK(week_day >= 0 && week_day <= 6);
+
+  // Week days are in [0, 6]; 0 = Monday, 6 = Sunday.
+  int current_week_day = orig_date.WeekDay();
+  DCHECK(current_week_day >= 0 && current_week_day <= 6);
+
+  if (current_week_day == week_day) {
+    return orig_date;
+  } else if (current_week_day > week_day) {
+    return orig_date.AddDays(week_day - current_week_day);
+  } else {
+    return orig_date.AddDays(week_day - current_week_day - 7);
+  }
 }
 
-TimestampVal UdfBuiltins::TruncImpl(
-    FunctionContext* context, const TimestampVal& tv, const StringVal& unit_str) {
-  if (tv.is_null) return TimestampVal::null();
-  TimestampValue ts = TimestampValue::FromTimestampVal(tv);
+// Used by both TRUNC and DATE_TRUNC functions to perform the truncation
+DateVal DoTrunc(const DateValue& date, TruncUnit trunc_unit, FunctionContext* ctx) {
+  if (!date.IsValid()) return DateVal::null();
 
-  // resolve trunc_unit using the prepared state if possible, o.w. parse now
-  // TruncPrepare() can only parse trunc_unit if user passes it as a string literal
+  DCHECK(trunc_unit != TruncUnit::UNIT_INVALID
+      && trunc_unit != TruncUnit::MICROSECONDS
+      && trunc_unit != TruncUnit::HOUR
+      && trunc_unit != TruncUnit::MINUTE
+      && trunc_unit != TruncUnit::SECOND
+      && trunc_unit != TruncUnit::MILLISECONDS);
+
+  DateValue ret;
+
+  switch(trunc_unit) {
+    case TruncUnit::YEAR: {
+      int year;
+      discard_result(date.ToYear(&year));
+      ret = DateValue(year, 1, 1);
+      break;
+    }
+    case TruncUnit::QUARTER: {
+      int year, month, day;
+      discard_result(date.ToYearMonthDay(&year, &month, &day));
+      ret = DateValue(year, BitUtil::RoundDown(month - 1, 3) + 1, 1);
+      break;
+    }
+    case TruncUnit::MONTH: {
+      int year, month, day;
+      discard_result(date.ToYearMonthDay(&year, &month, &day));
+      ret = DateValue(year, month, 1);
+      break;
+    }
+    case TruncUnit::DAY: {
+      ret = date;
+      break;
+    }
+    case TruncUnit::WW: {
+      int year;
+      discard_result(date.ToYear(&year));
+      ret = GoBackToWeekday(date, DateValue(year, 1, 1).WeekDay());
+      break;
+    }
+    case TruncUnit::W: {
+      int year, month, day;
+      discard_result(date.ToYearMonthDay(&year, &month, &day));
+      ret = GoBackToWeekday(date, DateValue(year, month, 1).WeekDay());
+      break;
+    }
+    case TruncUnit::DAY_OF_WEEK: {
+      // Date of the previous Monday
+      ret = GoBackToWeekday(date, 0);
+      break;
+    }
+    case TruncUnit::WEEK: {
+      // ISO-8601 week starts on monday. go back to monday
+      ret = GoBackToWeekday(date, 0);
+      break;
+    }
+    case TruncUnit::MILLENNIUM: {
+      int year;
+      discard_result(date.ToYear(&year));
+      if (year <= 0) return DateVal::null();
+      // First year of current millennium is 2001
+      ret = DateValue((year - 1) / 1000 * 1000 + 1, 1, 1);
+      break;
+    }
+    case TruncUnit::CENTURY: {
+      int year;
+      discard_result(date.ToYear(&year));
+      if (year <= 0) return DateVal::null();
+      // First year of current century is 2001
+      ret = DateValue((year - 1) / 100 * 100 + 1, 1, 1);
+      break;
+    }
+    case TruncUnit::DECADE: {
+      int year;
+      // Decades start with years ending in '0'.
+      discard_result(date.ToYear(&year));
+      ret = DateValue(year / 10 * 10, 1, 1);
+      break;
+    }
+    default:
+      // internal error: implies StrToTruncUnit out of sync with this switch
+      ctx->SetError("truncate unit not supported");
+      return DateVal::null();
+  }
+
+  return ret.ToDateVal();
+}
+
+// Maps the user facing name of a unit to a TExtractField
+// Returns the TExtractField for the given unit
+TExtractField::type StrToExtractField(FunctionContext* ctx,
+    const StringVal& unit_str) {
+  StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
+  if (UNLIKELY(unit.is_null)) return TExtractField::INVALID_FIELD;
+  if (unit == "year") return TExtractField::YEAR;
+  if (unit == "quarter") return TExtractField::QUARTER;
+  if (unit == "month") return TExtractField::MONTH;
+  if (unit == "day") return TExtractField::DAY;
+  if (unit == "hour") return TExtractField::HOUR;
+  if (unit == "minute") return TExtractField::MINUTE;
+  if (unit == "second") return TExtractField::SECOND;
+  if (unit == "millisecond") return TExtractField::MILLISECOND;
+  if (unit == "epoch") return TExtractField::EPOCH;
+  return TExtractField::INVALID_FIELD;
+}
+
+static int64_t ExtractMillisecond(const time_duration& time) {
+  // Fractional seconds are nanoseconds because Boost is configured
+  // to use nanoseconds precision
+  return time.fractional_seconds() / (NANOS_PER_MICRO * MICROS_PER_MILLI)
+       + time.seconds() * MILLIS_PER_SEC;
+}
+
+// Used by both EXTRACT and DATE_PART functions to perform field extraction.
+BigIntVal DoExtract(const TimestampValue& tv, TExtractField::type field,
+    FunctionContext* ctx) {
+  switch (field) {
+    case TExtractField::YEAR:
+    case TExtractField::QUARTER:
+    case TExtractField::MONTH:
+    case TExtractField::DAY:
+      if (!tv.HasDate()) return BigIntVal::null();
+      break;
+    case TExtractField::HOUR:
+    case TExtractField::MINUTE:
+    case TExtractField::SECOND:
+    case TExtractField::MILLISECOND:
+      if (!tv.HasTime()) return BigIntVal::null();
+      break;
+    case TExtractField::EPOCH:
+      if (!tv.HasDateAndTime()) return BigIntVal::null();
+      break;
+    case TExtractField::INVALID_FIELD:
+      DCHECK(false);
+  }
+
+  const date& orig_date = tv.date();
+  const time_duration& time = tv.time();
+
+  switch (field) {
+    case TExtractField::YEAR: {
+      return BigIntVal(orig_date.year());
+    }
+    case TExtractField::QUARTER: {
+      int m = orig_date.month();
+      return BigIntVal((m - 1) / 3 + 1);
+    }
+    case TExtractField::MONTH: {
+      return BigIntVal(orig_date.month());
+    }
+    case TExtractField::DAY: {
+      return BigIntVal(orig_date.day());
+    }
+    case TExtractField::HOUR: {
+      return BigIntVal(time.hours());
+    }
+    case TExtractField::MINUTE: {
+      return BigIntVal(time.minutes());
+    }
+    case TExtractField::SECOND: {
+      return BigIntVal(time.seconds());
+    }
+    case TExtractField::MILLISECOND: {
+      return BigIntVal(ExtractMillisecond(time));
+    }
+    case TExtractField::EPOCH: {
+      ptime epoch_date(date(1970, 1, 1), time_duration(0, 0, 0));
+      ptime cur_date(orig_date, time);
+      time_duration diff = cur_date - epoch_date;
+      return BigIntVal(diff.total_seconds());
+    }
+    default: {
+      // internal error: implies StrToExtractField out of sync with this switch
+      ctx->SetError("extract unit not supported");
+      return BigIntVal::null();
+    }
+  }
+}
+
+// Used by both EXTRACT and DATE_PART functions to perform field extraction.
+BigIntVal DoExtract(const DateValue& dv, TExtractField::type field,
+    FunctionContext* ctx) {
+  if (!dv.IsValid()) return BigIntVal::null();
+
+  DCHECK(field != TExtractField::INVALID_FIELD
+      && field != TExtractField::HOUR
+      && field != TExtractField::MINUTE
+      && field != TExtractField::SECOND
+      && field != TExtractField::MILLISECOND
+      && field != TExtractField::EPOCH);
+
+  switch (field) {
+    case TExtractField::YEAR: {
+      int year;
+      discard_result(dv.ToYear(&year));
+      return BigIntVal(year);
+    }
+    case TExtractField::QUARTER: {
+      int year, month, day;
+      discard_result(dv.ToYearMonthDay(&year, &month, &day));
+      return BigIntVal((month - 1) / 3 + 1);
+    }
+    case TExtractField::MONTH: {
+      int year, month, day;
+      discard_result(dv.ToYearMonthDay(&year, &month, &day));
+      return BigIntVal(month);
+    }
+    case TExtractField::DAY: {
+      int year, month, day;
+      discard_result(dv.ToYearMonthDay(&year, &month, &day));
+      return BigIntVal(day);
+    }
+    default: {
+      // internal error: implies StrToExtractField out of sync with this switch
+      ctx->SetError("extract unit not supported");
+      return BigIntVal::null();
+    }
+  }
+}
+
+inline TimestampValue FromVal(const TimestampVal& val) {
+  return TimestampValue::FromTimestampVal(val);
+}
+
+inline DateValue FromVal(const DateVal& val) {
+  return DateValue::FromDateVal(val);
+}
+
+inline bool IsTimeOfDayUnit(TruncUnit unit) {
+  return (unit == TruncUnit::HOUR
+      || unit == TruncUnit::MINUTE
+      || unit == TruncUnit::SECOND
+      || unit == TruncUnit::MILLISECONDS
+      || unit == TruncUnit::MICROSECONDS);
+}
+
+inline bool IsTimeOfDayUnit(TExtractField::type unit) {
+  return (unit == TExtractField::HOUR
+      || unit == TExtractField::MINUTE
+      || unit == TExtractField::SECOND
+      || unit == TExtractField::MILLISECOND
+      || unit == TExtractField::EPOCH);
+}
+
+inline bool IsInvalidUnit(TruncUnit unit) {
+  return (unit == TruncUnit::UNIT_INVALID);
+}
+
+inline bool IsInvalidUnit(TExtractField::type unit) {
+  return (unit == TExtractField::INVALID_FIELD);
+}
+
+/// Used for TRUNC/DATE_TRUNC/EXTRACT/DATE_PART built-in functions.
+/// ALLOW_TIME_OF_DAY_UNIT: true iff the built-in function call accepts time-of-day units.
+/// UdfType: udf type the built-in function works with.
+/// InternalType: Impla's internal type that corresponds to UdfType.
+/// ReturnUdfType: The built-in function's return type.
+/// UnitType: type to represent unit values.
+/// to_unit: function to parse unit strings.
+/// do_func: function to implement the built-in function.
+/// func_descr: description of the built-in function.
+/// unit_descr: description of the unit parameter.
+template <
+    bool ALLOW_TIME_OF_DAY_UNIT,
+    typename UdfType,
+    typename InternalType,
+    typename ReturnUdfType,
+    typename UnitType,
+    UnitType to_unit(FunctionContext*, const StringVal&),
+    ReturnUdfType do_func(const InternalType&, UnitType, FunctionContext*)>
+ReturnUdfType ExtractTruncFuncTempl(FunctionContext* ctx, const UdfType& val,
+    const StringVal& unit_str, const string& func_descr, const string& unit_descr) {
+  if (val.is_null) return ReturnUdfType::null();
+
+  // resolve 'unit' using the prepared state if possible, o.w. parse now
+  // ExtractTruncFuncPrepareTempl() can only parse unit if user passes it as a string
+  // literal
   // TODO: it would be nice to resolve the branch before codegen so we can optimise
   // this better.
-  TruncUnit trunc_unit;
-  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  UnitType unit;
+  void* state = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
   if (state != NULL) {
-    trunc_unit = *reinterpret_cast<TruncUnit*>(state);
+    unit = *reinterpret_cast<UnitType*>(state);
   } else {
-    trunc_unit = StrToTruncUnit(context, unit_str);
-    if (trunc_unit == TruncUnit::UNIT_INVALID) {
+    unit = to_unit(ctx, unit_str);
+    if (!ALLOW_TIME_OF_DAY_UNIT && IsTimeOfDayUnit(unit)) {
       string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
-      context->SetError(Substitute("Invalid Truncate Unit: $0", string_unit).c_str());
-      return TimestampVal::null();
+      ctx->SetError(Substitute(
+          "Unsupported $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+      return ReturnUdfType::null();
+    } else if (IsInvalidUnit(unit)) {
+      string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
+      ctx->SetError(Substitute(
+          "Invalid $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+      return ReturnUdfType::null();
     }
   }
-  return DoTrunc(ts, trunc_unit, context);
+  return do_func(FromVal(val), unit, ctx);
 }
 
-void UdfBuiltins::TruncPrepare(
-    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
-  // Parse the unit up front if we can, otherwise do it on the fly in Trunc()
-  if (ctx->IsArgConstant(1)) {
-    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
-    TruncUnit trunc_unit = StrToTruncUnit(ctx, *unit_str);
-    if (trunc_unit == TruncUnit::UNIT_INVALID) {
+/// Does the preparation for TRUNC/DATE_TRUNC/EXTRACT/DATE_PART built-in functions.
+/// ALLOW_TIME_OF_DAY_UNIT: true iff the built-in function call accepts time-of-day units.
+/// UNIT_IDX: indicates which parameter of the function call is the unit parameter.
+/// UnitType: type to represent unit values.
+/// to_unit: function to parse unit strings.
+/// func_descr: description of the built-in function.
+/// unit_descr: description of the unit parameter.
+template <
+    bool ALLOW_TIME_OF_DAY_UNIT,
+    int UNIT_IDX,
+    typename UnitType,
+    UnitType to_unit(FunctionContext*, const StringVal&)>
+void ExtractTruncFuncPrepareTempl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope,
+    const string& func_descr, const string& unit_descr) {
+  // Parse the unit up front if we can, otherwise do it on the fly in trunc_templ()
+  if (ctx->IsArgConstant(UNIT_IDX)) {
+    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(UNIT_IDX));
+    UnitType unit = to_unit(ctx, *unit_str);
+    if (!ALLOW_TIME_OF_DAY_UNIT && IsTimeOfDayUnit(unit)) {
       string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
-      ctx->SetError(Substitute("Invalid Truncate Unit: $0", string_unit).c_str());
+      ctx->SetError(Substitute(
+          "Unsupported $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
+    } else if (IsInvalidUnit(unit)) {
+      string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
+      ctx->SetError(Substitute(
+          "Invalid $0 $1: $2", func_descr, unit_descr, string_unit).c_str());
     } else {
-      TruncUnit* state = ctx->Allocate<TruncUnit>();
+      UnitType* state = ctx->Allocate<UnitType>();
       RETURN_IF_NULL(ctx, state);
-      *state = trunc_unit;
+      *state = unit;
       ctx->SetFunctionState(scope, state);
     }
   }
 }
 
-void UdfBuiltins::TruncClose(FunctionContext* ctx,
+}
+
+void UdfBuiltins::TruncForTimestampPrepareImpl(FunctionContext* ctx,
     FunctionContext::FunctionStateScope scope) {
-  void* state = ctx->GetFunctionState(scope);
-  ctx->Free(reinterpret_cast<uint8_t*>(state));
-  ctx->SetFunctionState(scope, nullptr);
+  return ExtractTruncFuncPrepareTempl<true,
+      1,
+      TruncUnit,
+      StrToTruncUnit>(ctx, scope, "Truncate", "Unit");
 }
 
-TimestampVal UdfBuiltins::DateTruncImpl(
-    FunctionContext* context, const TimestampVal& tv, const StringVal& unit_str) {
-  if (tv.is_null) return TimestampVal::null();
-  TimestampValue ts = TimestampValue::FromTimestampVal(tv);
-
-  // resolve date_trunc_unit using the prepared state if possible, o.w. parse now
-  // DateTruncPrepare() can only parse trunc_unit if user passes it as a string literal
-  TruncUnit date_trunc_unit;
-  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
-  if (state != NULL) {
-    date_trunc_unit = *reinterpret_cast<TruncUnit*>(state);
-  } else {
-    date_trunc_unit = StrToDateTruncUnit(context, unit_str);
-    if (date_trunc_unit == TruncUnit::UNIT_INVALID) {
-      string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
-      context->SetError(
-          Substitute("Invalid Date Truncate Unit: $0", string_unit).c_str());
-      return TimestampVal::null();
-    }
-  }
-  return DoTrunc(ts, date_trunc_unit, context);
+TimestampVal UdfBuiltins::TruncForTimestampImpl(FunctionContext* ctx,
+    const TimestampVal& tv, const StringVal &unit_str) {
+  return ExtractTruncFuncTempl<true,
+      TimestampVal,
+      TimestampValue,
+      TimestampVal,
+      TruncUnit,
+      StrToTruncUnit,
+      DoTrunc>(ctx, tv, unit_str, "Truncate", "Unit");
 }
 
-void UdfBuiltins::DateTruncPrepare(
-    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
-  // Parse the unit up front if we can, otherwise do it on the fly in DateTrunc()
-  if (ctx->IsArgConstant(0)) {
-    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(0));
-    TruncUnit date_trunc_unit = StrToDateTruncUnit(ctx, *unit_str);
-    if (date_trunc_unit == TruncUnit::UNIT_INVALID) {
-      string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
-      ctx->SetError(Substitute("Invalid Date Truncate Unit: $0", string_unit).c_str());
-    } else {
-      TruncUnit* state = ctx->Allocate<TruncUnit>();
-      RETURN_IF_NULL(ctx, state);
-      *state = date_trunc_unit;
-      ctx->SetFunctionState(scope, state);
-    }
-  }
+void UdfBuiltins::TruncForDatePrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<false,
+      1,
+      TruncUnit,
+      StrToTruncUnit>(ctx, scope, "Truncate", "Unit");
 }
 
-void UdfBuiltins::DateTruncClose(
-    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
-  void* state = ctx->GetFunctionState(scope);
-  ctx->Free(reinterpret_cast<uint8_t*>(state));
-  ctx->SetFunctionState(scope, nullptr);
+DateVal UdfBuiltins::TruncForDateImpl(FunctionContext* ctx, const DateVal& dv,
+    const StringVal &unit_str) {
+  return ExtractTruncFuncTempl<false,
+      DateVal,
+      DateValue,
+      DateVal,
+      TruncUnit,
+      StrToTruncUnit,
+      DoTrunc>(ctx, dv, unit_str, "Truncate", "Unit");
+}
+
+void UdfBuiltins::DateTruncForTimestampPrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<true,
+      0,
+      TruncUnit,
+      StrToDateTruncUnit>(ctx, scope, "Date Truncate", "Unit");
+}
+
+TimestampVal UdfBuiltins::DateTruncForTimestampImpl(FunctionContext* ctx,
+    const StringVal &unit_str, const TimestampVal& tv) {
+  return ExtractTruncFuncTempl<true,
+      TimestampVal,
+      TimestampValue,
+      TimestampVal,
+      TruncUnit,
+      StrToDateTruncUnit,
+      DoTrunc>(ctx, tv, unit_str, "Date Truncate", "Unit");
+}
+
+void UdfBuiltins::DateTruncForDatePrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<false,
+      0,
+      TruncUnit,
+      StrToDateTruncUnit>(ctx, scope, "Date Truncate", "Unit");
+}
+
+DateVal UdfBuiltins::DateTruncForDateImpl(FunctionContext* ctx, const StringVal &unit_str,
+    const DateVal& dv) {
+  return ExtractTruncFuncTempl<false,
+      DateVal,
+      DateValue,
+      DateVal,
+      TruncUnit,
+      StrToDateTruncUnit,
+      DoTrunc>(ctx, dv, unit_str, "Date Truncate", "Unit");
+}
+
+void UdfBuiltins::ExtractForTimestampPrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<true,
+      1,
+      TExtractField::type,
+      StrToExtractField>(ctx, scope, "Extract", "Field");
+}
+
+BigIntVal UdfBuiltins::ExtractForTimestampImpl(FunctionContext* ctx,
+    const TimestampVal& tv, const StringVal& unit_str) {
+  return ExtractTruncFuncTempl<true,
+      TimestampVal,
+      TimestampValue,
+      BigIntVal,
+      TExtractField::type,
+      StrToExtractField,
+      DoExtract>(ctx, tv, unit_str, "Extract", "Field");
+}
+
+void UdfBuiltins::ExtractForDatePrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<false,
+      1,
+      TExtractField::type,
+      StrToExtractField>(ctx, scope, "Extract", "Field");
+}
+
+BigIntVal UdfBuiltins::ExtractForDateImpl(FunctionContext* ctx, const DateVal& dv,
+    const StringVal& unit_str) {
+  return ExtractTruncFuncTempl<false,
+      DateVal,
+      DateValue,
+      BigIntVal,
+      TExtractField::type,
+      StrToExtractField,
+      DoExtract>(ctx, dv, unit_str, "Extract", "Field");
+}
+
+void UdfBuiltins::DatePartForTimestampPrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<true,
+      0,
+      TExtractField::type,
+      StrToExtractField>(ctx, scope, "Date Part", "Field");
+}
+
+BigIntVal UdfBuiltins::DatePartForTimestampImpl(FunctionContext* ctx,
+    const StringVal& unit_str, const TimestampVal& tv) {
+  return ExtractTruncFuncTempl<true,
+      TimestampVal,
+      TimestampValue,
+      BigIntVal,
+      TExtractField::type,
+      StrToExtractField,
+      DoExtract>(ctx, tv, unit_str, "Date Part", "Field");
+}
+
+void UdfBuiltins::DatePartForDatePrepareImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return ExtractTruncFuncPrepareTempl<false,
+      0,
+      TExtractField::type,
+      StrToExtractField>(ctx, scope, "Date Part", "Field");
+}
+
+BigIntVal UdfBuiltins::DatePartForDateImpl(FunctionContext* ctx,
+    const StringVal& unit_str, const DateVal& dv) {
+  return ExtractTruncFuncTempl<false,
+      DateVal,
+      DateValue,
+      BigIntVal,
+      TExtractField::type,
+      StrToExtractField,
+      DoExtract>(ctx, dv, unit_str, "Date Part", "Field");
 }

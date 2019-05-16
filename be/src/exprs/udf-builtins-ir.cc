@@ -25,20 +25,12 @@
 #include <string>
 
 #include "gen-cpp/Exprs_types.h"
-#include "gutil/walltime.h"
 #include "runtime/runtime-state.h"
-#include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
-#include "util/bit-util.h"
 
 #include "common/names.h"
 
-using boost::gregorian::date;
-using boost::gregorian::date_duration;
-using boost::posix_time::ptime;
-using boost::posix_time::time_duration;
 using namespace impala;
-using namespace strings;
 
 DoubleVal UdfBuiltins::Abs(FunctionContext* context, const DoubleVal& v) {
   if (v.is_null) return v;
@@ -102,161 +94,6 @@ BooleanVal UdfBuiltins::IsNan(FunctionContext* context, const DoubleVal& val) {
 BooleanVal UdfBuiltins::IsInf(FunctionContext* context, const DoubleVal& val) {
   if (val.is_null) return BooleanVal(false);
   return BooleanVal(std::isinf(val.val));
-}
-
-TimestampVal UdfBuiltins::Trunc(FunctionContext* context, const TimestampVal& tv,
-    const StringVal &unit_str) {
-  return TruncImpl(context, tv, unit_str);
-}
-
-TimestampVal UdfBuiltins::DateTrunc(
-    FunctionContext* context, const StringVal& unit_str, const TimestampVal& tv) {
-  return DateTruncImpl(context, tv, unit_str);
-}
-
-static int64_t ExtractMillisecond(const time_duration& time) {
-  // Fractional seconds are nanoseconds because Boost is configured
-  // to use nanoseconds precision
-  return time.fractional_seconds() / (NANOS_PER_MICRO * MICROS_PER_MILLI)
-       + time.seconds() * MILLIS_PER_SEC;
-}
-
-// Maps the user facing name of a unit to a TExtractField
-// Returns the TExtractField for the given unit
-TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
-  StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
-  if (UNLIKELY(unit.is_null)) return TExtractField::INVALID_FIELD;
-  if (unit == "year") return TExtractField::YEAR;
-  if (unit == "quarter") return TExtractField::QUARTER;
-  if (unit == "month") return TExtractField::MONTH;
-  if (unit == "day") return TExtractField::DAY;
-  if (unit == "hour") return TExtractField::HOUR;
-  if (unit == "minute") return TExtractField::MINUTE;
-  if (unit == "second") return TExtractField::SECOND;
-  if (unit == "millisecond") return TExtractField::MILLISECOND;
-  if (unit == "epoch") return TExtractField::EPOCH;
-  return TExtractField::INVALID_FIELD;
-}
-
-BigIntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
-    const TimestampVal& tv) {
-  // resolve extract_field using the prepared state if possible, o.w. parse now
-  // ExtractPrepare() can only parse extract_field if user passes it as a string literal
-  if (tv.is_null) return BigIntVal::null();
-
-  TExtractField::type field;
-  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
-  if (state != NULL) {
-    field = *reinterpret_cast<TExtractField::type*>(state);
-  } else {
-    field = StrToExtractField(context, unit_str);
-    if (field == TExtractField::INVALID_FIELD) {
-      string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
-      context->SetError(Substitute("invalid extract field: $0", string_unit).c_str());
-      return BigIntVal::null();
-    }
-  }
-
-  const date& orig_date = *reinterpret_cast<const date*>(&tv.date);
-  const time_duration& time = *reinterpret_cast<const time_duration*>(&tv.time_of_day);
-
-  switch (field) {
-    case TExtractField::YEAR:
-    case TExtractField::QUARTER:
-    case TExtractField::MONTH:
-    case TExtractField::DAY:
-      if (orig_date.is_special()) return BigIntVal::null();
-      break;
-    case TExtractField::HOUR:
-    case TExtractField::MINUTE:
-    case TExtractField::SECOND:
-    case TExtractField::MILLISECOND:
-      if (time.is_special()) return BigIntVal::null();
-      break;
-    case TExtractField::EPOCH:
-      if (time.is_special() || orig_date.is_special()) return BigIntVal::null();
-      break;
-    case TExtractField::INVALID_FIELD:
-      DCHECK(false);
-  }
-
-  switch (field) {
-    case TExtractField::YEAR: {
-      return BigIntVal(orig_date.year());
-    }
-    case TExtractField::QUARTER: {
-      int m = orig_date.month();
-      return BigIntVal((m - 1) / 3 + 1);
-    }
-    case TExtractField::MONTH: {
-      return BigIntVal(orig_date.month());
-    }
-    case TExtractField::DAY: {
-      return BigIntVal(orig_date.day());
-    }
-    case TExtractField::HOUR: {
-      return BigIntVal(time.hours());
-    }
-    case TExtractField::MINUTE: {
-      return BigIntVal(time.minutes());
-    }
-    case TExtractField::SECOND: {
-      return BigIntVal(time.seconds());
-    }
-    case TExtractField::MILLISECOND: {
-      return BigIntVal(ExtractMillisecond(time));
-    }
-    case TExtractField::EPOCH: {
-      ptime epoch_date(date(1970, 1, 1), time_duration(0, 0, 0));
-      ptime cur_date(orig_date, time);
-      time_duration diff = cur_date - epoch_date;
-      return BigIntVal(diff.total_seconds());
-    }
-    default: {
-      DCHECK(false) << field;
-      return BigIntVal::null();
-    }
-  }
-}
-
-BigIntVal UdfBuiltins::Extract(FunctionContext* context, const TimestampVal& tv,
-    const StringVal& unit_str) {
-  return Extract(context, unit_str, tv);
-}
-
-void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope, int unit_idx) {
-  // Parse the unit up front if we can, otherwise do it on the fly in Extract()
-  if (ctx->IsArgConstant(unit_idx)) {
-    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(unit_idx));
-    TExtractField::type field = StrToExtractField(ctx, *unit_str);
-    if (field == TExtractField::INVALID_FIELD) {
-      string string_field(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
-      ctx->SetError(Substitute("invalid extract field: $0", string_field).c_str());
-    } else {
-      TExtractField::type* state = ctx->Allocate<TExtractField::type>();
-      RETURN_IF_NULL(ctx, state);
-      *state = field;
-      ctx->SetFunctionState(scope, state);
-    }
-  }
-}
-
-void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope) {
-  ExtractPrepare(ctx, scope, 0);
-}
-
-void UdfBuiltins::SwappedExtractPrepare(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope) {
-  ExtractPrepare(ctx, scope, 1);
-}
-
-void UdfBuiltins::ExtractClose(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope) {
-  void* state = ctx->GetFunctionState(scope);
-  ctx->Free(reinterpret_cast<uint8_t*>(state));
-  ctx->SetFunctionState(scope, nullptr);
 }
 
 bool ValidateMADlibVector(FunctionContext* context, const StringVal& arr) {
@@ -360,4 +197,136 @@ StringVal UdfBuiltins::DecodeVector(FunctionContext* context, const StringVal& a
   memcpy(result.ptr, arr.ptr, arr.len);
   InplaceDoubleDecode(reinterpret_cast<char*>(result.ptr), arr.len);
   return result;
+}
+
+namespace {
+
+/// Used for closing TRUNC/DATE_TRUNC/EXTRACT/DATE_PART built-in functions.
+void CloseImpl(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  void* state = ctx->GetFunctionState(scope);
+  ctx->Free(reinterpret_cast<uint8_t*>(state));
+  ctx->SetFunctionState(scope, nullptr);
+}
+
+}
+
+void UdfBuiltins::TruncForTimestampPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return TruncForTimestampPrepareImpl(ctx, scope);
+}
+
+TimestampVal UdfBuiltins::TruncForTimestamp(FunctionContext* context,
+    const TimestampVal& tv, const StringVal &unit_str) {
+  return TruncForTimestampImpl(context, tv, unit_str);
+}
+
+void UdfBuiltins::TruncForTimestampClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::TruncForDatePrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return TruncForDatePrepareImpl(ctx, scope);
+}
+
+DateVal UdfBuiltins::TruncForDate(FunctionContext* context, const DateVal& dv,
+    const StringVal &unit_str) {
+  return TruncForDateImpl(context, dv, unit_str);
+}
+
+void UdfBuiltins::TruncForDateClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::DateTruncForTimestampPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return DateTruncForTimestampPrepareImpl(ctx, scope);
+}
+
+TimestampVal UdfBuiltins::DateTruncForTimestamp(FunctionContext* context,
+    const StringVal &unit_str, const TimestampVal& tv) {
+  return DateTruncForTimestampImpl(context, unit_str, tv);
+}
+
+void UdfBuiltins::DateTruncForTimestampClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::DateTruncForDatePrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return DateTruncForDatePrepareImpl(ctx, scope);
+}
+
+DateVal UdfBuiltins::DateTruncForDate(FunctionContext* context, const StringVal &unit_str,
+    const DateVal& dv) {
+  return DateTruncForDateImpl(context, unit_str, dv);
+}
+
+void UdfBuiltins::DateTruncForDateClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::ExtractForTimestampPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  ExtractForTimestampPrepareImpl(ctx, scope);
+}
+
+BigIntVal UdfBuiltins::ExtractForTimestamp(FunctionContext* ctx, const TimestampVal& tv,
+    const StringVal& unit_str) {
+  return ExtractForTimestampImpl(ctx, tv, unit_str);
+}
+
+void UdfBuiltins::ExtractForTimestampClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::ExtractForDatePrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  ExtractForDatePrepareImpl(ctx, scope);
+}
+
+BigIntVal UdfBuiltins::ExtractForDate(FunctionContext* ctx, const DateVal& dv,
+    const StringVal& unit_str) {
+  return ExtractForDateImpl(ctx, dv, unit_str);
+}
+
+void UdfBuiltins::ExtractForDateClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::DatePartForTimestampPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  DatePartForTimestampPrepareImpl(ctx, scope);
+}
+
+BigIntVal UdfBuiltins::DatePartForTimestamp(FunctionContext* ctx,
+    const StringVal& unit_str, const TimestampVal& tv) {
+  return DatePartForTimestampImpl(ctx, unit_str, tv);
+}
+
+void UdfBuiltins::DatePartForTimestampClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
+}
+
+void UdfBuiltins::DatePartForDatePrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  DatePartForDatePrepareImpl(ctx, scope);
+}
+
+BigIntVal UdfBuiltins::DatePartForDate(FunctionContext* ctx, const StringVal& unit_str,
+    const DateVal& dv) {
+  return DatePartForDateImpl(ctx, unit_str, dv);
+}
+
+void UdfBuiltins::DatePartForDateClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  return CloseImpl(ctx, scope);
 }

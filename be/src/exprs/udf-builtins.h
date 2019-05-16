@@ -33,6 +33,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 /// Builtins written against the UDF interface. The builtins in the other files
 /// should be replaced to the UDF interface as well.
@@ -56,6 +57,7 @@ class UdfBuiltins {
   static BooleanVal IsNan(FunctionContext* context, const DoubleVal& val);
   static BooleanVal IsInf(FunctionContext* context, const DoubleVal& val);
 
+  /// This is for TRUNC(TIMESTAMP, STRING) function.
   /// Rounds (truncating down) a Timestamp to the specified unit.
   ///    Units:
   ///    CC, SCC : One greater than the first two digits of
@@ -63,25 +65,36 @@ class UdfBuiltins {
   ///    SYYYY, YYYY, YEAR, SYEAR, YYY, YY, Y : Current Year
   ///    Q : Quarter
   ///    MONTH, MON, MM, RM : Month
-  ///    WW : Same day of the week as the first day of the year
-  ///    W : Same day of the week as the first day of the month
   ///    DDD, DD, J : Day
   ///    DAY, DY, D : Starting day of the week
+  ///    WW : Truncates to the most recent date, no later than 'tv', which is on the same
+  ///         day of the week as the first day of year.
+  ///    W : Truncates to the most recent date, no later than 'tv', which is on the same
+  ///        day of the week as the first day of month.
   ///    HH, HH12, HH24 : Hour
   ///    MI : Minute
   ///
   ///    Reference:
   ///    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions201.htm
-  static TimestampVal Trunc(FunctionContext* context, const TimestampVal& date,
-      const StringVal& unit_str);
-  /// Implementation of Trunc, not cross-compiled.
-  static TimestampVal TruncImpl(FunctionContext* context, const TimestampVal& date,
-      const StringVal& unit_str);
-  static void TruncPrepare(FunctionContext* context,
+  static TimestampVal TruncForTimestamp(FunctionContext* ctx, const TimestampVal& tv,
+      const StringVal &unit_str);
+  static void TruncForTimestampPrepare(FunctionContext* ctx,
       FunctionContext::FunctionStateScope scope);
-  static void TruncClose(
-      FunctionContext* context, FunctionContext::FunctionStateScope scope);
+  static void TruncForTimestampClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
 
+  /// This for TRUNC(DATE, STRING) function.
+  /// Rounds (truncating down) a Date to the specified unit.
+  /// Works as 'TruncForTimestamp' but doesn't accept time of day units: HH, HH12, HH24,
+  /// MI.
+  static DateVal TruncForDate(FunctionContext* ctx, const DateVal& dv,
+      const StringVal &unit_str);
+  static void TruncForDatePrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static void TruncForDateClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+
+  /// This for DATE_TRUNC(STRING, TIMESTAMP) function.
   /// Rounds (truncating down) a Timestamp to the specified unit.
   ///    Units:
   ///    MILLENNIUM: The millennium number.
@@ -96,44 +109,69 @@ class UdfBuiltins {
   ///    SECOND: The seconds field (0–59).
   ///    MILLISECONDS: The milliseconds fraction in the seconds.
   ///    MICROSECONDS: The microseconds fraction in the seconds.
-
+  ///
   ///    Reference:
   ///    https://my.vertica.com/docs/8.1.x/HTML/index.htm#Authoring/
   ///       SQLReferenceManual/Functions/Date-Time/DATE_TRUNC.htm
-  static TimestampVal DateTrunc(
-      FunctionContext* context, const StringVal& unit_str, const TimestampVal& date);
-  /// Implementation of DateTrunc, not cross-compiled.
-  static TimestampVal DateTruncImpl(
-      FunctionContext* context, const TimestampVal& date, const StringVal& unit_str);
-  static void DateTruncPrepare(
-      FunctionContext* context, FunctionContext::FunctionStateScope scope);
-  static void DateTruncClose(
-      FunctionContext* context, FunctionContext::FunctionStateScope scope);
+  static TimestampVal DateTruncForTimestamp(FunctionContext* ctx,
+      const StringVal &unit_str, const TimestampVal& tv);
+  static void DateTruncForTimestampPrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static void DateTruncForTimestampClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
 
+  /// This is for DATE_TRUNC(STRING, DATE) function.
+  /// Rounds (truncating down) a Date to the specified unit.
+  /// Works as 'DateTruncForTimestamp' but doesn't accept time of day units: HOUR, MINUTE,
+  /// SECOND, MILLISECONDS, MICROSECONDS.
+  static DateVal DateTruncForDate(FunctionContext* ctx, const StringVal &unit_str,
+      const DateVal& dv);
+  static void DateTruncForDatePrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static void DateTruncForDateClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+
+  /// This is for the EXTRACT(TIMESTAMP, STRING) and EXTRACT(TIMEUNIT FROM TIMESTAMP)
+  /// functions.
   /// Returns a single field from a timestamp
   ///    Fields:
   ///      YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH
-  ///    Reference:
-  ///    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
-  ///
-  /// This is used by the DATE_PART function.
-  static BigIntVal Extract(FunctionContext* context, const StringVal& field_str,
-      const TimestampVal& date);
-
-  /// This is for the EXTRACT(Timestamp, String) and EXTRACT(Timeunit FROM
-  /// Timestamp) functions.
-  static BigIntVal Extract(FunctionContext* context, const TimestampVal& date,
-      const StringVal& field_str);
-  /// This is used by the DATE_PART function.
-  static void ExtractPrepare(FunctionContext* context,
+  /// Reference:
+  /// http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
+  static void ExtractForTimestampPrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal ExtractForTimestamp(FunctionContext* ctx, const TimestampVal& tv,
+      const StringVal& unit_str);
+  static void ExtractForTimestampClose(FunctionContext* ctx,
       FunctionContext::FunctionStateScope scope);
 
-  /// This is for the EXTRACT(Timestamp, String) and EXTRACT(Timeunit FROM
-  /// Timestamp) functions.
-  static void SwappedExtractPrepare(FunctionContext* context,
+  /// This is for the EXTRACT(DATE, STRING) and EXTRACT(TIMEUNIT FROM DATE)
+  /// functions.
+  /// Works as 'ExtractForTimestamp' but doesn't accept time of day fields: HOUR, MINUTE,
+  /// SECOND, MILLISECOND, EPOCH.
+  static void ExtractForDatePrepare(FunctionContext* ctx,
       FunctionContext::FunctionStateScope scope);
-  /// This is used by both EXTRACT and DATE_PART
-  static void ExtractClose(FunctionContext* context,
+  static BigIntVal ExtractForDate(FunctionContext* ctx, const DateVal& dv,
+      const StringVal& unit_str);
+  static void ExtractForDateClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+
+  /// This is for DATE_PART(STRING, TIMESTAMP) function.
+  /// Similar to 'ExtractForTimestamp' with the argument order reversed.
+  static void DatePartForTimestampPrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal DatePartForTimestamp(FunctionContext* ctx, const StringVal& unit_str,
+      const TimestampVal& tv);
+  static void DatePartForTimestampClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+
+  /// This is for DATE_PART(STRING, DATE) function.
+  /// Similar to 'ExtractForDate' with the argument order reversed.
+  static void DatePartForDatePrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal DatePartForDate(FunctionContext* ctx, const StringVal& unit_str,
+      const DateVal& dv);
+  static void DatePartForDateClose(FunctionContext* ctx,
       FunctionContext::FunctionStateScope scope);
 
   /// Converts a set of doubles to double[] stored as a StringVal
@@ -159,11 +197,49 @@ class UdfBuiltins {
   static StringVal DecodeVector(FunctionContext* context, const StringVal& arr);
 
  private:
-  /// Does the preparation for EXTRACT. The unit_idx parameter should indicate which
-  /// parameter of the EXTRACT call is the time unit param. DATE_PART will also use this
-  /// with a different unit_idx than EXTRACT.
-  static void ExtractPrepare(FunctionContext* context,
-      FunctionContext::FunctionStateScope scope, int unit_idx);
+  /// Implementation of TruncForTimestamp, not cross-compiled.
+  static void TruncForTimestampPrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static TimestampVal TruncForTimestampImpl(FunctionContext* context,
+      const TimestampVal& tv, const StringVal &unit_str);
+  /// Implementation of TruncForDate, not cross-compiled.
+  static void TruncForDatePrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static DateVal TruncForDateImpl(FunctionContext* context, const DateVal& dv,
+      const StringVal &unit_str);
+
+  /// Implementation of DateTruncForTimestamp, not cross-compiled.
+  static void DateTruncForTimestampPrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static TimestampVal DateTruncForTimestampImpl(FunctionContext* context,
+      const StringVal &unit_str, const TimestampVal& tv);
+  /// Implementation of DateTruncForDate, not cross-compiled.
+  static void DateTruncForDatePrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static DateVal DateTruncForDateImpl(FunctionContext* context, const StringVal &unit_str,
+      const DateVal& dv);
+
+  /// Implementation of ExtractForTimestamp, not cross-compiled.
+  static void ExtractForTimestampPrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal ExtractForTimestampImpl(FunctionContext* context,
+      const TimestampVal& tv, const StringVal& unit_str);
+  /// Implementation of ExtractForDate, not cross-compiled.
+  static void ExtractForDatePrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal ExtractForDateImpl(FunctionContext* context, const DateVal& dv,
+      const StringVal& unit_st);
+
+  /// Implementation of DatePartForTimestamp, not cross-compiled.
+  static void DatePartForTimestampPrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal DatePartForTimestampImpl(FunctionContext* context,
+      const StringVal& unit_str, const TimestampVal& tv);
+  /// Implementation of DatePartForDate, not cross-compiled.
+  static void DatePartForDatePrepareImpl(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static BigIntVal DatePartForDateImpl(FunctionContext* context,
+      const StringVal& unit_str, const DateVal& dv);
 };
 
 } // namespace impala
