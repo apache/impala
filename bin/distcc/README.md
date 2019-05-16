@@ -30,8 +30,8 @@ The rest of the setup is done for you; here is a short description of what they 
   IMPALA_TOOLCHAIN at that directory. This ensures toolchain binaries are at the
   same path locally as on the distcc servers
 
-        mkdir -p "$IMPALA_TOOLCHAIN"/toolchain
-        sudo ln -s "$IMPALA_TOOLCHAIN"/toolchain /opt/Impala-Toolchain
+        mkdir -p "$IMPALA_TOOLCHAIN"
+        sudo ln -s "$IMPALA_TOOLCHAIN" /opt/Impala-Toolchain
         echo 'export IMPALA_TOOLCHAIN=/opt/Impala-Toolchain' >> bin/impala-config-local.sh
 
 1. Source bin/impala-config.sh in the Impala repo. Step #2 depends on this.
