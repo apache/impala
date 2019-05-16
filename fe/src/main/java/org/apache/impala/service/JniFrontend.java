@@ -17,23 +17,19 @@
 
 package org.apache.impala.service;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
-import org.apache.hadoop.fs.adl.AdlFileSystem;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.security.Groups;
@@ -43,11 +39,8 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
-import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
-import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
@@ -58,6 +51,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.hooks.QueryCompleteContext;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
@@ -88,6 +82,7 @@ import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TQueryCompleteContext;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TShowFilesParams;
@@ -110,9 +105,12 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -123,6 +121,7 @@ public class JniFrontend {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
+
 
   /**
    * Create a new instance of the Jni Frontend.
@@ -622,6 +621,20 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * JNI wrapper for {@link Frontend#callQueryCompleteHooks(QueryCompleteContext)}.
+   *
+   * @param serializedRequest
+   */
+  public void callQueryCompleteHooks(byte[] serializedRequest) throws ImpalaException {
+    final TQueryCompleteContext request = new TQueryCompleteContext();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+
+    final QueryCompleteContext context =
+        new QueryCompleteContext(request.getLineage_string());
+    this.frontend_.callQueryCompleteHooks(context);
   }
 
   /**

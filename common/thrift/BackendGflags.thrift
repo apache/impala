@@ -129,4 +129,8 @@ struct TBackendGflags {
   51: required string authorization_provider
 
   52: required bool recursively_list_partitions
+
+  53: required string query_event_hook_classes
+
+  54: required i32 query_event_hook_nthreads
 }

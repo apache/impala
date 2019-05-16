@@ -77,6 +77,8 @@ DECLARE_string(ranger_service_type);
 DECLARE_string(ranger_app_id);
 DECLARE_string(authorization_provider);
 DECLARE_bool(recursively_list_partitions);
+DECLARE_string(query_event_hook_classes);
+DECLARE_int32(query_event_hook_nthreads);
 
 namespace impala {
 
@@ -153,6 +155,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_ranger_app_id(FLAGS_ranger_app_id);
   cfg.__set_authorization_provider(FLAGS_authorization_provider);
   cfg.__set_recursively_list_partitions(FLAGS_recursively_list_partitions);
+  cfg.__set_query_event_hook_classes(FLAGS_query_event_hook_classes);
+  cfg.__set_query_event_hook_nthreads(FLAGS_query_event_hook_nthreads);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

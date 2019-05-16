@@ -65,7 +65,7 @@ class TestAuthorizationProvider(CustomClusterTestSuite):
     try:
       super(TestAuthorizationProvider, self).setup_method(method)
     except Exception:
-      pass
+      self._stop_impala_cluster()
 
   def teardown_method(self, method):
     # Explicitly override CustomClusterTestSuite.teardown_method() to
@@ -74,4 +74,4 @@ class TestAuthorizationProvider(CustomClusterTestSuite):
     try:
       super(TestAuthorizationProvider, self).teardown_method(method)
     except Exception:
-      pass
+      self._stop_impala_cluster()

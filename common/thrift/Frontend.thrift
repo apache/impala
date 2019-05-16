@@ -932,3 +932,13 @@ struct TTestCaseData {
   // underlying thrift layout changes.
   5: required string impala_version
 }
+
+// Information about a query sent to the FE QueryEventHooks
+// after query execution
+struct TQueryCompleteContext {
+  // the serialized lineage graph of the query, with optional BE-populated information
+  //
+  // this is an experimental feature and the format will likely change
+  // in a future version
+  1: required string lineage_string
+}

@@ -92,6 +92,7 @@
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/LineageGraph_types.h"
+#include "gen-cpp/Frontend_types.h"
 
 #include "common/names.h"
 
@@ -255,6 +256,14 @@ DEFINE_int64(accepted_client_cnxn_timeout, 300000,
     "(Advanced) The amount of time in milliseconds an accepted connection will wait in "
     "the post-accept, pre-setup connection queue before it is timed out and the "
     "connection request is rejected. A value of 0 means there is no timeout.");
+
+DEFINE_string(query_event_hook_classes, "", "Comma-separated list of java QueryEventHook "
+    "implementation classes to load and register at Impala startup. Class names should "
+    "be fully-qualified and on the classpath. Whitespace acceptable around delimiters.");
+
+DEFINE_int32(query_event_hook_nthreads, 1, "Number of threads to use for "
+    "QueryEventHook execution. If this number is >1 then hooks will execute "
+    "concurrently.");
 
 DECLARE_bool(compact_catalog_topic);
 
@@ -485,17 +494,42 @@ Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_s
   // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
   // e.g. converting from client_request_state.end_time() (IMPALA-4440).
   lineage_graph.__set_ended(UnixMillis() / 1000);
+
   string lineage_record;
   LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
-  const Status& status = lineage_logger_->AppendEntry(lineage_record);
-  if (!status.ok()) {
-    LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
-    if (FLAGS_abort_on_failed_lineage_event) {
-      CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
-          "abort_on_failed_lineage_event=true");
+
+  if (AreQueryHooksEnabled()) {
+    // invoke QueryEventHooks
+    TQueryCompleteContext query_complete_context;
+    query_complete_context.__set_lineage_string(lineage_record);
+    const Status& status = exec_env_->frontend()->CallQueryCompleteHooks(
+        query_complete_context);
+
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to send query lineage info to FE CallQueryCompleteHooks"
+                 << status.GetDetail();
+      if (FLAGS_abort_on_failed_lineage_event) {
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+            "abort_on_failed_lineage_event=true");
+      }
     }
   }
-  return status;
+
+  // lineage logfile writing is deprecated in favor of the
+  // QueryEventHooks (see FE).  this behavior is being retained
+  // for now but may be removed in the future.
+  if (IsLineageLoggingEnabled()) {
+    const Status& status = lineage_logger_->AppendEntry(lineage_record);
+    if (!status.ok()) {
+      LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
+      if (FLAGS_abort_on_failed_lineage_event) {
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+            "abort_on_failed_lineage_event=true");
+      }
+    }
+    return status;
+  }
+  return Status::OK();
 }
 
 bool ImpalaServer::IsCoordinator() { return is_coordinator_; }
@@ -527,6 +561,10 @@ const ImpalaServer::BackendDescriptorMap ImpalaServer::GetKnownBackends() {
 
 bool ImpalaServer::IsLineageLoggingEnabled() {
   return !FLAGS_lineage_event_log_dir.empty();
+}
+
+bool ImpalaServer::AreQueryHooksEnabled() {
+  return !FLAGS_query_event_hook_classes.empty();
 }
 
 Status ImpalaServer::InitLineageLogging() {
@@ -673,7 +711,9 @@ void ImpalaServer::LogQueryEvents(const ClientRequestState& request_state) {
     // TODO: deal with an error status
     discard_result(LogAuditRecord(request_state, request_state.exec_request()));
   }
-  if (IsLineageLoggingEnabled() && log_events) {
+
+  if (log_events &&
+      (AreQueryHooksEnabled() || IsLineageLoggingEnabled())) {
     // TODO: deal with an error status
     discard_result(LogLineageRecord(request_state));
   }
@@ -1217,6 +1257,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
       ImpaladMetrics::QUERY_DURATIONS->Update(duration_ms);
     }
   }
+  // TODO (IMPALA-8572): move LogQueryEvents to before query unregistration
   LogQueryEvents(*request_state.get());
 
   {

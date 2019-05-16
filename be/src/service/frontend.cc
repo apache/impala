@@ -109,6 +109,7 @@ Frontend::Frontend() {
     {"getTableFiles", "([B)[B", &get_table_files_id_},
     {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
+    {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_}
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -293,3 +294,9 @@ Status Frontend::BuildTestDescriptorTable(const TBuildTestDescriptorTableParams&
     TDescriptorTable* result) {
   return JniUtil::CallJniMethod(fe_, build_test_descriptor_table_id_, params, result);
 }
+
+// Call FE post-query execution hook
+Status Frontend::CallQueryCompleteHooks(const TQueryCompleteContext& context) {
+  return JniUtil::CallJniMethod(fe_, call_query_complete_hooks_id_, context);
+}
+

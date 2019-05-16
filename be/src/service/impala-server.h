@@ -377,7 +377,13 @@ class ImpalaServer : public ImpalaServiceIf,
   void WaitForCatalogUpdateTopicPropagation(const TUniqueId& catalog_service_id);
 
   /// Returns true if lineage logging is enabled, false otherwise.
+  ///
+  /// DEPRECATED: lineage file logging has been deprecated in favor of
+  ///             query execution hooks (FE)
   bool IsLineageLoggingEnabled();
+
+  /// Returns true if query execution (FE) hooks are enabled, false otherwise.
+  bool AreQueryHooksEnabled();
 
   /// Retuns true if this is a coordinator, false otherwise.
   bool IsCoordinator();

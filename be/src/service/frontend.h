@@ -24,6 +24,7 @@
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/LineageGraph_types.h"
 #include "common/status.h"
 
 namespace impala {
@@ -185,6 +186,9 @@ class Frontend {
   Status BuildTestDescriptorTable(const TBuildTestDescriptorTableParams& params,
       TDescriptorTable* result);
 
+  // Call FE post-query execution hook
+  Status CallQueryCompleteHooks(const TQueryCompleteContext& context);
+
  private:
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -213,6 +217,7 @@ class Frontend {
   jmethodID wait_for_catalog_id_; // JniFrontend.waitForCatalog
   jmethodID get_table_files_id_; // JniFrontend.getTableFiles
   jmethodID show_create_function_id_; // JniFrontend.showCreateFunction
+  jmethodID call_query_complete_hooks_id_; // JniFrontend.callQueryCompleteHooks
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

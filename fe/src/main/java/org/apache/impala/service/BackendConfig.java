@@ -161,6 +161,14 @@ public class BackendConfig {
     return backendCfg_.getAuthorization_provider();
   }
 
+  public String getQueryExecHookClasses() {
+    return backendCfg_.getQuery_event_hook_classes();
+  }
+
+  public int getNumQueryExecHookThreads() {
+    return backendCfg_.getQuery_event_hook_nthreads();
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local
