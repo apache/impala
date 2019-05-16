@@ -22,19 +22,30 @@
 # It has been tested on Ubuntu 16.04.
 set -x
 set -eu -o pipefail
+
+DOCKER_NETWORK="test-impala-cluster"
+
 # Helper to source impala-config.sh, which may have unbound variables
 source_impala_config() {
   set +u
   . ./bin/impala-config.sh
   set -u
 }
+
+onexit() {
+  # Clean up docker containers and networks that may have been created by
+  # these tests.
+  docker rm -f $(docker ps -a -q) || true
+  docker network rm $DOCKER_NETWORK || true
+}
+trap onexit EXIT
+
 source_impala_config
 
 # Check that docker is running and that our user can interact with it.
 docker run hello-world
 
 # Set up the test network.
-DOCKER_NETWORK="test-impala-cluster"
 ./docker/configure_test_network.sh $DOCKER_NETWORK
 
 # Pick up the new variables.
