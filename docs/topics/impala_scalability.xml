@@ -178,11 +178,6 @@ Memory Usage: Additional Notes
 
     <conbody>
 
-      <p audience="hidden">
-        Details to fill in in future: Impact of <q>load catalog in background</q> option.
-        Changing timeouts.
-      </p>
-
       <p>
         Because Hadoop I/O is optimized for reading and writing large files, Impala is optimized
         for tables containing relatively few, large data files. Schemas containing thousands of
@@ -193,13 +188,16 @@ Memory Usage: Additional Notes
       <note type="important" rev="TSB-168">
         <p>
           Because of a change in the default heap size for the <cmdname>catalogd</cmdname>
-          daemon in <keyword keyref="impala25_full"/> and higher, the following procedure to
-          increase the <cmdname>catalogd</cmdname> memory limit might be required following an
-          upgrade to <keyword keyref="impala25_full"/> even if not needed previously.
+          daemon in <keyword
+            keyref="impala25_full"/> and higher, the following
+          procedure to increase the <cmdname>catalogd</cmdname> memory limit might be required
+          following an upgrade to <keyword keyref="impala25_full"/> even if not needed
+          previously.
         </p>
       </note>
 
-      <p conref="../shared/impala_common.xml#common/increase_catalogd_heap_size"/>
+      <p conref="../shared/impala_common.xml#common/increase_catalogd_heap_size"
+      />
 
     </conbody>
 
@@ -343,8 +341,11 @@ Memory Usage: Additional Notes
 
       <p>
         The buffer pool feature includes some query options that you can fine-tune:
-        <xref keyref="buffer_pool_limit"/>, <xref keyref="default_spillable_buffer_size"/>,
-        <xref keyref="max_row_size"/>, and <xref keyref="min_spillable_buffer_size"/>.
+        <xref keyref="buffer_pool_limit"/>,
+        <xref
+          keyref="default_spillable_buffer_size"/>,
+        <xref keyref="max_row_size"
+        />, and <xref keyref="min_spillable_buffer_size"/>.
       </p>
 
       <p>
@@ -368,7 +369,7 @@ Memory Usage: Additional Notes
 
     <conbody>
 
-      <p></p>
+      <p/>
 
     </conbody>
 
@@ -380,7 +381,7 @@ Memory Usage: Additional Notes
 
     <conbody>
 
-      <p></p>
+      <p/>
 
     </conbody>
 
@@ -410,9 +411,10 @@ Memory Usage: Additional Notes
       <note rev="2.10.0 IMPALA-3200">
         <p>
           In <keyword keyref="impala210"/> and higher, also see
-          <xref keyref="scalability_buffer_pool"/> for changes to Impala memory allocation that
-          might change the details of which queries spill to disk, and how much memory and disk
-          space is involved in the spilling operation.
+          <xref
+            keyref="scalability_buffer_pool"/> for changes to Impala memory
+          allocation that might change the details of which queries spill to disk, and how much
+          memory and disk space is involved in the spilling operation.
         </p>
       </note>
 
@@ -468,13 +470,15 @@ Memory Usage: Additional Notes
         -->
       </ul>
 
-      <p conref="../shared/impala_common.xml#common/spill_to_disk_vs_dynamic_partition_pruning"/>
+      <p
+        conref="../shared/impala_common.xml#common/spill_to_disk_vs_dynamic_partition_pruning"/>
 
       <p>
         <b>How Impala handles scratch disk space for spilling:</b>
       </p>
 
-      <p rev="obwl" conref="../shared/impala_common.xml#common/order_by_scratch_dir"/>
+      <p rev="obwl"
+        conref="../shared/impala_common.xml#common/order_by_scratch_dir"/>
 
       <p>
         <b>Memory usage for SQL operators:</b>
@@ -547,8 +551,9 @@ Memory Usage: Additional Notes
         Impala 1.4. This feature was extended to cover join queries, aggregation functions, and
         analytic functions in Impala 2.0. The size of the memory work area required by each
         operator that spills was reduced from 512 megabytes to 256 megabytes in Impala 2.2.
-        <ph rev="2.10.0 IMPALA-3200">The spilling mechanism was reworked to take advantage of
-        the Impala buffer pool feature and be more predictable and stable in
+        <ph
+          rev="2.10.0 IMPALA-3200">The spilling mechanism was reworked to take
+        advantage of the Impala buffer pool feature and be more predictable and stable in
         <keyword keyref="impala210_full"/>.</ph>
       </p>
 
@@ -571,9 +576,12 @@ Memory Usage: Additional Notes
               <cmdname>impala-shell</cmdname> interpreter. This data shows the memory usage for
               each host and in total across the cluster. The <codeph>WriteIoBytes</codeph>
               counter reports how much data was written to disk for each operator during the
-              query. (In <keyword keyref="impala29_full"/>, the counter was named
-              <codeph>ScratchBytesWritten</codeph>; in <keyword keyref="impala28_full"/> and
-              earlier, it was named <codeph>BytesWritten</codeph>.)
+              query. (In <keyword
+                keyref="impala29_full"/>, the counter was
+              named <codeph>ScratchBytesWritten</codeph>; in
+              <keyword
+                keyref="impala28_full"/> and earlier, it was named
+              <codeph>BytesWritten</codeph>.)
             </li>
 
             <li>
@@ -601,12 +609,16 @@ Memory Usage: Additional Notes
               available to Impala and reduce the amount of memory required on each node.
             </li>
 
-            <li> Add more memory to the hosts running Impala daemons. </li>
+            <li>
+              Add more memory to the hosts running Impala daemons.
+            </li>
 
             <li>
               On a cluster with resources shared between Impala and other Hadoop components, use
               resource management features to allocate more memory for Impala. See
-              <xref href="impala_resource_management.xml#resource_management"/> for details.
+              <xref
+                href="impala_resource_management.xml#resource_management"/>
+              for details.
             </li>
 
             <li>
@@ -614,8 +626,9 @@ Memory Usage: Additional Notes
               memory-intensive ones, consider using the Impala admission control feature to
               lower the limit on the number of concurrent queries. By spacing out the most
               resource-intensive queries, you can avoid spikes in memory usage and improve
-              overall response times. See <xref href="impala_admission.xml#admission_control"/>
-              for details.
+              overall response times. See
+              <xref
+                href="impala_admission.xml#admission_control"/> for details.
             </li>
 
             <li>
@@ -635,7 +648,9 @@ Memory Usage: Additional Notes
                 <li>
                   Examine the <codeph>EXPLAIN</codeph> plan to understand the execution strategy
                   being used for the most resource-intensive queries. See
-                  <xref href="impala_explain_plan.xml#perf_explain"/> for details.
+                  <xref href="impala_explain_plan.xml#perf_explain"
+                  /> for
+                  details.
                 </li>
 
                 <li>
@@ -643,7 +658,8 @@ Memory Usage: Additional Notes
                   available, or if it is impractical to keep the statistics up to date for huge
                   or rapidly changing tables, add hints to the most resource-intensive queries
                   to select the right execution strategy. See
-                  <xref href="impala_hints.xml#hints"/> for details.
+                  <xref
+                    href="impala_hints.xml#hints"/> for details.
                 </li>
               </ul>
             </li>
@@ -652,7 +668,9 @@ Memory Usage: Additional Notes
               If your queries experience substantial performance overhead due to spilling,
               enable the <codeph>DISABLE_UNSAFE_SPILLS</codeph> query option. This option
               prevents queries whose memory usage is likely to be exorbitant from spilling to
-              disk. See <xref href="impala_disable_unsafe_spills.xml#disable_unsafe_spills"/>
+              disk. See
+              <xref
+                href="impala_disable_unsafe_spills.xml#disable_unsafe_spills"/>
               for details. As you tune problematic queries using the preceding steps, fewer and
               fewer will be cancelled by this option setting.
             </li>
@@ -952,8 +970,9 @@ these tables, hint the plan or disable this behavior via query options to enable
 
       <p>
         You can use the HDFS caching feature, described in
-        <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>, with Impala to reduce I/O and
-        memory-to-memory copying for frequently accessed tables or partitions.
+        <xref
+          href="impala_perf_hdfs_caching.xml#hdfs_caching"/>, with Impala to
+        reduce I/O and memory-to-memory copying for frequently accessed tables or partitions.
       </p>
 
       <p>
@@ -969,8 +988,10 @@ these tables, hint the plan or disable this behavior via query options to enable
         <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statements for tables that
         use HDFS caching. This clause allows more than one host to cache the relevant data
         blocks, so the CPU load can be shared, reducing the load on any one host. See
-        <xref href="impala_create_table.xml#create_table"/> and
-        <xref href="impala_alter_table.xml#alter_table"/> for details.
+        <xref
+          href="impala_create_table.xml#create_table"/> and
+        <xref
+          href="impala_alter_table.xml#alter_table"/> for details.
       </p>
 
       <p>
@@ -993,40 +1014,52 @@ these tables, hint the plan or disable this behavior via query options to enable
 
   <concept id="scalability_file_handle_cache" rev="2.10.0 IMPALA-4623">
 
-    <title>Scalability Considerations for NameNode Traffic with File Handle Caching</title>
+    <title>Scalability Considerations for File Handle Caching</title>
 
     <conbody>
 
       <p>
-        One scalability aspect that affects heavily loaded clusters is the load on the HDFS
-        NameNode from looking up the details as each HDFS file is opened. Impala queries often
-        access many different HDFS files. For example, a query that does a full table scan on a
-        partitioned table may need to read thousands of partitions, each partition containing
-        multiple data files. Accessing each column of a Parquet file also involves a separate
-        <q>open</q> call, further increasing the load on the NameNode. High NameNode overhead
-        can add startup time (that is, increase latency) to Impala queries, and reduce overall
+        One scalability aspect that affects heavily loaded clusters is the load on the metadata
+        layer from looking up the details as each file is opened. On HDFS, that can lead to
+        increased load on the NameNode, and on S3, this can lead to an excessive number of S3
+        metadata requests. For example, a query that does a full table scan on a partitioned
+        table may need to read thousands of partitions, each partition containing multiple data
+        files. Accessing each column of a Parquet file also involves a separate <q>open</q>
+        call, further increasing the load on the NameNode. High NameNode overhead can add
+        startup time (that is, increase latency) to Impala queries, and reduce overall
         throughput for non-Impala workloads that also require accessing HDFS files.
       </p>
 
       <p>
-        In <keyword keyref="impala210_full"/> and higher, you can reduce NameNode overhead by
-        enabling a caching feature for HDFS file handles. Data files that are accessed by
-        different queries, or even multiple times within the same query, can be accessed without
-        a new <q>open</q> call and without fetching the file details again from the NameNode.
+        You can reduce the number of calls made to your file system's metadata layer by enabling
+        the file handle caching feature. Data files that are accessed by different queries, or
+        even multiple times within the same query, can be accessed without a new <q>open</q>
+        call and without fetching the file details multiple times.
       </p>
 
       <p>
-        In Impala 3.2 and higher, file handle caching also applies to remote HDFS file handles.
-        This is controlled by the <codeph>cache_remote_file_handles</codeph> flag for an
-        <codeph>impalad</codeph>. It is recommended that you use the default value of
-        <codeph>true</codeph> as this caching prevents your NameNode from overloading when your
-        cluster has many remote HDFS reads.
-      </p>
+        Impala supports file handle caching for the following file systems:
+        <ul>
+          <li>
+            HDFS in <keyword keyref="impala210_full"/> and higher
+            <p>
+              In Impala 3.2 and higher, file handle caching also applies to remote HDFS file
+              handles. This is controlled by the <codeph>cache_remote_file_handles</codeph> flag
+              for an <codeph>impalad</codeph>. It is recommended that you use the default value
+              of <codeph>true</codeph> as this caching prevents your NameNode from overloading
+              when your cluster has many remote HDFS reads.
+            </p>
+          </li>
 
-      <p>
-        Because this feature only involves HDFS data files, it does not apply to non-HDFS
-        tables, such as Kudu or HBase tables, or tables that store their data on cloud services
-        such as S3 or ADLS.
+          <li>
+            S3 in <keyword keyref="impala33_full"/> and higher
+            <p>
+              The <codeph>cache_s3_file_handles</codeph> <codeph>impalad</codeph> flag controls
+              the S3 file handle caching. The feature is enabled by default with the flag set to
+              <codeph>true</codeph>.
+            </p>
+          </li>
+        </ul>
       </p>
 
       <p>
@@ -1041,17 +1074,17 @@ these tables, hint the plan or disable this behavior via query options to enable
       </p>
 
       <p>
-        If a manual HDFS operation moves a file to the HDFS Trashcan while the file handle is
-        cached, Impala still accesses the contents of that file. This is a change from prior
-        behavior. Previously, accessing a file that was in the trashcan would cause an error.
-        This behavior only applies to non-Impala methods of removing HDFS files, not the Impala
-        mechanisms such as <codeph>TRUNCATE TABLE</codeph> or <codeph>DROP TABLE</codeph>.
+        If a manual operation moves a file to the trashcan while the file handle is cached,
+        Impala still accesses the contents of that file. This is a change from prior behavior.
+        Previously, accessing a file that was in the trashcan would cause an error. This
+        behavior only applies to non-Impala methods of removing files, not the Impala mechanisms
+        such as <codeph>TRUNCATE TABLE</codeph> or <codeph>DROP TABLE</codeph>.
       </p>
 
       <p>
-        If files are removed, replaced, or appended by HDFS operations outside of Impala, the
-        way to bring the file information up to date is to run the <codeph>REFRESH</codeph>
-        statement on the table.
+        If files are removed, replaced, or appended by operations outside of Impala, the way to
+        bring the file information up to date is to run the <codeph>REFRESH</codeph> statement
+        on the table.
       </p>
 
       <p>
@@ -1071,11 +1104,19 @@ these tables, hint the plan or disable this behavior via query options to enable
 
       <p>
         To see metrics about file handle caching for each <cmdname>impalad</cmdname> instance,
-        examine the <uicontrol>/metrics</uicontrol> page in the Impala Web UI, in particular the
-        fields <uicontrol>impala-server.io.mgr.cached-file-handles-miss-count</uicontrol>,
-        <uicontrol>impala-server.io.mgr.cached-file-handles-hit-count</uicontrol>, and
-        <uicontrol>impala-server.io.mgr.num-cached-file-handles</uicontrol>.
+        examine the following fields on the <uicontrol>/metrics</uicontrol> page in the Impala
+        Web UI:
       </p>
+
+      <ul>
+        <li>
+          <uicontrol>impala-server.io.mgr.cached-file-handles-miss-count</uicontrol>
+        </li>
+
+        <li>
+          <uicontrol>impala-server.io.mgr.num-cached-file-handles</uicontrol>
+        </li>
+      </ul>
 
     </conbody>
 
