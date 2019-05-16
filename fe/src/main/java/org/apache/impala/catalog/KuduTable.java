@@ -70,11 +70,15 @@ public class KuduTable extends Table implements FeKuduTable {
   // with older versions.
   public static final String KEY_MASTER_HOSTS = "kudu.master_addresses";
 
+  // Kudu specific value for the legacy storage handler table property keyed by
+  // KEY_STORAGE_HANDLER. This is expected to be deprecated eventually.
+  public static final String KUDU_LEGACY_STORAGE_HANDLER =
+      "com.cloudera.kudu.hive.KuduStorageHandler";
+
   // Kudu specific value for the storage handler table property keyed by
   // KEY_STORAGE_HANDLER.
-  // TODO: Fix the storage handler name (see IMPALA-4271).
   public static final String KUDU_STORAGE_HANDLER =
-      "com.cloudera.kudu.hive.KuduStorageHandler";
+      "org.apache.kudu.hive.KuduStorageHandler";
 
   // Key to specify the number of tablet replicas.
   public static final String KEY_TABLET_REPLICAS = "kudu.num_tablet_replicas";
@@ -120,8 +124,13 @@ public class KuduTable extends Table implements FeKuduTable {
   @Override
   public List<Column> getColumnsInHiveOrder() { return getColumns(); }
 
+  public static boolean isKuduStorageHandler(String handler) {
+    return handler != null && (handler.equals(KUDU_LEGACY_STORAGE_HANDLER) ||
+                               handler.equals(KUDU_STORAGE_HANDLER));
+  }
+
   public static boolean isKuduTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    return KUDU_STORAGE_HANDLER.equals(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
+    return isKuduStorageHandler(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
   }
 
   @Override

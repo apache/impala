@@ -219,7 +219,7 @@ public class CreateTableStmt extends StatementBase {
    */
   private void analyzeKuduFormat(Analyzer analyzer) throws AnalysisException {
     if (getFileFormat() != THdfsFileFormat.KUDU) {
-      if (KuduTable.KUDU_STORAGE_HANDLER.equals(
+      if (KuduTable.KUDU_LEGACY_STORAGE_HANDLER.equals(
           getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
         throw new AnalysisException(KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
       }
@@ -262,12 +262,12 @@ public class CreateTableStmt extends StatementBase {
 
     // Only the Kudu storage handler may be specified for Kudu tables.
     String handler = getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER);
-    if (handler != null && !handler.equals(KuduTable.KUDU_STORAGE_HANDLER)) {
+    if (handler != null && !handler.equals(KuduTable.KUDU_LEGACY_STORAGE_HANDLER)) {
       throw new AnalysisException("Invalid storage handler specified for Kudu table: " +
           handler);
     }
     putGeneratedKuduProperty(KuduTable.KEY_STORAGE_HANDLER,
-        KuduTable.KUDU_STORAGE_HANDLER);
+        KuduTable.KUDU_LEGACY_STORAGE_HANDLER);
 
     String masterHosts = getTblProperties().get(KuduTable.KEY_MASTER_HOSTS);
     if (Strings.isNullOrEmpty(masterHosts)) {
