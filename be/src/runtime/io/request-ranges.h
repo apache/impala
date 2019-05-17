@@ -23,6 +23,7 @@
 #include <functional>
 
 #include <boost/thread/mutex.hpp>
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/atomic.h"
 #include "common/hdfs.h"
@@ -198,6 +199,7 @@ struct BufferOpts {
  private:
   friend class ScanRange;
   friend class HdfsFileReader;
+  FRIEND_TEST(DataCacheTest, TestBasics);
 
   BufferOpts(
       bool try_cache, int64_t mtime, uint8_t* client_buffer, int64_t client_buffer_len)

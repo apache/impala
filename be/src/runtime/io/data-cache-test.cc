@@ -22,6 +22,7 @@
 
 #include "gutil/strings/join.h"
 #include "runtime/io/data-cache.h"
+#include "runtime/io/request-ranges.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
@@ -262,6 +263,23 @@ TEST_F(DataCacheTest, TestBasics) {
 
   // Check that an insertion larger than the cache size will fail.
   ASSERT_FALSE(cache.Store(FNAME, MTIME, 0, test_buffer(), cache_size * 2));
+
+  // Test with uncacheable 'mtime' to make sure the entry is not stored.
+  ASSERT_FALSE(cache.Store(FNAME, BufferOpts::NEVER_CACHE, 0, test_buffer(),
+      TEMP_BUFFER_SIZE));
+  ASSERT_EQ(0, cache.Lookup(FNAME, BufferOpts::NEVER_CACHE, 0, TEMP_BUFFER_SIZE, buffer));
+
+  // Test with bad 'mtime' to make sure the entry is not stored.
+  ASSERT_FALSE(cache.Store(FNAME, -1000, 0, test_buffer(), TEMP_BUFFER_SIZE));
+  ASSERT_EQ(0, cache.Lookup(FNAME, -1000, 0, TEMP_BUFFER_SIZE, buffer));
+
+  // Test with bad 'offset' to make sure the entry is not stored.
+  ASSERT_FALSE(cache.Store(FNAME, MTIME, -2000, test_buffer(), TEMP_BUFFER_SIZE));
+  ASSERT_EQ(0, cache.Lookup(FNAME, MTIME, -2000, TEMP_BUFFER_SIZE, buffer));
+
+  // Test with bad 'buffer_len' to make sure the entry is not stored.
+  ASSERT_FALSE(cache.Store(FNAME, MTIME, 0, test_buffer(), -5000));
+  ASSERT_EQ(0, cache.Lookup(FNAME, MTIME, 0, -5000, buffer));
 }
 
 // Tests backing file rotation by setting FLAGS_data_cache_file_max_size_bytes to be 1/4

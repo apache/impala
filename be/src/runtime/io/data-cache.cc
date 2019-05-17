@@ -287,6 +287,8 @@ struct DataCache::CacheKey {
  public:
   explicit CacheKey(const string& filename, int64_t mtime, int64_t offset)
     : key_(filename.size() + sizeof(mtime) + sizeof(offset)) {
+    DCHECK_GE(mtime, 0);
+    DCHECK_GE(offset, 0);
     key_.append(filename);
     key_.append(&mtime, sizeof(mtime));
     key_.append(&offset, sizeof(offset));
@@ -658,6 +660,12 @@ void DataCache::ReleaseResources() {
 int64_t DataCache::Lookup(const string& filename, int64_t mtime, int64_t offset,
     int64_t bytes_to_read, uint8_t* buffer) {
   DCHECK(!partitions_.empty());
+  // Bail out early for uncacheable ranges or invalid requests.
+  if (mtime < 0 || offset < 0 || bytes_to_read < 0) {
+    VLOG(3) << Substitute("Skipping lookup of invalid entry $0 mtime: $1 offset: $2 "
+         "bytes_to_read: $3", filename, mtime, offset, bytes_to_read);
+    return 0;
+  }
 
   // Construct a cache key. The cache key is also hashed to compute the partition index.
   const CacheKey key(filename, mtime, offset);
@@ -676,6 +684,12 @@ int64_t DataCache::Lookup(const string& filename, int64_t mtime, int64_t offset,
 bool DataCache::Store(const string& filename, int64_t mtime, int64_t offset,
     const uint8_t* buffer, int64_t buffer_len) {
   DCHECK(!partitions_.empty());
+  // Bail out early for uncacheable ranges or invalid requests.
+  if (mtime < 0 || offset < 0 || buffer_len < 0) {
+    VLOG(3) << Substitute("Skipping insertion of invalid entry $0 mtime: $1 offset: $2 "
+         "buffer_len: $3", filename, mtime, offset, buffer_len);
+    return false;
+  }
 
   // Construct a cache key. The cache key is also hashed to compute the partition index.
   const CacheKey key(filename, mtime, offset);

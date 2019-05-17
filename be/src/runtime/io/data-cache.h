@@ -45,17 +45,19 @@ class Cache;
 /// Each partition has a meta-data cache which tracks the mappings of cache keys to
 /// the locations of the cached data. A cache key is a tuple of (file's name, file's
 /// modification time, file offset) and a cache entry is a tuple of (backing file,
-/// offset in the backing file, length of the cached data, optional checksum). Each
-/// partition stores its set of cached data in backing files created on local storage.
-/// When inserting new data into the cache, the data is appended to the current backing
-/// file in use. The storage consumption of each cache entry counts towards the quota of
-/// that partition. When a partition reaches its capacity, the least recently used data
-/// in that partition is evicted. Evicted data is removed from the underlying storage by
-/// punching holes in the backing file it's stored in. As a backing file reaches a certain
-/// size (e.g. 4TB), new data will stop being appended to it and a new file will be
-/// created instead. Note that due to hole punching, the backing file is actually sparse.
-/// For instance, a backing file may look like the following after some insertion and
-/// eviction. All the holes in file consume no storage space at all.
+/// offset in the backing file, length of the cached data, optional checksum). The
+/// file's modification time is used for distinguishing between different versions of
+/// a file with a given name. Each partition stores its set of cached data in backing
+/// files created on local storage. When inserting new data into the cache, the data is
+/// appended to the current backing file in use. The storage consumption of each cache
+/// entry counts towards the quota of that partition. When a partition reaches its
+/// capacity, the least recently used data in that partition is evicted. Evicted data is
+/// removed from the underlying storage by punching holes in the backing file it's stored
+/// in. As a backing file reaches a certain size (e.g. 4TB), new data will stop being
+/// appended to it and a new file will be created instead. Note that due to hole punching,
+/// the backing file is actually sparse. For instance, a backing file may look like the
+/// following after some insertion and eviction. All the holes in file consume no storage
+/// space at all.
 ///
 /// 0                                                                             1GB
 /// +----------+----------+----------+-----------------+---------+---------+-------+
