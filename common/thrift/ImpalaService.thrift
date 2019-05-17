@@ -390,6 +390,12 @@ enum TImpalaQueryOptions {
   // statistics at page-level granularity. It can be used to skip pages and rows during
   // scanning.
   PARQUET_READ_PAGE_INDEX = 80
+
+  // Enable writing the Parquet page index.
+  PARQUET_WRITE_PAGE_INDEX = 81
+
+  // Maximum number of rows written in a single Parquet data page.
+  PARQUET_PAGE_ROW_COUNT_LIMIT = 82
 }
 
 // The summary of a DML statement.

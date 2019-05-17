@@ -342,6 +342,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   81: optional bool parquet_read_page_index = true;
+
+  // See comment in ImpalaService.thrift.
+  82: optional bool parquet_write_page_index = true;
+
+  // See comment in ImpalaService.thrift.
+  83: optional i32 parquet_page_row_count_limit;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

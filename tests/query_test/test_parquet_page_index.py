@@ -23,7 +23,7 @@ from collections import namedtuple
 from subprocess import check_call
 from parquet.ttypes import BoundaryOrder, ColumnIndex, OffsetIndex, PageHeader, PageType
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (
@@ -36,7 +36,7 @@ PAGE_INDEX_MAX_STRING_LENGTH = 64
 
 
 @SkipIfLocal.parquet_file_size
-class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
+class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
   """Since PARQUET-922 page statistics can be written before the footer.
   The tests in this class checks if Impala writes the page indices correctly.
   It is temporarily a custom cluster test suite because we need to set the
@@ -51,7 +51,7 @@ class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(CustomClusterTestSuite, cls).add_test_dimensions()
+    super(TestHdfsParquetTableIndexWriter, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
@@ -243,27 +243,36 @@ class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
           e.args += ("Validation failed on column {}.".format(column_info.schema.name),)
           raise
 
-  def _ctas_table_and_verify_index(self, vector, unique_database, source_table,
+  def _ctas_table(self, vector, unique_database, source_db, source_table,
                                    tmpdir, sorting_column=None):
-    """Copies 'source_table' into a parquet table and makes sure that the index
-    in the resulting parquet file is valid.
+    """Copies the contents of 'source_db.source_table' into a parquet table.
     """
-    table_name = "test_hdfs_parquet_table_writer"
+    qualified_source_table = "{0}.{1}".format(source_db, source_table)
+    table_name = source_table
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
-    hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
-                                                                 table_name))
     # Setting num_nodes = 1 ensures that the query is executed on the coordinator,
     # resulting in a single parquet file being written.
     vector.get_value('exec_option')['num_nodes'] = 1
     self.execute_query("drop table if exists {0}".format(qualified_table_name))
     if sorting_column is None:
       query = ("create table {0} stored as parquet as select * from {1}").format(
-          qualified_table_name, source_table)
+          qualified_table_name, qualified_source_table)
     else:
       query = ("create table {0} sort by({1}) stored as parquet as select * from {2}"
-               ).format(qualified_table_name, sorting_column, source_table)
+               ).format(qualified_table_name, sorting_column, qualified_source_table)
     self.execute_query(query, vector.get_value('exec_option'))
-    self._validate_parquet_page_index(hdfs_path, tmpdir.join(source_table))
+
+  def _ctas_table_and_verify_index(self, vector, unique_database, source_db, source_table,
+                                   tmpdir, sorting_column=None):
+    """Copies 'source_table' into a parquet table and makes sure that the index
+    in the resulting parquet file is valid.
+    """
+    self._ctas_table(vector, unique_database, source_db, source_table, tmpdir,
+        sorting_column)
+    hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
+        source_table))
+    qualified_source_table = "{0}.{1}".format(unique_database, source_table)
+    self._validate_parquet_page_index(hdfs_path, tmpdir.join(qualified_source_table))
 
   def _create_string_table_with_values(self, vector, unique_database, table_name,
                                        values_sql):
@@ -282,59 +291,57 @@ class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
     return get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
         table_name))
 
-  @CustomClusterTestSuite.with_args("--enable_parquet_page_index_writing_debug_only")
   def test_ctas_tables(self, vector, unique_database, tmpdir):
     """Test different Parquet files created via CTAS statements."""
 
     # Test that writing a parquet file populates the rowgroup indexes with the correct
     # values.
-    self._ctas_table_and_verify_index(vector, unique_database, "functional.alltypes",
+    self._ctas_table_and_verify_index(vector, unique_database, "functional", "alltypes",
         tmpdir)
 
     # Test that writing a parquet file populates the rowgroup indexes with the correct
     # values, using decimal types.
-    self._ctas_table_and_verify_index(vector, unique_database, "functional.decimal_tbl",
-        tmpdir)
+    self._ctas_table_and_verify_index(vector, unique_database, "functional",
+        "decimal_tbl", tmpdir)
 
     # Test that writing a parquet file populates the rowgroup indexes with the correct
     # values, using date types.
-    self._ctas_table_and_verify_index(vector, unique_database, "functional.date_tbl",
+    self._ctas_table_and_verify_index(vector, unique_database, "functional", "date_tbl",
         tmpdir)
 
     # Test that writing a parquet file populates the rowgroup indexes with the correct
     # values, using char types.
-    self._ctas_table_and_verify_index(vector, unique_database, "functional.chars_formats",
-        tmpdir)
+    self._ctas_table_and_verify_index(vector, unique_database, "functional",
+        "chars_formats", tmpdir)
 
     # Test that we don't write min/max values in the index for null columns.
     # Ensure null_count is set for columns with null values.
-    self._ctas_table_and_verify_index(vector, unique_database, "functional.nulltable",
+    self._ctas_table_and_verify_index(vector, unique_database, "functional", "nulltable",
         tmpdir)
 
     # Test that when a ColumnChunk is written across multiple pages, the index is
     # valid.
-    self._ctas_table_and_verify_index(vector, unique_database, "tpch.customer",
+    self._ctas_table_and_verify_index(vector, unique_database, "tpch", "customer",
         tmpdir)
-    self._ctas_table_and_verify_index(vector, unique_database, "tpch.orders",
+    self._ctas_table_and_verify_index(vector, unique_database, "tpch", "orders",
         tmpdir)
 
     # Test that when the schema has a sorting column, the index is valid.
     self._ctas_table_and_verify_index(vector, unique_database,
-        "functional_parquet.zipcode_incomes", tmpdir, "id")
+        "functional_parquet", "zipcode_incomes", tmpdir, "id")
 
     # Test table with wide row.
     self._ctas_table_and_verify_index(vector, unique_database,
-        "functional_parquet.widerow", tmpdir)
+        "functional_parquet", "widerow", tmpdir)
 
     # Test tables with wide rows and many columns.
     self._ctas_table_and_verify_index(vector, unique_database,
-        "functional_parquet.widetable_250_cols", tmpdir)
+        "functional_parquet", "widetable_250_cols", tmpdir)
     self._ctas_table_and_verify_index(vector, unique_database,
-        "functional_parquet.widetable_500_cols", tmpdir)
+        "functional_parquet", "widetable_500_cols", tmpdir)
     self._ctas_table_and_verify_index(vector, unique_database,
-        "functional_parquet.widetable_1000_cols", tmpdir)
+        "functional_parquet", "widetable_1000_cols", tmpdir)
 
-  @CustomClusterTestSuite.with_args("--enable_parquet_page_index_writing_debug_only")
   def test_max_string_values(self, vector, unique_database, tmpdir):
     """Test string values that are all 0xFFs or end with 0xFFs."""
 
@@ -374,3 +381,57 @@ class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
     assert len(column.column_index.max_values) == 1
     max_value = column.column_index.max_values[0]
     assert max_value == 'aab'
+
+  def test_row_count_limit(self, vector, unique_database, tmpdir):
+    """Tests that we can set the page row count limit via a query option.
+    """
+    vector.get_value('exec_option')['parquet_page_row_count_limit'] = 20
+    table_name = "alltypessmall"
+    self._ctas_table_and_verify_index(vector, unique_database, "functional", table_name,
+        tmpdir)
+    hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
+        table_name))
+    row_group_indexes = self._get_row_groups_from_hdfs_folder(hdfs_path,
+        tmpdir.join(table_name))
+    for row_group in row_group_indexes:
+      for column in row_group:
+        for page_header in column.page_headers:
+          if page_header.data_page_header is not None:
+            assert page_header.data_page_header.num_values == 20
+    result_row20 = self.execute_query(
+        "select * from {0}.{1} order by id".format(unique_database, table_name))
+    result_orig = self.execute_query(
+        "select * from functional.alltypessmall order by id")
+    assert result_row20.data == result_orig.data
+
+  def test_row_count_limit_nulls(self, vector, unique_database, tmpdir):
+    """Tests that we can set the page row count limit on a table with null values.
+    """
+    vector.get_value('exec_option')['parquet_page_row_count_limit'] = 2
+    null_tbl = 'null_table'
+    null_tbl_path = self._create_string_table_with_values(vector, unique_database,
+        null_tbl, "(NULL), (NULL), ('foo'), (NULL), (NULL), (NULL)")
+    row_group_indexes = self._get_row_groups_from_hdfs_folder(null_tbl_path,
+        tmpdir.join(null_tbl))
+    column = row_group_indexes[0][0]
+    assert column.column_index.null_pages[0] == True
+    assert column.column_index.null_pages[1] == False
+    assert column.column_index.null_pages[2] == True
+    assert len(column.page_headers) == 3
+    for page_header in column.page_headers:
+      assert page_header.data_page_header.num_values == 2
+
+  def test_disable_page_index_writing(self, vector, unique_database, tmpdir):
+    """Tests that we can disable page index writing via a query option.
+    """
+    vector.get_value('exec_option')['parquet_write_page_index'] = False
+    table_name = "alltypessmall"
+    self._ctas_table(vector, unique_database, "functional", table_name, tmpdir)
+    hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
+        table_name))
+    row_group_indexes = self._get_row_groups_from_hdfs_folder(hdfs_path,
+        tmpdir.join(table_name))
+    for row_group in row_group_indexes:
+      for column in row_group:
+        assert column.offset_index is None
+        assert column.column_index is None

@@ -80,6 +80,8 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   virtual std::string file_extension() const override { return "parq"; }
 
+  int32_t page_row_count_limit() const { return page_row_count_limit_; }
+
  private:
   /// Default data page size. In bytes.
   static const int DEFAULT_DATA_PAGE_SIZE = 64 * 1024;
@@ -207,6 +209,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   /// For each column, the on disk size written.
   ParquetDmlStatsPB parquet_dml_stats_;
+
+  /// Maximum row count written in a page.
+  int32_t page_row_count_limit_ = std::numeric_limits<int32_t>::max();
 };
 
 }

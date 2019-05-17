@@ -85,8 +85,6 @@ using namespace apache::thrift;
 // the columns and run that function over row batches.
 // TODO: we need to pass in the compression from the FE/metadata
 
-DECLARE_bool(enable_parquet_page_index_writing_debug_only);
-
 namespace impala {
 
 // Base class for column writers. This contains most of the logic except for
@@ -186,6 +184,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     page_index_memory_consumption_ = 0;
     column_index_.null_counts.clear();
     valid_column_index_ = true;
+    write_page_index_ = parent_->state_->query_options().parquet_write_page_index;
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -209,6 +208,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
  protected:
   friend class HdfsParquetTableWriter;
 
+  // Returns true if we should start writing a new page because of reaching some limits.
+  bool ShouldStartNewPage() {
+    int32_t num_values = current_page_->header.data_page_header.num_values;
+    return def_levels_->buffer_full() || num_values >= parent_->page_row_count_limit();
+  }
+
   Status AddMemoryConsumptionForPageIndex(int64_t new_memory_allocation) {
     if (UNLIKELY(!table_sink_mem_tracker_->TryConsume(new_memory_allocation))) {
       return table_sink_mem_tracker_->MemLimitExceeded(parent_->state_,
@@ -219,7 +224,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   }
 
   Status ReserveOffsetIndex(int64_t capacity) {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
+    if (!write_page_index_) return Status::OK();
     RETURN_IF_ERROR(
         AddMemoryConsumptionForPageIndex(capacity * sizeof(parquet::PageLocation)));
     offset_index_.page_locations.reserve(capacity);
@@ -227,12 +232,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   }
 
   void AddLocationToOffsetIndex(const parquet::PageLocation& location) {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return;
+    if (!write_page_index_) return;
     offset_index_.page_locations.push_back(location);
   }
 
   Status AddPageStatsToColumnIndex() {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
+    if (!write_page_index_) return Status::OK();
     parquet::Statistics page_stats;
     page_stats_base_->EncodeToThrift(&page_stats);
     // If pages_stats contains min_value and max_value, then append them to min_values_
@@ -251,7 +256,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     } else {
       DCHECK(!page_stats.__isset.min_value && !page_stats.__isset.max_value);
       column_index_.null_pages.push_back(true);
-      DCHECK_EQ(page_stats.null_count, num_values_);
+      DCHECK_EQ(page_stats.null_count, current_page_->header.data_page_header.num_values);
     }
     RETURN_IF_ERROR(
         AddMemoryConsumptionForPageIndex(min_val.capacity() + max_val.capacity()));
@@ -384,6 +389,9 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Only write ColumnIndex when 'valid_column_index_' is true. We always need to write
   // the OffsetIndex though.
   bool valid_column_index_ = true;
+
+  // True, if we should write the page index.
+  bool write_page_index_;
 };
 
 // Per type column writer.
@@ -638,9 +646,7 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
   void* value = ConvertValue(expr_eval_->GetValue(row));
   if (current_page_ == nullptr) NewPage();
 
-  // Ensure that we have enough space for the definition level, but don't write it yet in
-  // case we don't have enough space for the value.
-  if (def_levels_->buffer_full()) {
+  if (ShouldStartNewPage()) {
     RETURN_IF_ERROR(FinalizeCurrentPage());
     NewPage();
   }
@@ -690,8 +696,8 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
   // Writing the def level will succeed because we ensured there was enough space for it
   // above, and new pages will always have space for at least a single def level.
   DCHECK(ret);
-
   ++current_page_->header.data_page_header.num_values;
+
   return Status::OK();
 }
 
@@ -961,8 +967,11 @@ Status HdfsParquetTableWriter::Init() {
     ss << "Invalid parquet compression codec " << Codec::GetCodecName(codec);
     return Status(ss.str());
   }
-
   VLOG_FILE << "Using compression codec: " << codec;
+
+  if (query_options.__isset.parquet_page_row_count_limit) {
+    page_row_count_limit_ = query_options.parquet_page_row_count_limit;
+  }
 
   int num_cols = table_desc_->num_cols() - table_desc_->num_clustering_cols();
   // When opening files using the hdfsOpenFile() API, the maximum block size is limited to
@@ -1342,7 +1351,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
 }
 
 Status HdfsParquetTableWriter::WritePageIndex() {
-  if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
+  if (!state_->query_options().parquet_write_page_index) return Status::OK();
 
   // Currently Impala only write Parquet files with a single row group. The current
   // page index logic depends on this behavior as it only keeps one row group's

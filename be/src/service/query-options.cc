@@ -724,15 +724,29 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_default_file_format(enum_type);
         break;
       }
-      case TImpalaQueryOptions::PARQUET_READ_PAGE_INDEX: {
-        query_options->__set_parquet_read_page_index(IsTrue(value));
-        break;
-      }
       case TImpalaQueryOptions::PARQUET_TIMESTAMP_TYPE: {
         TParquetTimestampType::type enum_type;
         RETURN_IF_ERROR(GetThriftEnum(value, "Parquet timestamp type",
             _TParquetTimestampType_VALUES_TO_NAMES, &enum_type));
         query_options->__set_parquet_timestamp_type(enum_type);
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_READ_PAGE_INDEX: {
+        query_options->__set_parquet_read_page_index(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_WRITE_PAGE_INDEX: {
+        query_options->__set_parquet_write_page_index(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_PAGE_ROW_COUNT_LIMIT: {
+        StringParser::ParseResult result;
+        const int32_t row_count_limit =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || row_count_limit <= 0) {
+          return Status("Parquet page row count limit must be a positive integer.");
+        }
+        query_options->__set_parquet_page_row_count_limit(row_count_limit);
         break;
       }
       default:
