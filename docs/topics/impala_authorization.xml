@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="1.1" id="authorization">
 
-  <title>Enabling Sentry Authorization for Impala</title>
+  <title>Impala Authorization</title>
 
   <prolog>
     <metadata>
@@ -39,33 +39,24 @@ under the License.
 
     <p>
       Authorization determines which users are allowed to access which resources, and what
-      operations they are allowed to perform. In Impala 1.1 and higher, you use Apache Sentry
-      for authorization. Sentry adds a fine-grained authorization framework for Hadoop. By
-      default (when authorization is not enabled), Impala does all read and write operations
-      with the privileges of the <codeph>impala</codeph> user, which is suitable for a
-      development/test environment but not for a secure production environment. When
-      authorization is enabled, Impala uses the OS user ID of the user who runs
-      <cmdname>impala-shell</cmdname> or other client program, and associates various privileges
-      with each user.
+      operations they are allowed to perform. You use Apache Sentry or Apache Ranger for
+      authorization. By default, when authorization is not enabled, Impala does all read and
+      write operations with the privileges of the <codeph>impala</codeph> user, which is
+      suitable for a development/test environment but not for a secure production environment.
+      When authorization is enabled, Impala uses the OS user ID of the user who runs
+      <cmdname>impala-shell</cmdname> or other client programs, and associates various
+      privileges with each user.
     </p>
 
-    <note>
-      Sentry is typically used in conjunction with Kerberos authentication, which defines which
-      hosts are allowed to connect to each server. Using the combination of Sentry and Kerberos
-      prevents malicious users from being able to connect by creating a named account on an
-      untrusted machine. See <xref href="impala_kerberos.xml#kerberos"/> for details about
-      Kerberos authentication.
-    </note>
-
     <p audience="PDF" outputclass="toc inpage">
-      See the following sections for details about using the Impala authorization features:
+      See the following sections for details about using the Impala authorization features.
     </p>
 
   </conbody>
 
   <concept id="sentry_priv_model">
 
-    <title>The Sentry Privilege Model</title>
+    <title>The Privilege Model</title>
 
     <conbody>
 
@@ -99,16 +90,17 @@ under the License.
 
       <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
-      <p> Privileges are managed via the <codeph>GRANT</codeph> and
-          <codeph>REVOKE</codeph> SQL statements that requires the Sentry
-        service enabled. The Sentry service stores, retrieves, and manipulates
-        privilege information stored inside the Sentry database. </p>
+      <p>
+        Privileges are managed via the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> SQL
+        statements that require the Sentry or Ranger service enabled.
+      </p>
 
-      <p> If you change privileges outside of Impala, e.g. adding a user,
-        removing a user, modifying privileges, you must clear the Impala Catalog
-        server cache by running the <codeph>REFRESH AUTHORIZATION</codeph>
-        statement. <codeph>REFRESH AUTHORIZATION</codeph> is not required if you
-        make the changes to privileges within Impala. </p>
+      <p>
+        If you change privileges outside of Impala, e.g. adding a user, removing a user,
+        modifying privileges, you must clear the Impala Catalog server cache by running the
+        <codeph>REFRESH AUTHORIZATION</codeph> statement. <codeph>REFRESH AUTHORIZATION</codeph>
+        is not required if you make the changes to privileges within Impala.
+      </p>
 
     </conbody>
 
@@ -116,7 +108,7 @@ under the License.
 
   <concept id="secure_startup">
 
-    <title>Starting the impalad Daemon with Sentry Authorization Enabled</title>
+    <title>Starting Impala with Sentry Authorization Enabled</title>
 
     <prolog>
       <metadata>
@@ -127,47 +119,76 @@ under the License.
     <conbody>
 
       <p>
-        To run the <cmdname>impalad</cmdname> daemon with authorization enabled, you add one or
-        more options to the <codeph>IMPALA_SERVER_ARGS</codeph> declaration in the
-        <filepath>/etc/default/impala</filepath> configuration file:
+        To enable authorization in an Impala cluster using Sentry:
+        <ol>
+          <li>
+            Add the following options to the <codeph>IMPALA_SERVER_ARGS</codeph> and the
+            <codeph>IMPALA_CATALOG_ARGS</codeph> settings in the
+            <filepath>/etc/default/impala</filepath> configuration file:
+            <ul>
+              <li>
+                <codeph>-server_name</codeph>: For all <cmdname>impalad</cmdname> nodes and the
+                <codeph>catalogd</codeph> in the cluster, specify the same name set in the
+                <codeph>sentry.hive.server</codeph> property in the
+                <filepath>sentry-site.xml</filepath> configuration file for Hive.
+              </li>
+
+              <li>
+                <codeph>-sentry_config</codeph>: Specifies the local path to the
+                <codeph>sentry-site.xml</codeph> configuration file.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            Restart the <codeph>catalogd</codeph> and all <cmdname>impalad</cmdname> daemons.
+          </li>
+        </ol>
       </p>
 
-      <ul>
+    </conbody>
+
+  </concept>
+
+  <concept id="enable_ranger_authz">
+
+    <title>Starting Impala with Ranger Authorization Enabled</title>
+
+    <conbody>
+
+      <p>
+        To enable authorization in an Impala cluster using Ranger:
+      </p>
+
+      <ol>
         <li>
-          <codeph>-server_name</codeph>: Turns on Sentry authorization for Impala. The
-          authorization rules refer to a symbolic server name, and you specify the same name to
-          use as the argument to the <codeph>-server_name</codeph> option for all
-          <cmdname>impalad</cmdname> nodes in the cluster.
+          Add the following options to the <codeph>IMPALA_SERVER_ARGS</codeph> and the
+          <codeph>IMPALA_CATALOG_ARGS</codeph> settings in the
+          <filepath>/etc/default/impala</filepath> configuration file:
+          <ul>
+            <li>
+              <codeph>-server_name</codeph>: Specify the same name for all
+              <cmdname>impalad</cmdname> nodes and the <codeph>catalogd</codeph> in the cluster.
+            </li>
+
+            <li>
+              <codeph>-ranger_service_type=hive</codeph>
+            </li>
+
+            <li>
+              <codeph>-ranger_app_id</codeph>: Set it to the Ranger application id.
+            </li>
+
+            <li>
+              <codeph>-authorization_provider=ranger</codeph>
+            </li>
+          </ul>
         </li>
 
         <li>
-          <codeph>-sentry_config</codeph>: Specifies the local path to the
-          <codeph>sentry-site.xml</codeph> configuration file. This setting is required to
-          enable authorization.
+          Restart the <codeph>catalogd</codeph> and all <cmdname>impalad</cmdname> daemons.
         </li>
-      </ul>
-
-      <p rev="1.4.0">
-        For example, you might adapt your <filepath>/etc/default/impala</filepath> configuration
-        to contain lines like the following. To use the Sentry service:
-      </p>
-
-<codeblock rev="1.4.0">IMPALA_SERVER_ARGS=" \
--server_name=server1 \
-...
-</codeblock>
-
-      <p>
-        The preceding examples set up a symbolic name of <codeph>server1</codeph> to refer to
-        the current instance of Impala. Specify the symbolic name for the
-        <codeph>sentry.hive.server</codeph> property in the <filepath>sentry-site.xml</filepath>
-        configuration file for Hive, as well as in the <codeph>-server_name</codeph> option for
-        <cmdname>impalad</cmdname>.
-      </p>
-
-      <p>
-        Now restart the <cmdname>impalad</cmdname> daemons on all the nodes.
-      </p>
+      </ol>
 
     </conbody>
 
@@ -175,17 +196,14 @@ under the License.
 
   <concept id="sentry_service">
 
-    <title>Using Impala with the Sentry Service</title>
+    <title>Managing Privileges</title>
 
     <conbody>
 
       <p>
-        When you use the Sentry service, you set up privileges through the
-        <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in either Impala or Hive.
-        Then both components use those same privileges automatically. (Impala added the
-        <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in
-        <keyword keyref="impala20_full"
-        />.)
+        You set up privileges through the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
+        statements in either Impala or Hive. Then both components use those same privileges
+        automatically.
       </p>
 
       <p>
@@ -200,14 +218,14 @@ under the License.
 
     <concept id="changing_privileges">
 
-      <title>Changing Privileges</title>
+      <title>Changing Privileges from Outside of Impala</title>
 
       <conbody>
 
         <p>
-          If you make a change to privileges in Sentry from outside of Impala, e.g. adding a
-          user, removing a user, modifying privileges, there are two options to propagate the
-          change:
+          If you make a change to privileges in Sentry or Ranger from outside of Impala, e.g.
+          adding a user, removing a user, modifying privileges, there are two options to
+          propagate the change:
         </p>
 
         <ul>
@@ -218,9 +236,15 @@ under the License.
           </li>
 
           <li>
-            Run the <codeph>INVALIDATE METADATA</codeph> statement to force a Sentry refresh.
-            <codeph>INVALIDATE METADATA</codeph> forces a Sentry refresh regardless of the
-            <codeph>--sentry_catalog_polling_fequency_s</codeph> flag.
+            Use the <codeph>ranger.plugin.hive.policy.pollIntervalMs</codeph> property to
+            specify how often to do a Ranger refresh. The property is specified in
+            <codeph>ranger-hive-security.xml</codeph> in the <codeph>conf</codeph> directory
+            under your Impala home directory.
+          </li>
+
+          <li>
+            Run the <codeph>INVALIDATE METADATA</codeph> or <codeph>REFRESH
+            AUTHORIZATION</codeph> statement to force a refresh.
           </li>
         </ul>
 
@@ -366,7 +390,7 @@ GRANT SELECT ON TABLE db1.training TO ROLE student;</codeblock>
           <title>Privileges for Working with External Data Files</title>
 
           <p>
-            When data is being inserted through the <codeph>LOAD DATA</codeph> statement, or is
+            When data is being inserted through the <codeph>LOAD DATA</codeph> statement or is
             referenced from an HDFS location outside the normal Impala database directories, the
             user also needs appropriate permissions on the URIs corresponding to those HDFS
             locations.
@@ -409,9 +433,9 @@ GRANT ALL ON URI 'hdfs://127.0.0.1:8020/user/impala-user/external_data' TO ROLE 
           <p>
             To create a database, you need the full privilege on that database while day-to-day
             operations on tables within that database can be performed with lower levels of
-            privilege on specific table. Thus, you might set up separate roles for each database
-            or application: an administrative one that could create or drop the database, and a
-            user-level one that can access only the relevant tables.
+            privilege on a specific table. Thus, you might set up separate roles for each
+            database or application: an administrative one that could create or drop the
+            database, and a user-level one that can access only the relevant tables.
           </p>
 
           <p>
@@ -469,7 +493,7 @@ GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
         In your role definitions, you must specify privileges at the level of individual
         databases and tables, or all databases or all tables within a database. To simplify the
         structure of these rules, plan ahead of time how to name your schema objects so that
-        data with different authorization requirements is divided into separate databases.
+        data with different authorization requirements are divided into separate databases.
       </p>
 
       <p>

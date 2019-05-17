@@ -194,12 +194,11 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
         <li>
           <p>
-            Authorization using the open source Sentry plugin. Specify the
-            <codeph>&#8209;&#8209;server_name</codeph> and
-            <codeph>&#8209;&#8209;authorization_policy_file</codeph> options as part of the
-            <codeph>IMPALA_SERVER_ARGS</codeph> and <codeph>IMPALA_STATE_STORE_ARGS</codeph>
-            settings to enable the core Impala support for authentication. See
-            <xref
+            Authorization. Specify the
+              <codeph>&#8209;&#8209;server_name</codeph> option as part of the
+              <codeph>IMPALA_SERVER_ARGS</codeph> and
+              <codeph>IMPALA_CATALOG_ARGS</codeph> settings to enable the core
+            Impala support for authorization. See <xref
               href="impala_authorization.xml#secure_startup"/> for details.
           </p>
         </li>
