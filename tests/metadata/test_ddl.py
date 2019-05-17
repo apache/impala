@@ -430,7 +430,6 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/alter-table-hdfs-caching', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfCatalogV2.alter_column_stats_broken()
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_alter_set_column_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,

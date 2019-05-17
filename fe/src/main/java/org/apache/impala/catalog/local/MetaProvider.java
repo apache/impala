@@ -103,6 +103,9 @@ public interface MetaProvider {
 
   /**
    * Load statistics for the given columns from the given table.
+   *
+   * NOTE: Stats should not be returned for the partition columns of FS-backed
+   * tables, since it's assumed that these will be computed by the coordinator.
    */
   List<ColumnStatisticsObj> loadTableColumnStatistics(TableMetaRef table,
       List<String> colNames) throws TException;

@@ -186,7 +186,14 @@ public class ColumnStats {
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
           numNulls_ = boolStats.getNumNulls();
-          numDistinctValues_ = (numNulls_ > 0) ? 3 : 2;
+          // If we have numNulls, we can infer NDV from that.
+          if (numNulls_ > 0) {
+            numDistinctValues_ = 3;
+          } else if (numNulls_ == 0) {
+            numDistinctValues_ = 2;
+          } else {
+            numDistinctValues_ = -1;
+          }
         }
         break;
       case TINYINT:
@@ -274,7 +281,10 @@ public class ColumnStats {
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
-        colStatsData.setBooleanStats(new BooleanColumnStatsData(1, -1, numNulls));
+        // TODO(IMPALA-8205): actually compute the count of true/false
+        // values.
+        colStatsData.setBooleanStats(new BooleanColumnStatsData(
+            /*numTrues=*/-1, /*numFalse=*/-1, numNulls));
         break;
       case TINYINT:
         ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));

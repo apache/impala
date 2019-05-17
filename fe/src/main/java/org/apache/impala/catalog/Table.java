@@ -486,10 +486,14 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       for (String colName: selector.want_stats_for_column_names) {
         Column col = getColumn(colName);
         if (col == null) continue;
-        // Ugly hack: if the catalogd has never gotten any stats from HMS, numDVs will
-        // be -1, and we'll have to send no stats to the impalad.
-        // TODO(todd): this breaks test_ddl.test_alter_set_column_stats.
-        if (!col.getStats().hasNumDistinctValues()) continue;
+
+        // Don't return stats for HDFS partitioning columns, since these are computed
+        // by the coordinator based on the partition map itself. This makes the
+        // behavior consistent with the HMS stats-fetching APIs.
+        //
+        // NOTE: we _do_ have to return stats for HBase clustering columns, because
+        // those aren't simple value partitions.
+        if (this instanceof FeFsTable && isClusteringColumn(col)) continue;
 
         ColumnStatisticsData tstats = col.getStats().toHmsCompatibleThrift(col.getType());
         if (tstats == null) continue;

@@ -226,13 +226,6 @@ class SkipIfCatalogV2:
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="IMPALA-8486: LibCache isn't invalidated by function DDL.")
 
-  # TODO: IMPALA-8458: fix bug or update tests to reflect expected behaviour.
-  @classmethod
-  def alter_column_stats_broken(self):
-    return pytest.mark.skipif(
-      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
-      reason="IMPALA-8458: setting column stats without setting NDV is no-op.")
-
   # TODO: IMPALA-7131: add support or update tests to reflect expected behaviour.
   @classmethod
   def data_sources_unsupported(self):
