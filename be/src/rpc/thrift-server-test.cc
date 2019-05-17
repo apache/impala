@@ -66,8 +66,8 @@ static string principal_kt_path;
 
 // Only use TLSv1.0 compatible ciphers, as tests might run on machines with only TLSv1.0
 // support.
-static const string TLS1_0_COMPATIBLE_CIPHER = "RC4-SHA";
-static const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
+static const string TLS1_0_COMPATIBLE_CIPHER = "AES128-SHA";
+static const string TLS1_0_COMPATIBLE_CIPHER_2 = "AES256-SHA";
 
 /// Dummy server class (chosen because it has the smallest interface to implement) that
 /// tests can use to start Thrift servers.

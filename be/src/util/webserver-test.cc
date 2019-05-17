@@ -268,7 +268,7 @@ TEST(Webserver, SslCipherSuite) {
 
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
-        &FLAGS_ssl_cipher_list, "RC4-SHA");
+        &FLAGS_ssl_cipher_list, "AES128-SHA");
     Webserver webserver(FLAGS_webserver_port);
     ASSERT_OK(webserver.Start());
   }

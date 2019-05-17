@@ -108,8 +108,8 @@ class ScopedSetTlsFlags {
 
 // Only use TLSv1.0 compatible ciphers, as tests might run on machines with only TLSv1.0
 // support.
-const string TLS1_0_COMPATIBLE_CIPHER = "RC4-SHA";
-const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
+const string TLS1_0_COMPATIBLE_CIPHER = "AES128-SHA";
+const string TLS1_0_COMPATIBLE_CIPHER_2 = "AES256-SHA";
 
 #define PAYLOAD_SIZE (4096)
 
