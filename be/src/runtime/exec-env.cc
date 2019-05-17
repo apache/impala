@@ -209,8 +209,9 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
         request_pool_service_.get()));
   }
 
-  admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
-      request_pool_service_.get(), metrics_.get(), configured_backend_address_));
+  admission_controller_.reset(
+      new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
+          request_pool_service_.get(), metrics_.get(), configured_backend_address_));
   exec_env_ = this;
 }
 

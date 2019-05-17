@@ -14,7 +14,7 @@ set mem_limit=150mb;
 select distinct * from functional_parquet.alltypesagg
 ---- CATCH
 minimum memory reservation needed is greater than pool max mem resources.
- Pool max mem resources: 40.00 MB.
+ Pool max mem resources: 40.00 MB (configured statically).
  Cluster-wide memory reservation needed: 204.26 MB
 ====
 ---- QUERY

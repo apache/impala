@@ -688,6 +688,21 @@ struct TPoolConfig {
   // If false, the mem_limit query option will not be bounded by the max/min query mem
   // limits specified for the pool. Default is true.
   8: required bool clamp_mem_limit_query_option = true;
+
+  // This floating point number is multiplied by the current total number of executors at
+  // runtime to give the maximum number of concurrently running queries allowed in the
+  // pool. If this value is zero then it is ignored.
+  9: required double max_running_queries_multiple = 0;
+
+  // This floating point number is multiplied by the current total number of executors at
+  // runtime to give the maximum number of queries that can be queued in the pool.  If
+  // this value is zero then it is ignored.
+  10: required double max_queued_queries_multiple = 0;
+
+  // This number of bytes is multiplied by the current total number of executors at
+  // runtime to give the maximum memory available across the cluster for the pool.  If
+  // this value is zero then it is ignored.
+  11: required i64 max_memory_multiple = 0;
 }
 
 struct TBloomFilter {

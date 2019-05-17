@@ -12,6 +12,14 @@
       <aclSubmitApps>userC root</aclSubmitApps>
       <maxResources>128 mb, 1 vcores</maxResources>
     </queue>
+    <queue name="queueD">
+      <aclSubmitApps>* </aclSubmitApps>
+      <maxResources>1024 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="queueE">
+      <aclSubmitApps>* </aclSubmitApps>
+      <maxResources>1024 mb, 0 vcores</maxResources>
+    </queue>
     <aclSubmitApps> </aclSubmitApps>
   </queue>
   <queuePlacementPolicy>

@@ -55,4 +55,16 @@
     <name>impala.admission-control.clamp-mem-limit-query-option.root.queueC</name>
     <value>false</value>
   </property>
+  <property>
+    <name>impala.admission-control.max-running-queries-multiple.root.queueD</name>
+    <value>0.5</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-queued-queries-multiple.root.queueD</name>
+    <value>2.5</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-memory-multiple.root.queueD</name>
+    <value>25</value>
+  </property>
 </configuration>

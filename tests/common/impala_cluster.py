@@ -390,6 +390,11 @@ class Process(object):
     while self.__get_pid() is not None:
       sleep(0.01)
 
+  def kill_and_wait_for_exit(self, signal=SIGKILL):
+    """Kill the process and wait for it to exit"""
+    self.kill(signal)
+    self.wait_for_exit()
+
 
 # Base class for all Impala processes
 class BaseImpalaProcess(Process):

@@ -94,7 +94,7 @@ public class TestRequestPoolService {
    *                      create a RequestPoolService with no llama-conf.xml as it is
    *                      not required.
    */
-  void createPoolService(String allocationFile, String llamaConfFile)
+  private void createPoolService(String allocationFile, String llamaConfFile)
       throws Exception {
     allocationConfFile_ = tempFolder.newFile("fair-scheduler-temp-file.xml");
     Files.copy(getClasspathFile(allocationFile), allocationConfFile_);
@@ -114,7 +114,7 @@ public class TestRequestPoolService {
     f.setAccessible(true);
     f.set(poolService_.allocLoader_, CHECK_INTERVAL_MS);
     if (llamaConfFile != null) {
-      poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
+      poolService_.confWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
     }
     poolService_.start();
     // Make sure that the Hadoop configuration from classpath is used for the underlying
@@ -152,7 +152,7 @@ public class TestRequestPoolService {
   public void testPoolResolution() throws Exception {
     createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     Assert.assertEquals("root.queueA", poolService_.assignToPool("root.queueA", "userA"));
-    Assert.assertNull(poolService_.assignToPool("queueD", "userA"));
+    Assert.assertNull(poolService_.assignToPool("nonexistentQueue", "userA"));
   }
 
   @Test
@@ -205,7 +205,9 @@ public class TestRequestPoolService {
         10000L, "mem_limit=1024m,query_timeout_s=10");
     checkPoolConfigResult("root.queueB", 5, 10, -1, 30000L, "mem_limit=1024m");
     checkPoolConfigResult("root.queueC", 5, 10, 1024 * ByteUnits.MEGABYTE, 30000L,
-        "mem_limit=1024m", 1000, 10, false);
+        "mem_limit=1024m", 1000, 10, false, 0.0, 0.0, 0);
+    checkPoolConfigResult("root.queueD", 5, 10, 1024 * ByteUnits.MEGABYTE, 30000L,
+        "mem_limit=1024m", 0, 0, true, 0.5, 2.5, 25);
   }
 
   @Test
@@ -213,7 +215,7 @@ public class TestRequestPoolService {
     createPoolService(ALLOCATION_FILE_EMPTY, LLAMA_CONFIG_FILE_EMPTY);
     Assert.assertEquals("root.userA", poolService_.assignToPool("", "userA"));
     Assert.assertTrue(poolService_.hasAccess("root.userA", "userA"));
-    checkPoolConfigResult("root", -1, 200, -1, null, "", 0 ,0, true);
+    checkPoolConfigResult("root", -1, 200, -1, null, "", 0, 0, true, 0.0, 0.0, 0);
   }
 
   @Ignore("IMPALA-4868") @Test
@@ -309,7 +311,8 @@ public class TestRequestPoolService {
   private void checkPoolConfigResult(String pool, long expectedMaxRequests,
       long expectedMaxQueued, long expectedMaxMem, Long expectedQueueTimeoutMs,
       String expectedQueryOptions, long max_query_mem_limit, long min_query_mem_limit,
-      boolean clamp_mem_limit_query_option) {
+      boolean clamp_mem_limit_query_option, double max_running_queries_multiple,
+      double max_queued_queries_multiple, long max_memory_multiple) {
     TPoolConfig expectedResult = new TPoolConfig();
     expectedResult.setMax_requests(expectedMaxRequests);
     expectedResult.setMax_queued(expectedMaxQueued);
@@ -317,6 +320,9 @@ public class TestRequestPoolService {
     expectedResult.setMax_query_mem_limit(max_query_mem_limit);
     expectedResult.setMin_query_mem_limit(min_query_mem_limit);
     expectedResult.setClamp_mem_limit_query_option(clamp_mem_limit_query_option);
+    expectedResult.setMax_running_queries_multiple(max_running_queries_multiple);
+    expectedResult.setMax_queued_queries_multiple(max_queued_queries_multiple);
+    expectedResult.setMax_memory_multiple(max_memory_multiple);
     if (expectedQueueTimeoutMs != null) {
       expectedResult.setQueue_timeout_ms(expectedQueueTimeoutMs);
     }
@@ -330,8 +336,8 @@ public class TestRequestPoolService {
   private void checkPoolConfigResult(String pool, long expectedMaxRequests,
       long expectedMaxQueued, long expectedMaxMem, Long expectedQueueTimeoutMs,
       String expectedQueryOptions) {
-    checkPoolConfigResult(pool, expectedMaxRequests, expectedMaxQueued,
-        expectedMaxMem, expectedQueueTimeoutMs, expectedQueryOptions, 0, 0, true);
+    checkPoolConfigResult(pool, expectedMaxRequests, expectedMaxQueued, expectedMaxMem,
+        expectedQueueTimeoutMs, expectedQueryOptions, 0, 0, true, 0.0, 0.0, 0);
   }
 
   private void checkPoolConfigResult(String pool, long expectedMaxRequests,

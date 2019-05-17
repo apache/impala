@@ -80,6 +80,66 @@
     "key": "admission-controller.pool-clamp-mem-limit-query-option.$0"
   },
   {
+    "description": "This floating point number is multiplied by the current total number of executors at runtime to give the maximum number of concurrently running queries allowed in the pool.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Running Queries Multiple",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-running-queries-multiple.$0"
+  },
+  {
+    "description": "This floating point number is multiplied by the current total number of executors at runtime to give the maximum number of queries that can be queued in the pool.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Queued Queries Multiple",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-queued-queries-multiple.$0"
+  },
+  {
+    "description": "This number of bytes is multiplied by the current total number of executors at runtime to give the maximum memory available across the cluster for the pool.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Memory Multiple",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-memory-multiple.$0"
+  },
+  {
+    "description": "The maximum number of concurrently running queries allowed in the pool. If pool-max-running-queries-multiple is set then the metric is derived by multiplying that value by the current total number of executors.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Running Queries Derived",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-running-queries-derived.$0"
+  },
+  {
+    "description": "The maximum number of queries that can be queued in the pool. If pool-max-queued-queries-multiple is set then the metric is derived by multiplying that value by the current total number of executors.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Queued Queries Derived",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "admission-controller.max-queued-queries-derived.$0"
+  },
+  {
+    "description": "The maximum memory available across the cluster for the pool. If pool-max-memory-multiple is set then the metric is derived by multiplying that value by the current total number of executors.",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Memory Derived",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "admission-controller.max-memory-derived.$0"
+  },
+  {
     "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"

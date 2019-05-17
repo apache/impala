@@ -252,6 +252,18 @@ Time since last statestore update containing admission control topic state (ms):
       <td>Clamp MEM_LIMIT query option</td>
       <td>{{clamp_mem_limit_query_option}}</td>
     </tr>
+    <tr>
+      <td>Max Running Queries Multiple</td>
+      <td>{{max_running_queries_multiple}}</td>
+    </tr>
+    <tr>
+      <td>Max Queued Queries Multiple</td>
+      <td>{{max_queued_queries_multiple}}</td>
+    </tr>
+    <tr>
+      <td>Max Memory Multiple</td>
+      <td class='memory'>{{max_memory_multiple}}</td>
+    </tr>
   </table>
 
   <h4>Queued queries in order of being queued (submitted to this coordinator)</h4>
@@ -320,22 +332,22 @@ Time since last statestore update containing admission control topic state (ms):
     <tr>
       <td>Queries currently running</td>
       <td>{{agg_num_running}}</td>
-      <td>{{pool_max_requests}}</td>
+      <td>{{max_running_queries_derived}}</td>
     </tr>
     <tr>
       <td>Queries currently queued</td>
       <td>{{agg_num_queued}}</td>
-      <td>{{pool_max_queued}}</td>
+      <td>{{max_queued_queries_derived}}</td>
     </tr>
     <tr>
       <td>Total memory reserved across cluster</td>
       <td class='memory'>{{agg_mem_reserved}}</td>
-      <td class='memory'>{{pool_max_mem_resources}}</td>
+      <td class='memory'>{{max_memory_derived}}</td>
     </tr>
     <tr>
       <td>Memory admitted on this coordinator</td>
       <td class='memory'>{{local_mem_admitted}}</td>
-      <td class='memory'>{{pool_max_mem_resources}}</td>
+      <td class='memory'>{{max_memory_derived}}</td>
     </tr>
     <tr>
       <td>Queued reason of query at the head of the queue</td>

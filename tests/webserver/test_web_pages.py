@@ -498,7 +498,18 @@ class TestWebPage(ImpalaTestSuite):
     assert response_json[0]['total_admitted'] > 0
     self.get_and_check_status(self.RESET_RESOURCE_POOL_STATS_URL, ports_to_test=[25000])
     response_json = self.__fetch_resource_pools_json("default-pool")
-    assert response_json[0]['total_admitted'] == 0
+    pool_config = response_json[0]
+    assert pool_config['total_admitted'] == 0
+
+    # check that metrics exist
+    assert pool_config['max_query_mem_limit'] == 0
+    assert pool_config['min_query_mem_limit'] == 0
+    assert pool_config['max_running_queries_multiple'] == 0
+    assert pool_config['max_memory_multiple'] == 0
+    assert 'clamp_mem_limit_query_option' in pool_config
+    assert 'max_running_queries_derived' in pool_config
+    assert 'max_queued_queries_derived' in pool_config
+    assert 'max_memory_derived' in pool_config
 
   def __fetch_resource_pools_json(self, pool_name=None):
     """Helper method used to fetch the resource pool json from the admission debug page.

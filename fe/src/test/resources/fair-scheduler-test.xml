@@ -12,6 +12,10 @@
       <aclSubmitApps>* </aclSubmitApps>
       <maxResources>1024 mb, 0 vcores</maxResources>
     </queue>
+    <queue name="queueD">
+      <aclSubmitApps>* </aclSubmitApps>
+      <maxResources>1024 mb, 0 vcores</maxResources>
+    </queue>
     <aclSubmitApps> </aclSubmitApps>
   </queue>
   <queuePlacementPolicy>

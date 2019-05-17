@@ -149,5 +149,6 @@ set request_pool=maxMemLessThanMinLimit;
 Select 1;
 ---- CATCH
 Rejected query from pool root.maxMemLessThanMinLimit: Invalid pool config: the
- min_query_mem_limit is greater than the max_mem_resources (2621440001 > 2621440000)
+ min_query_mem_limit 2621440001 is greater than the max_mem_resources 2621440000
+ (configured statically)
 ====

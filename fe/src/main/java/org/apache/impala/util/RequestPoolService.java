@@ -87,51 +87,63 @@ public class RequestPoolService {
 
   // Key for the default maximum number of running queries ("placed reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
-  // "{key}.{pool}". This is a llama-site.xml configuration.
-  final static String LLAMA_MAX_PLACED_RESERVATIONS_KEY =
+  // "{key}.{pool}".
+  private final static String MAX_PLACED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.placed.reservations";
 
   // Default value for the maximum.placed.reservations property. Note that this value
   // differs from the current Llama default of 10000.
-  final static int LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT = -1;
+  private final static int MAX_PLACED_RESERVATIONS_DEFAULT = -1;
 
   // Key for the default maximum number of queued requests ("queued reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
-  // "{key}.{pool}". This is a llama-site.xml configuration.
-  final static String LLAMA_MAX_QUEUED_RESERVATIONS_KEY =
+  // "{key}.{pool}".
+  private final static String MAX_QUEUED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.queued.reservations";
 
   // Default value for the maximum.queued.reservations property. Note that this value
   // differs from the current Llama default of 0 which disables queuing.
-  final static int LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT = 200;
+  private final static int MAX_QUEUED_RESERVATIONS_DEFAULT = 200;
 
-  // Key for the pool queue timeout (milliseconds). This is be specified in the
-  // llama-site.xml but is Impala-specific and Llama does not use this.
-  final static String QUEUE_TIMEOUT_KEY = "impala.admission-control.pool-queue-timeout-ms";
+  // Key for the pool queue timeout (milliseconds).
+  private final static String QUEUE_TIMEOUT_KEY =
+      "impala.admission-control.pool-queue-timeout-ms";
 
   // Key for the pool default query options. Query options are specified as a
   // comma delimited string of 'key=value' pairs, e.g. 'key1=val1,key2=val2'.
-  // This is specified in the llama-site.xml but is Impala-specific and Llama does not
-  // use this.
-  final static String QUERY_OPTIONS_KEY = "impala.admission-control.pool-default-query-options";
+  private final static String QUERY_OPTIONS_KEY =
+      "impala.admission-control.pool-default-query-options";
 
-  // Keys for the pool max and min query mem limits (in bytes) respectively. This is
-  // specified in the llama-site.xml but is Impala-specific and Llama does not use this.
-  final static String MAX_QUERY_MEM_LIMIT_BYTES =
+  // Keys for the pool max and min query mem limits (in bytes) respectively.
+  private final static String MAX_QUERY_MEM_LIMIT_BYTES =
       "impala.admission-control.max-query-mem-limit";
-  final static String MIN_QUERY_MEM_LIMIT_BYTES =
+  private final static String MIN_QUERY_MEM_LIMIT_BYTES =
       "impala.admission-control.min-query-mem-limit";
 
   // Key for specifying if the mem_limit query option can override max/min mem limits
-  // of the pool. This is specified in the llama-site.xml but is Impala-specific and
-  // Llama does not use this.
-  final static String CLAMP_MEM_LIMIT_QUERY_OPTION =
+  // of the pool.
+  private final static String CLAMP_MEM_LIMIT_QUERY_OPTION =
       "impala.admission-control.clamp-mem-limit-query-option";
 
+  // Key for specifying the "Max Running Queries Multiple" configuration
+  // of the pool.
+  private final static String MAX_RUNNING_QUERIES_MULTIPLE =
+      "impala.admission-control.max-running-queries-multiple";
+
+  // Key for specifying the "Max Queued Queries Multiple" configuration
+  // of the pool.
+  private final static String MAX_QUEUED_QUERIES_MULTIPLE =
+      "impala.admission-control.max-queued-queries-multiple";
+
+  // Key for specifying the "Max Memory Multiple" configuration
+  // of the pool.
+  private final static String MAX_MEMORY_MULTIPLE =
+      "impala.admission-control.max-memory-multiple";
+
   // String format for a per-pool configuration key. First parameter is the key for the
-  // default, e.g. LLAMA_MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
+  // default, e.g. MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
   // pool name.
-  final static String LLAMA_PER_POOL_CONFIG_KEY_FORMAT = "%s.%s";
+  private final static String PER_POOL_CONFIG_KEY_FORMAT = "%s.%s";
 
   // Watches for changes to the fair scheduler allocation file.
   @VisibleForTesting
@@ -141,31 +153,31 @@ public class RequestPoolService {
   // is reset when the allocation configuration file changes and other threads access it.
   private final AtomicReference<AllocationConfiguration> allocationConf_;
 
-  // Watches the Llama configuration file for changes.
+  // Watches the configuration file for changes.
   @VisibleForTesting
-  final FileWatchService llamaConfWatcher_;
+  final FileWatchService confWatcher_;
 
-  // Used by this class to access to the configs provided by the Llama configuration.
-  // This is replaced when the Llama configuration file changes.
-  private volatile Configuration llamaConf_;
+  // Used by this class to access to the configs provided by the configuration.
+  // This is replaced when the configuration file changes.
+  private volatile Configuration conf_;
 
-  // URL of the Llama configuration file.
-  private final URL llamaConfUrl_;
+  // URL of the configuration file.
+  private final URL confUrl_;
 
   /**
-   * Updates the Llama configuration when the file changes. The file is llamaConfUrl_
+   * Updates the configuration when the file changes. The file is confUrl_
    * and it will exist when this is created (or RequestPoolService will not start). If
    * the file is later removed, warnings will be written to the log but the previous
    * configuration will still be accessible.
    */
-  private final class LlamaConfWatcher implements FileChangeListener {
+  private final class ConfWatcher implements FileChangeListener {
     public void onFileChange() {
-      // If llamaConfUrl_ is null the watcher should not have been created.
-      Preconditions.checkNotNull(llamaConfUrl_);
-      LOG.info("Loading Llama configuration: " + llamaConfUrl_.getFile());
+      // If confUrl_ is null the watcher should not have been created.
+      Preconditions.checkNotNull(confUrl_);
+      LOG.info("Loading configuration: " + confUrl_.getFile());
       Configuration conf = new Configuration();
-      conf.addResource(llamaConfUrl_);
-      llamaConf_ = conf;
+      conf.addResource(confUrl_);
+      conf_ = conf;
     }
   }
 
@@ -174,12 +186,12 @@ public class RequestPoolService {
    * fair-scheduler.xml and llama-site.xml.
    *
    * @param fsAllocationPath path to the fair scheduler allocation file.
-   * @param llamaSitePath path to the Llama configuration file.
+   * @param sitePath path to the configuration file.
    */
-  public RequestPoolService(final String fsAllocationPath, final String llamaSitePath) {
+  RequestPoolService(final String fsAllocationPath, final String sitePath) {
     Preconditions.checkNotNull(fsAllocationPath);
     running_ = new AtomicBoolean(false);
-    allocationConf_ = new AtomicReference<AllocationConfiguration>();
+    allocationConf_ = new AtomicReference<>();
     URL fsAllocationURL = getURL(fsAllocationPath);
     if (fsAllocationURL == null) {
       throw new IllegalArgumentException(
@@ -192,19 +204,19 @@ public class RequestPoolService {
     allocLoader_ = new AllocationFileLoaderService();
     allocLoader_.init(allocConf);
 
-    if (!Strings.isNullOrEmpty(llamaSitePath)) {
-      llamaConfUrl_ = getURL(llamaSitePath);
-      if (llamaConfUrl_ == null) {
+    if (!Strings.isNullOrEmpty(sitePath)) {
+      confUrl_ = getURL(sitePath);
+      if (confUrl_ == null) {
         throw new IllegalArgumentException(
-            "Unable to find Llama configuration file: " + llamaSitePath);
+            "Unable to find configuration file: " + sitePath);
       }
-      llamaConf_ = new Configuration(false);
-      llamaConf_.addResource(llamaConfUrl_);
-      llamaConfWatcher_ = new FileWatchService(new File(llamaConfUrl_.getPath()),
-          new LlamaConfWatcher());
+      conf_ = new Configuration(false);
+      conf_.addResource(confUrl_);
+      confWatcher_ =
+          new FileWatchService(new File(confUrl_.getPath()), new ConfWatcher());
     } else {
-      llamaConfWatcher_ = null;
-      llamaConfUrl_ = null;
+      confWatcher_ = null;
+      confUrl_ = null;
     }
   }
 
@@ -212,7 +224,7 @@ public class RequestPoolService {
    * Returns a {@link URL} for the file if it exists, null otherwise.
    */
   @VisibleForTesting
-  static URL getURL(String path) {
+  private static URL getURL(String path) {
     Preconditions.checkNotNull(path);
     File file = new File(path);
     file = file.getAbsoluteFile();
@@ -234,12 +246,7 @@ public class RequestPoolService {
    */
   public void start() {
     Preconditions.checkState(!running_.get());
-    allocLoader_.setReloadListener(new AllocationFileLoaderService.Listener() {
-      @Override
-      public void onReload(AllocationConfiguration info) {
-        allocationConf_.set(info);
-      }
-    });
+    allocLoader_.setReloadListener(allocationConf_::set);
     allocLoader_.start();
     try {
       allocLoader_.reloadAllocations();
@@ -252,7 +259,7 @@ public class RequestPoolService {
       }
       throw new RuntimeException(ex);
     }
-    if (llamaConfWatcher_ != null) llamaConfWatcher_.start();
+    if (confWatcher_ != null) confWatcher_.start();
     running_.set(true);
   }
 
@@ -271,7 +278,7 @@ public class RequestPoolService {
    */
   private void stopInternal() {
     running_.set(false);
-    if (llamaConfWatcher_ != null) llamaConfWatcher_.stop();
+    if (confWatcher_ != null) confWatcher_.stop();
     allocLoader_.stop();
   }
 
@@ -282,6 +289,7 @@ public class RequestPoolService {
    * @param thriftResolvePoolParams Serialized {@link TResolveRequestPoolParams}
    * @return serialized {@link TResolveRequestPoolResult}
    */
+  @SuppressWarnings("unused") // called from C++
   public byte[] resolveRequestPool(byte[] thriftResolvePoolParams)
       throws ImpalaException {
     TResolveRequestPoolParams resolvePoolParams = new TResolveRequestPoolParams();
@@ -290,9 +298,8 @@ public class RequestPoolService {
     TResolveRequestPoolResult result = resolveRequestPool(resolvePoolParams);
     if (LOG.isTraceEnabled()) {
       LOG.trace("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
-          new Object[] {
-            resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
-            result.resolved_pool, result.has_access });
+          resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
+          result.resolved_pool, result.has_access);
     }
     try {
       return new TSerializer(protocolFactory_).serialize(result);
@@ -329,7 +336,7 @@ public class RequestPoolService {
       if (errorMessage == null) {
         // This occurs when assignToPool returns null (not an error), i.e. if the pool
         // cannot be resolved according to the policy.
-        result.setStatus(new TStatus(TErrorCode.OK, Lists.<String>newArrayList()));
+        result.setStatus(new TStatus(TErrorCode.OK, Lists.newArrayList()));
       } else {
         // If Yarn throws an exception, return an error status.
         result.setStatus(
@@ -338,7 +345,7 @@ public class RequestPoolService {
     } else {
       result.setResolved_pool(pool);
       result.setHas_access(hasAccess(pool, user));
-      result.setStatus(new TStatus(TErrorCode.OK, Lists.<String>newArrayList()));
+      result.setStatus(new TStatus(TErrorCode.OK, Lists.newArrayList()));
     }
     return result;
   }
@@ -349,6 +356,7 @@ public class RequestPoolService {
    * @param thriftPoolConfigParams Serialized {@link TPoolConfigParams}
    * @return serialized {@link TPoolConfig}
    */
+  @SuppressWarnings("unused") // called from C++
   public byte[] getPoolConfig(byte[] thriftPoolConfigParams) throws ImpalaException {
     Preconditions.checkState(running_.get());
     TPoolConfigParams poolConfigParams = new TPoolConfigParams();
@@ -367,73 +375,91 @@ public class RequestPoolService {
     TPoolConfig result = new TPoolConfig();
     long maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
     result.setMax_mem_resources(
-        maxMemoryMb == Integer.MAX_VALUE ? -1 : (long) maxMemoryMb * ByteUnits.MEGABYTE);
-    if (llamaConf_ == null) {
-      result.setMax_requests(LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT);
-      result.setMax_queued(LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT);
+        maxMemoryMb == Integer.MAX_VALUE ? -1 : maxMemoryMb * ByteUnits.MEGABYTE);
+    if (conf_ == null) {
+      result.setMax_requests(MAX_PLACED_RESERVATIONS_DEFAULT);
+      result.setMax_queued(MAX_QUEUED_RESERVATIONS_DEFAULT);
       result.setDefault_query_options("");
     } else {
-      // Capture the current llamaConf_ in case it changes while we're using it.
-      Configuration currentLlamaConf = llamaConf_;
-      result.setMax_requests(getLlamaPoolConfigValue(currentLlamaConf, pool,
-          LLAMA_MAX_PLACED_RESERVATIONS_KEY,
-          LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT));
-      result.setMax_queued(getLlamaPoolConfigValue(currentLlamaConf, pool,
-          LLAMA_MAX_QUEUED_RESERVATIONS_KEY,
-          LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT));
+      // Capture the current conf_ in case it changes while we're using it.
+      Configuration currentConf = conf_;
+      result.setMax_requests(getPoolConfigValue(currentConf, pool,
+          MAX_PLACED_RESERVATIONS_KEY, MAX_PLACED_RESERVATIONS_DEFAULT));
+      result.setMax_queued(getPoolConfigValue(currentConf, pool,
+          MAX_QUEUED_RESERVATIONS_KEY, MAX_QUEUED_RESERVATIONS_DEFAULT));
 
       // Only return positive values. Admission control has a default from gflags.
-      long queueTimeoutMs = getLlamaPoolConfigValue(currentLlamaConf, pool,
-          QUEUE_TIMEOUT_KEY, -1L);
+      long queueTimeoutMs = getPoolConfigValue(currentConf, pool, QUEUE_TIMEOUT_KEY, -1L);
       if (queueTimeoutMs > 0) result.setQueue_timeout_ms(queueTimeoutMs);
-      result.setDefault_query_options(getLlamaPoolConfigValue(currentLlamaConf, pool,
-          QUERY_OPTIONS_KEY, ""));
-      result.setMax_query_mem_limit(getLlamaPoolConfigValue(currentLlamaConf, pool,
-          MAX_QUERY_MEM_LIMIT_BYTES, 0L));
-      result.setMin_query_mem_limit(getLlamaPoolConfigValue(currentLlamaConf, pool,
-          MIN_QUERY_MEM_LIMIT_BYTES, 0L));
-      result.setClamp_mem_limit_query_option(getLlamaPoolConfigValue(currentLlamaConf,
-          pool, CLAMP_MEM_LIMIT_QUERY_OPTION, true));
+      result.setDefault_query_options(
+          getPoolConfigValue(currentConf, pool, QUERY_OPTIONS_KEY, ""));
+      result.setMax_query_mem_limit(
+          getPoolConfigValue(currentConf, pool, MAX_QUERY_MEM_LIMIT_BYTES, 0L));
+      result.setMin_query_mem_limit(
+          getPoolConfigValue(currentConf, pool, MIN_QUERY_MEM_LIMIT_BYTES, 0L));
+      result.setClamp_mem_limit_query_option(
+          getPoolConfigValue(currentConf, pool, CLAMP_MEM_LIMIT_QUERY_OPTION, true));
+      result.setMax_running_queries_multiple(
+          getPoolConfigDoubleValue(currentConf, pool, MAX_RUNNING_QUERIES_MULTIPLE, 0.0));
+      result.setMax_queued_queries_multiple(
+          getPoolConfigDoubleValue(currentConf, pool, MAX_QUEUED_QUERIES_MULTIPLE, 0.0));
+      result.setMax_memory_multiple(
+          getPoolConfigValue(currentConf, pool, MAX_MEMORY_MULTIPLE, 0));
     }
     if (LOG.isTraceEnabled()) {
-      LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
-          "max_queued={},  queue_timeout_ms={}, default_query_options={}",
-          new Object[] { pool, result.max_mem_resources, result.max_requests,
-              result.max_queued, result.queue_timeout_ms, result.default_query_options });
+      LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
+              + " max_queued={},  queue_timeout_ms={}, default_query_options={},"
+              + " max_query_mem_limit={}, min_query_mem_limit={},"
+              + " clamp_mem_limit_query_option={}, max_running_queries_multiple={},"
+              + " max_queued_queries_multiple={}, max_memory_multiple={}",
+          pool, result.max_mem_resources, result.max_requests, result.max_queued,
+          result.queue_timeout_ms, result.default_query_options,
+          result.max_query_mem_limit, result.min_query_mem_limit,
+          result.clamp_mem_limit_query_option, result.max_running_queries_multiple,
+          result.max_queued_queries_multiple, result.max_memory_multiple);
     }
     return result;
   }
 
   /**
-   * Looks up the per-pool integer config from the llama Configuration. First checks for
+   * Looks up the per-pool integer config from the Configuration. First checks for
    * a per-pool value, then a default set in the config, and lastly to the specified
    * 'defaultValue'.
    *
    * @param conf The Configuration to use, provided so the caller can ensure the same
    *        Configuration is used to look up multiple properties.
    */
-  private long getLlamaPoolConfigValue(Configuration conf, String pool, String key,
-      long defaultValue) {
-    return conf.getLong(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+  private long getPoolConfigValue(
+      Configuration conf, String pool, String key, long defaultValue) {
+    return conf.getLong(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.getLong(key, defaultValue));
   }
 
   /**
-   * Looks up the per-pool String config from the llama Configuration. See above.
+   * Looks up the per-pool String config from the Configuration. See above.
    */
-  private String getLlamaPoolConfigValue(Configuration conf, String pool, String key,
-      String defaultValue) {
-    return conf.get(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+  private String getPoolConfigValue(
+      Configuration conf, String pool, String key, String defaultValue) {
+    return conf.get(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.get(key, defaultValue));
   }
 
   /**
-   * Looks up the per-pool Boolean config from the llama Configuration. See above.
+   * Looks up the per-pool Boolean config from the Configuration. See above.
    */
-  private boolean getLlamaPoolConfigValue(Configuration conf, String pool, String key,
-      boolean defaultValue) {
-    return conf.getBoolean(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+  private boolean getPoolConfigValue(
+      Configuration conf, String pool, String key, boolean defaultValue) {
+    return conf.getBoolean(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.getBoolean(key, defaultValue));
+  }
+
+  /**
+   * Looks up the per-pool Double config from the Configuration. See above.
+   */
+  private double getPoolConfigDoubleValue(
+      Configuration conf, String pool, String key, double defaultValue) {
+    return conf.getDouble(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+        conf.getDouble(key, defaultValue));
   }
 
   /**

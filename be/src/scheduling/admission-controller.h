@@ -28,8 +28,9 @@
 #include <gtest/gtest_prod.h>
 
 #include "common/status.h"
-#include "scheduling/request-pool-service.h"
+#include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/query-schedule.h"
+#include "scheduling/request-pool-service.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
@@ -215,23 +216,23 @@ enum class AdmissionOutcome {
 class AdmissionController {
  public:
   // Profile info strings
-  static const string PROFILE_INFO_KEY_ADMISSION_RESULT;
-  static const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
-  static const string PROFILE_INFO_VAL_QUEUED;
-  static const string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
-  static const string PROFILE_INFO_VAL_ADMIT_QUEUED;
-  static const string PROFILE_INFO_VAL_REJECTED;
-  static const string PROFILE_INFO_VAL_TIME_OUT;
-  static const string PROFILE_INFO_KEY_INITIAL_QUEUE_REASON;
-  static const string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON;
-  static const string PROFILE_INFO_KEY_LAST_QUEUED_REASON;
-  static const string PROFILE_INFO_KEY_ADMITTED_MEM;
-  static const string PROFILE_INFO_KEY_STALENESS_WARNING;
-  static const string PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME;
+  static const std::string PROFILE_INFO_KEY_ADMISSION_RESULT;
+  static const std::string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
+  static const std::string PROFILE_INFO_VAL_QUEUED;
+  static const std::string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
+  static const std::string PROFILE_INFO_VAL_ADMIT_QUEUED;
+  static const std::string PROFILE_INFO_VAL_REJECTED;
+  static const std::string PROFILE_INFO_VAL_TIME_OUT;
+  static const std::string PROFILE_INFO_KEY_INITIAL_QUEUE_REASON;
+  static const std::string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON;
+  static const std::string PROFILE_INFO_KEY_LAST_QUEUED_REASON;
+  static const std::string PROFILE_INFO_KEY_ADMITTED_MEM;
+  static const std::string PROFILE_INFO_KEY_STALENESS_WARNING;
+  static const std::string PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME;
 
-  AdmissionController(StatestoreSubscriber* subscriber,
-      RequestPoolService* request_pool_service, MetricGroup* metrics,
-      const TNetworkAddress& host_addr);
+  AdmissionController(ClusterMembershipMgr* cluster_membership_mgr,
+      StatestoreSubscriber* subscriber, RequestPoolService* request_pool_service,
+      MetricGroup* metrics, const TNetworkAddress& host_addr);
   ~AdmissionController();
 
   /// Submits the request for admission. Returns immediately if rejected, but otherwise
@@ -259,7 +260,7 @@ class AdmissionController {
   /// queries for the resource pool identified by 'pool_name' to JSON by adding members to
   /// 'resource_pools'. Is a no-op if a pool with name 'pool_name' does not exist or no
   /// queries have been submitted to that pool yet.
-  void PoolToJson(const string& pool_name, rapidjson::Value* resource_pools,
+  void PoolToJson(const std::string& pool_name, rapidjson::Value* resource_pools,
       rapidjson::Document* document);
 
   /// Serializes relevant stats, configurations and information associated with queued
@@ -268,7 +269,7 @@ class AdmissionController {
   void AllPoolsToJson(rapidjson::Value* resource_pools, rapidjson::Document* document);
 
   /// Calls ResetInformationalStats on the pool identified by 'pool_name'.
-  void ResetPoolInformationalStats(const string& pool_name);
+  void ResetPoolInformationalStats(const std::string& pool_name);
 
   /// Calls ResetInformationalStats on all pools.
   void ResetAllPoolInformationalStats();
@@ -289,6 +290,9 @@ class AdmissionController {
  private:
   class PoolStats;
   friend class PoolStats;
+
+  /// Pointer to the cluster membership manager. Not owned by the AdmissionController.
+  ClusterMembershipMgr* cluster_membership_mgr_;
 
   /// Subscription manager used to handle admission control updates. This is not
   /// owned by this class.
@@ -365,6 +369,13 @@ class AdmissionController {
       IntGauge* max_query_mem_limit;
       IntGauge* min_query_mem_limit;
       BooleanProperty* clamp_mem_limit_query_option;
+      DoubleGauge* max_running_queries_multiple;
+      DoubleGauge* max_queued_queries_multiple;
+      IntGauge* max_memory_multiple;
+      /// Metrics exposing the pool's derived runtime configuration.
+      IntGauge* max_running_queries_derived;
+      IntGauge* max_queued_queries_derived;
+      IntGauge* max_memory_derived;
     };
 
     PoolStats(AdmissionController* parent, const std::string& name)
@@ -380,15 +391,17 @@ class AdmissionController {
       return std::max(agg_mem_reserved_, local_mem_admitted_);
     }
 
-    /// ADMISSION LIFECYCLE METHODS
-    /// The following methods update the pool stats when the request represented by
-    /// schedule is admitted, released, queued, or dequeued.
+    // ADMISSION LIFECYCLE METHODS
+    /// Updates the pool stats when the request represented by 'schedule' is admitted.
     void Admit(const QuerySchedule& schedule);
+    /// Updates the pool stats when the request represented by 'schedule' is released.
     void Release(const QuerySchedule& schedule, int64_t peak_mem_consumption);
+    /// Updates the pool stats when the request represented by 'schedule' is queued.
     void Queue(const QuerySchedule& schedule);
+    /// Updates the pool stats when the request represented by 'schedule' is dequeued.
     void Dequeue(const QuerySchedule& schedule, bool timed_out);
 
-    /// STATESTORE CALLBACK METHODS
+    // STATESTORE CALLBACK METHODS
     /// Updates the local_stats_.backend_mem_reserved with the pool mem tracker. Called
     /// before sending local_stats().
     void UpdateMemTrackerStats();
@@ -412,7 +425,10 @@ class AdmissionController {
     const TPoolStats& local_stats() { return local_stats_; }
 
     /// Updates the metrics exposing the pool configuration to those in pool_cfg.
-    void UpdateConfigMetrics(const TPoolConfig& pool_cfg);
+    void UpdateConfigMetrics(const TPoolConfig& pool_cfg, int64_t cluster_size);
+
+    /// Updates the metrics exposing the scalable pool configuration values.
+    void UpdateDerivedMetrics(const TPoolConfig& pool_cfg, int64_t cluster_size);
 
     PoolMetrics* metrics() { return &metrics_; }
     std::string DebugString() const;
@@ -485,6 +501,12 @@ class AdmissionController {
     void InitMetrics();
 
     FRIEND_TEST(AdmissionControllerTest, Simple);
+    FRIEND_TEST(AdmissionControllerTest, PoolStats);
+    FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
+    FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
+    FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
+    FRIEND_TEST(AdmissionControllerTest, RejectImmediately);
+    friend class AdmissionControllerTest;
   };
 
   /// Map of pool names to pool stats. Accessed via GetPoolStats().
@@ -518,7 +540,7 @@ class AdmissionController {
 
   /// Queue for the queries waiting to be admitted for execution. Once the
   /// maximum number of concurrently executing queries has been reached,
-  /// incoming queries are queued and admitted FCFS.
+  /// incoming queries are queued and admitted first come, first served.
   typedef InternalQueue<QueueNode> RequestQueue;
 
   /// Map of pool names to request queues.
@@ -570,7 +592,7 @@ class AdmissionController {
   /// false and not_admitted_reason specifies why the request can not be admitted
   /// immediately. Caller owns not_admitted_reason.  Must hold admission_ctrl_lock_.
   bool CanAdmitRequest(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
-      bool admit_from_queue, std::string* not_admitted_reason);
+      int64_t cluster_size, bool admit_from_queue, std::string* not_admitted_reason);
 
   /// Returns true if the per host mem limit for the query represented by 'schedule' is
   /// large enough to accommodate the largest initial reservation required. Otherwise,
@@ -582,18 +604,19 @@ class AdmissionController {
   /// 3. mem_limit in query options is set low and min_query_mem_limit is also set low.
   /// 4. mem_limit in query options is set low and the pool.min_query_mem_limit is set
   ///    to a higher value but pool.clamp_mem_limit_query_option is false.
-  bool CanAccommodateMaxInitialReservation(const QuerySchedule& schedule,
-      const TPoolConfig& pool_cfg, string* mem_unavailable_reason);
+  static bool CanAccommodateMaxInitialReservation(const QuerySchedule& schedule,
+      const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
 
   /// Returns true if there is enough memory available to admit the query based on the
   /// schedule, the aggregate pool memory, and the per-host memory. If not, this returns
   /// false and returns the reason in mem_unavailable_reason. Caller owns
   /// mem_unavailable_reason. Must hold admission_ctrl_lock_.
   bool HasAvailableMemResources(const QuerySchedule& schedule,
-      const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
+      const TPoolConfig& pool_cfg, int64_t cluster_size,
+      std::string* mem_unavailable_reason);
 
   /// Adds per_node_mem to host_mem_admitted_ for each host in schedule. Must hold
-  /// admission_ctrl_lock_.
+  /// admission_ctrl_lock_. Note that per_node_mem may be negative when a query completes.
   void UpdateHostMemAdmitted(const QuerySchedule& schedule, int64_t per_node_mem);
 
   /// Returns true if this request must be rejected immediately, e.g. requires more
@@ -601,18 +624,19 @@ class AdmissionController {
   /// rejection_reason is set to a explanation of why the request was rejected.
   /// Must hold admission_ctrl_lock_.
   bool RejectImmediately(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
-      std::string* rejection_reason);
+      int64_t cluster_size, std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name);
 
   /// Log the reason for dequeueing of 'node' failing and add the reason to the query's
   /// profile. Must hold admission_ctrl_lock_.
-  void LogDequeueFailed(QueueNode* node, const std::string& not_admitted_reason);
+  static void LogDequeueFailed(QueueNode* node, const std::string& not_admitted_reason);
 
   /// Returns false if pool config is invalid and populates the 'reason' with the reason
   /// behind invalidity.
-  bool IsPoolConfigValid(const TPoolConfig& pool_cfg, std::string* reason);
+  static bool IsPoolConfigValidForCluster(
+      const TPoolConfig& pool_cfg, int64_t cluster_size, std::string* reason);
 
   /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
   /// accounting and logging on successful submission.
@@ -621,7 +645,7 @@ class AdmissionController {
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
-  void PoolToJsonLocked(const string& pool_name, rapidjson::Value* resource_pools,
+  void PoolToJsonLocked(const std::string& pool_name, rapidjson::Value* resource_pools,
       rapidjson::Document* document);
 
   /// Same as GetStalenessDetail() except caller must hold 'admission_ctrl_lock_'.
@@ -630,9 +654,62 @@ class AdmissionController {
 
   /// Returns the topic key for the pool at this backend, i.e. a string of the
   /// form: "<pool_name><delimiter><backend_id>".
-  static string MakePoolTopicKey(const string& pool_name, const string& backend_id);
+  static std::string MakePoolTopicKey(
+      const std::string& pool_name, const std::string& backend_id);
+
+  /// Returns the maximum memory for the pool.
+  static int64_t GetMaxMemForPool(const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns a description of how the maximum memory for the pool is configured.
+  static std::string GetMaxMemForPoolDescription(
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns the maximum number of requests that can run in the pool.
+  static int64_t GetMaxRequestsForPool(
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns a description of how the maximum number of requests that can run in the pool
+  /// is configured.
+  static std::string GetMaxRequestsForPoolDescription(
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns a maximum number of queries that should be dequeued locally from 'queue'
+  /// before DequeueLoop waits on dequeue_cv_ at the top of its loop.
+  /// If it can be determined that no queries can currently be run, then zero
+  /// is returned.
+  /// Uses a heuristic to limit the number of requests we dequeue locally to avoid all
+  /// impalads dequeuing too many requests at the same time.
+  int64_t GetMaxToDequeue(RequestQueue& queue, PoolStats* stats,
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns true if the pool has been disabled through configuration.
+  static bool PoolDisabled(const TPoolConfig& pool_config);
+
+  /// Returns true if the pool is configured to limit the number of running queries.
+  static bool PoolLimitsRunningQueriesCount(const TPoolConfig& pool_config);
+
+  /// Returns true if the pool has a fixed (i.e. not scalable) maximum memory limit.
+  static bool PoolHasFixedMemoryLimit(const TPoolConfig& pool_config);
+
+  /// Returns the maximum number of requests that can be queued in the pool.
+  static int64_t GetMaxQueuedForPool(
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns a description of how the maximum number of requests that can run be queued
+  /// in the pool is configured.
+  static std::string GetMaxQueuedForPoolDescription(
+      const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns the current size of the cluster.
+  /// The minimum cluster size that is returned is 1.
+  int64_t GetClusterSize();
 
   FRIEND_TEST(AdmissionControllerTest, Simple);
+  FRIEND_TEST(AdmissionControllerTest, PoolStats);
+  FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
+  FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
+  FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
+  FRIEND_TEST(AdmissionControllerTest, RejectImmediately);
   friend class AdmissionControllerTest;
 };
 

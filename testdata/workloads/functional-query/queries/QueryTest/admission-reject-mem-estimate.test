@@ -6,7 +6,8 @@ select min(c_name), min(n_name)
 from tpch_parquet.customer
   join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 82.94 MB is greater than pool max mem resources 40.00 MB
+Rejected query from pool default-pool: request memory needed 82.94 MB is greater than pool
+ max mem resources 40.00 MB (configured statically)
 ====
 ---- QUERY
 # Overriding the memory estimate should allow the query to execute.
@@ -32,7 +33,8 @@ select min(c_name), min(n_name)
 from tpch_parquet.customer
   join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool max mem resources 40.00 MB
+Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool
+ max mem resources 40.00 MB (configured statically)
 ====
 ---- QUERY
 # MEM_LIMIT takes precedence over MAX_MEM_ESTIMATE_FOR_ADMISSION, so the query is
@@ -43,7 +45,8 @@ select min(c_name), min(n_name)
 from tpch_parquet.customer
   join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool max mem resources 40.00 MB
+Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool
+ max mem resources 40.00 MB (configured statically)
 ====
 ---- QUERY
 # MEM_LIMIT takes precedence over MAX_MEM_ESTIMATE_FOR_ADMISSION, so the query is

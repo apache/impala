@@ -92,7 +92,7 @@ namespace java org.apache.impala.thrift
 
 include "Metrics.thrift"
 
-// All metadata associated with a metric. Used to instanciate metrics.
+// All metadata associated with a metric. Used to instantiate metrics.
 struct TMetricDef {
   1: optional string key
   2: optional Metrics.TMetricKind kind

@@ -26,6 +26,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "scheduling/scheduler.h"
+#include "service/impala-server.h"
 #include "util/bit-util.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
@@ -113,6 +114,18 @@ const string POOL_MIN_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT =
   "admission-controller.pool-min-query-mem-limit.$0";
 const string POOL_CLAMP_MEM_LIMIT_QUERY_OPTION_METRIC_KEY_FORMAT =
   "admission-controller.pool-clamp-mem-limit-query-option.$0";
+const string POOL_MAX_RUNNING_QUERIES_MULTIPLE_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-running-queries-multiple.$0";
+const string POOL_MAX_QUEUED_QUERIES_MULTIPLE_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-queued-queries-multiple.$0";
+const string POOL_MAX_MEMORY_MULTIPLE_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-memory-multiple.$0";
+const string POOL_MAX_RUNNING_QUERIES_DERIVED_METRIC_KEY_FORMAT =
+  "admission-controller.pool-max-running-queries-derived.$0";
+const string POOL_MAX_QUEUED_QUERIES_DERIVED_METRIC_KEY_FORMAT =
+  "admission-controller.max-queued-queries-derived.$0";
+const string POOL_MAX_MEMORY_DERIVED_METRIC_KEY_FORMAT =
+  "admission-controller.max-memory-derived.$0";
 
 // Profile query events
 const string QUERY_EVENT_SUBMIT_FOR_ADMISSION = "Submit for admission";
@@ -156,16 +169,17 @@ const string REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION =
     "profile for more information about the per-node memory requirements.";
 const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
     "minimum memory reservation needed is greater than pool max mem resources. Pool "
-    "max mem resources: $0. Cluster-wide memory reservation needed: $1. Increase the "
-    "pool max mem resources. See the query profile for more information about the "
+    "max mem resources: $0 ($1). Cluster-wide memory reservation needed: $2. Increase "
+    "the pool max mem resources. See the query profile for more information about the "
     "per-node memory requirements.";
 const string REASON_DISABLED_MAX_MEM_RESOURCES =
     "disabled by pool max mem resources set to 0";
 const string REASON_DISABLED_REQUESTS_LIMIT = "disabled by requests limit set to 0";
-// $2 is the staleness detail.
-const string REASON_QUEUE_FULL = "queue full, limit=$0, num_queued=$1.$2";
+// $2 is the description of how the queue limit was calculated, $3 is the staleness
+// detail.
+const string REASON_QUEUE_FULL = "queue full, limit=$0 ($1), num_queued=$2.$3";
 const string REASON_REQ_OVER_POOL_MEM =
-    "request memory needed $0 is greater than pool max mem resources $1.\n\n"
+    "request memory needed $0 is greater than pool max mem resources $1 ($2).\n\n"
     "Use the MEM_LIMIT query option to indicate how much memory is required per node. "
     "The total memory needed is the per-node MEM_LIMIT times the number of nodes "
     "executing the query. See the Admission Control documentation for more information.";
@@ -181,16 +195,18 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
     "THREAD_RESERVATION_AGGREGATE_LIMIT query option value: $1 > $2.";
 
 // Queue decision details
-// $0 = num running queries, $1 = num queries limit, $2 = staleness detail
+// $0 = num running queries, $1 = num queries limit, $2 = num queries limit explanation,
+// $3 = staleness detail
 const string QUEUED_NUM_RUNNING =
-    "number of running queries $0 is at or over limit $1.$2";
+    "number of running queries $0 is at or over limit $1 ($2)$3.";
 // $0 = queue size, $1 = staleness detail
 const string QUEUED_QUEUE_NOT_EMPTY = "queue is not empty (size $0); queued queries are "
     "executed first.$1";
-// $0 = pool name, $1 = pool max memory, $2 = pool mem needed, $3 = pool mem available,
-// $4 = staleness detail
-const string POOL_MEM_NOT_AVAILABLE = "Not enough aggregate memory available in pool $0 "
-    "with max mem resources $1. Needed $2 but only $3 was available.$4";
+// $0 = pool name, $1 = pool max memory, $2 = pool max memory explanation,
+// $3 = pool mem needed, $4 = pool mem available, $5 = staleness detail
+const string POOL_MEM_NOT_AVAILABLE =
+    "Not enough aggregate memory available in pool $0 "
+    "with max mem resources $1 ($2). Needed $3 but only $4 was available.$5";
 // $0 = host name, $1 = host mem needed, $3 = host mem available, $4 = staleness detail
 const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0."
     "Needed $1 but only $2 out of $3 was available.$4";
@@ -241,15 +257,16 @@ string AdmissionController::PoolStats::DebugString() const {
 
 // TODO: do we need host_id_ to come from host_addr or can it just take the same id
 // the Scheduler has (coming from the StatestoreSubscriber)?
-AdmissionController::AdmissionController(StatestoreSubscriber* subscriber,
-    RequestPoolService* request_pool_service, MetricGroup* metrics,
-    const TNetworkAddress& host_addr)
-    : subscriber_(subscriber),
-      request_pool_service_(request_pool_service),
-      metrics_group_(metrics->GetOrCreateChildGroup("admission-controller")),
-      host_id_(TNetworkAddressToString(host_addr)),
-      thrift_serializer_(false),
-      done_(false) {}
+AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membership_mgr,
+    StatestoreSubscriber* subscriber, RequestPoolService* request_pool_service,
+    MetricGroup* metrics, const TNetworkAddress& host_addr)
+  : cluster_membership_mgr_(cluster_membership_mgr),
+    subscriber_(subscriber),
+    request_pool_service_(request_pool_service),
+    metrics_group_(metrics->GetOrCreateChildGroup("admission-controller")),
+    host_id_(TNetworkAddressToString(host_addr)),
+    thrift_serializer_(false),
+    done_(false) {}
 
 AdmissionController::~AdmissionController() {
   // If the dequeue thread is not running (e.g. if Init() fails), then there is
@@ -383,9 +400,9 @@ bool AdmissionController::CanAccommodateMaxInitialReservation(
 }
 
 bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule,
-    const TPoolConfig& pool_cfg, string* mem_unavailable_reason) {
+    const TPoolConfig& pool_cfg, int64_t cluster_size, string* mem_unavailable_reason) {
   const string& pool_name = schedule.request_pool();
-  const int64_t pool_max_mem = pool_cfg.max_mem_resources;
+  const int64_t pool_max_mem = GetMaxMemForPool(pool_cfg, cluster_size);
   // If the pool doesn't have memory resources configured, always true.
   if (pool_max_mem < 0) return true;
 
@@ -402,10 +419,12 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   PoolStats* stats = GetPoolStats(pool_name);
   VLOG_RPC << "Checking agg mem in pool=" << pool_name << " : " << stats->DebugString()
            << " cluster_mem_needed=" << PrintBytes(cluster_mem_to_admit)
-           << " pool_max_mem=" << PrintBytes(pool_max_mem);
+           << " pool_max_mem=" << PrintBytes(pool_max_mem) << " ("
+           << GetMaxMemForPoolDescription(pool_cfg, cluster_size) << ")";
   if (stats->EffectiveMemReserved() + cluster_mem_to_admit > pool_max_mem) {
     *mem_unavailable_reason = Substitute(POOL_MEM_NOT_AVAILABLE, pool_name,
-        PrintBytes(pool_max_mem), PrintBytes(cluster_mem_to_admit),
+        PrintBytes(pool_max_mem), GetMaxMemForPoolDescription(pool_cfg, cluster_size),
+        PrintBytes(cluster_mem_to_admit),
         PrintBytes(max(pool_max_mem - stats->EffectiveMemReserved(), 0L)),
         GetStalenessDetailLocked(" "));
     return false;
@@ -444,7 +463,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 }
 
 bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
-    const TPoolConfig& pool_cfg, bool admit_from_queue, string* not_admitted_reason) {
+    const TPoolConfig& pool_cfg, int64_t cluster_size, bool admit_from_queue,
+    string* not_admitted_reason) {
   // Can't admit if:
   //  (a) Pool configuration is invalid
   //  (b) There are already queued requests (and this is not admitting from the queue).
@@ -453,33 +473,39 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
 
   // Queries from a misconfigured pool will remain queued till they either time out or the
   // pool config is changed to a valid config.
-  if (!IsPoolConfigValid(pool_cfg, not_admitted_reason)) return false;
+  if (!IsPoolConfigValidForCluster(pool_cfg, cluster_size, not_admitted_reason))
+    return false;
 
   const string& pool_name = schedule.request_pool();
   PoolStats* stats = GetPoolStats(pool_name);
+  const int64_t max_requests = GetMaxRequestsForPool(pool_cfg, cluster_size);
   if (!admit_from_queue && stats->local_stats().num_queued > 0) {
     *not_admitted_reason = Substitute(QUEUED_QUEUE_NOT_EMPTY,
         stats->local_stats().num_queued, GetStalenessDetailLocked(" "));
     return false;
-  } else if (pool_cfg.max_requests >= 0 &&
-      stats->agg_num_running() >= pool_cfg.max_requests) {
+  } else if (max_requests >= 0 && stats->agg_num_running() >= max_requests) {
     *not_admitted_reason = Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(),
-        pool_cfg.max_requests, GetStalenessDetailLocked(" "));
+        max_requests, GetMaxRequestsForPoolDescription(pool_cfg, cluster_size),
+        GetStalenessDetailLocked(" "));
     return false;
-  } else if (!HasAvailableMemResources(schedule, pool_cfg, not_admitted_reason)) {
-    return false;
+  } else {
+    bool has_available_mem_resources =
+        HasAvailableMemResources(schedule, pool_cfg, cluster_size, not_admitted_reason);
+    if (!has_available_mem_resources) {
+      return false;
+    }
   }
   return true;
 }
 
 bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
-    const TPoolConfig& pool_cfg, string* rejection_reason) {
+    const TPoolConfig& pool_cfg, int64_t cluster_size, string* rejection_reason) {
   DCHECK(rejection_reason != nullptr && rejection_reason->empty());
   // This function checks for a number of cases where the query can be rejected
   // immediately. The first check that fails is the error that is reported. The order of
   // the checks isn't particularly important, though some thought was given to ordering
   // them in a way that might make the sense for a user.
-  if (!IsPoolConfigValid(pool_cfg, rejection_reason)) return true;
+  if (!IsPoolConfigValidForCluster(pool_cfg, cluster_size, rejection_reason)) return true;
 
   // Compute the max (over all backends) and cluster total (across all backends) for
   // min_mem_reservation_bytes and thread_reservation and the min (over all backends)
@@ -539,27 +565,29 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
   }
 
   // Checks related to pool max_requests:
-  if (pool_cfg.max_requests == 0) {
+  if (GetMaxRequestsForPool(pool_cfg, cluster_size) == 0) {
     *rejection_reason = REASON_DISABLED_REQUESTS_LIMIT;
     return true;
   }
 
   // Checks related to pool max_mem_resources:
-  if (pool_cfg.max_mem_resources == 0) {
+  int64_t max_mem = GetMaxMemForPool(pool_cfg, cluster_size);
+  if (max_mem == 0) {
     *rejection_reason = REASON_DISABLED_MAX_MEM_RESOURCES;
     return true;
   }
-  if (pool_cfg.max_mem_resources > 0) {
-    if (cluster_min_mem_reservation_bytes > pool_cfg.max_mem_resources) {
+  if (max_mem > 0) {
+    if (cluster_min_mem_reservation_bytes > max_mem) {
       *rejection_reason = Substitute(REASON_MIN_RESERVATION_OVER_POOL_MEM,
-          PrintBytes(pool_cfg.max_mem_resources),
+          PrintBytes(max_mem), GetMaxMemForPoolDescription(pool_cfg, cluster_size),
           PrintBytes(cluster_min_mem_reservation_bytes));
       return true;
     }
     int64_t cluster_mem_to_admit = schedule.GetClusterMemoryToAdmit();
-    if (cluster_mem_to_admit > pool_cfg.max_mem_resources) {
-      *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
-          PrintBytes(cluster_mem_to_admit), PrintBytes(pool_cfg.max_mem_resources));
+    if (cluster_mem_to_admit > max_mem) {
+      *rejection_reason =
+          Substitute(REASON_REQ_OVER_POOL_MEM, PrintBytes(cluster_mem_to_admit),
+              PrintBytes(max_mem), GetMaxMemForPoolDescription(pool_cfg, cluster_size));
       return true;
     }
     int64_t per_backend_mem_to_admit = schedule.per_backend_mem_to_admit();
@@ -573,16 +601,19 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
 
   // Checks related to the pool queue size:
   PoolStats* stats = GetPoolStats(schedule.request_pool());
-  if (stats->agg_num_queued() >= pool_cfg.max_queued) {
-    *rejection_reason = Substitute(REASON_QUEUE_FULL, pool_cfg.max_queued,
-        stats->agg_num_queued(), GetStalenessDetailLocked(" "));
+  int64_t max_queued = GetMaxQueuedForPool(pool_cfg, cluster_size);
+  if (stats->agg_num_queued() >= max_queued) {
+    *rejection_reason = Substitute(REASON_QUEUE_FULL, max_queued,
+        GetMaxQueuedForPoolDescription(pool_cfg, cluster_size), stats->agg_num_queued(),
+        GetStalenessDetailLocked(" "));
     return true;
   }
 
   return false;
 }
 
-void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool_cfg) {
+void AdmissionController::PoolStats::UpdateConfigMetrics(
+    const TPoolConfig& pool_cfg, int64_t cluster_size) {
   metrics_.pool_max_mem_resources->SetValue(pool_cfg.max_mem_resources);
   metrics_.pool_max_requests->SetValue(pool_cfg.max_requests);
   metrics_.pool_max_queued->SetValue(pool_cfg.max_queued);
@@ -590,17 +621,30 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
   metrics_.min_query_mem_limit->SetValue(pool_cfg.min_query_mem_limit);
   metrics_.clamp_mem_limit_query_option->SetValue(
       pool_cfg.clamp_mem_limit_query_option);
+  metrics_.max_running_queries_multiple->SetValue(pool_cfg.max_running_queries_multiple);
+  metrics_.max_queued_queries_multiple->SetValue(pool_cfg.max_queued_queries_multiple);
+  metrics_.max_memory_multiple->SetValue(pool_cfg.max_memory_multiple);
+}
+
+void AdmissionController::PoolStats::UpdateDerivedMetrics(
+    const TPoolConfig& pool_cfg, int64_t cluster_size) {
+  metrics_.max_running_queries_derived->SetValue(
+      GetMaxRequestsForPool(pool_cfg, cluster_size));
+  metrics_.max_queued_queries_derived->SetValue(
+      GetMaxQueuedForPool(pool_cfg, cluster_size));
+  metrics_.max_memory_derived->SetValue(GetMaxMemForPool(pool_cfg, cluster_size));
 }
 
 Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
     Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome) {
   const string& pool_name = schedule->request_pool();
+  const int64_t cluster_size = GetClusterSize();
   TPoolConfig pool_cfg;
   RETURN_IF_ERROR(request_pool_service_->GetPoolConfig(pool_name, &pool_cfg));
   schedule->UpdateMemoryRequirements(pool_cfg);
-  const int64_t max_requests = pool_cfg.max_requests;
-  const int64_t max_queued = pool_cfg.max_queued;
-  const int64_t max_mem = pool_cfg.max_mem_resources;
+  const int64_t max_requests = GetMaxRequestsForPool(pool_cfg, cluster_size);
+  const int64_t max_queued = GetMaxQueuedForPool(pool_cfg, cluster_size);
+  const int64_t max_mem = GetMaxMemForPool(pool_cfg, cluster_size);
 
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(schedule, admit_outcome, schedule->summary_profile());
@@ -614,15 +658,20 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
     RequestQueue* queue = &request_queue_map_[pool_name];
     pool_config_map_[pool_name] = pool_cfg;
     PoolStats* stats = GetPoolStats(pool_name);
-    stats->UpdateConfigMetrics(pool_cfg);
-    VLOG_QUERY << "Schedule for id=" << PrintId(schedule->query_id()) << " in pool_name="
-               << pool_name << " per_host_mem_estimate="
+    stats->UpdateConfigMetrics(pool_cfg, cluster_size);
+    stats->UpdateDerivedMetrics(pool_cfg, cluster_size);
+    VLOG_QUERY << "Schedule for id=" << PrintId(schedule->query_id())
+               << " in pool_name=" << pool_name << " per_host_mem_estimate="
                << PrintBytes(schedule->GetPerHostMemoryEstimate())
-               << " PoolConfig: max_requests=" << max_requests << " max_queued="
-               << max_queued << " max_mem=" << PrintBytes(max_mem);
+               << " PoolConfig: max_requests=" << max_requests << " ("
+               << GetMaxRequestsForPoolDescription(pool_cfg, cluster_size) << ")"
+               << " max_queued=" << max_queued << " ("
+               << GetMaxQueuedForPoolDescription(pool_cfg, cluster_size) << ")"
+               << " max_mem=" << PrintBytes(max_mem) << " ("
+               << GetMaxMemForPoolDescription(pool_cfg, cluster_size) << ")";
     VLOG_QUERY << "Stats: " << stats->DebugString();
     string rejection_reason;
-    if (RejectImmediately(*schedule, pool_cfg, &rejection_reason)) {
+    if (RejectImmediately(*schedule, pool_cfg, cluster_size, &rejection_reason)) {
       AdmissionOutcome outcome =
           admit_outcome->Set(AdmissionOutcome::REJECTED_OR_TIMED_OUT);
       if (outcome != AdmissionOutcome::REJECTED_OR_TIMED_OUT) {
@@ -642,7 +691,7 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
     }
     pools_for_updates_.insert(pool_name);
 
-    if (CanAdmitRequest(*schedule, pool_cfg, false, &not_admitted_reason)) {
+    if (CanAdmitRequest(*schedule, pool_cfg, cluster_size, false, &not_admitted_reason)) {
       DCHECK_EQ(stats->local_stats().num_queued, 0);
       AdmissionOutcome outcome = admit_outcome->Set(AdmissionOutcome::ADMITTED);
       if (outcome != AdmissionOutcome::ADMITTED) {
@@ -949,57 +998,32 @@ void AdmissionController::DequeueLoop() {
     unique_lock<mutex> lock(admission_ctrl_lock_);
     if (done_) break;
     dequeue_cv_.Wait(lock);
+    const int64_t cluster_size = GetClusterSize();
     for (const PoolConfigMap::value_type& entry: pool_config_map_) {
       const string& pool_name = entry.first;
       const TPoolConfig& pool_config = entry.second;
-      const int64_t max_requests = pool_config.max_requests;
-      const int64_t max_mem = pool_config.max_mem_resources;
       PoolStatsMap::iterator it = pool_stats_.find(pool_name);
       DCHECK(it != pool_stats_.end());
       PoolStats* stats = &it->second;
       RequestQueue& queue = request_queue_map_[pool_name];
+      stats->UpdateDerivedMetrics(pool_config, cluster_size);
 
       if (stats->local_stats().num_queued == 0) continue; // Nothing to dequeue
 
       // Handle the unlikely case that after requests were queued, the pool config was
       // changed and the pool was disabled. Skip dequeuing them and let them time out.
       // TODO: Dequeue and reject all requests in this pool.
-      if (max_requests == 0 || max_mem == 0) continue;
+      if (PoolDisabled(pool_config)) continue;
 
       DCHECK_GT(stats->local_stats().num_queued, 0);
       DCHECK_GE(stats->agg_num_queued(), stats->local_stats().num_queued);
 
-      // Use a heuristic to limit the number of requests we dequeue locally to avoid all
-      // impalads dequeuing too many requests at the same time. This is based on the
-      // max_requests limit and the current queue size. We will attempt to dequeue up to
-      // this number of requests until reaching the per-pool memory limit.
-      int64_t max_to_dequeue = 0;
-      if (max_requests > 0) {
-        const int64_t total_available = max_requests - stats->agg_num_running();
-        if (total_available <= 0) {
-          if (!queue.empty()) {
-            LogDequeueFailed(queue.head(),
-                Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(), max_requests,
-                    GetStalenessDetailLocked(" ")));
-          }
-          continue;
-        }
-        // Use the ratio of locally queued requests to agg queued so that each impalad
-        // can dequeue a proportional amount total_available. Note, this offers no
-        // fairness between impalads.
-        double queue_size_ratio =
-            static_cast<double>(stats->local_stats().num_queued) /
-            static_cast<double>(stats->agg_num_queued());
-        // TODO: Floating point arithmetic may result in dequeuing one less request than
-        // it should if the local num_queued is equal to the agg_num_queued.
-        max_to_dequeue = min(stats->local_stats().num_queued,
-            max<int64_t>(1, queue_size_ratio * total_available));
-      } else {
-        max_to_dequeue = stats->agg_num_queued(); // No limit on num running requests
-      }
+      int64_t max_to_dequeue = GetMaxToDequeue(queue, stats, pool_config, cluster_size);
       VLOG_RPC << "Dequeue thread will try to admit " << max_to_dequeue << " requests"
-               << ", pool=" << pool_name << ", num_queued="
-               << stats->local_stats().num_queued;
+               << ", pool=" << pool_name
+               << ", num_queued=" << stats->local_stats().num_queued
+               << " cluster_size=" << cluster_size;
+      if (max_to_dequeue == 0) continue; // to next pool.
 
       while (max_to_dequeue > 0 && !queue.empty()) {
         QueueNode* queue_node = queue.head();
@@ -1012,7 +1036,8 @@ void AdmissionController::DequeueLoop() {
         // TODO: Requests further in the queue may be blocked unnecessarily. Consider a
         // better policy once we have better test scenarios.
         if (!is_cancelled
-            && !CanAdmitRequest(*schedule, pool_config, true, &not_admitted_reason)) {
+            && !CanAdmitRequest(
+                   *schedule, pool_config, cluster_size, true, &not_admitted_reason)) {
           LogDequeueFailed(queue_node, not_admitted_reason);
           break;
         }
@@ -1032,6 +1057,37 @@ void AdmissionController::DequeueLoop() {
       }
       pools_for_updates_.insert(pool_name);
     }
+  }
+}
+
+int64_t AdmissionController::GetMaxToDequeue(RequestQueue& queue, PoolStats* stats,
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (PoolLimitsRunningQueriesCount(pool_config)) {
+    const int64_t max_requests = GetMaxRequestsForPool(pool_config, cluster_size);
+    const int64_t total_available = max_requests - stats->agg_num_running();
+    if (total_available <= 0) {
+      // There is a limit for the number of running queries, so we can
+      // see that nothing can run in this pool.
+      // This can happen in the case of over-admission.
+      if (!queue.empty()) {
+        LogDequeueFailed(queue.head(),
+            Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(), max_requests,
+                GetMaxRequestsForPoolDescription(pool_config, cluster_size),
+                GetStalenessDetailLocked(" ")));
+      }
+      return 0;
+    }
+
+    // Use the ratio of locally queued requests to agg queued so that each impalad
+    // can dequeue a proportional amount total_available. Note, this offers no
+    // fairness between impalads.
+    double queue_size_ratio = static_cast<double>(stats->local_stats().num_queued)
+        / static_cast<double>(max<int64_t>(1, stats->agg_num_queued()));
+    DCHECK(queue_size_ratio <= 1.0);
+    return min(stats->local_stats().num_queued,
+        max<int64_t>(1, queue_size_ratio * total_available));
+  } else {
+    return stats->agg_num_queued(); // No limit on num running requests
   }
 }
 
@@ -1055,7 +1111,8 @@ AdmissionController::GetPoolStats(const string& pool_name) {
   return &it->second;
 }
 
-bool AdmissionController::IsPoolConfigValid(const TPoolConfig& pool_cfg, string* reason) {
+bool AdmissionController::IsPoolConfigValidForCluster(
+    const TPoolConfig& pool_cfg, int64_t cluster_size, string* reason) {
   if (pool_cfg.max_query_mem_limit > 0
       && pool_cfg.min_query_mem_limit > pool_cfg.max_query_mem_limit) {
     *reason = Substitute("Invalid pool config: the min_query_mem_limit is greater than "
@@ -1063,11 +1120,21 @@ bool AdmissionController::IsPoolConfigValid(const TPoolConfig& pool_cfg, string*
         pool_cfg.min_query_mem_limit, pool_cfg.max_query_mem_limit);
     return false;
   }
-  if (pool_cfg.max_mem_resources > 0
-      && pool_cfg.min_query_mem_limit > pool_cfg.max_mem_resources) {
-    *reason = Substitute("Invalid pool config: the min_query_mem_limit is greater than "
-                         "the max_mem_resources ($0 > $1)",
-        pool_cfg.min_query_mem_limit, pool_cfg.max_mem_resources);
+  int64_t max_mem = GetMaxMemForPool(pool_cfg, cluster_size);
+  if (max_mem > 0 && pool_cfg.min_query_mem_limit > max_mem) {
+    if (PoolHasFixedMemoryLimit(pool_cfg)) {
+      *reason =
+          Substitute("Invalid pool config: the min_query_mem_limit $0 is greater than "
+                     "the max_mem_resources $1 (configured statically)",
+              pool_cfg.min_query_mem_limit, max_mem);
+    } else {
+      *reason =
+          Substitute("The min_query_mem_limit $0 is greater than "
+                     "the current max_mem_resources $1 ($2); queries will not be admitted"
+                     " until more executors are available.",
+              pool_cfg.min_query_mem_limit, max_mem,
+              GetMaxMemForPoolDescription(pool_cfg, cluster_size));
+    }
     return false;
   }
   return true;
@@ -1224,6 +1291,18 @@ void AdmissionController::PoolStats::ToJson(
       document->GetAllocator());
   pool->AddMember("clamp_mem_limit_query_option",
       metrics_.clamp_mem_limit_query_option->GetValue(), document->GetAllocator());
+  pool->AddMember("max_running_queries_multiple",
+      metrics_.max_running_queries_multiple->GetValue(), document->GetAllocator());
+  pool->AddMember("max_queued_queries_multiple",
+      metrics_.max_queued_queries_multiple->GetValue(), document->GetAllocator());
+  pool->AddMember("max_memory_multiple", metrics_.max_memory_multiple->GetValue(),
+      document->GetAllocator());
+  pool->AddMember("max_running_queries_derived",
+      metrics_.max_running_queries_derived->GetValue(), document->GetAllocator());
+  pool->AddMember("max_queued_queries_derived",
+      metrics_.max_queued_queries_derived->GetValue(), document->GetAllocator());
+  pool->AddMember("max_memory_derived", metrics_.max_memory_derived->GetValue(),
+      document->GetAllocator());
   pool->AddMember("wait_time_ms_ema", wait_time_ms_ema_, document->GetAllocator());
   Value histogram(kArrayType);
   for (int bucket = 0; bucket < peak_mem_histogram_.size(); bucket++) {
@@ -1306,6 +1385,18 @@ void AdmissionController::PoolStats::InitMetrics() {
       POOL_MIN_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT, 0, name_);
   metrics_.clamp_mem_limit_query_option = parent_->metrics_group_->AddProperty<bool>(
       POOL_CLAMP_MEM_LIMIT_QUERY_OPTION_METRIC_KEY_FORMAT, false, name_);
+  metrics_.max_running_queries_multiple = parent_->metrics_group_->AddDoubleGauge(
+      POOL_MAX_RUNNING_QUERIES_MULTIPLE_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_queued_queries_multiple = parent_->metrics_group_->AddDoubleGauge(
+      POOL_MAX_QUEUED_QUERIES_MULTIPLE_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_memory_multiple = parent_->metrics_group_->AddGauge(
+      POOL_MAX_MEMORY_MULTIPLE_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_running_queries_derived = parent_->metrics_group_->AddGauge(
+      POOL_MAX_RUNNING_QUERIES_DERIVED_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_queued_queries_derived = parent_->metrics_group_->AddGauge(
+      POOL_MAX_QUEUED_QUERIES_DERIVED_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.max_memory_derived = parent_->metrics_group_->AddGauge(
+      POOL_MAX_MEMORY_DERIVED_METRIC_KEY_FORMAT, 0, name_);
 }
 
 void AdmissionController::PopulatePerHostMemReservedAndAdmitted(
@@ -1323,4 +1414,81 @@ string AdmissionController::MakePoolTopicKey(
   DCHECK_EQ(backend_id.find(TOPIC_KEY_DELIMITER), string::npos);
   return Substitute("$0$1$2", pool_name, TOPIC_KEY_DELIMITER, backend_id);
 }
+
+int64_t AdmissionController::GetClusterSize() {
+  const ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+      cluster_membership_mgr_->GetSnapshot();
+  // The count is computed including executors that are quiescing. This is important
+  // as this value is used in calculating the memory needed to run a query.
+  // If we exclude the quiescing executors, and a query at the head of the queue is
+  // scheduled to run on those, then the scaled down limits of the pool would prevent it
+  // from being admitted and hold up the rest of the queue (till it times out), even
+  // though the query can be allowed to start running on those quiescing executors.
+  return max<int64_t>(1, membership_snapshot->current_backends.size());
 }
+
+int64_t AdmissionController::GetMaxMemForPool(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_memory_multiple > 0) {
+    return pool_config.max_memory_multiple * cluster_size;
+  }
+  return pool_config.max_mem_resources;
+}
+
+string AdmissionController::GetMaxMemForPoolDescription(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_memory_multiple > 0) {
+    return Substitute("calculated as $0 backends each with $1", cluster_size,
+        PrintBytes(pool_config.max_memory_multiple));
+  }
+  return "configured statically";
+}
+
+int64_t AdmissionController::GetMaxRequestsForPool(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_running_queries_multiple > 0) {
+    return ceil(pool_config.max_running_queries_multiple * cluster_size);
+  }
+  return pool_config.max_requests;
+}
+
+string AdmissionController::GetMaxRequestsForPoolDescription(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_running_queries_multiple > 0) {
+    return Substitute("calculated as $0 backends each with $1 queries", cluster_size,
+        pool_config.max_running_queries_multiple);
+  }
+  return "configured statically";
+}
+
+int64_t AdmissionController::GetMaxQueuedForPool(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_queued_queries_multiple > 0) {
+    return ceil(pool_config.max_queued_queries_multiple * cluster_size);
+  }
+  return pool_config.max_queued;
+}
+
+string AdmissionController::GetMaxQueuedForPoolDescription(
+    const TPoolConfig& pool_config, int64_t cluster_size) {
+  if (pool_config.max_queued_queries_multiple > 0) {
+    return Substitute("calculated as $0 backends each with $1 queries", cluster_size,
+        pool_config.max_queued_queries_multiple);
+  }
+  return "configured statically";
+}
+
+bool AdmissionController::PoolDisabled(const TPoolConfig& pool_config) {
+  return ((pool_config.max_requests == 0 && pool_config.max_running_queries_multiple == 0)
+      || (pool_config.max_mem_resources == 0 && pool_config.max_memory_multiple == 0));
+}
+
+bool AdmissionController::PoolLimitsRunningQueriesCount(const TPoolConfig& pool_config) {
+  return pool_config.max_requests > 0 || pool_config.max_running_queries_multiple > 0;
+}
+
+bool AdmissionController::PoolHasFixedMemoryLimit(const TPoolConfig& pool_config) {
+  return pool_config.max_mem_resources > 0 && pool_config.max_memory_multiple <= 0;
+}
+
+} // namespace impala

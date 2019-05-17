@@ -19,6 +19,7 @@
 
 import itertools
 import logging
+import math
 import os
 import pytest
 import re
@@ -29,6 +30,7 @@ from copy import copy
 from time import sleep, time
 
 from beeswaxd.BeeswaxService import QueryState
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout, IMPALA_TEST_CLUSTER_PROPERTIES
@@ -439,7 +441,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     for query in non_trivial_queries:
       ex = self.execute_query_expect_failure(self.client, query)
       assert re.search("Rejected query from pool default-pool: request memory needed "
-          ".* is greater than pool max mem resources 10.00 MB", str(ex))
+                       ".* is greater than pool max mem resources 10.00 MB \(configured "
+                       "statically\)", str(ex))
 
   @SkipIfS3.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
@@ -650,7 +653,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     """Test that queue details appear in the profile when queued based on num_queries."""
     # Run a bunch of queries - one should get admitted immediately, the rest should
     # be dequeued one-by-one.
-    STMT = "select sleep(100)"
+    STMT = "select sleep(1000)"
     TIMEOUT_S = 60
     EXPECTED_REASON = \
         "Latest admission queue reason: number of running queries 1 is at or over limit 1"
@@ -685,8 +688,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     STMT = "select sleep(100)"
     TIMEOUT_S = 60
     EXPECTED_REASON = "Latest admission queue reason: Not enough aggregate memory " +\
-        "available in pool default-pool with max mem resources 10.00 MB. Needed " +\
-        "9.00 MB but only 1.00 MB was available."
+        "available in pool default-pool with max mem resources 10.00 MB (configured " \
+        "statically). Needed 9.00 MB but only 1.00 MB was available."
     NUM_QUERIES = 5
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
         TIMEOUT_S, {'mem_limit': '9mb'})
@@ -944,6 +947,186 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     assert num_admitted_immediately == 1
     assert num_queued == 3
     assert num_rejected == NUM_QUERIES - num_admitted_immediately - num_queued
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=impalad_admission_ctrl_config_args(
+    fs_allocation_file="fair-scheduler-test2.xml",
+    llama_site_file="llama-site-test2.xml"),
+    statestored_args=_STATESTORED_ARGS)
+  def test_scalable_config(self, vector):
+    """
+    Test that the scalable configuration parameters scale as the cluster size changes.
+    """
+    # Start with 3 Impalads
+    coordinator = self.cluster.impalads[0]
+    impalad_1 = self.cluster.impalads[1]
+    impalad_2 = self.cluster.impalads[2]
+    self.__check_admission_by_counts(expected_num_impalads=3)
+    # The mem_limit values that are passed to __check_admission_by_memory are based on
+    # the memory used by the query when run on clusters of varying sizes, but mem_limit
+    # is used in the test to make the test deterministic in the presence of changing
+    # memory estimates.
+    self.__check_admission_by_memory(True, '85M')
+
+    # Kill an Impalad, now there are 2.
+    impalad_1.kill_and_wait_for_exit()
+    coordinator.service.wait_for_num_known_live_backends(2)
+    self.__check_admission_by_counts(expected_num_impalads=2)
+    self.__check_admission_by_memory(False, '125M',
+                                   'is greater than pool max mem resources 200.00 MB'
+                                   ' (calculated as 2 backends each with 100.00 MB)')
+
+    # Restart an Impalad, now there are 3 again.
+    impalad_1.start(wait_until_ready=True)
+    coordinator.service.wait_for_num_known_live_backends(3)
+    self.__check_admission_by_counts(expected_num_impalads=3)
+    self.__check_admission_by_memory(True, '85M')
+
+    # Kill 2 Impalads, now there are 1.
+    impalad_1.kill_and_wait_for_exit()
+    impalad_2.kill_and_wait_for_exit()
+    coordinator.service.wait_for_num_known_live_backends(1)
+    self.__check_admission_by_counts(expected_num_impalads=1)
+    self.__check_admission_by_memory(False, '135M',
+                                   'is greater than pool max mem resources 100.00 MB'
+                                   ' (calculated as 1 backends each with 100.00 MB)')
+
+    # Restart 2 Impalads, now there are 3 again.
+    impalad_1.start(wait_until_ready=True)
+    impalad_2.start(wait_until_ready=True)
+    coordinator.service.wait_for_num_known_live_backends(3)
+    self.__check_admission_by_counts(expected_num_impalads=3)
+    self.__check_admission_by_memory(True, '85M')
+
+  def __check_admission_by_memory(self, expected_admission, mem_limit,
+                                  expected_rejection_reason=None):
+    """
+    Test if a query can run against the current cluster.
+    :param mem_limit set in the client configuration to limit query memory.
+    :param expected_admission: True if admission is expected.
+    :param expected_rejection_reason: a string expected to be in the reason for rejection.
+    """
+    query = "select * from functional.alltypesagg  order by int_col limit 1"
+    profiles = self._execute_and_collect_profiles([query], timeout_s=60,
+        allow_query_failure=True, config_options={'request_pool': 'root.queueE',
+                                                  'mem_limit': mem_limit})
+    assert len(profiles) == 1
+    profile = profiles[0]
+    if "Admission result: Admitted immediately" in profile:
+      did_admit = True
+    elif "Admission result: Rejected" in profile:
+      did_admit = False
+      num_rejected, rejected_reasons = self.parse_profiles_rejected(profiles)
+      assert num_rejected == 1
+      assert expected_rejection_reason is not None, rejected_reasons[0]
+      assert expected_rejection_reason in rejected_reasons[0], profile
+    else:
+      assert "Admission result: Admitted (queued)" in profile, profile
+      assert 0, "should not queue based on memory"
+    assert did_admit == expected_admission, profile
+
+  def __check_admission_by_counts(self, expected_num_impalads):
+    """
+    Run some queries, find how many were admitted, queued or rejected, and check that
+    AdmissionController correctly enforces query count limits based in the configuration
+    in llama-site-test2.xml.
+    """
+    NUM_QUERIES = 6
+    # Set expected values based on expected_num_impalads.
+    # We can run 1 query per backend for queueE from llama-site-test2.xml.
+    expected_num_admitted = expected_num_impalads
+    # The value of max-queued-queries-multiple for queueE from llama-site-test2.xml.
+    QUERIES_MULTIPLE = 0.6
+    expected_num_queued = int(math.ceil(expected_num_impalads * QUERIES_MULTIPLE))
+    expected_num_rejected = NUM_QUERIES - (expected_num_admitted + expected_num_queued)
+
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    client.set_configuration({'request_pool': 'root.queueE'})
+    result = client.execute("select 1")
+    # Query should execute in queueE.
+    self.__check_query_options(result.runtime_profile, ['REQUEST_POOL=root.queueE'])
+    STMT = "select sleep(1000)"
+    TIMEOUT_S = 60
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+            TIMEOUT_S, allow_query_failure=True,
+            config_options={'request_pool': 'root.queueE'})
+    # Check admitted queries
+    num_admitted_immediately = self.parse_profiles_admitted(profiles)
+    assert num_admitted_immediately == expected_num_admitted
+
+    # Check queued queries.
+    num_queued, queued_reasons = self.parse_profiles_queued(profiles)
+    assert num_queued == expected_num_queued
+    assert len(queued_reasons) == num_queued
+    expected_queue_reason = (
+      "number of running queries {0} is at or over limit {1}".format(
+        expected_num_admitted, expected_num_admitted)
+    )
+    # The first query to get queued sees expected_queue_reason.
+    assert len([s for s in queued_reasons if
+                expected_queue_reason in s]) == 1
+    # Subsequent queries that are queued see that the queue is not empty.
+    expected_see_non_empty_queue = max(expected_num_queued - 1, 0)
+    assert len([s for s in queued_reasons if
+                "queue is not empty" in s]) == expected_see_non_empty_queue
+
+    # Check rejected queries
+    num_rejected, rejected_reasons = self.parse_profiles_rejected(profiles)
+    assert num_rejected == expected_num_rejected
+    expected_rejection_reason = (
+      "Rejected query from pool root.queueE: queue full, "
+      "limit={0} (calculated as {1} backends each with 0.6 queries)".format(
+        expected_num_queued, expected_num_impalads)
+    )
+    assert len([s for s in rejected_reasons if
+                expected_rejection_reason in s]) == expected_num_rejected
+
+  def parse_profiles_queued(self, profiles):
+    """
+    Parse a list of Profile strings and sum the counts of queries queued.
+    :param profiles: a list of query profiles to parse.
+    :return: The number queued.
+    """
+    num_queued = 0
+    queued_reasons_return = []
+    for profile in profiles:
+      if "Admission result: Admitted (queued)" in profile:
+        queued_reasons = [line for line in profile.split("\n")
+                          if "Initial admission queue reason:" in line]
+        assert len(queued_reasons) == 1, profile
+        num_queued += 1
+        queued_reasons_return.append(queued_reasons[0])
+    return num_queued, queued_reasons_return
+
+  def parse_profiles_admitted(self, profiles):
+    """
+    Parse a list of Profile strings and sum the counts of queries admitted immediately.
+    :param profiles: a list of query profiles to parse.
+    :return: The number admitted immediately.
+    """
+    num_admitted_immediately = 0
+    for profile in profiles:
+      if "Admission result: Admitted immediately" in profile:
+        num_admitted_immediately += 1
+    return num_admitted_immediately
+
+  def parse_profiles_rejected(self, profiles):
+    """
+    Parse a list of Profile strings and sum the counts of queries rejected.
+    :param profiles: a list of query profiles to parse.
+    :return: The number rejected.
+    """
+    num_rejected = 0
+    rejected_reasons_return = []
+    for profile in profiles:
+      if "Admission result: Rejected" in profile:
+        num_rejected += 1
+        query_statuses = [line for line in profile.split("\n")
+                          if "Query Status:" in line]
+        assert len(query_statuses) == 1, profile
+        rejected_reasons_return.append(query_statuses[0])
+    return num_rejected, rejected_reasons_return
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
