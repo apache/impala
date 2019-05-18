@@ -18,10 +18,6 @@
 package org.apache.impala.catalog.events;
 
 import static java.lang.Thread.sleep;
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.DEFAULT_METASTORE_CONFIG_VALUE;
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.METASTORE_PARAMETER_EXCLUDE_PATTERNS;
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.validateMetastoreConfigs;
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.validateMetastoreEventParameters;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.ALTER_TABLE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_DATABASE;
 import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_DATABASE;
@@ -77,8 +73,7 @@ import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.events.EventProcessorConfigValidator.MetastoreEventConfigsToValidate;
-import org.apache.impala.catalog.events.EventProcessorConfigValidator.ValidationResult;
+import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
@@ -137,7 +132,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
@@ -162,32 +156,6 @@ public class MetastoreEventsProcessorTest {
   private static CatalogServiceCatalog catalog_;
   private static CatalogOpExecutor catalogOpExecutor_;
   private static MetastoreEventsProcessor eventsProcessor_;
-
-  // This enum contains incorrect config values for each key, to test that event processor
-  // fails when incorrect value is set in Metastore for the required configs. It also
-  // has the correct value to verify the case that event processor does not fail with
-  // correct config values.
-  private enum TestIncorrectMetastoreEventConfigs {
-    ADD_THRIFT_OBJECTS("hive.metastore.notifications.add.thrift.objects", "true",
-        "false"),
-    ALTER_NOTIFICATIONS_BASIC("hive.metastore.alter.notifications.basic", "false",
-        "true"),
-    FIRE_EVENTS_FOR_DML("hive.metastore.dml.events", "true", "false");
-
-    private String conf_, correctValue_, incorrectValue_;
-
-    TestIncorrectMetastoreEventConfigs(String conf, String correctValue,
-        String incorrectValue) {
-      this.conf_ = conf;
-      this.correctValue_ = correctValue;
-      this.incorrectValue_ = incorrectValue;
-    }
-
-    @Override
-    public String toString() {
-      return "Config : " + conf_ + ", Expected Value : " + correctValue_;
-    }
-  }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MetastoreEventsProcessorTest.class);
@@ -265,125 +233,79 @@ public class MetastoreEventsProcessorTest {
    * that if event processor starts, the required configs are set.
    */
   @Test
-  public void testConfigValidation() throws TException {
+  public void testConfigValidation() throws CatalogException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
-
-    IMetaStoreClient metaStoreClient = catalog_.getMetaStoreClient().getHiveClient();
-    for (MetastoreEventConfigsToValidate config : MetastoreEventConfigsToValidate
-        .values()) {
-      assertEquals(config.getExpectedValue(),
-          MetaStoreUtil.getMetastoreConfigValue(metaStoreClient, config.getConf(),
-              DEFAULT_METASTORE_CONFIG_VALUE));
-    }
+    eventsProcessor_.validateConfigs();
   }
 
   /**
-   * Mock the eventsProcessor#getConfigValueFromMetastore method and make it return
-   * incorrect values for the required configs for event processing. Verify that the
-   * incorrect config leads to invalid result for each config.
+   * Test provides a mock value and confirms if the MetastoreEventConfig validate
+   * suceeds or fails as expected
    */
   @Test
-  public void testConfigValidationWithIncorrectValues() throws TException {
-    MetastoreEventsProcessor mockEventsProcessor =
-        Mockito.mock(MetastoreEventsProcessor.class);
-    for (TestIncorrectMetastoreEventConfigs config :
-        TestIncorrectMetastoreEventConfigs.values()) {
-      when(mockEventsProcessor.getConfigValueFromMetastore(config.conf_,
-          DEFAULT_METASTORE_CONFIG_VALUE))
-          .thenReturn(config.incorrectValue_);
-      ValidationResult testResult =
-          validateMetastoreConfigs(mockEventsProcessor);
-      assertFalse(testResult.isValid());
-      assertTrue(testResult.getReason().isPresent());
-      assertEquals(String.format("Incorrect configuration for %s. "
-              + "Found : %s", config.toString(), config.incorrectValue_),
-          testResult.getReason().get());
-
-      when(mockEventsProcessor.getConfigValueFromMetastore(config.conf_,
-          DEFAULT_METASTORE_CONFIG_VALUE))
-          .thenReturn(config.correctValue_);
+  public void testConfigValidationWithIncorrectValues() {
+    Map<MetastoreEventProcessorConfig, String> incorrectValues = new HashMap<>();
+    incorrectValues.put(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "false");
+    incorrectValues.put(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "true");
+    incorrectValues.put(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "false");
+    for (MetastoreEventProcessorConfig config : incorrectValues.keySet()) {
+      testConfigValidation(config, incorrectValues.get(config), false);
     }
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "^impala",
+        false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "impala*",
+        false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        "randomString1, impala.disableHmsSync, randomString2", false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
+        "^impala.events.catalogServiceId", false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".*", false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".+", false);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".*disable.*",
+        false);
+
+    // check validation succeeds for correct values
+    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "true", true);
+    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "TRUE", true);
+    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "True", true);
+
+    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "false",
+        true);
+    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "FALSE",
+        true);
+    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "fAlse",
+        true);
+
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "true", true);
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "TRUE", true);
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "tRue", true);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "", true);
+    testConfigValidation(
+        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "random",
+        true);
   }
 
-  /**
-   * Test that when HiveConf.METASTORE_PARAMETER_EXCLUDE_PATTERNS contains a regex
-   * that filters out any parameter required for event processing, the config
-   * validation fails. Config validation should succeed when the regex does not match
-   * any of the required parameters.
-   */
-  @Test
-  public void testParameterFilterValidation() throws TException {
-    MetastoreEventsProcessor mockEventsProcessor =
-        Mockito.mock(MetastoreEventsProcessor.class);
-
-    //Regex to filter all parameters starting with impala
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("^impala");
-    ValidationResult testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertFalse(testResult.isValid());
-    assertTrue(testResult.getReason().isPresent());
-
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("impala*");
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertFalse(testResult.isValid());
-    assertTrue(testResult.getReason().isPresent());
-
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("");
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertTrue(testResult.isValid());
-    assertFalse(testResult.getReason().isPresent());
-
-    // Test with default return value
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE))
-        .thenReturn(DEFAULT_METASTORE_CONFIG_VALUE);
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertTrue(testResult.isValid());
-    assertFalse(testResult.getReason().isPresent());
-
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("randomString1, impala"
-        + ".disableHmsSync, randomString2");
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertFalse(testResult.isValid());
-    assertTrue(testResult.getReason().isPresent());
-
-    //Test when a required parameter is given as regex
-    String requiredParameter = MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey();
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS, DEFAULT_METASTORE_CONFIG_VALUE))
-        .thenReturn(requiredParameter);
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertFalse(testResult.isValid());
-    assertTrue(testResult.getReason().isPresent());
-    // Verify that the error message is correct
-    assertEquals(String.format("Failed config validation. "
-            + "Required Impala parameter %s is"
-            + " filtered out using the Hive configuration %s=%s", requiredParameter,
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS, requiredParameter),
-        testResult.getReason().get());
-
-    when(mockEventsProcessor.getConfigValueFromMetastore(
-        METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        DEFAULT_METASTORE_CONFIG_VALUE)).thenReturn("^impala.events"
-        + ".catalogServiceId");
-    testResult =
-        validateMetastoreEventParameters(mockEventsProcessor);
-    assertFalse(testResult.isValid());
-    assertTrue(testResult.getReason().isPresent());
+  private void testConfigValidation(MetastoreEventProcessorConfig config,
+      String mockValue, boolean expectSuccess) {
+    ValidationResult result = config.validate(mockValue);
+    assertNotNull(result);
+    if (expectSuccess) {
+      assertTrue(result.isValid());
+    } else {
+      assertFalse(result.isValid());
+      assertNotNull(result.getReason());
+    }
   }
 
   /**

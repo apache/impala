@@ -17,14 +17,13 @@
 
 package org.apache.impala.catalog.events;
 
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.hasValidMetastoreConfigs;
-import static org.apache.impala.catalog.events.EventProcessorConfigValidator.verifyParametersNotFiltered;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -39,7 +38,7 @@ import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.events.EventProcessorConfigValidator.ValidationResult;
+import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
@@ -245,16 +244,47 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       long pollingFrequencyInSec) throws CatalogException {
     Preconditions.checkState(pollingFrequencyInSec > 0);
     this.catalog_ = Preconditions.checkNotNull(catalog);
-    ValidationResult result =
-        hasValidMetastoreConfigs().and(verifyParametersNotFiltered()).apply(this);
-    if (!result.isValid()) {
-      throw new CatalogException(result.getReason().orElse("Event Processor "
-          + "initialization failed during validation check."));
-    }
+    validateConfigs();
     lastSyncedEventId_.set(startSyncFromId);
     metastoreEventFactory_ = new MetastoreEventFactory(catalog_, metrics_);
     pollingFrequencyInSec_ = pollingFrequencyInSec;
     initMetrics();
+  }
+
+  /**
+   * Fetches the required metastore config values and validates them against the
+   * expected values. The configurations to validate are different for HMS-2 v/s HMS-3
+   * and hence it uses MetastoreShim to get the configurations which need to be validated.
+   * @throws CatalogException if the validation fails or if metastore is not accessible
+   */
+  @VisibleForTesting
+  void validateConfigs() throws CatalogException {
+    for (MetastoreEventProcessorConfig config : getEventProcessorConfigsToValidate()) {
+      String configKey = config.getValidator().getConfigKey();
+      try {
+        String value = getConfigValueFromMetastore(configKey, "");
+        ValidationResult result = config.validate(value);
+        if (!result.isValid()) {
+          throw new CatalogException(result.getReason());
+        }
+      } catch (TException e) {
+        String msg = String.format("Unable to get configuration %s from metastore. Check "
+            + "if metastore is accessible", configKey);
+        LOG.error(msg, e);
+        throw new CatalogException(msg);
+      }
+    }
+  }
+
+  /**
+   * Returns the list of Metastore configurations to validate depending on the hive
+   * version
+   */
+  private List<MetastoreEventProcessorConfig> getEventProcessorConfigsToValidate() {
+    if (MetastoreShim.getMajorVersion() >= 2) {
+      return Arrays.asList(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML);
+    }
+    return Arrays.asList(MetastoreEventProcessorConfig.values());
   }
 
   private void initMetrics() {

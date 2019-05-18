@@ -110,15 +110,16 @@ if hive_major_version >= 3:
 else:
   CONFIG.update({
    'hive.metastore.event.listeners': 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener',
+   # HMS-2 based environments have a different set of expected configurations for event processor
+   'hive.metastore.alter.notifications.basic': 'false',
+   'hive.metastore.notification.parameters.exclude.patterns': '',
+   'hive.metastore.notifications.add.thrift.objects': 'true'
   })
 
 # Notifications-related configuration.
 # These are for enabling notification between Hive and Sentry as well as
 # metastore event processing in Impala (see IMPALA-7954)
 CONFIG.update({
- 'hive.metastore.alter.notifications.basic': 'false',
- 'hive.metastore.notification.parameters.exclude.patterns': '',
- 'hive.metastore.notifications.add.thrift.objects': 'true',
  'hive.metastore.transactional.event.listeners': 'org.apache.hive.hcatalog.listener.DbNotificationListener',
  'hcatalog.message.factory.impl.json': 'org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory',
  'hive.metastore.dml.events': 'true',
