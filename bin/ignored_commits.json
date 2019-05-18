@@ -42,7 +42,9 @@
       { "hash": "c01efd09679faaacfd5488fc7f4c1526a1af2f35",
         "comment": "Don't need to revert IMPALA-6988(54b3c60) since it doesn't cause build failure now"},
       { "hash": "df78eaec0b42d7fa5d148238f40fa57fcfcb25b5",
-        "comment": "Don't need to revert c01efd0 since we've ignored it"}
+        "comment": "Don't need to revert c01efd0 since we've ignored it"},
+      { "hash": "a203733fac3e1e37df8abeee39a88d187153a8c5",
+        "comment": "Only apply to master: 2.x branch only supports hadoop 2.x"}
     ]
   }
 ]
