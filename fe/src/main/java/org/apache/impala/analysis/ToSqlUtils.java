@@ -326,11 +326,14 @@ public class ToSqlUtils {
       storageHandlerClassName = null;
       properties.remove(KuduTable.KEY_STORAGE_HANDLER);
       String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
-      Preconditions.checkNotNull(kuduTableName);
-      if (kuduTableName.equals(KuduUtil.getDefaultCreateKuduTableName(
-          table.getDb().getName(), table.getName()))) {
+      // Remove the hidden table property 'kudu.table_name' for a managed Kudu table.
+      if (kuduTableName != null &&
+          KuduUtil.isDefaultKuduTableName(kuduTableName,
+              table.getDb().getName(), table.getName())) {
         properties.remove(KuduTable.KEY_TABLE_NAME);
       }
+      // Remove the hidden table property 'kudu.table_id'.
+      properties.remove(KuduTable.KEY_TABLE_ID);
       // Internal property, should not be exposed to the user.
       properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
 

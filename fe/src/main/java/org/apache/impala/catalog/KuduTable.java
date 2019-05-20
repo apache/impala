@@ -38,6 +38,7 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.client.HiveMetastoreConfig;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.thrift.TException;
@@ -59,6 +60,9 @@ public class KuduTable extends Table implements FeKuduTable {
 
   // Key to access the table name from the table properties.
   public static final String KEY_TABLE_NAME = "kudu.table_name";
+
+  // Key to access the table ID from the table properties.
+  public static final String KEY_TABLE_ID = "kudu.table_id";
 
   // Key to access the columns used to build the (composite) key of the table.
   // Deprecated - Used only for error checking.
@@ -152,6 +156,34 @@ public class KuduTable extends Table implements FeKuduTable {
   }
 
   /**
+   * Get the Hive Metastore configuration from Kudu masters.
+   */
+  private static HiveMetastoreConfig getHiveMetastoreConfig(String kuduMasters)
+      throws ImpalaRuntimeException {
+    Preconditions.checkNotNull(kuduMasters);
+    Preconditions.checkArgument(!kuduMasters.isEmpty());
+    KuduClient kuduClient = KuduUtil.getKuduClient(kuduMasters);
+    HiveMetastoreConfig hmsConfig;
+    try {
+      hmsConfig = kuduClient.getHiveMetastoreConfig();
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException(
+          String.format("Error determining if Kudu's integration with " +
+              "the Hive Metastore is enabled: %s", e.getMessage()));
+    }
+    return hmsConfig;
+  }
+
+  /**
+   * Check with Kudu master to see if Kudu's integration with the Hive Metastore
+   * is enabled.
+   */
+  public static boolean isHMSIntegrationEnabled(String kuduMasters)
+      throws ImpalaRuntimeException {
+    return getHiveMetastoreConfig(kuduMasters) != null;
+  }
+
+  /**
    * Load schema and partitioning schemes directly from Kudu.
    */
   public void loadSchemaFromKudu() throws ImpalaRuntimeException {
@@ -192,9 +224,15 @@ public class KuduTable extends Table implements FeKuduTable {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
       kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
-      Preconditions.checkNotNull(kuduTableName_);
+      if (kuduTableName_ == null || kuduTableName_.isEmpty()) {
+        throw new TableLoadingException("No " + KuduTable.KEY_TABLE_NAME +
+            " property found for Kudu table " + kuduTableName_);
+      }
       kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-      Preconditions.checkNotNull(kuduMasters_);
+      if (kuduMasters_ == null || kuduMasters_.isEmpty()) {
+        throw new TableLoadingException("No " + KuduTable.KEY_MASTER_HOSTS +
+            " property found for Kudu table " + kuduTableName_);
+      }
       setTableStats(msTable_);
       // Load metadata from Kudu and HMS
       try {

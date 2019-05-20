@@ -25,6 +25,9 @@ DIR=$(dirname $0)
 . "$DIR/kudu-common"   # Sets KUDU_COMMON_ARGS
 
 function start {
+  if [[ -n "$IMPALA_KUDU_STARTUP_FLAGS" ]]; then
+    KUDU_COMMON_ARGS+=(${IMPALA_KUDU_STARTUP_FLAGS})
+  fi
   do_start "$KUDU_BIN_DIR"/kudu-master \
       -flagfile "$NODE_DIR"/etc/kudu/master.conf \
       "${KUDU_COMMON_ARGS[@]}"

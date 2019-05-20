@@ -219,8 +219,8 @@ public class CreateTableStmt extends StatementBase {
    */
   private void analyzeKuduFormat(Analyzer analyzer) throws AnalysisException {
     if (getFileFormat() != THdfsFileFormat.KUDU) {
-      if (KuduTable.KUDU_LEGACY_STORAGE_HANDLER.equals(
-          getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
+      String handler = getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER);
+      if (KuduTable.isKuduStorageHandler(handler)) {
         throw new AnalysisException(KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
       }
       AnalysisUtils.throwIfNotEmpty(getKuduPartitionParams(),
@@ -262,23 +262,20 @@ public class CreateTableStmt extends StatementBase {
 
     // Only the Kudu storage handler may be specified for Kudu tables.
     String handler = getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER);
-    if (handler != null && !handler.equals(KuduTable.KUDU_LEGACY_STORAGE_HANDLER)) {
+    if (handler != null && !KuduTable.isKuduStorageHandler(handler)) {
       throw new AnalysisException("Invalid storage handler specified for Kudu table: " +
           handler);
     }
     putGeneratedKuduProperty(KuduTable.KEY_STORAGE_HANDLER,
-        KuduTable.KUDU_LEGACY_STORAGE_HANDLER);
+        KuduTable.KUDU_STORAGE_HANDLER);
 
-    String masterHosts = getTblProperties().get(KuduTable.KEY_MASTER_HOSTS);
-    if (Strings.isNullOrEmpty(masterHosts)) {
-      masterHosts = analyzer.getCatalog().getDefaultKuduMasterHosts();
-      if (masterHosts.isEmpty()) {
-        throw new AnalysisException(String.format(
-            "Table property '%s' is required when the impalad startup flag " +
-            "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
-      }
-      putGeneratedKuduProperty(KuduTable.KEY_MASTER_HOSTS, masterHosts);
+    String kuduMasters = populateKuduMasters(analyzer);
+    if (kuduMasters.isEmpty()) {
+      throw new AnalysisException(String.format(
+          "Table property '%s' is required when the impalad startup flag " +
+          "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
     }
+    putGeneratedKuduProperty(KuduTable.KEY_MASTER_HOSTS, kuduMasters);
 
     // TODO: Find out what is creating a directory in HDFS and stop doing that. Kudu
     //       tables shouldn't have HDFS dirs: IMPALA-3570
@@ -288,6 +285,21 @@ public class CreateTableStmt extends StatementBase {
         "Kudu table.");
     AnalysisUtils.throwIfNotEmpty(tableDef_.getPartitionColumnDefs(),
         "PARTITIONED BY cannot be used in Kudu tables.");
+    AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_ID),
+        String.format("Table property %s should not be specified when creating a " +
+            "Kudu table.", KuduTable.KEY_TABLE_ID));
+  }
+
+  /**
+   *  Populates Kudu master addresses either from table property or
+   *  the -kudu_master_hosts flag.
+   */
+  private String populateKuduMasters(Analyzer analyzer) {
+    String kuduMasters = getTblProperties().get(KuduTable.KEY_MASTER_HOSTS);
+    if (Strings.isNullOrEmpty(kuduMasters)) {
+      kuduMasters = analyzer.getCatalog().getDefaultKuduMasterHosts();
+    }
+    return kuduMasters;
   }
 
   /**
@@ -316,7 +328,7 @@ public class CreateTableStmt extends StatementBase {
    * Analyzes and checks parameters specified for managed Kudu tables.
    */
   private void analyzeManagedKuduTableParams(Analyzer analyzer) throws AnalysisException {
-    analyzeManagedKuduTableName();
+    analyzeManagedKuduTableName(analyzer);
 
     // Check column types are valid Kudu types
     for (ColumnDef col: getColumnDefs()) {
@@ -359,12 +371,23 @@ public class CreateTableStmt extends StatementBase {
    * it in TableDef.generatedKuduTableName_. Throws if the Kudu table
    * name was given manually via TBLPROPERTIES.
    */
-  private void analyzeManagedKuduTableName() throws AnalysisException {
+  private void analyzeManagedKuduTableName(Analyzer analyzer) throws AnalysisException {
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
         String.format("Not allowed to set '%s' manually for managed Kudu tables .",
             KuduTable.KEY_TABLE_NAME));
+    String kuduMasters = populateKuduMasters(analyzer);
+    boolean isHMSIntegrationEnabled;
+    try {
+      // Check if Kudu's integration with the Hive Metastore is enabled. Validation
+      // of whether Kudu is configured to use the same Hive Metstore as Impala is skipped
+      // and is not necessary for syntax parsing.
+      isHMSIntegrationEnabled = KuduTable.isHMSIntegrationEnabled(kuduMasters);
+    } catch (ImpalaRuntimeException e) {
+      throw new AnalysisException(String.format("Cannot analyze Kudu table '%s': %s",
+          getTbl(), e.getMessage()));
+    }
     putGeneratedKuduProperty(KuduTable.KEY_TABLE_NAME,
-        KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
+        KuduUtil.getDefaultKuduTableName(getDb(), getTbl(), isHMSIntegrationEnabled));
   }
 
   /**

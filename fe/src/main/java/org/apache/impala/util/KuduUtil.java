@@ -382,12 +382,27 @@ public class KuduUtil {
   }
 
   /**
-   * Return the name that should be used in Kudu when creating a table, assuming a custom
-   * name was not provided.
+   * When Kudu's integration with the Hive Metastore is enabled, returns the Kudu
+   * table name with the format 'metastoreDbName.metastoreTableName'. Otherwise,
+   * returns with the format 'impala::metastoreDbName.metastoreTableName'. This
+   * should only be used for managed table.
    */
-  public static String getDefaultCreateKuduTableName(String metastoreDbName,
-      String metastoreTableName) {
-    return KUDU_TABLE_NAME_PREFIX + metastoreDbName + "." + metastoreTableName;
+  public static String getDefaultKuduTableName(String metastoreDbName,
+      String metastoreTableName, boolean isHMSIntegrationEnabled) {
+    return isHMSIntegrationEnabled ? metastoreDbName + "." + metastoreTableName :
+        KUDU_TABLE_NAME_PREFIX + metastoreDbName + "." + metastoreTableName;
+  }
+
+  /**
+   * Check if the given name is the default Kudu table name for managed table
+   * whether Kudu's integration with the Hive Metastore is enabled or not.
+   */
+  public static boolean isDefaultKuduTableName(String name,
+      String metastoreDbName, String metastoreTableName) {
+    return getDefaultKuduTableName(metastoreDbName,
+        metastoreTableName, true).equals(name) ||
+           getDefaultKuduTableName(metastoreDbName,
+        metastoreTableName, false).equals(name);
   }
 
   /**

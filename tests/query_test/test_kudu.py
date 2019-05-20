@@ -556,7 +556,7 @@ class TestCreateExternalTable(KuduTestSuite):
         assert ["", "EXTERNAL", "TRUE"] in table_desc
         assert ["", "kudu.master_addresses", KUDU_MASTER_HOSTS] in table_desc
         assert ["", "kudu.table_name", kudu_table.name] in table_desc
-        assert ["", "storage_handler", "com.cloudera.kudu.hive.KuduStorageHandler"] \
+        assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
             in table_desc
 
   def test_col_types(self, cursor, kudu_client):

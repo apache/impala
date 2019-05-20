@@ -2575,8 +2575,10 @@ public class CatalogOpExecutor {
   private void renameKuduTable(KuduTable oldTbl,
       org.apache.hadoop.hive.metastore.api.Table oldMsTbl, TableName newTableName)
       throws ImpalaRuntimeException {
-    String newKuduTableName = KuduUtil.getDefaultCreateKuduTableName(
-        newTableName.getDb(), newTableName.getTbl());
+    // TODO: update it to properly handle HMS integration.
+    String newKuduTableName = KuduUtil.getDefaultKuduTableName(
+        newTableName.getDb(), newTableName.getTbl(),
+        /* isHMSIntegrationEnabled= */false);
 
     // If the name of the Kudu table has not changed, do nothing
     if (oldTbl.getKuduTableName().equals(newKuduTableName)) return;

@@ -21,14 +21,12 @@ import java.util.Set;
 
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationException;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
-import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.junit.Assert;
@@ -62,10 +60,14 @@ public class AuditingTest extends FrontendTestBase {
     // Select from a view that contains a subquery.
     accessEvents = AnalyzeAccessEvents("select * from functional_rc.subquery_view");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_rc.alltypessmall", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_rc.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_rc.subquery_view", TCatalogObjectType.VIEW, "SELECT"),
-        new TAccessEvent("_impala_builtins", TCatalogObjectType.DATABASE, "VIEW_METADATA")
+        new TAccessEvent("functional_rc.alltypessmall", TCatalogObjectType.TABLE,
+            "SELECT"),
+        new TAccessEvent("functional_rc.alltypes", TCatalogObjectType.TABLE,
+            "SELECT"),
+        new TAccessEvent("functional_rc.subquery_view", TCatalogObjectType.VIEW,
+            "SELECT"),
+        new TAccessEvent("_impala_builtins", TCatalogObjectType.DATABASE,
+            "VIEW_METADATA")
         ));
 
     // Select from an inline view.
@@ -193,6 +195,13 @@ public class AuditingTest extends FrontendTestBase {
     accessEvents = AnalyzeAccessEvents("create table tpch.new_table like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("tpch.new_table", TCatalogObjectType.TABLE, "CREATE")));
+
+    accessEvents = AnalyzeAccessEvents(
+        "create table tpch.new_table as select * from functional.alltypesagg");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("tpch", TCatalogObjectType.DATABASE, "ANY"),
+        new TAccessEvent("functional.alltypesagg", TCatalogObjectType.TABLE, "SELECT"),
         new TAccessEvent("tpch.new_table", TCatalogObjectType.TABLE, "CREATE")));
   }
 
@@ -389,96 +398,5 @@ public class AuditingTest extends FrontendTestBase {
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("_impala_builtins", TCatalogObjectType.DATABASE, "VIEW_METADATA"),
         new TAccessEvent("functional.alltypesagg", TCatalogObjectType.TABLE, "SELECT")));
-  }
-
-  @Test
-  public void TestKuduStatements() throws AuthorizationException, AnalysisException {
-    TestUtils.assumeKuduIsSupported();
-    // Select
-    Set<TAccessEvent> accessEvents =
-        AnalyzeAccessEvents("select * from functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT")));
-
-    // Insert
-    accessEvents = AnalyzeAccessEvents(
-        "insert into functional_kudu.testtbl (id) select id from " +
-        "functional_kudu.alltypes");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
-
-    // Upsert
-    accessEvents = AnalyzeAccessEvents(
-        "upsert into functional_kudu.testtbl (id) select id from " +
-        "functional_kudu.alltypes");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
-
-    // Delete
-    accessEvents = AnalyzeAccessEvents(
-        "delete from functional_kudu.testtbl where id = 1");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
-
-    // Delete using a complex query
-    accessEvents = AnalyzeAccessEvents(
-        "delete c from functional_kudu.testtbl c, functional_kudu.alltypes s where " +
-        "c.id = s.id and s.int_col < 10");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
-
-    // Update
-    accessEvents = AnalyzeAccessEvents(
-        "update functional_kudu.testtbl set name = 'test' where id < 10");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
-
-    // Drop table
-    accessEvents = AnalyzeAccessEvents("drop table functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "DROP")));
-
-    // Show create table
-    accessEvents = AnalyzeAccessEvents("show create table functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
-
-    // Compute stats
-    accessEvents = AnalyzeAccessEvents("compute stats functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALTER"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT")));
-
-    // Describe
-    accessEvents = AnalyzeAccessEvents("describe functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
-
-    // Describe formatted
-    accessEvents = AnalyzeAccessEvents("describe formatted functional_kudu.testtbl");
-    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
-  }
-
-  /**
-   * Analyzes the given statement and returns the set of TAccessEvents
-   * that were captured as part of analysis.
-   */
-  private Set<TAccessEvent> AnalyzeAccessEvents(String stmt)
-      throws AuthorizationException, AnalysisException {
-    return AnalyzeAccessEvents(stmt, Catalog.DEFAULT_DB);
-  }
-
-  private Set<TAccessEvent> AnalyzeAccessEvents(String stmt, String db)
-      throws AuthorizationException, AnalysisException {
-    AnalysisContext ctx = createAnalysisCtx(db);
-    AnalyzesOk(stmt, ctx);
-    return ctx.getAnalyzer().getAccessEvents();
   }
 }

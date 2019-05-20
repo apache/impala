@@ -55,6 +55,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Assert;
 
@@ -301,6 +302,22 @@ public class FrontendTestBase extends AbstractFrontendTest {
         new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
     return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+  }
+
+  /**
+   * Analyzes the given statement and returns the set of TAccessEvents
+   * that were captured as part of analysis.
+   */
+  protected Set<TAccessEvent> AnalyzeAccessEvents(String stmt)
+      throws AuthorizationException, AnalysisException {
+    return AnalyzeAccessEvents(stmt, Catalog.DEFAULT_DB);
+  }
+
+  protected Set<TAccessEvent> AnalyzeAccessEvents(String stmt, String db)
+      throws AuthorizationException, AnalysisException {
+    AnalysisContext ctx = createAnalysisCtx(db);
+    AnalyzesOk(stmt, ctx);
+    return ctx.getAnalyzer().getAccessEvents();
   }
 
   /**
