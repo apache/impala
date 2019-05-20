@@ -48,17 +48,17 @@ show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7300,-1,4,4
-'bool_col','BOOLEAN',2,-1,1,1
-'tinyint_col','TINYINT',10,-1,1,1
-'smallint_col','SMALLINT',10,-1,2,2
-'int_col','INT',10,-1,4,4
-'bigint_col','BIGINT',10,-1,8,8
-'float_col','FLOAT',10,-1,4,4
-'double_col','DOUBLE',10,-1,8,8
-'date_string_col','STRING',736,-1,8,8
-'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7300,-1,16,16
+'id','INT',7300,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',736,0,8,8
+'string_col','STRING',10,0,1,1
+'timestamp_col','TIMESTAMP',7300,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -141,17 +141,17 @@ show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7300,-1,4,4
-'bool_col','BOOLEAN',2,-1,1,1
-'tinyint_col','TINYINT',10,-1,1,1
-'smallint_col','SMALLINT',10,-1,2,2
-'int_col','INT',10,-1,4,4
-'bigint_col','BIGINT',10,-1,8,8
-'float_col','FLOAT',10,-1,4,4
-'double_col','DOUBLE',10,-1,8,8
-'date_string_col','STRING',736,-1,8,8
-'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7300,-1,16,16
+'id','INT',7300,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',736,0,8,8
+'string_col','STRING',10,0,1,1
+'timestamp_col','TIMESTAMP',7300,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -242,17 +242,17 @@ show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',6990,-1,4,4
-'bool_col','BOOLEAN',2,-1,1,1
-'tinyint_col','TINYINT',10,-1,1,1
-'smallint_col','SMALLINT',10,-1,2,2
-'int_col','INT',10,-1,4,4
-'bigint_col','BIGINT',10,-1,8,8
-'float_col','FLOAT',10,-1,4,4
-'double_col','DOUBLE',10,-1,8,8
-'date_string_col','STRING',688,-1,8,8
-'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',6990,-1,16,16
+'id','INT',6990,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',688,0,8,8
+'string_col','STRING',10,0,1,1
+'timestamp_col','TIMESTAMP',6990,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -305,17 +305,17 @@ show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7300,-1,4,4
-'bool_col','BOOLEAN',2,-1,1,1
-'tinyint_col','TINYINT',10,-1,1,1
-'smallint_col','SMALLINT',10,-1,2,2
-'int_col','INT',10,-1,4,4
-'bigint_col','BIGINT',10,-1,8,8
-'float_col','FLOAT',10,-1,4,4
-'double_col','DOUBLE',10,-1,8,8
-'date_string_col','STRING',736,-1,8,8
-'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7300,-1,16,16
+'id','INT',7300,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',10,0,1,1
+'smallint_col','SMALLINT',10,0,2,2
+'int_col','INT',10,0,4,4
+'bigint_col','BIGINT',10,0,8,8
+'float_col','FLOAT',10,0,4,4
+'double_col','DOUBLE',10,0,8,8
+'date_string_col','STRING',736,0,8,8
+'string_col','STRING',10,0,1,1
+'timestamp_col','TIMESTAMP',7300,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -546,14 +546,14 @@ show column stats chars_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',2915,-1,4,4
-'ch1','CHAR(1)',1,-1,1,1
-'ch2','CHAR(8)',10,-1,8,8
-'ch3','CHAR(20)',10,-1,8,8
-'ts','TIMESTAMP',2871,-1,16,16
-'vc1','VARCHAR(1)',1,-1,1,1
-'vc2','VARCHAR(8)',10,-1,8,8
-'vc3','VARCHAR(20)',10,-1,8,8
+'id','INT',2915,0,4,4
+'ch1','CHAR(1)',1,0,1,1
+'ch2','CHAR(8)',10,0,8,8
+'ch3','CHAR(20)',10,0,8,8
+'ts','TIMESTAMP',2871,0,16,16
+'vc1','VARCHAR(1)',1,0,1,1
+'vc2','VARCHAR(8)',10,0,8,8
+'vc3','VARCHAR(20)',10,0,8,8
 'year','CHAR(5)',1,0,5,5
 'day','VARCHAR(13)',3,1,-1,-1
 ---- TYPES
@@ -576,14 +576,14 @@ show column stats chars_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',2915,0,4,4
-'ch1','CHAR(1)',2,-1,1,1
-'ch2','CHAR(8)',11,-1,8,7.99766731262207
-'ch3','CHAR(20)',11,-1,8,7.99766731262207
-'ts','TIMESTAMP',2871,0,16,16
-'vc1','VARCHAR(1)',2,-1,1,1
-'vc2','VARCHAR(8)',11,-1,8,7.99766731262207
-'vc3','VARCHAR(20)',11,-1,8,7.99766731262207
+'id','INT',2915,1,4,4
+'ch1','CHAR(1)',2,0,1,1
+'ch2','CHAR(8)',11,0,8,7.99766731262207
+'ch3','CHAR(20)',11,0,8,7.99766731262207
+'ts','TIMESTAMP',2871,1,16,16
+'vc1','VARCHAR(1)',2,0,1,1
+'vc2','VARCHAR(8)',11,0,8,7.99766731262207
+'vc3','VARCHAR(20)',11,0,8,7.99766731262207
 'year','CHAR(5)',2,0,5,5
 'day','VARCHAR(13)',4,1,-1,-1
 ---- TYPES

@@ -140,7 +140,7 @@ struct PerColumnStats {
   double avg_width;
 
   PerColumnStats()
-      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(-1),
+      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
         max_width(0), num_rows(0), avg_width(0) { }
 
   // Updates all aggregate statistics with a new set of measurements.
@@ -150,11 +150,11 @@ struct PerColumnStats {
     DCHECK_GE(num_new_rows, 0);
     DCHECK_GE(max_new_width, 0);
     DCHECK_GE(new_avg_width, 0);
-    DCHECK_GE(num_new_nulls, -1);
+    DCHECK_GE(num_new_nulls, 0);
     for (int j = 0; j < ndv.size(); ++j) {
       intermediate_ndv[j] = ::max(intermediate_ndv[j], ndv[j]);
     }
-    if (num_new_nulls >= 0) num_nulls += num_new_nulls;
+    num_nulls += num_new_nulls;
     max_width = ::max(max_width, max_new_width);
     avg_width += (new_avg_width * num_new_rows);
     num_rows += num_new_rows;
