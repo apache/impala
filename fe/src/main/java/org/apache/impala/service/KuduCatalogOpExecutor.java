@@ -74,6 +74,8 @@ public class KuduCatalogOpExecutor {
   static void createManagedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       TCreateTableParams params) throws ImpalaRuntimeException {
     Preconditions.checkState(!Table.isExternalTable(msTbl));
+    Preconditions.checkState(
+        msTbl.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     if (LOG.isTraceEnabled()) {
@@ -91,7 +93,15 @@ public class KuduCatalogOpExecutor {
       }
       Schema schema = createTableSchema(params);
       CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
-      kudu.createTable(kuduTableName, schema, tableOpts);
+      org.apache.kudu.client.KuduTable table =
+          kudu.createTable(kuduTableName, schema, tableOpts);
+      // Populate table ID from Kudu table if Kudu's integration with the Hive
+      // Metastore is enabled.
+      if (KuduTable.isHMSIntegrationEnabled(masterHosts)) {
+        String tableId = table.getTableId();
+        Preconditions.checkNotNull(tableId);
+        msTbl.getParameters().put(KuduTable.KEY_TABLE_ID, tableId);
+      }
     } catch (Exception e) {
       throw new ImpalaRuntimeException(String.format("Error creating Kudu table '%s'",
           kuduTableName), e);
@@ -227,6 +237,9 @@ public class KuduCatalogOpExecutor {
       }
       tableOpts.setNumReplicas(parsedReplicas);
     }
+
+    // Set the table's owner.
+    tableOpts.setOwner(msTbl.getOwner());
     return tableOpts;
   }
 
@@ -263,12 +276,17 @@ public class KuduCatalogOpExecutor {
 
   /**
    * Reads the column definitions from a Kudu table and populates 'msTbl' with
-   * an equivalent schema. Throws an exception if any errors are encountered.
+   * an equivalent schema for external tables. Throws an exception if any errors
+   * are encountered.
    */
-  public static void populateColumnsFromKudu(
+  public static void populateExternalTableColsFromKudu(
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
     org.apache.hadoop.hive.metastore.api.Table msTblCopy = msTbl.deepCopy();
     List<FieldSchema> cols = msTblCopy.getSd().getCols();
+    // External table should not have table ID.
+    Preconditions.checkState(Table.isExternalTable(msTbl));
+    Preconditions.checkState(
+        msTblCopy.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTblCopy.getParameters().get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
     String masterHosts = msTblCopy.getParameters().get(KuduTable.KEY_MASTER_HOSTS);

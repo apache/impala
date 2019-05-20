@@ -107,6 +107,9 @@ class SkipIfKudu:
   no_hybrid_clock = pytest.mark.skipif(
       get_kudu_master_flag("--use_hybrid_clock") == "false",
       reason="Test relies on --use_hybrid_clock=true in Kudu.")
+  hms_integration_enabled = pytest.mark.skipif(
+      get_kudu_master_flag("--hive_metastore_uris") != "",
+      reason="Test assumes Kudu/HMS integration is not enabled.")
 
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,

@@ -1888,9 +1888,19 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Creates a new Kudu table. The Kudu table is first created in the Kudu storage engine
-   * (only applicable to managed tables), then in HMS and finally in the catalog cache.
-   * Failure to add the table in HMS results in the table being dropped from Kudu.
+   * Creates a new Kudu table.
+   *
+   * For managed tables:
+   *  1. If Kudu's integration with the Hive Metastore is not enabled, the Kudu
+   *     table is first created in Kudu, then in the HMS.
+   *  2. Otherwise, when the table is created in Kudu, we rely on Kudu to have
+   *     created the table in the HMS.
+   * For external tables:
+   *  1. We only create the table in the HMS (regardless of Kudu's integration
+   *     with the Hive Metastore).
+   *
+   * After the above is complete, we create the table in the catalog cache.
+   *
    * 'response' is populated with the results of this operation. Returns true if a new
    * table was created as part of this call, false otherwise.
    */
@@ -1898,16 +1908,36 @@ public class CatalogOpExecutor {
       TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(KuduTable.isKuduTable(newTable));
     if (Table.isExternalTable(newTable)) {
-      KuduCatalogOpExecutor.populateColumnsFromKudu(newTable);
+      KuduCatalogOpExecutor.populateExternalTableColsFromKudu(newTable);
     } else {
       KuduCatalogOpExecutor.createManagedTable(newTable, params);
     }
+    boolean createsHMSTable;
+    if (Table.isExternalTable(newTable)) {
+      createsHMSTable = true;
+    } else {
+      String masterHosts = newTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+      String hmsUris;
+      // Check if Kudu's integration with the Hive Metastore is enabled for
+      // managed tables, and validate the configuration.
+      try {
+        hmsUris = MetaStoreUtil.getHiveMetastoreUrisKeyValue(
+            catalog_.getMetaStoreClient().getHiveClient());
+      } catch (Exception e) {
+        throw new RuntimeException(String.format("Failed to get the Hive Metastore " +
+            "configuration for table '%s' ", newTable.getTableName()), e);
+      }
+      createsHMSTable =
+         !KuduTable.isHMSIntegrationEnabledAndValidate(masterHosts, hmsUris);
+    }
     try {
-      // Add the table to the HMS and the catalog cache. Aquire metastoreDdlLock_ to
+      // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
       synchronized (metastoreDdlLock_) {
-        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-          msClient.getHiveClient().createTable(newTable);
+        if (createsHMSTable) {
+          try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+            msClient.getHiveClient().createTable(newTable);
+          }
         }
         // Add the table to the catalog cache
         Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());

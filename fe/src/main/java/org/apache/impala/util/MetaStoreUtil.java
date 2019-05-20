@@ -83,6 +83,11 @@ public class MetaStoreUtil {
   public static final String DEFAULT_NULL_PARTITION_KEY_VALUE =
       "__HIVE_DEFAULT_PARTITION__";
 
+  // The configuration key represents thrift URI for the remote Hive Metastore.
+  public static final String HIVE_METASTORE_URIS_KEY = "hive.metastore.uris";
+  // The default value for the above configuration key.
+  public static final String DEFAULT_HIVE_METASTORE_URIS = "";
+
   static {
     // Get the value from the Hive configuration, if present.
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
@@ -109,6 +114,15 @@ public class MetaStoreUtil {
       throws ConfigValSecurityException, TException {
     return client.getConfigValue(
         NULL_PARTITION_KEY_VALUE_CONF_KEY, DEFAULT_NULL_PARTITION_KEY_VALUE);
+  }
+
+  /**
+   * Return the value of thrift URI for the remote Hive Metastore.
+   */
+  public static String getHiveMetastoreUrisKeyValue(IMetaStoreClient client)
+      throws ConfigValSecurityException, TException {
+    return client.getConfigValue(
+        HIVE_METASTORE_URIS_KEY, DEFAULT_HIVE_METASTORE_URIS);
   }
 
   /**

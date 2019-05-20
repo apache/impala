@@ -17,7 +17,10 @@
 
 package org.apache.impala.catalog;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -114,6 +117,13 @@ public class KuduTable extends Table implements FeKuduTable {
     super(msTable, db, name, owner);
     kuduTableName_ = msTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
     kuduMasters_ = msTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+    if (kuduTableName_ == null || kuduTableName_.isEmpty()) {
+      // When 'kudu.table_name' property is empty, it implies Kudu/HMS
+      // integration is enabled.
+      // TODO: remove this hack once Kudu support 'kudu.table_name'
+      // property with the new storage handler.
+      populateDefaultTableName(msTable, /* isHMSIntegrationEnabled */true);
+    }
   }
 
   @Override
@@ -156,6 +166,17 @@ public class KuduTable extends Table implements FeKuduTable {
   }
 
   /**
+   * Populates the default table name.
+   */
+  private void populateDefaultTableName(
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      boolean isHMSIntegrationEnabled) {
+    kuduTableName_ = KuduUtil.getDefaultKuduTableName(
+        msTbl.getDbName(), msTbl.getTableName(), isHMSIntegrationEnabled);
+    msTbl.getParameters().put(KuduTable.KEY_TABLE_NAME, kuduTableName_);
+  }
+
+  /**
    * Get the Hive Metastore configuration from Kudu masters.
    */
   private static HiveMetastoreConfig getHiveMetastoreConfig(String kuduMasters)
@@ -181,6 +202,61 @@ public class KuduTable extends Table implements FeKuduTable {
   public static boolean isHMSIntegrationEnabled(String kuduMasters)
       throws ImpalaRuntimeException {
     return getHiveMetastoreConfig(kuduMasters) != null;
+  }
+
+  /**
+   * Check with the Kudu master to see if its Kudu-HMS integration is enabled;
+   * if so, validate that it is integrated with the same Hive Metastore that
+   * Impala is configured to use.
+   */
+  public static boolean isHMSIntegrationEnabledAndValidate(String kuduMasters,
+      String hmsUris) throws ImpalaRuntimeException {
+    Preconditions.checkNotNull(hmsUris);
+    // Skip validation if the HMS URIs in impala is empty for some reason.
+    // TODO: Is this a valid case?
+    if (hmsUris.isEmpty()) {
+      return true;
+    }
+    HiveMetastoreConfig hmsConfig = getHiveMetastoreConfig(kuduMasters);
+    if (hmsConfig == null) {
+      return false;
+    }
+    // Validate Kudu is configured to use the same HMS as Impala. We consider
+    // it is the case as long as Kudu and Impala are configured to talk to
+    // the HMS with the same host address(es).
+    final String kuduHmsUris = hmsConfig.getHiveMetastoreUris();
+    Set<String> hmsHosts;
+    Set<String> kuduHmsHosts;
+    try {
+      hmsHosts = parseHosts(hmsUris);
+      kuduHmsHosts = parseHosts(kuduHmsUris);
+    } catch (URISyntaxException e) {
+      throw new ImpalaRuntimeException(
+          String.format("Error parsing URI: %s", e.getMessage()));
+    }
+    if (hmsHosts != null && kuduHmsHosts != null && hmsHosts.equals(kuduHmsHosts)) {
+      return true;
+    }
+    throw new ImpalaRuntimeException(
+       String.format("Kudu is integrated with a different Hive Metastore " +
+           "than that used by Impala, Kudu is configured to use the HMS: " +
+           "%s, while Impala is configured to use the HMS: %s",
+           kuduHmsUris, hmsUris));
+  }
+
+  /**
+   * Parse the given URIs and return a set of hosts in the URIs.
+   */
+  private static Set<String> parseHosts(String uris) throws URISyntaxException {
+    String[] urisString = uris.split(",");
+    Set<String> parsedHosts = new HashSet<>();
+
+    for (String s : urisString) {
+      s.trim();
+      URI tmpUri = new URI(s);
+      parsedHosts.add(tmpUri.getHost());
+    }
+    return parsedHosts;
   }
 
   /**
@@ -225,8 +301,11 @@ public class KuduTable extends Table implements FeKuduTable {
       msTable_ = msTbl.deepCopy();
       kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
       if (kuduTableName_ == null || kuduTableName_.isEmpty()) {
-        throw new TableLoadingException("No " + KuduTable.KEY_TABLE_NAME +
-            " property found for Kudu table " + kuduTableName_);
+        // When 'kudu.table_name' property is empty, it implies Kudu/HMS
+        // integration is enabled.
+        // TODO: remove this hack once Kudu support 'kudu.table_name'
+        // property with the new storage handler.
+        populateDefaultTableName(msTable_, /* isHMSIntegrationEnabled */true);
       }
       kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
       if (kuduMasters_ == null || kuduMasters_.isEmpty()) {
@@ -274,16 +353,23 @@ public class KuduTable extends Table implements FeKuduTable {
     Preconditions.checkNotNull(kuduTable);
     clearColumns();
     primaryKeyColumnNames_.clear();
+    boolean isHMSIntegrationEnabled = KuduTable.isHMSIntegrationEnabled(kuduMasters_);
     List<FieldSchema> cols = msTable_.getSd().getCols();
-    cols.clear();
+    if (!isHMSIntegrationEnabled) {
+      cols.clear();
+    }
+
     int pos = 0;
     kuduSchema_ = kuduTable.getSchema();
     for (ColumnSchema colSchema: kuduSchema_.getColumns()) {
       KuduColumn kuduCol = KuduColumn.fromColumnSchema(colSchema, pos);
       Preconditions.checkNotNull(kuduCol);
-      // Add the HMS column
-      cols.add(new FieldSchema(kuduCol.getName(), kuduCol.getType().toSql().toLowerCase(),
-          null));
+      // Only update the HMS column definition when Kudu/HMS integration
+      // is disabled.
+      if (!isHMSIntegrationEnabled) {
+        cols.add(new FieldSchema(kuduCol.getName(),
+            kuduCol.getType().toSql().toLowerCase(), null));
+      }
       if (kuduCol.isKey()) primaryKeyColumnNames_.add(kuduCol.getName());
       addColumn(kuduCol);
       ++pos;

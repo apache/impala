@@ -39,6 +39,7 @@ NUM_COORDINATORS = DEFAULT_CLUSTER_SIZE
 IMPALAD_ARGS = 'impalad_args'
 STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
+KUDU_ARGS = 'kudu_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
 SENTRY_CONFIG = 'sentry_config'
@@ -101,7 +102,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
       start_args=None, sentry_config=None, default_query_options=None,
       impala_log_dir=None, sentry_log_dir=None, cluster_size=None,
-      num_exclusive_coordinators=None):
+      num_exclusive_coordinators=None, kudu_args=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -120,6 +121,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[SENTRY_CONFIG] = sentry_config
       if sentry_log_dir is not None:
         func.func_dict[SENTRY_LOG_DIR] = sentry_log_dir
+      if kudu_args is not None:
+        func.func_dict[KUDU_ARGS] = kudu_args
       if default_query_options is not None:
         func.func_dict[DEFAULT_QUERY_OPTIONS] = default_query_options
       if impala_log_dir is not None:
@@ -138,6 +141,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:
       cluster_args.extend(method.func_dict[START_ARGS])
+
+    if KUDU_ARGS in method.func_dict:
+      self._restart_kudu_service(method.func_dict[KUDU_ARGS])
 
     if SENTRY_CONFIG in method.func_dict:
       self._start_sentry_service(method.func_dict[SENTRY_CONFIG],
@@ -176,6 +182,19 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     sleep(2)
     check_call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'), '--kill_only'])
     sleep(2)
+
+  @classmethod
+  def _restart_kudu_service(cls, kudu_args=None):
+    kudu_env = dict(os.environ)
+    if kudu_args is not None:
+      kudu_env["IMPALA_KUDU_STARTUP_FLAGS"] = kudu_args
+    call = subprocess.Popen(
+        ['/bin/bash', '-c', os.path.join(IMPALA_HOME,
+                                         'testdata/cluster/admin restart kudu')],
+        env=kudu_env)
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError("Unable to restart Kudu")
 
   @classmethod
   def _start_sentry_service(cls, sentry_service_config, sentry_log_dir=None):

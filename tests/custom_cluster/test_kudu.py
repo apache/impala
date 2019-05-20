@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+import os
 import pytest
 from kudu.schema import INT32
 
@@ -44,6 +45,7 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=\
       "--use_local_tz_for_unix_timestamp_conversions=true")
   @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.hms_integration_enabled
   def test_local_tz_conversion_ops(self, vector, unique_database):
     """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
        use_local_tz_for_unix_timestamp_conversions flag."""
@@ -53,6 +55,7 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_master_hosts=")
+  @SkipIfKudu.hms_integration_enabled
   def test_kudu_master_hosts(self, cursor, kudu_client):
     """Check behavior when -kudu_master_hosts is not provided to catalogd."""
     with self.temp_kudu_table(kudu_client, [INT32]) as kudu_table:
@@ -74,6 +77,7 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_error_buffer_size=1024")
+  @SkipIfKudu.hms_integration_enabled
   def test_error_buffer_size(self, cursor, unique_database):
     """Check that queries fail if the size of the Kudu client errors they generate is
     greater than kudu_error_buffer_size."""
@@ -104,6 +108,84 @@ class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_operation_timeout_ms=1")
+  @SkipIfKudu.hms_integration_enabled
   def test_impalad_timeout(self, vector):
     """Check impalad behavior when -kudu_operation_timeout_ms is too low."""
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
+
+
+class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
+  """Tests the different DDL operations when using a kudu table with Kudu's integration
+     with the Hive Metastore."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_create_managed_kudu_tables(self, vector, unique_database):
+    """Tests the Create table operation when using a kudu table with Kudu's integration
+       with the Hive Metastore for managed tables."""
+    vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
+    self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_implicit_external_table_props(self, cursor, kudu_client):
+    """Check that table properties added internally for external table during
+       table creation are as expected.
+    """
+    db_name = cursor.conn.db_name
+    with self.temp_kudu_table(kudu_client, [INT32], db_name=db_name) as kudu_table:
+      impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
+      external_table_name = "%s_external" % impala_table_name
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
+          external_table_name, props))
+      with self.drop_impala_table_after_context(cursor, external_table_name):
+        cursor.execute("DESCRIBE FORMATTED %s" % external_table_name)
+        table_desc = [[col.strip() if col else col for col in row] for row in cursor]
+        # Pytest shows truncated output on failure, so print the details just in case.
+        LOG.info(table_desc)
+        assert not any("kudu.table_id" in s for s in table_desc)
+        assert any("Owner:" in s for s in table_desc)
+        assert ["", "EXTERNAL", "TRUE"] in table_desc
+        assert ["", "kudu.master_addresses", KUDU_MASTER_HOSTS] in table_desc
+        assert ["", "kudu.table_name", kudu_table.name] in table_desc
+        assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
+            in table_desc
+
+  @pytest.mark.execute_serially
+  def test_implicit_managed_table_props(self, cursor, kudu_client, unique_database):
+    """Check that table properties added internally for managed table during table
+       creation are as expected.
+    """
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+      KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    cursor.execute("DESCRIBE FORMATTED %s.foo" % unique_database)
+    table_desc = [[col.strip() if col else col for col in row] for row in cursor]
+    # Pytest shows truncated output on failure, so print the details just in case.
+    LOG.info(table_desc)
+    assert not any("EXTERNAL" in s for s in table_desc)
+    assert any("Owner:" in s for s in table_desc)
+    assert any("kudu.table_id" in s for s in table_desc)
+    assert any("kudu.master_addresses" in s for s in table_desc)
+    assert ["Table Type:", "MANAGED_TABLE", None] in table_desc
+    assert ["", "kudu.table_name", "%s.foo" % unique_database] in table_desc
+    assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
+        in table_desc
+
+  @classmethod
+  def setup_class(cls):
+    # Restart Kudu cluster with HMS integration enabled
+    KUDU_ARGS = "-hive_metastore_uris=thrift://%s" % os.environ['INTERNAL_LISTEN_HOST']
+    cls._restart_kudu_service(KUDU_ARGS)
+    super(TestKuduHMSIntegration, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    # Restart Kudu cluster with HMS integration disabled
+    cls._restart_kudu_service("-hive_metastore_uris=")
+    super(TestKuduHMSIntegration, cls).teardown_class()
