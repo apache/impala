@@ -160,7 +160,7 @@ under the License.
       CDP does not use maven SNAPSHOT versions - every build has a version number.
       -->
       <id>impala.cdp.repo</id>
-      <url>https://${env.IMPALA_TOOLCHAIN_HOST}/build/cdp_components/${env.CDP_BUILD_NUMBER}/maven</url>
+      <url>${env.CDP_MAVEN_REPOSITORY}</url>
       <name>Impala CDP Repository</name>
       <snapshots>
         <enabled>false</enabled>
@@ -172,7 +172,7 @@ under the License.
       CDH uses maven SNAPSHOT versions for non-released versions of components.
       -->
       <id>impala.cdh.repo</id>
-      <url>https://${env.IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${env.CDH_BUILD_NUMBER}/maven</url>
+      <url>${env.CDH_MAVEN_REPOSITORY}</url>
       <name>Impala CDH Repository</name>
       <snapshots>
         <enabled>true</enabled>

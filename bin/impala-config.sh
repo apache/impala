@@ -168,19 +168,28 @@ fi
 export IMPALA_TOOLCHAIN_HOST
 export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=1173663
-export CDP_BUILD_NUMBER=1352353
+export CDH_MAVEN_REPOSITORY=\
+"https://${IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${CDH_BUILD_NUMBER}/maven"
 export CDH_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
+export CDH_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
+export CDH_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
+export CDH_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
+
+export CDP_BUILD_NUMBER=1352353
+export CDP_MAVEN_REPOSITORY=\
+"https://${IMPALA_TOOLCHAIN_HOST}/build/cdp_components/${CDP_BUILD_NUMBER}/maven"
 export CDP_HADOOP_VERSION=3.1.1.7.1.0.0-33
-export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export IMPALA_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export IMPALA_RANGER_VERSION=1.2.0.7.1.0.0-33
+export CDP_HBASE_VERSION=2.2.0.7.1.0.0-33
+export CDP_HIVE_VERSION=3.1.0.7.1.0.0-33
+export CDP_RANGER_VERSION=1.2.0.7.1.0.0-33
+export CDP_TEZ_VERSION=0.9.1.7.1.0.0-33
+export CDP_KNOX_VERSION=1.0.0.7.1.0.0-33
+
 export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export IMPALA_KUDU_JAVA_VERSION=1.10.0-cdh6.x-SNAPSHOT
-export CDH_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
-export CDP_HIVE_VERSION=3.1.0.7.1.0.0-33
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -200,6 +209,18 @@ if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
 fi
 
+export CDH_HIVE_URL=${CDH_HIVE_URL-}
+export CDH_HADOOP_URL=${CDH_HADOOP_URL-}
+export CDH_HBASE_URL=${CDH_HBASE_URL-}
+export CDH_SENTRY_URL=${CDH_SENTRY_URL-}
+
+export CDP_HIVE_URL=${CDP_HIVE_URL-}
+export CDP_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
+export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
+export CDP_HBASE_URL=${CDP_HBASE_URL-}
+export CDP_TEZ_URL=${CDP_TEZ_URL-}
+export CDP_RANGER_URL=${CDP_RANGER_URL-}
+
 export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 export USE_CDP_HIVE=${USE_CDP_HIVE-false}
@@ -207,17 +228,36 @@ if $USE_CDP_HIVE; then
   # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
   # the minicluster
   export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
-  export IMPALA_TEZ_VERSION=0.9.1.7.1.0.0-33
-  export IMPALA_KNOX_VERSION=1.0.0.7.1.0.0-33
+  export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
+  export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
   export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
-  export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${CDP_HADOOP_VERSION}/"
+  export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
+  export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
+  export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
+  export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
+  export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
+  export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
+  export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 else
   # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
   # false
   export IMPALA_HIVE_VERSION=${CDH_HIVE_VERSION}
+  export IMPALA_HIVE_URL=${CDH_HIVE_URL-}
   export IMPALA_HADOOP_VERSION=${CDH_HADOOP_VERSION}
+  export IMPALA_HADOOP_URL=${CDH_HADOOP_URL-}
+  export IMPALA_HBASE_VERSION=${CDH_HBASE_VERSION}
+  export IMPALA_HBASE_URL=${CDH_HBASE_URL-}
   export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 fi
+
+# Ranger always uses the CDP version
+export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
+export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
+
+# Sentry always uses the CDH version
+export IMPALA_SENTRY_VERSION=${CDH_SENTRY_VERSION}
+export IMPALA_SENTRY_URL=${CDH_SENTRY_URL-}
+
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
 # a complete Hive build. This is used by fe/pom.xml to activate compatibility shims
@@ -320,17 +360,19 @@ if $USE_CDP_HIVE; then
 ${IMPALA_HIVE_VERSION}"}
   # Set the path to the hive_metastore.thrift which is used to build thrift code
   export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
+  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
+  export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
   # It is likely that devs will want to work with both the versions of metastore
   # if cdp hive is being used change the metastore db name, so we don't have to
   # format the metastore db everytime we switch between hive versions
   export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
-  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 else
   export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}"
   # Allow overriding of Hive source location in case we want to build Impala without
 # a complete Hive build.
   export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
   export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/metastore/if
+  export HBASE_HOME="$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
   export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
 fi
 # Set the Hive binaries in the path
@@ -593,7 +635,6 @@ export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-export HBASE_HOME="$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
 export PATH="$HBASE_HOME/bin:$PATH"
 
 # Add the jars so hive can create hbase tables.
