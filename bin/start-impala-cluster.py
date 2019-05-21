@@ -557,6 +557,13 @@ class DockerMiniClusterOperations(object):
     conf_dir = os.path.join(IMPALA_HOME, "fe/src/test/resources/")
     mount_args = ["--mount", "type=bind,src={0},dst=/opt/impala/conf".format(conf_dir)]
 
+    # Collect container logs in a unique subdirectory per daemon to avoid any potential
+    # interaction between containers, which should be isolated.
+    log_dir = os.path.join(IMPALA_HOME, options.log_dir, host_name)
+    if not os.path.isdir(log_dir):
+      os.makedirs(log_dir)
+    mount_args += ["--mount", "type=bind,src={0},dst=/opt/impala/logs".format(log_dir)]
+
     # Allow loading LZO plugin, if built.
     lzo_lib_dir = os.path.join(IMPALA_LZO, "build")
     if os.path.isdir(lzo_lib_dir):

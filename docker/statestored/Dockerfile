@@ -21,4 +21,5 @@ FROM impala_base
 # Debug webserver
 EXPOSE 25010
 
-ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/statestored"]
+ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/statestored",\
+     "-log_dir=/opt/impala/logs"]

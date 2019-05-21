@@ -33,5 +33,7 @@ COPY www /opt/impala/www
 COPY kudu /opt/kudu
 # Create conf directory for later config injection.
 RUN mkdir /opt/impala/conf
+# Create logs directory to collect container logs.
+RUN mkdir /opt/impala/logs
 
 WORKDIR /opt/impala/
