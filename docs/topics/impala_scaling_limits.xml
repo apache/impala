@@ -64,24 +64,17 @@ under the License.
           Number of Impalad Executors
           <ul>
             <li>
-              80 nodes in CDH 5.14 and lower
+              80 nodes in <keyword keyref="impala211"/> and lower
             </li>
 
             <li>
-              150 nodes in CDH 5.15 and higher
+              150 nodes in <keyword keyref="impala212"/> and higher
             </li>
           </ul>
         </li>
 
         <li>
           Number of Impalad Coordinators: 1 coordinator for at most every 50 executors
-          <p>
-            See
-            <xref
-              href="https://www.cloudera.com/documentation/enterprise/6/6.2/topics/impala_dedicated_coordinator.html#concept_vhv_4b1_n2b"
-              format="html" scope="external">Dedicated
-            Coordinators</xref> for details.
-          </p>
         </li>
 
         <li audience="hidden">
@@ -189,7 +182,7 @@ under the License.
               <p>
                 See
                 <xref
-                  href="https://www.cloudera.com/documentation/enterprise/latest/topics/kudu_limitations.html"
+                  href="https://kudu.apache.org/docs/known_issues.html"
                   format="html" scope="external">Kudu
                 Usage Limitations</xref> for more information.
               </p>
