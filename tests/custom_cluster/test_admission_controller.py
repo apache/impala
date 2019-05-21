@@ -33,7 +33,7 @@ from beeswaxd.BeeswaxService import QueryState
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import build_flavor_timeout, IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import (
@@ -1172,7 +1172,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
     # Additional constraints for code coverage jobs and core.
     num_queries = None
-    if IMPALA_TEST_CLUSTER_PROPERTIES.has_code_coverage():
+    if ImpalaTestClusterProperties.get_instance().has_code_coverage():
       # Code coverage builds can't handle the increased concurrency.
       num_queries = 15
     elif cls.exploration_strategy() == 'core':

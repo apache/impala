@@ -14,7 +14,6 @@
 from subprocess import check_call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -117,7 +116,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     # Impala's refresh didn't alter Hive's knowledge of the partition
     assert [] == self.hive_partition_names(table_name)
 
-  def test_add_data_and_refresh(self, vector, unique_database):
+  def test_add_data_and_refresh(self, vector, unique_database, cluster_properties):
     """
     Data added through hive is visible in impala after refresh of partition.
     """
@@ -135,7 +134,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     # Make sure its still shows the same result before refreshing
     result = self.client.execute("select count(*) from %s" % table_name)
     valid_counts = [0]
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+    if cluster_properties.is_catalog_v2_cluster():
       # HMS notifications may pick up added partition racily.
       valid_counts.append(1)
     assert int(result.data[0]) in valid_counts

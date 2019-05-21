@@ -24,7 +24,7 @@ import os
 import pytest
 from functools import partial
 
-from tests.common.environ import (IMPALA_TEST_CLUSTER_PROPERTIES,
+from tests.common.environ import (ImpalaTestClusterProperties,
     IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL, HIVE_MAJOR_VERSION)
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
@@ -37,6 +37,7 @@ from tests.util.filesystem_utils import (
     IS_S3,
     SECONDARY_FILESYSTEM)
 
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 class SkipIfS3:
 
@@ -167,10 +168,11 @@ class SkipIfLocal:
 
 class SkipIfNotHdfsMinicluster:
   # These are skipped when not running against a local HDFS mini-cluster.
-  plans = pytest.mark.skipif(not IS_HDFS or pytest.config.option.testing_remote_cluster,
+  plans = pytest.mark.skipif(
+      not IS_HDFS or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test assumes plans from local HDFS mini-cluster")
   tuned_for_minicluster = pytest.mark.skipif(
-      not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,
+      not IS_HDFS or IS_EC or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
   scheduling = pytest.mark.skipif(
       not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,

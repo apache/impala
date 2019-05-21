@@ -26,7 +26,7 @@ import time
 from urllib2 import urlopen
 
 from ImpalaService import ImpalaHiveServer2Service
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
     operation_id_to_query_id, create_session_handle_without_secret,
@@ -39,7 +39,7 @@ SQLSTATE_GENERAL_ERROR = "HY000"
 
 class TestHS2(HS2TestSuite):
   def setup_method(self, method):
-    # Keep track of extra session handless opened by _open_extra_session.
+    # Keep track of extra session handles opened by _open_extra_session.
     self.__extra_sessions = []
 
   def teardown_method(self, method):
@@ -473,7 +473,8 @@ class TestHS2(HS2TestSuite):
         assert table_schema == "default"
         assert table_name == table
         assert table_type == "TABLE"
-        if i == 0 and not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+        if (i == 0 and
+              not ImpalaTestClusterProperties.get_instance().is_catalog_v2_cluster()):
           # IMPALA-7587: comments not returned for non-loaded tables with legacy catalog.
           assert table_remarks == ""
         else:

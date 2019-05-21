@@ -29,13 +29,14 @@ import random
 import string
 from subprocess import call
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES, HIVE_MAJOR_VERSION
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
+
 
 @SkipIfS3.hive
 @SkipIfABFS.hive
@@ -56,14 +57,14 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @pytest.mark.execute_serially
-  def test_sanity(self, vector):
+  def test_sanity(self, vector, cluster_properties):
     """Verifies that creating a catalog entity (database, table) in Impala using
     'IF NOT EXISTS' while the entity exists in HMS, does not throw an error."""
     # Create a database in Hive
     self.run_stmt_in_hive("drop database if exists hms_sanity_db cascade")
     self.run_stmt_in_hive("create database hms_sanity_db")
     # Make sure Impala's metadata is in sync.
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+    if cluster_properties.is_catalog_v2_cluster():
       # Using local catalog + HMS event processor - wait until the database shows up.
       self.wait_for_db_to_appear("hms_sanity_db", timeout_s=30)
     else:
@@ -86,7 +87,7 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     self.client.execute("create table if not exists hms_sanity_db.test_tbl (a int)")
     # The table should not appear in the catalog for catalog_v1 unless invalidate
     # metadata is executed.
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+    if cluster_properties.is_catalog_v2_cluster():
       self.wait_for_table_to_appear("hms_sanity_db", "test_tbl", 10)
       assert 'test_tbl' in self.client.execute("show tables in hms_sanity_db").data
     else:

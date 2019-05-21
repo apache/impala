@@ -21,7 +21,6 @@ import pytest
 import re
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfIsilon, SkipIfS3, SkipIfABFS, SkipIfADLS,
                                SkipIfLocal, SkipIfCatalogV2)
@@ -158,7 +157,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @pytest.mark.execute_serially  # because of use of hardcoded database
-  def test_describe_db(self, vector):
+  def test_describe_db(self, vector, cluster_properties):
     self.__test_describe_db_cleanup()
     try:
       self.client.execute("create database impala_test_desc_db1")
@@ -170,7 +169,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                           "location \"" + get_fs_path("/test2.db") + "\"")
       self.run_stmt_in_hive("create database hive_test_desc_db comment 'test comment' "
                            "with dbproperties('pi' = '3.14', 'e' = '2.82')")
-      if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      if cluster_properties.is_catalog_v2_cluster():
         # Using local catalog + HMS event processor - wait until the database shows up.
         self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
       else:

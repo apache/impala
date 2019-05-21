@@ -18,7 +18,7 @@
 import pytest
 from subprocess import check_call
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
@@ -28,6 +28,9 @@ from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from CatalogObjects.ttypes import THdfsCompression
+
+
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
@@ -52,8 +55,8 @@ class TestComputeStats(ImpalaTestSuite):
 
   @SkipIfLocal.hdfs_blocks
   @SkipIfS3.eventually_consistent
-  def test_compute_stats_avro(self, vector, unique_database):
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+  def test_compute_stats_avro(self, vector, unique_database, cluster_properties):
+    if cluster_properties.is_catalog_v2_cluster():
       # IMPALA-7308: changed behaviour of various Avro edge cases significantly in the
       # local catalog - the expected behaviour is different.
       self.run_test_case('QueryTest/compute-stats-avro-catalog-v2', vector,
@@ -228,13 +231,13 @@ class TestHbaseComputeStats(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'hbase')
 
-  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+  @pytest.mark.xfail(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
                      reason=("Setting up HBase tests currently assumes a local "
                              "mini-cluster. See IMPALA-4661."))
   def test_hbase_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/hbase-compute-stats', vector, unique_database)
 
-  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+  @pytest.mark.xfail(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
                      reason=("Setting up HBase tests currently assumes a local "
                              "mini-cluster. See IMPALA-4661."))
   def test_hbase_compute_stats_incremental(self, vector, unique_database):

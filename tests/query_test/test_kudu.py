@@ -37,7 +37,7 @@ import time
 from datetime import datetime
 from pytz import utc
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu
@@ -45,6 +45,7 @@ from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 LOG = logging.getLogger(__name__)
 
@@ -119,6 +120,8 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
 
+  @pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+                      reason="Test references hardcoded hostnames: IMPALA-4873")
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock
   @SkipIfKudu.hms_integration_enabled
@@ -160,7 +163,8 @@ class TestKuduOperations(KuduTestSuite):
               assert kudu_client.table_exists(
                   KuduTestSuite.to_kudu_table_name(unique_database, impala_tbl_name))
 
-  def test_kudu_col_changed(self, cursor, kudu_client, unique_database):
+  def test_kudu_col_changed(
+      self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a Kudu column outside of Impala results in a failure on read with
        outdated metadata (IMPALA-4828)."""
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
@@ -190,10 +194,10 @@ class TestKuduOperations(KuduTestSuite):
     # Scanning should result in an error with Catalog V1, since the metadata is cached.
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert cluster_properties.is_catalog_v2_cluster(),\
           "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
-      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert not cluster_properties.is_catalog_v2_cluster(),\
           "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is type INT but Impala expected STRING. The table "\
           "metadata in Impala may be outdated and need to be refreshed."
@@ -204,7 +208,8 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     assert len(cursor.fetchall()) == 100
 
-  def test_kudu_col_not_null_changed(self, cursor, kudu_client, unique_database):
+  def test_kudu_col_not_null_changed(
+      self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a NOT NULL Kudu column outside of Impala results in a failure
        on read with outdated metadata (IMPALA-4828)."""
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NOT NULL)
@@ -234,10 +239,10 @@ class TestKuduOperations(KuduTestSuite):
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert cluster_properties.is_catalog_v2_cluster(),\
           "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
-      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert not cluster_properties.is_catalog_v2_cluster(),\
           "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is nullable but Impala expected it to be "\
           "not nullable. The table metadata in Impala may be outdated and need to be "\
@@ -249,7 +254,8 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     assert len(cursor.fetchall()) == 100
 
-  def test_kudu_col_null_changed(self, cursor, kudu_client, unique_database):
+  def test_kudu_col_null_changed(
+      self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a NULL Kudu column outside of Impala results in a failure
        on read with outdated metadata (IMPALA-4828)."""
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NULL)
@@ -279,10 +285,10 @@ class TestKuduOperations(KuduTestSuite):
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-      assert IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert cluster_properties.is_catalog_v2_cluster(),\
           "Should fail with Catalog V1, which caches metadata"
     except Exception as e:
-      assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),\
+      assert not cluster_properties.is_catalog_v2_cluster(),\
           "Should succeed with Catalog V2, which does not cache metadata"
       expected_error = "Column 's' is not nullable but Impala expected it to be "\
           "nullable. The table metadata in Impala may be outdated and need to be "\
@@ -294,7 +300,7 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     assert len(cursor.fetchall()) == 100
 
-  def test_kudu_col_added(self, cursor, kudu_client, unique_database):
+  def test_kudu_col_added(self, cursor, kudu_client, unique_database, cluster_properties):
     """Test adding a Kudu column outside of Impala."""
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
@@ -317,7 +323,7 @@ class TestKuduOperations(KuduTestSuite):
     session.flush()
 
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+    if cluster_properties.is_catalog_v2_cluster():
       # Changes in Kudu should be immediately visible to Impala with Catalog V2.
       assert cursor.fetchall() == [(0, 0)]
     else:

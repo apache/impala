@@ -27,6 +27,7 @@ import tempfile
 from shell.impala_shell import ImpalaShell as ImpalaShellClass
 
 from subprocess import call, Popen
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
@@ -35,6 +36,7 @@ from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE)
 from contextlib import closing
+
 
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
@@ -830,7 +832,7 @@ class TestImpalaShell(ImpalaTestSuite):
     finally:
       os.remove(sql_path)
 
-  @pytest.mark.skipif(pytest.config.option.testing_remote_cluster,
+  @pytest.mark.skipif(ImpalaTestClusterProperties.get_instance().is_remote_cluster(),
                       reason='Test assumes a minicluster.')
   def test_default_timezone(self, vector):
     """Test that the default TIMEZONE query option is a valid timezone.

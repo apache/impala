@@ -20,6 +20,7 @@
 import pytest
 
 from copy import deepcopy
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfEC
@@ -94,7 +95,7 @@ class TestMtDopParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet', vector)
 
-  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+  @pytest.mark.xfail(ImpalaTestClusterProperties.get_instance().is_remote_cluster(),
                      reason='IMPALA-4641')
   def test_parquet_nested(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')

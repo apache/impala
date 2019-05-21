@@ -18,6 +18,7 @@
 import json
 import logging
 import os
+import pytest
 import re
 import requests
 import platform
@@ -25,6 +26,8 @@ import platform
 LOG = logging.getLogger('tests.common.environ')
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
 IMPALA_HOME = os.environ.get("IMPALA_HOME", "")
+# TODO: IMPALA-8553: this is often inconsistent with the --testing_remote_cluster flag.
+# Clarify the relationship and enforce that they are set correctly.
 IMPALA_REMOTE_URL = os.environ.get("IMPALA_REMOTE_URL", "")
 
 # Default web UI URL for local test cluster
@@ -203,25 +206,38 @@ class ImpalaTestClusterFlagsDetector:
     return build_flags
 
 
-"""
-Indicates whether we are operating against a locally built Impala cluster or a remote one.
-"""
-(
-  LOCAL_BUILD,
-  REMOTE_BUILD,
-) = xrange(2)
-
-
 class ImpalaTestClusterProperties(object):
+  _instance = None
+
   """
   Acquires and provides characteristics about the way the Impala under test was compiled
   and its likely effects on its responsiveness to automated test timings.
   """
-  def __init__(self, build_flavor, library_link_type, local_or_remote_build):
+  def __init__(self, build_flavor, library_link_type, web_ui_url):
     self._build_flavor = build_flavor
     self._library_link_type = library_link_type
-    self._local_or_remote_build = local_or_remote_build
+    self._web_ui_url = web_ui_url
     self._runtime_flags = None  # Lazily populated to avoid unnecessary web UI calls.
+
+  @classmethod
+  def get_instance(cls):
+    """Implements lazy initialization of a singleton instance of this class. We cannot
+    initialize the instances when this module is imported because some dependencies may
+    not be available yet, e.g. the pytest.config object. Thus we instead initialize it
+    the first time that a test needs it."""
+    if cls._instance is not None:
+      return cls._instance
+
+    web_ui_url = IMPALA_REMOTE_URL or DEFAULT_LOCAL_WEB_UI_URL
+    if IMPALA_REMOTE_URL:
+      # If IMPALA_REMOTE_URL is set, prefer detecting from the web UI.
+      build_flavor, link_type =\
+          ImpalaTestClusterFlagsDetector.detect_using_web_ui(web_ui_url)
+    else:
+      build_flavor, link_type =\
+          ImpalaTestClusterFlagsDetector.detect_using_build_root_or_web_ui(IMPALA_HOME)
+    cls._instance = ImpalaTestClusterProperties(build_flavor, link_type, web_ui_url)
+    return cls._instance
 
   @property
   def build_flavor(self):
@@ -293,45 +309,42 @@ class ImpalaTestClusterProperties(object):
 
   def is_remote_cluster(self):
     """
-    Return true if the Impala test cluster is running remotely, false otherwise
+    Return true if the Impala test cluster is running remotely, false otherwise.
+    This should only be called from python tests once pytest has been initialised
+    and pytest command line arguments are available.
     """
-    return self._local_or_remote_build == REMOTE_BUILD
+    assert hasattr(pytest, 'config'), "Must only be called from Python tests"
+    # A remote cluster build can be indicated in multiple ways.
+    return (IMPALA_REMOTE_URL or os.getenv("REMOTE_LOAD") or
+            pytest.config.option.testing_remote_cluster)
 
-  def _get_flags_from_web_ui(self, impala_url):
-    if self._runtime_flags is not None:
-      return self._runtime_flags
+  @property
+  def runtime_flags(self):
     """Return the command line flags from the impala web UI. Returns a Python map with
     the flag name as the key and a dictionary of flag properties as the value."""
-    response = requests.get(impala_url + "/varz?json")
-    assert response.status_code == requests.codes.ok,\
-            "Offending url: " + impala_url
-    assert "application/json" in response.headers['Content-Type']
-    self._runtime_flags = {}
-    for flag_dict in json.loads(response.text)["flags"]:
-      self._runtime_flags[flag_dict["name"]] = flag_dict
+    if self._runtime_flags is None:
+      response = requests.get(self._web_ui_url + "/varz?json")
+      assert response.status_code == requests.codes.ok,\
+              "Offending url: " + impala_url
+      assert "application/json" in response.headers['Content-Type']
+      self._runtime_flags = {}
+      for flag_dict in json.loads(response.text)["flags"]:
+        self._runtime_flags[flag_dict["name"]] = flag_dict
     return self._runtime_flags
 
   def is_catalog_v2_cluster(self):
     """Whether we use CATALOG_V2 options, including local catalog and HMS notifications.
     For now, assume that --use_local_catalog=true implies that the others are enabled."""
-    flags = self._get_flags_from_web_ui(web_ui_url)
-    key = "use_local_catalog"
-    # --use_local_catalog is hidden so does not appear in JSON if disabled.
-    return key in flags and flags[key]["current"] == "true"
-
-
-if IMPALA_REMOTE_URL:
-  web_ui_url = IMPALA_REMOTE_URL
-  build_flavor, link_type =\
-      ImpalaTestClusterFlagsDetector.detect_using_web_ui(IMPALA_REMOTE_URL)
-  IMPALA_TEST_CLUSTER_PROPERTIES =\
-      ImpalaTestClusterProperties(build_flavor, link_type, REMOTE_BUILD)
-else:
-  web_ui_url = DEFAULT_LOCAL_WEB_UI_URL
-  build_flavor, link_type =\
-      ImpalaTestClusterFlagsDetector.detect_using_build_root_or_web_ui(IMPALA_HOME)
-  IMPALA_TEST_CLUSTER_PROPERTIES =\
-      ImpalaTestClusterProperties(build_flavor, link_type, LOCAL_BUILD)
+    try:
+      key = "use_local_catalog"
+      # --use_local_catalog is hidden so does not appear in JSON if disabled.
+      return key in self.runtime_flags and self.runtime_flags[key]["current"] == "true"
+    except Exception:
+      if self.is_remote_cluster():
+        # IMPALA-8553: be more tolerant of failures on remote cluster builds.
+        LOG.exception("Failed to get flags from web UI, assuming catalog V1")
+        return False
+      raise
 
 
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,
@@ -358,13 +371,13 @@ def build_flavor_timeout(default_timeout, slow_build_timeout=None,
   code_coverage_build_timeout - timeout to use if Impala with code coverage is running
   (both debug and release code coverage)
   """
-
-  if IMPALA_TEST_CLUSTER_PROPERTIES.is_asan() and asan_build_timeout is not None:
+  cluster_properties = ImpalaTestClusterProperties.get_instance()
+  if cluster_properties.is_asan() and asan_build_timeout is not None:
     timeout_val = asan_build_timeout
-  elif IMPALA_TEST_CLUSTER_PROPERTIES.has_code_coverage() and\
+  elif cluster_properties.has_code_coverage() and\
           code_coverage_build_timeout is not None:
     timeout_val = code_coverage_build_timeout
-  elif IMPALA_TEST_CLUSTER_PROPERTIES.runs_slowly() and slow_build_timeout is not None:
+  elif cluster_properties.runs_slowly() and slow_build_timeout is not None:
     timeout_val = slow_build_timeout
   else:
     timeout_val = default_timeout

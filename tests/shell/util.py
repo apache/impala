@@ -26,7 +26,7 @@ import time
 from subprocess import Popen, PIPE
 
 from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
-                                  IMPALA_TEST_CLUSTER_PROPERTIES)
+                                  ImpalaTestClusterProperties)
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
                                             IMPALAD_HS2_HOST_PORT)
 
@@ -34,7 +34,7 @@ from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 IMPALA_HOME = os.environ['IMPALA_HOME']
 
-if IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster():
+if ImpalaTestClusterProperties.get_instance().is_remote_cluster():
   # With remote cluster testing, we cannot assume that the shell was built locally.
   IMPALA_SHELL_EXECUTABLE = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
 else:

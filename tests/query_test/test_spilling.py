@@ -18,10 +18,13 @@
 import pytest
 from copy import deepcopy
 
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_parquet_dimension)
+
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 # Test with denial of reservations at varying frequency.
 # Always test with the minimal amount of spilling and running with the absolute minimum
@@ -36,7 +39,8 @@ EXHAUSTIVE_DEBUG_ACTION_DIMS = [
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.9']
 
-@pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+
+@pytest.mark.xfail(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
                    reason='Queries may not spill on larger clusters')
 class TestSpillingDebugActionDimensions(ImpalaTestSuite):
   @classmethod
@@ -83,7 +87,7 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
         'QueryTest/spilling-regression-exhaustive-no-default-buffer-size', new_vector)
 
 
-@pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+@pytest.mark.xfail(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
                    reason='Queries may not spill on larger clusters')
 class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
   """Spilling tests to which we don't want to apply the debug_action dimension."""

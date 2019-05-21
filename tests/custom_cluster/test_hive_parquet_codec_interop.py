@@ -20,7 +20,6 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.util.filesystem_utils import get_fs_path
@@ -47,7 +46,7 @@ class TestParquetInterop(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-convert_legacy_hive_parquet_utc_timestamps=true "
       "-hdfs_zone_info_zip=%s" % get_fs_path("/test-warehouse/tzdb/2017c.zip"))
-  def test_hive_impala_interop(self, vector, unique_database):
+  def test_hive_impala_interop(self, vector, unique_database, cluster_properties):
     # Setup source table.
     source_table = "{0}.{1}".format(unique_database, "t1_source")
     self.execute_query_expect_success(self.client,
@@ -78,7 +77,7 @@ class TestParquetInterop(CustomClusterTestSuite):
           .format(codec, hive_table, impala_table))
 
       # Make sure Impala's metadata is in sync.
-      if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+      if cluster_properties.is_catalog_v2_cluster():
         self.wait_for_table_to_appear(unique_database, hive_table, timeout_s=10)
       else:
         self.client.execute("invalidate metadata {0}".format(hive_table))

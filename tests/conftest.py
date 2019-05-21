@@ -573,6 +573,16 @@ def validate_pytest_config():
       pytest.exit("Invalid pytest config option: --testing_remote_cluster")
 
 
+@pytest.yield_fixture(autouse=True, scope='session')
+def cluster_properties():
+  """Set up test cluster properties for the test session"""
+  # Don't import at top level to avoid circular dependency between conftest and
+  # tests.common.environ, which uses command-line flags set up by conftest.
+  from tests.common.environ import ImpalaTestClusterProperties
+  cluster_properties = ImpalaTestClusterProperties.get_instance()
+  yield cluster_properties
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(items, config, session):
   """Hook to handle --shard_tests command line option.

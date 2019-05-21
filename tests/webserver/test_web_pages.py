@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from tests.common.environ import (IMPALA_TEST_CLUSTER_PROPERTIES,
-    ImpalaTestClusterFlagsDetector)
+from tests.common.environ import ImpalaTestClusterFlagsDetector
 from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -24,6 +23,7 @@ import json
 import pytest
 import re
 import requests
+
 
 class TestWebPage(ImpalaTestSuite):
 
@@ -78,17 +78,15 @@ class TestWebPage(ImpalaTestSuite):
       assert build_flags["library_link_type"] in ["dynamic", "static"]
 
   @SkipIfBuildType.remote
-  def test_root_correct_build_flags(self):
+  def test_root_correct_build_flags(self, cluster_properties):
     """Tests that the build flags on the root page contain correct values"""
-    assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster()
+    assert not cluster_properties.is_remote_cluster()
     for port in self.TEST_PORTS_WITH_SS:
       build_flags = ImpalaTestClusterFlagsDetector.\
           get_build_flags_from_web_ui(self.ROOT_URL.format(port))
 
-      assert build_flags["cmake_build_type"] ==\
-              IMPALA_TEST_CLUSTER_PROPERTIES.build_flavor
-      assert build_flags["library_link_type"] ==\
-              IMPALA_TEST_CLUSTER_PROPERTIES.library_link_type
+      assert build_flags["cmake_build_type"] == cluster_properties.build_flavor
+      assert build_flags["library_link_type"] == cluster_properties.library_link_type
 
   def test_root_consistent_build_flags(self):
     """Tests that the build flags on the root page contain consistent values"""
@@ -272,24 +270,24 @@ class TestWebPage(ImpalaTestSuite):
     # Reset log level.
     self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
 
-  def test_catalog(self):
+  def test_catalog(self, cluster_properties):
     """Tests the /catalog and /catalog_object endpoints."""
     self.get_and_check_status_jvm(self.CATALOG_URL, "functional")
     self.get_and_check_status_jvm(self.CATALOG_URL, "alltypes")
     # IMPALA-5028: Test toThrift() of a partitioned table via the WebUI code path.
-    self.__test_catalog_object("functional", "alltypes")
-    self.__test_catalog_object("functional_parquet", "alltypes")
-    self.__test_catalog_object("functional", "alltypesnopart")
-    self.__test_catalog_object("functional_kudu", "alltypes")
+    self.__test_catalog_object("functional", "alltypes", cluster_properties)
+    self.__test_catalog_object("functional_parquet", "alltypes", cluster_properties)
+    self.__test_catalog_object("functional", "alltypesnopart", cluster_properties)
+    self.__test_catalog_object("functional_kudu", "alltypes", cluster_properties)
     self.__test_table_metrics("functional", "alltypes", "total-file-size-bytes")
     self.__test_table_metrics("functional", "alltypes", "num-files")
     self.__test_table_metrics("functional_kudu", "alltypes", "alter-duration")
     self.__test_catalog_tablesfilesusage("functional", "alltypes", "24")
 
-  def __test_catalog_object(self, db_name, tbl_name):
+  def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs
     against an unloaded as well as a loaded table."""
-    if IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster():
+    if cluster_properties.is_catalog_v2_cluster():
       impalad_expected_str = \
           "UnsupportedOperationException: LocalCatalog.getTCatalogObject"
     else:
