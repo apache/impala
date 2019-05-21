@@ -22,6 +22,12 @@
 # CLASSPATH wildcard expansion, we have to add every dependency jar
 # explicitly to the CLASSPATH.
 
+if [ "$0" = "$BASH_SOURCE" ]; then
+  >&2 echo "error: $BASH_SOURCE should be sourced, not executed. e.g:"
+  >&2 echo "   source $BASH_SOURCE"
+  exit 1
+fi
+
 CLASSPATH=\
 "$IMPALA_HOME"/fe/src/test/resources:\
 "$IMPALA_HOME"/fe/target/classes:\
@@ -36,7 +42,7 @@ FE_CP_FILE="$IMPALA_HOME/fe/target/build-classpath.txt"
 if [ ! -s "$FE_CP_FILE" ]; then
   >&2 echo FE classpath file $FE_CP_FILE missing.
   >&2 echo Build the front-end first.
-  exit 1
+  return 1
 fi
 
 CLASSPATH=$(cat "$IMPALA_HOME"/fe/target/build-classpath.txt):"$CLASSPATH"
