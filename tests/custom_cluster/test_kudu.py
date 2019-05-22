@@ -116,7 +116,8 @@ class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
 
 class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
   # TODO(IMPALA-8614): parameterize the common tests in query_test/test_kudu.py
-  # to run with HMS integration enabled.
+  # to run with HMS integration enabled. Also avoid restarting Impala to reduce
+  # tests time.
   """Tests the different DDL operations when using a kudu table with Kudu's integration
      with the Hive Metastore."""
 
@@ -284,3 +285,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
       cursor.execute("DROP TABLE %s" % (external_table_name))
       cursor.execute("SHOW TABLES")
       assert (external_table_name,) not in cursor.fetchall()
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_alter_table(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)

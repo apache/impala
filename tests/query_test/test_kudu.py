@@ -119,8 +119,6 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
 
-  @pytest.mark.skipif(pytest.config.option.testing_remote_cluster,
-                      reason="Test references hardcoded hostnames: IMPALA-4873")
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock
   @SkipIfKudu.hms_integration_enabled

@@ -1,6 +1,6 @@
-# Test cases on Kudu tables that only expected to be ran without HMS integration enabled.
-# TODO(IMPALA-8614): The test is almost identical to kudu_hms_alter.test, with the
-# difference this test later contains tests with hardcoded legacy table naming 'impala::'.
+# Test cases on Kudu tables that only expected to be ran with HMS integration enabled.
+# TODO(IMPALA-8614): The test is almost identical to kudu_alter.test, with the difference
+# the later contains tests with hardcoded legacy table naming 'impala::'.
 # Note that changes that are made to one file should be reflected in the other.
 ====
 ---- QUERY
@@ -45,7 +45,7 @@ STRING
 # Try to use an invalid master address
 alter table simple set tblproperties ('kudu.master_addresses' = 'invalid_host')
 ---- CATCH
-ImpalaRuntimeException: Kudu table 'impala::$DATABASE.simple' does not exist on master 'invalid_host'
+ImpalaRuntimeException: Kudu table '$DATABASE.simple' does not exist on master 'invalid_host'
 ====
 ---- QUERY
 alter table simple rename to simple_new;
@@ -389,7 +389,7 @@ BIGINT
 # The Kudu table kudu_tbl_to_alter is used in order to validate that renaming
 # the managed Impala-Kudu table tbl_to_alter renames the underlying Kudu table
 create external table external_tbl stored as kudu
-  tblproperties('kudu.table_name'='impala::$DATABASE.kudu_tbl_to_alter');
+  tblproperties('kudu.table_name'='$DATABASE.kudu_tbl_to_alter');
 select count(*) from external_tbl
 ---- RESULTS
 5
@@ -400,9 +400,9 @@ BIGINT
 # Ensure that after renaming the Impala table that the old Kudu table no longer
 # exists
 create external table external_tbl_on_nonexistent_kudu_tbl stored as kudu
-  tblproperties('kudu.table_name'='impala::$DATABASE.tbl_to_alter');
+  tblproperties('kudu.table_name'='$DATABASE.tbl_to_alter');
 ---- CATCH
-ImpalaRuntimeException: Table does not exist in Kudu: 'impala::$DATABASE.tbl_to_alter'
+ImpalaRuntimeException: Table does not exist in Kudu: '$DATABASE.tbl_to_alter'
 ====
 ---- QUERY
 # Insert an item into the table pointed by the external Kudu table
@@ -437,7 +437,7 @@ BIGINT
 create table temp_kudu_table (i int primary key) stored as kudu;
 insert into temp_kudu_table values (1), (2), (3);
 alter table external_tbl set
-  tblproperties('kudu.table_name'='impala::$DATABASE.temp_kudu_table');
+  tblproperties('kudu.table_name'='$DATABASE.temp_kudu_table');
 select count(*) from external_tbl
 ---- RESULTS
 3
@@ -635,7 +635,7 @@ alter table external_tbl rename to external_tbl_new;
 ---- QUERY
 describe formatted external_tbl_new;
 ---- RESULTS: VERIFY_IS_SUBSET
-'','kudu.table_name     ','impala::$DATABASE.temp_kudu_table'
+'','kudu.table_name     ','$DATABASE.temp_kudu_table'
 ---- TYPES
 STRING,STRING,STRING
 ----

@@ -1513,6 +1513,7 @@ public class CatalogOpExecutor {
           throws ImpalaRuntimeException {
     // Check if Kudu's integration with the Hive Metastore is enabled, and validate
     // the configuration.
+    Preconditions.checkState(KuduTable.isKuduTable(msTbl));
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     String hmsUris;
     try {
@@ -2583,17 +2584,30 @@ public class CatalogOpExecutor {
     msTbl.setDbName(newTableName.getDb());
     msTbl.setTableName(newTableName.getTbl());
 
-    // If oldTbl is a managed Kudu table, rename the underlying Kudu table
-    if (oldTbl instanceof KuduTable && !Table.isExternalTable(msTbl)) {
+    // If oldTbl is a managed Kudu table, rename the underlying Kudu table.
+    boolean isManagedKuduTable = (oldTbl instanceof KuduTable) &&
+                                 !Table.isExternalTable(msTbl);
+    boolean altersHMSTable = true;
+    if (isManagedKuduTable) {
       Preconditions.checkState(KuduTable.isKuduTable(msTbl));
-      renameKuduTable((KuduTable) oldTbl, msTbl, newTableName);
+      boolean isKuduHmsIntegrationEnabled = isKuduHmsIntegrationEnabled(msTbl);
+      altersHMSTable = !isKuduHmsIntegrationEnabled;
+      renameManagedKuduTable((KuduTable) oldTbl, msTbl, newTableName,
+          isKuduHmsIntegrationEnabled);
     }
 
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      msClient.getHiveClient().alter_table(tableName.getDb(), tableName.getTbl(), msTbl);
-    } catch (TException e) {
-      throw new ImpalaRuntimeException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
+    // Always updates the HMS metadata for non-Kudu tables. For Kudu tables, when
+    // Kudu is not integrated with the Hive Metastore or if this is an external table,
+    // Kudu will not automatically update the HMS metadata, we have to do it
+    // manually.
+    if (altersHMSTable) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        msClient.getHiveClient().alter_table(
+            tableName.getDb(), tableName.getTbl(), msTbl);
+      } catch (TException e) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
+      }
     }
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
@@ -2617,16 +2631,16 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Renames the underlying Kudu table for the given Impala table. If the new Kudu
+   * Renames the underlying Kudu table for the given managed table. If the new Kudu
    * table name is the same as the old Kudu table name, this method does nothing.
    */
-  private void renameKuduTable(KuduTable oldTbl,
-      org.apache.hadoop.hive.metastore.api.Table oldMsTbl, TableName newTableName)
+  private void renameManagedKuduTable(KuduTable oldTbl,
+      org.apache.hadoop.hive.metastore.api.Table oldMsTbl,
+      TableName newTableName, boolean isHMSIntegrationEanbled)
       throws ImpalaRuntimeException {
-    // TODO: update it to properly handle HMS integration.
     String newKuduTableName = KuduUtil.getDefaultKuduTableName(
         newTableName.getDb(), newTableName.getTbl(),
-        /* isHMSIntegrationEnabled= */false);
+        isHMSIntegrationEanbled);
 
     // If the name of the Kudu table has not changed, do nothing
     if (oldTbl.getKuduTableName().equals(newKuduTableName)) return;
@@ -2796,6 +2810,7 @@ public class CatalogOpExecutor {
           if (KuduTable.isKuduTable(msTbl)) {
             // If 'kudu.table_name' is specified and this is a managed table, rename
             // the underlying Kudu table.
+            // TODO(IMPALA-8618): this should be disallowed since IMPALA-5654
             if (properties.containsKey(KuduTable.KEY_TABLE_NAME)
                 && !properties.get(KuduTable.KEY_TABLE_NAME).equals(
                     msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME))
