@@ -115,12 +115,27 @@ class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
 
 
 class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
+  # TODO(IMPALA-8614): parameterize the common tests in query_test/test_kudu.py
+  # to run with HMS integration enabled.
   """Tests the different DDL operations when using a kudu table with Kudu's integration
      with the Hive Metastore."""
 
   @classmethod
   def get_workload(cls):
     return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    # Restart Kudu cluster with HMS integration enabled
+    KUDU_ARGS = "-hive_metastore_uris=thrift://%s" % os.environ['INTERNAL_LISTEN_HOST']
+    cls._restart_kudu_service(KUDU_ARGS)
+    super(TestKuduHMSIntegration, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    # Restart Kudu cluster with HMS integration disabled
+    cls._restart_kudu_service("-hive_metastore_uris=")
+    super(TestKuduHMSIntegration, cls).teardown_class()
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock
@@ -177,15 +192,95 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
     assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
         in table_desc
 
-  @classmethod
-  def setup_class(cls):
-    # Restart Kudu cluster with HMS integration enabled
-    KUDU_ARGS = "-hive_metastore_uris=thrift://%s" % os.environ['INTERNAL_LISTEN_HOST']
-    cls._restart_kudu_service(KUDU_ARGS)
-    super(TestKuduHMSIntegration, cls).setup_class()
+  @pytest.mark.execute_serially
+  def test_drop_non_empty_db(self, unique_cursor, kudu_client):
+    """Check that an attempt to drop a database will fail if Kudu tables are present
+       and that the tables remain.
+    """
+    db_name = unique_cursor.conn.db_name
+    with self.temp_kudu_table(kudu_client, [INT32], db_name=db_name) as kudu_table:
+      assert kudu_client.table_exists(kudu_table.name)
+      unique_cursor.execute("INVALIDATE METADATA")
+      unique_cursor.execute("USE DEFAULT")
+      try:
+        unique_cursor.execute("DROP DATABASE %s" % db_name)
+        assert False
+      except Exception as e:
+        assert "One or more tables exist" in str(e)
 
-  @classmethod
-  def teardown_class(cls):
-    # Restart Kudu cluster with HMS integration disabled
-    cls._restart_kudu_service("-hive_metastore_uris=")
-    super(TestKuduHMSIntegration, cls).teardown_class()
+      # Dropping an empty database should succeed, once all tables
+      # from the database have been dropped.
+      assert kudu_client.table_exists(kudu_table.name)
+      unique_cursor.execute("DROP Table %s" % kudu_table.name)
+      unique_cursor.execute("DROP DATABASE %s" % db_name)
+      assert not kudu_client.table_exists(kudu_table.name)
+
+  @pytest.mark.execute_serially
+  def test_drop_db_cascade(self, unique_cursor, kudu_client):
+    """Check that an attempt to drop a database cascade will succeed even if Kudu
+       tables are present. Make sure the corresponding managed tables are removed
+       from Kudu.
+    """
+    db_name = unique_cursor.conn.db_name
+    with self.temp_kudu_table(kudu_client, [INT32], db_name=db_name) as kudu_table:
+      assert kudu_client.table_exists(kudu_table.name)
+      unique_cursor.execute("INVALIDATE METADATA")
+
+      # Create a table in HDFS
+      hdfs_table_name = self.random_table_name()
+      unique_cursor.execute("""
+          CREATE TABLE %s (a INT) PARTITIONED BY (x INT)""" % (hdfs_table_name))
+
+      unique_cursor.execute("USE DEFAULT")
+      unique_cursor.execute("DROP DATABASE %s CASCADE" % db_name)
+      unique_cursor.execute("SHOW DATABASES")
+      assert (db_name, '') not in unique_cursor.fetchall()
+      assert not kudu_client.table_exists(kudu_table.name)
+
+  @pytest.mark.execute_serially
+  def test_drop_managed_kudu_table(self, cursor, kudu_client, unique_database):
+    """Check that dropping a managed Kudu table should fail if the underlying
+       Kudu table has been dropped externally.
+    """
+    impala_tbl_name = "foo"
+    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
+        PARTITIONS 3 STORED AS KUDU""" % (unique_database, impala_tbl_name))
+    kudu_tbl_name = KuduTestSuite.to_kudu_table_name(unique_database, impala_tbl_name)
+    assert kudu_client.table_exists(kudu_tbl_name)
+    kudu_client.delete_table(kudu_tbl_name)
+    assert not kudu_client.table_exists(kudu_tbl_name)
+    try:
+      cursor.execute("DROP TABLE %s" % kudu_tbl_name)
+      assert False
+    except Exception as e:
+      LOG.info(str(e))
+      assert "Table %s no longer exists in the Hive MetaStore." % kudu_tbl_name in str(e)
+
+  @pytest.mark.execute_serially
+  def test_drop_external_kudu_table(self, cursor, kudu_client, unique_database):
+    """Check that Impala can recover from the case where the underlying Kudu table of
+       an external table is dropped using the Kudu client.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32], db_name=unique_database) \
+        as kudu_table:
+      # Create an external Kudu table
+      impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
+      external_table_name = "%s_external" % impala_table_name
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
+        external_table_name, props))
+      cursor.execute("DESCRIBE %s" % (external_table_name))
+      assert cursor.fetchall() == \
+             [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+               "DEFAULT_COMPRESSION", "0")]
+      # Drop the underlying Kudu table
+      kudu_client.delete_table(kudu_table.name)
+      assert not kudu_client.table_exists(kudu_table.name)
+      err_msg = 'the table does not exist: table_name: "%s"' % (kudu_table.name)
+      try:
+        cursor.execute("REFRESH %s" % (external_table_name))
+      except Exception as e:
+        assert err_msg in str(e)
+      cursor.execute("DROP TABLE %s" % (external_table_name))
+      cursor.execute("SHOW TABLES")
+      assert (external_table_name,) not in cursor.fetchall()

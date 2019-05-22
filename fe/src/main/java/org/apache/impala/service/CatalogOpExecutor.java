@@ -1435,6 +1435,8 @@ public class CatalogOpExecutor {
       // Remove all the Kudu tables of 'db' from the Kudu storage engine.
       if (db != null && params.cascade) dropTablesFromKudu(db);
 
+      // The Kudu tables in the HMS should have been dropped at this point
+      // with the Hive Metastore integration enabled.
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropDatabase(
             params.getDb(), true, params.if_exists, params.cascade);
@@ -1506,6 +1508,23 @@ public class CatalogOpExecutor {
     }
   }
 
+  private boolean isKuduHmsIntegrationEnabled(
+      org.apache.hadoop.hive.metastore.api.Table msTbl)
+          throws ImpalaRuntimeException {
+    // Check if Kudu's integration with the Hive Metastore is enabled, and validate
+    // the configuration.
+    String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+    String hmsUris;
+    try {
+      hmsUris = MetaStoreUtil.getHiveMetastoreUrisKeyValue(
+          catalog_.getMetaStoreClient().getHiveClient());
+    } catch (Exception e) {
+      throw new RuntimeException(String.format("Failed to get the Hive Metastore " +
+          "configuration for table '%s' ", msTbl.getTableName()), e);
+    }
+    return KuduTable.isHMSIntegrationEnabledAndValidate(masterHosts, hmsUris);
+  }
+
   /**
    * Drops a table or view from the metastore and removes it from the catalog.
    * Also drops all associated caching requests on the table and/or table's partitions,
@@ -1566,8 +1585,9 @@ public class CatalogOpExecutor {
           LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
         }
       }
-      if (msTbl != null && KuduTable.isKuduTable(msTbl)
-          && !Table.isExternalTable(msTbl)) {
+      boolean isManagedKuduTable = msTbl != null &&
+              KuduTable.isKuduTable(msTbl) && !Table.isExternalTable(msTbl);
+      if (isManagedKuduTable) {
         KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
       }
 
@@ -1587,16 +1607,23 @@ public class CatalogOpExecutor {
         }
         throw new CatalogException(errorMsg);
       }
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        msClient.getHiveClient().dropTable(
-            tableName.getDb(), tableName.getTbl(), true, params.if_exists, params.purge);
-      } catch (NoSuchObjectException e) {
-        throw new ImpalaRuntimeException(String.format("Table %s no longer exists in " +
-            "the Hive MetaStore. Run 'invalidate metadata %s' to update the Impala " +
-            "catalog.", tableName, tableName));
-      } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
+
+      // When Kudu's HMS integration is enabled, Kudu will drop the managed table
+      // entries automatically. In all other cases, we need to drop the HMS table
+      // entry ourselves.
+      if (!isManagedKuduTable || !isKuduHmsIntegrationEnabled(msTbl)) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          msClient.getHiveClient().dropTable(
+              tableName.getDb(), tableName.getTbl(), true,
+              params.if_exists, params.purge);
+        } catch (NoSuchObjectException e) {
+          throw new ImpalaRuntimeException(String.format("Table %s no longer exists " +
+              "in the Hive MetaStore. Run 'invalidate metadata %s' to update the " +
+              "Impala catalog.", tableName, tableName));
+        } catch (TException e) {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
+        }
       }
       addSummary(resp, (params.is_table ? "Table " : "View ") + "has been dropped.");
 
@@ -1911,24 +1938,10 @@ public class CatalogOpExecutor {
     } else {
       KuduCatalogOpExecutor.createManagedTable(newTable, params);
     }
-    boolean createsHMSTable;
-    if (Table.isExternalTable(newTable)) {
-      createsHMSTable = true;
-    } else {
-      String masterHosts = newTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-      String hmsUris;
-      // Check if Kudu's integration with the Hive Metastore is enabled for
-      // managed tables, and validate the configuration.
-      try {
-        hmsUris = MetaStoreUtil.getHiveMetastoreUrisKeyValue(
-            catalog_.getMetaStoreClient().getHiveClient());
-      } catch (Exception e) {
-        throw new RuntimeException(String.format("Failed to get the Hive Metastore " +
-            "configuration for table '%s' ", newTable.getTableName()), e);
-      }
-      createsHMSTable =
-         !KuduTable.isHMSIntegrationEnabledAndValidate(masterHosts, hmsUris);
-    }
+    // When Kudu's integration with the Hive Metastore is enabled, Kudu will create
+    // the HMS table for managed tables.
+    boolean createsHMSTable = Table.isExternalTable(newTable) ?
+        true : !isKuduHmsIntegrationEnabled(newTable);
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
