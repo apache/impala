@@ -410,8 +410,8 @@ class TestParquet(ImpalaTestSuite):
         "    float_col, double_col,date_string_col,string_col,timestamp_col" \
         "  from functional_parquet.alltypes" \
         "  where year = {year} and month = {month}" % unique_database
-    check_call(['hive', '-e', hql_format.format(codec="snappy", year=2010, month=1)])
-    check_call(['hive', '-e', hql_format.format(codec="gzip", year=2010, month=2)])
+    self.run_stmt_in_hive(hql_format.format(codec="snappy", year=2010, month=1))
+    self.run_stmt_in_hive(hql_format.format(codec="gzip", year=2010, month=2))
 
     test_files = ["testdata/multi_compression_parquet_data/tinytable_0_gzip_snappy.parq",
                   "testdata/multi_compression_parquet_data/tinytable_1_snappy_gzip.parq"]

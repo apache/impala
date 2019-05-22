@@ -1,0 +1,15 @@
+====
+---- CREATE_VIEW
+# Create a view in Impala with plan hints. Hive should recognize the hints as
+# comments and ignore them.
+create view test as
+select /* +straight_join */ a.* from functional.alltypestiny a
+inner join /* +broadcast */ functional.alltypes b on a.id = b.id
+inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id;
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====

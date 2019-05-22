@@ -22,6 +22,7 @@ import shlex
 from subprocess import call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -75,6 +76,12 @@ class TestViewCompatibility(ImpalaTestSuite):
   def test_view_compatibility(self, vector, unique_database):
     self._run_view_compat_test_case('QueryTest/views-compatibility', vector,
       unique_database)
+    if HIVE_MAJOR_VERSION == 2:
+      self._run_view_compat_test_case('QueryTest/views-compatibility-hive2-only', vector,
+          unique_database)
+    if HIVE_MAJOR_VERSION >= 3:
+      self._run_view_compat_test_case('QueryTest/views-compatibility-hive3-only', vector,
+          unique_database)
 
   def _run_view_compat_test_case(self, test_file_name, vector, test_db_name):
     """
@@ -144,8 +151,12 @@ class TestViewCompatibility(ImpalaTestSuite):
                             test_case.get_create_view_sql('IMPALA'), None)
 
   def _exec_in_hive(self, sql_str, create_view_sql, exp_res):
-    hive_ret = call(['hive', '-e', sql_str])
-    self._cmp_expected(sql_str, create_view_sql, exp_res, "HIVE", hive_ret == 0)
+    try:
+      self.run_stmt_in_hive(sql_str)
+      success = True
+    except: # consider any exception a failure
+      success = False
+    self._cmp_expected(sql_str, create_view_sql, exp_res, "HIVE", success)
 
   def _exec_in_impala(self, sql_str, create_view_sql, exp_res):
     success = True

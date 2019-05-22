@@ -1,0 +1,30 @@
+====
+---- CREATE_VIEW
+# Create a view in Impala with plan hints. Hive should recognize the hints as
+# comments and ignore them.
+create view test as
+select /* +straight_join */ a.* from functional.alltypestiny a
+inner join /* +broadcast */ functional.alltypes b on a.id = b.id
+inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id;
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
+---- CREATE_VIEW
+# Create a view in Hive with plan hints. Impala should ignore the unknown hints.
+# TODO: move this to the common .test file once "HIVE-21782: Cannot use query hints
+# in views" is resolved.
+create view test as
+select /*+ MAPJOIN(alltypestiny) */ count(*) from
+functional.alltypes a inner join functional.alltypestiny b
+on (a.id = b.id);
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_HIVE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
