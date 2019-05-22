@@ -169,6 +169,10 @@ class SkipIfNotHdfsMinicluster:
   tuned_for_minicluster = pytest.mark.skipif(
       not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
+  scheduling = pytest.mark.skipif(
+      not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,
+      reason="Test is tuned for scheduling decisions made on a 3-node HDFS minicluster "
+             "with no EC")
 
 class SkipIfBuildType:
   not_dev_build = pytest.mark.skipif(not IMPALA_TEST_CLUSTER_PROPERTIES.is_dev(),
@@ -181,7 +185,6 @@ class SkipIfEC:
       "features relying on local read do not work.")
   oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
   fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")
-  scheduling = pytest.mark.skipif(IS_EC, reason="Scheduling is different on EC")
 
 
 class SkipIfDockerizedCluster:

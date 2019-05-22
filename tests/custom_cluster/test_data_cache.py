@@ -18,12 +18,12 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIf, SkipIfEC
+from tests.common.skip import SkipIf, SkipIfNotHdfsMinicluster
 
 
 @SkipIf.not_hdfs
 @SkipIf.is_buggy_el6_kernel
-@SkipIfEC.scheduling
+@SkipIfNotHdfsMinicluster.scheduling
 class TestDataCache(CustomClusterTestSuite):
   """ This test enables the data cache and verfies that cache hit and miss counts
   in the runtime profile and metrics are as expected. Run on non-EC HDFS only as

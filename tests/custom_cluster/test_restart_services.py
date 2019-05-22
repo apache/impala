@@ -32,7 +32,7 @@ from TCLIService import TCLIService
 from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfEC
+from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)
@@ -93,6 +93,7 @@ class TestRestart(CustomClusterTestSuite):
   CANCELLATION_GRACE_PERIOD_S = 5
 
   @pytest.mark.execute_serially
+  @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
     impalad_args="--statestore_subscriber_timeout_seconds={timeout_s} "
                  "--failed_backends_query_cancellation_grace_period_ms={grace_period_ms}"
@@ -113,6 +114,8 @@ class TestRestart(CustomClusterTestSuite):
       handle = client.execute_async(slow_query)
       # Make sure query starts running.
       self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      profile = client.get_runtime_profile(handle)
+      assert "NumBackends: 3" in profile, profile
       # Restart Statestore and wait till the grace period ends + some buffer.
       self.cluster.statestored.restart()
       self.cluster.statestored.service.wait_for_live_subscribers(4)
@@ -140,6 +143,8 @@ class TestRestart(CustomClusterTestSuite):
       impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
       handle = client.execute_async(slow_query)
       self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      profile = client.get_runtime_profile(handle)
+      assert "NumBackends: 2" in profile, profile
       start_time = time.time()
       self.cluster.statestored.restart()
       # Make sure it has connected to the impalads before killing one.
@@ -245,7 +250,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   EXEC_SHUTDOWN_DEADLINE_S = 10
 
   @pytest.mark.execute_serially
-  @SkipIfEC.scheduling
+  @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \
@@ -255,7 +260,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     self.do_test_shutdown_executor(fetch_delay_s=0)
 
   @pytest.mark.execute_serially
-  @SkipIfEC.scheduling
+  @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \
