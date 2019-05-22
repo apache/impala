@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateOrAlterViewParams;
@@ -175,9 +176,9 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
    */
   protected void computeLineageGraph(Analyzer analyzer) {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
-    List<String> colDefs = new ArrayList<>();
+    List<ColumnLabel> colDefs = new ArrayList<>();
     for (ColumnDef colDef: finalColDefs_) {
-      colDefs.add(dbName_ + "." + getTbl() + "." + colDef.getColName());
+      colDefs.add(new ColumnLabel(colDef.getColName(), new TableName(dbName_, getTbl())));
     }
     graph.addTargetColumnLabels(colDefs);
     graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);

@@ -42,6 +42,15 @@ class LineageUtil {
       writer->String("COLUMN");
       writer->String("vertexId");
       writer->String(vertex.label.c_str());
+      if (vertex.__isset.metadata) {
+        writer->String("metadata");
+        writer->StartObject();
+        writer->String("tableName");
+        writer->String(vertex.metadata.table_name.c_str());
+        writer->String("tableCreateTime");
+        writer->Int64(vertex.metadata.table_create_time);
+        writer->EndObject();
+      }
       writer->EndObject();
     }
 

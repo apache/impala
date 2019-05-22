@@ -740,13 +740,13 @@ public class PlannerTestBase extends FrontendTestBase {
       ColumnLineageGraph outputGraph =
         ColumnLineageGraph.fromThrift(lineageGraph);
       if (expectedGraph == null || outputGraph == null ||
-          !outputGraph.equals(expectedGraph)) {
+          !outputGraph.equalsForTests(expectedGraph)) {
         StringBuilder lineageError = new StringBuilder();
         lineageError.append("section " + Section.LINEAGE + " of query:\n"
             + query + "\n");
-        lineageError.append("Output:\n");
-        lineageError.append(outputGraph.toJson() + "\n");
-        lineageError.append("Expected:\n");
+        lineageError.append("Output:");
+        lineageError.append(TestUtils.prettyPrintJson(outputGraph.toJson() + "\n"));
+        lineageError.append("\nExpected:\n");
         lineageError.append(serializedGraph + "\n");
         errorLog.append(lineageError.toString());
       }

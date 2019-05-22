@@ -89,7 +89,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
-import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -1982,7 +1981,13 @@ public class CatalogOpExecutor {
     synchronized (metastoreDdlLock_) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().createTable(newTable);
+        // TODO (HIVE-21807): Creating a table and retrieving the table information is
+        // not atomic.
         addSummary(response, "Table has been created.");
+        long tableCreateTime = msClient.getHiveClient().getTable(
+            newTable.getDbName(), newTable.getTableName()).getCreateTime();
+        response.setTable_name(newTable.getDbName() + "." + newTable.getTableName());
+        response.setTable_create_time(tableCreateTime);
         // If this table should be cached, and the table location was not specified by
         // the user, an extra step is needed to read the table to find the location.
         if (cacheOp != null && cacheOp.isSet_cached() &&

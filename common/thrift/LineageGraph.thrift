@@ -20,17 +20,28 @@ namespace java org.apache.impala.thrift
 
 include "Types.thrift"
 
+struct TVertexMetadata {
+  // Table name.
+  1: required string table_name
+
+  // Create time of the table/view.
+  2: required i64 table_create_time
+}
+
 struct TVertex {
   // Vertex id
   1: required i64 id
 
   // Column label
   2: required string label
+
+  // Metadata of the vertex.
+  3: optional TVertexMetadata metadata
 }
 
 enum TEdgeType {
-    PROJECTION = 0
-    PREDICATE = 1
+  PROJECTION = 0
+  PREDICATE = 1
 }
 
 struct TMultiEdge {

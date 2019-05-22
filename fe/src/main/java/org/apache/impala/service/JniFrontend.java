@@ -122,7 +122,6 @@ public class JniFrontend {
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
 
-
   /**
    * Create a new instance of the Jni Frontend.
    */

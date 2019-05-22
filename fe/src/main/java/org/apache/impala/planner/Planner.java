@@ -20,11 +20,13 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
+import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
@@ -192,10 +194,10 @@ public class Planner {
             // the labels of columns mentioned in the column list.
             List<String> mentionedColumns = insertStmt.getMentionedColumns();
             Preconditions.checkState(!mentionedColumns.isEmpty());
-            List<String> targetColLabels = new ArrayList<>();
+            List<ColumnLabel> targetColLabels = new ArrayList<>();
             String tblFullName = targetTable.getFullName();
             for (String column: mentionedColumns) {
-              targetColLabels.add(tblFullName + "." + column);
+              targetColLabels.add(new ColumnLabel(column, targetTable.getTableName()));
             }
             graph.addTargetColumnLabels(targetColLabels);
           } else {
@@ -213,7 +215,9 @@ public class Planner {
         }
         graph.computeLineageGraph(exprs, ctx_.getRootAnalyzer());
       } else {
-        graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels());
+        graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels().stream()
+            .map(col -> new ColumnLabel(col))
+            .collect(Collectors.toList()));
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
       if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());

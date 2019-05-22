@@ -9,7 +9,7 @@ select * from (
     "queryText":"select * from (\n  select tinyint_col + int_col x from functional.alltypes\n  union all\n  select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
     "queryId":"0:0",
     "hash":"25456c60a2e874a20732f42c7af27553",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -33,17 +33,29 @@ select * from (
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -63,7 +75,7 @@ order by b.bigint_col limit 10
     "queryText":"select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n  count(b.string_col), b.timestamp_col\nfrom functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2010 and b.float_col > 0\ngroup by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\nhaving count(a.int_col) > 10\norder by b.bigint_col limit 10",
     "queryId":"0:0",
     "hash":"e0309eeff9811f53c82657d62c1e04eb",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -133,17 +145,29 @@ order by b.bigint_col limit 10
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.smallint_col"
+            "vertexId":"functional.alltypes.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -153,7 +177,11 @@ order by b.bigint_col limit 10
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"functional.alltypessmall.string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":6,
@@ -163,32 +191,56 @@ order by b.bigint_col limit 10
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.timestamp_col"
+            "vertexId":"functional.alltypessmall.timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bigint_col"
+            "vertexId":"functional.alltypessmall.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"functional.alltypessmall.float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -200,7 +252,7 @@ create table lineage_test_tbl as select int_col, tinyint_col from functional.all
     "queryText":"create table lineage_test_tbl as select int_col, tinyint_col from functional.alltypes",
     "queryId":"0:0",
     "hash":"407f23b24758ffcb2ac445b9703f5c44",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -226,22 +278,38 @@ create table lineage_test_tbl as select int_col, tinyint_col from functional.all
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tbl.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tbl",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tbl.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tbl",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -255,7 +323,7 @@ where a.year = 2009 and b.month = 2
     "queryText":"create table lineage_test_tbl as\nselect distinct a.int_col, a.string_col from functional.alltypes a\ninner join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2009 and b.month = 2",
     "queryId":"0:0",
     "hash":"f3101dcb046a7d34d7ee14892a6cc94e",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -294,42 +362,74 @@ where a.year = 2009 and b.month = 2
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tbl.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tbl",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tbl.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tbl",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"functional.alltypessmall.month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -343,7 +443,7 @@ select * from
     "queryText":"create table lineage_test_tbl as\nselect * from\n  (select * from\n     (select int_col from functional.alltypestiny limit 1) v1 ) v2",
     "queryId":"0:0",
     "hash":"9c04c1e9feee35ffacf14bfcd3b363a7",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -360,12 +460,20 @@ select * from
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tbl.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tbl",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.int_col"
+            "vertexId":"functional.alltypestiny.int_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         }
     ]
 }
@@ -377,7 +485,7 @@ create table lineage_test_tblm as select * from functional_hbase.alltypes limit 
     "queryText":"create table lineage_test_tblm as select * from functional_hbase.alltypes limit 5",
     "queryId":"0:0",
     "hash":"a294f36bddf2adb329eac3055a76b2b5",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -502,132 +610,236 @@ create table lineage_test_tblm as select * from functional_hbase.alltypes limit 
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.id"
+            "vertexId":"functional_hbase.alltypes.id",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.bigint_col"
+            "vertexId":"functional_hbase.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.bool_col"
+            "vertexId":"functional_hbase.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.date_string_col"
+            "vertexId":"functional_hbase.alltypes.date_string_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.double_col"
+            "vertexId":"functional_hbase.alltypes.double_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.float_col"
+            "vertexId":"functional_hbase.alltypes.float_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.int_col"
+            "vertexId":"functional_hbase.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.month"
+            "vertexId":"functional_hbase.alltypes.month",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":17,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.smallint_col"
+            "vertexId":"functional_hbase.alltypes.smallint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":18,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":19,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.string_col"
+            "vertexId":"functional_hbase.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":20,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":21,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.timestamp_col"
+            "vertexId":"functional_hbase.alltypes.timestamp_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":22,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":23,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.tinyint_col"
+            "vertexId":"functional_hbase.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":24,
             "vertexType":"COLUMN",
-            "vertexId":"default.lineage_test_tblm.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"default.lineage_test_tblm",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":25,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.year"
+            "vertexId":"functional_hbase.alltypes.year",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         }
     ]
 }
@@ -642,7 +854,7 @@ functional_hbase.alltypes
     "queryText":"insert into\nfunctional_hbase.alltypes\n  values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",\n  cast(now() as timestamp), 1, 1999)",
     "queryId":"0:0",
     "hash":"b923425ce9cc2d53d36523ec83971e67",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -754,67 +966,119 @@ functional_hbase.alltypes
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypes.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"functional_hbase.alltypes",
+                "tableCreateTime":1559151687
+            }
         }
     ]
 }
@@ -827,7 +1091,7 @@ from functional.alltypes
     "queryText":"insert into table functional.alltypesnopart (id, bool_col, timestamp_col)\nselect id, bool_col, timestamp_col\nfrom functional.alltypes",
     "queryId":"0:0",
     "hash":"b7b9474fc6b97f104bd031209438ee0e",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -926,72 +1190,128 @@ from functional.alltypes
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesnopart.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypesnopart",
+                "tableCreateTime":1559151324
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.timestamp_col"
+            "vertexId":"functional.alltypes.timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -1006,7 +1326,7 @@ where year=2009 and month=05
     "queryText":"insert into table functional.alltypessmall (smallint_col, int_col)\npartition (year=2009, month=04)\nselect smallint_col, int_col\nfrom functional.alltypes\nwhere year=2009 and month=05",
     "queryId":"0:0",
     "hash":"2ed3a6c784e1c0c7fcef226d71375180",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1142,87 +1462,155 @@ where year=2009 and month=05
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.smallint_col"
+            "vertexId":"functional.alltypes.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.month"
+            "vertexId":"functional.alltypes.month",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -1237,7 +1625,7 @@ where year=2009 and month>10
     "queryText":"insert into table functional.alltypessmall (id, string_col, int_col)\npartition (year, month)\nselect id, string_col, int_col, year, month\nfrom functional_seq_snap.alltypes\nwhere year=2009 and month>10",
     "queryId":"0:0",
     "hash":"39ac95ce0632ef1ee8b474be644971f3",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1376,92 +1764,164 @@ where year=2009 and month>10
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_seq_snap.alltypes.year"
+            "vertexId":"functional_seq_snap.alltypes.year",
+            "metadata":{
+                "tableName":"functional_seq_snap.alltypes",
+                "tableCreateTime":1559151137
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_seq_snap.alltypes.month"
+            "vertexId":"functional_seq_snap.alltypes.month",
+            "metadata":{
+                "tableName":"functional_seq_snap.alltypes",
+                "tableCreateTime":1559151137
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional_seq_snap.alltypes.id"
+            "vertexId":"functional_seq_snap.alltypes.id",
+            "metadata":{
+                "tableName":"functional_seq_snap.alltypes",
+                "tableCreateTime":1559151137
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional_seq_snap.alltypes.int_col"
+            "vertexId":"functional_seq_snap.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional_seq_snap.alltypes",
+                "tableCreateTime":1559151137
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"functional_seq_snap.alltypes.string_col"
+            "vertexId":"functional_seq_snap.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional_seq_snap.alltypes",
+                "tableCreateTime":1559151137
+            }
         },
         {
             "id":17,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -1480,7 +1940,7 @@ having min(id) > 10
     "queryText":"insert into table functional.alltypessmall\npartition (year=2009, month)\nselect min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col),\nmin(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col),\nmin(timestamp_col), month\nfrom functional.alltypes\nwhere year=2009 and month>10\ngroup by month\nhaving min(id) > 10",
     "queryId":"0:0",
     "hash":"e6969c2cc67e9d6f3f985ddc6431f915",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1627,132 +2087,236 @@ having min(id) > 10
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.month"
+            "vertexId":"functional.alltypes.month",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.smallint_col"
+            "vertexId":"functional.alltypes.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.float_col"
+            "vertexId":"functional.alltypes.float_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":17,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":18,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.double_col"
+            "vertexId":"functional.alltypes.double_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":19,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":20,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.date_string_col"
+            "vertexId":"functional.alltypes.date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":21,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":22,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":23,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":24,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.timestamp_col"
+            "vertexId":"functional.alltypes.timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":25,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -1767,7 +2331,7 @@ group by int_col, tinyint_col
     "queryText":"select\nmax(tinyint_col) over(partition by int_col)\nfrom functional.alltypes\ngroup by int_col, tinyint_col",
     "queryId":"0:0",
     "hash":"83c78528e6f5325c56a3f3521b08a78d",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1798,12 +2362,20 @@ group by int_col, tinyint_col
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -1814,7 +2386,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
     "queryText":"select int_col, rank() over(order by int_col) from functional.alltypesagg",
     "queryId":"0:0",
     "hash":"4f1ecaaed571d2ed9f09f091f399c311",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1853,7 +2425,11 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.int_col"
+            "vertexId":"functional.alltypesagg.int_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":2,
@@ -1872,7 +2448,7 @@ order by a.tinyint_col, a.int_col
     "queryText":"select a.tinyint_col, a.int_col, count(a.double_col)\n  over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following)\nfrom functional.alltypes a inner join functional.alltypessmall b on a.id = b.id\norder by a.tinyint_col, a.int_col",
     "queryId":"0:0",
     "hash":"b6e26c00b2ef17f0592ebadb0ecc21f6",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -1934,7 +2510,11 @@ order by a.tinyint_col, a.int_col
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -1944,7 +2524,11 @@ order by a.tinyint_col, a.int_col
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -1954,17 +2538,29 @@ order by a.tinyint_col, a.int_col
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.double_col"
+            "vertexId":"functional.alltypes.double_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -1983,7 +2579,7 @@ order by 2, 3, 4
     "queryText":"with v2 as\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1)\nselect double_col, a, b, a + b, double_col + a from v2\norder by 2, 3, 4",
     "queryId":"0:0",
     "hash":"6bf993cea0d1ab9e613674ef178916c9",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -2062,7 +2658,11 @@ order by 2, 3, 4
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.double_col"
+            "vertexId":"functional.alltypes.double_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -2072,7 +2672,11 @@ order by 2, 3, 4
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -2082,12 +2686,20 @@ order by 2, 3, 4
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
@@ -2115,7 +2727,7 @@ order by 2, 3, 4
     "queryText":"select double_col, a, b, a + b, double_col + a from\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1) v2\norder by 2, 3, 4",
     "queryId":"0:0",
     "hash":"811403c86e86fe630dea7bd0a6c89273",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867921,
     "edges":[
         {
@@ -2194,7 +2806,11 @@ order by 2, 3, 4
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.double_col"
+            "vertexId":"functional.alltypes.double_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -2204,7 +2820,11 @@ order by 2, 3, 4
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -2214,12 +2834,20 @@ order by 2, 3, 4
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
@@ -2249,7 +2877,7 @@ where b.month = 1
     "queryText":"select a.month, a.year, b.int_col, b.month\nfrom\n  (select year, month from functional.alltypes\n   union all\n   select year, month from functional.alltypes) a\n  inner join\n  functional.alltypessmall b\n  on (a.month = b.month)\nwhere b.month = 1",
     "queryId":"0:0",
     "hash":"e3000cd5edf2a02e1f5407810f3cc09a",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2310,7 +2938,11 @@ where b.month = 1
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.month"
+            "vertexId":"functional.alltypes.month",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -2320,7 +2952,11 @@ where b.month = 1
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -2330,12 +2966,20 @@ where b.month = 1
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.int_col"
+            "vertexId":"functional.alltypessmall.int_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"functional.alltypessmall.month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -2357,7 +3001,7 @@ where month = 1
     "queryText":"select t1.int_col, t2.month, t2.int_col + 1\nfrom (\n  select int_col, count(*)\n  from functional.alltypessmall\n  where month = 1\n  group by int_col\n  having count(*) > 1\n  order by count(*) desc limit 5\n  ) t1\njoin functional.alltypes t2 on (t1.int_col = t2.int_col)\nwhere month = 1",
     "queryId":"0:0",
     "hash":"3f1ecf7239e205342aee4979e7cb4877",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2411,7 +3055,11 @@ where month = 1
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.int_col"
+            "vertexId":"functional.alltypessmall.int_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":2,
@@ -2421,7 +3069,11 @@ where month = 1
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.month"
+            "vertexId":"functional.alltypes.month",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -2431,12 +3083,20 @@ where month = 1
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.month"
+            "vertexId":"functional.alltypessmall.month",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -2459,7 +3119,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
     "queryText":"select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\nfrom functional.alltypessmall c\njoin (\n   select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n   from ( select * from functional.alltypesagg a where month=1 ) a\n   join functional.alltypessmall b on (a.smallint_col = b.id)\n ) x on (x.tinyint_col = c.id)\nwhere x.day=1\nand x.int_col > 899\nand x.float_col > 4.5\nand c.string_col < '7'\nand x.int_col + x.float_col + cast(c.string_col as float) < 1000",
     "queryId":"0:0",
     "hash":"4edf165aed5982ede63f7c91074f4b44",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2556,7 +3216,11 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.smallint_col"
+            "vertexId":"functional.alltypesagg.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":2,
@@ -2566,7 +3230,11 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":4,
@@ -2576,7 +3244,11 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.tinyint_col"
+            "vertexId":"functional.alltypesagg.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":6,
@@ -2586,7 +3258,11 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.int_col"
+            "vertexId":"functional.alltypesagg.int_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":8,
@@ -2596,7 +3272,11 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"functional.alltypessmall.float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":10,
@@ -2606,17 +3286,29 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"functional.alltypessmall.string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.day"
+            "vertexId":"functional.alltypesagg.day",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.month"
+            "vertexId":"functional.alltypesagg.month",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         }
     ]
 }
@@ -2636,7 +3328,7 @@ from
     "queryText":"select c1, c2, c3\nfrom\n  (select c1, c2, c3\n   from\n     (select int_col c1, sum(float_col) c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1) x\n    order by 2,3 desc\n    limit 5\n) y",
     "queryId":"0:0",
     "hash":"8b4d1ab11721d9ebdf26666d4195eb18",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2688,7 +3380,11 @@ from
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.int_col"
+            "vertexId":"functional_hbase.alltypessmall.int_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         },
         {
             "id":2,
@@ -2698,7 +3394,11 @@ from
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.float_col"
+            "vertexId":"functional_hbase.alltypessmall.float_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         },
         {
             "id":4,
@@ -2730,7 +3430,7 @@ limit 0
     "queryText":"select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
     "queryId":"0:0",
     "hash":"50d3b4f249f038b0711ea75c17640fc9",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2772,7 +3472,11 @@ limit 0
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.int_col"
+            "vertexId":"functional_hbase.alltypessmall.int_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         },
         {
             "id":2,
@@ -2782,7 +3486,11 @@ limit 0
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.tinyint_col"
+            "vertexId":"functional_hbase.alltypessmall.tinyint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         }
     ]
 }
@@ -2794,7 +3502,7 @@ select int_col, string_col from functional.view_view
     "queryText":"select int_col, string_col from functional.view_view",
     "queryId":"0:0",
     "hash":"9073496459077de1332e5017977dedf5",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2825,7 +3533,11 @@ select int_col, string_col from functional.view_view
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -2835,7 +3547,11 @@ select int_col, string_col from functional.view_view
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -2847,7 +3563,7 @@ where t.id < 10
     "queryText":"select t.id from (select id from functional.alltypes_view) t\nwhere t.id < 10",
     "queryId":"0:0",
     "hash":"8ba7998033f90e1e358f4fdc7ea4251b",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2878,7 +3594,11 @@ where t.id < 10
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -2893,7 +3613,7 @@ where id in
     "queryText":"select string_col, float_col, bool_col\nfrom functional.alltypes\nwhere id in\n  (select id from functional.alltypesagg)",
     "queryId":"0:0",
     "hash":"e8ad1371d2a13e1ee9ec45689b62cdc9",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -2945,7 +3665,11 @@ where id in
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -2955,7 +3679,11 @@ where id in
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.float_col"
+            "vertexId":"functional.alltypes.float_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
@@ -2965,17 +3693,29 @@ where id in
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.id"
+            "vertexId":"functional.alltypesagg.id",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         }
     ]
 }
@@ -2993,7 +3733,7 @@ and tinyint_col < 10
     "queryText":"select 1\nfrom functional.alltypesagg a\nwhere exists\n  (select id, count(int_col) over (partition by bool_col)\n   from functional.alltypestiny b\n   where a.tinyint_col = b.tinyint_col\n   group by id, int_col, bool_col)\nand tinyint_col < 10",
     "queryId":"0:0",
     "hash":"a7500c022d29c583c31b287868a848bf",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3024,12 +3764,20 @@ and tinyint_col < 10
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.tinyint_col"
+            "vertexId":"functional.alltypesagg.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.tinyint_col"
+            "vertexId":"functional.alltypestiny.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         }
     ]
 }
@@ -3044,7 +3792,7 @@ and a.bigint_col > 10
     "queryText":"select int_col + 1, tinyint_col - 1\nfrom functional.alltypes a\nwhere a.int_col <\n  (select max(int_col) from functional.alltypesagg g where g.bool_col = true)\nand a.bigint_col > 10",
     "queryId":"0:0",
     "hash":"5e6227f323793ea4441e2a3119af2f09",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3088,7 +3836,11 @@ and a.bigint_col > 10
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -3098,22 +3850,38 @@ and a.bigint_col > 10
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.bool_col"
+            "vertexId":"functional.alltypesagg.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.int_col"
+            "vertexId":"functional.alltypesagg.int_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         }
     ]
 }
@@ -3125,7 +3893,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
     "queryText":"with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
     "queryId":"0:0",
     "hash":"a7ab58d90540f28a8dfd69703632ad7a",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3156,7 +3924,11 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
@@ -3166,7 +3938,11 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -3179,7 +3955,7 @@ select id, int_col, string_col, year, month from t1
     "queryText":"with t1 as (select * from functional.alltypestiny)\ninsert into functional.alltypesinsert (id, int_col, string_col) partition(year, month)\nselect id, int_col, string_col, year, month from t1",
     "queryId":"0:0",
     "hash":"0bc5b3e66cc72387f74893b1f1934946",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3296,92 +4072,164 @@ select id, int_col, string_col, year, month from t1
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.year"
+            "vertexId":"year",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.year"
+            "vertexId":"functional.alltypestiny.year",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.month"
+            "vertexId":"month",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.month"
+            "vertexId":"functional.alltypestiny.month",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.id"
+            "vertexId":"functional.alltypestiny.id",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.int_col"
+            "vertexId":"functional.alltypestiny.int_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.string_col"
+            "vertexId":"functional.alltypestiny.string_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":17,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesinsert.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypesinsert",
+                "tableCreateTime":1559151331
+            }
         }
     ]
 }
@@ -3398,7 +4246,7 @@ from
     "queryText":"select lead(a) over (partition by b order by c)\nfrom\n  (select lead(id) over (partition by int_col order by bigint_col) as a,\n   max(id) over (partition by tinyint_col order by int_col) as b,\n   min(int_col) over (partition by string_col order by bool_col) as c\n   from functional.alltypes) v",
     "queryId":"0:0",
     "hash":"aa95e5e6f39fc80bb3c318a2515dc77d",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3434,32 +4282,56 @@ from
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bigint_col"
+            "vertexId":"functional.alltypes.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.bool_col"
+            "vertexId":"functional.alltypes.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -3471,7 +4343,7 @@ create view test_view_lineage as select id from functional.alltypestiny
     "queryText":"create view test_view_lineage as select id from functional.alltypestiny",
     "queryId":"0:0",
     "hash":"ff6b1ecb265afe4f03355a07238cfe37",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3488,12 +4360,20 @@ create view test_view_lineage as select id from functional.alltypestiny
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.id"
+            "vertexId":"functional.alltypestiny.id",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         }
     ]
 }
@@ -3521,7 +4401,7 @@ limit 0
     "queryText":"create view test_view_lineage (a, b) as select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
     "queryId":"0:0",
     "hash":"b96adf892b897da1e562c5be98724fb5",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3558,22 +4438,38 @@ limit 0
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a"
+            "vertexId":"a",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.int_col"
+            "vertexId":"functional_hbase.alltypessmall.int_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.b"
+            "vertexId":"b",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_hbase.alltypessmall.tinyint_col"
+            "vertexId":"functional_hbase.alltypessmall.tinyint_col",
+            "metadata":{
+                "tableName":"functional_hbase.alltypessmall",
+                "tableCreateTime":1559151688
+            }
         }
     ]
 }
@@ -3598,7 +4494,7 @@ create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
     "queryText":"create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as\n  select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\n  from functional.alltypessmall c\n  join (\n     select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n     from ( select * from functional.alltypesagg a where month=1 ) a\n     join functional.alltypessmall b on (a.smallint_col = b.id)\n   ) x on (x.tinyint_col = c.id)\n  where x.day=1\n  and x.int_col > 899\n  and x.float_col > 4.5\n  and c.string_col < '7'\n  and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
     "queryId":"0:0",
     "hash":"ffbe643df8f26e92907fb45de1aeda36",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3691,77 +4587,137 @@ create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a1"
+            "vertexId":"a1",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.smallint_col"
+            "vertexId":"functional.alltypesagg.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a2"
+            "vertexId":"a2",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a3"
+            "vertexId":"a3",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.tinyint_col"
+            "vertexId":"functional.alltypesagg.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a4"
+            "vertexId":"a4",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a5"
+            "vertexId":"a5",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.int_col"
+            "vertexId":"functional.alltypesagg.int_col",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a6"
+            "vertexId":"a6",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"functional.alltypessmall.float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.a7"
+            "vertexId":"a7",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"functional.alltypessmall.string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.day"
+            "vertexId":"functional.alltypesagg.day",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypesagg.month"
+            "vertexId":"functional.alltypesagg.month",
+            "metadata":{
+                "tableName":"functional.alltypesagg",
+                "tableCreateTime":1559151363
+            }
         }
     ]
 }
@@ -3781,7 +4737,7 @@ create view test_view_lineage as
     "queryText":"create view test_view_lineage as\n  select * from (\n    select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n      count(b.string_col), b.timestamp_col\n    from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\n    where a.year = 2010 and b.float_col > 0\n    group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\n    having count(a.int_col) > 10\n    order by b.bigint_col limit 10) t",
     "queryId":"0:0",
     "hash":"d4b9e2d63548088f911816b2ae29d7c2",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3846,67 +4802,119 @@ create view test_view_lineage as
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage._c0"
+            "vertexId":"_c0",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.tinyint_col"
+            "vertexId":"functional.alltypes.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.smallint_col"
+            "vertexId":"functional.alltypes.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage._c1"
+            "vertexId":"_c1",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.string_col"
+            "vertexId":"functional.alltypessmall.string_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.timestamp_col"
+            "vertexId":"timestamp_col",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.timestamp_col"
+            "vertexId":"functional.alltypessmall.timestamp_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.year"
+            "vertexId":"functional.alltypes.year",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.bigint_col"
+            "vertexId":"functional.alltypessmall.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.float_col"
+            "vertexId":"functional.alltypessmall.float_col",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypessmall.id"
+            "vertexId":"functional.alltypessmall.id",
+            "metadata":{
+                "tableName":"functional.alltypessmall",
+                "tableCreateTime":1559151325
+            }
         }
     ]
 }
@@ -3918,7 +4926,7 @@ alter view functional.alltypes_view as select id from functional.alltypestiny
     "queryText":"alter view functional.alltypes_view as select id from functional.alltypestiny",
     "queryId":"0:0",
     "hash":"8c9367afc562a4c04d2d40e1276646c2",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3935,12 +4943,20 @@ alter view functional.alltypes_view as select id from functional.alltypestiny
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes_view.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional.alltypes_view",
+                "tableCreateTime":1559151386
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.id"
+            "vertexId":"functional.alltypestiny.id",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         }
     ]
 }
@@ -3959,7 +4975,7 @@ select * from (
     "queryText":"select * from (\n  select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes\n  where year = 2000\n  order by nested_struct_col.f2.f12.f21 limit 10\n  union all\n  select sum(f1) y from\n    (select complex_struct_col.f1 f1 from functional.allcomplextypes\n     group by 1) v1) v2",
     "queryId":"0:0",
     "hash":"4fb3ceddbf596097335af607d528f5a7",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -3993,27 +5009,47 @@ select * from (
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.complex_struct_col.f1"
+            "vertexId":"functional.allcomplextypes.complex_struct_col.f1",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_struct_col.f1"
+            "vertexId":"functional.allcomplextypes.int_struct_col.f1",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_struct_col.f2"
+            "vertexId":"functional.allcomplextypes.int_struct_col.f2",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.nested_struct_col.f2.f12.f21"
+            "vertexId":"functional.allcomplextypes.nested_struct_col.f2.f12.f21",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.year"
+            "vertexId":"functional.allcomplextypes.year",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         }
     ]
 }
@@ -4027,7 +5063,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
     "queryText":"select * from functional.allcomplextypes.int_array_col a inner join\n  functional.allcomplextypes.struct_map_col m on (a.item = m.f1)",
     "queryId":"0:0",
     "hash":"8c0c64f8a4c08b82ad343ab439101957",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4089,7 +5125,11 @@ select * from functional.allcomplextypes.int_array_col a inner join
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_array_col.item"
+            "vertexId":"functional.allcomplextypes.int_array_col.item",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":2,
@@ -4099,7 +5139,11 @@ select * from functional.allcomplextypes.int_array_col a inner join
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.key"
+            "vertexId":"functional.allcomplextypes.struct_map_col.key",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":4,
@@ -4109,7 +5153,11 @@ select * from functional.allcomplextypes.int_array_col a inner join
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1"
+            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":6,
@@ -4119,7 +5167,11 @@ select * from functional.allcomplextypes.int_array_col a inner join
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.value.f2"
+            "vertexId":"functional.allcomplextypes.struct_map_col.value.f2",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         }
     ]
 }
@@ -4133,7 +5185,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
     "queryText":"select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m\n  where a.item = m.f1",
     "queryId":"0:0",
     "hash":"1b0db371b32e90d33629ed7779332cf7",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4227,7 +5279,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.id"
+            "vertexId":"functional.allcomplextypes.id",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":2,
@@ -4237,7 +5293,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.year"
+            "vertexId":"functional.allcomplextypes.year",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":4,
@@ -4247,7 +5307,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.month"
+            "vertexId":"functional.allcomplextypes.month",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":6,
@@ -4257,7 +5321,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_array_col.item"
+            "vertexId":"functional.allcomplextypes.int_array_col.item",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":8,
@@ -4267,7 +5335,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.key"
+            "vertexId":"functional.allcomplextypes.struct_map_col.key",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":10,
@@ -4277,7 +5349,11 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1"
+            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":12,
@@ -4287,17 +5363,29 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.value.f2"
+            "vertexId":"functional.allcomplextypes.struct_map_col.value.f2",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_array_col"
+            "vertexId":"functional.allcomplextypes.int_array_col",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col"
+            "vertexId":"functional.allcomplextypes.struct_map_col",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         }
     ]
 }
@@ -4318,7 +5406,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
     "queryText":"select a + b as ab, c, d, e from functional.allcomplextypes t,\n  (select sum(item) a from t.int_array_col\n   where item < 10) v1,\n  (select count(f1) b from t.struct_map_col\n   group by key) v2,\n  (select avg(value) over(partition by key) c from t.map_map_col.value) v3,\n  (select item d from t.int_array_col\n   union all\n   select value from t.int_map_col) v4,\n  (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5",
     "queryId":"0:0",
     "hash":"4affc0d1e384475d1ff2fc2e19643064",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4392,12 +5480,20 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_array_col.item"
+            "vertexId":"functional.allcomplextypes.int_array_col.item",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1"
+            "vertexId":"functional.allcomplextypes.struct_map_col.value.f1",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":3,
@@ -4407,12 +5503,20 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.map_map_col.value.value"
+            "vertexId":"functional.allcomplextypes.map_map_col.value.value",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.map_map_col.value.key"
+            "vertexId":"functional.allcomplextypes.map_map_col.value.key",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":6,
@@ -4422,7 +5526,11 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.int_map_col.value"
+            "vertexId":"functional.allcomplextypes.int_map_col.value",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":8,
@@ -4432,17 +5540,29 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.value.f21"
+            "vertexId":"functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.value.f21",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.key"
+            "vertexId":"functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.key",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.allcomplextypes.struct_map_col.key"
+            "vertexId":"functional.allcomplextypes.struct_map_col.key",
+            "metadata":{
+                "tableName":"functional.allcomplextypes",
+                "tableCreateTime":1559151373
+            }
         }
     ]
 }
@@ -4456,7 +5576,7 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
     "queryText":"create view test_view_lineage as\nselect id from functional.alltypes_view v\nwhere not exists (select 1 from functional.alltypes a where v.id = a.id)",
     "queryId":"0:0",
     "hash":"e79b8abc8a682d9e0f6b2c30a6c885f3",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4482,12 +5602,20 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.test_view_lineage.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"default.test_view_lineage",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -4500,7 +5628,7 @@ where k.int_col < 10
     "queryText":"select count(*) from functional_kudu.alltypes k join functional.alltypes h on k.id = h.id\nwhere k.int_col < 10",
     "queryId":"0:0",
     "hash":"7b7c92d488186d869bb6b78c97666f41",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4532,17 +5660,29 @@ where k.int_col < 10
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.alltypes.id"
+            "vertexId":"functional_kudu.alltypes.id",
+            "metadata":{
+                "tableName":"functional_kudu.alltypes",
+                "tableCreateTime":1559150985
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.alltypes.int_col"
+            "vertexId":"functional_kudu.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional_kudu.alltypes",
+                "tableCreateTime":1559150985
+            }
         }
     ]
 }
@@ -4555,7 +5695,7 @@ functional.alltypes a where a.id < 100
     "queryText":"insert into functional_kudu.testtbl select id, string_col as name, int_col as zip from\nfunctional.alltypes a where a.id < 100",
     "queryId":"0:0",
     "hash":"87a59bac56c6ad27f7af6e71af46d552",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4601,32 +5741,56 @@ functional.alltypes a where a.id < 100
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.name"
+            "vertexId":"name",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.zip"
+            "vertexId":"zip",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.int_col"
+            "vertexId":"functional.alltypes.int_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -4639,7 +5803,7 @@ functional.alltypes where id < 10
     "queryText":"insert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
     "queryId":"0:0",
     "hash":"0bccfdbf4118e6d5a3d94062ecb5130a",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4675,22 +5839,38 @@ functional.alltypes where id < 10
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.name"
+            "vertexId":"name",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -4703,7 +5883,7 @@ functional.alltypes where id < 10
     "queryText":"upsert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
     "queryId":"0:0",
     "hash":"f4c1e7b016e75012f7268f2f42ae5630",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4739,22 +5919,38 @@ functional.alltypes where id < 10
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.id"
+            "vertexId":"functional.alltypes.id",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"functional_kudu.testtbl.name"
+            "vertexId":"name",
+            "metadata":{
+                "tableName":"functional_kudu.testtbl",
+                "tableCreateTime":1559151047
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypes.string_col"
+            "vertexId":"functional.alltypes.string_col",
+            "metadata":{
+                "tableName":"functional.alltypes",
+                "tableCreateTime":1559151317
+            }
         }
     ]
 }
@@ -4769,7 +5965,7 @@ from functional.alltypestiny
     "queryText":"create table kudu_ctas primary key (id) partition by hash (id) partitions 3\nstored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col,\nbigint_col, float_col, double_col, date_string_col, string_col\nfrom functional.alltypestiny",
     "queryId":"0:0",
     "hash":"de98b09af6b6ab0f0678c5fc0c4369b4",
-    "user":"progers",
+    "user":"dummy_user",
     "timestamp":1547867922,
     "edges":[
         {
@@ -4867,102 +6063,182 @@ from functional.alltypestiny
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.id"
+            "vertexId":"id",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":1,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.id"
+            "vertexId":"functional.alltypestiny.id",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.bool_col"
+            "vertexId":"bool_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":3,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.bool_col"
+            "vertexId":"functional.alltypestiny.bool_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.tinyint_col"
+            "vertexId":"tinyint_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":5,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.tinyint_col"
+            "vertexId":"functional.alltypestiny.tinyint_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.smallint_col"
+            "vertexId":"smallint_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":7,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.smallint_col"
+            "vertexId":"functional.alltypestiny.smallint_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.int_col"
+            "vertexId":"int_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":9,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.int_col"
+            "vertexId":"functional.alltypestiny.int_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.bigint_col"
+            "vertexId":"bigint_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":11,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.bigint_col"
+            "vertexId":"functional.alltypestiny.bigint_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.float_col"
+            "vertexId":"float_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":13,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.float_col"
+            "vertexId":"functional.alltypestiny.float_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.double_col"
+            "vertexId":"double_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":15,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.double_col"
+            "vertexId":"functional.alltypestiny.double_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.date_string_col"
+            "vertexId":"date_string_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":17,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.date_string_col"
+            "vertexId":"functional.alltypestiny.date_string_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         },
         {
             "id":18,
             "vertexType":"COLUMN",
-            "vertexId":"default.kudu_ctas.string_col"
+            "vertexId":"string_col",
+            "metadata":{
+                "tableName":"default.kudu_ctas",
+                "tableCreateTime":-1
+            }
         },
         {
             "id":19,
             "vertexType":"COLUMN",
-            "vertexId":"functional.alltypestiny.string_col"
+            "vertexId":"functional.alltypestiny.string_col",
+            "metadata":{
+                "tableName":"functional.alltypestiny",
+                "tableCreateTime":1559151330
+            }
         }
     ]
 }

@@ -299,4 +299,3 @@ Status Frontend::BuildTestDescriptorTable(const TBuildTestDescriptorTableParams&
 Status Frontend::CallQueryCompleteHooks(const TQueryCompleteContext& context) {
   return JniUtil::CallJniMethod(fe_, call_query_complete_hooks_id_, context);
 }
-

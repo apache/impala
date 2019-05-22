@@ -164,6 +164,14 @@ struct TDdlExecResponse {
   // Result of DDL operation to be returned to the client. Currently only set
   // by COMPUTE STATS and ALTER TABLE.
   3: optional Results.TResultSet result_set
+
+  // The table/view name in HMS. Set only for CREATE TABLE, CREATE TABLE AS SELECT,
+  // CREATE TABLE LIKE, and CREATE VIEW statements.
+  4: optional string table_name
+
+  // The table/view create time stored in HMS. Set only for CREATE TABLE,
+  // CREATE TABLE AS SELECT, CREATE TABLE LIKE, and CREATE VIEW statements.
+  5: optional i64 table_create_time
 }
 
 // Updates the metastore with new partition information and returns a response

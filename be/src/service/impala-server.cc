@@ -480,6 +480,22 @@ Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_s
   } else {
     return Status::OK();
   }
+
+  if (client_request_state.catalog_op_type() == TCatalogOpType::DDL) {
+    const TDdlExecResponse* ddl_exec_response = client_request_state.ddl_exec_response();
+    // Update vertices that have -1 table_create_time for a newly created table/view.
+    if (ddl_exec_response->__isset.table_name &&
+        ddl_exec_response->__isset.table_create_time) {
+      for (auto &vertex: lineage_graph.vertices) {
+        if (!vertex.__isset.metadata) continue;
+        if (vertex.metadata.table_name == ddl_exec_response->table_name &&
+            vertex.metadata.table_create_time == -1) {
+          vertex.metadata.__set_table_create_time(ddl_exec_response->table_create_time);
+        }
+      }
+    }
+  }
+
   // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
   // e.g. converting from client_request_state.end_time() (IMPALA-4440).
   lineage_graph.__set_ended(UnixMillis() / 1000);

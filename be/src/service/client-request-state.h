@@ -197,7 +197,7 @@ class ClientRequestState {
   void set_fetched_rows() { fetched_rows_ = true; }
   bool fetched_rows() const { return fetched_rows_; }
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
-  const TResultSetMetadata* result_metadata() { return &result_metadata_; }
+  const TResultSetMetadata* result_metadata() const { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
   const TExecRequest& exec_request() const { return exec_request_; }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
@@ -259,7 +259,11 @@ class ClientRequestState {
   RuntimeProfile::EventSequence* query_events() const { return query_events_; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
 
- protected:
+  /// Returns nullptr when catalog_op_type is not DDL.
+  const TDdlExecResponse* ddl_exec_response() const {
+    return catalog_op_executor_->ddl_exec_response();
+  }
+protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
   /// change the end time.
