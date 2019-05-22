@@ -182,14 +182,6 @@ under the License.
         <enabled>false</enabled>
       </snapshots>
     </repository>
-    <repository>
-      <id>hwx.public.repo</id>
-      <url>http://nexus-private.hortonworks.com/nexus/content/groups/public</url>
-      <name>Hortonworks public repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
   </repositories>
 
   <pluginRepositories>
