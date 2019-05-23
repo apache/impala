@@ -54,10 +54,8 @@ class TestClientSsl(CustomClusterTestSuite):
   SAN_UNSUPPORTED_ERROR = ("Certificate error with remote host: hostname "
                           "'localhost' doesn't match u'badCN'")
 
-  # Deprecation warnings that should not be seen.
-  DEPRECATED_POSITIONAL_WARNING = "positional argument is deprecated"
-  DEPRECATED_VALIDATE_WARNING = "validate is deprecated"
-  # TODO(IMPALA-8333) check for "DeprecationWarning"
+  # Deprecation warnings should not be seen.
+  DEPRECATION_WARNING = "DeprecationWarning"
 
   SSL_WILDCARD_ARGS = ("--ssl_client_ca_certificate=%s/wildcardCA.pem "
                       "--ssl_server_certificate=%s/wildcard-cert.pem "
@@ -231,17 +229,14 @@ class TestClientSsl(CustomClusterTestSuite):
     result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr
-    for warning in [self.DEPRECATED_POSITIONAL_WARNING, self.DEPRECATED_VALIDATE_WARNING]:
-      assert warning not in result.stderr
+    assert self.DEPRECATION_WARNING not in result.stderr
 
     if ca_cert != "":
       shell_options = shell_options + ["--ca_cert=%s" % ca_cert]
       result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
       for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
         assert msg in result.stderr
-      for warning in [self.DEPRECATED_POSITIONAL_WARNING,
-                      self.DEPRECATED_VALIDATE_WARNING]:
-        assert warning not in result.stderr
+      assert self.DEPRECATION_WARNING not in result.stderr
 
   def _verify_ssl_webserver(self):
     for port in ["25000", "25010", "25020"]:
