@@ -18,8 +18,6 @@
 #ifndef IMPALA_RPC_RPC_MGR_TEST_H
 #define IMPALA_RPC_RPC_MGR_TEST_H
 
-#include "rpc/rpc-mgr.inline.h"
-
 #include "common/init.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/remote_user.h"
@@ -268,6 +266,25 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
 
 };
 
+/// A class that behaves like a ::kudu::rpc::Proxy and keeps a count of the number of
+/// times it is called. It always fails by returning an IOError.
+class FailingPingServiceProxy {
+ public:
+  kudu::Status Ping(const class PingRequestPB& req, class PingResponsePB* resp,
+      ::kudu::rpc::RpcController* controller) {
+    ++number_of_calls_;
+    return kudu::Status::IOError(
+        Substitute("ping failing, number of calls=$0.", number_of_calls_));
+  }
+
+  /// Return the number of times Ping has been called.
+  int GetNumberOfCalls() const { return number_of_calls_; }
+
+ private:
+  /// Number of times Ping has been called.
+  int number_of_calls_ = 0;
+};
+
 Status RpcMgrTest::RunMultipleServicesTest(
     RpcMgr* rpc_mgr, const TNetworkAddress& krpc_address) {
   // Test that a service can be started, and will respond to requests.
@@ -308,9 +325,9 @@ Status RpcMgrTest::RunMultipleServicesTest(
       KUDU_RETURN_IF_ERROR(ping_proxy->Ping(request, &response, &controller),
           "unable to execute Ping() RPC.");
       if (response.int_response() != 42) {
-          return Status(Substitute(
-              "Ping() failed. Incorrect response. Expected: 42; Got: $0",
-                  response.int_response()));
+        return Status(
+            Substitute("Ping() failed. Incorrect response. Expected: 42; Got: $0",
+                response.int_response()));
       }
     } else {
       ScanMemRequestPB request;

@@ -50,9 +50,11 @@ METRIC_DEFINE_histogram(server, impala_incoming_queue_time,
 
 using namespace rapidjson;
 
+DECLARE_string(debug_actions);
+
 namespace impala {
-// Metric key format for rpc call duration metrics.
-const string RPC_QUEUE_OVERFLOW_METRIC_KEY = "rpc.$0.rpcs_queue_overflow";
+const char * ImpalaServicePool::RPC_QUEUE_OVERFLOW_METRIC_KEY =
+    "rpc.$0.rpcs_queue_overflow";
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
     int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
@@ -184,6 +186,13 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
       return kudu::Status::OK();
     }
     service_mem_tracker_->Consume(transfer_size);
+  }
+
+  Status debug_status = DebugAction(FLAGS_debug_actions, "SERVICE_POOL_SERVER_BUSY");
+  if (UNLIKELY(!debug_status.ok())) {
+    // Simulate the service being too busy.
+    RejectTooBusy(c);
+    return kudu::Status::OK();
   }
 
   boost::optional<kudu::rpc::InboundCall*> evicted;

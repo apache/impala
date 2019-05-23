@@ -26,6 +26,7 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
+#include "rpc/rpc-mgr.inline.h"
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator-filter-state.h"
@@ -465,12 +466,13 @@ bool Coordinator::BackendState::Cancel() {
   TUniqueIdToUniqueIdPB(query_id(), request.mutable_query_id());
   CancelQueryFInstancesResponsePB response;
 
-  auto cancel_rpc = [&](RpcController* rpc_controller) -> kudu::Status {
-    return proxy->CancelQueryFInstances(request, &response, rpc_controller);
-  };
-
-  Status rpc_status = ControlService::DoRpcWithRetry(cancel_rpc, query_ctx(),
-      "COORD_CANCEL_QUERY_FINSTANCES_RPC", "Cancel() RPC failed", 3, 10);
+  const int num_retries = 3;
+  const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+  const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
+  Status rpc_status =
+      RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::CancelQueryFInstances, request,
+          &response, query_ctx(), "Cancel() RPC failed", num_retries, timeout_ms,
+          backoff_time_ms, "COORD_CANCEL_QUERY_FINSTANCES_RPC");
 
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);

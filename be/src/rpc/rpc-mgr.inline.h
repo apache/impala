@@ -49,6 +49,42 @@ Status RpcMgr::GetProxy(const TNetworkAddress& address, const std::string& hostn
   return Status::OK();
 }
 
+template <typename Proxy, typename ProxyMethod, typename Request, typename Response>
+Status RpcMgr::DoRpcWithRetry(const std::unique_ptr<Proxy>& proxy,
+    const ProxyMethod& rpc_call, const Request& request, Response* response,
+    const TQueryCtx& query_ctx, const char* error_msg, const int times_to_try,
+    const int64_t timeout_ms, const int64_t server_busy_backoff_ms,
+    const char* debug_action) {
+  DCHECK_GT(times_to_try, 0);
+  Status rpc_status;
+
+  for (int i = 0; i < times_to_try; ++i) {
+    kudu::rpc::RpcController rpc_controller;
+    rpc_controller.set_timeout(kudu::MonoDelta::FromMilliseconds(timeout_ms));
+
+    if (debug_action != nullptr) {
+      // Check for injected failures.
+      rpc_status = DebugAction(query_ctx.client_request.query_options, debug_action);
+      if (!rpc_status.ok()) continue;
+    }
+
+    const kudu::Status& k_status =
+        (proxy.get()->*rpc_call)(request, response, &rpc_controller);
+    rpc_status = FromKuduStatus(k_status, error_msg);
+
+    // If the call succeeded, or the server is not busy, then return result to caller.
+    if (rpc_status.ok() || !RpcMgr::IsServerTooBusy(rpc_controller)) {
+      return rpc_status;
+    }
+
+    // Server is busy, sleep if caller requested it and this is not the last time to try.
+    if (server_busy_backoff_ms != 0 && i != times_to_try - 1) {
+      SleepForMs(server_busy_backoff_ms);
+    }
+  }
+  return rpc_status;
+}
+
 } // namespace impala
 
 #endif

@@ -25,6 +25,7 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_controller.h"
+#include "rpc/rpc-mgr.inline.h"
 #include "runtime/backend-client.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
@@ -658,12 +659,12 @@ Status ClientRequestState::ExecShutdownRequest() {
   RemoteShutdownResultPB resp;
   VLOG_QUERY << "Sending Shutdown RPC to " << TNetworkAddressToString(addr);
 
-  auto shutdown_rpc = [&](RpcController* rpc_controller) -> kudu::Status {
-    return proxy->RemoteShutdown(params, &resp, rpc_controller);
-  };
-
-  Status rpc_status = ControlService::DoRpcWithRetry(
-      shutdown_rpc, query_ctx_, "CRS_SHUTDOWN_RPC", "RemoteShutdown() RPC failed", 3, 10);
+  const int num_retries = 3;
+  const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+  const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
+  Status rpc_status = RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::RemoteShutdown,
+      params, &resp, query_ctx_, "RemoteShutdown() RPC failed", num_retries, timeout_ms,
+      backoff_time_ms, "CRS_SHUTDOWN_RPC");
 
   if (!rpc_status.ok()) {
     const string& msg = rpc_status.msg().msg();

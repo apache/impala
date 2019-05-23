@@ -175,6 +175,21 @@ class RpcMgr {
   /// in flight, and metrics and histograms for each service and their methods.
   void ToJson(rapidjson::Document* document);
 
+  /// Retry the Rpc 'rpc_call' on the 'proxy' object up to 'times_to_try' times.
+  /// The 'rpc_call' must be idempotent as it may be called multiple times.
+  /// Each Rpc has a timeout of 'timeout_ms' milliseconds.
+  /// If the service is busy then sleep 'server_busy_backoff_ms' milliseconds before
+  /// retrying.
+  /// Pass 'debug_action' to DebugAction() to potentially inject errors.
+  /// TODO: Clean up this interface. Replace the debug action with fault injection in RPC
+  /// callbacks or other places.
+  template <typename Proxy, typename ProxyMethod, typename Request, typename Response>
+  static Status DoRpcWithRetry(const std::unique_ptr<Proxy>& proxy,
+      const ProxyMethod& rpc_call, const Request& request, Response* response,
+      const TQueryCtx& query_ctx, const char* error_msg, const int times_to_try,
+      const int64_t timeout_ms, const int64_t server_busy_backoff_ms = 0,
+      const char* debug_action = nullptr);
+
   ~RpcMgr() {
     DCHECK_EQ(service_pools_.size(), 0)
         << "Must call Shutdown() before destroying RpcMgr";

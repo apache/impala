@@ -417,7 +417,7 @@ class QueryState {
   void ConstructReport(bool instances_started, ReportExecStatusRequestPB* report,
       TRuntimeProfileForest* profiles_forest);
 
-  /// Gather statues and profiles of all fragment instances belonging to this query state
+  /// Gather statuses and profiles of all fragment instances belonging to this query state
   /// and send it to the coordinator via ReportExecStatus() RPC. Returns true if the
   /// report rpc was successful or if it was unsuccessful and we've reached the maximum
   /// number of allowed failures and cancelled.

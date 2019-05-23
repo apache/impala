@@ -31,12 +31,14 @@ DECLARE_int32(num_reactor_threads);
 DECLARE_int32(num_acceptor_threads);
 DECLARE_int32(rpc_negotiation_timeout_ms);
 DECLARE_string(hostname);
+DECLARE_string(debug_actions);
 
 // For tests that do not require kerberized testing, we use RpcTest.
 namespace impala {
 
+// Test multiple services managed by an Rpc Manager using TLS.
 TEST_F(RpcMgrTest, MultipleServicesTls) {
-  // TODO: We're starting a seperate RpcMgr here instead of configuring
+  // TODO: We're starting a separate RpcMgr here instead of configuring
   // RpcTestBase::rpc_mgr_ to use TLS. To use RpcTestBase::rpc_mgr_, we need to introduce
   // new gtest params to turn on TLS which needs to be a coordinated change across
   // rpc-mgr-test and thrift-server-test.
@@ -55,6 +57,7 @@ TEST_F(RpcMgrTest, MultipleServicesTls) {
   tls_rpc_mgr.Shutdown();
 }
 
+// Test multiple services managed by an Rpc Manager.
 TEST_F(RpcMgrTest, MultipleServices) {
   ASSERT_OK(RunMultipleServicesTest(&rpc_mgr_, krpc_address_));
 }
@@ -163,6 +166,7 @@ TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
   tls_rpc_mgr.Shutdown();
 }
 
+// Test behavior with a slow service.
 TEST_F(RpcMgrTest, SlowCallback) {
   // Use a callback which is slow to respond.
   auto slow_cb = [](RpcContext* ctx) {
@@ -199,6 +203,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
   }
 }
 
+// Test async calls.
 TEST_F(RpcMgrTest, AsyncCall) {
   GeneratedServiceIf* scan_mem_impl =
       TakeOverService(make_unique<ScanMemServiceImpl>(&rpc_mgr_));
@@ -249,6 +254,86 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
   ASSERT_OK(secondary_rpc_mgr.Init());
   ASSERT_FALSE(RunMultipleServicesTest(&secondary_rpc_mgr, secondary_krpc_address).ok());
   secondary_rpc_mgr.Shutdown();
+}
+
+// Test RpcMgr::DoRpcWithRetry using a fake proxy.
+TEST_F(RpcMgrTest, DoRpcWithRetry) {
+  TQueryCtx query_ctx;
+  const int num_retries = 10;
+  const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+
+  // Test how DoRpcWithRetry retries by using a proxy that always fails.
+  unique_ptr<FailingPingServiceProxy> failing_proxy =
+      make_unique<FailingPingServiceProxy>();
+  // A call that fails is not retried as the server is not busy.
+  PingRequestPB request1;
+  PingResponsePB response1;
+  Status rpc_status_fail =
+      RpcMgr::DoRpcWithRetry(failing_proxy, &FailingPingServiceProxy::Ping, request1,
+          &response1, query_ctx, "ping failed", num_retries, timeout_ms);
+  ASSERT_FALSE(rpc_status_fail.ok());
+  // Check that proxy was only called once.
+  ASSERT_EQ(1, failing_proxy->GetNumberOfCalls());
+
+  // Test injection of DebugAction into DoRpcWithRetry.
+  query_ctx.client_request.query_options.__set_debug_action("DoRpcWithRetry:FAIL");
+  PingRequestPB request2;
+  PingResponsePB response2;
+  Status inject_status = RpcMgr::DoRpcWithRetry(failing_proxy,
+      &FailingPingServiceProxy::Ping, request2, &response2, query_ctx, "ping failed",
+      num_retries, timeout_ms, 0, "DoRpcWithRetry");
+  ASSERT_FALSE(inject_status.ok());
+  EXPECT_ERROR(inject_status, TErrorCode::INTERNAL_ERROR);
+  ASSERT_EQ("Debug Action: DoRpcWithRetry:FAIL", inject_status.msg().msg());
+}
+
+// Test RpcMgr::DoRpcWithRetry by injecting service-too-busy failures.
+TEST_F(RpcMgrTest, BusyService) {
+  TQueryCtx query_ctx;
+  auto cb = [](RpcContext* ctx) { ctx->RespondSuccess(); };
+  GeneratedServiceIf* ping_impl =
+      TakeOverService(make_unique<PingServiceImpl>(&rpc_mgr_, cb));
+  const int num_service_threads = 4;
+  const int queue_size = 25;
+  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+  FLAGS_num_acceptor_threads = 2;
+  FLAGS_num_reactor_threads = 10;
+  ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
+
+  // Find the counter which tracks the number of times the service queue is too full.
+  const string& overflow_count = Substitute(
+      ImpalaServicePool::RPC_QUEUE_OVERFLOW_METRIC_KEY, ping_impl->service_name());
+  IntCounter* overflow_metric =
+      ExecEnv::GetInstance()->rpc_metrics()->FindMetricForTesting<IntCounter>(
+          overflow_count);
+  ASSERT_TRUE(overflow_metric != nullptr);
+
+  unique_ptr<PingServiceProxy> proxy;
+  ASSERT_OK(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(
+      krpc_address_, FLAGS_hostname, &proxy));
+
+  // There have been no overflows yet.
+  EXPECT_EQ(overflow_metric->GetValue(), 0L);
+
+  // Use DebugAction to make the Impala Service Pool reject 50% of Krpc calls as if the
+  // service is too busy.
+  auto s = ScopedFlagSetter<string>::Make(
+      &FLAGS_debug_actions, "SERVICE_POOL_SERVER_BUSY:FAIL@0.5");
+  PingRequestPB request;
+  PingResponsePB response;
+  const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+  int num_retries = 40; // How many times DoRpcWithRetry can retry.
+  int num_rpc_retry_calls = 40; // How many times to call DoRpcWithRetry
+  for (int i = 0; i < num_rpc_retry_calls; ++i) {
+    Status status = RpcMgr::DoRpcWithRetry(proxy, &PingServiceProxy::Ping, request,
+        &response, query_ctx, "ping failed", num_retries, timeout_ms);
+    // DoRpcWithRetry will fail with probability (1/2)^num_rpc_retry_calls.
+    ASSERT_TRUE(status.ok());
+  }
+  // There will be no overflows (i.e. service too busy) with probability
+  // (1/2)^num_retries.
+  ASSERT_GT(overflow_metric->GetValue(), 0);
 }
 
 } // namespace impala

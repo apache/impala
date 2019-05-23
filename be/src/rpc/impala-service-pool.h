@@ -68,6 +68,9 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Expose the service pool metrics by storing them as JSON in 'value'.
   void ToJson(rapidjson::Value* value, rapidjson::Document* document);
 
+  /// Metric key format for rpc call duration metrics.
+  static const char* RPC_QUEUE_OVERFLOW_METRIC_KEY;
+
  private:
   void RunThread();
   void RejectTooBusy(kudu::rpc::InboundCall* c);
