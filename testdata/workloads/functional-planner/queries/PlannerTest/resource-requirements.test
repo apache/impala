@@ -1102,6 +1102,9 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservat
 ====
 # Avro scan.
 select * from tpch_avro.orders
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
@@ -1177,6 +1180,88 @@ Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reserva
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=88B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
+select * from tpch_avro.orders
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+3
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
+Per-Host Resource Estimates: Memory=64MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_avro.orders
+Analyzed query: SELECT * FROM tpch_avro.orders
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [tpch_avro.orders]
+   HDFS partitions=1/1 files=3 size=156.92MB
+   stored statistics:
+     table: rows=unavailable size=156.92MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=88B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=3
+Per-Host Resource Estimates: Memory=64MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_avro.orders
+Analyzed query: SELECT * FROM tpch_avro.orders
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=275.97KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=275.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=88B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=2
+00:SCAN HDFS [tpch_avro.orders, RANDOM]
+   HDFS partitions=1/1 files=3 size=156.92MB
+   stored statistics:
+     table: rows=unavailable size=156.92MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=88B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=5
+Per-Host Resource Estimates: Memory=129MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_avro.orders
+Analyzed query: SELECT * FROM tpch_avro.orders
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=551.97KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=551.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=88B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=4
+00:SCAN HDFS [tpch_avro.orders, RANDOM]
+   HDFS partitions=1/1 files=3 size=156.92MB
+   stored statistics:
+     table: rows=unavailable size=156.92MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=88B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====
@@ -1342,6 +1427,9 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00MB thread-reservat
 ====
 # ORC scan
 select * from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=40MB
@@ -1362,8 +1450,36 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
+# ORC scan
+select * from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+3
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
+Per-Host Resource Estimates: Memory=88MB
+Analyzed query: SELECT * FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=1 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=231B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
 # Single column ORC scan - memory reservation is same as multi-column scan.
 select l_comment from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=40MB
@@ -1381,6 +1497,30 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1.08M
    mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+select l_comment from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+3
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
+Per-Host Resource Estimates: Memory=88MB
+Analyzed query: SELECT l_comment FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=1 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====

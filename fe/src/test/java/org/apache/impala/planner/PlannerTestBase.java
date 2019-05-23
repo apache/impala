@@ -876,6 +876,18 @@ public class PlannerTestBase extends FrontendTestBase {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
+
+      String neededHiveMajorVersion =
+          testCase.getSectionAsString(Section.HIVE_MAJOR_VERSION, false, "");
+      if (neededHiveMajorVersion != null && !neededHiveMajorVersion.isEmpty() &&
+          Integer.parseInt(neededHiveMajorVersion) != TestUtils.getHiveMajorVersion()) {
+        actualOutput.append("Skipping test case (needs Hive major version: ");
+        actualOutput.append(neededHiveMajorVersion);
+        actualOutput.append(")\n");
+        actualOutput.append("====\n");
+        continue;
+      }
+
       String queryOptionsSection = testCase.getSectionAsString(
           Section.QUERYOPTIONS, true, "\n");
       if (queryOptionsSection != null && !queryOptionsSection.isEmpty()) {

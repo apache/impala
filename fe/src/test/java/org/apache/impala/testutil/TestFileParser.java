@@ -95,7 +95,8 @@ public class TestFileParser {
     ERRORS,
     SCANRANGELOCATIONS,
     LINEAGE,
-    QUERYOPTIONS;
+    QUERYOPTIONS,
+    HIVE_MAJOR_VERSION;
 
     // Return header line for this section
     public String getHeader() {
