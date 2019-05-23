@@ -327,6 +327,181 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("revoke select(x) on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
 
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_grant_revoke_ranger_api(self, unique_name):
+    user = getuser()
+    admin_client = self.create_impala_client()
+    unique_db = unique_name + "_db"
+    resource = {
+      "database": unique_db,
+      "column": "*",
+      "table": "*"
+    }
+    access = ["select", "create"]
+
+    try:
+      # Create the test database
+      admin_client.execute("drop database if exists {0} cascade".format(unique_db),
+                           user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_db), user=ADMIN)
+
+      # Grant privileges via Ranger REST API
+      TestRanger._grant_ranger_privilege(user, resource, access)
+
+      # Privileges should be stale before a refresh
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+      TestRanger._check_privileges(result, [])
+
+      # Refresh and check updated privileges
+      admin_client.execute("refresh authorization")
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+
+      TestRanger._check_privileges(result, [
+        ["USER", user, unique_db, "*", "*", "", "", "create", "false"],
+        ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+      ])
+
+      # Revoke privileges via Ranger REST API
+      TestRanger._revoke_ranger_privilege(user, resource, access)
+
+      # Privileges should be stale before a refresh
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+      TestRanger._check_privileges(result, [
+        ["USER", user, unique_db, "*", "*", "", "", "create", "false"],
+        ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+      ])
+
+      # Refresh and check updated privileges
+      admin_client.execute("refresh authorization")
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+
+      TestRanger._check_privileges(result, [])
+    finally:
+      admin_client.execute("revoke all on database {0} from user {1}"
+                           .format(unique_db, user))
+      admin_client.execute("drop database if exists {0} cascade".format(unique_db),
+                           user=ADMIN)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_show_grant_hive_privilege(self, unique_name):
+    user = getuser()
+    admin_client = self.create_impala_client()
+    unique_db = unique_name + "_db"
+    resource = {
+      "database": unique_db,
+      "column": "*",
+      "table": "*"
+    }
+    access = ["lock", "select"]
+
+    try:
+      TestRanger._grant_ranger_privilege(user, resource, access)
+      admin_client.execute("drop database if exists {0} cascade".format(unique_db),
+                           user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_db), user=ADMIN)
+
+      admin_client.execute("refresh authorization")
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+
+      TestRanger._check_privileges(result, [
+        ["USER", user, unique_db, "*", "*", "", "", "select", "false"]
+      ])
+
+      # Assert that lock, select privilege exists in Ranger server
+      assert "lock" in TestRanger._get_ranger_privileges_db(user, unique_db)
+      assert "select" in TestRanger._get_ranger_privileges_db(user, unique_db)
+
+      admin_client.execute("revoke select on database {0} from user {1}"
+                           .format(unique_db, user))
+
+      # Assert that lock is still present and select is revoked in Ranger server
+      assert "lock" in TestRanger._get_ranger_privileges_db(user, unique_db)
+      assert "select" not in TestRanger._get_ranger_privileges_db(user, unique_db)
+
+      admin_client.execute("refresh authorization")
+      result = self.client.execute("show grant user {0} on database {1}"
+                                   .format(user, unique_db))
+
+      TestRanger._check_privileges(result, [])
+    finally:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_db),
+                           user=ADMIN)
+      TestRanger._revoke_ranger_privilege(user, resource, access)
+
+  @staticmethod
+  def _grant_ranger_privilege(user, resource, access):
+    data = {
+      "grantor": ADMIN,
+      "grantorGroups": [],
+      "resource": resource,
+      "users": [user],
+      "groups": [],
+      "accessTypes": access,
+      "delegateAdmin": "false",
+      "enableAudit": "true",
+      "replaceExistingPermissions": "false",
+      "isRecursive": "false",
+      "clusterName": "server1"
+    }
+
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    r = requests.post("{0}/service/plugins/services/grant/test_impala?pluginId=impala"
+                      .format(RANGER_HOST),
+                      auth=RANGER_AUTH, json=data, headers=headers)
+    assert 200 <= r.status_code < 300
+
+  @staticmethod
+  def _revoke_ranger_privilege(user, resource, access):
+    data = {
+      "grantor": ADMIN,
+      "grantorGroups": [],
+      "resource": resource,
+      "users": [user],
+      "groups": [],
+      "accessTypes": access,
+      "delegateAdmin": "false",
+      "enableAudit": "true",
+      "replaceExistingPermissions": "false",
+      "isRecursive": "false",
+      "clusterName": "server1"
+    }
+
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    r = requests.post("{0}/service/plugins/services/revoke/test_impala?pluginId=impala"
+                      .format(RANGER_HOST),
+                      auth=RANGER_AUTH, json=data, headers=headers)
+    assert 200 <= r.status_code < 300
+
+  @staticmethod
+  def _get_ranger_privileges_db(user, db):
+    policies = TestRanger._get_ranger_privileges(user)
+    result = []
+
+    for policy in policies:
+      resources = policy["resources"]
+      if "database" in resources and db in resources["database"]["values"]:
+        for policy_items in policy["policyItems"]:
+          if user in policy_items["users"]:
+            for access in policy_items["accesses"]:
+              result.append(access["type"])
+
+    return result
+
+  @staticmethod
+  def _get_ranger_privileges(user):
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    r = requests.get("{0}/service/plugins/policies"
+                     .format(RANGER_HOST),
+                     auth=RANGER_AUTH, headers=headers)
+    return json.loads(r.content)["policies"]
+
   def _add_ranger_user(self, user):
     data = {"name": user, "password": "password123", "userRoleList": ["ROLE_USER"]}
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
