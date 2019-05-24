@@ -47,6 +47,10 @@ class TestAcid(ImpalaTestSuite):
   def test_acid_negative(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-negative', vector, use_db=unique_database)
 
+  @SkipIfHive2.acid
+  def test_acid_partitioned(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-partitioned', vector, use_db=unique_database)
+
 # TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.

@@ -87,10 +87,66 @@ public class AcidUtilsTest {
           "abc/",
           "abc/base_0000006/", // Not at root, so shouldn't be handled.
           "base_00000100/def.txt"},
+      // <tableName>:<highWatermark>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
         "default.test:10:1234:1,2,3",
         new String[]{
           "base_0000005/abc.txt",
           "base_0000005/0000/abc.txt"});
+  }
+
+  @Test
+  public void testOpenTransactions() {
+    assertFiltering(new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005/",
+          "base_0000005/abc.txt",
+          "base_0000005/0000/",
+          "base_0000005/0000/abc.txt",
+          "delta_0000006_0000006_0000/",
+          "delta_0000006_0000006_0000/000000_0",
+          "delta_0000007_0000007_0000/",
+          "delta_0000007_0000007_0000/000000_0",
+          "delta_0000008_0000008_0000/",
+          "delta_0000008_0000008_0000/000000_0",
+          "delta_0000009_0000009_0000/",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"},
+        "default.test:10:6:6,7,8:", // 6,7,8 are open write ids
+        new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005/abc.txt",
+          "base_0000005/0000/abc.txt",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"});
+  }
+
+  @Test
+  public void testAbortedTransactions() {
+    assertFiltering(new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005/",
+          "base_0000005/abc.txt",
+          "base_0000005/0000/",
+          "base_0000005/0000/abc.txt",
+          "delta_0000006_0000006_0000/",
+          "delta_0000006_0000006_0000/000000_0",
+          "delta_0000007_0000007_0000/",
+          "delta_0000007_0000007_0000/000000_0",
+          "delta_0000008_0000008_0000/",
+          "delta_0000008_0000008_0000/000000_0",
+          "delta_0000009_0000009_0000/",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"},
+        "default.test:10:1337::7,8,9", // 7,8,9 are aborted write ids
+        new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005/abc.txt",
+          "base_0000005/0000/abc.txt",
+          "delta_0000006_0000006_0000/000000_0"});
   }
 
   @Test

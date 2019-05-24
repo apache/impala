@@ -109,7 +109,7 @@ if hive_major_version >= 3:
 
    # Enable compaction workers. The compaction initiator is off by default
    # but configuring a worker thread allows manual compaction.
-   'hive.compactor.worker.threads': 1
+   'hive.compactor.worker.threads': 4
   })
 else:
   CONFIG.update({

@@ -51,11 +51,19 @@ public class AcidUtils {
   public static final String TABLE_IS_TRANSACTIONAL = "transactional";
   public static final String TABLE_TRANSACTIONAL_PROPERTIES = "transactional_properties";
 
+  // Regex pattern for files in base directories. The pattern matches strings like
+  // "base_0000005/abc.txt",
+  // "base_0000005/0000/abc.txt",
+  // "base_0000003_v0003217/000000_0"
   private static final Pattern BASE_PATTERN = Pattern.compile(
       "base_" +
       "(?<writeId>\\d+)" +
       "(?:_v(?<visibilityTxnId>\\d+))?" +
       "(?:/.*)?");
+
+  // Regex pattern for files in delta directories. The pattern matches strings like
+  // "delta_0000006_0000006/000000_0",
+  // "delta_0000009_0000009_0000/0000/def.txt"
   private static final Pattern DELTA_PATTERN = Pattern.compile(
       "delta_" +
        "(?<minWriteId>\\d+)_" +

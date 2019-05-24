@@ -1,0 +1,133 @@
+====
+---- HIVE_QUERY
+# Create partitioned ACID table in Hive and query it in Impala.
+use $DATABASE;
+create table pt (i int)
+partitioned by (p int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+insert into pt partition (p=1) values (10), (11);
+insert into pt partition (p=2) values (20);
+====
+---- QUERY
+invalidate metadata pt;
+select p, i from pt order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+---- TYPES
+INT,INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into pt partition (p=2) values (21);
+====
+---- QUERY
+refresh pt;
+select p, i from pt order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+2,21
+---- TYPES
+INT,INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert overwrite table pt partition (p=1) values (12);
+insert into pt partition (p=2) values (22);
+====
+---- QUERY
+refresh pt;
+select p, i from pt order by i;
+---- RESULTS
+1,12
+2,20
+2,21
+2,22
+---- TYPES
+INT,INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table pt partition(p=2) compact 'major' and wait;
+====
+---- QUERY
+refresh pt;
+select p, i from pt order by i;
+---- RESULTS
+1,12
+2,20
+2,21
+2,22
+---- TYPES
+INT,INT
+====
+---- HIVE_QUERY
+# Create partitioned ACID table and use dynamic partitioning during insert.
+use $DATABASE;
+create table pt_dyn (i int)
+partitioned by (sp int, dp int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+insert into table pt_dyn partition(sp=1, dp) select * from pt;
+insert into table pt_dyn partition(sp=3, dp) select 30, 3;
+====
+---- QUERY
+invalidate metadata pt_dyn;
+select sp, dp, i from pt_dyn order by i;
+---- RESULTS
+1,1,12
+1,2,20
+1,2,21
+1,2,22
+3,3,30
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Create non-ACID partitioned table in Impala and upgrade it to a
+# transactional one in Hive.
+create table upgraded_pt (i int) partitioned by (p int);
+insert into upgraded_pt partition (p=1) values (10);
+insert into upgraded_pt partition (p=2) values (20), (21);
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table upgraded_pt set tblproperties (
+  'transactional' = 'true',
+  'transactional_properties' = 'insert_only');
+insert into upgraded_pt partition(p=1) values (11);
+insert into upgraded_pt partition (p=2) values (22);
+====
+---- QUERY
+refresh upgraded_pt;
+select p, i from upgraded_pt order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+2,21
+2,22
+---- TYPES
+INT,INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table upgraded_pt partition(p=1) compact 'major' and wait;
+alter table upgraded_pt partition(p=2) compact 'major' and wait;
+====
+---- QUERY
+refresh upgraded_pt;
+select p, i from upgraded_pt order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+2,21
+2,22
+---- TYPES
+INT,INT
+====
