@@ -17,10 +17,14 @@
 
 #include <algorithm>
 #include <boost/bind.hpp>
+#include <fstream>
 #include <gflags/gflags.h>
+#include <iostream>
+#include <rapidjson/document.h>
 #include <sys/sysinfo.h>
 
 #include "gutil/strings/join.h"
+#include "gutil/strings/util.h"
 #include "runtime/io/data-cache.h"
 #include "runtime/io/request-ranges.h"
 #include "runtime/test-env.h"
@@ -43,6 +47,8 @@
 #define TEST_BUFFER_SIZE   (8192)
 
 DECLARE_bool(cache_force_single_shard);
+DECLARE_bool(data_cache_anonymize_trace);
+DECLARE_bool(data_cache_enable_tracing);
 DECLARE_int64(data_cache_file_max_size_bytes);
 DECLARE_int32(data_cache_max_opened_files);
 DECLARE_int32(data_cache_write_concurrency);
@@ -136,11 +142,16 @@ class DataCacheTest : public testing::Test {
 
   // Delete all the test directories created.
   virtual void TearDown() {
-    // Make sure the cache's destructor removes all backing files.
+    // Make sure the cache's destructor removes all backing files, except for
+    // potentially the trace file.
     for (const string& dir_path : data_cache_dirs_) {
       vector<string> entries;
       ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir_path, &entries));
-      ASSERT_EQ(0, entries.size());
+      if (entries.size() == 1) {
+        EXPECT_EQ(DataCache::Partition::TRACE_FILE_NAME, entries[0]);
+      } else {
+        ASSERT_EQ(0, entries.size());
+      }
     }
     ASSERT_OK(FileSystemUtil::RemovePaths(data_cache_dirs_));
     flag_saver_.reset();
@@ -492,6 +503,58 @@ TEST_F(DataCacheTest, LargeFootprint) {
     ASSERT_EQ(TEST_BUFFER_SIZE,
         cache.Lookup(FNAME, MTIME, offset, TEST_BUFFER_SIZE, buffer));
     ASSERT_EQ(0, memcmp(buffer, test_buffer(), TEST_BUFFER_SIZE));
+  }
+}
+
+TEST_F(DataCacheTest, TestAccessTrace) {
+  FLAGS_data_cache_enable_tracing = true;
+  for (bool anon : { false, true }) {
+    SCOPED_TRACE(anon);
+    FLAGS_data_cache_anonymize_trace = anon;
+    {
+      int64_t cache_size = DEFAULT_CACHE_SIZE;
+      DataCache cache(Substitute(
+          "$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+      ASSERT_OK(cache.Init());
+
+      int64_t max_start_offset = 1024;
+      bool use_per_thread_filename = true;
+      bool expect_misses = true;
+      MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
+                             expect_misses);
+    }
+
+    // Read the trace file and ensure that all of the lines are valid JSON with the
+    // expected fields.
+    std::ifstream trace(Substitute("$0/$1", data_cache_dirs()[0],
+                                   DataCache::Partition::TRACE_FILE_NAME));
+    int line_num = 1;
+    while (trace.good()) {
+      SCOPED_TRACE(line_num++);
+      string line;
+      std::getline(trace, line);
+      if (line.empty()) {
+        ASSERT_TRUE(trace.eof());
+        break;
+      }
+      SCOPED_TRACE(line);
+      rapidjson::Document d;
+      d.Parse<0>(line.c_str());
+      ASSERT_TRUE(d.IsObject());
+      ASSERT_TRUE(d["ts"].IsDouble());
+      ASSERT_TRUE(d["s"].IsString());
+      ASSERT_TRUE(d["m"].IsInt64());
+      ASSERT_TRUE(d["f"].IsString());
+      if (anon) {
+        // We expect anonymized filenames to be 22-character fingerprints:
+        // - 128 bit fingerprint = 16 bytes
+        // - 16 * 4/3 (base64 encoding) = 21.3333
+        // - Round up to 22.
+        EXPECT_EQ(22, d["f"].GetStringLength());
+      } else {
+        EXPECT_TRUE(MatchPattern(d["f"].GetString(), "thread-*file"));
+      }
+    }
   }
 }
 

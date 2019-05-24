@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <gtest/gtest_prod.h>
 
 #include "common/status.h"
 #include "util/spinlock.h"
@@ -182,6 +183,9 @@ class DataCache {
   Status CloseFilesAndVerifySizes();
 
  private:
+  friend class DataCacheTest;
+  FRIEND_TEST(DataCacheTest, TestAccessTrace);
+
   class CacheFile;
   struct CacheKey;
   class CacheEntry;
@@ -245,6 +249,10 @@ class DataCache {
     void DeleteOldFiles();
 
    private:
+    friend class DataCacheTest;
+    FRIEND_TEST(DataCacheTest, TestAccessTrace);
+    class Tracer;
+
     /// The directory path which this partition stores cached data in.
     const std::string path_;
 
@@ -260,6 +268,9 @@ class DataCache {
 
     /// The prefix of the names of the cache backing files.
     static const char* CACHE_FILE_PREFIX;
+
+    /// The file name used for the access trace.
+    static const char* TRACE_FILE_NAME;
 
     /// Protects the following fields.
     SpinLock lock_;
@@ -288,6 +299,8 @@ class DataCache {
     /// A cache entry has type CacheEntry and it contains the metadata of the cached
     /// content. Please see comments at CachedEntry for details.
     std::unique_ptr<kudu::Cache> meta_cache_;
+
+    std::unique_ptr<Tracer> tracer_;
 
     /// Utility function for creating a new backing file in 'path_'. The cache
     /// partition's lock needs to be held when calling this function. Returns

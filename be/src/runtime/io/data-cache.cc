@@ -23,13 +23,22 @@
 #include <mutex>
 #include <string.h>
 #include <unistd.h>
+#include <sstream>
+
+#include <glog/logging.h>
 
 #include "exec/kudu-util.h"
+#include "kudu/util/async_logger.h"
 #include "kudu/util/cache.h"
 #include "kudu/util/env.h"
+#include "kudu/util/jsonwriter.h"
 #include "kudu/util/locks.h"
 #include "kudu/util/path_util.h"
+#include "gutil/hash/city.h"
+#include "gutil/port.h"
+#include "gutil/strings/escaping.h"
 #include "gutil/strings/split.h"
+#include "gutil/walltime.h"
 #include "util/bit-util.h"
 #include "util/error-util.h"
 #include "util/filesystem-util.h"
@@ -47,12 +56,14 @@
 
 #include "common/names.h"
 
+using kudu::Env;
 using kudu::faststring;
 using kudu::JoinPathSegments;
 using kudu::percpu_rwlock;
 using kudu::RWFile;
 using kudu::rw_spinlock;
 using kudu::Slice;
+using kudu::WritableFile;
 using strings::SkipEmpty;
 using strings::Split;
 
@@ -74,12 +85,114 @@ DEFINE_int32(data_cache_write_concurrency, 1,
 DEFINE_bool(data_cache_checksum, ENABLE_CHECKSUMMING,
     "(Advanced) Enable checksumming for the cached buffer.");
 
+DEFINE_bool(data_cache_enable_tracing, false,
+    "(Advanced) Collect a trace of all lookups in the data cache.");
+DEFINE_bool(data_cache_anonymize_trace, false,
+    "(Advanced) Use hashes of filenames rather than file paths in the data "
+    "cache access trace.");
+
 namespace impala {
 namespace io {
 
 static const int64_t PAGE_SIZE = 1L << 12;
 const char* DataCache::Partition::CACHE_FILE_PREFIX = "impala-cache-file-";
+const char* DataCache::Partition::TRACE_FILE_NAME = "impala-cache-trace.txt";
 const int MAX_FILE_DELETER_QUEUE_SIZE = 500;
+
+
+namespace {
+
+class FileLogger;
+
+// Simple implementation of a glog Logger that writes to a file, used for
+// cache access tracing.
+//
+// This doesn't fully implement the Logger interface -- only the bare minimum
+// to be usable with kudu::AsyncLogger.
+class FileLogger : public google::base::Logger {
+ public:
+  explicit FileLogger(string path) : path_(std::move(path)) {}
+
+  virtual ~FileLogger() {
+    if (file_) Flush();
+  }
+
+  Status Open() {
+    KUDU_RETURN_IF_ERROR(Env::Default()->NewWritableFile({}, path_, &file_),
+                         "Failed to create trace log file");
+    return Status::OK();
+  }
+
+  void Write(bool force_flush,
+             time_t timestamp,
+             const char* message,
+             int message_len) override {
+    buf_.append(message, message_len);
+    if (force_flush || buf_.size() > kBufSize) {
+      Flush();
+    }
+  }
+
+  // Flush any buffered messages.
+  // NOTE: declared 'final' to allow safe calls from the destructor.
+  void Flush() override final {
+    if (buf_.empty()) return;
+
+    KUDU_WARN_NOT_OK(file_->Append(buf_), "Could not append to trace log");
+    buf_.clear();
+  }
+
+  uint32 LogSize() override {
+    LOG(FATAL) << "Unimplemented";
+    return 0;
+  }
+
+ private:
+  const string path_;
+  string buf_;
+  unique_ptr<WritableFile> file_;
+
+  static constexpr int kBufSize = 64*1024;
+};
+
+} // anonymous namespace
+
+class DataCache::Partition::Tracer {
+ public:
+  explicit Tracer(string path) : underlying_logger_(new FileLogger(std::move(path))) {}
+
+  ~Tracer() {
+    if (logger_) logger_->Stop();
+  }
+
+  Status Start() {
+    RETURN_IF_ERROR(underlying_logger_->Open());
+    logger_.reset(new kudu::AsyncLogger(underlying_logger_.get(), 8 * 1024 * 1024));
+    logger_->Start();
+    return Status::OK();
+  }
+
+  enum CacheStatus {
+    HIT,
+    MISS,
+    STORE,
+    STORE_FAILED_BUSY
+  };
+
+  void Trace(CacheStatus status, const DataCache::CacheKey& key,
+             int64_t lookup_len, int64_t entry_len);
+
+ private:
+  // The underlying logger that we wrap with the AsyncLogger wrapper
+  // 'logger_'. NOTE: AsyncLogger consumes a raw pointer which must
+  // outlive the AsyncLogger instance, so it's important that these
+  // are declared in this order (logger_ must destruct before
+  // underlying_logger_).
+  unique_ptr<FileLogger> underlying_logger_;
+  // The async wrapper around underlying_logger_ (see above).
+  unique_ptr<kudu::AsyncLogger> logger_;
+};
+
 
 /// This class is an implementation of backing files in a cache partition.
 ///
@@ -289,13 +402,25 @@ struct DataCache::CacheKey {
     : key_(filename.size() + sizeof(mtime) + sizeof(offset)) {
     DCHECK_GE(mtime, 0);
     DCHECK_GE(offset, 0);
-    key_.append(filename);
     key_.append(&mtime, sizeof(mtime));
     key_.append(&offset, sizeof(offset));
+    key_.append(filename);
   }
 
   int64_t Hash() const {
     return HashUtil::FastHash64(key_.data(), key_.size(), 0);
+  }
+
+  Slice filename() const {
+    return Slice(key_.data() + OFFSETOF_FILENAME, key_.size() - OFFSETOF_FILENAME);
+  }
+
+  int64_t mtime() const {
+    return UNALIGNED_LOAD64(key_.data() + OFFSETOF_MTIME);
+  }
+
+  int64_t offset() const {
+    return UNALIGNED_LOAD64(key_.data() + OFFSETOF_OFFSET);
   }
 
   Slice ToSlice() const {
@@ -303,6 +428,14 @@ struct DataCache::CacheKey {
   }
 
  private:
+  // Key encoding stored in key_:
+  //
+  //  int64_t mtime;
+  //  int64_t offset;
+  //  <variable length bytes> filename;
+  static constexpr int OFFSETOF_MTIME = 0;
+  static constexpr int OFFSETOF_OFFSET = OFFSETOF_MTIME + sizeof(int64_t);
+  static constexpr int OFFSETOF_FILENAME = OFFSETOF_OFFSET + sizeof(int64_t);
   faststring key_;
 };
 
@@ -369,6 +502,11 @@ Status DataCache::Partition::Init() {
   // Make sure hole punching is supported for the caching directory.
   RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(path_));
 
+  if (FLAGS_data_cache_enable_tracing) {
+    tracer_.reset(new Tracer(path_ + "/" + TRACE_FILE_NAME));
+    RETURN_IF_ERROR(tracer_->Start());
+  }
+
   // Create a backing file for the partition.
   RETURN_IF_ERROR(CreateCacheFile());
   oldest_opened_file_ = 0;
@@ -414,12 +552,24 @@ int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to
   Slice key = cache_key.ToSlice();
   kudu::Cache::Handle* handle =
       meta_cache_->Lookup(key, kudu::Cache::EXPECT_IN_CACHE);
-  if (handle == nullptr) return 0;
+
+
+  if (handle == nullptr) {
+    if (tracer_ != nullptr) {
+      tracer_->Trace(Tracer::MISS, cache_key, bytes_to_read, /*entry_len=*/-1);
+    }
+    return 0;
+  }
   auto handle_release =
       MakeScopeExitTrigger([this, &handle]() { meta_cache_->Release(handle); });
 
   // Read from the backing file.
   CacheEntry entry(meta_cache_->Value(handle));
+
+  if (tracer_ != nullptr) {
+    tracer_->Trace(Tracer::HIT, cache_key, bytes_to_read, entry.len());
+  }
+
   CacheFile* cache_file = entry.file();
   bytes_to_read = min(entry.len(), bytes_to_read);
   VLOG(3) << Substitute("Reading file $0 offset $1 len $2 checksum $3 bytes_to_read $4",
@@ -521,6 +671,10 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
     if (exceed_concurrency ||
         pending_insert_set_.find(key.ToString()) != pending_insert_set_.end()) {
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES->Increment(buffer_len);
+      if (tracer_ != nullptr) {
+        tracer_->Trace(Tracer::STORE_FAILED_BUSY, cache_key, /*lookup_len=*/-1,
+            buffer_len);
+      }
       return false;
     }
 
@@ -541,6 +695,10 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
 
     // Do this last. At this point, we are committed to inserting 'key' into the cache.
     pending_insert_set_.emplace(key.ToString());
+  }
+
+  if (tracer_ != nullptr) {
+    tracer_->Trace(Tracer::STORE, cache_key, /* lookup_len=*/-1, buffer_len);
   }
 
   // Set up a scoped exit to always remove entry from the pending insertion set.
@@ -716,6 +874,65 @@ Status DataCache::CloseFilesAndVerifySizes() {
 void DataCache::DeleteOldFiles(uint32_t thread_id, int partition_idx) {
   DCHECK_LT(partition_idx, partitions_.size());
   partitions_[partition_idx]->DeleteOldFiles();
+}
+
+void DataCache::Partition::Tracer::Trace(
+    CacheStatus status, const DataCache::CacheKey& key,
+    int64_t lookup_len, int64_t entry_len) {
+
+  ostringstream buf;
+  kudu::JsonWriter jw(&buf, kudu::JsonWriter::COMPACT);
+
+  jw.StartObject();
+  jw.String("ts");
+  jw.Double(WallTime_Now());
+  jw.String("s");
+  switch (status) {
+    case HIT: jw.String("H"); break;
+    case MISS: jw.String("M"); break;
+    case STORE: jw.String("S"); break;
+    case STORE_FAILED_BUSY: jw.String("F"); break;
+  }
+
+  jw.String("f");
+  if (FLAGS_data_cache_anonymize_trace) {
+    uint128 hash = util_hash::CityHash128(
+        reinterpret_cast<const char*>(key.filename().data()),
+        key.filename().size());
+    // A 128-bit (16-byte) hash results in a 24-byte base64-encoded string, including
+    // two characters of padding.
+    const int BUF_LEN = 24;
+    DCHECK_EQ(BUF_LEN, CalculateBase64EscapedLen(sizeof(hash)));
+    char b64_buf[BUF_LEN];
+    int out_len = Base64Escape(reinterpret_cast<const unsigned char*>(&hash),
+        sizeof(hash), b64_buf, BUF_LEN);
+    DCHECK_EQ(out_len, BUF_LEN);
+    // Chop off the two padding bytes.
+    DCHECK(b64_buf[23] == '=' && b64_buf[22] == '=');
+    out_len = 22;
+    jw.String(b64_buf, out_len);
+  } else {
+    jw.String(reinterpret_cast<const char*>(key.filename().data()),
+              key.filename().size());
+  }
+  jw.String("m");
+  jw.Int64(key.mtime());
+  jw.String("o");
+  jw.Int64(key.offset());
+
+  if (lookup_len != -1) {
+    jw.String("lLen");
+    jw.Int64(lookup_len);
+  }
+  if (entry_len != -1) {
+    jw.String("eLen");
+    jw.Int64(entry_len);
+  }
+  jw.EndObject();
+  buf << "\n";
+
+  string s = buf.str();
+  logger_->Write(/*force_flush=*/false, /*timestamp=*/0, s.data(), s.size());
 }
 
 } // namespace io
