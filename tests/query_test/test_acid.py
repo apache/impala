@@ -50,5 +50,4 @@ class TestAcid(ImpalaTestSuite):
 # TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.
-#  Test for a post-upgrade Hive table which contains files not in ACID layout.
 #  Negative test for LOAD DATA INPATH and all other SQL that we don't support.

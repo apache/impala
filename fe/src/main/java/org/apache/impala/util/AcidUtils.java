@@ -224,7 +224,13 @@ public class AcidUtils {
       }
 
       // Not in a base or a delta directory. In that case, it's probably a post-upgrade
-      // file and we should include it.
+      // file.
+      // If there is no valid base: we should read the file (assuming that
+      // hive.mm.allow.originals == true)
+      // If there is a valid base: the file should be merged to the base by the
+      // compaction, so we can assume that the file is no longer valid and just
+      // waits to be deleted.
+      if (maxBaseWriteId != SENTINEL_BASE_WRITE_ID) it.remove();
     }
     return validStats;
   }

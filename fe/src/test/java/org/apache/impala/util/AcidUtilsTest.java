@@ -89,8 +89,6 @@ public class AcidUtilsTest {
           "base_00000100/def.txt"},
         "default.test:10:1234:1,2,3",
         new String[]{
-          "base_01.txt",
-          "post_upgrade.txt",
           "base_0000005/abc.txt",
           "base_0000005/0000/abc.txt"});
   }
@@ -155,28 +153,35 @@ public class AcidUtilsTest {
   @Test
   public void testAcidStateNoBase() {
     assertFiltering(new String[]{
-        "delta_000005_000005_0000/",
-        "delta_000005_000005_0000/lmn.txt",
-        "base_000010/",
-        "delta_0000012_0000012_0000/",
-        "delta_0000012_0000012_0000/0000_0",
-        "delta_0000012_0000012_0000/0000_1"},
-    "", // writeIdList that accepts all transactions as valid
-    new String[]{
-        "delta_0000012_0000012_0000/0000_0",
-        "delta_0000012_0000012_0000/0000_1"});
+            "base_01.txt",
+            "post_upgrade.txt",
+            "delta_000005_000005_0000/",
+            "delta_000005_000005_0000/lmn.txt",
+            "base_000010/",
+            "delta_0000012_0000012_0000/",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"},
+        "", // writeIdList that accepts all transactions as valid
+        new String[]{
+            // Post upgrade files are ignored if there is a valid base.
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"});
 
     // Same set of files, but no base directory.
     assertFiltering(new String[]{
-        "delta_000005_000005_0000/",
-        "delta_000005_000005_0000/lmn.txt",
-        "delta_0000012_0000012_0000/",
-        "delta_0000012_0000012_0000/0000_0",
-        "delta_0000012_0000012_0000/0000_1"},
-    "", // writeIdList that accepts all transactions as valid
-    new String[]{
-        "delta_000005_000005_0000/lmn.txt",
-        "delta_0000012_0000012_0000/0000_0",
-        "delta_0000012_0000012_0000/0000_1"});
+            "base_01.txt",
+            "post_upgrade.txt",
+            "delta_000005_000005_0000/",
+            "delta_000005_000005_0000/lmn.txt",
+            "delta_0000012_0000012_0000/",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"},
+        "", // writeIdList that accepts all transactions as valid
+        new String[]{
+            "base_01.txt", // Post upgrade files are considered valid if there is no base.
+            "post_upgrade.txt",
+            "delta_000005_000005_0000/lmn.txt",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"});
   }
 }

@@ -37,3 +37,34 @@ Path,Size,Partition
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B',''
 ---- TYPES
 STRING,STRING,STRING
+====
+---- HIVE_QUERY
+use $DATABASE;
+create table upgraded_table (x int);
+insert into upgraded_table values (1);
+# Upgrade to the table to insert only acid when there are already values in it.
+alter table upgraded_table set tblproperties
+ ('transactional' = 'true', 'transactional_properties' = 'insert_only');
+insert into upgraded_table values (2);
+insert into upgraded_table values (3);
+====
+---- QUERY
+invalidate metadata upgraded_table;
+select * from upgraded_table;
+---- RESULTS
+1
+2
+3
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table upgraded_table compact 'major' and wait;
+====
+---- QUERY
+refresh upgraded_table;
+select * from upgraded_table;
+---- RESULTS
+1
+2
+3
+====
