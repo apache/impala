@@ -1,0 +1,59 @@
+# Each tested query in this file involves at least one hdfs table
+# without available statistics.
+# The following are the hdfs tables without available statistics:
+# functional_parquet.alltypes
+# Query with both Kudu and HDFS filter targets.
+select count(*) from functional_kudu.alltypes a, functional_parquet.alltypes b,
+    functional_kudu.alltypes c
+where a.int_col = b.int_col and a.int_col = c.int_col
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=31.88MB mem-reservation=5.89MB thread-reservation=4 runtime-filters-memory=2.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col
+|  fk/pk conjuncts: none
+|  runtime filters: RF000[bloom] <- c.int_col, RF001[min_max] <- c.int_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1,0,2 row-size=12B cardinality=9.31M
+|  in pipelines: 01(GETNEXT), 02(OPEN)
+|
+|--02:SCAN KUDU [functional_kudu.alltypes c]
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=2 row-size=4B cardinality=7.30K
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.int_col
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- a.int_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1,0 row-size=8B cardinality=12.75K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+|--00:SCAN KUDU [functional_kudu.alltypes a]
+|     runtime filters: RF001[min_max] -> a.int_col
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=0 row-size=4B cardinality=7.30K
+|     in pipelines: 00(GETNEXT)
+|
+01:SCAN HDFS [functional_parquet.alltypes b]
+   HDFS partitions=24/24 files=24 size=200.43KB
+   runtime filters: RF000[bloom] -> b.int_col, RF002[bloom] -> b.int_col
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=1 row-size=4B cardinality=12.75K
+   in pipelines: 01(GETNEXT)
+====

@@ -20,7 +20,10 @@ package org.apache.impala.planner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend.PlanCtx;
@@ -29,11 +32,15 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableSet;
+
 /**
  * Test the planner's inference of tuple cardinality from metadata NDV and
  * resulting selectivity.
  */
 public class CardinalityTest extends PlannerTestBase {
+
+  private static double CARDINALITY_TOLERANCE = 0.05;
 
   /**
    * Test the happy path: table with stats, no all-null cols.
@@ -206,8 +213,531 @@ public class CardinalityTest extends PlannerTestBase {
 
   @Test
   public void testBasicsWithoutStats() {
-    // IMPALA-7608: no cardinality is available (result is -1)
-    verifyCardinality("SELECT a FROM functional.tinytable", -1);
+    verifyApproxCardinality("SELECT a FROM functional.tinytable", 2);
+  }
+
+  @Test
+  public void testBasicsWithoutStatsWithHDFSNumRowsEstDisabled() {
+    verifyCardinality("SELECT a FROM functional.tinytable", -1, false,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE));
+  }
+
+  /**
+   *  functional.alltypesmixedformat is a table of 4 partitions, each having a different
+   *  format. These formats are text, sequence file, rc file, and parquet.
+   *  True cardinality of functional.alltypesmixedformat is 1200.
+   *  Estimated cardinality of functional.alltypesmixedformat is 2536.
+   */
+  @Test
+  public void testTableOfMixedTypesWithoutStats() {
+    verifyApproxCardinality("SELECT * FROM functional.alltypesmixedformat", 2536);
+  }
+
+  @Test
+  public void testTableOfMixedTypesWithoutStatsWithHDFSNumRowsEstDisabled() {
+    verifyCardinality("SELECT * FROM functional.alltypesmixedformat", -1, false,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE));
+  }
+
+
+  /**
+   * tpch_text_gzip.lineitem is a table of 1 partition but having 6 files.
+   * True cardinality of tpch_text_gzip.lineitem is 6,001,215.
+   * Estimated cardinality of tpch_text_gzip.lineitem is 5,141,177.
+   */
+  @Test
+  public void testTableOfMultipleFilesWithoutStats() {
+    verifyApproxCardinality("SELECT * FROM tpch_text_gzip.lineitem", 5_141_177);
+  }
+
+  @Test
+  public void testTableOfMultipleFilesWithoutStatsWithHDFSNumRowsEstDisabled() {
+    verifyCardinality("SELECT * FROM tpch_text_gzip.lineitem", -1, false,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE));
+  }
+
+  @Test
+  public void testAggregationNodeCount() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan not involving GROUP BY.
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList();
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    // Estimated cardinality of the resulting AggregateNode's not involving
+    // GROUP BY is 1 for both AggregationNodes's no matter whether or not
+    // there is available statistics for the underlying hdfs table.
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable", 1, true,
+        ImmutableSet.of(), pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable", 1, true,
+        ImmutableSet.of(), pathToSecondAggregationNode, AggregationNode.class);
+
+  }
+
+  @Test
+  public void testAggregationNodeCountWithHDFSNumRowsEstDisabled() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan not involving GROUP BY.
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList();
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    // Estimated cardinality of the resulting AggregateNode's not involving
+    // GROUP BY is 1 for both AggregationNodes's no matter whether or not
+    // there is available statistics for the underlying hdfs table.
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable", 1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable", 1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToSecondAggregationNode, AggregationNode.class);
+
+  }
+
+  @Test
+  public void testAggregationNodeGroupBy() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan involving GROUP BY.
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList(0);
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0, 0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    // Estimated cardinality of the resulting AggregationNode's involving
+    // GROUP BY is 2 for both AggregationNode's.
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a", 2, true, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a", 2, true, ImmutableSet.of(),
+        pathToSecondAggregationNode, AggregationNode.class);
+  }
+
+  @Test
+  public void testAggregationNodeGroupByWithHDFSNumRowsEstDisabled() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan involving GROUP BY..
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList(0);
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0, 0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of the resulting AggregationNode's involving
+    // GROUP BY is -1 for both AggregationNode's.
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToSecondAggregationNode, AggregationNode.class);
+  }
+
+  @Test
+  public void testAnalyticEvalNode() {
+    // Since the root node of the generated distributed plan is
+    // the AnalyticEvalNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 742.
+    verifyApproxCardinality("SELECT SUM(int_col) OVER() int_col "
+        + "FROM functional_parquet.alltypestiny", 742, true,
+        ImmutableSet.of(), path, AnalyticEvalNode.class);
+  }
+
+  @Test
+  public void testAnalyticEvalNodeWithHDFSNumRowsEstDisabled() {
+    // Since the root node of the generated distributed plan is
+    // the AnalyticEvalNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    verifyApproxCardinality("SELECT SUM(int_col) OVER() int_col "
+        + "FROM functional_parquet.alltypestiny", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, AnalyticEvalNode.class);
+  }
+
+  @Test
+  public void testCardinalityCheckNode() {
+    // Create the path to the CardinalityCheckNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    String subQuery = "(SELECT id "
+        + "FROM functional_parquet.alltypestiny b "
+        + "WHERE id = 1)";
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 523.
+    verifyApproxCardinality("SELECT bigint_col "
+        + "FROM functional_parquet.alltypestiny a "
+        + "WHERE id = " + subQuery, 1, true,
+        ImmutableSet.of(), path, CardinalityCheckNode.class);
+  }
+
+  @Test
+  public void testCardinalityCheckNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the CardinalityCheckNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    String subQuery = "(SELECT id "
+        + "FROM functional_parquet.alltypestiny b "
+        + "WHERE id = 1)";
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    verifyApproxCardinality("SELECT bigint_col "
+        + "FROM functional_parquet.alltypestiny a "
+        + "WHERE id = " + subQuery, 1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, CardinalityCheckNode.class);
+  }
+
+  @Test
+  public void testEmptySetNode() {
+    // Since the root node of the generated distributed plan is
+    // the EmptySetNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 523.
+    String subQuery = "(SELECT * "
+        + "FROM functional_parquet.alltypestiny "
+        + "LIMIT 0)";
+    verifyApproxCardinality("SELECT 1 "
+        + "FROM functional_parquet.alltypessmall "
+        + "WHERE EXISTS " + subQuery, 0, true,
+        ImmutableSet.of(), path, EmptySetNode.class);
+  }
+
+  @Test
+  public void testEmptySetNodeWithHDFSNumRowsEstDisabled() {
+    // Since the root node of the generated distributed plan is
+    // the EmptySetNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    String subQuery = "(SELECT * "
+        + "FROM functional_parquet.alltypestiny "
+        + "LIMIT 0)";
+    verifyApproxCardinality("SELECT 1 "
+        + "FROM functional_parquet.alltypessmall "
+        + "WHERE EXISTS " + subQuery, 0, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, EmptySetNode.class);
+  }
+
+  @Test
+  public void testExchangeNode() {
+    // Since the root node of the generated distributed plan is
+    // the ExchangeNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    verifyApproxCardinality("SELECT a FROM functional.tinytable", 2, true,
+        ImmutableSet.of(), path, ExchangeNode.class);
+  }
+
+  @Test
+  public void testExchangeNodeWithHDFSNumRowsEstDisabled() {
+    // Since the root node of the generated distributed plan is
+    // the ExchangeNode of interest, we do not have to create a
+    // path to it explicitly.
+    List<Integer> path = Arrays.asList();
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    verifyApproxCardinality("SELECT a FROM functional.tinytable", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, ExchangeNode.class);
+  }
+
+  @Test
+  public void testHashJoinNode() {
+    // Create the path to the HashJoinNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional.tinytable x INNER JOIN "
+        + "functional.tinytable y ON x.a = y.a", 2, true,
+        ImmutableSet.of(), path, HashJoinNode.class);
+  }
+
+  @Test
+  public void testHashJoinNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the HashJoinNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional.tinytable x INNER JOIN "
+        + "functional.tinytable y ON x.a = y.a", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, HashJoinNode.class);
+  }
+
+  @Test
+  public void testNestedLoopJoinNode() {
+    // Create the path to the NestedLoopJoinNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 742.
+    // Estimated cardinality of the NestedLoopJoinNode is 550,564 = 742 * 742.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypestiny a, "
+        + "functional_parquet.alltypestiny b", 550_564, true,
+        ImmutableSet.of(), path, NestedLoopJoinNode.class);
+  }
+
+  @Test
+  public void testNestedLoopJoinNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the NestedLoopJoinNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypestiny a, "
+        + "functional_parquet.alltypestiny b", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, NestedLoopJoinNode.class);
+  }
+
+  @Test
+  public void testHdfsScanNode() {
+    // Create the path to the HdfsScanNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    verifyApproxCardinality("SELECT a FROM functional.tinytable", 2, true,
+        ImmutableSet.of(), path, HdfsScanNode.class);
+  }
+
+  @Test
+  public void testHdfsScanNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the HdfsScanNode of interest
+    // in the distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    verifyApproxCardinality("SELECT a FROM functional.tinytable", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, HdfsScanNode.class);
+  }
+
+  // TODO(IMPALA-8647): It seems that the cardinality of the SelectNode should be 1
+  // instead of 0. Specifically, if we had executed "compute stats
+  // functional_parquet.alltypestiny" before issuing this
+  // SQL statement, the returned cardinality of this SelectNode would be 1
+  // instead of 0. Not very sure if this is a bug. It looks like the cardinality
+  // of a SelectNode depends on whether there is stats information associated
+  // with its child node. The cardinality of a SelectNode would still be 0
+  // even if its child node (ExchangeNode in this case) has a non-zero cardinality.
+  @Test
+  public void testSelectNode() {
+    // Create the path to the SelectNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 523.
+    // There is no available statistics in functional_parquet.alltypessmall.
+    // True cardinality of functional_parquet.alltypessmall is 100.
+    // Estimated cardinality of functional_parquet.alltypessmall is 649.
+    String subQuery = "(SELECT int_col "
+        + "FROM functional_parquet.alltypestiny "
+        + "LIMIT 1)";
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypessmall "
+        + "WHERE 1 IN " + subQuery, 0, true,
+        ImmutableSet.of(), path, SelectNode.class);
+  }
+
+  @Test
+  public void testSelectNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the SelectNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // There is no available statistics in functional_parquet.alltypessmall.
+    // True cardinality of functional_parquet.alltypessmall is 100.
+    String subQuery = "(SELECT int_col "
+        + "FROM functional_parquet.alltypestiny "
+        + "LIMIT 1)";
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypessmall "
+        + "WHERE 1 IN " + subQuery, 0, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, SelectNode.class);
+  }
+
+  @Test
+  public void testSingularRowSrcNode() {
+    // Create the path to the SingularRowSrcNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 1);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 1, true,
+        ImmutableSet.of(), path, SingularRowSrcNode.class);
+  }
+
+  @Test
+  public void testSingularRowSrcNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the SingularRowSrcNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 1);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, SingularRowSrcNode.class);
+  }
+
+  @Test
+  public void testSortNode() {
+    // Create the path to the SortNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    // Estimated cardinality of functional_parquet.alltypestiny is 742.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypestiny "
+        + "ORDER BY int_col", 742, true, ImmutableSet.of(), path,
+        SortNode.class);
+  }
+
+  @Test
+  public void testSortNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the SortNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional_parquet.alltypestiny.
+    // True cardinality of functional_parquet.alltypestiny is 8.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypestiny "
+        + "ORDER BY int_col", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, SortNode.class);
+  }
+
+  @Test
+  public void testSubPlanNode() {
+    // Create the path to the SubplanNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 1_500_000, true,
+        ImmutableSet.of(), path, SubplanNode.class);
+  }
+
+  @Test
+  public void testSubPlanNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the SubplanNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 1_500_000, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, SubplanNode.class);
+  }
+
+  @Test
+  public void testUnionNode() {
+    // Create the path to the UnionNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    // Estimated cardinality of functional.tinytable is 2.
+    String subQuery = "SELECT * FROM functional.tinytable";
+    verifyApproxCardinality(subQuery + " UNION ALL " + subQuery, 4, true,
+        ImmutableSet.of(), path, UnionNode.class);
+  }
+
+  @Test
+  public void testUnionNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the UnionNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0);
+
+    // There is no available statistics in functional.tinytable.
+    // True cardinality of functional.tinytable is 3.
+    String subQuery = "SELECT * FROM functional.tinytable";
+    verifyApproxCardinality(subQuery + " UNION ALL " + subQuery, 0, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, UnionNode.class);
+  }
+
+  @Test
+  public void testUnnestNode() {
+    // Create the path to the UnnestNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 10, true,
+        ImmutableSet.of(), path, UnnestNode.class);
+  }
+
+  @Test
+  public void testUnnestNodeWithHDFSNumRowsEstDisabled() {
+    // Create the path to the UnnestNode of interest
+    // in a distributed plan.
+    List<Integer> path = Arrays.asList(0, 1, 0);
+
+    verifyApproxCardinality("SELECT c_custkey, pos "
+        + "FROM tpch_nested_parquet.customer c, c.c_orders", 10, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, UnnestNode.class);
   }
 
   /**
@@ -222,9 +752,71 @@ public class CardinalityTest extends PlannerTestBase {
   protected void verifyCardinality(String query, long expected) {
     List<PlanFragment> plan = getPlan(query);
     PlanNode planRoot = plan.get(0).getPlanRoot();
-    assertEquals("Cardinality error for: " + query,
-        expected, planRoot.getCardinality());
+    assertEquals("Cardinality error for: " + query, expected,
+        planRoot.getCardinality());
   }
+
+  protected void verifyCardinality(String query, long expected,
+      boolean isDistributedPlan, Set<PlannerTestOption> testOptions) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan, testOptions);
+    PlanNode planRoot = plan.get(0).getPlanRoot();
+    assertEquals("Cardinality error for: " + query, expected,
+        planRoot.getCardinality());
+  }
+
+  /**
+   * The cardinality check performed by this method allows for a margin of
+   * error. Specifically, two cardinalities are considered equal as long as
+   * the difference is upper bounded by the expected number multiplied by
+   * CARDINALITY_TOLERANCE.
+   *
+   * @param query query to test
+   * @param expected expected cardinality at the root node
+   */
+  protected void verifyApproxCardinality(String query, long expected) {
+    List<PlanFragment> plan = getPlan(query);
+    PlanNode planRoot = plan.get(0).getPlanRoot();
+    assertEquals("Cardinality error for: " + query, expected,
+        planRoot.getCardinality(), expected * CARDINALITY_TOLERANCE);
+  }
+
+  /**
+   * This method allows us to inspect the cardinality of a PlanNode located by
+   * path with respect to the root of the retrieved query plan. The class of
+   * the located PlanNode by path will also be checked against cl, the class of
+   * the PlanNode of interest.
+   * In addition, the cardinality check performed by this method allows for a
+   * margin of error. Specifically, two cardinalities are considered equal as
+   * long as the difference is upper bounded by the expected number multiplied
+   * by CARDINALITY_TOLERANCE.
+   *
+   * @param query query to test
+   * @param expected expected cardinality at the PlanNode of interest
+   * @param isDistributedPlan set to true if we would like to generate
+   * a distributed plan
+   * @param testOptions specified test options
+   * @param path path to the PlanNode of interest
+   * @param cl class of the PlanNode of interest
+   */
+  protected void verifyApproxCardinality(String query, long expected,
+      boolean isDistributedPlan, Set<PlannerTestOption> testOptions,
+      List<Integer> path, Class<?> cl) {
+
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan, testOptions);
+    // We use the last element on the List of PlanFragment
+    // because this PlanFragment encloses all the PlanNode's
+    // in the query plan (either the single node plan or
+    // the distributed plan).
+    PlanNode currentNode = plan.get(plan.size() - 1).getPlanRoot();
+    for (Integer currentChildIndex: path) {
+      currentNode = currentNode.getChild(currentChildIndex);
+    }
+    assertEquals("PlanNode class not matched: ", cl.getName(),
+        currentNode.getClass().getName());
+    assertEquals("Cardinality error for: " + query,
+        expected, currentNode.getCardinality(), expected * CARDINALITY_TOLERANCE);
+  }
+
 
   /**
    * Given a query, run the planner and extract the physical plan prior
@@ -258,4 +850,35 @@ public class CardinalityTest extends PlannerTestBase {
     }
     return planCtx.getPlan();
   }
+
+  private List<PlanFragment> getPlan(String query,
+      boolean isDistributedPlan, Set<PlannerTestOption> testOptions) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        "default", System.getProperty("user.name"));
+    queryCtx.client_request.setStmt(query);
+
+    // Disable the attempt to compute an estimated number of rows in an
+    // hdfs table.
+    TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
+    queryOptions.setDisable_hdfs_num_rows_estimate(
+        testOptions.contains(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE));
+    // Instruct the planner to generate a distributed plan
+    // by setting the query option of NUM_NODES to 0 if
+    // distributedPlan is set to true.
+    // Otherwise, set NUM_NODES to 1 to instruct the planner to
+    // create a single node plan.
+    queryOptions.setNum_nodes(isDistributedPlan? 0: 1);
+
+    // Plan the query, discard the actual execution plan, and
+    // return the plan tree.
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    planCtx.requestPlanCapture();
+    try {
+      frontend_.createExecRequest(planCtx);
+    } catch (ImpalaException e) {
+      fail(e.getMessage());
+    }
+    return planCtx.getPlan();
+  }
+
 }

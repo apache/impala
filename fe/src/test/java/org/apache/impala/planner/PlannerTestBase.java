@@ -837,7 +837,10 @@ public class PlannerTestBase extends FrontendTestBase {
     //
     // By default, this flag is disabled. So tests will ignore the values of 'HDFS',
     // 'S3', and 'ADLS' in the above explain plan.
-    VALIDATE_SCAN_FS
+    VALIDATE_SCAN_FS,
+    // If set, disables the attempt to compute an estimated number of rows in an
+    // hdfs table.
+    DISABLE_HDFS_NUM_ROWS_ESTIMATE
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {

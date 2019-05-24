@@ -217,7 +217,17 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testJoins() {
-    runPlannerTestFile("joins",
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(false);
+    runPlannerTestFile("joins-hdfs-num-rows-est-enabled", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
+  public void testJoinsWithHDFSNumRowsEstDisabled() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(true);
+    runPlannerTestFile("joins", options,
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
@@ -242,8 +252,20 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testFkPkJoinDetection() {
     // The FK/PK detection result is included in EXTENDED or higher.
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(false);
+    runPlannerTestFile("fk-pk-join-detection-hdfs-num-rows-est-enabled",
+        options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
+  public void testFkPkJoinDetectionWithHDFSNumRowsEstDisabled() {
+    // The FK/PK detection result is included in EXTENDED or higher.
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("fk-pk-join-detection",
-        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+        options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
@@ -283,7 +305,16 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testSubqueryRewrite() {
-    runPlannerTestFile("subquery-rewrite");
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(false);
+    runPlannerTestFile("subquery-rewrite-hdfs-num-rows-est-enabled", options);
+  }
+
+  @Test
+  public void testSubqueryRewriteWithHDFSNumRowsEstDisabled() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(true);
+    runPlannerTestFile("subquery-rewrite", options);
   }
 
   @Test
@@ -495,6 +526,24 @@ public class PlannerTest extends PlannerTestBase {
     // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
     TQueryOptions options = defaultQueryOptions();
     options.setMt_dop(3);
+    options.setDisable_hdfs_num_rows_estimate(false);
+    try {
+      // Temporarily unset the test env such that unsupported queries with mt_dop > 0
+      // throw an exception. Those are otherwise allowed for testing parallel plans.
+      RuntimeEnv.INSTANCE.setTestEnv(false);
+      runPlannerTestFile("mt-dop-validation-hdfs-num-rows-est-enabled", options);
+    } finally {
+      RuntimeEnv.INSTANCE.setTestEnv(true);
+    }
+  }
+
+  @Test
+  public void testMtDopValidationWithHDFSNumRowsEstDisabled() {
+    // Tests that queries supported with mt_dop > 0 produce a parallel plan, or
+    // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
+    TQueryOptions options = defaultQueryOptions();
+    options.setMt_dop(3);
+    options.setDisable_hdfs_num_rows_estimate(true);
     try {
       // Temporarily unset the test env such that unsupported queries with mt_dop > 0
       // throw an exception. Those are otherwise allowed for testing parallel plans.
@@ -550,10 +599,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testResourceRequirements() {
+  public void testResourceRequirementsWithHDFSNumRowsEstDisabled() {
     // Tests the resource requirement computation from the planner.
     TQueryOptions options = defaultQueryOptions();
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("resource-requirements", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_EXPLAIN_HEADER,
@@ -561,12 +611,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testSpillableBufferSizing() {
+  public void testSpillableBufferSizingWithHDFSNumRowsEstDisabled() {
     // Tests the resource requirement computation from the planner when it is allowed to
     // vary the spillable buffer size.
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("spillable-buffer-sizing", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_EXPLAIN_HEADER,
@@ -613,7 +664,18 @@ public class PlannerTest extends PlannerTestBase {
   public void testDefaultJoinDistributionShuffleMode() {
     TQueryOptions options = defaultQueryOptions();
     options.setDefault_join_distribution_mode(TJoinDistributionMode.SHUFFLE);
-    runPlannerTestFile("default-join-distr-mode-shuffle", options);
+    options.setDisable_hdfs_num_rows_estimate(false);
+    runPlannerTestFile("default-join-distr-mode-shuffle-hdfs-num-rows-est-enabled",
+        options);
+  }
+
+  @Test
+  public void testDefaultJoinDistributionShuffleModeWithHDFSNumRowsEstDisabled() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_join_distribution_mode(TJoinDistributionMode.SHUFFLE);
+    options.setDisable_hdfs_num_rows_estimate(true);
+    runPlannerTestFile("default-join-distr-mode-shuffle",
+        options);
   }
 
   @Test
@@ -646,6 +708,15 @@ public class PlannerTest extends PlannerTestBase {
   public void testMinMaxRuntimeFilters() {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setDisable_hdfs_num_rows_estimate(false);
+    runPlannerTestFile("min-max-runtime-filters-hdfs-num-rows-est-enabled", options);
+  }
+
+  @Test
+  public void testMinMaxRuntimeFiltersWithHDFSNumRowsEstDisabled() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("min-max-runtime-filters", options);
   }
 

@@ -1,0 +1,86 @@
+# Each tested query in this file involves at least one hdfs table
+# without available statistics.
+# The following are the hdfs tables without available statistics:
+# tpcds_seq_snap.customer
+# tpcds_seq_snap.store_sales
+# Assumed FK/PK join due to missing stats on the rhs. Join cardinality is equal to
+# the lhs cardinality.
+select 1 from
+tpcds.store_sales inner join tpcds_seq_snap.customer
+on ss_customer_sk = c_customer_sk
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- c_customer_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=8B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_seq_snap.customer]
+|     partitions=1/1 files=1 size=8.58MB
+|     stored statistics:
+|       table: rows=unavailable size=8.58MB
+|       columns: unavailable
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=1 row-size=4B cardinality=223.80K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000[bloom] -> ss_customer_sk
+   stored statistics:
+     table: rows=2.88M size=346.60MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=128.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
+# Assumed FK/PK join due to missing stats on the lhs. Join cardinality is unknown.
+select /* +straight_join */ 1 from
+tpcds_seq_snap.store_sales inner join tpcds.customer
+on ss_customer_sk = c_customer_sk
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- c_customer_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=8B cardinality=7.99M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
+|     stored statistics:
+|       table: rows=100.00K size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=100.00K
+|     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=1 row-size=4B cardinality=100.00K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_seq_snap.store_sales]
+   partitions=1824/1824 files=1824 size=212.80MB
+   runtime filters: RF000[bloom] -> ss_customer_sk
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/1824 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=128.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=7.99M
+   in pipelines: 00(GETNEXT)
+====

@@ -796,6 +796,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_parquet_page_row_count_limit(row_count_limit);
         break;
       }
+      case TImpalaQueryOptions::DISABLE_HDFS_NUM_ROWS_ESTIMATE: {
+        query_options->__set_disable_hdfs_num_rows_estimate(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

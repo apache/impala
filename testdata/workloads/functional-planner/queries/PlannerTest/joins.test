@@ -3009,3 +3009,91 @@ PLAN-ROOT SINK
    constant-operands=1
    row-size=16B cardinality=1
 ====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_gzip.emptytable a inner join
+functional_text_gzip.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.f2 = b.int_col
+|  runtime filters: RF000 <- b.int_col
+|  row-size=96B cardinality=0
+|
+|--01:SCAN HDFS [functional_text_gzip.alltypes b]
+|     HDFS partitions=24/24 files=24 size=77.88KB
+|     row-size=80B cardinality=unavailable
+|
+00:SCAN HDFS [functional_text_gzip.emptytable a]
+   partitions=0/0 files=0 size=0B
+   runtime filters: RF000 -> a.f2
+   row-size=16B cardinality=0
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_bzip.emptytable a inner join
+functional_text_bzip.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.f2 = b.int_col
+|  runtime filters: RF000 <- b.int_col
+|  row-size=96B cardinality=0
+|
+|--01:SCAN HDFS [functional_text_bzip.alltypes b]
+|     HDFS partitions=24/24 files=24 size=56.23KB
+|     row-size=80B cardinality=unavailable
+|
+00:SCAN HDFS [functional_text_bzip.emptytable a]
+   partitions=0/0 files=0 size=0B
+   runtime filters: RF000 -> a.f2
+   row-size=16B cardinality=0
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_lzo.emptytable a inner join
+functional_text_lzo.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.f2 = b.int_col
+|  runtime filters: RF000 <- b.int_col
+|  row-size=96B cardinality=0
+|
+|--01:SCAN HDFS [functional_text_lzo.alltypes b]
+|     HDFS partitions=24/24 files=24 size=123.32KB
+|     row-size=80B cardinality=unavailable
+|
+00:SCAN HDFS [functional_text_lzo.emptytable a]
+   partitions=0/0 files=0 size=0B
+   runtime filters: RF000 -> a.f2
+   row-size=16B cardinality=0
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_snap.emptytable a inner join
+functional_text_snap.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.f2 = b.int_col
+|  runtime filters: RF000 <- b.int_col
+|  row-size=96B cardinality=0
+|
+|--01:SCAN HDFS [functional_text_snap.alltypes b]
+|     HDFS partitions=24/24 files=24 size=121.15KB
+|     row-size=80B cardinality=unavailable
+|
+00:SCAN HDFS [functional_text_snap.emptytable a]
+   partitions=0/0 files=0 size=0B
+   runtime filters: RF000 -> a.f2
+   row-size=16B cardinality=0
+====

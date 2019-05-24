@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -52,13 +51,14 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -87,7 +87,6 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,6 +94,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -159,6 +160,42 @@ public class HdfsScanNode extends ScanNode {
 
   // Read size for Parquet and ORC footers. Matches HdfsScanner::FOOTER_SIZE in backend.
   private static final long FOOTER_SIZE = 100L * 1024L;
+
+  // When the information of cardinality is not available for the underlying hdfs table,
+  // i.e., the field of cardinality_ is equal to -1, we will attempt to compute an
+  // estimate for the number of rows in getStatsNumbers().
+  // Specifically, we divide the files into 3 categories - uncompressed,
+  // legacy compressed (e.g., text, avro, rc, seq), and
+  // columnar (e.g., parquet and orc).
+  // Depending on the category of a file, we multiply the size of the file by
+  // its corresponding compression factor to derive an estimated original size
+  // of the file before compression.
+  // These estimates were computed based on the empirical compression ratios
+  // that we have observed for 3 tables in our tpch datasets:
+  // customer, lineitem, and orders.
+  // The max compression ratio we have seen for legacy formats is 3.58, whereas
+  // the max compression ratio we have seen for columnar formats is 4.97.
+  private static double ESTIMATED_COMPRESSION_FACTOR_UNCOMPRESSED = 1.0;
+  private static double ESTIMATED_COMPRESSION_FACTOR_LEGACY = 3.58;
+  private static double ESTIMATED_COMPRESSION_FACTOR_COLUMNAR = 4.97;
+
+  private static Set<HdfsFileFormat> VALID_LEGACY_FORMATS =
+      ImmutableSet.<HdfsFileFormat>builder()
+      .add(HdfsFileFormat.RC_FILE)
+      .add(HdfsFileFormat.TEXT)
+      .add(HdfsFileFormat.LZO_TEXT)
+      .add(HdfsFileFormat.SEQUENCE_FILE)
+      .add(HdfsFileFormat.AVRO)
+      .build();
+
+  private static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
+      ImmutableSet.<HdfsFileFormat>builder()
+      .add(HdfsFileFormat.PARQUET)
+      .add(HdfsFileFormat.ORC)
+      .build();
+
+  //An estimate of the width of a row when the information is not available.
+  private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
 
   private final FeFsTable tbl_;
 
@@ -275,6 +312,7 @@ public class HdfsScanNode extends ScanNode {
   // Conjuncts used to trim the set of partitions passed to this node.
   // Used only to display EXPLAIN information.
   private final List<Expr> partitionConjuncts_;
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -1044,7 +1082,7 @@ public class HdfsScanNode extends ScanNode {
   public void computeStats(Analyzer analyzer) {
     Preconditions.checkNotNull(scanRangeSpecs_);
     super.computeStats(analyzer);
-    computeCardinalities();
+    computeCardinalities(analyzer);
     computeNumNodes(analyzer, cardinality_);
   }
 
@@ -1065,11 +1103,11 @@ public class HdfsScanNode extends ScanNode {
    * Sets these members:
    * extrapolatedNumRows_, inputCardinality_, cardinality_
    */
-  private void computeCardinalities() {
+  private void computeCardinalities(Analyzer analyzer) {
     // Choose between the extrapolated row count and the one based on stored stats.
     extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_,
             sumValues(totalBytesPerFs_));
-    long statsNumRows = getStatsNumRows();
+    long statsNumRows = getStatsNumRows(analyzer.getQueryOptions());
     if (extrapolatedNumRows_ != -1) {
       // The extrapolated row count is based on the 'totalBytesPerFs_' which already
       // accounts for table sampling, so no additional adjustment for sampling is
@@ -1133,7 +1171,7 @@ public class HdfsScanNode extends ScanNode {
    * Sets these members:
    * numPartitionsWithNumRows_, partitionNumRows_, hasCorruptTableStats_.
    */
-  private long getStatsNumRows() {
+  private long getStatsNumRows(TQueryOptions queryOptions) {
     numPartitionsWithNumRows_ = 0;
     partitionNumRows_ = -1;
     hasCorruptTableStats_ = false;
@@ -1157,10 +1195,76 @@ public class HdfsScanNode extends ScanNode {
     // Table is unpartitioned or the table is partitioned but no partitions have stats.
     // Set cardinality based on table-level stats.
     long numRows = tbl_.getNumRows();
+    // Depending on the query option of disable_hdfs_num_rows_est, if numRows
+    // is still not available, we provide a crude estimation by computing
+    // sumAvgRowSizes, the sum of the slot size of each column of scalar type,
+    // and then generate the estimate using sumValues(totalBytesPerFs_), the size of
+    // the hdfs table.
+    if (!queryOptions.disable_hdfs_num_rows_estimate && numRows == -1L) {
+      // Compute the estimated table size when taking compression into consideration
+      long estimatedTableSize = computeEstimatedTableSize();
+
+      double sumAvgRowSizes = 0.0;
+      for (Column col : tbl_.getColumns()) {
+        Type currentType = col.getType();
+        if (currentType instanceof ScalarType) {
+          if (col.getStats().hasAvgSize()) {
+            sumAvgRowSizes = sumAvgRowSizes + col.getStats().getAvgSerializedSize();
+          } else {
+            sumAvgRowSizes = sumAvgRowSizes + col.getType().getSlotSize();
+          }
+        }
+      }
+
+      if (sumAvgRowSizes == 0.0) {
+        // When the type of each Column is of ArrayType or MapType,
+        // sumAvgRowSizes would be equal to 0. In this case, we use a ultimate
+        // fallback row width if sumAvgRowSizes == 0.0.
+        numRows = Math.round(estimatedTableSize / DEFAULT_ROW_WIDTH_ESTIMATE);
+      } else {
+        numRows = Math.round(estimatedTableSize / sumAvgRowSizes);
+      }
+    }
     if (numRows < -1 || (numRows == 0 && tbl_.getTotalHdfsBytes() > 0)) {
       hasCorruptTableStats_ = true;
     }
     return numRows;
+  }
+
+  /** Compute the estimated table size when taking compression into consideration */
+  private long computeEstimatedTableSize() {
+    long estimatedTableSize = 0;
+    for (FeFsPartition p: partitions_) {
+      HdfsFileFormat format = p.getFileFormat();
+      long estimatedPartitionSize = 0;
+      if (format == HdfsFileFormat.TEXT) {
+        for (FileDescriptor desc : p.getFileDescriptors()) {
+          HdfsCompression compression
+            = HdfsCompression.fromFileName(desc.getRelativePath().toString());
+          if (HdfsCompression.SUFFIX_MAP.containsValue(compression)) {
+            estimatedPartitionSize += Math.round(desc.getFileLength()
+                * ESTIMATED_COMPRESSION_FACTOR_LEGACY);
+          } else {
+            // When the text file is not compressed.
+            estimatedPartitionSize += Math.round(desc.getFileLength()
+                * ESTIMATED_COMPRESSION_FACTOR_UNCOMPRESSED);
+          }
+        }
+      } else {
+        // When the current partition is not a text file.
+        if (VALID_LEGACY_FORMATS.contains(format)) {
+          estimatedPartitionSize += Math.round(p.getSize()
+              * ESTIMATED_COMPRESSION_FACTOR_LEGACY);
+        } else {
+         Preconditions.checkState(VALID_COLUMNAR_FORMATS.contains(format),
+             "Unknown HDFS compressed format: %s", this);
+         estimatedPartitionSize += Math.round(p.getSize()
+             * ESTIMATED_COMPRESSION_FACTOR_COLUMNAR);
+        }
+      }
+      estimatedTableSize += estimatedPartitionSize;
+    }
+    return estimatedTableSize;
   }
 
   /**

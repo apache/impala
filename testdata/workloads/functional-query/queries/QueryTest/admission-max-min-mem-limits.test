@@ -47,6 +47,20 @@ set num_scanner_threads=2;
 select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
  A.int_col = B.int_col limit 1;
 ---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=67MB.*
+row_regex: .*Cluster Memory Admitted: 66.94 MB.*
+====
+---- QUERY
+# No mem_limit set
+# Upper bound enforced by pool.max_query_mem_limit
+set request_pool=regularPool;
+# set this to make estimates deterministic.
+set num_scanner_threads=2;
+# Disable the estimation of cardinality for an hdfs table withot stats.
+set DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
+select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
+ A.int_col = B.int_col limit 1;
+---- RUNTIME_PROFILE
 row_regex: .*Per-Host Resource Estimates: Memory=2.06GB.*
 row_regex: .*Cluster Memory Admitted: 1.50 GB.*
 ====

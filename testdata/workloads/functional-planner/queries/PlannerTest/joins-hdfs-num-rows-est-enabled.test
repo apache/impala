@@ -1,0 +1,574 @@
+# Each tested query in this file involves at least one hdfs table
+# without available statistics.
+# The following are the hdfs tables without available statistics:
+# functional.testtbl
+# functional.alltypesnopart
+# functional.emptytable
+# functional.decimal_tbl
+select *
+from functional.testtbl t1 join functional.testtbl t2 using(id)
+where t1.zip = 94611
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
+   row-size=24B cardinality=0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
+   row-size=24B cardinality=0
+====
+# general exprs on both sides of equi-join predicates
+select *
+from functional.testtbl t1 left outer join functional.testtbl t2
+on (t1.id - 1 = t2.id + 1)
+where t1.zip = 94611
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id - 1 = t2.id + 1
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   row-size=24B cardinality=0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t1.id - 1 = t2.id + 1
+|  row-size=48B cardinality=0
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   row-size=24B cardinality=0
+====
+# left join followed by right join and then aggregate
+select x.tinyint_col, count(x.day)
+from (
+       select a.day day, c.tinyint_col tinyint_col
+       from functional.alltypesagg a
+            join functional.alltypessmall b using (id, int_col)
+            right outer join functional.alltypesnopart c on (b.id = c.id)
+            join functional.alltypesagg d on (a.id = d.id)
+       order by 1,2
+       limit 10
+     ) x
+where x.day >= 6
+group by x.tinyint_col
+order by 2
+limit 5
+---- PLAN
+PLAN-ROOT SINK
+|
+10:TOP-N [LIMIT=5]
+|  order by: count(x.`day`) ASC
+|  row-size=9B cardinality=1
+|
+09:AGGREGATE [FINALIZE]
+|  output: count(day)
+|  group by: tinyint_col
+|  row-size=9B cardinality=1
+|
+08:SELECT
+|  predicates: day >= 6
+|  row-size=5B cardinality=1
+|
+07:TOP-N [LIMIT=10]
+|  order by: day ASC, tinyint_col ASC
+|  row-size=5B cardinality=10
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: d.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=29B cardinality=113
+|
+|--05:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: b.id = c.id
+|  |  runtime filters: RF002 <- c.id
+|  |  row-size=25B cardinality=106
+|  |
+|  |--02:SCAN HDFS [functional.alltypesnopart c]
+|  |     partitions=1/1 files=0 size=0B
+|  |     row-size=5B cardinality=0
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  |  runtime filters: RF004 <- b.id, RF005 <- b.int_col
+|  |  row-size=20B cardinality=106
+|  |
+|  |--01:SCAN HDFS [functional.alltypessmall b]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF002 -> b.id
+|  |     row-size=8B cardinality=100
+|  |
+|  00:SCAN HDFS [functional.alltypesagg a]
+|     partitions=11/11 files=11 size=814.73KB
+|     runtime filters: RF002 -> a.id, RF004 -> a.id, RF005 -> a.int_col
+|     row-size=12B cardinality=11.00K
+|
+03:SCAN HDFS [functional.alltypesagg d]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> d.id
+   row-size=4B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:TOP-N [LIMIT=5]
+|  order by: count(x.`day`) ASC
+|  row-size=9B cardinality=1
+|
+09:AGGREGATE [FINALIZE]
+|  output: count(day)
+|  group by: tinyint_col
+|  row-size=9B cardinality=1
+|
+08:SELECT
+|  predicates: day >= 6
+|  row-size=5B cardinality=1
+|
+15:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: day ASC, tinyint_col ASC
+|  limit: 10
+|
+07:TOP-N [LIMIT=10]
+|  order by: day ASC, tinyint_col ASC
+|  row-size=5B cardinality=10
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: d.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=29B cardinality=113
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  |  hash predicates: b.id = c.id
+|  |  runtime filters: RF002 <- c.id
+|  |  row-size=25B cardinality=106
+|  |
+|  |--13:EXCHANGE [HASH(c.id)]
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypesnopart c]
+|  |     partitions=1/1 files=0 size=0B
+|  |     row-size=5B cardinality=0
+|  |
+|  12:EXCHANGE [HASH(b.id)]
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  |  runtime filters: RF004 <- b.id, RF005 <- b.int_col
+|  |  row-size=20B cardinality=106
+|  |
+|  |--11:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [functional.alltypessmall b]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF002 -> b.id
+|  |     row-size=8B cardinality=100
+|  |
+|  00:SCAN HDFS [functional.alltypesagg a]
+|     partitions=11/11 files=11 size=814.73KB
+|     runtime filters: RF002 -> a.id, RF004 -> a.id, RF005 -> a.int_col
+|     row-size=12B cardinality=11.00K
+|
+03:SCAN HDFS [functional.alltypesagg d]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> d.id
+   row-size=4B cardinality=11.00K
+====
+# join conjunct is derived from equivalence classes
+# (no explicit join conjunct between t1 and t2)
+select *
+from functional.testtbl t1, functional.testtbl t2, functional.testtbl t3
+where t1.id = t3.id and t2.id = t3.id
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|  row-size=72B cardinality=0
+|
+|--02:SCAN HDFS [functional.testtbl t3]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF002 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     runtime filters: RF000 -> t2.id
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   runtime filters: RF000 -> t1.id, RF002 -> t1.id
+   row-size=24B cardinality=0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|  row-size=72B cardinality=0
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.testtbl t3]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF002 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     runtime filters: RF000 -> t2.id
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   runtime filters: RF000 -> t1.id, RF002 -> t1.id
+   row-size=24B cardinality=0
+====
+# join involving a table with no table stats (functional.emptytable)
+# tests that the default join strategy is broadcast
+select * from functional.emptytable a inner join
+functional.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=105B cardinality=7.30K
+|
+|--00:SCAN HDFS [functional.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=105B cardinality=7.30K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
+   row-size=89B cardinality=7.30K
+====
+# cross join
+select *
+from functional.testtbl t1 cross join functional.testtbl
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   row-size=24B cardinality=0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=48B cardinality=0
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   row-size=24B cardinality=0
+====
+# cross join with where clause
+select *
+from functional.testtbl t1 cross join functional.testtbl t2 where t1.id < t2.id
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: t1.id < t2.id
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   row-size=24B cardinality=0
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: t1.id < t2.id
+|  row-size=48B cardinality=0
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   row-size=24B cardinality=0
+====
+# Test joins with decimals with different precision and scale
+# Regression test for IMPALA-1121
+select straight_join count(*)
+from functional.decimal_tbl a join functional.decimal_tbl b on a.d1 = b.d5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.d1 = b.d5
+|  runtime filters: RF000 <- b.d5
+|  row-size=12B cardinality=3
+|
+|--01:SCAN HDFS [functional.decimal_tbl b]
+|     HDFS partitions=1/1 files=1 size=195B
+|     row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional.decimal_tbl a]
+   partitions=1/1 files=1 size=195B
+   runtime filters: RF000 -> a.d1
+   row-size=4B cardinality=3
+====
+# Test queries that appear earlier in this file, but substitute "<=>" or "IS DISTINCT
+# FROM" for "=" in the join predicates.
+select *
+from functional.testtbl t1 join functional.testtbl t2
+where t1.id <=> t2.id and t1.zip = 94611
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id IS NOT DISTINCT FROM t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
+   row-size=24B cardinality=0
+====
+select *
+from functional.testtbl t1 join functional.testtbl t2
+where t1.id is not distinct from t2.id and t1.zip = 94611
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id IS NOT DISTINCT FROM t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
+   row-size=24B cardinality=0
+====
+select *
+from functional.testtbl t1 join functional.testtbl t2
+where (t1.id IS DISTINCT FROM t2.id) and t1.zip = 94611
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: (t1.id IS DISTINCT FROM t2.id)
+|  row-size=48B cardinality=0
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     partitions=1/1 files=0 size=0B
+|     row-size=24B cardinality=0
+|
+00:SCAN HDFS [functional.testtbl t1]
+   partitions=1/1 files=0 size=0B
+   predicates: t1.zip = 94611
+   row-size=24B cardinality=0
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_gzip.emptytable a inner join
+functional_text_gzip.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=96B cardinality=3.57K
+|
+|--00:SCAN HDFS [functional_text_gzip.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional_text_gzip.alltypes b]
+   HDFS partitions=24/24 files=24 size=77.88KB
+   runtime filters: RF000 -> b.int_col
+   row-size=80B cardinality=3.57K
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_bzip.emptytable a inner join
+functional_text_bzip.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=96B cardinality=2.58K
+|
+|--00:SCAN HDFS [functional_text_bzip.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional_text_bzip.alltypes b]
+   HDFS partitions=24/24 files=24 size=56.23KB
+   runtime filters: RF000 -> b.int_col
+   row-size=80B cardinality=2.58K
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_lzo.emptytable a inner join
+functional_text_lzo.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=96B cardinality=5.65K
+|
+|--00:SCAN HDFS [functional_text_lzo.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional_text_lzo.alltypes b]
+   HDFS partitions=24/24 files=24 size=123.32KB
+   runtime filters: RF000 -> b.int_col
+   row-size=80B cardinality=5.65K
+====
+# join involving tables with no table stats
+# one of the tables (alltypes) is a compressed text file
+# tests that the default join strategy is broadcast
+select * from functional_text_snap.emptytable a inner join
+functional_text_snap.alltypes b on a.f2 = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
+|  row-size=96B cardinality=5.55K
+|
+|--00:SCAN HDFS [functional_text_snap.emptytable a]
+|     partitions=0/0 files=0 size=0B
+|     row-size=16B cardinality=0
+|
+01:SCAN HDFS [functional_text_snap.alltypes b]
+   HDFS partitions=24/24 files=24 size=121.15KB
+   runtime filters: RF000 -> b.int_col
+   row-size=80B cardinality=5.55K
+====

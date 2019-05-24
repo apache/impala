@@ -348,6 +348,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   83: optional i32 parquet_page_row_count_limit;
+
+  // Disable the attempt to compute an estimated number of rows in an
+  // hdfs table.
+  84: optional bool disable_hdfs_num_rows_estimate = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

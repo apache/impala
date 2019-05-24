@@ -66,6 +66,20 @@ from functional_avro.alltypes t1
   left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
 where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
 ---- RESULTS: VERIFY_IS_SUBSET
+'Per-Host Resource Estimates: Memory=74MB'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'functional_avro.alltypes, functional_parquet.alltypessmall'
+====
+---- QUERY
+# Tests the warning about missing table stats in the explain header.
+# Disable the estimation of cardinality for an hdfs table withot stats.
+set DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
+explain select count(t1.int_col), avg(t2.float_col), sum(t3.bigint_col)
+from functional_avro.alltypes t1
+  inner join functional_parquet.alltypessmall t2 on (t1.id = t2.id)
+  left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
+where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
+---- RESULTS: VERIFY_IS_SUBSET
 'Per-Host Resource Estimates: Memory=4.07GB'
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'

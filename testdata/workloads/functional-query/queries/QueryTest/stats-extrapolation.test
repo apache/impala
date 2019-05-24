@@ -7,7 +7,20 @@ insert into alltypes partition(year, month)
 select * from functional_parquet.alltypes where year = 2009;
 ====
 ---- QUERY
-# No stats are available.
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'   stored statistics:'
+'     table: rows=unavailable size=unavailable'
+'     partitions: 0/12 rows=unavailable'
+'     columns: unavailable'
+row_regex:.* extrapolated-rows=unavailable.*
+'   tuple-ids=0 row-size=4B cardinality=5.92K'
+---- TYPES
+STRING
+====
+---- QUERY
+# Disable the estimation of cardinality for an hdfs table withot stats.
+SET DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
 '   stored statistics:'
@@ -195,6 +208,22 @@ STRING
 ====
 ---- QUERY
 # Test that dropping stats resets everything.
+drop stats alltypes;
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'   stored statistics:'
+'     table: rows=unavailable size=unavailable'
+'     partitions: 0/24 rows=unavailable'
+'     columns: unavailable'
+row_regex:.* extrapolated-rows=unavailable.*
+'   tuple-ids=0 row-size=4B cardinality=17.76K'
+'   in pipelines: 00(GETNEXT)'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test that dropping stats resets everything.
+SET DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 drop stats alltypes;
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET

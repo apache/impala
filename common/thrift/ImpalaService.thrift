@@ -396,6 +396,10 @@ enum TImpalaQueryOptions {
 
   // Maximum number of rows written in a single Parquet data page.
   PARQUET_PAGE_ROW_COUNT_LIMIT = 82
+
+  // Disable the attempt to compute an estimated number of rows in an
+  // hdfs table.
+  DISABLE_HDFS_NUM_ROWS_ESTIMATE = 83
 }
 
 // The summary of a DML statement.

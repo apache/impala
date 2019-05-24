@@ -1,0 +1,31 @@
+# Each tested query in this file involves at least one hdfs table
+# without available statistics.
+# The following is the hdfs table without available statistics:
+# functional.tinyinttable
+# Constant on LHS of IN for nested subqueries (no correlation)
+select * from functional.alltypes t where 1 in
+(select int_col from functional.tinyinttable where
+ 1 in (select int_col from functional.alltypestiny))
+---- PLAN
+PLAN-ROOT SINK
+|
+04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  row-size=89B cardinality=7.30K
+|
+|--03:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  row-size=4B cardinality=1
+|  |
+|  |--01:SCAN HDFS [functional.tinyinttable]
+|  |     partitions=1/1 files=1 size=20B
+|  |     predicates: 1 = functional.tinyinttable.int_col
+|  |     row-size=4B cardinality=1
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|     predicates: 1 = functional.alltypestiny.int_col
+|     row-size=4B cardinality=4
+|
+00:SCAN HDFS [functional.alltypes t]
+   partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====

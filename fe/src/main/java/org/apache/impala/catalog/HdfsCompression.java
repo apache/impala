@@ -44,7 +44,7 @@ public enum HdfsCompression {
   ZSTD;
 
   /* Map from a suffix to a compression type */
-  private static final ImmutableMap<String, HdfsCompression> SUFFIX_MAP =
+  public static final ImmutableMap<String, HdfsCompression> SUFFIX_MAP =
       ImmutableMap.<String, HdfsCompression>builder().
           put("deflate", DEFLATE).
           put("gz", GZIP).

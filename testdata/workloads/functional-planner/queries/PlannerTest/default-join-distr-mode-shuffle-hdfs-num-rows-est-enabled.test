@@ -1,0 +1,76 @@
+# Each tested query in this file involves at least one hdfs table
+# without available statistics.
+# The following is the hdfs table without available statistics:
+# functional.tinytable
+# Both join inputs have an unknown cardinality.
+select /* +straight_join */ * from
+functional.tinytable x inner join functional.tinytable y on x.a = y.a
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: x.a = y.a
+|  runtime filters: RF000 <- y.a
+|  row-size=48B cardinality=2
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.tinytable y]
+|     HDFS partitions=1/1 files=1 size=38B
+|     row-size=24B cardinality=2
+|
+00:SCAN HDFS [functional.tinytable x]
+   HDFS partitions=1/1 files=1 size=38B
+   runtime filters: RF000 -> x.a
+   row-size=24B cardinality=2
+====
+# Left join input has an unknown cardinality.
+select /* +straight_join */ * from
+functional.tinytable x inner join functional.alltypes y on x.a = y.string_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: x.a = y.string_col
+|  runtime filters: RF000 <- y.string_col
+|  row-size=113B cardinality=2
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes y]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=89B cardinality=7.30K
+|
+00:SCAN HDFS [functional.tinytable x]
+   HDFS partitions=1/1 files=1 size=38B
+   runtime filters: RF000 -> x.a
+   row-size=24B cardinality=2
+====
+# Right join input has an unknown cardinality.
+select /* +straight_join */ * from
+functional.alltypes x inner join functional.tinytable y on x.string_col = y.a
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: x.string_col = y.a
+|  runtime filters: RF000 <- y.a
+|  row-size=113B cardinality=7.30K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.tinytable y]
+|     HDFS partitions=1/1 files=1 size=38B
+|     row-size=24B cardinality=2
+|
+00:SCAN HDFS [functional.alltypes x]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> x.string_col
+   row-size=89B cardinality=7.30K
+====
