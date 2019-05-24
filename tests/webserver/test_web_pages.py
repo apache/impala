@@ -46,6 +46,7 @@ class TestWebPage(ImpalaTestSuite):
   ADMISSION_URL = "http://localhost:{0}/admission"
   RESET_RESOURCE_POOL_STATS_URL = "http://localhost:{0}/resource_pool_reset"
   BACKENDS_URL = "http://localhost:{0}/backends"
+  PROMETHEUS_METRICS_URL = "http://localhost:{0}/metrics_prometheus"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -564,3 +565,10 @@ class TestWebPage(ImpalaTestSuite):
     # Check the query id is in the content of the reponse.
     assert len(responses) == 1
     assert query_id in responses[0].text
+
+  def test_prometheus_metrics(self):
+    """Test to check prometheus metrics"""
+    resp = self.get_and_check_status(self.PROMETHEUS_METRICS_URL)
+    assert len(resp) == 3
+    # check if metric shows up
+    assert 'statestore_subscriber_heartbeat_interval_time_min' in resp[0].text

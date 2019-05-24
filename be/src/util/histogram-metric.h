@@ -71,6 +71,83 @@ class HistogramMetric : public Metric {
     *value = container;
   }
 
+  virtual TMetricKind::type ToPrometheus(std::string name, std::stringstream* value,
+      std::stringstream* metric_kind) override {
+    {
+      boost::lock_guard<SpinLock> l(lock_);
+
+      // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
+      // this is because prometheus only supports time format in seconds
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.2\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(25), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.2\"} " << histogram_->ValueAtPercentile(25) << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.5\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(50), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.5\"} " << histogram_->ValueAtPercentile(50) << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.7\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(75), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.7\"} " << histogram_->ValueAtPercentile(75) << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.9\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(90), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.9\"} " << histogram_->ValueAtPercentile(90) << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.95\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(95), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.95\"} " << histogram_->ValueAtPercentile(95) << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "{le=\"0.999\"} "
+               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(99.9), unit_)
+               << "\n";
+      } else {
+        *value << name << "{le=\"0.999\"} " << histogram_->ValueAtPercentile(99.9)
+               << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "_max "
+               << ConvertToPrometheusSecs(histogram_->MaxValue(), unit_) << "\n";
+      } else {
+        *value << name << "_max " << histogram_->MaxValue() << "\n";
+      }
+
+      if (IsUnitTimeBased(unit_)) {
+        *value << name << "_min "
+               << ConvertToPrometheusSecs(histogram_->MinValue(), unit_) << "\n";
+      } else {
+        *value << name << "_min " << histogram_->MinValue() << "\n";
+      }
+
+      *value << name << "_count " << histogram_->TotalCount();
+    }
+
+    *metric_kind << "# TYPE " << name << " histogram";
+    return TMetricKind::HISTOGRAM;
+  }
+
   void Update(int64_t val) {
     boost::lock_guard<SpinLock> l(lock_);
     histogram_->Increment(val);

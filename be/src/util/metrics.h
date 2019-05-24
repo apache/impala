@@ -96,12 +96,27 @@ class Metric {
   /// This method is kept for backwards-compatibility with CM5.0.
   virtual void ToLegacyJson(rapidjson::Document* document) = 0;
 
+  /// Builds a new Value into 'val', based on prometheus text exposition format
+  /// Details of this format can be found below:
+  /// https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/
+  //  exposition_formats.md
+  /// Should set the following fields where appropriate:
+  //
+  /// name, value, metric_kind
+  virtual TMetricKind::type ToPrometheus(
+      string name, std::stringstream* val, std::stringstream* metric_kind) = 0;
+
   /// Writes a human-readable representation of this metric to 'out'. This is the
   /// representation that is often displayed in webpages etc.
   virtual std::string ToHumanReadable() = 0;
 
   const std::string& key() const { return key_; }
   const std::string& description() const { return description_; }
+
+  bool IsUnitTimeBased(TUnit::type type) {
+    return (type == TUnit::type::TIME_MS || type == TUnit::type::TIME_US
+        || type == TUnit::type::TIME_NS);
+  }
 
  protected:
   /// Unique key identifying this metric
@@ -119,6 +134,26 @@ class Metric {
   /// to 'val'.
   void AddStandardFields(rapidjson::Document* document, rapidjson::Value* val);
 };
+
+template <typename T>
+inline double ConvertToPrometheusSecs(const T& val, TUnit::type unit) {
+  double value = val;
+  if (unit == TUnit::type::TIME_MS) {
+    value /= 1000;
+  } else if (unit == TUnit::type::TIME_US) {
+    value /= 1000000;
+  } else if (unit == TUnit::type::TIME_NS) {
+    value /= 1000000000;
+  }
+  return value;
+}
+
+template <>
+inline double ConvertToPrometheusSecs<std::string>(
+    const std::string& val, TUnit::type unit) {
+  DCHECK(false) << "Should not be called for string metrics";
+  return 0.0;
+}
 
 /// A ScalarMetric has a value which is a simple primitive type: e.g. integers, strings
 /// and floats. It is parameterised not only by the type of its value, but by both the
@@ -158,6 +193,30 @@ class ScalarMetric: public Metric {
     rapidjson::Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
     *val = container;
+  }
+
+  virtual TMetricKind::type ToPrometheus(
+      std::string name, std::stringstream* val, std::stringstream* metric_kind) override {
+    std::string metric_type = PrintThriftEnum(kind()).c_str();
+    // prometheus doesn't support 'property', so ignore it
+    if (!metric_type.compare("property")) {
+      return TMetricKind::PROPERTY;
+    }
+
+    if (IsUnitTimeBased(unit())) {
+      // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
+      // this is because prometheus only supports time format in seconds
+      *val << ConvertToPrometheusSecs(GetValue(), unit());
+    } else {
+      *val << GetValue();
+    }
+
+    // convert metric type to lower case, that's what prometheus expects
+    std::transform(
+        metric_type.begin(), metric_type.end(), metric_type.begin(), ::tolower);
+
+    *metric_kind << "# TYPE " << name << " " << metric_type;
+    return kind();
   }
 
   virtual std::string ToHumanReadable() override {
@@ -440,6 +499,9 @@ class MetricGroup {
   void ToJson(bool include_children, rapidjson::Document* document,
       rapidjson::Value* out_val);
 
+  /// Converts this metric group (and optionally all of its children recursively) to JSON.
+  void ToPrometheus(bool include_children, std::stringstream* out_val);
+
   /// Creates or returns an already existing child metric group.
   MetricGroup* GetOrCreateChildGroup(const std::string& name);
 
@@ -475,6 +537,12 @@ class MetricGroup {
   /// returned.
   void TemplateCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
+
+  /// Webserver callback for /metricsPrometheus. Produces string in prometheus format,
+  /// each representing metric group, and each including a list of metrics, and a list
+  /// of immediate children.  If args contains a paramater 'metric', only the json for
+  /// that metric is returned.
+  void PrometheusCallback(const Webserver::WebRequest& req, std::stringstream* data);
 
   /// Legacy webpage callback for CM 5.0 and earlier. Produces a flattened map of (key,
   /// value) pairs for all metrics in this hierarchy.

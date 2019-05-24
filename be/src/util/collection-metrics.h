@@ -74,6 +74,12 @@ class SetMetric : public Metric {
 
   void Reset() { value_.clear(); }
 
+  virtual TMetricKind::type ToPrometheus(
+      std::string name, std::stringstream* val, std::stringstream* metric_kind) {
+    // this is not supported type in prometheus, so ignore
+    return TMetricKind::SET;
+  }
+
   virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) {
     rapidjson::Value container(rapidjson::kObjectType);
     AddStandardFields(document, &container);
@@ -155,6 +161,62 @@ class StatsMetric : public Metric {
   void Reset() {
     boost::lock_guard<boost::mutex> l(lock_);
     acc_ = Accumulator();
+  }
+
+  virtual TMetricKind::type ToPrometheus(
+      std::string name, std::stringstream* val, std::stringstream* metric_kind) {
+    boost::lock_guard<boost::mutex> l(lock_);
+
+    *val << name << "_total " << boost::accumulators::count(acc_) << "\n";
+
+    if (boost::accumulators::count(acc_) > 0) {
+      if (IsUnitTimeBased(unit_)) {
+        *val << name << "_last " << ConvertToPrometheusSecs(value_, unit_) << "\n";
+      } else {
+        *val << name << "_last " << value_ << "\n";
+      }
+
+      if (StatsSelection & StatsType::MIN) {
+        if (IsUnitTimeBased(unit_)) {
+          *val << name << "_min "
+               << ConvertToPrometheusSecs(boost::accumulators::min(acc_), unit_) << "\n";
+        } else {
+          *val << name << "_min " << boost::accumulators::min(acc_) << "\n";
+        }
+      }
+
+      if (StatsSelection & StatsType::MAX) {
+        if (IsUnitTimeBased(unit_)) {
+          *val << name << "_max "
+               << ConvertToPrometheusSecs(boost::accumulators::max(acc_), unit_) << "\n";
+        } else {
+          *val << name << "_max " << boost::accumulators::max(acc_) << "\n";
+        }
+      }
+
+      if (StatsSelection & StatsType::MEAN) {
+        if (IsUnitTimeBased(unit_)) {
+          *val << name << "_mean "
+               << ConvertToPrometheusSecs(boost::accumulators::mean(acc_), unit_) << "\n";
+        } else {
+          *val << name << "_mean " << boost::accumulators::mean(acc_) << "\n";
+        }
+      }
+
+      if (StatsSelection & StatsType::STDDEV) {
+        if (IsUnitTimeBased(unit_)) {
+          *val << name << "_stddev "
+               << ConvertToPrometheusSecs(
+                      std::sqrt(boost::accumulators::variance(acc_)), unit_)
+               << "\n";
+        } else {
+          *val << name << "_stddev " << std::sqrt(boost::accumulators::variance(acc_))
+               << "\n";
+        }
+      }
+    }
+    *metric_kind << "# TYPE " << name << " counter";
+    return TMetricKind::STATS;
   }
 
   virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) {

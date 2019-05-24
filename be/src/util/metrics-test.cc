@@ -463,5 +463,416 @@ TEST_F(MetricsTest, MetricGroupJson) {
   EXPECT_EQ(val2["name"].GetString(), string("child1"));
 }
 
+void AssertPrometheus(const std::stringstream& val, const string& name,
+    const string& value, const string& desc, const string& kind = "") {
+  std::stringstream exp_val;
+  // convert to all values to expected format
+  exp_val << "# HELP " << name << " " << desc << "\n"
+          << "# TYPE " << name << " " << kind << "\n";
+  if (name == "stats_metric" || name == "histogram_metric") {
+    exp_val << value + "\n";
+  } else {
+    exp_val << name << " " << value + "\n";
+  }
+  EXPECT_EQ(val.str(), exp_val.str());
+}
+
+TEST_F(MetricsTest, CountersPrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::UNIT, "description");
+  metrics.AddCounter("counter", 0);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "0", "description", "counter");
+}
+
+TEST_F(MetricsTest, CountersBytesPrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  metrics.AddCounter("counter", 555);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "555", "description", "counter");
+}
+
+TEST_F(MetricsTest, CountersNonePrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::NONE, "description");
+  metrics.AddCounter("counter", 0);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "0", "description", "counter");
+}
+
+TEST_F(MetricsTest, CountersTimeMSPrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::TIME_MS, "description");
+  metrics.AddCounter("counter", 4354364);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "4354.36", "description", "counter");
+}
+
+TEST_F(MetricsTest, CountersTimeNSPrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::TIME_NS, "description");
+  metrics.AddCounter("counter", 4354364234);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "4.35436", "description", "counter");
+}
+
+TEST_F(MetricsTest, CountersTimeSPrometheus) {
+  MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::TIME_S, "description");
+  metrics.AddCounter("counter", 120);
+  std::stringstream counter_val;
+  metrics.ToPrometheus(true, &counter_val);
+  AssertPrometheus(counter_val, "counter", "120", "description", "counter");
+}
+
+TEST_F(MetricsTest, GaugesPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
+  metrics.AddGauge("gauge", 10);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "10", "", "gauge");
+}
+
+TEST_F(MetricsTest, GaugesBytesPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::BYTES);
+  metrics.AddGauge("gauge", 150000);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "150000", "", "gauge");
+}
+
+TEST_F(MetricsTest, GaugesTimeMSPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::TIME_MS);
+  metrics.AddGauge("gauge", 10000);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "10", "", "gauge");
+}
+
+TEST_F(MetricsTest, GaugesTimeNSPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::TIME_NS);
+  metrics.AddGauge("gauge", 2334123456);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "2.33412", "", "gauge");
+}
+
+TEST_F(MetricsTest, GaugesTimeSPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::TIME_S);
+  metrics.AddGauge("gauge", 1500);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "1500", "", "gauge");
+}
+
+TEST_F(MetricsTest, GaugesUnitPrometheus) {
+  MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::UNIT);
+  metrics.AddGauge("gauge", 111);
+  std::stringstream gauge_val;
+  metrics.ToPrometheus(true, &gauge_val);
+  AssertPrometheus(gauge_val, "gauge", "111", "", "gauge");
+}
+
+TEST_F(MetricsTest, StatsMetricsPrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::UNIT);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.0);
+  metric->Update(20.0);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 20\n"
+      "stats_metric_min 10\n"
+      "stats_metric_max 20\n"
+      "stats_metric_mean 15\n"
+      "stats_metric_stddev 5\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, StatsMetricsBytesPrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::BYTES);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.0);
+  metric->Update(2230.1234567);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 2230.12\n"
+      "stats_metric_min 10\n"
+      "stats_metric_max 2230.12\n"
+      "stats_metric_mean 1120.06\n"
+      "stats_metric_stddev 1110.06\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, StatsMetricsNonePrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::NONE);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.0);
+  metric->Update(20.0);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 20\n"
+      "stats_metric_min 10\n"
+      "stats_metric_max 20\n"
+      "stats_metric_mean 15\n"
+      "stats_metric_stddev 5\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, StatsMetricsTimeMSPrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::TIME_MS);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.0);
+  metric->Update(20.0);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 0.02\n"
+      "stats_metric_min 0.01\n"
+      "stats_metric_max 0.02\n"
+      "stats_metric_mean 0.015\n"
+      "stats_metric_stddev 0.005\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, StatsMetricsTimeNSPrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::TIME_NS);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.12345);
+  metric->Update(20.567);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 2.0567e-08\n"
+      "stats_metric_min 1.01235e-08\n"
+      "stats_metric_max 2.0567e-08\n"
+      "stats_metric_mean 1.53452e-08\n"
+      "stats_metric_stddev 5.22178e-09\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, StatsMetricsTimeSPrometheus) {
+  MetricGroup metrics("StatsMetrics");
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::TIME_S);
+  StatsMetric<double>* metric =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_metric");
+  metric->Update(10.22);
+  metric->Update(20.22);
+  std::stringstream stats_val;
+  metrics.ToPrometheus(true, &stats_val);
+  AssertPrometheus(stats_val, "stats_metric",
+      "stats_metric_total 2\n"
+      "stats_metric_last 20.22\n"
+      "stats_metric_min 10.22\n"
+      "stats_metric_max 20.22\n"
+      "stats_metric_mean 15.22\n"
+      "stats_metric_stddev 5\n",
+      "", "counter");
+}
+
+TEST_F(MetricsTest, HistogramPrometheus) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric =
+      metrics.RegisterMetric(new HistogramMetric(metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  AssertPrometheus(val, "histogram_metric",
+      "histogram_metric{le=\"0.2\"} 2.5\n"
+      "histogram_metric{le=\"0.5\"} 5\n"
+      "histogram_metric{le=\"0.7\"} 7.5\n"
+      "histogram_metric{le=\"0.9\"} 9\n"
+      "histogram_metric{le=\"0.95\"} 9.496\n"
+      "histogram_metric{le=\"0.999\"} 9.984\n"
+      "histogram_metric_max 10.001\n"
+      "histogram_metric_min 0\n"
+      "histogram_metric_count 10002",
+      "", "histogram");
+}
+
+TEST_F(MetricsTest, HistogramTimeNSPrometheus) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::TIME_NS);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric =
+      metrics.RegisterMetric(new HistogramMetric(metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  AssertPrometheus(val, "histogram_metric",
+      "histogram_metric{le=\"0.2\"} 2.5e-06\n"
+      "histogram_metric{le=\"0.5\"} 5e-06\n"
+      "histogram_metric{le=\"0.7\"} 7.5e-06\n"
+      "histogram_metric{le=\"0.9\"} 9e-06\n"
+      "histogram_metric{le=\"0.95\"} 9.496e-06\n"
+      "histogram_metric{le=\"0.999\"} 9.984e-06\n"
+      "histogram_metric_max 1.0001e-05\n"
+      "histogram_metric_min 0\n"
+      "histogram_metric_count 10002",
+      "", "histogram");
+}
+
+TEST_F(MetricsTest, HistogramTimeSPrometheus) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::TIME_S);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric =
+      metrics.RegisterMetric(new HistogramMetric(metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  AssertPrometheus(val, "histogram_metric",
+      "histogram_metric{le=\"0.2\"} 2500\n"
+      "histogram_metric{le=\"0.5\"} 5000\n"
+      "histogram_metric{le=\"0.7\"} 7500\n"
+      "histogram_metric{le=\"0.9\"} 9000\n"
+      "histogram_metric{le=\"0.95\"} 9496\n"
+      "histogram_metric{le=\"0.999\"} 9984\n"
+      "histogram_metric_max 10001\n"
+      "histogram_metric_min 0\n"
+      "histogram_metric_count 10002",
+      "", "histogram");
+}
+
+TEST_F(MetricsTest, HistogramBytesPrometheus) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::BYTES);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric =
+      metrics.RegisterMetric(new HistogramMetric(metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  AssertPrometheus(val, "histogram_metric",
+      "histogram_metric{le=\"0.2\"} 2500\n"
+      "histogram_metric{le=\"0.5\"} 5000\n"
+      "histogram_metric{le=\"0.7\"} 7500\n"
+      "histogram_metric{le=\"0.9\"} 9000\n"
+      "histogram_metric{le=\"0.95\"} 9496\n"
+      "histogram_metric{le=\"0.999\"} 9984\n"
+      "histogram_metric_max 10001\n"
+      "histogram_metric_min 0\n"
+      "histogram_metric_count 10002",
+      "", "histogram");
+}
+
+TEST_F(MetricsTest, HistogramUnitPrometheus) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::UNIT);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric =
+      metrics.RegisterMetric(new HistogramMetric(metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  AssertPrometheus(val, "histogram_metric",
+      "histogram_metric{le=\"0.2\"} 2500\n"
+      "histogram_metric{le=\"0.5\"} 5000\n"
+      "histogram_metric{le=\"0.7\"} 7500\n"
+      "histogram_metric{le=\"0.9\"} 9000\n"
+      "histogram_metric{le=\"0.95\"} 9496\n"
+      "histogram_metric{le=\"0.999\"} 9984\n"
+      "histogram_metric_max 10001\n"
+      "histogram_metric_min 0\n"
+      "histogram_metric_count 10002",
+      "", "histogram");
+}
+
+TEST_F(MetricsTest, MetricGroupPrometheus) {
+  std::stringstream exp_val;
+  exp_val << "# HELP counter1 description\n"
+             "# TYPE counter1 counter\n"
+             "counter1 2048\n"
+             "# HELP counter2 description\n"
+             "# TYPE counter2 counter\n"
+             "counter2 2048\n"
+             "# HELP child_counter description\n"
+             "# TYPE child_counter counter\n"
+             "child_counter 0\n";
+  MetricGroup metrics("PrometheusTest");
+  AddMetricDef("counter1", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  AddMetricDef("counter2", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  metrics.AddCounter("counter1", 2048);
+  metrics.AddCounter("counter2", 2048);
+
+  MetricGroup* find_result = metrics.FindChildGroup("child1");
+  EXPECT_EQ(find_result, reinterpret_cast<MetricGroup*>(NULL));
+
+  metrics.GetOrCreateChildGroup("child1");
+  AddMetricDef("child_counter", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  metrics.GetOrCreateChildGroup("child2")->AddCounter("child_counter", 0);
+
+  IntCounter* counter = metrics.FindMetricForTesting<IntCounter>(string("child_counter"));
+  ASSERT_NE(counter, reinterpret_cast<IntCounter*>(NULL));
+
+  std::stringstream val;
+  metrics.ToPrometheus(true, &val);
+  EXPECT_EQ(val.str(), exp_val.str());
+}
+
+// test with null metrics
+TEST_F(MetricsTest, StatsMetricsNullPrometheus) {
+  MetricGroup nullMetrics("StatsMetrics");
+  AddMetricDef("", TMetricKind::STATS, TUnit::TIME_S);
+  std::stringstream stats_val;
+  nullMetrics.ToPrometheus(true, &stats_val);
+  EXPECT_EQ("", stats_val.str());
+
+  MetricGroup metrics("Metrics");
+  AddMetricDef("test", TMetricKind::STATS, TUnit::TIME_S);
+  metrics.ToPrometheus(true, &stats_val);
+  EXPECT_EQ("", stats_val.str());
+}
 }
 

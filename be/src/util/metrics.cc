@@ -31,6 +31,7 @@
 
 #include "common/names.h"
 
+using boost::algorithm::replace_all_copy;
 using namespace impala;
 using namespace rapidjson;
 using namespace strings;
@@ -91,6 +92,10 @@ Status MetricGroup::Init(Webserver* webserver) {
     Webserver::UrlCallback json_callback =
         bind<void>(mem_fn(&MetricGroup::TemplateCallback), this, _1, _2);
     webserver->RegisterUrlCallback("/metrics", "metrics.tmpl", json_callback, true);
+
+    Webserver::RawUrlCallback prometheus_callback =
+        bind<void>(mem_fn(&MetricGroup::PrometheusCallback), this, _1, _2);
+    webserver->RegisterUrlCallback("/metrics_prometheus", prometheus_callback);
   }
 
   return Status::OK();
@@ -172,6 +177,20 @@ void MetricGroup::TemplateCallback(const Webserver::WebRequest& req,
   }
 }
 
+void MetricGroup::PrometheusCallback(
+    const Webserver::WebRequest& req, stringstream* data) {
+  const auto& args = req.parsed_args;
+  Webserver::ArgumentMap::const_iterator metric_group = args.find("metric_group");
+
+  lock_guard<SpinLock> l(lock_);
+  // If no particular metric group is requested, render this metric group (and all its
+  // children).
+  if (metric_group == args.end()) {
+    Value container;
+    ToPrometheus(true, data);
+  }
+}
+
 void MetricGroup::ToJson(bool include_children, Document* document, Value* out_val) {
   Value metric_list(kArrayType);
   for (const MetricMap::value_type& m: metric_map_) {
@@ -195,6 +214,42 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
   }
 
   *out_val = container;
+}
+
+void MetricGroup::ToPrometheus(bool include_children, stringstream* out_val) {
+  for (auto const& m : metric_map_) {
+    stringstream metric_value;
+    stringstream metric_kind;
+
+    // replace all occurrence of '.' and '-'
+    string name = replace_all_copy(m.first, ".", "_");
+    name = replace_all_copy(name, "-", "_");
+    TMetricKind::type metric_type =
+        m.second->ToPrometheus(name, &metric_value, &metric_kind);
+    if (metric_type == TMetricKind::SET || metric_type == TMetricKind::PROPERTY) {
+      // not supported in prometheus
+      continue;
+    }
+    *out_val << "# HELP " << name << " ";
+    *out_val << m.second->description_;
+    *out_val << "\n";
+    *out_val << metric_kind.str();
+    *out_val << "\n";
+    // append only if metric type is not stats, set or histogram
+    if (metric_type != TMetricKind::HISTOGRAM && metric_type != TMetricKind::STATS) {
+      *out_val << name;
+      *out_val << " ";
+    }
+    *out_val << metric_value.str();
+    *out_val << "\n";
+  }
+
+  if (include_children) {
+    Value child_groups(kArrayType);
+    for (const ChildGroupMap::value_type& child : children_) {
+      child.second->ToPrometheus(true, out_val);
+    }
+  }
 }
 
 MetricGroup* MetricGroup::GetOrCreateChildGroup(const string& name) {
