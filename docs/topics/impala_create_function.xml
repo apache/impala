@@ -37,11 +37,9 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">CREATE FUNCTION statement</indexterm>
-      Creates a user-defined function (UDF), which you can use to implement custom logic during
-      <codeph>SELECT</codeph> or <codeph>INSERT</codeph> operations.
-    </p>
+    <p>  Creates a user-defined function (UDF), which you can use to implement
+      custom logic during <codeph>SELECT</codeph> or <codeph>INSERT</codeph>
+      operations. </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
@@ -73,14 +71,6 @@ under the License.
   LOCATION '<varname>hdfs_path_to_jar</varname>'
   SYMBOL='<varname>class_name</varname>'</codeblock>
     </p>
-
-<!--
-Examples:
-CREATE FUNCTION IF NOT EXISTS foo location '/path/to/jar' SYMBOL='TestUdf';
-CREATE FUNCTION bar location '/path/to/jar' SYMBOL='TestUdf2';
-DROP FUNCTION foo;
-DROP FUNCTION IF EXISTS bar;
--->
 
     <p>
       To create a persistent UDA, which must be written in C++, issue a <codeph>CREATE AGGREGATE FUNCTION</codeph> statement:
@@ -212,18 +202,6 @@ DROP FUNCTION IF EXISTS bar;
       determine the names based on the first such clause, so the others are optional.
     </p>
 
-    <p audience="hidden">
-      The <codeph>INTERMEDIATE</codeph> clause specifies the data type of intermediate values passed from the
-      <q>update</q> phase to the <q>merge</q> phase, and from the <q>merge</q> phase to the <q>finalize</q> phase.
-      You can use any of the existing Impala data types, or the special notation
-      <codeph>CHAR(<varname>n</varname>)</codeph> to allocate a scratch area of <varname>n</varname> bytes for the
-      intermediate result. For example, if the different phases of your UDA pass strings to each other but in the
-      end the function returns a <codeph>BIGINT</codeph> value, you would specify <codeph>INTERMEDIATE
-      STRING</codeph>. Likewise, if the different phases of your UDA pass 2 separate <codeph>BIGINT</codeph> values
-      between them (8 bytes each), you would specify <codeph>INTERMEDIATE CHAR(16)</codeph> so that each function
-      could read from and write to a 16-byte buffer.
-    </p>
-
     <p>
       For end-to-end examples of UDAs, see <xref href="impala_udf.xml#udfs"/>.
     </p>
@@ -235,6 +213,13 @@ DROP FUNCTION IF EXISTS bar;
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <ul>
+      <li> When authorization is enabled, the <codeph>CREATE FUNCTION</codeph>
+        statement requires:<ul>
+          <li>The <codeph>CREATE</codeph> privilege on the database.</li>
+          <li>The <codeph>ALL</codeph> privilege on URI where URI is the value
+            you specified for the <codeph>LOCATION</codeph> in the
+              <codeph>CREATE FUNCTION</codeph> statement. </li>
+        </ul></li>
       <li>
         You can write Impala UDFs in either C++ or Java. C++ UDFs are new to Impala, and are the recommended format
         for high performance utilizing native code. Java-based UDFs are compatible between Impala and Hive, and are

@@ -45,13 +45,8 @@ under the License.
       copying from one table to another with the <codeph>INSERT ... SELECT</codeph> syntax.
     </p>
 
-    <p>
-      You might be familiar with this feature from other database products, under names such as stored functions or
-      stored routines.
-<!--
-    , user-defined aggregate functions (UDAFs), table functions, or window functions.
-    -->
-    </p>
+    <p> You might be familiar with this feature from other database products,
+      under names such as stored functions or stored routines.  </p>
 
     <p>
       Impala support for UDFs is available in Impala 1.2 and higher:
@@ -137,18 +132,6 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             Currently, Impala does not support other categories of user-defined functions, such as user-defined
             table functions (UDTFs) or window functions.
           </li>
-
-<!--
-<li>
-A user-defined table function (UDTF) returns an arbitrary number of rows (zero, one, or many) for each input row.
-These functions filter, explode, or transform the input data in a variety of ways.
-Currently, Impala does not support UDTFs.
-For example:
-<codeblock>select anomalous_event() from web_traffic;
-select price_change() from stock_ticker;
-select real_words(letters) from word_games;</codeblock>
-</li>
--->
         </ul>
       </conbody>
     </concept>
@@ -1860,12 +1843,12 @@ Returned 2 row(s) in 0.43s</codeblock>
           To call a UDF in a query, you must have the required read privilege for any databases and tables used in
           the query.
         </li>
-
-        <li>
-          Because incorrectly coded UDFs could cause performance or capacity problems, for example by going into
-          infinite loops or allocating excessive amounts of memory, only an administrative user can create UDFs.
-          That is, to execute the <codeph>CREATE FUNCTION</codeph> statement requires the <codeph>ALL</codeph>
-          privilege on the server.
+        <li> The <codeph>CREATE FUNCTION</codeph> statement requires:<ul>
+            <li>The <codeph>CREATE</codeph> privilege on the database.</li>
+            <li>The <codeph>ALL</codeph> privilege on URI where URI is the value
+              you specified for the <codeph>LOCATION</codeph> in the
+                <codeph>CREATE FUNCTION</codeph> statement. </li>
+          </ul>
         </li>
       </ul>
 
