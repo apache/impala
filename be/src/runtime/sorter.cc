@@ -27,6 +27,7 @@
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -572,7 +573,7 @@ Status Sorter::Run::AddPage(vector<Page>* page_sequence) {
 void Sorter::Run::CopyVarLenData(const vector<StringValue*>& string_values,
     uint8_t* dest) {
   for (StringValue* string_val: string_values) {
-    memcpy(dest, string_val->ptr, string_val->len);
+    Ubsan::MemCpy(dest, string_val->ptr, string_val->len);
     string_val->ptr = reinterpret_cast<char*>(dest);
     dest += string_val->len;
   }

@@ -35,6 +35,7 @@
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -102,7 +103,7 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     if (IsNull((*slot)->null_indicator_offset())) continue;
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
     char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->len));
-    memcpy(string_copy, string_v->ptr, string_v->len);
+    Ubsan::MemCpy(string_copy, string_v->ptr, string_v->len);
     string_v->ptr = string_copy;
   }
 
@@ -143,7 +144,7 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    memcpy(*data, string_v->ptr, string_v->len);
+    Ubsan::MemCpy(*data, string_v->ptr, string_v->len);
     string_v->ptr = convert_ptrs ? reinterpret_cast<char*>(*offset) : *data;
     *data += string_v->len;
     *offset += string_v->len;

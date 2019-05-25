@@ -22,6 +22,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/tuple.h"
 #include "util/debug-util.h"
+#include "util/ubsan.h"
 
 namespace impala {
 
@@ -72,7 +73,7 @@ class CollectionValueBuilder {
               ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED, new_buffer_size,
               path, buffer_size_, coll_value_->num_tuples).msg(), new_buffer_size);
         }
-        memcpy(new_buf, coll_value_->ptr, bytes_written);
+        Ubsan::MemCpy(new_buf, coll_value_->ptr, bytes_written);
         coll_value_->ptr = new_buf;
         buffer_size_ = new_buffer_size;
       }

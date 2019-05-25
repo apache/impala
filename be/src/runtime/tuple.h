@@ -24,6 +24,7 @@
 #include "gutil/macros.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "util/ubsan.h"
 
 namespace llvm {
 class Function;
@@ -103,7 +104,8 @@ class Tuple {
   }
 
   void ClearNullBits(int null_bytes_offset, int num_null_bytes) {
-    memset(reinterpret_cast<uint8_t*>(this) + null_bytes_offset, 0, num_null_bytes);
+    Ubsan::MemSet(
+        reinterpret_cast<uint8_t*>(this) + null_bytes_offset, 0, num_null_bytes);
   }
 
   /// The total size of all data represented in this tuple (tuple data and referenced
