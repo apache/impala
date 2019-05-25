@@ -31,6 +31,8 @@
 
 #include <common/logging.h>
 
+#include "util/arithmetic-util.h"
+
 #define BASE_HAS_ATOMIC64 1  // Use only in tests and base/atomic*
 
 
@@ -116,7 +118,7 @@ inline Atomic32 NoBarrier_AtomicIncrement(volatile Atomic32* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now holds the old value of *ptr
-  return temp + increment;
+  return impala::ArithmeticUtil::AsUnsigned<std::plus>(temp, increment);
 }
 
 inline Atomic32 Barrier_AtomicIncrement(volatile Atomic32* ptr,
@@ -127,7 +129,7 @@ inline Atomic32 Barrier_AtomicIncrement(volatile Atomic32* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now holds the old value of *ptr
-  return temp + increment;
+  return impala::ArithmeticUtil::AsUnsigned<std::plus>(temp, increment);
 }
 
 // On x86, the NoBarrier_CompareAndSwap() uses a locked instruction and so also
@@ -269,7 +271,7 @@ inline Atomic64 NoBarrier_AtomicIncrement(volatile Atomic64* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now contains the previous value of *ptr
-  return temp + increment;
+  return impala::ArithmeticUtil::AsUnsigned<std::plus>(temp, increment);
 }
 
 inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
@@ -280,7 +282,7 @@ inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now contains the previous value of *ptr
-  return temp + increment;
+  return impala::ArithmeticUtil::AsUnsigned<std::plus>(temp, increment);
 }
 
 inline void NoBarrier_Store(volatile Atomic64* ptr, Atomic64 value) {
@@ -408,10 +410,10 @@ inline Atomic64 NoBarrier_AtomicIncrement(volatile Atomic64* ptr,
 
   do {
     old_val = *ptr;
-    new_val = old_val + increment;
+    new_val = return impala::ArithmeticUtil::AsUnsigned<std::plus>(old_val, increment);
   } while (__sync_val_compare_and_swap(ptr, old_val, new_val) != old_val);
 
-  return old_val + increment;
+  return impala::ArithmeticUtil::AsUnsigned<std::plus>(old_val, increment);
 }
 
 inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
