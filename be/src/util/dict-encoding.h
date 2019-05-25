@@ -30,6 +30,7 @@
 #include "util/bit-util.h"
 #include "util/mem-util.h"
 #include "util/rle-encoding.h"
+#include "util/ubsan.h"
 
 namespace impala {
 
@@ -448,7 +449,7 @@ template<>
 inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
     NodeIndex* bucket) {
   char* ptr_copy = reinterpret_cast<char*>(pool_->Allocate(value.len));
-  memcpy(ptr_copy, value.ptr, value.len);
+  Ubsan::MemCpy(ptr_copy, value.ptr, value.len);
   StringValue sv(ptr_copy, value.len);
   Node node(sv, *bucket);
   ConsumeBytes(sizeof(node));
