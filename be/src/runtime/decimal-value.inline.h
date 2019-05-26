@@ -142,7 +142,7 @@ inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
   } else if (delta_scale < 0) {
     T mult = DecimalUtil::GetScaleMultiplier<T>(-delta_scale);
     *overflow |= abs(result) >= max_value / mult;
-    result *= mult;
+    result = ArithmeticUtil::AsUnsigned<std::multiplies>(result, mult);
   }
   return DecimalValue(result);
 }

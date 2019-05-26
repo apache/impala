@@ -36,6 +36,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
+#include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
 
 #include "common/names.h"
@@ -461,7 +462,8 @@ void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
       abs(dst_struct->sum_val16) >
       DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src_struct->sum_val16);
   if (UNLIKELY(overflow)) ctx->SetError("Avg computation overflowed");
-  dst_struct->sum_val16 += src_struct->sum_val16;
+  dst_struct->sum_val16 =
+      ArithmeticUtil::AsUnsigned<std::plus>(dst_struct->sum_val16, src_struct->sum_val16);
   dst_struct->count += src_struct->count;
 }
 
@@ -510,7 +512,7 @@ void AggregateFunctions::SumUpdate(FunctionContext* ctx, const SRC_VAL& src,
     return;
   }
   if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
-  dst->val += src.val;
+  dst->val = ArithmeticUtil::Compute<std::plus, decltype(dst->val)>(dst->val, src.val);
 }
 
 template<typename SRC_VAL, typename DST_VAL>
@@ -582,7 +584,7 @@ void AggregateFunctions::SumDecimalMerge(FunctionContext* ctx,
   bool overflow = decimal_v2 &&
       abs(dst->val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src.val16);
   if (UNLIKELY(overflow)) ctx->SetError("Sum computation overflowed");
-  dst->val16 += src.val16;
+  dst->val16 = ArithmeticUtil::AsUnsigned<std::plus>(dst->val16, src.val16);
 }
 
 template<typename T>

@@ -26,6 +26,7 @@
 
 #include "common/atomic.h"
 #include "common/logging.h"
+#include "util/arithmetic-util.h"
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"
 #include "util/streaming-sampler.h"
@@ -191,7 +192,8 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
       double result_val = current_double_sum_ / (double) counter_value_map_.size();
       value_.Store(*reinterpret_cast<int64_t*>(&result_val));
     } else {
-      current_int_sum_ += (new_counter->value() - old_val);
+      current_int_sum_ = ArithmeticUtil::AsUnsigned<std::plus>(
+          current_int_sum_, (new_counter->value() - old_val));
       value_.Store(current_int_sum_ / counter_value_map_.size());
     }
   }

@@ -113,6 +113,15 @@ class ArithmeticUtil {
     return OperateOn<T>::template Compute<Operator>(x, y);
   }
 
+  // Negation of the least value of signed two's-complement types is undefined behavior.
+  // This operator makes that behavior defined by doing it in the unsigned domain. Note
+  // that this induces Negate(INT_MIN) == INT_MIN, though otherwise produces identical
+  // behavior to just using the usual unary negation operator like "-x".
+  template<typename T>
+  static T Negate(T x) {
+    return ToSigned(-ToUnsigned(x));
+  }
+
  private:
   // Ring and OperateOn are used for compile-time dispatching on how Compute() should
   // perform an arithmetic operation: as an unsigned integer operation, as a

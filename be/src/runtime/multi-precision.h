@@ -113,7 +113,7 @@ inline int128_t ConvertToInt128(int256_t x, int128_t max_value, bool* overflow) 
     scale =
         ArithmeticUtil::AsUnsigned<std::multiplies>(scale, static_cast<int128_t>(base));
   }
-  return negative ? -result : result;
+  return negative ? ArithmeticUtil::Negate(result) : result;
 }
 
 /// abs() is not defined for int128_t. Name it abs() so it can be compatible with
