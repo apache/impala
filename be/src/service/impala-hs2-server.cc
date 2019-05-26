@@ -20,17 +20,19 @@
 #include "service/impala-server.inline.h"
 
 #include <algorithm>
+#include <type_traits>
+
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
 #include <jni.h>
-#include <thrift/protocol/TDebugProtocol.h>
-#include <gtest/gtest.h>
-#include <boost/bind.hpp>
-#include <boost/algorithm/string.hpp>
 #include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
+#include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
 #include "common/version.h"
@@ -301,7 +303,14 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->session_type = TSessionType::HIVESERVER2;
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
   state->last_accessed_ms = UnixMillis();
-  state->hs2_version = min(MAX_SUPPORTED_HS2_VERSION, request.client_protocol);
+  // request.client_protocol is not guaranteed to be a valid TProtocolVersion::type, so
+  // loading it can cause undefined behavior. Instead, we copy it to a value of the
+  // "underlying type" of the enum, then copy it back to state->hs_version only once we
+  // have clamped it to be at most MAX_SUPPORTED_HS2_VERSION.
+  std::underlying_type_t<decltype(request.client_protocol)> protocol_integer;
+  memcpy(&protocol_integer, &request.client_protocol, sizeof(request.client_protocol));
+  state->hs2_version = static_cast<TProtocolVersion::type>(
+      min<decltype(protocol_integer)>(MAX_SUPPORTED_HS2_VERSION, protocol_integer));
   state->kudu_latest_observed_ts = 0;
 
   // If the username was set by a lower-level transport, use it.
