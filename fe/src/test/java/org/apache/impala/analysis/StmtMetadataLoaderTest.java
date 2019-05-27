@@ -116,7 +116,8 @@ public class StmtMetadataLoaderTest {
     Assert.assertEquals(expectedNumCatalogUpdates,
         mdLoader.getNumCatalogUpdatesReceived());
     // Validate timeline.
-    Assert.assertEquals(2, mdLoader.getTimeline().getNumEvents());
+    long expectedNumEvents = MetastoreShim.getMajorVersion() >= 3 ? 3 : 2;
+    Assert.assertEquals(expectedNumEvents, mdLoader.getTimeline().getNumEvents());
     // Validate dbs and tables.
     validateDbs(stmtTableCache, expectedDbs);
     validateTables(stmtTableCache, expectedTables);
