@@ -32,7 +32,8 @@ from tests.common.skip import (
     SkipIfADLS,
     SkipIfEC,
     SkipIfLocal,
-    SkipIfNotHdfsMinicluster
+    SkipIfNotHdfsMinicluster,
+    SkipIfHive3
     )
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
@@ -609,6 +610,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
 
+  @SkipIfHive3.slow_nested_types
   def test_max_nesting_depth(self, vector, unique_database):
     """Tests that Impala can scan Parquet and ORC files having complex types of
     the maximum nesting depth."""
