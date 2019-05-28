@@ -47,10 +47,14 @@ echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 # Default to 2GB heap. Allow overriding by externally-set JAVA_TOOL_OPTIONS.
 export JAVA_TOOL_OPTIONS="-Xmx2g $JAVA_TOOL_OPTIONS"
 
-# Allow any files written by the container to be modified by other users.
-# This is required when mounting the log directory to a host directory.
-# TODO: IMPALA-8491: once running as non-root user, this may not be needed.
-umask 000
+# Various Hadoop libraries depend on having a username. If we're running under
+# an unknown username, create an entry in the password file for this user.
+if ! whoami ; then
+  export USER=${HADOOP_USER_NAME:-dummyuser}
+  echo "${USER}:x:$(id -u):$(id -g):,,,:/opt/impala:/bin/bash" >> /etc/passwd
+  whoami
+  cat /etc/passwd
+fi
 
 "$@"
 EXIT_CODE=$?

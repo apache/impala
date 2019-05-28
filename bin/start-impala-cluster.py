@@ -567,6 +567,9 @@ class DockerMiniClusterOperations(object):
       os.makedirs(log_dir)
     mount_args += ["--mount", "type=bind,src={0},dst=/opt/impala/logs".format(log_dir)]
 
+    # Run the container as the current user.
+    user_args = ["--user", "{0}:{1}".format(os.getuid(), os.getgid())]
+
     # Allow loading LZO plugin, if built.
     lzo_lib_dir = os.path.join(IMPALA_LZO, "build")
     if os.path.isdir(lzo_lib_dir):
@@ -577,7 +580,7 @@ class DockerMiniClusterOperations(object):
     if mem_limit is not None:
       mem_limit_args = ["--memory", str(mem_limit)]
     LOG.info("Running container {0}".format(container_name))
-    run_cmd = (["docker", "run", "-d"] + env_args + port_args + ["--network",
+    run_cmd = (["docker", "run", "-d"] + env_args + port_args + user_args + ["--network",
       self.network_name, "--name", container_name, "--network-alias", host_name] +
       mount_args + mem_limit_args + [image_tag] + args)
     LOG.info("Running command {0}".format(run_cmd))
