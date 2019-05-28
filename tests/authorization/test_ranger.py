@@ -124,25 +124,44 @@ class TestRanger(CustomClusterTestSuite):
                                         "grant select on database {0} to user {1} with "
                                         "grant option".format(unique_database, user1),
                                         user=ADMIN)
+      self.execute_query_expect_success(admin_client,
+                                        "grant insert on database {0} to user {1} with "
+                                        "grant option".format(unique_database, user1),
+                                        user=ADMIN)
 
       # Verify user 1 has with_grant privilege on unique_database
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
       TestRanger._check_privileges(result, [
+        ["USER", user1, unique_database, "", "", "", "*", "insert", "true"],
         ["USER", user1, unique_database, "", "", "", "*", "select", "true"],
+        ["USER", user1, unique_database, "*", "*", "", "", "insert", "true"],
         ["USER", user1, unique_database, "*", "*", "", "", "select", "true"]])
 
+      # Revoke select privilege and check grant option is still present
+      self.execute_query_expect_success(admin_client,
+                                        "revoke select on database {0} from user {1}"
+                                        .format(unique_database, user1), user=ADMIN)
+      result = self.execute_query("show grant user {0} on database {1}"
+                                  .format(user1, unique_database))
+      TestRanger._check_privileges(result, [
+        ["USER", user1, unique_database, "", "", "", "*", "insert", "true"],
+        ["USER", user1, unique_database, "*", "*", "", "", "insert", "true"]])
+
       # Revoke privilege granting from user 1
-      self.execute_query_expect_success(admin_client, "revoke grant option for select "
+      self.execute_query_expect_success(admin_client, "revoke grant option for insert "
                                                       "on database {0} from user {1}"
                                         .format(unique_database, user1), user=ADMIN)
 
       # User 1 can no longer grant privileges on unique_database
+      # In ranger it is currently not possible to revoke grant for a single access type
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
-      TestRanger._check_privileges(result, [])
+      TestRanger._check_privileges(result, [
+        ["USER", user1, unique_database, "", "", "", "*", "insert", "false"],
+        ["USER", user1, unique_database, "*", "*", "", "", "insert", "false"]])
     finally:
-      admin_client.execute("revoke grant option for select on database {0} from user {1}"
+      admin_client.execute("revoke insert on database {0} from user {1}"
                            .format(unique_database, user1), user=ADMIN)
       admin_client.execute("drop database if exists {0} cascade".format(unique_database),
                            user=ADMIN)
@@ -177,9 +196,6 @@ class TestRanger(CustomClusterTestSuite):
 
       # Test USER inherits privileges for their GROUP
       self._test_show_grant_user_group(admin_client, user, group, unique_db)
-
-      # Test that show grant without ON a resource fails
-
     finally:
       admin_client.execute("drop database if exists {0} cascade".format(unique_db),
                            user=ADMIN)
@@ -237,6 +253,7 @@ class TestRanger(CustomClusterTestSuite):
         ["USER", user, "*", "", "", "", "*", "all", "false"],
         ["USER", user, "*", "*", "*", "", "", "all", "false"]])
     finally:
+      admin_client.execute("revoke all on server from user {0}".format(user))
       for privilege in privileges:
         admin_client.execute("revoke {0} on server from user {1}".format(privilege, user))
 

@@ -122,8 +122,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), params.getPrincipal_name(), Collections.emptyList(),
-        plugin_.get().getClusterName(), params.getPrivileges());
+        requestingUser.getName(), true, params.getPrincipal_name(),
+        Collections.emptyList(), plugin_.get().getClusterName(), params.getPrivileges());
 
     grantPrivilege(requests);
     refreshAuthorization(response);
@@ -133,8 +133,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), params.getPrincipal_name(), Collections.emptyList(),
-        plugin_.get().getClusterName(), params.getPrivileges());
+        requestingUser.getName(), false, params.getPrincipal_name(),
+        Collections.emptyList(), plugin_.get().getClusterName(), params.getPrivileges());
 
     revokePrivilege(requests);
     refreshAuthorization(response);
@@ -144,7 +144,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), null,
+        requestingUser.getName(), true, null,
         Collections.singletonList(params.getPrincipal_name()),
         plugin_.get().getClusterName(), params.getPrivileges());
 
@@ -156,7 +156,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
       TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), null,
+        requestingUser.getName(), false, null,
         Collections.singletonList(params.getPrincipal_name()),
         plugin_.get().getClusterName(), params.getPrivileges());
 
@@ -236,13 +236,14 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,
-      String user, List<String> groups, String clusterName, List<TPrivilege> privileges) {
+      boolean isGrant, String user, List<String> groups, String clusterName,
+      List<TPrivilege> privileges) {
     List<GrantRevokeRequest> requests = new ArrayList<>();
 
     for (TPrivilege p: privileges) {
       Function<Map<String, String>, GrantRevokeRequest> createRequest = (resource) ->
           createGrantRevokeRequest(grantor, user, groups, clusterName, p.has_grant_opt,
-              p.privilege_level, resource);
+              isGrant, p.privilege_level, resource);
 
       // Ranger Impala service definition defines 3 resources:
       // [DB -> Table -> Column]
@@ -271,22 +272,25 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,
-      List<String> groups, String clusterName, boolean withGrantOpt,
+      List<String> groups, String clusterName, boolean withGrantOpt, boolean isGrant,
       TPrivilegeLevel level, Map<String, String> resource) {
     GrantRevokeRequest request = new GrantRevokeRequest();
     request.setGrantor(grantor);
     if (user != null) request.getUsers().add(user);
     if (!groups.isEmpty()) request.getGroups().addAll(groups);
-    request.setDelegateAdmin((withGrantOpt) ? Boolean.TRUE : Boolean.FALSE);
+    request.setDelegateAdmin(isGrant == withGrantOpt);
     request.setEnableAudit(Boolean.TRUE);
     request.setReplaceExistingPermissions(Boolean.FALSE);
     request.setClusterName(clusterName);
     request.setResource(resource);
 
-    if (level == TPrivilegeLevel.INSERT) {
-      request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
-    } else {
-      request.getAccessTypes().add(level.name().toLowerCase());
+    // For revoke grant option, omit the privilege
+    if (!(!isGrant && withGrantOpt)) {
+      if (level == TPrivilegeLevel.INSERT) {
+        request.getAccessTypes().add(RangerAuthorizationChecker.UPDATE_ACCESS_TYPE);
+      } else {
+        request.getAccessTypes().add(level.name().toLowerCase());
+      }
     }
 
     return request;

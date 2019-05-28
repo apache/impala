@@ -200,14 +200,14 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   }
 
   protected abstract class WithRanger implements WithPrincipal {
-    private final List<GrantRevokeRequest> requests = new ArrayList<>();
+    private final List<GrantRevokeRequest> grants = new ArrayList<>();
     private final RangerCatalogdAuthorizationManager authzManager =
         new RangerCatalogdAuthorizationManager(() -> rangerImpalaPlugin_, null);
 
     @Override
     public void init(TPrivilege[]... privileges) throws ImpalaException {
       for (TPrivilege[] privilege : privileges) {
-        requests.addAll(buildRequest(Arrays.asList(privilege))
+        grants.addAll(buildRequest(Arrays.asList(privilege))
             .stream()
             .peek(r -> {
               r.setResource(updateUri(r.getResource()));
@@ -218,7 +218,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
             }).collect(Collectors.toList()));
       }
 
-      authzManager.grantPrivilege(requests);
+      authzManager.grantPrivilege(grants);
       rangerImpalaPlugin_.refreshPoliciesAndTags();
     }
 
@@ -229,7 +229,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
     @Override
     public void cleanUp() throws ImpalaException {
-      authzManager.revokePrivilege(requests);
+      authzManager.revokePrivilege(grants);
     }
 
     @Override
@@ -240,7 +240,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     @Override
     protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
-          RANGER_ADMIN.getName(), USER.getName(), Collections.emptyList(),
+          RANGER_ADMIN.getName(), true, USER.getName(), Collections.emptyList(),
           rangerImpalaPlugin_.getClusterName(), privileges);
     }
   }
@@ -251,7 +251,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       List<String> groups = Collections.singletonList(System.getProperty("user.name"));
 
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
-          RANGER_ADMIN.getName(), null, groups,
+          RANGER_ADMIN.getName(), true, null, groups,
           rangerImpalaPlugin_.getClusterName(), privileges);
     }
   }
