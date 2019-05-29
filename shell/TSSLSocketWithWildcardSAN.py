@@ -43,14 +43,16 @@ class TSSLSocketWithWildcardSAN(TSSLSocket.TSSLSocket):
       ca_certs=None,
       unix_socket=None):
     cert_reqs = ssl.CERT_REQUIRED if validate else ssl.CERT_NONE
-    TSSLSocket.TSSLSocket.__init__(self, host=host, port=port, cert_reqs=cert_reqs,
-                                   ca_certs=ca_certs, unix_socket=unix_socket)
     # Set client protocol choice to be very permissive, as we rely on servers to enforce
     # good protocol selection. This value is forwarded to the ssl.wrap_socket() API during
     # open(). See https://docs.python.org/2/library/ssl.html#socket-creation for a table
     # that shows a better option is not readily available for sockets that use
     # wrap_socket().
-    self.SSL_VERSION = ssl.PROTOCOL_SSLv23
+    # THRIFT-3505 changes transport/TSSLSocket.py. The SSL_VERSION is passed to TSSLSocket
+    # via a parameter.
+    TSSLSocket.TSSLSocket.__init__(self, host=host, port=port, cert_reqs=cert_reqs,
+                                   ca_certs=ca_certs, unix_socket=unix_socket,
+                                   ssl_version=ssl.PROTOCOL_SSLv23)
 
   def _validate_cert(self):
     cert = self.handle.getpeercert()

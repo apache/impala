@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import requests
+import platform
 
 LOG = logging.getLogger('tests.common.environ')
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
@@ -40,6 +41,13 @@ if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
         IMPALA_LOCAL_BUILD_VERSION = match.group(1)
   if IMPALA_LOCAL_BUILD_VERSION is None:
     raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
+
+# Check if it is Red Hat/CentOS Linux
+dist = platform.linux_distribution()[0].lower()
+if dist.find('centos') or dist.find('red hat'):
+  IS_REDHAT_DERIVATIVE = True
+else:
+  IS_REDHAT_DERIVATIVE = False
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.
