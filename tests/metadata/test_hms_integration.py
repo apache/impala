@@ -29,7 +29,7 @@ import random
 import string
 from subprocess import call
 
-from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES, HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
@@ -190,11 +190,9 @@ class TestHmsIntegration(ImpalaTestSuite):
       result[stats[0]] = attributes
     return result
 
-  def hive_column_stats(self, table, column):
-    """Returns a dictionary of stats for a column according to Hive."""
-    output = self.run_stmt_in_hive(
-        'describe formatted %s %s' %
-        (table, column))
+  def parse_hive2_describe_formatted_output(self, output):
+    """Parses the output of a 'describe formatted' statement for Hive 2. Returns a
+    dictionary that holds the parsed attributes."""
     result = {}
     output_lines = output.split('\n')
     stat_names = map(string.strip, output_lines[0].split(','))
@@ -203,6 +201,24 @@ class TestHmsIntegration(ImpalaTestSuite):
     for i in range(0, len(stat_names)):
       result[stat_names[i]] = stat_values[i]
     return result
+
+  def parse_hive3_describe_formatted_output(self, output):
+    """Parses the output of a 'describe formatted' statement for Hive 3. Returns a
+    dictionary that holds the parsed attributes."""
+    result = {}
+    for line in output.split('\n'):
+      line_elements = map(string.strip, line.split(','))
+      if len(line_elements) >= 2:
+        result[line_elements[0]] = line_elements[1]
+    return result
+
+  def hive_column_stats(self, table, column):
+    """Returns a dictionary of stats for a column according to Hive."""
+    output = self.run_stmt_in_hive('describe formatted %s %s' % (table, column))
+    if HIVE_MAJOR_VERSION == 2:
+      return self.parse_hive2_describe_formatted_output(output)
+    else:
+      return self.parse_hive3_describe_formatted_output(output)
 
   def impala_columns(self, table_name):
     """
@@ -595,7 +611,7 @@ class TestHmsIntegration(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_change_parquet_column_type(self, vector):
     """
-    Changing column types in Parquet doesn't work in Hive and it causes
+    Changing column types in Parquet doesn't always work in Hive and it causes
     'select *' to fail in Impala as well, after invalidating metadata. This is a
     known issue with changing column types in Hive/parquet.
     """
@@ -603,23 +619,44 @@ class TestHmsIntegration(ImpalaTestSuite):
     with HiveDbWrapper(self, self.unique_string()) as db_name:
       with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
                             '(x int, y int) stored as parquet') as table_name:
-        self.run_stmt_in_hive(
-            'insert into table %s values (33,44)' % table_name)
+        # The following INSERT statement creates a Parquet file with INT columns.
+        self.run_stmt_in_hive('insert into table %s values (33,44)' % table_name)
         assert '33,44' == self.run_stmt_in_hive(
             'select * from %s' % table_name).split('\n')[1]
         self.client.execute('invalidate metadata')
         assert '33\t44' == self.client.execute(
             'select * from %s' % table_name).get_data()
+        # Modify table metadata. After this statement, the table metadata in HMS
+        # and the Parquet file metadata won't agree on the type of column 'y'.
         self.run_stmt_in_hive('alter table %s change y y string' % table_name)
+        if HIVE_MAJOR_VERSION == 2:
+          # Hive 2 doesn't allow implicit conversion from INT to STRING.
+          self.assert_sql_error(
+              self.run_stmt_in_hive, 'select * from %s' % table_name,
+              'Cannot inspect org.apache.hadoop.io.IntWritable')
+        else:
+          # Hive 3 implicitly converts INTs to STRINGs.
+          assert '33,44' == self.run_stmt_in_hive(
+              'select * from %s' % table_name).split('\n')[1]
+        self.client.execute('invalidate metadata %s' % table_name)
+        # Impala doesn't convert INTs to STRINGs implicitly.
         self.assert_sql_error(
-            self.run_stmt_in_hive, 'select * from %s' %
-            table_name, 'Cannot inspect org.apache.hadoop.io.IntWritable')
+            self.client.execute, 'select * from %s' % table_name,
+            "Column type: STRING, Parquet schema:")
+        # Insert STRING value, it will create a Parquet file where column 'y'
+        # has type STRING.
+        self.run_stmt_in_hive('insert into table %s values (33,\'100\')' % table_name)
+        # Modify HMS table metadata again, change the type of column 'y' back to INT.
+        self.run_stmt_in_hive('alter table %s change y y int' % table_name)
+        # Neither Hive 2 and 3, nor Impala converts STRINGs to INTs implicitly.
+        self.assert_sql_error(
+            self.run_stmt_in_hive, 'select * from %s' % table_name,
+            'org.apache.hadoop.io.Text cannot be '
+            'cast to org.apache.hadoop.io.IntWritable')
         self.client.execute('invalidate metadata %s' % table_name)
         self.assert_sql_error(
-            self.client.execute,
-            'select * from %s' %
-            table_name,
-            "Column type: STRING, Parquet schema:")
+            self.client.execute, 'select * from %s' % table_name,
+            "Column type: INT, Parquet schema:")
 
   @pytest.mark.execute_serially
   def test_change_table_name(self, vector):
