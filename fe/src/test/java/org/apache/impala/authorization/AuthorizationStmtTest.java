@@ -2432,9 +2432,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         authorize("explain update functional_kudu.alltypes set int_col = 1")}) {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.OWNER))
+          .ok(onTable("functional_kudu", "alltypes", TPrivilegeLevel.ALL))
+          .ok(onTable("functional_kudu", "alltypes", TPrivilegeLevel.OWNER))
           .error(accessError("functional_kudu.alltypes"))
           .error(accessError("functional_kudu.alltypes"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.alltypes"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.alltypes"), onTable(
+              "functional", "alltypes", allExcept(
+                  TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Database does not exist.
@@ -2466,9 +2475,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             "values(1, 'a')")}) {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.OWNER))
+          .ok(onTable("functional_kudu", "testtbl", TPrivilegeLevel.ALL))
+          .ok(onTable("functional_kudu", "testtbl", TPrivilegeLevel.OWNER))
           .error(accessError("functional_kudu.testtbl"))
           .error(accessError("functional_kudu.testtbl"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.testtbl"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.testtbl"), onTable(
+              "functional", "testtbl", allExcept(
+                  TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Upsert select.
@@ -2476,9 +2494,26 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         "select int_col from functional.alltypes")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional_kudu", TPrivilegeLevel.ALL),
+            onDatabase("functional", TPrivilegeLevel.SELECT))
+        .ok(onTable("functional_kudu", "testtbl", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypes", TPrivilegeLevel.SELECT))
         .error(selectError("functional.alltypes"))
         .error(accessError("functional_kudu.testtbl"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+        .error(accessError("functional_kudu.testtbl"),
+            onDatabase("functional_kudu", allExcept(
+                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)),
+            onDatabase("functional", TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+                TPrivilegeLevel.SELECT))
+        .error(selectError("functional.alltypes"),
+            onTable("functional_kudu", "testtbl", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypes", allExcept(
+                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.SELECT)))
+        .error(accessError("functional_kudu.testtbl"),
+            onTable("functional_kudu", "testtbl", allExcept(TPrivilegeLevel.ALL,
+                TPrivilegeLevel.OWNER)),
+            onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
 
     // Database does not exist.
     authorize("upsert into table nodb.testtbl(id, name) values(1, 'a')")
@@ -2503,9 +2538,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         authorize("explain delete from functional_kudu.alltypes")}) {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional_kudu", TPrivilegeLevel.OWNER))
+          .ok(onTable("functional_kudu", "alltypes", TPrivilegeLevel.ALL))
+          .ok(onTable("functional_kudu", "alltypes", TPrivilegeLevel.OWNER))
           .error(accessError("functional_kudu.alltypes"))
           .error(accessError("functional_kudu.alltypes"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.alltypes"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError("functional_kudu.alltypes"), onTable(
+              "functional", "alltypes", allExcept(
+                  TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Database does not exist.
