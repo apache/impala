@@ -779,7 +779,8 @@ public class MetastoreEvents {
         // Ignore event if table or database is not in catalog. Throw exception if
         // refresh fails. If the partition does not exist in metastore the reload
         // method below removes it from the catalog
-        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+            "processing partition-level INSERT event from HMS")) {
           debugLog("Refresh of table {} partition {} after insert "
                   + "event failed as the table is not present in the catalog.",
               getFullyQualifiedTblName(), (tPartSpec));
@@ -811,7 +812,8 @@ public class MetastoreEvents {
       try {
         // Ignore event if table or database is not in the catalog. Throw exception if
         // refresh fails.
-        if (!catalog_.reloadTableIfExists(dbName_, tblName_)) {
+        if (!catalog_.reloadTableIfExists(dbName_, tblName_,
+              "processing table-level INSERT event from HMS")) {
           debugLog("Automatic refresh table {} failed as the table is not "
               + "present either catalog or metastore.", getFullyQualifiedTblName());
         } else {
@@ -1366,7 +1368,8 @@ public class MetastoreEvents {
         for (Partition partition : addedPartitions_) {
           List<TPartitionKeyValue> tPartSpec =
               getTPartitionSpecFromHmsPartition(msTbl_, partition);
-          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+              "processing ADD_PARTITION event from HMS")) {
             debugLog("Refresh partitions on table {} failed "
                 + "as table was not present in the catalog.", getFullyQualifiedTblName());
             success = false;
@@ -1453,7 +1456,8 @@ public class MetastoreEvents {
         // Ignore event if table or database is not in catalog. Throw exception if
         // refresh fails.
 
-        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+            "processing ALTER_PARTITION event from HMS")) {
           debugLog("Refresh of table {} partition {} failed as the table "
                   + "is not present in the catalog.", getFullyQualifiedTblName(),
               constructPartitionStringFromTPartitionSpec(tPartSpec));
@@ -1538,7 +1542,8 @@ public class MetastoreEvents {
           for (Map.Entry<String, String> entry : partSpec.entrySet()) {
             tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
           }
-          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
+          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+              "processing DROP_PARTITION event from HMS")) {
             debugLog("Could not refresh partition {} of table {} as table "
                     + "was not present in the catalog.",
                     getFullyQualifiedTblName());

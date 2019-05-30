@@ -219,7 +219,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * valid existing metadata.
    */
   public abstract void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException;
 
   /**
    * Sets 'tableStats_' by extracting the table statistics from the given HMS table.

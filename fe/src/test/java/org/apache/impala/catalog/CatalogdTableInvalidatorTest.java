@@ -64,7 +64,7 @@ public class CatalogdTableInvalidatorTest {
             2, /*invalidateTablesOnMemoryPressure=*/false, /*oldGenFullThreshold=*/
             0.6, /*gcInvalidationFraction=*/0.1));
     Assert.assertFalse(catalog_.getDb(dbName).getTable(tblName).isLoaded());
-    Table table = catalog_.getOrLoadTable(dbName, tblName);
+    Table table = catalog_.getOrLoadTable(dbName, tblName, "test");
     Assert.assertTrue(table.isLoaded());
     Assert.assertEquals(ticker.now_, table.getLastUsedTime());
     long previousTriggerCount = catalog_.getCatalogdTableInvalidator().scanCount_.get();

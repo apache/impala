@@ -91,6 +91,7 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
@@ -615,7 +616,15 @@ public class HdfsTable extends Table implements FeFsTable {
     // - how many block locations did we reuse/load individually/load via batch
     // - how many partitions did we read metadata for
     // - etc...
-    LOG.info("Loaded file and block metadata for {}", getFullName());
+    String partNames = Joiner.on(", ").join(
+        Iterables.limit(Iterables.transform(parts, HdfsPartition::getPartitionName), 3));
+    if (partsByPath.size() > 3) {
+      partNames += String.format(", and %s others",
+          Iterables.size(parts) - 3);
+    }
+
+    LOG.info("Loaded file and block metadata for {} partitions: {}", getFullName(),
+        partNames);
   }
 
   /**
@@ -878,8 +887,9 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    load(reuseMetadata, client, msTbl, true, true, null);
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException {
+    load(reuseMetadata, client, msTbl, true, true, null, reason);
   }
 
   /**
@@ -909,13 +919,15 @@ public class HdfsTable extends Table implements FeFsTable {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean loadParitionFileMetadata, boolean loadTableSchema,
-      Set<String> partitionsToUpdate) throws TableLoadingException {
+      Set<String> partitionsToUpdate, String reason) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
-    String annotation = String.format("%s metadata for %s partition(s) of %s.%s",
+    String annotation = String.format("%s metadata for %s%s partition(s) of %s.%s (%s)",
         reuseMetadata ? "Reloading" : "Loading",
+        loadTableSchema ? "table definition and " : "",
         partitionsToUpdate == null ? "all" : String.valueOf(partitionsToUpdate.size()),
-        msTbl.getDbName(), msTbl.getTableName());
+        msTbl.getDbName(), msTbl.getTableName(), reason);
+    LOG.info(annotation);;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       // turn all exceptions into TableLoadingException
       msTable_ = msTbl;
@@ -932,7 +944,6 @@ public class HdfsTable extends Table implements FeFsTable {
         // Load partition and file metadata
         if (reuseMetadata) {
           // Incrementally update this table's partitions and file metadata
-          LOG.info("Incrementally loading table metadata for: " + getFullName());
           Preconditions.checkState(
               partitionsToUpdate == null || loadParitionFileMetadata);
           updateMdFromHmsTable(msTbl);
@@ -944,8 +955,8 @@ public class HdfsTable extends Table implements FeFsTable {
           }
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
         } else {
-          // Load all partitions from Hive Metastore, including file metadata.
           LOG.info("Fetching partition metadata from the Metastore: " + getFullName());
+          // Load all partitions from Hive Metastore, including file metadata.
           List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
               MetaStoreUtil.fetchAllPartitions(
                   client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);

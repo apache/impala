@@ -30,6 +30,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
@@ -151,8 +152,8 @@ public class TableLoadingMgr {
 
   // Tables for the async refresh thread to process. Synchronization must be handled
   // externally.
-  private final LinkedBlockingQueue<TTableName> refreshThreadWork_ =
-      new LinkedBlockingQueue<TTableName>();
+  private final LinkedBlockingQueue<Pair<TTableName, String>> refreshThreadWork_ =
+      new LinkedBlockingQueue<>();
 
   private final CatalogServiceCatalog catalog_;
   private final TableLoader tblLoader_;
@@ -172,7 +173,8 @@ public class TableLoadingMgr {
       @Override
       public Void call() throws Exception {
         while(true) {
-          execAsyncRefreshWork(refreshThreadWork_.take());
+          Pair<TTableName, String> work = refreshThreadWork_.take();
+          execAsyncRefreshWork(work.first, /* reason=*/work.second);
         }
       }});
   }
@@ -206,7 +208,8 @@ public class TableLoadingMgr {
    * asyncRefreshThread_ will refresh the table metadata. After processing the
    * request the watch will be deleted.
    */
-  public void watchCacheDirs(List<Long> cacheDirIds, final TTableName tblName) {
+  public void watchCacheDirs(List<Long> cacheDirIds, final TTableName tblName,
+      final String reason) {
     synchronized (pendingTableCacheDirs_) {
       // A single table may have multiple pending cache requests since one request
       // gets submitted per-partition.
@@ -214,7 +217,7 @@ public class TableLoadingMgr {
       if (existingCacheReqIds == null) {
         existingCacheReqIds = cacheDirIds;
         pendingTableCacheDirs_.put(tblName, cacheDirIds);
-        refreshThreadWork_.add(tblName);
+        refreshThreadWork_.add(Pair.create(tblName, reason));
       } else {
         existingCacheReqIds.addAll(cacheDirIds);
       }
@@ -227,7 +230,7 @@ public class TableLoadingMgr {
    * the same underlying loading task (Future) will be used, helping to prevent duplicate
    * loads of the same table.
    */
-  public LoadRequest loadAsync(final TTableName tblName)
+  public LoadRequest loadAsync(final TTableName tblName, final String reason)
       throws DatabaseNotFoundException {
     final Db parentDb = catalog_.getDb(tblName.getDb_name());
     if (parentDb == null) {
@@ -238,7 +241,7 @@ public class TableLoadingMgr {
     FutureTask<Table> tableLoadTask = new FutureTask<Table>(new Callable<Table>() {
         @Override
         public Table call() throws Exception {
-          return tblLoader_.load(parentDb, tblName.table_name);
+          return tblLoader_.load(parentDb, tblName.table_name, reason);
         }});
 
     FutureTask<Table> existingValue = loadingTables_.putIfAbsent(tblName, tableLoadTask);
@@ -297,7 +300,8 @@ public class TableLoadingMgr {
     try {
       // TODO: Instead of calling "getOrLoad" here we could call "loadAsync". We would
       // just need to add a mechanism for moving loaded tables into the Catalog.
-      catalog_.getOrLoadTable(tblName.getDb_name(), tblName.getTable_name());
+      catalog_.getOrLoadTable(tblName.getDb_name(), tblName.getTable_name(),
+          "background load");
     } catch (CatalogException e) {
       // Ignore.
     } finally {
@@ -312,12 +316,12 @@ public class TableLoadingMgr {
    * anyway, and if the table failed to load, then we do not want to hide errors by
    * reloading it 'silently' in response to the completion of an HDFS caching request.
    */
-  private void execAsyncRefreshWork(TTableName tblName) {
+  private void execAsyncRefreshWork(TTableName tblName, String reason) {
     if (!waitForCacheDirs(tblName)) return;
     try {
       Table tbl = catalog_.getTable(tblName.getDb_name(), tblName.getTable_name());
       if (tbl == null || tbl instanceof IncompleteTable || !tbl.isLoaded()) return;
-      catalog_.reloadTable(tbl);
+      catalog_.reloadTable(tbl, reason);
     } catch (CatalogException e) {
       LOG.error("Error reloading cached table: ", e);
     }

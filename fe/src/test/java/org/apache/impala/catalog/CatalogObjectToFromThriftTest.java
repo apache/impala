@@ -63,7 +63,7 @@ public class CatalogObjectToFromThriftTest {
     String[] dbNames = {"functional", "functional_avro", "functional_parquet",
                         "functional_seq"};
     for (String dbName: dbNames) {
-      Table table = catalog_.getOrLoadTable(dbName, "alltypes");
+      Table table = catalog_.getOrLoadTable(dbName, "alltypes", "test");
       Assert.assertEquals(24, ((HdfsTable)table).getPartitions().size());
       Assert.assertEquals(24, ((HdfsTable)table).getPartitionIds().size());
 
@@ -131,7 +131,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestMismatchedAvroAndTableSchemas() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional_avro_snap",
-        "schema_resolution_test");
+        "schema_resolution_test", "test");
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
     Assert.assertTrue(thriftTable.isSetTable_type());
@@ -151,7 +151,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestHBaseTables() throws CatalogException {
     String dbName = "functional_hbase";
-    Table table = catalog_.getOrLoadTable(dbName, "alltypes");
+    Table table = catalog_.getOrLoadTable(dbName, "alltypes", "test");
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -180,7 +180,7 @@ public class CatalogObjectToFromThriftTest {
   public void TestHBaseTableWithBinaryEncodedCols()
       throws CatalogException {
     String dbName = "functional_hbase";
-    Table table = catalog_.getOrLoadTable(dbName, "alltypessmallbinary");
+    Table table = catalog_.getOrLoadTable(dbName, "alltypessmallbinary", "test");
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -217,7 +217,7 @@ public class CatalogObjectToFromThriftTest {
     Assume.assumeTrue(
         "Skipping this test since it is only supported when running against Hive-2",
         TestUtils.getHiveMajorVersion() == 2);
-    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
+    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl", "test");
     Assert.assertNotNull(table);
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "hive_index_tbl");
@@ -226,7 +226,7 @@ public class CatalogObjectToFromThriftTest {
 
   @Test
   public void TestTableLoadingErrors() throws ImpalaException {
-    Table table = catalog_.getOrLoadTable("functional", "alltypes");
+    Table table = catalog_.getOrLoadTable("functional", "alltypes", "test");
     HdfsTable hdfsTable = (HdfsTable) table;
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
@@ -250,7 +250,7 @@ public class CatalogObjectToFromThriftTest {
 
   @Test
   public void TestView() throws CatalogException {
-    Table table = catalog_.getOrLoadTable("functional", "view_view");
+    Table table = catalog_.getOrLoadTable("functional", "view_view", "test");
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "view_view");
     Assert.assertEquals(thriftTable.db_name, "functional");

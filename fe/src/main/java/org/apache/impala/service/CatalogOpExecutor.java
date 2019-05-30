@@ -512,7 +512,8 @@ public class CatalogOpExecutor {
     Reference<Long> numUpdatedPartitions = new Reference<>(0L);
 
     TableName tableName = TableName.fromThrift(params.getTable_name());
-    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
+        "Load for ALTER TABLE");
     tryLock(tbl);
     // Get a new catalog version to assign to the table being altered.
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -699,7 +700,7 @@ public class CatalogOpExecutor {
 
       if (reloadMetadata) {
         loadTableMetadata(tbl, newCatalogVersion, reloadFileMetadata,
-            reloadTableSchema, null);
+            reloadTableSchema, null, "ALTER TABLE " + params.getAlter_type().name());
         addTableToCatalogUpdate(tbl, response.result);
       }
       // now that HMS alter operation has succeeded, add this version to list of inflight
@@ -766,7 +767,8 @@ public class CatalogOpExecutor {
             params.getAlter_type());
     }
 
-    loadTableMetadata(tbl, newCatalogVersion, true, true, null);
+    loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER KUDU TABLE " +
+        params.getAlter_type().name());
     addTableToCatalogUpdate(tbl, response.result);
   }
 
@@ -778,16 +780,16 @@ public class CatalogOpExecutor {
    */
   private void loadTableMetadata(Table tbl, long newCatalogVersion,
       boolean reloadFileMetadata, boolean reloadTableSchema,
-      Set<String> partitionsToUpdate) throws CatalogException {
+      Set<String> partitionsToUpdate, String reason) throws CatalogException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           getMetaStoreTable(msClient, tbl);
       if (tbl instanceof HdfsTable) {
         ((HdfsTable) tbl).load(true, msClient.getHiveClient(), msTbl,
-            reloadFileMetadata, reloadTableSchema, partitionsToUpdate);
+            reloadFileMetadata, reloadTableSchema, partitionsToUpdate, reason);
       } else {
-        tbl.load(true, msClient.getHiveClient(), msTbl);
+        tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
     }
     tbl.setCatalogVersion(newCatalogVersion);
@@ -832,7 +834,8 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns() != null &&
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.alterView");
-    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
+        "Load for ALTER VIEW");
     Preconditions.checkState(tbl instanceof View, "Expected view: %s",
         tableName);
     tryLock(tbl);
@@ -859,7 +862,7 @@ public class CatalogOpExecutor {
       }
       applyAlterTable(msTbl, true);
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        tbl.load(true, msClient.getHiveClient(), msTbl);
+        tbl.load(true, msClient.getHiveClient(), msTbl, "ALTER VIEW");
       }
       addSummary(resp, "View has been altered.");
       tbl.setCatalogVersion(newCatalogVersion);
@@ -1282,7 +1285,7 @@ public class CatalogOpExecutor {
   private void dropStats(TDropStatsParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Table table = getExistingTable(params.getTable_name().getDb_name(),
-        params.getTable_name().getTable_name());
+        params.getTable_name().getTable_name(), "Load for DROP STATS");
     Preconditions.checkNotNull(table);
     if (!catalog_.tryLockTable(table)) {
       throw new InternalException(String.format("Error dropping stats for table %s " +
@@ -1316,7 +1319,7 @@ public class CatalogOpExecutor {
           }
         }
       }
-      loadTableMetadata(table, newCatalogVersion, false, true, null);
+      loadTableMetadata(table, newCatalogVersion, false, true, null, "DROP STATS");
       addTableToCatalogUpdate(table, resp.result);
       addSummary(resp, "Stats have been dropped.");
     } finally {
@@ -1539,7 +1542,8 @@ public class CatalogOpExecutor {
     // In the LocalCatalog configuration, however, this is often necessary.
     try {
       catalog_.getOrLoadTable(params.getTable_name().db_name,
-          params.getTable_name().table_name);
+          params.getTable_name().table_name, "Load for DROP TABLE/VIEW");
+
     } catch (CatalogException e) {
       // Ignore exceptions -- the above was just to trigger loading. Failure to load
       // or non-existence of the database will be handled down below.
@@ -1686,7 +1690,8 @@ public class CatalogOpExecutor {
     TTableName tblName = params.getTable_name();
     Table table = null;
     try {
-      table = getExistingTable(tblName.getDb_name(), tblName.getTable_name());
+      table = getExistingTable(tblName.getDb_name(), tblName.getTable_name(),
+          "Load for TRUNCATE TABLE");
     } catch (TableNotFoundException e) {
       if (params.if_exists) {
         addSummary(resp, "Table does not exist.");
@@ -1724,7 +1729,7 @@ public class CatalogOpExecutor {
       }
       addSummary(resp, "Table has been truncated.");
 
-      loadTableMetadata(table, newCatalogVersion, true, true, null);
+      loadTableMetadata(table, newCatalogVersion, true, true, null, "TRUNCATE");
       addTableToCatalogUpdate(table, resp.result);
     } finally {
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
@@ -2014,7 +2019,8 @@ public class CatalogOpExecutor {
         long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
             cacheOp.getCache_pool_name(), replication);
         catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
-            new TTableName(newTable.getDbName(), newTable.getTableName()));
+            new TTableName(newTable.getDbName(), newTable.getTableName()),
+                "CREATE TABLE CACHED");
         applyAlterTable(newTable, true);
       }
       Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
@@ -2110,7 +2116,8 @@ public class CatalogOpExecutor {
       }
       return;
     }
-    Table srcTable = getExistingTable(srcTblName.getDb(), srcTblName.getTbl());
+    Table srcTable = getExistingTable(srcTblName.getDb(), srcTblName.getTbl(),
+        "Load source for CREATE TABLE LIKE");
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
     Preconditions.checkState(!KuduTable.isKuduTable(tbl),
@@ -2464,7 +2471,8 @@ public class CatalogOpExecutor {
     // Update the partition metadata to include the cache directive id.
     if (!cacheIds.isEmpty()) {
       applyAlterHmsPartitions(msTbl, msClient, tableName, hmsPartitionsToCache);
-      catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+      catalog_.watchCacheDirs(cacheIds, tableName.toThrift(),
+         "ALTER TABLE CACHE PARTITIONS");
     }
   }
 
@@ -2924,7 +2932,8 @@ public class CatalogOpExecutor {
 
       // Submit a request to watch these cache directives. The TableLoadingMgr will
       // asynchronously refresh the table metadata once the directives complete.
-      catalog_.watchCacheDirs(cacheDirIds, tableName.toThrift());
+      catalog_.watchCacheDirs(cacheDirIds, tableName.toThrift(),
+          "ALTER TABLE SET CACHED");
     } else {
       // Uncache the table.
       if (cacheDirId != null) HdfsCachingUtil.removeTblCacheDirective(msTbl);
@@ -2995,7 +3004,8 @@ public class CatalogOpExecutor {
         // Once the cache directives are submitted, observe the status of the caching
         // until no more progress is made -- either fully cached or out of cache memory
         if (!cacheDirs.isEmpty()) {
-          catalog_.watchCacheDirs(cacheDirs, tableName.toThrift());
+          catalog_.watchCacheDirs(cacheDirs, tableName.toThrift(),
+              "ALTER PARTITION SET CACHED");
         }
         if (!partition.isMarkedCached()) {
           modifiedParts.add(partition);
@@ -3080,7 +3090,8 @@ public class CatalogOpExecutor {
           String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
     }
     if (!cacheIds.isEmpty()) {
-      catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+      catalog_.watchCacheDirs(cacheIds, tableName.toThrift(),
+          "ALTER TABLE RECOVER PARTITIONS");
     }
   }
 
@@ -3493,6 +3504,9 @@ public class CatalogOpExecutor {
    */
   public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
       throws CatalogException {
+    String cmdString = String.format("%s issued by %s",
+        req.is_refresh ? "REFRESH":"INVALIDATE",
+        req.header != null ? req.header.requesting_user : " unknown user");
     TResetMetadataResponse resp = new TResetMetadataResponse();
     resp.setResult(new TCatalogUpdateResult());
     resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());
@@ -3529,13 +3543,15 @@ public class CatalogOpExecutor {
           // If the table is not loaded, no need to perform refresh after the initial
           // metadata load.
           boolean needsRefresh = tbl.isLoaded();
-          tbl = getExistingTable(tblName.getDb(), tblName.getTbl());
+          tbl = getExistingTable(tblName.getDb(), tblName.getTbl(),
+              "Load triggered by " + cmdString);
           if (tbl != null) {
             if (needsRefresh) {
               if (req.isSetPartition_spec()) {
-                updatedThriftTable = catalog_.reloadPartition(tbl, req.getPartition_spec());
+                updatedThriftTable = catalog_.reloadPartition(tbl,
+                    req.getPartition_spec(), cmdString);
               } else {
-                updatedThriftTable = catalog_.reloadTable(tbl);
+                updatedThriftTable = catalog_.reloadTable(tbl, cmdString);
               }
             } else {
               // Table was loaded from scratch, so it's already "refreshed".
@@ -3610,7 +3626,8 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
-    Table table = getExistingTable(update.getDb_name(), update.getTarget_table());
+    Table table = getExistingTable(update.getDb_name(), update.getTarget_table(),
+        "Load for INSERT");
     if (!(table instanceof HdfsTable)) {
       throw new InternalException("Unexpected table type: " +
           update.getTarget_table());
@@ -3658,14 +3675,14 @@ public class CatalogOpExecutor {
           // consistent.
           String partName = partition.getPartitionName() + "/";
 
-          // Attempt to remove this partition name from from partsToCreate. If remove
+          // Attempt to remove this partition name from partsToCreate. If remove
           // returns true, it indicates the partition already exists.
           if (partsToCreate.remove(partName)) {
             affectedExistingPartitions.add(partition);
             if (partition.isMarkedCached()) {
-              // The partition was targeted by the insert and is also a cached. Since
+              // The partition was targeted by the insert and is also cached. Since
               // data was written to the partition, a watch needs to be placed on the
-              // cache cache directive so the TableLoadingMgr can perform an async
+              // cache directive so the TableLoadingMgr can perform an async
               // refresh once all data becomes cached.
               cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
                   partition.getParameters()));
@@ -3762,7 +3779,8 @@ public class CatalogOpExecutor {
       }
       // Submit the watch request for the given cache directives.
       if (!cacheDirIds.isEmpty()) {
-        catalog_.watchCacheDirs(cacheDirIds, tblName.toThrift());
+        catalog_.watchCacheDirs(cacheDirIds, tblName.toThrift(),
+            "INSERT into cached partitions");
       }
 
       response.setResult(new TCatalogUpdateResult());
@@ -3777,7 +3795,8 @@ public class CatalogOpExecutor {
             new TStatus(TErrorCode.OK, new ArrayList<String>()));
       }
 
-      loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata);
+      loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,
+          "INSERT");
       // After loading metadata, fire insert events if external event processing is
       // enabled.
       createInsertEvents(table, affectedExistingPartitions, update.is_overwrite);
@@ -3876,8 +3895,9 @@ public class CatalogOpExecutor {
    * TODO: Track object IDs to
    * know when a table has been dropped and re-created with the same name.
    */
-  private Table getExistingTable(String dbName, String tblName) throws CatalogException {
-    Table tbl = catalog_.getOrLoadTable(dbName, tblName);
+  private Table getExistingTable(String dbName, String tblName, String reason)
+      throws CatalogException {
+    Table tbl = catalog_.getOrLoadTable(dbName, tblName, reason);
     if (tbl == null) {
       throw new TableNotFoundException("Table not found: " + dbName + "." + tblName);
     }
@@ -4017,7 +4037,8 @@ public class CatalogOpExecutor {
   private void alterCommentOnTableOrView(TableName tableName, String comment,
       TDdlExecResponse response) throws CatalogException, InternalException,
       ImpalaRuntimeException {
-    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
+        "Load for ALTER COMMENT");
     tryLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -4034,7 +4055,7 @@ public class CatalogOpExecutor {
         msTbl.getParameters().put("comment", comment);
       }
       applyAlterTable(msTbl, true);
-      loadTableMetadata(tbl, newCatalogVersion, false, false, null);
+      loadTableMetadata(tbl, newCatalogVersion, false, false, null, "ALTER COMMENT");
       addTableToCatalogUpdate(tbl, response.result);
       addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
     } finally {
@@ -4045,7 +4066,8 @@ public class CatalogOpExecutor {
   private void alterCommentOnColumn(TableName tableName, String columnName,
       String comment, TDdlExecResponse response) throws CatalogException,
       InternalException, ImpalaRuntimeException {
-    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
+        "Load for ALTER COLUMN COMMENT");
     tryLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -4067,7 +4089,8 @@ public class CatalogOpExecutor {
         }
         applyAlterTable(msTbl, true);
       }
-      loadTableMetadata(tbl, newCatalogVersion, false, true, null);
+      loadTableMetadata(tbl, newCatalogVersion, false, true, null,
+          "ALTER COLUMN COMMENT");
       addTableToCatalogUpdate(tbl, response.result);
       addSummary(response, "Column has been altered.");
     } finally {

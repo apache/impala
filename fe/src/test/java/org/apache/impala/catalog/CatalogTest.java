@@ -130,50 +130,52 @@ public class CatalogTest {
     Db functionalDb = catalog_.getDb("functional");
     assertNotNull(functionalDb);
     assertEquals(functionalDb.getName(), "functional");
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view_sub"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypessmall"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserror"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserrornonulls"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesagg"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesaggnonulls"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesnopart"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesinsert"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "complex_view"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "testtbl"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "dimtbl"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "jointbl"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "liketbl"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "greptiny"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "rankingssmall"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "uservisitssmall"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "view_view"));
-    assertNotNull(catalog_.getOrLoadTable("functional", "date_tbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view_sub", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypessmall", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserror", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserrornonulls", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesagg", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesaggnonulls", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesnopart", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesinsert", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "complex_view", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "testtbl", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "dimtbl", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "jointbl", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "liketbl", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "greptiny", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "rankingssmall", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "uservisitssmall", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "view_view", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "date_tbl", "test"));
     // IMP-163 - table with string partition column does not load if there are partitions
-    assertNotNull(catalog_.getOrLoadTable("functional", "StringPartitionKey"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "StringPartitionKey", "test"));
     // Test non-existent table
-    assertNull(catalog_.getOrLoadTable("functional", "nonexistenttable"));
+    assertNull(catalog_.getOrLoadTable("functional", "nonexistenttable", "test"));
 
     // functional_seq contains the same tables as functional
     Db testDb = catalog_.getDb("functional_seq");
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "functional_seq");
-    assertNotNull(catalog_.getOrLoadTable("functional_seq", "alltypes"));
-    assertNotNull(catalog_.getOrLoadTable("functional_seq", "testtbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional_seq", "alltypes", "test"));
+    assertNotNull(catalog_.getOrLoadTable("functional_seq", "testtbl", "test"));
 
     Db hbaseDb = catalog_.getDb("functional_hbase");
     assertNotNull(hbaseDb);
     assertEquals(hbaseDb.getName(), "functional_hbase");
     // Loading succeeds for an HBase table that has binary columns and an implicit key
     // column mapping
-    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmallbinary"));
-    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmall"));
-    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "hbasealltypeserror"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmallbinary",
+        "test"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmall", "test"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "hbasealltypeserror",
+        "test"));
     assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(),
-        "hbasealltypeserrornonulls"));
-    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypesagg"));
-    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "stringids"));
+        "hbasealltypeserrornonulls", "test"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypesagg", "test"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "stringids", "test"));
 
     checkTableCols(functionalDb, "alltypes", 2,
         new String[]
@@ -323,8 +325,8 @@ public class CatalogTest {
         new Type[] {Type.DATE, Type.INT, Type.DATE});
 
     // case-insensitive lookup
-    assertEquals(catalog_.getOrLoadTable("functional", "alltypes"),
-        catalog_.getOrLoadTable("functional", "AllTypes"));
+    assertEquals(catalog_.getOrLoadTable("functional", "alltypes", "test"),
+        catalog_.getOrLoadTable("functional", "AllTypes", "test"));
   }
 
   // Count of listFiles (list status + blocks) calls
@@ -352,7 +354,8 @@ public class CatalogTest {
         /*tblWasRemoved=*/new Reference<Boolean>(),
         /*dbWasAdded=*/new Reference<Boolean>());
 
-    HdfsTable table = (HdfsTable)catalog_.getOrLoadTable("functional", "AllTypes");
+    HdfsTable table = (HdfsTable)catalog_.getOrLoadTable("functional", "AllTypes",
+        "test");
     StorageStatistics opsCounts = stats.get(DFSOpsCountStatistics.NAME);
 
     // We expect:
@@ -375,7 +378,7 @@ public class CatalogTest {
 
     // Now test REFRESH on the table...
     stats.reset();
-    catalog_.reloadTable(table);
+    catalog_.reloadTable(table, "test");
 
     // Again, we expect only one getFileStatus call, for the top-level directory.
     assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
@@ -393,17 +396,17 @@ public class CatalogTest {
     List<TPartitionKeyValue> partitionSpec = ImmutableList.of(
         new TPartitionKeyValue("year", "2010"),
         new TPartitionKeyValue("month", "10"));
-    catalog_.reloadPartition(table, partitionSpec);
+    catalog_.reloadPartition(table, partitionSpec, "test");
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 
     // Loading or reloading an unpartitioned table with some files in it should not make
     // an RPC per file.
     stats.reset();
     HdfsTable unpartTable = (HdfsTable)catalog_.getOrLoadTable(
-        "functional", "alltypesaggmultifilesnopart");
+        "functional", "alltypesaggmultifilesnopart", "test");
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
     stats.reset();
-    catalog_.reloadTable(unpartTable);
+    catalog_.reloadTable(unpartTable, "test");
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 
     // Simulate an empty partition, which will trigger the full
@@ -414,7 +417,7 @@ public class CatalogTest {
         .getPartitionFromThriftPartitionSpec(partitionSpec);
     hdfsPartition.setFileDescriptors(new ArrayList<>());
     stats.reset();
-    catalog_.reloadPartition(table, partitionSpec);
+    catalog_.reloadPartition(table, partitionSpec, "test");
 
     // Should not scan the directory file-by-file, should use a single
     // listLocatedStatus() to get the whole directory (partition)
@@ -427,7 +430,7 @@ public class CatalogTest {
   @Test
   public void TestPartitions() throws CatalogException {
     HdfsTable table =
-        (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
+        (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes", "test");
     checkAllTypesPartitioning(table, true);
   }
 
@@ -477,7 +480,8 @@ public class CatalogTest {
   @Test
   public void testStats() throws CatalogException {
     // make sure the stats for functional.alltypesagg look correct
-    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypesAgg");
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypesAgg",
+        "test");
 
     Column idCol = table.getColumn("id");
     assertEquals(idCol.getStats().getAvgSerializedSize(),
@@ -550,7 +554,8 @@ public class CatalogTest {
   public void testColStatsColTypeMismatch() throws Exception {
     // First load a table that has column stats.
     //catalog_.refreshTable("functional", "alltypesagg", false);
-    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "alltypesagg");
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "alltypesagg",
+        "test");
 
     // Now attempt to update a column's stats with mismatched stats data and ensure
     // we get the expected results.
@@ -643,7 +648,7 @@ public class CatalogTest {
       gflags.setPull_incremental_statistics(true);
 
       // Partitioned table with stats. Load the table prior to fetching.
-      catalog_.getOrLoadTable("functional", "alltypesagg");
+      catalog_.getOrLoadTable("functional", "alltypesagg", "test");
       expectStatistics("functional", "alltypesagg", 11);
 
       // Partitioned table with stats. Invalidate the table prior to fetching.
@@ -675,7 +680,7 @@ public class CatalogTest {
   public void testInternalHBaseTable() throws CatalogException {
     // Cast will fail if table not an HBaseTable
    HBaseTable table = (HBaseTable)
-       catalog_.getOrLoadTable("functional_hbase", "internal_hbase_table");
+       catalog_.getOrLoadTable("functional_hbase", "internal_hbase_table", "test");
     assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
 
@@ -687,14 +692,14 @@ public class CatalogTest {
 
   @Test
   public void testCreateTableMetadata() throws CatalogException {
-    Table table = catalog_.getOrLoadTable("functional", "alltypes");
+    Table table = catalog_.getOrLoadTable("functional", "alltypes", "test");
     // Tables are created via Impala so the metadata should have been populated properly.
     // alltypes is an external table.
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.EXTERNAL_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
-    table = catalog_.getOrLoadTable("functional", "alltypesinsert");
+    table = catalog_.getOrLoadTable("functional", "alltypesinsert", "test");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.MANAGED_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
@@ -707,7 +712,7 @@ public class CatalogTest {
     Assume.assumeTrue(
         "Skipping this test since it is only supported when running against Hive-2",
         TestUtils.getHiveMajorVersion() == 2);
-    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
+    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl", "test");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -718,7 +723,7 @@ public class CatalogTest {
   @Test
   public void testLoadingUnsupportedTableTypes() throws CatalogException {
     // Table with unsupported SerDe library.
-    Table table = catalog_.getOrLoadTable("functional", "bad_serde");
+    Table table = catalog_.getOrLoadTable("functional", "bad_serde", "test");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -728,7 +733,7 @@ public class CatalogTest {
 
     // Impala does not yet support Hive's LazyBinaryColumnarSerDe which can be
     // used for RCFILE tables.
-    table = catalog_.getOrLoadTable("functional_rc", "rcfile_lazy_binary_serde");
+    table = catalog_.getOrLoadTable("functional_rc", "rcfile_lazy_binary_serde", "test");
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);

@@ -82,7 +82,8 @@ public class View extends Table implements FeView {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException {
     try {
       clearColumns();
       msTable_ = msTbl;

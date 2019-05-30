@@ -289,7 +289,8 @@ public class KuduTable extends Table implements FeKuduTable {
    */
   @Override
   public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     try {

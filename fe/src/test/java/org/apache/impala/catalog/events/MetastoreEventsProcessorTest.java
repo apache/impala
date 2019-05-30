@@ -682,7 +682,7 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
 
     // Simulate a load table
-    Table tbl = catalog_.getOrLoadTable(dbName, tblName);
+    Table tbl = catalog_.getOrLoadTable(dbName, tblName, "test");
     Partition partition = null;
     if (isPartitionInsert) {
       // Get the partition from metastore. This should now contain the new file.
@@ -2622,7 +2622,7 @@ public class MetastoreEventsProcessorTest {
   }
 
   private Table loadTable(String dbName, String tblName) throws CatalogException {
-    Table loadedTable = catalog_.getOrLoadTable(dbName, tblName);
+    Table loadedTable = catalog_.getOrLoadTable(dbName, tblName, "test");
     assertFalse("Table should have been loaded after getOrLoadTable call",
         loadedTable instanceof IncompleteTable);
     return loadedTable;

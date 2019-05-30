@@ -171,7 +171,8 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      throws TableLoadingException {
     Preconditions.checkNotNull(msTbl);
     msTable_ = msTbl;
     clearColumns();

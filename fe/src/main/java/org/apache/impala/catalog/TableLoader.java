@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.metastore.TableType;
@@ -54,10 +53,10 @@ public class TableLoader {
    * Returns new instance of Table, If there were any errors loading the table metadata
    * an IncompleteTable will be returned that contains details on the error.
    */
-  public Table load(Db db, String tblName) {
+  public Table load(Db db, String tblName, String reason) {
     Stopwatch sw = new Stopwatch().start();
     String fullTblName = db.getName() + "." + tblName;
-    String annotation = "Loading metadata for: " + fullTblName;
+    String annotation = "Loading metadata for: " + fullTblName + " (" + reason + ")";
     LOG.info(annotation);
     Table table;
     // turn all exceptions into TableLoadingException
@@ -81,7 +80,7 @@ public class TableLoader {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + fullTblName);
       }
-      table.load(false, msClient.getHiveClient(), msTbl);
+      table.load(false, msClient.getHiveClient(), msTbl, reason);
       table.validate();
     } catch (TableLoadingException e) {
       table = IncompleteTable.createFailedMetadataLoadTable(db, tblName, e);

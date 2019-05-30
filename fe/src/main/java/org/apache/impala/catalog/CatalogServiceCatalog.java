@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.fs.Hdfs;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -481,8 +480,8 @@ public class CatalogServiceCatalog extends Catalog {
    * Adds a list of cache directive IDs for the given table name. Asynchronously
    * refreshes the table metadata once all cache directives complete.
    */
-  public void watchCacheDirs(List<Long> dirIds, TTableName tblName) {
-    tableLoadingMgr_.watchCacheDirs(dirIds, tblName);
+  public void watchCacheDirs(List<Long> dirIds, TTableName tblName, String reason) {
+    tableLoadingMgr_.watchCacheDirs(dirIds, tblName, reason);
   }
 
   /**
@@ -512,7 +511,8 @@ public class CatalogServiceCatalog extends Catalog {
     TTableName tableName = request.table_name;
     LOG.info("Fetching partition statistics for: " + tableName.getDb_name() + "."
         + tableName.getTable_name());
-    Table table = getOrLoadTable(tableName.db_name, tableName.table_name);
+    Table table = getOrLoadTable(tableName.db_name, tableName.table_name,
+        "needed to fetch partition stats");
 
     // Table could be null if it does not exist anymore.
     if (table == null) {
@@ -1695,7 +1695,7 @@ public class CatalogServiceCatalog extends Catalog {
    * and the current cached value will be returned. This may mean that a missing table
    * (not yet loaded table) will be returned.
    */
-  public Table getOrLoadTable(String dbName, String tblName)
+  public Table getOrLoadTable(String dbName, String tblName, String reason)
       throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
     TableLoadingMgr.LoadRequest loadReq;
@@ -1707,7 +1707,7 @@ public class CatalogServiceCatalog extends Catalog {
       Table tbl = getTable(dbName, tblName);
       if (tbl == null || tbl.isLoaded()) return tbl;
       previousCatalogVersion = tbl.getCatalogVersion();
-      loadReq = tableLoadingMgr_.loadAsync(tableName);
+      loadReq = tableLoadingMgr_.loadAsync(tableName, reason);
     } finally {
       versionLock_.readLock().unlock();
     }
@@ -1951,7 +1951,7 @@ public class CatalogServiceCatalog extends Catalog {
    * metadata load from concurrent table modifications and assigns a new catalog version.
    * Throws a CatalogException if there is an error loading table metadata.
    */
-  public TCatalogObject reloadTable(Table tbl) throws CatalogException {
+  public TCatalogObject reloadTable(Table tbl, String reason) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
@@ -1973,7 +1973,7 @@ public class CatalogServiceCatalog extends Catalog {
           throw new TableLoadingException("Error loading metadata for table: " +
               dbName + "." + tblName, e);
         }
-        tbl.load(true, msClient.getHiveClient(), msTbl);
+        tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
@@ -2146,10 +2146,10 @@ public class CatalogServiceCatalog extends Catalog {
    * @throws DatabaseNotFoundException if Db doesn't exist.
    */
   public boolean reloadPartitionIfExists(String dbName, String tblName,
-      List<TPartitionKeyValue> tPartSpec) throws CatalogException {
+      List<TPartitionKeyValue> tPartSpec, String reason) throws CatalogException {
     Table table = getTable(dbName, tblName);
     if (table == null || table instanceof IncompleteTable) return false;
-    reloadPartition(table, tPartSpec);
+    reloadPartition(table, tPartSpec, reason);
     return true;
   }
 
@@ -2158,11 +2158,11 @@ public class CatalogServiceCatalog extends Catalog {
    * otherwise. Throws CatalogException if reloadTable() is unsuccessful. Throws
    * DatabaseNotFoundException if Db doesn't exist.
    */
-  public boolean reloadTableIfExists(String dbName, String tblName)
+  public boolean reloadTableIfExists(String dbName, String tblName, String reason)
       throws CatalogException {
     Table table = getTable(dbName, tblName);
     if (table == null || table instanceof IncompleteTable) return false;
-    reloadTable(table);
+    reloadTable(table, reason);
     return true;
   }
 
@@ -2467,8 +2467,8 @@ public class CatalogServiceCatalog extends Catalog {
    * 'partitionSpec' in table 'tbl'. Returns the resulting table's TCatalogObject after
    * the partition metadata was reloaded.
    */
-  public TCatalogObject reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
-      throws CatalogException {
+  public TCatalogObject reloadPartition(Table tbl,
+      List<TPartitionKeyValue> partitionSpec, String reason) throws CatalogException {
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error reloading partition of table %s " +
           "due to lock contention", tbl.getFullName()));
@@ -2484,8 +2484,8 @@ public class CatalogServiceCatalog extends Catalog {
       String partitionName = hdfsPartition == null
           ? HdfsTable.constructPartitionName(partitionSpec)
           : hdfsPartition.getPartitionName();
-      LOG.info(String.format("Refreshing partition metadata: %s %s",
-          hdfsTable.getFullName(), partitionName));
+      LOG.info(String.format("Refreshing partition metadata: %s %s (%s)",
+          hdfsTable.getFullName(), partitionName, reason));
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
         try {
@@ -2789,7 +2789,8 @@ public class CatalogServiceCatalog extends Catalog {
       Table table;
       try {
         table = getOrLoadTable(
-            objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name());
+            objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
+            "needed by coordinator");
       } catch (DatabaseNotFoundException e) {
         return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
       }
