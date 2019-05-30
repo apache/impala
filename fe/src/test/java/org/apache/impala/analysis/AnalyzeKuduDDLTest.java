@@ -492,4 +492,131 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         String.format("Table property %s should not be specified when creating " +
             "a Kudu table.", KuduTable.KEY_TABLE_ID));
   }
+
+  @Test
+  public void TestAlterKuduTable() {
+    TestUtils.assumeKuduIsSupported();
+    // ALTER TABLE ADD/DROP range partitions
+    String[] addDrop = {"add if not exists", "add", "drop if exists", "drop"};
+    for (String kw: addDrop) {
+      AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition 10 <= values < 20", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition value = 30", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition values < 100", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition 10 <= values", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition 1+1 <= values <= factorial(3)", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0, '0') < values", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition values <= (1, '1')", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0, '0') <= values < (1, '1')", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition value = (-1, 'a')", kw));
+      AnalysisError(String.format("alter table functional.alltypes %s range " +
+          "partition 10 < values < 20", kw), "Table functional.alltypes does not " +
+          "support range partitions: RANGE PARTITION 10 < VALUES < 20");
+      AnalysisError(String.format("alter table functional_kudu.testtbl %s range " +
+          "partition values < isnull(null, null)", kw), "Range partition values " +
+          "cannot be NULL. Range partition: 'PARTITION VALUES < isnull(NULL, NULL)'");
+      AnalysisError(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0) < values", kw),
+          "Number of specified range partition values is different than the number of " +
+          "partitioning columns: (1 vs 2). Range partition: 'PARTITION (0) < VALUES'");
+      AnalysisError(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition values < (0, 0)", kw),
+          "Range partition value 0 (type: TINYINT) is not type compatible with " +
+          "partitioning column 'test_name' (type: STRING).");
+    }
+
+    // ALTER TABLE ADD COLUMNS
+    // Columns with different supported data types
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 tinyint null, a2 " +
+        "smallint null, a3 int null, a4 bigint null, a5 string null, a6 float null, " +
+        "a7 double null, a8 boolean null comment 'boolean')");
+    // Decimal types
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (d1 decimal null, d2 " +
+        "decimal(9, 2) null, d3 decimal(15, 15) null, d4 decimal(38, 0) null)");
+    // Complex types
+    AnalysisError("alter table functional_kudu.testtbl add columns ( "+
+        "a struct<f1:int>)", "Kudu tables do not support complex types: " +
+        "a STRUCT<f1:INT>");
+    // Add primary key
+    AnalysisError("alter table functional_kudu.testtbl add columns (a int primary key)",
+        "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
+        "a INT PRIMARY KEY");
+    // Columns requiring a default value
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 int not null " +
+        "default 10)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 int null " +
+        "default 10)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (d1 decimal(9, 2) null " +
+        "default 99.99)");
+    // Other Kudu column options
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int encoding rle)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int compression lz4)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int block_size 10)");
+
+    // REPLACE columns is not supported for Kudu tables
+    AnalysisError("alter table functional_kudu.testtbl replace columns (a int null)",
+        "ALTER TABLE REPLACE COLUMNS is not supported on Kudu tables");
+    // Conflict with existing column
+    AnalysisError("alter table functional_kudu.testtbl add columns (zip int)",
+        "Column already exists: zip");
+    // Kudu column options on an HDFS table
+    AnalysisError("alter table functional.alltypes add columns (a int not null)",
+        "The specified column options are only supported in Kudu tables: " +
+        "a INT NOT NULL");
+
+    // ALTER TABLE DROP COLUMN
+    AnalyzesOk("alter table functional_kudu.testtbl drop column name");
+    AnalysisError("alter table functional_kudu.testtbl drop column no_col",
+        "Column 'no_col' does not exist in table: functional_kudu.testtbl");
+
+    // ALTER TABLE CHANGE COLUMN on Kudu tables
+    AnalyzesOk("alter table functional_kudu.testtbl change column name new_name string");
+    AnalyzesOk("alter table functional_kudu.testtbl change column zip " +
+        "zip int comment 'comment'");
+    // Unsupported column options
+    AnalysisError("alter table functional_kudu.testtbl change column zip zip_code int " +
+        "encoding rle compression lz4 default 90000", "Unsupported column options in " +
+        "ALTER TABLE CHANGE COLUMN statement: 'zip_code INT ENCODING RLE COMPRESSION " +
+        "LZ4 DEFAULT 90000'. Use ALTER TABLE ALTER COLUMN instead.");
+    // Changing the column type is not supported for Kudu tables
+    AnalysisError("alter table functional_kudu.testtbl change column zip zip bigint",
+        "Cannot change the type of a Kudu column using an ALTER TABLE CHANGE COLUMN " +
+        "statement: (INT vs BIGINT)");
+
+    // Setting kudu.table_id is not allowed for Kudu tables.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('kudu.table_id' = '1234')",
+        "Property 'kudu.table_id' cannot be altered for Kudu tables");
+
+    // Rename the underlying Kudu table is not supported for managed Kudu tables.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('kudu.table_name' = 'Hans')",
+        "Not allowed to set 'kudu.table_name' manually for managed Kudu tables");
+
+    // TODO IMPALA-6375: Allow setting kudu.table_name for managed Kudu tables
+    // if the 'EXTERNAL' property is set to TRUE in the same step.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('EXTERNAL' = 'TRUE','kudu.table_name' = 'Hans')",
+        "Not allowed to set 'kudu.table_name' manually for managed Kudu tables");
+
+    // ALTER TABLE RENAME TO
+    AnalyzesOk("ALTER TABLE functional_kudu.testtbl RENAME TO new_testtbl");
+
+    // ALTER TABLE SORT BY
+    AnalysisError("alter table functional_kudu.alltypes sort by (int_col)",
+        "ALTER TABLE SORT BY not supported on Kudu tables.");
+
+    // ALTER TABLE SET TBLPROPERTIES for sort.columns
+    AnalysisError("alter table functional_kudu.alltypes set tblproperties(" +
+        "'sort.columns'='int_col')",
+        "'sort.columns' table property is not supported for Kudu tables.");
+  }
 }
