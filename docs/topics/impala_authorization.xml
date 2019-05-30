@@ -106,6 +106,45 @@ under the License.
 
   </concept>
 
+  <concept id="object_ownership">
+
+    <title>Object Ownership in Sentry</title>
+
+    <conbody>
+
+      <p>
+        Impala supports the ownership on databases, tables, and views. The
+        <codeph>CREATE</codeph> statements implicitly make the user running the statement the
+        owner of the object. An owner has the <codeph>OWNER</codeph> privilege if enabled in
+        Sentry. For example, if <varname>User A</varname> creates a database,
+        <varname>foo</varname>, via the <codeph>CREATE DATABASE</codeph> statement,
+        <varname>User A</varname> now owns the <varname>foo</varname> database and is authorized
+        to perform any operation on the <varname>foo</varname> database.
+      </p>
+
+      <p>
+        The <codeph>OWNER</codeph> privilege is not a grantable or revokable privilege whereas
+        the <codeph>ALL</codeph> privilege is explicitly granted via the <codeph>GRANT</codeph>
+        statement.
+      </p>
+
+      <p>
+        The object ownership feature is controlled by a Sentry configuration. The
+        <codeph>OWNER</codeph> privilege is only granted when the feature is enabled in Sentry.
+        When enabled they get the owner privilege, with or without the <codeph>GRANT
+        OPTION</codeph>, which is also controlled by the Sentry configuration.
+      </p>
+
+      <p>
+        An ownership can be transferred to another user or role via the <codeph>ALTER
+        DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, or <codeph>ALTER VIEW</codeph> with the
+        <codeph>SET OWNER</codeph> clause.
+      </p>
+
+    </conbody>
+
+  </concept>
+
   <concept id="secure_startup">
 
     <title>Starting Impala with Sentry Authorization Enabled</title>
