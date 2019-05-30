@@ -36,6 +36,7 @@ from getpass import getuser
 from random import choice
 from subprocess import check_call
 from tests.common.base_test_suite import BaseTestSuite
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
@@ -515,6 +516,13 @@ class ImpalaTestSuite(BaseTestSuite):
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
         encoding=encoding)
     for test_section in sections:
+      if 'HIVE_MAJOR_VERSION' in test_section:
+        needed_hive_major_version = int(test_section['HIVE_MAJOR_VERSION'])
+        assert needed_hive_major_version in [2, 3]
+        assert HIVE_MAJOR_VERSION in [2, 3]
+        if needed_hive_major_version != HIVE_MAJOR_VERSION:
+          continue
+
       if 'SHELL' in test_section:
         assert len(test_section) == 1, \
             "SHELL test sections can't contain other sections"

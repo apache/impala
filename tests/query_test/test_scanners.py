@@ -1145,6 +1145,10 @@ class TestScanTruncatedFiles(ImpalaTestSuite):
     self.run_stmt_in_hive("insert overwrite table %s select string_col from "
         "functional.alltypes limit %s" % (fq_tbl_name, num_rows))
 
+    # The file will not exist if the table is empty and the insert is done by Hive 3, so
+    # another refresh is needed.
+    self.execute_query("refresh %s" % fq_tbl_name)
+
     result = self.execute_query("select count(*) from %s" % fq_tbl_name)
     assert(len(result.data) == 1)
     assert(result.data[0] == str(num_rows))

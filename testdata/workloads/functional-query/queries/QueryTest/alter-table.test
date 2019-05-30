@@ -900,10 +900,14 @@ show tables in $DATABASE2 like '*mv*'
 ---- TYPES
 STRING
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 # Tests that renaming a partitioned table with column stats across databases
 # succeeds and preserves table and column stats, and allows the renamed table
 # to be dropped (IMPALA-2810).
+#
+# Skip in Hive 3, see HIVE-21806 for details.
 create table $DATABASE.mv (x int) partitioned by (y string);
 insert into $DATABASE.mv partition(y='a') values(1);
 insert into $DATABASE.mv partition(y='b') values(2);
@@ -913,12 +917,16 @@ alter table $DATABASE.mv rename to $DATABASE2.mv2;
 invalidate metadata $DATABASE2.mv2
 ---- RESULTS
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 show tables in $DATABASE like '*mv*'
 ---- RESULTS
 ---- TYPES
 STRING
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 show tables in $DATABASE2 like '*mv*'
 ---- RESULTS
@@ -926,6 +934,8 @@ show tables in $DATABASE2 like '*mv*'
 ---- TYPES
 STRING
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 show table stats $DATABASE2.mv2
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -936,6 +946,8 @@ show table stats $DATABASE2.mv2
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 show column stats $DATABASE2.mv2
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -944,11 +956,15 @@ show column stats $DATABASE2.mv2
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 drop table $DATABASE2.mv2
 ---- RESULTS
 'Table has been dropped.'
 ====
+---- HIVE_MAJOR_VERSION
+2
 ---- QUERY
 show tables in $DATABASE2 like '*mv*'
 ---- RESULTS
