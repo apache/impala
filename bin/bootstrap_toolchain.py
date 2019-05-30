@@ -414,7 +414,11 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
 
   def download(component):
     try:
-      pkg_directory = package_directory(cdh_components_home, component.name,
+      # Download and unpack Kudu's java package
+      component_name = component.name
+      if component.name == "kudu-java":
+        component_name = "kudu"
+      pkg_directory = package_directory(cdh_components_home, component_name,
           component.version)
       if os.path.isdir(pkg_directory):
         return
@@ -425,7 +429,7 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
         platform_label = "-%s" % get_platform_release_label().cdh
       # Download the package if it doesn't exist
       file_name = "{0}-{1}{2}.tar.gz".format(
-          component.name, component.version, platform_label)
+          component_name, component.version, platform_label)
 
       if component.url is None:
         download_path = url_prefix + file_name
@@ -564,6 +568,9 @@ if __name__ == "__main__":
                     "to use the toolchain Kudu.")
       sys.exit(1)
     cdh_components += [Package("kudu")]
+  # Always download Kudu's jars regardless of USE_CDH_KUDU since they
+  # aren't platform dependent and aren't packaged by the toolchain.
+  cdh_components += [Package("kudu-java")]
   download_path_prefix = \
       "https://{0}/build/cdh_components/{1}/tarballs/".format(toolchain_host,
                                                               cdh_build_number)

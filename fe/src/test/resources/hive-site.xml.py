@@ -124,7 +124,7 @@ else:
 # These are for enabling notification between Hive and Sentry as well as
 # metastore event processing in Impala (see IMPALA-7954)
 CONFIG.update({
- 'hive.metastore.transactional.event.listeners': 'org.apache.hive.hcatalog.listener.DbNotificationListener',
+ 'hive.metastore.transactional.event.listeners': 'org.apache.hive.hcatalog.listener.DbNotificationListener,org.apache.kudu.hive.metastore.KuduMetastorePlugin',
  'hcatalog.message.factory.impl.json': 'org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory',
  'hive.metastore.dml.events': 'true',
 })
