@@ -27,9 +27,9 @@ export IMPALA_HOME=/opt/impala
 
 # Add directories containing dynamic libraries required by the daemons that
 # are not on the system library paths.
-export LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/
+export LD_LIBRARY_PATH=/opt/impala/lib
+LD_LIBRARY_PATH+=:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/
 LD_LIBRARY_PATH+=:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server/
-LD_LIBRARY_PATH+=:/opt/kudu/release/lib
 
 # Add directory with optional plugins that can be mounted for the container.
 LD_LIBRARY_PATH+=:/opt/impala/lib/plugins

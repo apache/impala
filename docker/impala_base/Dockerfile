@@ -24,24 +24,26 @@ RUN apt-get update && \
   apt-get install -y openjdk-8-jre-headless \
   libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
   tzdata liblzo2-2 && \
-  apt-get clean
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
+
+# Copy build artifacts required for the daemon processes.
+# Need to have multiple copy commands to preserve directory structure.
+COPY lib /opt/impala/lib
+COPY www /opt/impala/www
+COPY bin /opt/impala/bin
+# Symlink here instead of in setup_build_context to avoid duplicate binaries.
+RUN cd /opt/impala/bin && ln -s impalad statestored && ln -s impalad catalogd && \
+# Create conf directory for later config injection.
+    mkdir /opt/impala/conf && \
+# Create logs directory to collect container logs.
+    mkdir /opt/impala/logs
 
 # Use a non-privileged impala user to run the daemons in the container.
 # That user should own everything in the /opt/impala subdirectory.
 RUN groupadd -r impala && useradd --no-log-init -r -g impala impala && \
-    mkdir -p /opt/impala && chown impala /opt/impala && \
+    mkdir -p /opt/impala && chown impala -R /opt/impala && \
     chmod ugo+w /etc/passwd
 USER impala
-
-# Copy build artifacts required for the daemon processes.
-# Need to have multiple copy commands to preserve directory structure.
-COPY bin /opt/impala/bin
-COPY lib /opt/impala/lib
-COPY www /opt/impala/www
-COPY kudu /opt/kudu
-# Create conf directory for later config injection.
-RUN mkdir /opt/impala/conf
-# Create logs directory to collect container logs.
-RUN mkdir /opt/impala/logs
 
 WORKDIR /opt/impala/

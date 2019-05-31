@@ -23,6 +23,7 @@
 import glob
 import os
 import shutil
+from subprocess import check_call
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context")
@@ -30,7 +31,13 @@ DOCKERFILE = os.path.join(IMPALA_HOME, "docker/impala_base/Dockerfile")
 
 IMPALA_TOOLCHAIN = os.environ["IMPALA_TOOLCHAIN"]
 IMPALA_GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
+IMPALA_BINUTILS_VERSION = os.environ["IMPALA_BINUTILS_VERSION"]
 GCC_HOME = os.path.join(IMPALA_TOOLCHAIN, "gcc-{0}".format(IMPALA_GCC_VERSION))
+BINUTILS_HOME = os.path.join(
+    IMPALA_TOOLCHAIN, "binutils-{0}".format(IMPALA_BINUTILS_VERSION))
+STRIP = os.path.join(BINUTILS_HOME, "bin/strip")
+KUDU_HOME = os.environ["IMPALA_KUDU_HOME"]
+KUDU_LIB_DIR = os.path.join(KUDU_HOME, "release/lib")
 
 # Ensure the output directory exists and is empty.
 if os.path.exists(OUTPUT_DIR):
@@ -47,18 +54,20 @@ os.mkdir(LIB_DIR)
 
 
 def symlink_file_into_dir(src_file, dst_dir):
-    """Helper to symlink 'src_file' into 'dst_dir'."""
-    os.symlink(src_file, os.path.join(dst_dir, os.path.basename(src_file)))
+  """Helper to symlink 'src_file' into 'dst_dir'."""
+  os.symlink(src_file, os.path.join(dst_dir, os.path.basename(src_file)))
 
 
 # Impala binaries and native dependencies.
-for bin in ["impalad", "statestored", "catalogd", "libfesupport.so"]:
-    symlink_file_into_dir(os.path.join(IMPALA_HOME, "be/build/latest/service", bin),
-         BIN_DIR)
+check_call([STRIP, "--strip-debug",
+            os.path.join(IMPALA_HOME, "be/build/latest/service/impalad"),
+            "-o", os.path.join(BIN_DIR, "impalad")])
 for lib in ["libstdc++", "libgcc"]:
-    for so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format(lib))):
-        symlink_file_into_dir(so, LIB_DIR)
-os.symlink(os.environ["IMPALA_KUDU_HOME"], os.path.join(OUTPUT_DIR, "kudu"))
+  for so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format(lib))):
+    symlink_file_into_dir(so, LIB_DIR)
+
+for so in glob.glob(os.path.join(KUDU_LIB_DIR, "libkudu_client.so*")):
+  symlink_file_into_dir(so, LIB_DIR)
 
 # Impala dependencies.
 dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
