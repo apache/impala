@@ -412,7 +412,7 @@ class TestObservability(ImpalaTestSuite):
         if key in line:
           # Match byte count within parentheses
           m = re.search("\(([0-9]+)\)", line)
-          assert m
+          assert m, "Cannot match pattern for key %s in line '%s'" % (key, line)
           # Only keep first (query-level) counter
           if counters[key] == 0:
             counters[key] = int(m.group(1))
