@@ -19,12 +19,9 @@
 #ifndef IMPALA_UTIL_IMPALAD_METRICS_H
 #define IMPALA_UTIL_IMPALAD_METRICS_H
 
-#include "util/metrics.h"
-#include "util/collection-metrics.h"
+#include "util/metrics-fwd.h"
 
 namespace impala {
-
-class HistogramMetric;
 
 /// Contains the keys (strings) for impala metrics.
 class ImpaladMetricKeys {

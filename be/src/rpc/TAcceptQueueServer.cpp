@@ -24,6 +24,7 @@
 
 #include <thrift/concurrency/PlatformThreadFactory.h>
 
+#include "util/metrics.h"
 #include "util/thread-pool.h"
 
 DEFINE_int32(accepted_cnxn_queue_depth, 10000,

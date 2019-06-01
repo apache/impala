@@ -31,7 +31,8 @@
 #include "rpc/thrift-util.h"
 #include "runtime/client-cache-types.h"
 #include "util/debug-util.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
+#include "util/network-util.h"
 
 #include "common/status.h"
 

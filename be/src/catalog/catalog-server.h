@@ -30,7 +30,7 @@
 #include "catalog/catalog.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "rapidjson/rapidjson.h"
 
 namespace impala {

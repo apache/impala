@@ -27,6 +27,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 

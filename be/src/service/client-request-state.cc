@@ -38,6 +38,7 @@
 #include "service/query-result-set.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
 

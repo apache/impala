@@ -27,6 +27,7 @@
 #include "testutil/cpu-util.h"
 #include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
+#include "util/metrics.h"
 
 #include "common/names.h"
 

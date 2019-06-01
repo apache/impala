@@ -42,6 +42,7 @@
 #include "service/control-service.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/system-state-info.h"
 #include "util/thread.h"
 

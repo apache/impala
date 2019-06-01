@@ -37,7 +37,7 @@
 #include "scheduling/query-schedule.h"
 #include "scheduling/request-pool-service.h"
 #include "statestore/statestore-subscriber.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "util/network-util.h"
 #include "util/runtime-profile.h"
 

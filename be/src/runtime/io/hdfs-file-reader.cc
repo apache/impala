@@ -25,6 +25,7 @@
 #include "runtime/io/request-ranges.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/scope-exit-trigger.h"
 
 #include "common/names.h"

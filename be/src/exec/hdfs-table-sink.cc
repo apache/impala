@@ -32,6 +32,7 @@
 #include "util/coding-util.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 
 #include <limits>
 #include <vector>

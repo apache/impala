@@ -20,6 +20,8 @@
 #include "runtime/io/handle-cache.h"
 #include "runtime/io/hdfs-monitored-ops.h"
 #include "util/hash-util.h"
+#include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/time.h"
 
 #ifndef IMPALA_RUNTIME_DISK_IO_MGR_HANDLE_CACHE_INLINE_H

@@ -119,18 +119,6 @@ class SetMetric : public Metric {
   std::set<T> value_;
 };
 
-/// Enum to define which statistic types are available in the StatsMetric
-struct StatsType {
-  enum type {
-    MIN = 1,
-    MAX = 2,
-    MEAN = 4,
-    STDDEV = 8,
-    COUNT = 16,
-    ALL = 31
-  };
-};
-
 /// Metric which accumulates min, max and mean of all values, plus a count of samples
 /// seen. The output can be controlled by passing a bitmask as a template parameter to
 /// indicate which values should be printed or returned as JSON.
@@ -140,7 +128,7 @@ struct StatsType {
 ///
 /// After construction, all statistics are ill-defined, but count will be 0. The first call
 /// to Update() will initialise all stats.
-template <typename T, int StatsSelection=StatsType::ALL>
+template <typename T, int StatsSelection>
 class StatsMetric : public Metric {
  public:
   static StatsMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,

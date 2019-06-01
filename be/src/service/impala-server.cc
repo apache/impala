@@ -73,6 +73,7 @@
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/lineage-util.h"
+#include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/parse-util.h"

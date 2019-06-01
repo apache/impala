@@ -34,6 +34,7 @@
 #include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/filesystem-util.h"
+#include "util/collection-metrics.h"
 #include "util/metrics.h"
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId

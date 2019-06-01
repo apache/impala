@@ -23,8 +23,9 @@
 #include "util/hash-util.h"
 #include "util/time.h"
 #include "rpc/thrift-server.h"
-#include "gen-cpp/Types_types.h"
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/Types_types.h"
 
 // TCompactProtocol requires some #defines to work right.  They also define UNLIKELY
 // so we need to undef this.

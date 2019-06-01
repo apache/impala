@@ -32,8 +32,9 @@
 #include "rpc/thrift-util.h"
 #include "statestore/statestore.h"
 #include "statestore/statestore-service-client-wrapper.h"
-#include "util/metrics.h"
 #include "util/stopwatch.h"
+#include "gen-cpp/StatestoreService.h"
+#include "gen-cpp/StatestoreSubscriber.h"
 
 namespace impala {
 

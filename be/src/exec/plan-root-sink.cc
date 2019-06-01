@@ -22,6 +22,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "service/query-result-set.h"
+#include "util/pretty-printer.h"
 
 #include <memory>
 #include <boost/thread/mutex.hpp>

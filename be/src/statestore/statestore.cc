@@ -36,6 +36,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
+#include "util/metrics.h"
 #include "util/openssl-util.h"
 #include "util/test-info.h"
 #include "util/time.h"

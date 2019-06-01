@@ -30,7 +30,7 @@
 #include "common/object-pool.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/row-batch.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "util/thread-pool.h"

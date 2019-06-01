@@ -21,6 +21,7 @@
 #include "runtime/io/local-file-reader.h"
 #include "runtime/io/request-ranges.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 
 #include "common/names.h"
 

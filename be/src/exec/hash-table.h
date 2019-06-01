@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include <boost/cstdint.hpp>
+#include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"

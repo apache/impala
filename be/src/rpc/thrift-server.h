@@ -25,10 +25,11 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <thrift/TProcessor.h>
 #include <thrift/server/TServer.h>
+#include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TSSLSocket.h>
 
 #include "common/status.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "util/thread.h"
 
 namespace impala {

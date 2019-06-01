@@ -28,6 +28,7 @@
 #include "rpc/jni-thrift-util.h"
 #include "service/query-options.h"
 #include "util/auth-util.h"
+#include "util/collection-metrics.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/time.h"

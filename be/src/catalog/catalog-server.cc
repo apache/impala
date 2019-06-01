@@ -29,6 +29,8 @@
 #include "util/debug-util.h"
 #include "util/event-metrics.h"
 #include "util/logging-support.h"
+#include "util/collection-metrics.h"
+#include "util/metrics.h"
 #include "util/webserver.h"
 
 #include "common/names.h"

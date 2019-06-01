@@ -32,6 +32,8 @@
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
 #include "util/hdfs-util.h"
+#include "util/collection-metrics.h"
+#include "util/metrics.h"
 #include "util/time.h"
 
 #ifndef NDEBUG

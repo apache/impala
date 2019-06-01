@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <iostream>
 
+#include "common/object-pool.h"
 #include "experiments/data-provider.h"
 #include "util/cpu-info.h"
 #include "runtime/mem-pool.h"

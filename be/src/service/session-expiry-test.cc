@@ -26,6 +26,7 @@
 #include "testutil/in-process-servers.h"
 #include "util/asan.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/time.h"
 
 #include "common/names.h"

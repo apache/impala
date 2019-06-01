@@ -28,9 +28,9 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h" // for TUniqueId
-#include "util/collection-metrics.h"
 #include "util/condition-variable.h"
 #include "util/mem-range.h"
+#include "util/metrics-fwd.h"
 #include "util/openssl-util.h"
 #include "util/runtime-profile.h"
 #include "util/spinlock.h"

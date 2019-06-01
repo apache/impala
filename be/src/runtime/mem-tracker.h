@@ -32,7 +32,7 @@
 #include "runtime/mem-tracker-types.h"
 #include "util/debug-util.h"
 #include "util/internal-queue.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
@@ -262,12 +262,7 @@ class MemTracker {
   /// limit is exceeded after calling the GC functions. Returns false if there is no limit
   /// or consumption is under the limit.
   bool LimitExceeded(MemLimit mode) {
-    if (UNLIKELY(CheckLimitExceeded(mode))) {
-      if (mode == MemLimit::HARD && bytes_over_limit_metric_ != nullptr) {
-        bytes_over_limit_metric_->SetValue(consumption() - limit_);
-      }
-      return GcMemory(GetLimit(mode));
-    }
+    if (UNLIKELY(CheckLimitExceeded(mode))) return LimitExceededSlow(mode);
     return false;
   }
 
@@ -278,10 +273,7 @@ class MemTracker {
 
   /// Refresh the memory consumption value from the consumption metric. Only valid to
   /// call if this tracker has a consumption metric.
-  void RefreshConsumptionFromMetric() {
-    DCHECK(consumption_metric_ != nullptr);
-    consumption_->Set(consumption_metric_->GetValue());
-  }
+  void RefreshConsumptionFromMetric();
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
@@ -376,6 +368,9 @@ class MemTracker {
     int64_t limit = GetLimit(mode);
     return limit >= 0 && limit < consumption();
   }
+
+  /// Slow path for LimitExceeded().
+  bool LimitExceededSlow(MemLimit mode);
 
   /// If consumption is higher than max_consumption, attempts to free memory by calling
   /// any added GC functions.  Returns true if max_consumption is still exceeded. Takes

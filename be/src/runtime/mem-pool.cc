@@ -18,7 +18,6 @@
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "util/bit-util.h"
-#include "util/impalad-metrics.h"
 
 #include <algorithm>
 #include <stdio.h>

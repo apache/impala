@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_METRICS_H
-#define IMPALA_UTIL_METRICS_H
+#pragma once
 
 #include <map>
 #include <sstream>
@@ -34,12 +33,10 @@
 #include "common/status.h"
 #include "util/debug-util.h"
 #include "util/json-util.h"
+#include "util/metrics-fwd.h"
 #include "util/pretty-printer.h"
 #include "util/spinlock.h"
 #include "util/webserver.h"
-
-#include "gen-cpp/MetricDefs_types.h"
-#include "gen-cpp/MetricDefs_constants.h"
 
 namespace impala {
 
@@ -267,10 +264,6 @@ class LockedMetric : public ScalarMetric<T, metric_kind_t> {
   T value_;
 };
 
-typedef class LockedMetric<bool, TMetricKind::PROPERTY> BooleanProperty;
-typedef class LockedMetric<std::string,TMetricKind::PROPERTY> StringProperty;
-typedef class LockedMetric<double, TMetricKind::GAUGE> DoubleGauge;
-
 /// An implementation of 'gauge' or 'counter' metric kind. The metric can be incremented
 /// atomically via the Increment() interface.
 template<TMetricKind::type metric_kind_t>
@@ -303,10 +296,6 @@ class AtomicMetric : public ScalarMetric<int64_t, metric_kind_t> {
   /// The current value of the metric.
   AtomicInt64 value_;
 };
-
-/// We write 'Int' as a placeholder for all integer types.
-typedef class AtomicMetric<TMetricKind::GAUGE> IntGauge;
-typedef class AtomicMetric<TMetricKind::COUNTER> IntCounter;
 
 /// An AtomicMetric that keeps track of the highest value seen and the current value.
 ///
@@ -559,5 +548,3 @@ class MetricGroup {
 TMetricDef MakeTMetricDef(const std::string& key, TMetricKind::type kind,
     TUnit::type unit);
 }
-
-#endif // IMPALA_UTIL_METRICS_H

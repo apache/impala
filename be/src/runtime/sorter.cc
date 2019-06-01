@@ -27,6 +27,7 @@
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
+#include "util/pretty-printer.h"
 #include "util/ubsan.h"
 
 #include "common/names.h"

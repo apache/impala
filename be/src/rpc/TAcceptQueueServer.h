@@ -29,7 +29,7 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 
 namespace apache {
 namespace thrift {
@@ -75,7 +75,7 @@ class TAcceptQueueServer : public TServer {
 
   // New - Adds a metric for the size of the queue of connections waiting to be setup to
   // the provided MetricGroup, prefixing its key with key_prefix.
-  void InitMetrics(impala::MetricGroup* metrics, const string& key_prefix);
+  void InitMetrics(impala::MetricGroup* metrics, const std::string& key_prefix);
 
  protected:
   void init();

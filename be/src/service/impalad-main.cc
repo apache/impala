@@ -44,7 +44,6 @@
 #include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "util/impalad-metrics.h"
 #include "util/thread.h"
 
 #include "common/names.h"

@@ -42,7 +42,7 @@
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"
 #include "util/collection-metrics.h"
-#include "util/metrics.h"
+#include "util/metrics-fwd.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 

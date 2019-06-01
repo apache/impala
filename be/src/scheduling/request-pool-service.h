@@ -22,7 +22,7 @@
 
 #include "gen-cpp/ImpalaInternalService.h"
 #include "common/status.h"
-#include "util/collection-metrics.h"
+#include "util/metrics-fwd.h"
 
 namespace impala {
 

@@ -37,6 +37,7 @@
 #include "util/counting-barrier.h"
 #include "util/error-util-internal.h"
 #include "util/network-util.h"
+#include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
 #include "util/uid-util.h"
 

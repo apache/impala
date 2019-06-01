@@ -34,8 +34,11 @@
 #include "rpc/thrift-util.h"
 #include "statestore/statestore-service-client-wrapper.h"
 #include "util/container-util.h"
+#include "util/collection-metrics.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 #include "util/openssl-util.h"
+#include "util/collection-metrics.h"
 #include "util/time.h"
 
 #include "common/names.h"

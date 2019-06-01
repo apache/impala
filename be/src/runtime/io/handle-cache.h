@@ -28,7 +28,6 @@
 #include "common/hdfs.h"
 #include "common/status.h"
 #include "util/aligned-new.h"
-#include "util/impalad-metrics.h"
 #include "util/spinlock.h"
 #include "util/thread.h"
 

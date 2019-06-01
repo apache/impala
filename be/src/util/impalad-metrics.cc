@@ -18,7 +18,9 @@
 #include "util/impalad-metrics.h"
 
 #include "util/debug-util.h"
+#include "util/collection-metrics.h"
 #include "util/histogram-metric.h"
+#include "util/metrics.h"
 
 #include "common/names.h"
 

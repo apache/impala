@@ -35,6 +35,7 @@
 #include "service/data-stream-service.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"

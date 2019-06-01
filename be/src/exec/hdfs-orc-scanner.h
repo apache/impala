@@ -19,6 +19,8 @@
 #ifndef IMPALA_EXEC_HDFS_ORC_SCANNER_H
 #define IMPALA_EXEC_HDFS_ORC_SCANNER_H
 
+#include <stack>
+
 #include <orc/OrcFile.hh>
 
 #include "runtime/exec-env.h"

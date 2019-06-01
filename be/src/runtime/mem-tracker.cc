@@ -27,6 +27,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
+#include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/test-info.h"
 #include "util/uid-util.h"
@@ -164,6 +165,11 @@ int64_t MemTracker::SpareCapacity(MemLimit mode) const {
     result = std::min(result, mem_left);
   }
   return result;
+}
+
+void MemTracker::RefreshConsumptionFromMetric() {
+  DCHECK(consumption_metric_ != nullptr);
+  consumption_->Set(consumption_metric_->GetValue());
 }
 
 int64_t MemTracker::GetPoolMemReserved() {
@@ -451,6 +457,13 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
 
 void MemTracker::AddGcFunction(GcFunction f) {
   gc_functions_.push_back(f);
+}
+
+bool MemTracker::LimitExceededSlow(MemLimit mode) {
+  if (mode == MemLimit::HARD && bytes_over_limit_metric_ != nullptr) {
+    bytes_over_limit_metric_->SetValue(consumption() - limit_);
+  }
+  return GcMemory(GetLimit(mode));
 }
 
 bool MemTracker::GcMemory(int64_t max_consumption) {

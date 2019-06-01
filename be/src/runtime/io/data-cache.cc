@@ -35,6 +35,7 @@
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
 #include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"

@@ -29,7 +29,6 @@
 #include "service/query-options.h"
 #include "service/query-result-set.h"
 #include "util/auth-util.h"
-#include "util/impalad-metrics.h"
 #include "util/webserver.h"
 #include "util/runtime-profile.h"
 #include "util/runtime-profile-counters.h"

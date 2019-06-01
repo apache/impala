@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <stack>
 
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
@@ -36,6 +37,7 @@
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "util/dict-encoding.h"
+#include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
 
 #include "common/names.h"

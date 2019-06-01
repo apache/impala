@@ -17,6 +17,7 @@
 
 #include "exec/scan-node.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 
 #include "exprs/scalar-expr.h"
@@ -28,6 +29,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
 #include "util/disk-info.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
