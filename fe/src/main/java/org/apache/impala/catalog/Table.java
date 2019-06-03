@@ -39,6 +39,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -327,7 +328,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     CatalogInterners.internFieldsInPlace(msTbl);
     Table table = null;
     // Create a table of appropriate type
-    if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
+    if (MetadataOp.TABLE_TYPE_VIEW.equals(
+          MetastoreShim.mapToInternalTableType(msTbl.getTableType()))) {
       table = new View(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (HBaseTable.isHBaseTable(msTbl)) {
       table = new HBaseTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());

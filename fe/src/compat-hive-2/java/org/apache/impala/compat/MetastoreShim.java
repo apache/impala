@@ -159,6 +159,30 @@ public class MetastoreShim {
           .put("INDEX_TABLE", TABLE_TYPE_TABLE)
           .put("VIRTUAL_VIEW", TABLE_TYPE_VIEW).build();
 
+  public static String mapToInternalTableType(String typeStr) {
+    String defaultTableType = TABLE_TYPE_TABLE;
+
+    TableType tType;
+
+    if (typeStr == null) return defaultTableType;
+    try {
+      tType = TableType.valueOf(typeStr.toUpperCase());
+    } catch (Exception e) {
+      return defaultTableType;
+    }
+    switch (tType) {
+      case EXTERNAL_TABLE:
+      case MANAGED_TABLE:
+      case INDEX_TABLE:
+        return TABLE_TYPE_TABLE;
+      case VIRTUAL_VIEW:
+        return TABLE_TYPE_VIEW;
+      default:
+        return defaultTableType;
+    }
+
+  }
+
   /**
    * Wrapper method which returns ExtendedJSONMessageFactory in case Impala is
    * building against Hive-2 to keep compatibility with Sentry

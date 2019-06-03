@@ -615,6 +615,25 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalyzesOk("show column stats functional.insert_only_transactional_table");
   }
 
+  @Test
+  public void TestAnalyzeMaterializedView() {
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() > 2);
+    AnalysisError("alter table functional.materialized_view " +
+        "set tblproperties ('foo'='bar')",
+      "ALTER TABLE not allowed on a " +
+      "view: functional.materialized_view");
+
+    AnalysisError("insert into table functional.materialized_view " +
+        "select * from functional.insert_only_transactional_table",
+      "Impala does not support INSERTing into views:" +
+        " functional.materialized_view");
+
+    AnalysisError("drop table functional.materialized_view ",
+      "DROP TABLE not allowed on a view: functional.materialized_view");
+
+    AnalyzesOk("Select * from functional.materialized_view");
+  }
+
   private Function createFunction(boolean hasVarArgs, Type... args) {
     return new Function(new FunctionName("test"), args, Type.INVALID, hasVarArgs);
   }

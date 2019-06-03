@@ -2152,6 +2152,16 @@ TBLPROPERTIES('transactional'='true');
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+materialized_view
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE_HIVE
+CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+  AS SELECT * FROM {db_name}{db_suffix}.insert_only_transactional_table;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 testescape_16_lf
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
