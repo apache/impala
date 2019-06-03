@@ -283,7 +283,7 @@ class ImpylaHS2Connection(ImpalaConnection):
       self.__cursor.close()
     except Exception, e:
       # The session may no longer be valid if the impalad was restarted during the test.
-      LOG.exception(e)
+      pass
     self.__impyla_conn.close()
 
   def close_query(self, operation_handle):
