@@ -246,13 +246,15 @@ do
     fi
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
 
-    # Run the FE custom cluster tests.
-    pushd "${IMPALA_FE_DIR}"
-    MVN_ARGS=" -Dtest=org.apache.impala.custom*.*Test "
-    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ${MVN_ARGS}; then
-      TEST_RET_CODE=1
+    # Run the FE custom cluster tests only if not running against S3.
+    if [[ "$FE_TEST" == true && "${TARGET_FILESYSTEM}" != "s3" ]]; then
+      pushd "${IMPALA_FE_DIR}"
+      MVN_ARGS=" -Dtest=org.apache.impala.custom*.*Test "
+      if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ${MVN_ARGS}; then
+        TEST_RET_CODE=1
+      fi
+      popd
     fi
-    popd
   fi
 
   # Run the process failure tests.
