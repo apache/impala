@@ -103,7 +103,7 @@ public class ImpalaJdbcClient {
     // Make sure the driver can be found, throws a ClassNotFoundException if
     // it is not available.
     Class.forName(driverName_);
-    conn_ = DriverManager.getConnection(connString_, "", "");
+    conn_ = DriverManager.getConnection(connString_);
     stmt_ = conn_.createStatement();
   }
 
@@ -145,17 +145,20 @@ public class ImpalaJdbcClient {
     return stmt_;
   }
 
+  public static ImpalaJdbcClient createClient(String driver, String connString) {
+    return new ImpalaJdbcClient(driver, connString);
+  }
+
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {
-    return new ImpalaJdbcClient(
-        HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("binary"));
+    return createClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("binary"));
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {
-    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, connString);
+    return createClient(HIVE_SERVER2_DRIVER_NAME, connString);
   }
 
   public static ImpalaJdbcClient createHttpClientUsingHiveJdbcDriver() {
-    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("http"));
+    return createClient(HIVE_SERVER2_DRIVER_NAME, getNoAuthConnectionStr("http"));
   }
 
   public static String getNoAuthConnectionStr(String connType) {
@@ -183,10 +186,12 @@ public class ImpalaJdbcClient {
   private static class ClientExecOptions {
     private final String connStr;
     private final String query;
+    private final String driver;
 
-    public ClientExecOptions(String connStr, String query) {
+    public ClientExecOptions(String connStr, String query, String driver) {
       this.connStr = connStr;
       this.query = query;
+      this.driver = driver;
     }
 
     public String getQuery() {
@@ -195,6 +200,10 @@ public class ImpalaJdbcClient {
 
     public String getConnStr() {
       return connStr;
+    }
+
+    public String getDriver() {
+      return driver;
     }
   }
 
@@ -208,6 +217,7 @@ public class ImpalaJdbcClient {
         "Full connection string to use. Overrides host/port value");
     options.addOption("t", true, "SASL/NOSASL, whether to use SASL transport or not");
     options.addOption("q", true, "Query String");
+    options.addOption("d", true, "Driver name, default: org.apache.hive.jdbc.HiveDriver");
     options.addOption("help", false, "Help");
 
     BasicParser optionParser = new BasicParser();
@@ -235,12 +245,12 @@ public class ImpalaJdbcClient {
     if (connStr == null) {
       String hostPort = cmdArgs.getOptionValue("i", "localhost:21050");
       connStr = "jdbc:hive2://" + hostPort + "/";
-    }
-    // Append appropriate auth option to connection string.
-    if (useSasl) {
-      connStr = connStr + SASL_AUTH_SPEC;
-    } else {
-      connStr = connStr + NOSASL_AUTH_SPEC;
+      // Append appropriate auth option to connection string.
+      if (useSasl) {
+        connStr = connStr + SASL_AUTH_SPEC;
+      } else {
+        connStr = connStr + NOSASL_AUTH_SPEC;
+      }
     }
 
     String query = cmdArgs.getOptionValue("q");
@@ -250,7 +260,9 @@ public class ImpalaJdbcClient {
       System.exit(1);
     }
 
-    return new ClientExecOptions(connStr, query);
+    String driver = cmdArgs.getOptionValue("d", HIVE_SERVER2_DRIVER_NAME);
+
+    return new ClientExecOptions(connStr, query, driver);
   }
 
   private static String formatColumnValue(String colVal, String columnType)
@@ -338,7 +350,7 @@ public class ImpalaJdbcClient {
     ClientExecOptions execOptions = parseOptions(args);
 
     ImpalaJdbcClient client =
-      ImpalaJdbcClient.createClientUsingHiveJdbcDriver(execOptions.getConnStr());
+      ImpalaJdbcClient.createClient(execOptions.getDriver(), execOptions.getConnStr());
 
     try {
       client.connect();
