@@ -28,6 +28,7 @@
 #include "scheduling/scheduler.h"
 #include "util/bit-util.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"

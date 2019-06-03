@@ -38,7 +38,6 @@
 #include "service/query-options.h"
 #include "util/condition-variable.h"
 #include "util/container-util.h"
-#include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"

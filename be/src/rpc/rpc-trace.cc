@@ -24,6 +24,8 @@
 #include "common/logging.h"
 #include "rpc/rpc-mgr.h"
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
+#include "util/pretty-printer.h"
 #include "util/time.h"
 #include "util/webserver.h"
 

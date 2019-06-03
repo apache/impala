@@ -17,6 +17,8 @@
 
 #include "runtime/runtime-filter-bank.h"
 
+#include <boost/algorithm/string/join.hpp>
+
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/client-cache.h"
@@ -32,6 +34,7 @@
 #include "util/bit-util.h"
 #include "util/bloom-filter.h"
 #include "util/min-max-filter.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 

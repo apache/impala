@@ -19,22 +19,20 @@
 
 #include <map>
 #include <sstream>
-#include <stack>
 #include <string>
 #include <vector>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
+#include <rapidjson/fwd.h>
 
 #include "common/atomic.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "util/debug-util.h"
-#include "util/json-util.h"
 #include "util/metrics-fwd.h"
-#include "util/pretty-printer.h"
 #include "util/spinlock.h"
 #include "util/webserver.h"
 
@@ -132,26 +130,6 @@ class Metric {
   void AddStandardFields(rapidjson::Document* document, rapidjson::Value* val);
 };
 
-template <typename T>
-inline double ConvertToPrometheusSecs(const T& val, TUnit::type unit) {
-  double value = val;
-  if (unit == TUnit::type::TIME_MS) {
-    value /= 1000;
-  } else if (unit == TUnit::type::TIME_US) {
-    value /= 1000000;
-  } else if (unit == TUnit::type::TIME_NS) {
-    value /= 1000000000;
-  }
-  return value;
-}
-
-template <>
-inline double ConvertToPrometheusSecs<std::string>(
-    const std::string& val, TUnit::type unit) {
-  DCHECK(false) << "Should not be called for string metrics";
-  return 0.0;
-}
-
 /// A ScalarMetric has a value which is a simple primitive type: e.g. integers, strings
 /// and floats. It is parameterised not only by the type of its value, but by both the
 /// unit (e.g. bytes/s), drawn from TUnit and the 'kind' of the metric itself.
@@ -177,55 +155,14 @@ class ScalarMetric: public Metric {
   /// Returns the current value. Thread-safe.
   virtual T GetValue() = 0;
 
-  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) override {
-    rapidjson::Value container(rapidjson::kObjectType);
-    AddStandardFields(document, &container);
-
-    rapidjson::Value metric_value;
-    ToJsonValue(GetValue(), TUnit::NONE, document, &metric_value);
-    container.AddMember("value", metric_value, document->GetAllocator());
-
-    rapidjson::Value type_value(PrintThriftEnum(kind()).c_str(), document->GetAllocator());
-    container.AddMember("kind", type_value, document->GetAllocator());
-    rapidjson::Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
-    container.AddMember("units", units, document->GetAllocator());
-    *val = container;
-  }
+  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) override;
 
   virtual TMetricKind::type ToPrometheus(
-      std::string name, std::stringstream* val, std::stringstream* metric_kind) override {
-    std::string metric_type = PrintThriftEnum(kind()).c_str();
-    // prometheus doesn't support 'property', so ignore it
-    if (!metric_type.compare("property")) {
-      return TMetricKind::PROPERTY;
-    }
+      std::string name, std::stringstream* val, std::stringstream* metric_kind) override;
 
-    if (IsUnitTimeBased(unit())) {
-      // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
-      // this is because prometheus only supports time format in seconds
-      *val << ConvertToPrometheusSecs(GetValue(), unit());
-    } else {
-      *val << GetValue();
-    }
+  virtual std::string ToHumanReadable() override;
 
-    // convert metric type to lower case, that's what prometheus expects
-    std::transform(
-        metric_type.begin(), metric_type.end(), metric_type.begin(), ::tolower);
-
-    *metric_kind << "# TYPE " << name << " " << metric_type;
-    return kind();
-  }
-
-  virtual std::string ToHumanReadable() override {
-    return PrettyPrinter::Print(GetValue(), unit());
-  }
-
-  virtual void ToLegacyJson(rapidjson::Document* document) override {
-    rapidjson::Value val;
-    ToJsonValue(GetValue(), TUnit::NONE, document, &val);
-    rapidjson::Value key(key_.c_str(), document->GetAllocator());
-    document->AddMember(key, val, document->GetAllocator());
-  }
+  virtual void ToLegacyJson(rapidjson::Document* document) override;
 
   TUnit::type unit() const { return unit_; }
   TMetricKind::type kind() const { return metric_kind_t; }
@@ -465,19 +402,7 @@ class MetricGroup {
   /// Used for testing only.
   template <typename M>
   M* FindMetricForTesting(const std::string& key) {
-    std::stack<MetricGroup*> groups;
-    groups.push(this);
-    boost::lock_guard<SpinLock> l(lock_);
-    do {
-      MetricGroup* group = groups.top();
-      groups.pop();
-      MetricMap::const_iterator it = group->metric_map_.find(key);
-      if (it != group->metric_map_.end()) return reinterpret_cast<M*>(it->second);
-      for (const ChildGroupMap::value_type& child: group->children_) {
-        groups.push(child.second);
-      }
-    } while (!groups.empty());
-    return NULL;
+    return reinterpret_cast<M*>(FindMetricForTestingInternal(key));
   }
 
   /// Register page callbacks with the webserver. Only the root of any metric group
@@ -538,6 +463,9 @@ class MetricGroup {
   /// If args contains a paramater 'metric', only the json for that metric is returned.
   void CMCompatibleCallback(const Webserver::WebRequest& req,
       rapidjson::Document* document);
+
+  /// Non-templated implementation for FindMetricForTesting() that does not cast.
+  Metric* FindMetricForTestingInternal(const std::string& key);
 };
 
 
@@ -547,4 +475,16 @@ class MetricGroup {
 /// in special cases where the regular approach is unsuitable.
 TMetricDef MakeTMetricDef(const std::string& key, TMetricKind::type kind,
     TUnit::type unit);
+
+/// Helper to convert a value 'val' that is a time metric into fractional seconds
+/// (the only unit of time supported by Prometheus).
+template <typename T>
+double ConvertToPrometheusSecs(const T& val, TUnit::type unit);
+
+// These template classes are instantiated in the .cc file.
+extern template class LockedMetric<bool, TMetricKind::PROPERTY>;
+extern template class LockedMetric<std::string, TMetricKind::PROPERTY>;
+extern template class LockedMetric<double, TMetricKind::GAUGE>;
+extern template class AtomicMetric<TMetricKind::GAUGE>;
+extern template class AtomicMetric<TMetricKind::COUNTER>;
 }

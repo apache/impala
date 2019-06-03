@@ -18,6 +18,8 @@
 #include "util/metrics.h"
 
 #include <sstream>
+#include <stack>
+
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
@@ -28,6 +30,9 @@
 
 #include "common/logging.h"
 #include "util/impalad-metrics.h"
+#include "util/json-util.h"
+#include "util/pretty-printer.h"
+#include "util/webserver.h"
 
 #include "common/names.h"
 
@@ -45,8 +50,6 @@ void ToJsonValue<string>(const string& value, const TUnit::type unit,
   *out_val = val;
 }
 
-}
-
 void Metric::AddStandardFields(Document* document, Value* val) {
   Value name(key_.c_str(), document->GetAllocator());
   val->AddMember("name", name, document->GetAllocator());
@@ -54,6 +57,59 @@ void Metric::AddStandardFields(Document* document, Value* val) {
   val->AddMember("description", desc, document->GetAllocator());
   Value metric_value(ToHumanReadable().c_str(), document->GetAllocator());
   val->AddMember("human_readable", metric_value, document->GetAllocator());
+}
+
+template <typename T, TMetricKind::type metric_kind_t>
+void ScalarMetric<T, metric_kind_t>::ToJson(Document* document, Value* val) {
+  Value container(kObjectType);
+  AddStandardFields(document, &container);
+
+  Value metric_value;
+  ToJsonValue(GetValue(), TUnit::NONE, document, &metric_value);
+  container.AddMember("value", metric_value, document->GetAllocator());
+
+  Value type_value(PrintThriftEnum(kind()).c_str(), document->GetAllocator());
+  container.AddMember("kind", type_value, document->GetAllocator());
+  Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
+  container.AddMember("units", units, document->GetAllocator());
+  *val = container;
+}
+
+template <typename T, TMetricKind::type metric_kind_t>
+void ScalarMetric<T, metric_kind_t>::ToLegacyJson(Document* document) {
+  Value val;
+  ToJsonValue(GetValue(), TUnit::NONE, document, &val);
+  Value key(key_.c_str(), document->GetAllocator());
+  document->AddMember(key, val, document->GetAllocator());
+}
+
+template <typename T, TMetricKind::type metric_kind_t>
+TMetricKind::type ScalarMetric<T, metric_kind_t>::ToPrometheus(
+    string name, stringstream* val, stringstream* metric_kind) {
+  string metric_type = PrintThriftEnum(kind()).c_str();
+  // prometheus doesn't support 'property', so ignore it
+  if (!metric_type.compare("property")) {
+    return TMetricKind::PROPERTY;
+  }
+
+  if (IsUnitTimeBased(unit())) {
+    // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
+    // this is because prometheus only supports time format in seconds
+    *val << ConvertToPrometheusSecs(GetValue(), unit());
+  } else {
+    *val << GetValue();
+  }
+
+  // convert metric type to lower case, that's what prometheus expects
+  std::transform(metric_type.begin(), metric_type.end(), metric_type.begin(), ::tolower);
+
+  *metric_kind << "# TYPE " << name << " " << metric_type;
+  return kind();
+}
+
+template <typename T, TMetricKind::type metric_kind_t>
+string ScalarMetric<T, metric_kind_t>::ToHumanReadable() {
+  return PrettyPrinter::Print(GetValue(), unit());
 }
 
 MetricDefs* MetricDefs::GetInstance() {
@@ -268,6 +324,22 @@ MetricGroup* MetricGroup::FindChildGroup(const string& name) {
   return NULL;
 }
 
+Metric* MetricGroup::FindMetricForTestingInternal(const string& key) {
+  stack<MetricGroup*> groups;
+  groups.push(this);
+  lock_guard<SpinLock> l(lock_);
+  do {
+    MetricGroup* group = groups.top();
+    groups.pop();
+    auto it = group->metric_map_.find(key);
+    if (it != group->metric_map_.end()) return it->second;
+    for (const auto& child : group->children_) {
+      groups.push(child.second);
+    }
+  } while (!groups.empty());
+  return nullptr;
+}
+
 string MetricGroup::DebugString() {
   Webserver::WebRequest empty_req;
   Document document;
@@ -279,11 +351,45 @@ string MetricGroup::DebugString() {
   return strbuf.GetString();
 }
 
-TMetricDef impala::MakeTMetricDef(const string& key, TMetricKind::type kind,
-    TUnit::type unit) {
+TMetricDef MakeTMetricDef(const string& key, TMetricKind::type kind, TUnit::type unit) {
   TMetricDef ret;
   ret.__set_key(key);
   ret.__set_kind(kind);
   ret.__set_units(unit);
   return ret;
 }
+
+template <typename T>
+double ConvertToPrometheusSecs(const T& val, TUnit::type unit) {
+  double value = val;
+  if (unit == TUnit::type::TIME_MS) {
+    value /= 1000;
+  } else if (unit == TUnit::type::TIME_US) {
+    value /= 1000000;
+  } else if (unit == TUnit::type::TIME_NS) {
+    value /= 1000000000;
+  }
+  return value;
+}
+
+// Explicitly instantiate the variants that will be used.
+template double ConvertToPrometheusSecs<>(const double&, TUnit::type);
+template double ConvertToPrometheusSecs<>(const int64_t&, TUnit::type);
+template double ConvertToPrometheusSecs<>(const uint64_t&, TUnit::type);
+
+template <>
+double ConvertToPrometheusSecs<string>(const string& val, TUnit::type unit) {
+  DCHECK(false) << "Should not be called for string metrics";
+  return 0.0;
+}
+
+// Explicitly instantiate template classes with parameter combinations that will be used.
+// If these classes are instantiated with new parameters, the instantiation must be
+// added to this list. This is required because some methods of these classes are
+// defined in .cc files and are used from other translation units.
+template class LockedMetric<bool, TMetricKind::PROPERTY>;
+template class LockedMetric<std::string, TMetricKind::PROPERTY>;
+template class LockedMetric<double, TMetricKind::GAUGE>;
+template class AtomicMetric<TMetricKind::GAUGE>;
+template class AtomicMetric<TMetricKind::COUNTER>;
+} // namespace impala

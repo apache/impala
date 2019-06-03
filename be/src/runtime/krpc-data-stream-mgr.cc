@@ -27,8 +27,8 @@
 
 #include "exec/kudu-util.h"
 #include "runtime/exec-env.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/krpc-data-stream-recvr.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -37,6 +37,7 @@
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/periodic-counter-updater.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 

@@ -41,6 +41,7 @@
 #include "util/hash-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"

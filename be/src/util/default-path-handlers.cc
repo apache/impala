@@ -38,6 +38,7 @@
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/pprof-path-handlers.h"
+#include "util/pretty-printer.h"
 #include "util/process-state-info.h"
 
 #include "common/names.h"

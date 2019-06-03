@@ -25,6 +25,7 @@
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
+#include "util/metrics.h"
 
 // Access the flags that are defined in RequestPoolService.
 DECLARE_string(fair_scheduler_allocation_path);

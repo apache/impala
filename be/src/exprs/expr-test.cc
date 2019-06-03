@@ -21,6 +21,7 @@
 #include <map>
 #include <string>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
@@ -64,6 +65,7 @@
 #include "udf/udf-test-harness.h"
 #include "util/asan.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 #include "util/string-parser.h"
 #include "util/string-util.h"
 #include "util/test-info.h"

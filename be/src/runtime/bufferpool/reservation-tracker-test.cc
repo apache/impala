@@ -27,6 +27,7 @@
 #include "common/object-pool.h"
 #include "runtime/mem-tracker.h"
 #include "util/memory-metrics.h"
+#include "util/pretty-printer.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"

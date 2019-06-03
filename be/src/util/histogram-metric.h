@@ -15,14 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_HISTOGRAM_METRIC
-#define IMPALA_UTIL_HISTOGRAM_METRIC
+#pragma once
 
 #include "util/hdr-histogram.h"
 #include "util/metrics.h"
 #include "util/spinlock.h"
 
 namespace impala {
+
+class HdrHistogram;
 
 /// Metric which constructs (using HdrHistogram) a histogram of a set of values.
 /// Thread-safe: histogram access protected by a spin lock.
@@ -31,122 +32,13 @@ class HistogramMetric : public Metric {
   /// Constructs a new histogram metric. `highest_trackable_value` is the maximum value
   /// that may be entered into the histogram. `num_significant_digits` is the precision
   /// that values must be stored with.
-  HistogramMetric(
-      const TMetricDef& def, uint64_t highest_trackable_value, int num_significant_digits)
-    : Metric(def),
-      histogram_(new HdrHistogram(highest_trackable_value, num_significant_digits)),
-      unit_(def.units) {
-    DCHECK_EQ(TMetricKind::HISTOGRAM, def.kind);
-  }
+  HistogramMetric(const TMetricDef& def, uint64_t highest_trackable_value,
+      int num_significant_digits);
 
-  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) override {
-    rapidjson::Value container(rapidjson::kObjectType);
-    AddStandardFields(document, &container);
-
-    {
-      boost::lock_guard<SpinLock> l(lock_);
-
-      container.AddMember(
-          "25th %-ile", histogram_->ValueAtPercentile(25), document->GetAllocator());
-      container.AddMember(
-          "50th %-ile", histogram_->ValueAtPercentile(50), document->GetAllocator());
-      container.AddMember(
-          "75th %-ile", histogram_->ValueAtPercentile(75), document->GetAllocator());
-      container.AddMember(
-          "90th %-ile", histogram_->ValueAtPercentile(90), document->GetAllocator());
-      container.AddMember(
-          "95th %-ile", histogram_->ValueAtPercentile(95), document->GetAllocator());
-      container.AddMember(
-          "99.9th %-ile", histogram_->ValueAtPercentile(99.9), document->GetAllocator());
-      container.AddMember("max", histogram_->MaxValue(), document->GetAllocator());
-      container.AddMember("min", histogram_->MinValue(), document->GetAllocator());
-      container.AddMember("count", histogram_->TotalCount(), document->GetAllocator());
-    }
-    rapidjson::Value type_value(PrintThriftEnum(TMetricKind::HISTOGRAM).c_str(),
-        document->GetAllocator());
-    container.AddMember("kind", type_value, document->GetAllocator());
-    rapidjson::Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
-    container.AddMember("units", units, document->GetAllocator());
-
-    *value = container;
-  }
+  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) override;
 
   virtual TMetricKind::type ToPrometheus(std::string name, std::stringstream* value,
-      std::stringstream* metric_kind) override {
-    {
-      boost::lock_guard<SpinLock> l(lock_);
-
-      // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
-      // this is because prometheus only supports time format in seconds
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.2\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(25), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.2\"} " << histogram_->ValueAtPercentile(25) << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.5\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(50), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.5\"} " << histogram_->ValueAtPercentile(50) << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.7\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(75), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.7\"} " << histogram_->ValueAtPercentile(75) << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.9\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(90), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.9\"} " << histogram_->ValueAtPercentile(90) << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.95\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(95), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.95\"} " << histogram_->ValueAtPercentile(95) << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "{le=\"0.999\"} "
-               << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(99.9), unit_)
-               << "\n";
-      } else {
-        *value << name << "{le=\"0.999\"} " << histogram_->ValueAtPercentile(99.9)
-               << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "_max "
-               << ConvertToPrometheusSecs(histogram_->MaxValue(), unit_) << "\n";
-      } else {
-        *value << name << "_max " << histogram_->MaxValue() << "\n";
-      }
-
-      if (IsUnitTimeBased(unit_)) {
-        *value << name << "_min "
-               << ConvertToPrometheusSecs(histogram_->MinValue(), unit_) << "\n";
-      } else {
-        *value << name << "_min " << histogram_->MinValue() << "\n";
-      }
-
-      *value << name << "_count " << histogram_->TotalCount();
-    }
-
-    *metric_kind << "# TYPE " << name << " histogram";
-    return TMetricKind::HISTOGRAM;
-  }
+      std::stringstream* metric_kind) override;
 
   void Update(int64_t val) {
     boost::lock_guard<SpinLock> l(lock_);
@@ -154,46 +46,19 @@ class HistogramMetric : public Metric {
   }
 
   /// Reset the histogram by removing all previous entries.
-  void Reset() {
-    boost::lock_guard<SpinLock> l(lock_);
-    uint64_t highest = histogram_->highest_trackable_value();
-    int digits = histogram_->num_significant_digits();
-    histogram_.reset(new HdrHistogram(highest, digits));
-  }
+  void Reset();
 
   virtual void ToLegacyJson(rapidjson::Document*) override {}
 
   const TUnit::type& unit() const { return unit_; }
 
-  virtual std::string ToHumanReadable() override {
-    boost::lock_guard<SpinLock> l(lock_);
-    return HistogramToHumanReadable(histogram_.get(), unit_);
-  }
+  virtual std::string ToHumanReadable() override;
 
   /// Render a HdrHistogram into a human readable string representation. The histogram
   /// type is a template parameter so that it accepts both Impala's and Kudu's
   /// HdrHistogram classes.
   template <class T>
-  static std::string HistogramToHumanReadable(T* histogram, TUnit::type unit) {
-    DCHECK(histogram != nullptr);
-    std::stringstream out;
-    out << "Count: " << histogram->TotalCount() << ", "
-        << "min / max: " << PrettyPrinter::Print(histogram->MinValue(), unit)
-        << " / " << PrettyPrinter::Print(histogram->MaxValue(), unit) << ", "
-        << "25th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(25), unit) << ", "
-        << "50th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(50), unit) << ", "
-        << "75th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(75), unit) << ", "
-        << "90th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(90), unit) << ", "
-        << "95th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(95), unit) << ", "
-        << "99.9th %-ile: "
-        << PrettyPrinter::Print(histogram->ValueAtPercentile(99.9), unit);
-    return out.str();
-  }
+  static std::string HistogramToHumanReadable(T* histogram, TUnit::type unit);
 
  private:
   /// Protects histogram_ pointer itself.
@@ -203,7 +68,4 @@ class HistogramMetric : public Metric {
 
   DISALLOW_COPY_AND_ASSIGN(HistogramMetric);
 };
-
 }
-
-#endif

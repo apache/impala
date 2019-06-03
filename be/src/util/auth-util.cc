@@ -15,8 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "service/client-request-state.h"
 #include "util/auth-util.h"
+
+#include <boost/algorithm/string.hpp>
+
+#include "service/client-request-state.h"
 #include "util/network-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 

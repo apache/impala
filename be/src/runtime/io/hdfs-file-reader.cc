@@ -26,6 +26,7 @@
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
+#include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
 
 #include "common/names.h"

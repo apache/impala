@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_CLIENT_REQUEST_STATE_H
-#define IMPALA_SERVICE_CLIENT_REQUEST_STATE_H
+#pragma once
 
 #include "common/atomic.h"
+#include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
 #include "runtime/timestamp-value.h"
@@ -526,4 +526,3 @@ class ClientRequestState {
 };
 
 }
-#endif

@@ -38,6 +38,7 @@ add_library(Util
   cgroup-util.cc
   coding-util.cc
   codec.cc
+  collection-metrics.cc
   common-metrics.cc
   compress.cc
   cpu-info.cc
@@ -54,6 +55,7 @@ add_library(Util
   hdfs-util.cc
   hdfs-bulk-ops.cc
   hdr-histogram.cc
+  histogram-metric.cc
   impalad-metrics.cc
   jni-util.cc
   logging-support.cc

@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef STATESTORE_STATESTORE_H
-#define STATESTORE_STATESTORE_H
+#pragma once
 
 #include <atomic>
 #include <cstdint>
@@ -41,7 +40,6 @@
 #include "statestore/failure-detector.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"
-#include "util/collection-metrics.h"
 #include "util/metrics-fwd.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
@@ -723,5 +721,3 @@ class Statestore : public CacheLineAligned {
 };
 
 } // namespace impala
-
-#endif

@@ -49,6 +49,7 @@
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
 #include "util/min-max-filter.h"
+#include "util/pretty-printer.h"
 #include "util/table-printer.h"
 
 #include "common/names.h"

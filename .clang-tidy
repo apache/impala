@@ -69,6 +69,7 @@ Checks: "-*,clang*,\
 -clang-diagnostic-unused-parameter,\
 -clang-diagnostic-used-but-marked-unused,\
 -clang-diagnostic-vla-extension,\
+-clang-diagnostic-weak-template-vtables,\
 -clang-diagnostic-weak-vtables"
 
 # Ignore warnings in gutil

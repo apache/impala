@@ -77,6 +77,7 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/parse-util.h"
+#include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"

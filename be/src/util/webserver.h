@@ -15,15 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_WEBSERVER_H
-#define IMPALA_UTIL_WEBSERVER_H
-
+#include <map>
+#include <string>
 #include <boost/function.hpp>
 #include <boost/thread/shared_mutex.hpp>
-#include <map>
-#include <rapidjson/document.h>
-#include <string>
+#include <rapidjson/fwd.h>
 
 #include "common/status.h"
 #include "kudu/util/web_callback_registry.h"
@@ -204,5 +202,3 @@ class Webserver {
 };
 
 }
-
-#endif // IMPALA_UTIL_WEBSERVER_H

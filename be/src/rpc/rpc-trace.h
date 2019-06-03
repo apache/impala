@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RPC_RPC_TRACE_H
-#define IMPALA_RPC_RPC_TRACE_H
+#pragma once
 
 #include "rpc/thrift-server.h"
-#include "util/histogram-metric.h"
+#include "util/metrics-fwd.h"
 #include "util/internal-queue.h"
 
 #include <thrift/TProcessor.h>
@@ -130,5 +129,3 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
 void InitRpcEventTracing(Webserver* webserver, RpcMgr* = nullptr);
 
 }
-
-#endif

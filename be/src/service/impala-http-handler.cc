@@ -40,6 +40,7 @@
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/logging-support.h"
+#include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/time.h"

@@ -232,9 +232,9 @@ TEST_F(MetricsTest, StatsMetrics) {
 
 TEST_F(MetricsTest, StatsMetricsSingle) {
   MetricGroup metrics("StatsMetrics");
-  StatsMetric<int, StatsType::MAX | StatsType::MEAN>*
+  StatsMetric<uint64_t, StatsType::MAX | StatsType::MEAN>*
       stats_metric =
-      StatsMetric<int, StatsType::MAX | StatsType::MEAN>::CreateAndRegister(&metrics,
+      StatsMetric<uint64_t, StatsType::MAX | StatsType::MEAN>::CreateAndRegister(&metrics,
           "impala-server.io.mgr.cached-file-handles-hit-ratio");
   EXPECT_EQ(stats_metric->ToHumanReadable(), "");
   stats_metric->Update(3);

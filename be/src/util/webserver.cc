@@ -17,20 +17,21 @@
 
 #include "util/webserver.h"
 
+#include <signal.h>
+#include <stdio.h>
+#include <fstream>
+#include <map>
+#include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/thread/locks.hpp>
-#include <fstream>
 #include <gutil/strings/substitute.h>
-#include <map>
-#include <stdio.h>
-#include <signal.h>
-#include <string>
-#include <rapidjson/stringbuffer.h>
+#include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
+#include <rapidjson/stringbuffer.h>
 
 #include "common/logging.h"
 #include "rpc/thrift-util.h"
