@@ -28,6 +28,8 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TTableName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -35,6 +37,8 @@ import com.google.common.base.Preconditions;
  * Represents a DROP TABLE/VIEW [IF EXISTS] statement
  */
 public class DropTableOrViewStmt extends StatementBase {
+  private static final Logger LOG = LoggerFactory.getLogger(DropTableOrViewStmt.class);
+
   protected final TableName tableName_;
   protected final boolean ifExists_;
 
@@ -99,6 +103,9 @@ public class DropTableOrViewStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
+    // Set the servername here if authorization is enabled because analyzer_ is not
+    // available in the toThrift() method.
+    serverName_ = analyzer.getServerName();
     try {
       FeTable table = analyzer.getTable(tableName_, /* add access event */ true,
           /* add column-level privilege */ false, Privilege.DROP);
@@ -112,10 +119,6 @@ public class DropTableOrViewStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
-      // Set the servername here if authorization is enabled because analyzer_ is not
-      // available in the toThrift() method.
-      serverName_ = analyzer.getServerName();
-
     } catch (TableLoadingException e) {
       // We should still try to DROP tables that failed to load, so that tables that are
       // in a bad state, eg. deleted externally from Kudu, can be dropped.
@@ -125,8 +128,10 @@ public class DropTableOrViewStmt extends StatementBase {
       analyzer.addAccessEvent(new TAccessEvent(
           analyzer.getFqTableName(tableName_).toString(), TCatalogObjectType.TABLE,
           Privilege.DROP.toString()));
+      LOG.info("Ignoring TableLoadingException for {}", tableName_);
     } catch (AnalysisException e) {
       if (!ifExists_) throw e;
+      LOG.info("Ignoring AnalysisException for {}", tableName_);
     }
   }
 
