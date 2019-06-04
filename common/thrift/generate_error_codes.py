@@ -414,6 +414,8 @@ error_codes = (
 
   ("UNAUTHORIZED_SESSION_USER", 136,
    "The user authorized on the connection '$0' does not match the session username '$1'"),
+
+  ("ZSTD_ERROR", 137, "$0 failed with error: $1"),
 )
 
 import sys

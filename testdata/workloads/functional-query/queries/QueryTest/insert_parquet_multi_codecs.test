@@ -1,0 +1,42 @@
+====
+---- QUERY
+create table t1_default (c1 tinyint, c2 smallint, c3 int, c4 bigint, c5 boolean, c6 float,
+  c7 real, c8 double, c9 decimal(20,15), c10 timestamp, c11 char(10),
+  c13 varchar(20), c14 string) stored as parquet;
+====
+---- QUERY
+create table t1_zstd_gzip (c1 tinyint, c2 smallint, c3 int, c4 bigint, c5 boolean, c6 float,
+  c7 real, c8 double, c9 decimal(20,15), c10 timestamp, c11 char(10),
+  c13 varchar(20), c14 string) stored as parquet;
+====
+---- QUERY
+insert into t1_default select tinyint_col, smallint_col, id, bigint_col, bool_col,
+  float_col, double_col, double_col, cast(float_col as decimal(20,15)),
+  timestamp_col, cast(year as char(10)), cast(double_col as varchar(10)),
+  string_col from functional.alltypes;
+====
+---- QUERY
+insert into t1_default(c3) values (8000),(9000);
+====
+---- QUERY
+set COMPRESSION_CODEC=ZSTD;
+insert into t1_zstd_gzip select tinyint_col, smallint_col, id, bigint_col, bool_col,
+  float_col, double_col, double_col, cast(float_col as decimal(20,15)),
+  timestamp_col, cast(year as char(10)), cast(double_col as varchar(10)), string_col
+  from functional.alltypes where id < 4000;
+====
+---- QUERY
+set COMPRESSION_CODEC=GZIP;
+insert into t1_zstd_gzip(c3) values (9000);
+====
+---- QUERY
+set COMPRESSION_CODEC=GZIP;
+insert into t1_zstd_gzip select tinyint_col, smallint_col, id, bigint_col, bool_col,
+  float_col, double_col, double_col, cast(float_col as decimal(20,15)),
+  timestamp_col, cast(year as char(10)), cast(double_col as varchar(10)), string_col
+  from functional.alltypes where id >= 4000;
+====
+---- QUERY
+set COMPRESSION_CODEC=ZSTD;
+insert into t1_zstd_gzip(c3) values(8000);
+====

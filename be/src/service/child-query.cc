@@ -125,13 +125,27 @@ Status ChildQuery::ExecAndFetch() {
   return status;
 }
 
+template <typename T>
+void PrintQueryOptionValue (const T& option, stringstream& val) {
+  val << option;
+}
+
+void PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec,
+    stringstream& val) {
+  if (compression_codec.codec != THdfsCompression::ZSTD) {
+    val << compression_codec.codec;
+  } else {
+    val << compression_codec.codec << ":" << compression_codec.compression_level;
+  }
+}
+
 void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (parent_options.__isset.NAME) {\
     stringstream val;\
-    val << parent_options.NAME;\
+    PrintQueryOptionValue(parent_options.NAME, val);\
     conf[#ENUM] = val.str();\
   }
 #define REMOVED_QUERY_OPT_FN(NAME, ENUM)

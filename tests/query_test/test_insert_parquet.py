@@ -31,12 +31,13 @@ from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS,
     SkipIfADLS)
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (decode_stats_value,
     get_parquet_metadata_from_hdfs_folder)
 
-PARQUET_CODECS = ['none', 'snappy', 'gzip']
+PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd']
 
 
 class RoundFloat():
@@ -123,6 +124,35 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, unique_database, multiple_impalad=True)
+
+
+class TestParquetQueriesMultiCodecs(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetQueriesMultiCodecs, cls).add_test_dimensions()
+    # Fix the exec_option vector to have a single value.
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+        sync_ddl=[1]))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_insert_parquet_multi_codecs(self, vector, unique_database):
+    # Tests that parquet files are written/read correctly when using multiple codecs
+    self.run_test_case('QueryTest/insert_parquet_multi_codecs', vector, unique_database,
+        multiple_impalad=True)
+    base_table = "{0}.{1}".format(unique_database, "t1_default")
+    test_table = "{0}.{1}".format(unique_database, "t1_zstd_gzip")
+    # select all rows and compare the data in base_table and test_table
+    base_result = self.execute_query("select * from {0} order by c3".format(base_table))
+    test_result = self.execute_query("select * from {0} order by c3".format(test_table))
+    verify_query_result_is_equal(test_result.data, base_result.data)
 
 
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):

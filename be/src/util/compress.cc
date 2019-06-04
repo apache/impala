@@ -22,8 +22,10 @@
 #include <boost/crc.hpp>
 #include <gutil/strings/substitute.h>
 #undef DISALLOW_COPY_AND_ASSIGN // Snappy redefines this.
-#include <snappy.h>
 #include <lz4.h>
+#include <snappy.h>
+#include <zstd.h>
+#include <zstd_errors.h>
 
 #include "exec/read-write-util.h"
 #include "runtime/mem-pool.h"
@@ -316,5 +318,25 @@ Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_lengt
   }
   *output_length = LZ4_compress_default(reinterpret_cast<const char*>(input),
       reinterpret_cast<char*>(*output), input_length, *output_length);
+  return Status::OK();
+}
+
+ZstandardCompressor::ZstandardCompressor(MemPool* mem_pool, bool reuse_buffer, int clevel)
+  : Codec(mem_pool, reuse_buffer), clevel_(clevel) {}
+
+int64_t ZstandardCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
+  return ZSTD_compressBound(input_len);
+}
+
+Status ZstandardCompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
+    const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  DCHECK_GE(input_length, 0);
+  DCHECK(output_preallocated) << "Output was not allocated for Zstd Codec";
+  if (input_length == 0) return Status::OK();
+  *output_length = ZSTD_compress(*output, *output_length, input, input_length, clevel_);
+  if (ZSTD_isError(*output_length)) {
+    return Status(TErrorCode::ZSTD_ERROR, "ZSTD_compress",
+        ZSTD_getErrorString(ZSTD_getErrorCode(*output_length)));
+  }
   return Status::OK();
 }

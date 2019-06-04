@@ -476,7 +476,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   }
   if (partition_descriptor.file_format() == THdfsFileFormat::TEXT &&
       state->query_options().__isset.compression_codec &&
-      state->query_options().compression_codec != THdfsCompression::NONE) {
+      state->query_options().compression_codec.codec != THdfsCompression::NONE) {
     stringstream error_msg;
     error_msg << "Writing to compressed text table is not supported. ";
     return Status(error_msg.str());

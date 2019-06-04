@@ -283,7 +283,8 @@ Status ParquetMetadataUtils::ValidateRowGroupColumn(
   const auto codec = Ubsan::EnumToInt(&col_chunk_metadata.codec);
   if (codec != parquet::CompressionCodec::UNCOMPRESSED &&
       codec != parquet::CompressionCodec::SNAPPY &&
-      codec != parquet::CompressionCodec::GZIP) {
+      codec != parquet::CompressionCodec::GZIP &&
+      codec != parquet::CompressionCodec::ZSTD) {
     return Status(Substitute("File '$0' uses an unsupported compression: $1 for column "
         "'$2'.", filename, codec, schema_element.name));
   }

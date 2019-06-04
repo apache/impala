@@ -17,9 +17,11 @@
 
 #include "service/query-options.h"
 
+#include <zstd.h>
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 
+#include "gutil/strings/substitute.h"
 #include "runtime/runtime-filter.h"
 #include "testutil/gtest-util.h"
 #include "util/mem-info.h"
@@ -27,6 +29,7 @@
 using namespace boost;
 using namespace impala;
 using namespace std;
+using namespace strings;
 
 constexpr int32_t I32_MAX = numeric_limits<int32_t>::max();
 constexpr int64_t I64_MAX = numeric_limits<int64_t>::max();
@@ -209,9 +212,6 @@ TEST(QueryOptions, SetEnumOptions) {
       TParquetFallbackSchemaResolution, (POSITION, NAME)), true);
   TestEnumCase(options, CASE(parquet_array_resolution, TParquetArrayResolution,
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
-  TestEnumCase(options, CASE(compression_codec, THdfsCompression,
-      (NONE, DEFAULT, GZIP, DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB,
-          ZSTD)), true);
   TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,
       (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC)), true);
   TestEnumCase(options, CASE(runtime_filter_mode, TRuntimeFilterMode,
@@ -227,7 +227,7 @@ TEST(QueryOptions, SetEnumOptions) {
 TEST(QueryOptions, SetIntOptions) {
   TQueryOptions options;
   // List of pairs of Key and its valid range
-  pair<OptionDef<int32_t>, Range<int32_t>> case_set[] {
+  pair<OptionDef<int32_t>, Range<int32_t>> case_set[]{
       {MAKE_OPTIONDEF(runtime_filter_wait_time_ms),    {0, I32_MAX}},
       {MAKE_OPTIONDEF(mt_dop),                         {0, 64}},
       {MAKE_OPTIONDEF(disable_codegen_rows_threshold), {0, I32_MAX}},
@@ -462,4 +462,51 @@ TEST(QueryOptions, ResetToDefaultViaEmptyString) {
   }
 }
 
+TEST(QueryOptions, CompressionCodec) {
+#define ENTRY(_, prefix, entry) (prefix::entry),
+#define ENTRIES(prefix, name) BOOST_PP_SEQ_FOR_EACH(ENTRY, prefix, name)
+#define CASE(enumtype, enums) {ENTRIES(enumtype, BOOST_PP_TUPLE_TO_SEQ(enums))}
+  TQueryOptions options;
+  vector<THdfsCompression::type> codecs = CASE(THdfsCompression, (NONE, DEFAULT, GZIP,
+      DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB, ZSTD, BROTLI));
+  // Test valid values for compression_codec.
+  for (auto& codec : codecs) {
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0",codec), &options,
+        nullptr).ok());
+    // Test that compression level is only supported for ZSTD.
+    if (codec != THdfsCompression::ZSTD) {
+      EXPECT_FALSE(SetQueryOption("compression_codec", Substitute("$0:1",codec),
+        &options, nullptr).ok());
+    }
+    else {
+      EXPECT_TRUE(SetQueryOption("compression_codec",
+          Substitute("zstd:$0",ZSTD_CLEVEL_DEFAULT), &options, nullptr).ok());
+    }
+  }
+
+  // Test invalid values for compression_codec.
+  EXPECT_FALSE(SetQueryOption("compression_codec", Substitute("$0", codecs.back() + 1),
+      &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec", "foo", &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec", "1%", &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec", "-1", &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec", ":", &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec", ":1", &options, nullptr).ok());
+
+  // Test compression levels for ZSTD.
+  const int zstd_min_clevel = 1;
+  const int zstd_max_clevel = ZSTD_maxCLevel();
+  for (int i = zstd_min_clevel; i <= zstd_max_clevel; i++)
+  {
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("ZSTD:$0",i), &options,
+      nullptr).ok());
+  }
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("ZSTD:$0", zstd_min_clevel - 1), &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("ZSTD:$0", zstd_max_clevel + 1), &options, nullptr).ok());
+#undef CASE
+#undef ENTRIES
+#undef ENTRY
+}
 IMPALA_TEST_MAIN();

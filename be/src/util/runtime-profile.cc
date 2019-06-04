@@ -860,8 +860,8 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   // Compress the serialized thrift string.  This uses string keys and is very
   // easy to compress.
   scoped_ptr<Codec> compressor;
-  RETURN_IF_ERROR(
-      Codec::CreateCompressor(NULL, false, THdfsCompression::DEFAULT, &compressor));
+  Codec::CodecInfo codec_info(THdfsCompression::DEFAULT);
+  RETURN_IF_ERROR(Codec::CreateCompressor(NULL, false, codec_info, &compressor));
   const auto close_compressor =
       MakeScopeExitTrigger([&compressor]() { compressor->Close(); });
 

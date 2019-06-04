@@ -106,6 +106,7 @@ set_dep_root(LIBUNWIND)
 set_dep_root(LLVM)
 set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
 set_dep_root(LZ4)
+set_dep_root(ZSTD)
 set_dep_root(OPENLDAP)
 set_dep_root(PROTOBUF)
 set_dep_root(RE2)
@@ -283,6 +284,10 @@ IMPALA_ADD_THIRDPARTY_LIB(snappy ${SNAPPY_INCLUDE_DIR} ${SNAPPY_STATIC_LIB} "")
 # find lz4 lib
 find_package(Lz4 REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(lz4 ${LZ4_INCLUDE_DIR} ${LZ4_STATIC_LIB} "")
+
+# find zstd lib
+find_package(Zstd REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(zstd ${ZSTD_INCLUDE_DIR} ${ZSTD_STATIC_LIB} "")
 
 # find re2 headers and libs
 find_package(Re2 REQUIRED)

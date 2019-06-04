@@ -44,6 +44,8 @@ class Codec {
   static const char* const GZIP_COMPRESSION;
   static const char* const BZIP2_COMPRESSION;
   static const char* const SNAPPY_COMPRESSION;
+  static const char* const LZ4_COMPRESSION;
+  static const char* const ZSTD_COMPRESSION;
   static const char* const UNKNOWN_CODEC_ERROR;
 
   // Output buffer size for streaming compressed file.
@@ -52,6 +54,16 @@ class Codec {
   /// Map from codec string to compression format
   typedef std::map<const std::string, const THdfsCompression::type> CodecMap;
   static const CodecMap CODEC_MAP;
+
+  struct CodecInfo {
+   public:
+    CodecInfo(THdfsCompression::type format, int compression_level = 0)
+      : format_(format), compression_level_(compression_level) {}
+
+    THdfsCompression::type format_;
+    // Currently only ZSTD uses compression level.
+    int compression_level_;
+  };
 
   /// Create a decompressor.
   /// Input:
@@ -79,7 +91,7 @@ class Codec {
   /// Output:
   ///  compressor: scoped pointer to the compressor class to use.
   static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-      THdfsCompression::type format,
+      const CodecInfo& codec_info,
       boost::scoped_ptr<Codec>* compressor) WARN_UNUSED_RESULT;
 
   /// Alternate factory method: takes a codec string and populates a scoped pointer.

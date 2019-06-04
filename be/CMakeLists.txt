@@ -480,6 +480,7 @@ endif ()
 set (IMPALA_DEPENDENCIES
   snappy
   lz4
+  zstd
   re2
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}

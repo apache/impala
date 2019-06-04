@@ -342,8 +342,8 @@ Status TPrivilegeFromObjectName(const string& object_name, TPrivilege* privilege
 
 Status CompressCatalogObject(const uint8_t* src, uint32_t size, string* dst) {
   scoped_ptr<Codec> compressor;
-  RETURN_IF_ERROR(Codec::CreateCompressor(nullptr, false, THdfsCompression::LZ4,
-      &compressor));
+  Codec::CodecInfo codec_info(THdfsCompression::LZ4);
+  RETURN_IF_ERROR(Codec::CreateCompressor(nullptr, false, codec_info, &compressor));
   int64_t compressed_data_len = compressor->MaxOutputLen(size);
   int64_t output_buffer_len = compressed_data_len + sizeof(uint32_t);
   dst->resize(static_cast<size_t>(output_buffer_len));

@@ -44,7 +44,7 @@ namespace impala {
 
 // Generates num strings between min_len and max_len.
 // Outputs the uncompressed/compressed/sorted_compressed sizes.
-void TestCompression(int num, int min_len, int max_len, THdfsCompression::type codec) {
+void TestCompression(int num, int min_len, int max_len, THdfsCompression::type format) {
   vector<string> strings;
   uint8_t* buffer = (uint8_t*)malloc(max_len * num);
   int offset = 0;
@@ -69,7 +69,8 @@ void TestCompression(int num, int min_len, int max_len, THdfsCompression::type c
   }
 
   scoped_ptr<Codec> compressor;
-  Status status = Codec::CreateCompressor(NULL, false, codec, &compressor);
+  Codec::CodecInfo codec_info(format);
+  Status status = Codec::CreateCompressor(NULL, false, codec_info, &compressor);
   DCHECK(status.ok());
 
   int64_t compressed_len = compressor->MaxOutputLen(offset);
@@ -83,7 +84,7 @@ void TestCompression(int num, int min_len, int max_len, THdfsCompression::type c
         &sorted_compressed_len, &sorted_compressed_buffer));
 
   cout << "NumStrings=" << num << " MinLen=" << min_len << " MaxLen=" << max_len
-       << " Codec=" << codec << endl;
+       << " Codec=" << codec_info.format_ << endl;
   cout << "  Uncompressed len: " << offset << endl;
   cout << "  Compressed len: " << compressed_len << endl;
   cout << "  Sorted Compressed len: " << sorted_compressed_len << endl;

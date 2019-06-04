@@ -15,8 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <zstd.h>
 #include <iostream>
 
 #include "gen-cpp/Descriptors_types.h"
@@ -24,11 +25,15 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/decompress.h"
 #include "util/compress.h"
 #include "util/ubsan.h"
 
 #include "common/names.h"
+
+using std::mt19937;
+using std::uniform_int_distribution;
 
 namespace impala {
 
@@ -58,15 +63,16 @@ class DecompressorTest : public ::testing::Test {
     mem_pool_.FreeAll();
   }
 
-  void RunTest(THdfsCompression::type format) {
+  void RunTest(THdfsCompression::type format, int clevel = 0) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
 
-    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, format, &compressor));
+    Codec::CodecInfo codec_info(format, clevel);
+    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
     EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
-    // LZ4 is not implemented to work without an allocated output
-    if(format == THdfsCompression::LZ4) {
+    // LZ4 & ZSTD are not implemented to work without an allocated output
+    if (format == THdfsCompression::LZ4 || format == THdfsCompression::ZSTD) {
       CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
           sizeof(input_), input_);
       CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
@@ -97,7 +103,9 @@ class DecompressorTest : public ::testing::Test {
   void RunTestStreaming(THdfsCompression::type format) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
-    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, format, &compressor));
+    Codec::CodecInfo codec_info(format);
+
+    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
     EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
     CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
@@ -331,7 +339,8 @@ class DecompressorTest : public ::testing::Test {
     *compressed_len = 0;
 
     scoped_ptr<Codec> compressor;
-    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, format, &compressor));
+    Codec::CodecInfo codec_info(format);
+    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
 
     // Make sure we don't completely fill the buffer, leave at least RAW_INPUT_SIZE
     // bytes free in compressed buffer for junk data testing (Test case 3).
@@ -412,8 +421,8 @@ TEST_F(DecompressorTest, Impala1506) {
   MemTracker trax;
   MemPool pool(&trax);
   scoped_ptr<Codec> compressor;
-  EXPECT_OK(
-      Codec::CreateCompressor(&pool, true, impala::THdfsCompression::GZIP, &compressor));
+  Codec::CodecInfo codec_info(impala::THdfsCompression::GZIP);
+  EXPECT_OK(Codec::CreateCompressor(&pool, true, codec_info, &compressor));
 
   int64_t input_len = 3;
   const uint8_t input[3] = {1, 2, 3};
@@ -457,8 +466,8 @@ TEST_F(DecompressorTest, LZ4Huge) {
   for (int i = 0 ; i < payload_len; ++i) payload[i] = rand();
 
   scoped_ptr<Codec> compressor;
-  EXPECT_OK(Codec::CreateCompressor(nullptr, true, impala::THdfsCompression::LZ4,
-      &compressor));
+  Codec::CodecInfo codec_info(impala::THdfsCompression::LZ4);
+  EXPECT_OK(Codec::CreateCompressor(nullptr, true, codec_info, &compressor));
 
   // The returned max_size is 0 because the payload is too big.
   int64_t max_size = compressor->MaxOutputLen(payload_len);
@@ -472,6 +481,14 @@ TEST_F(DecompressorTest, LZ4Huge) {
       &compressed_len, &compressed_ptr), TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE);
 }
 
+TEST_F(DecompressorTest, ZSTD) {
+  RunTest(THdfsCompression::ZSTD, ZSTD_CLEVEL_DEFAULT);
+  mt19937 rng;
+  RandTestUtil::SeedRng("ZSTD_COMPRESSION_LEVEL_SEED", &rng);
+  // zstd supports compression levels from 1 up to ZSTD_maxCLevel()
+  const int clevel = uniform_int_distribution<int>(1, ZSTD_maxCLevel())(rng);
+  RunTest(THdfsCompression::ZSTD, clevel);
+}
 }
 
 int main(int argc, char **argv) {

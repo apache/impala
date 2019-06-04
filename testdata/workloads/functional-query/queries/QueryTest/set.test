@@ -94,7 +94,7 @@ Invalid query option: foo
 ---- QUERY
 set parquet_compression_codec=bar
 ---- CATCH
-Invalid compression codec: 'bar'. Valid values are NONE(0), DEFAULT(1), GZIP(2), DEFLATE(3), BZIP2(4), SNAPPY(5), SNAPPY_BLOCKED(6), LZO(7), LZ4(8), ZLIB(9), ZSTD(10).
+Invalid compression codec: 'bar'. Valid values are NONE(0), DEFAULT(1), GZIP(2), DEFLATE(3), BZIP2(4), SNAPPY(5), SNAPPY_BLOCKED(6), LZO(7), LZ4(8), ZLIB(9), ZSTD(10), BROTLI(11).
 ====
 ---- QUERY
 set explain_level=bar

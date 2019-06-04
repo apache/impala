@@ -34,6 +34,9 @@ const char* const Codec::DEFAULT_COMPRESSION =
 const char* const Codec::GZIP_COMPRESSION = "org.apache.hadoop.io.compress.GzipCodec";
 const char* const Codec::BZIP2_COMPRESSION = "org.apache.hadoop.io.compress.BZip2Codec";
 const char* const Codec::SNAPPY_COMPRESSION = "org.apache.hadoop.io.compress.SnappyCodec";
+const char* const Codec::LZ4_COMPRESSION = "org.apache.hadoop.io.compress.Lz4Codec";
+const char* const Codec::ZSTD_COMPRESSION =
+    "org.apache.hadoop.io.compress.ZStandardCodec";
 const char* const Codec::UNKNOWN_CODEC_ERROR =
     "This compression codec is currently unsupported: ";
 const char* const NO_LZO_MSG = "LZO codecs may not be created via the Codec interface. "
@@ -43,7 +46,9 @@ const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {DEFAULT_COMPRESSION, THdfsCompression::DEFAULT},
     {GZIP_COMPRESSION, THdfsCompression::GZIP},
     {BZIP2_COMPRESSION, THdfsCompression::BZIP2},
-    {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED}};
+    {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED},
+    {LZ4_COMPRESSION, THdfsCompression::LZ4},
+    {ZSTD_COMPRESSION, THdfsCompression::ZSTD}};
 
 string Codec::GetCodecName(THdfsCompression::type type) {
   for (const CodecMap::value_type& codec: g_CatalogObjects_constants.COMPRESSION_MAP) {
@@ -71,13 +76,15 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& code
     return Status(Substitute("$0$1", UNKNOWN_CODEC_ERROR, codec));
   }
 
-  RETURN_IF_ERROR(
-      CreateCompressor(mem_pool, reuse, type->second, compressor));
+  CodecInfo codec_info(
+      type->second, (type->second == THdfsCompression::ZSTD) ? ZSTD_CLEVEL_DEFAULT : 0);
+  RETURN_IF_ERROR(CreateCompressor(mem_pool, reuse, codec_info, compressor));
   return Status::OK();
 }
 
-Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
-    THdfsCompression::type format, scoped_ptr<Codec>* compressor) {
+Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& codec_info,
+    scoped_ptr<Codec>* compressor) {
+  THdfsCompression::type format = codec_info.format_;
   switch (format) {
     case THdfsCompression::NONE:
       compressor->reset(nullptr);
@@ -102,6 +109,10 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
       break;
     case THdfsCompression::LZ4:
       compressor->reset(new Lz4Compressor(mem_pool, reuse));
+      break;
+    case THdfsCompression::ZSTD:
+      compressor->reset(new ZstandardCompressor(mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);
@@ -148,6 +159,9 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
       break;
     case THdfsCompression::LZ4:
       decompressor->reset(new Lz4Decompressor(mem_pool, reuse));
+      break;
+    case THdfsCompression::ZSTD:
+      decompressor->reset(new ZstandardDecompressor(mem_pool, reuse));
       break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);

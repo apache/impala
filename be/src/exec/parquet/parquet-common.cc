@@ -24,8 +24,10 @@ const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::NONE,
   THdfsCompression::SNAPPY,
   THdfsCompression::GZIP,
-  THdfsCompression::LZO
-};
+  THdfsCompression::LZO,
+  THdfsCompression::BROTLI,
+  THdfsCompression::LZ4,
+  THdfsCompression::ZSTD};
 
 const int PARQUET_TO_IMPALA_CODEC_SIZE =
     sizeof(PARQUET_TO_IMPALA_CODEC) / sizeof(PARQUET_TO_IMPALA_CODEC[0]);
@@ -33,13 +35,18 @@ const int PARQUET_TO_IMPALA_CODEC_SIZE =
 /// Mapping of Impala codec enums to Parquet enums
 const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
   parquet::CompressionCodec::UNCOMPRESSED,
-  parquet::CompressionCodec::SNAPPY,  // DEFAULT
-  parquet::CompressionCodec::GZIP,    // GZIP
-  parquet::CompressionCodec::GZIP,    // DEFLATE
+  parquet::CompressionCodec::SNAPPY, // DEFAULT
+  parquet::CompressionCodec::GZIP,   // GZIP
+  parquet::CompressionCodec::GZIP,   // DEFLATE
+  // Placeholder for BZIP2 which isn't a valid parquet codec.
+  parquet::CompressionCodec::SNAPPY, // BZIP2
   parquet::CompressionCodec::SNAPPY,
-  parquet::CompressionCodec::SNAPPY,  // SNAPPY_BLOCKED
+  parquet::CompressionCodec::SNAPPY, // SNAPPY_BLOCKED
   parquet::CompressionCodec::LZO,
-};
+  parquet::CompressionCodec::LZ4,
+  parquet::CompressionCodec::GZIP,   // ZLIB
+  parquet::CompressionCodec::ZSTD,
+  parquet::CompressionCodec::BROTLI};
 
 const int IMPALA_TO_PARQUET_CODEC_SIZE =
     sizeof(IMPALA_TO_PARQUET_CODEC) / sizeof(IMPALA_TO_PARQUET_CODEC[0]);

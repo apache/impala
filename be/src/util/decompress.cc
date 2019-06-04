@@ -21,8 +21,10 @@
 #include <zlib.h>
 #include <bzlib.h>
 #undef DISALLOW_COPY_AND_ASSIGN // Snappy redefines this.
-#include <snappy.h>
 #include <lz4.h>
+#include <snappy.h>
+#include <zstd.h>
+#include <zstd_errors.h>
 
 #include "common/logging.h"
 #include "exec/read-write-util.h"
@@ -599,6 +601,27 @@ Status Lz4Decompressor::ProcessBlock(bool output_preallocated, int64_t input_len
   if (ret < 0) {
     *output_length = 0;
     return Status("Lz4: uncompress failed");
+  }
+  *output_length = ret;
+  return Status::OK();
+}
+
+ZstandardDecompressor::ZstandardDecompressor(MemPool* mem_pool, bool reuse_buffer)
+  : Codec(mem_pool, reuse_buffer) {}
+
+int64_t ZstandardDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
+  return -1;
+}
+
+Status ZstandardDecompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
+    const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  DCHECK(output_preallocated) << "Output was not allocated for Zstd Codec";
+  if (*output_length == 0) return Status::OK();
+  size_t ret = ZSTD_decompress(*output, *output_length, input, input_length);
+  if (ZSTD_isError(ret)) {
+    *output_length = 0;
+    return Status(TErrorCode::ZSTD_ERROR, "ZSTD_decompress",
+        ZSTD_getErrorString(ZSTD_getErrorCode(ret)));
   }
   *output_length = ret;
   return Status::OK();
