@@ -109,6 +109,7 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
   ScanRange* range = scanner_->scan_node_->AllocateScanRange(
       metadata_range->fs(), scanner_->filename(), length, offset, partition_id,
       split_range->disk_id(), expected_local, split_range->is_erasure_coded(),
+      split_range->mtime(),
       BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length));
 
   unique_ptr<BufferDescriptor> io_buffer;

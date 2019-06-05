@@ -64,7 +64,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     // 1 queue for each NIC as well?
     ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
         files[i]->filename.c_str(), header_size, 0, header_metadata, -1, false,
-        files[i]->is_erasure_coded, BufferOpts::Uncached());
+        files[i]->is_erasure_coded, files[i]->mtime, BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }
   // When the header is parsed, we will issue more AddDiskIoRanges in

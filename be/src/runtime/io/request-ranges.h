@@ -167,33 +167,31 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
 struct BufferOpts {
  public:
   // Set options for a read into an IoMgr-allocated or HDFS-cached buffer. Caching is
-  // enabled if 'try_cache' is true, the file is in the HDFS cache and 'mtime' matches
-  // the modified time of the cached file in the HDFS cache.
-  BufferOpts(bool try_cache, int64_t mtime)
+  // enabled if 'try_cache' is true and the file is in the HDFS cache.
+  BufferOpts(bool try_cache)
     : try_cache_(try_cache),
-      mtime_(mtime),
       client_buffer_(nullptr),
       client_buffer_len_(-1) {}
 
   /// Set options for an uncached read into an IoMgr-allocated buffer.
   static BufferOpts Uncached() {
-    return BufferOpts(false, NEVER_CACHE, nullptr, -1);
+    return BufferOpts(false, nullptr, -1);
   }
 
   /// Set options to read the entire scan range into 'client_buffer'. The length of the
   /// buffer, 'client_buffer_len', must fit the entire scan range. HDFS caching is not
   /// enabled in this case.
   static BufferOpts ReadInto(uint8_t* client_buffer, int64_t client_buffer_len) {
-    return BufferOpts(false, NEVER_CACHE, client_buffer, client_buffer_len);
+    return BufferOpts(false, client_buffer, client_buffer_len);
   }
 
   /// Use only when you don't want to to read the entire scan range, but only sub-ranges
   /// in it. In this case you can copy the relevant parts from the HDFS cache into the
   /// client buffer. The length of the buffer, 'client_buffer_len' must fit the
   /// concatenation of all the sub-ranges.
-  static BufferOpts ReadInto(bool try_cache, int64_t mtime, uint8_t* client_buffer,
+  static BufferOpts ReadInto(bool try_cache, uint8_t* client_buffer,
       int64_t client_buffer_len) {
-    return BufferOpts(try_cache, mtime, client_buffer, client_buffer_len);
+    return BufferOpts(try_cache, client_buffer, client_buffer_len);
   }
 
  private:
@@ -201,23 +199,13 @@ struct BufferOpts {
   friend class HdfsFileReader;
   FRIEND_TEST(DataCacheTest, TestBasics);
 
-  BufferOpts(
-      bool try_cache, int64_t mtime, uint8_t* client_buffer, int64_t client_buffer_len)
+  BufferOpts(bool try_cache, uint8_t* client_buffer, int64_t client_buffer_len)
     : try_cache_(try_cache),
-      mtime_(mtime),
       client_buffer_(client_buffer),
       client_buffer_len_(client_buffer_len) {}
 
-  /// If 'mtime_' is set to NEVER_CACHE, the file handle will never be cached, because
-  /// the modification time won't match.
-  const static int64_t NEVER_CACHE = -1;
-
   /// If true, read from HDFS cache if possible.
   const bool try_cache_;
-
-  /// Last modified time of the file associated with the scan range. If set to
-  /// NEVER_CACHE, caching is disabled.
-  const int64_t mtime_;
 
   /// A destination buffer provided by the client, nullptr and -1 if no buffer.
   uint8_t* const client_buffer_;
@@ -244,22 +232,26 @@ class ScanRange : public RequestRange {
   /// local filesystem). The scan range must be non-empty and fall within the file bounds
   /// (len > 0 and offset >= 0 and offset + len <= file_length). 'disk_id' is the disk
   /// queue to add the range to. If 'expected_local' is true, a warning is generated if
-  /// the read did not come from a local disk. 'buffer_opts' specifies buffer management
-  /// options - see the DiskIoMgr class comment and the BufferOpts comments for details.
+  /// the read did not come from a local disk. 'mtime' is the last modification time for
+  /// 'file'; the mtime must change when the file changes. 'is_erasure_coded' is whether
+  /// 'file' is stored using HDFS erasure coding.
+  /// 'buffer_opts' specifies buffer management options - see the DiskIoMgr class comment
+  /// and the BufferOpts comments for details.
   /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
   ///
   /// TODO: IMPALA-4249: clarify if a ScanRange can be reused after Reset(). Currently
   /// it is not generally safe to do so, but some unit tests reuse ranges after
   /// successfully reading to eos.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, bool is_erasure_coded, const BufferOpts& buffer_opts,
-      void* meta_data = nullptr);
+      bool expected_local, bool is_erasure_coded, int64_t mtime,
+      const BufferOpts& buffer_opts, void* meta_data = nullptr);
 
   /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
   /// in advance, as this method will do the merge.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, bool is_erasure_coded, const BufferOpts& buffer_opts,
-      std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr);
+      bool expected_local, bool is_erasure_coded, int64_t mtime,
+      const BufferOpts& buffer_opts, std::vector<SubRange>&& sub_ranges,
+      void* meta_data = nullptr);
 
   void* meta_data() const { return meta_data_; }
   bool try_cache() const { return try_cache_; }
@@ -291,6 +283,10 @@ class ScanRange : public RequestRange {
 
   /// return a descriptive string for debug.
   std::string DebugString() const;
+
+  /// Non-HDFS files (e.g. local files) do not use mtime, so they should use this known
+  /// bogus mtime.
+  const static int64_t INVALID_MTIME = -1;
 
   int64_t mtime() const { return mtime_; }
 

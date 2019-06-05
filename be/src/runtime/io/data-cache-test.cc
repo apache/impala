@@ -265,9 +265,10 @@ TEST_F(DataCacheTest, TestBasics) {
   ASSERT_FALSE(cache.Store(FNAME, MTIME, 0, test_buffer(), cache_size * 2));
 
   // Test with uncacheable 'mtime' to make sure the entry is not stored.
-  ASSERT_FALSE(cache.Store(FNAME, BufferOpts::NEVER_CACHE, 0, test_buffer(),
+  ASSERT_FALSE(cache.Store(FNAME, ScanRange::INVALID_MTIME, 0, test_buffer(),
       TEMP_BUFFER_SIZE));
-  ASSERT_EQ(0, cache.Lookup(FNAME, BufferOpts::NEVER_CACHE, 0, TEMP_BUFFER_SIZE, buffer));
+  ASSERT_EQ(0, cache.Lookup(FNAME, ScanRange::INVALID_MTIME, 0, TEMP_BUFFER_SIZE,
+      buffer));
 
   // Test with bad 'mtime' to make sure the entry is not stored.
   ASSERT_FALSE(cache.Store(FNAME, -1000, 0, test_buffer(), TEMP_BUFFER_SIZE));

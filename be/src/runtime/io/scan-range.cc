@@ -448,14 +448,14 @@ ScanRange::~ScanRange() {
 }
 
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, bool is_erasure_coded,
+    int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
     const BufferOpts& buffer_opts, void* meta_data) {
-  Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded, buffer_opts,
-      {}, meta_data);
+  Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded, mtime,
+      buffer_opts, {}, meta_data);
 }
 
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
-    int disk_id, bool expected_local, bool is_erasure_coded,
+    int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
     const BufferOpts& buffer_opts, vector<SubRange>&& sub_ranges, void* meta_data) {
   DCHECK(ready_buffers_.empty());
   DCHECK(!read_in_flight_);
@@ -476,7 +476,9 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   offset_ = offset;
   disk_id_ = disk_id;
   try_cache_ = buffer_opts.try_cache_;
-  mtime_ = buffer_opts.mtime_;
+  // HDFS ranges must have an mtime > 0. Local ranges do not use mtime.
+  if (fs_) DCHECK_GT(mtime, 0);
+  mtime_ = mtime;
   meta_data_ = meta_data;
   if (buffer_opts.client_buffer_ != nullptr) {
     external_buffer_tag_ = ExternalBufferTag::CLIENT_BUFFER;

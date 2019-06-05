@@ -90,6 +90,7 @@ Status FileHandleCache::Init() {
 Status FileHandleCache::GetFileHandle(
     const hdfsFS& fs, std::string* fname, int64_t mtime, bool require_new_handle,
     CachedHdfsFileHandle** handle_out, bool* cache_hit) {
+  DCHECK_GT(mtime, 0);
   // Hash the key and get appropriate partition
   int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
   FileHandleCachePartition& p = cache_partitions_[index];

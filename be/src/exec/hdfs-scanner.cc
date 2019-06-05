@@ -813,13 +813,15 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
               files[i]->filename.c_str(), footer_size, footer_start,
               split_metadata->partition_id, footer_split->disk_id(),
               footer_split->expected_local(), files[i]->is_erasure_coded,
-              BufferOpts(footer_split->try_cache(), files[i]->mtime), split);
+              files[i]->mtime, BufferOpts(footer_split->try_cache()),
+              split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
           footer_range =
               scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
                    footer_size, footer_start, split_metadata->partition_id, -1, false,
-                   files[i]->is_erasure_coded, BufferOpts::Uncached(), split);
+                   files[i]->is_erasure_coded, files[i]->mtime, BufferOpts::Uncached(),
+                   split);
         }
 
         footer_ranges.push_back(footer_range);
