@@ -22,6 +22,8 @@ FROM impala_base
 EXPOSE 21000
 # HS2
 EXPOSE 21050
+# HS2 over HTTP
+EXPOSE 28000
 # Debug webserver
 EXPOSE 25000
 
