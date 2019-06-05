@@ -59,8 +59,8 @@ under the License.
           Time-based invalidation with the
           <codeph>&#8209;&#8209;invalidate_tables_timeout_s</codeph> flag:
           <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
-          specified time period (in seconds). This flag needs to be applied to
-          <codeph>catalogd</codeph> only.
+          specified time period (in seconds). This flag needs to be applied to both
+          <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
         </li>
 
         <li>
@@ -68,7 +68,8 @@ under the License.
           <codeph>&#8209;&#8209;invalidate_tables_on_memory_pressure</codeph> flag: When the
           memory pressure reaches 60% of JVM heap size after a Java garbage collection in
           <codeph>catalogd</codeph>, Impala invalidates 10% of the least recently used tables.
-          This flag needs to be applied to <codeph>catalogd</codeph> only.
+          This flag needs to be applied to both <codeph>impalad</codeph> and
+          <codeph>catalogd</codeph>.
         </li>
       </ul>
 
