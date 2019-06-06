@@ -40,6 +40,7 @@
 #
 #     python bootstrap_toolchain.py
 import logging
+import glob
 import multiprocessing.pool
 import os
 import random
@@ -418,10 +419,24 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
       component_name = component.name
       if component.name == "kudu-java":
         component_name = "kudu"
+
+      # Check if the diretory already exists, and skip downloading it if it does. Since
+      # the kudu and kudu-java tarballs unpack to the same directory, we check for files
+      # in that directory expected for each package. TODO: if we change how the Kudu
+      # tarballs are packaged we can remove this special case.
       pkg_directory = package_directory(cdh_components_home, component_name,
           component.version)
-      if os.path.isdir(pkg_directory):
-        return
+      if component.name == "kudu-java":
+        if len(glob.glob("%s/*jar" % pkg_directory)) > 0:
+          return
+      elif component.name == "kudu":
+        # Regardless of the actual build type, the 'kudu' tarball will always contain a
+        # 'debug' and a 'release' directory.
+        if os.path.exists(os.path.join(pkg_directory, "debug")):
+          return
+      else:
+        if os.path.isdir(pkg_directory):
+          return
 
       platform_label = ""
       # Kudu is the only component that's platform dependent.

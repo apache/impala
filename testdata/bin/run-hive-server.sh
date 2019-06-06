@@ -102,9 +102,9 @@ fi
 
 # Add kudu-hive.jar to the Hive Metastore classpath, so that Kudu's HMS
 # plugin can be loaded.
-FILE_NAME="${CDH_COMPONENTS_HOME}/kudu-${IMPALA_KUDU_JAVA_VERSION}/\
-kudu-hive-${IMPALA_KUDU_JAVA_VERSION}.jar"
-export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${FILE_NAME}
+for file in ${IMPALA_KUDU_JAVA_HOME}/*kudu-hive*jar; do
+  export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${file}
+done
 # Default to skip validation on Kudu tables if KUDU_SKIP_HMS_PLUGIN_VALIDATION
 # is unset.
 export KUDU_SKIP_HMS_PLUGIN_VALIDATION=${KUDU_SKIP_HMS_PLUGIN_VALIDATION:-1}
