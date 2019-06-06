@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.messaging.AddPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.CreateTableMessage;
@@ -48,6 +49,7 @@ import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
@@ -775,7 +777,8 @@ public class MetastoreEvents {
           insertPartition_);
       try {
         // Ignore event if table or database is not in catalog. Throw exception if
-        // refresh fails.
+        // refresh fails. If the partition does not exist in metastore the reload
+        // method below removes it from the catalog
         if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec)) {
           debugLog("Refresh of table {} partition {} after insert "
                   + "event failed as the table is not present in the catalog.",
@@ -795,7 +798,7 @@ public class MetastoreEvents {
                 + "partition on table {} partition {} failed. Event processing cannot "
                 + "continue. Issue and invalidate command to reset the event processor "
                 + "state.", getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec)));
+            constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
       }
     }
 
@@ -808,9 +811,9 @@ public class MetastoreEvents {
       try {
         // Ignore event if table or database is not in the catalog. Throw exception if
         // refresh fails.
-        if (!catalog_.refreshTableIfExists(dbName_, tblName_)) {
+        if (!catalog_.reloadTableIfExists(dbName_, tblName_)) {
           debugLog("Automatic refresh table {} failed as the table is not "
-              + "present in the catalog. ", getFullyQualifiedTblName());
+              + "present either catalog or metastore.", getFullyQualifiedTblName());
         } else {
           infoLog("Table {} has been refreshed after insert.",
               getFullyQualifiedTblName());
@@ -819,10 +822,17 @@ public class MetastoreEvents {
         debugLog("Automatic refresh of table {} insert failed as the "
             + "database is not present in the catalog.", getFullyQualifiedTblName());
       } catch (CatalogException e) {
-        throw new MetastoreNotificationNeedsInvalidateException(
-            debugString("Refresh table {} failed. Event processing "
-                + "cannot continue. Issue an invalidate metadata command to reset "
-                + "the event processor state.", getFullyQualifiedTblName()));
+        if (e instanceof TableLoadingException &&
+            e.getCause() instanceof NoSuchObjectException) {
+          LOG.warn(
+              "Ignoring the refresh of the table since the table does"
+                  + " not exist in metastore anymore");
+        } else {
+          throw new MetastoreNotificationNeedsInvalidateException(
+              debugString("Refresh table {} failed. Event processing "
+                  + "cannot continue. Issue an invalidate metadata command to reset "
+                  + "the event processor state.", getFullyQualifiedTblName()), e);
+        }
       }
     }
   }
@@ -1375,7 +1385,7 @@ public class MetastoreEvents {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
                 + "refresh newly added partitions of table {}. Event processing cannot "
                 + "continue. Issue an invalidate command to reset event processor.",
-            getFullyQualifiedTblName()));
+            getFullyQualifiedTblName()), e);
       }
     }
 
@@ -1461,7 +1471,7 @@ public class MetastoreEvents {
                 + "partition on table {} partition {} failed. Event processing cannot "
                 + "continue. Issue and invalidate command to reset the event processor "
                 + "state.", getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec)));
+            constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
       }
     }
 
@@ -1547,7 +1557,7 @@ public class MetastoreEvents {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
             + "drop some partitions from table {} after a drop partitions event. Event "
                 + "processing cannot continue. Issue an invalidate command to reset "
-            + "event processor state.", getFullyQualifiedTblName()));
+            + "event processor state.", getFullyQualifiedTblName()), e);
       }
     }
 

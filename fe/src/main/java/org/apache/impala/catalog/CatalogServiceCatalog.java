@@ -2158,7 +2158,7 @@ public class CatalogServiceCatalog extends Catalog {
    * otherwise. Throws CatalogException if reloadTable() is unsuccessful. Throws
    * DatabaseNotFoundException if Db doesn't exist.
    */
-  public boolean refreshTableIfExists(String dbName, String tblName)
+  public boolean reloadTableIfExists(String dbName, String tblName)
       throws CatalogException {
     Table table = getTable(dbName, tblName);
     if (table == null || table instanceof IncompleteTable) return false;

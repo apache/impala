@@ -45,9 +45,6 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.FireEventRequest;
-import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
-import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -3848,45 +3845,19 @@ public class CatalogOpExecutor {
             filesPostInsert.size(), table.getTableName(), part.getPartitionName());
       }
       if (deltaFiles != null || isInsertOverwrite) {
-        fireInsertEvent(table, partVals, deltaFiles, isInsertOverwrite);
+        try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+          MetaStoreUtil
+              .fireInsertEvent(metaStoreClient.getHiveClient(), table.getDb().getName(),
+                  table.getName(), partVals, deltaFiles, isInsertOverwrite);
+        } catch (Exception e) {
+          LOG.error("Failed to fire insert event. Some tables might not be"
+              + " refreshed on other impala clusters.", e);
+        }
       }
       else {
         LOG.info("No new files were created, and is not a replace. Skipping "
             + "generating INSERT event.");
       }
-    }
-  }
-
-  /**
-   *  Fires an insert event to HMS notification log. For partitioned table, each
-   *  existing partition touched by the insert will fire a separate insert event.
-   *
-   * @param newFiles Set of all the 'new' files added by this insert. This is empty in
-   * case of insert overwrite.
-   * @param partVals List of partition values corresponding to the partition keys in
-   * a partitioned table. This is null for non-partitioned table.
-   * @param isOverwrite If true, sets the 'replace' flag to true indicating that the
-   * operation was an insert overwrite in the notification log. Will set the same to
-   * false otherwise.
-   */
-  private void fireInsertEvent(Table tbl, List<String> partVals,
-      Set<String> newFiles, boolean isOverwrite) {
-    LOG.debug("Firing an insert event for {}.", tbl.getName());
-    FireEventRequestData data = new FireEventRequestData();
-    InsertEventRequestData insertData = new InsertEventRequestData();
-    data.setInsertData(insertData);
-    FireEventRequest rqst = new FireEventRequest(true, data);
-    rqst.setDbName(tbl.getDb().getName());
-    rqst.setTableName(tbl.getName());
-    insertData.setFilesAdded(new ArrayList<>(newFiles));
-    insertData.setReplace(isOverwrite);
-    rqst.setPartitionVals(partVals);
-
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      msClient.getHiveClient().fireListenerEvent(rqst);
-    } catch (Exception e) {
-      LOG.error("Failed to fire insert event. Some tables might not be"
-          + " refreshed on other impala clusters.", e);
     }
   }
 

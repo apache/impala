@@ -17,16 +17,21 @@
 
 package org.apache.impala.util;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Collection;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.FireEventRequest;
+import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -34,7 +39,6 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import org.apache.impala.thrift.TColumn;
@@ -43,12 +47,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility methods for interacting with the Hive Metastore.
  */
 public class MetaStoreUtil {
-  private static final Logger LOG = Logger.getLogger(MetaStoreUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MetaStoreUtil.class);
 
   // Maximum comment length, e.g., for columns, that can be stored in the HMS.
   // This number is a lower bound of the constraint set in the HMS DB schema,
@@ -305,5 +311,39 @@ public class MetaStoreUtil {
       partVals.add(val);
     }
     return partVals;
+  }
+
+  /**
+   *  Fires an insert event to HMS notification log. For partitioned table, each
+   *  existing partition touched by the insert will fire a separate insert event.
+   *
+   * @param msClient Metastore client
+   * @param newFiles Set of all the 'new' files added by this insert. This is empty in
+   * case of insert overwrite.
+   * @param partVals List of partition values corresponding to the partition keys in
+   * a partitioned table. This is null for non-partitioned table.
+   * @param isOverwrite If true, sets the 'replace' flag to true indicating that the
+   * operation was an insert overwrite in the notification log. Will set the same to
+   * false otherwise.
+   */
+  public static void fireInsertEvent(IMetaStoreClient msClient,
+      String dbName, String tblName, List<String> partVals,
+      Collection<String> newFiles, boolean isOverwrite) throws TException {
+    Preconditions.checkNotNull(msClient);
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tblName);
+    Preconditions.checkNotNull(newFiles);
+    LOG.debug("Firing an insert event for {}", tblName);
+    FireEventRequestData data = new FireEventRequestData();
+    InsertEventRequestData insertData = new InsertEventRequestData();
+    data.setInsertData(insertData);
+    FireEventRequest rqst = new FireEventRequest(true, data);
+    rqst.setDbName(dbName);
+    rqst.setTableName(tblName);
+    insertData.setFilesAdded(new ArrayList<>(newFiles));
+    insertData.setReplace(isOverwrite);
+    if (partVals != null) rqst.setPartitionVals(partVals);
+
+    msClient.fireListenerEvent(rqst);
   }
 }
