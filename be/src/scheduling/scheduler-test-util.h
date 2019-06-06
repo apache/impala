@@ -87,6 +87,24 @@ enum class ReplicaPlacement {
   REMOTE_ONLY,
 };
 
+/// Blocks and FileSplitGeneratorSpecs mimic real files, and for some parts of scheduling
+/// (e.g. consistent remote scheduling) the actual file names and partition paths matter.
+/// When defining a table, you can specify a block naming policy to control this.
+///  - UNPARTITIONED means that the partition paths and partition ids are constant, but
+///    the file names are unique.
+///  - PARTITIONED_SINGLE_FILENAME means that the partition paths and partition ids are
+///    unique, but the file name inside the partition is a single constant.
+///  - PARTITIONED_UNIQUE_FILENAMES means that the partition paths, partition ids, and
+///    the file names inside the partition.
+/// These policies are mostly irrelevent for single block tables or tables with local
+/// scheduling, so the default policy is UNPARTITIONED.
+enum class BlockNamingPolicy {
+  UNPARTITIONED,
+  PARTITIONED_SINGLE_FILENAME,
+  PARTITIONED_UNIQUE_FILENAMES,
+};
+std::ostream& operator<<(std::ostream& os, const BlockNamingPolicy& naming_policy);
+
 /// Host model. Each host can have either a backend, a datanode, or both. To specify that
 /// a host should not act as a backend or datanode specify '-1' as the respective port.
 /// A host with a backend is always a coordinator but it may not be an executor.
@@ -121,6 +139,13 @@ class Cluster {
 
   const std::vector<Host>& hosts() const { return hosts_; }
   int NumHosts() const { return hosts_.size(); }
+
+  /// Helper function to create a cluster with Impala nodes separate from the datanodes.
+  /// This is primarily used for consistent remote scheduling tests. This places
+  /// the impalad nodes first, then the data nodes. Impalad nodes will have indices
+  /// in the range [0, num_impala_nodes-1] and data nodes will have indices in the
+  /// range [num_impala_nodes, num_impala_nodes+num_data_nodes-1].
+  static Cluster CreateRemoteCluster(int num_impala_nodes, int num_data_nodes);
 
   /// These methods return lists of host indexes, grouped by their type, which can be used
   /// to draw samples of random sets of hosts.
@@ -193,10 +218,14 @@ struct FileSplitGeneratorSpec {
   static const int64_t DEFAULT_BLOCK_SIZE;
 };
 
-/// A table models multiple partitions, some of which represent their files explicitly
-/// with Blocks or with FileSplitGeneratorSpecs. A table can consist of both
-/// representations.
+/// A table models multiple files. Each file can be represented explicitly with a Block
+/// or with a FileSplitGeneratorSpecs. A table can consist of files with both
+/// representations. The table can specify a BlockNamingPolicy, which tailors the
+/// file name and path for scan ranges to simulate partitioned vs unpartitioned tables.
+/// Consistent remote scheduling depends on the file paths, but the file names do not
+/// impact other aspects of scheduling.
 struct Table {
+  BlockNamingPolicy naming_policy = BlockNamingPolicy::UNPARTITIONED;
   std::vector<Block> blocks;
   std::vector<FileSplitGeneratorSpec> specs;
 };
@@ -204,6 +233,10 @@ struct Table {
 class Schema {
  public:
   Schema(const Cluster& cluster) : cluster_(cluster) {}
+
+  /// Add a table with no blocks. This is useful for tables with a custom naming
+  /// policy that later add FileSplitGeneratorSpecs.
+  void AddEmptyTable(const TableName& table_name, BlockNamingPolicy naming_policy);
 
   /// Add a table consisting of a single block to the schema with explicitly specified
   /// replica indexes for non-cached replicas and without any cached replicas. Replica
@@ -226,9 +259,11 @@ class Schema {
 
   /// Add a table to the schema, selecting replica hosts according to the given replica
   /// placement preference. After replica selection has been done, 'num_cached_replicas'
-  /// of them are marked as cached.
+  /// of them are marked as cached. The table uses the specified 'naming_policy' for
+  /// its blocks.
   void AddMultiBlockTable(const TableName& table_name, int num_blocks,
-      ReplicaPlacement replica_placement, int num_replicas, int num_cached_replicas);
+      ReplicaPlacement replica_placement, int num_replicas, int num_cached_replicas,
+      BlockNamingPolicy naming_policy);
 
   /// Adds FileSplitGeneratorSpecs to table named 'table_name'. If the table does not
   /// exist, creates a new table. Otherwise, adds the 'specs' to an existing table.
@@ -293,15 +328,24 @@ class Plan {
 
   /// Initialize a TScanRangeLocationList object in place.
   void BuildTScanRangeLocationList(const TableName& table_name, const Block& block,
-      int block_idx, TScanRangeLocationList* scan_range_locations);
+      int block_idx, BlockNamingPolicy naming_policy,
+      TScanRangeLocationList* scan_range_locations);
+
+  /// Builds appropriate paths for a Block given the table name and block naming
+  /// policy.
+  void GetBlockPaths(const TableName& table_name, bool is_spec, int index,
+      BlockNamingPolicy naming_policy, string* relative_path, int64_t* partition_id,
+      string* partition_path);
 
   /// Initializes a scan range for a Block.
   void BuildScanRange(
-      const TableName& table_name, const Block& block, int block_idx, TScanRange* range);
+      const TableName& table_name, const Block& block, int block_idx,
+      BlockNamingPolicy naming_policy, TScanRange* range);
 
   /// Initializes a scan range for a FileSplitGeneratorSpec.
   void BuildScanRangeSpec(const TableName& table_name, const FileSplitGeneratorSpec& spec,
-      int spec_idx, TFileSplitGeneratorSpec* thrift_spec);
+      int spec_idx, BlockNamingPolicy naming_policy,
+      TFileSplitGeneratorSpec* thrift_spec);
 
   /// Look up the plan-local host index of 'cluster_datanode_idx'. If the host has not
   /// been added to the plan before, it will add it to 'referenced_datanodes_' and return

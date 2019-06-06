@@ -25,12 +25,32 @@
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/scheduler.h"
+#include "util/hash-util.h"
 
 using namespace impala;
 using namespace impala::test;
 using namespace org::apache::impala::fb;
 
 DECLARE_int32(krpc_port);
+
+/// Make the BlockNamingPolicy enum easy to print. Must be declared in impala::test
+namespace impala {
+namespace test {
+std::ostream& operator<<(std::ostream& os, const BlockNamingPolicy& naming_policy)
+{
+  switch(naming_policy) {
+  case BlockNamingPolicy::UNPARTITIONED:
+    os << "UNPARTITIONED"; break;
+  case BlockNamingPolicy::PARTITIONED_SINGLE_FILENAME:
+    os << "PARTITIONED_SINGLE_FILENAME"; break;
+  case BlockNamingPolicy::PARTITIONED_UNIQUE_FILENAMES:
+    os << "PARTITIONED_UNIQUE_FILENAMES"; break;
+  default: os.setstate(std::ios_base::failbit);
+  }
+  return os;
+}
+}
+}
 
 /// Sample 'n' elements without replacement from the set [0..N-1].
 /// This is an implementation of "Algorithm R" by J. Vitter.
@@ -115,12 +135,31 @@ void Cluster::GetBackendAddress(int host_idx, TNetworkAddress* addr) const {
   addr->port = hosts_[host_idx].be_port;
 }
 
+Cluster Cluster::CreateRemoteCluster(int num_impala_nodes, int num_data_nodes) {
+  Cluster cluster;
+  // Set of Impala hosts
+  cluster.AddHosts(num_impala_nodes, true, false);
+  // Set of datanodes
+  cluster.AddHosts(num_data_nodes, false, true);
+  return cluster;
+}
+
 const vector<int>& Cluster::datanode_with_backend_host_idxs() const {
   return datanode_with_backend_host_idxs_;
 }
 
 const vector<int>& Cluster::datanode_only_host_idxs() const {
   return datanode_only_host_idxs_;
+}
+
+void Schema::AddEmptyTable(
+    const TableName& table_name, BlockNamingPolicy naming_policy) {
+  DCHECK(tables_.find(table_name) == tables_.end());
+  // Create table
+  Table table;
+  table.naming_policy = naming_policy;
+  // Insert table
+  tables_.emplace(table_name, table);
 }
 
 void Schema::AddSingleBlockTable(
@@ -154,14 +193,17 @@ void Schema::AddSingleBlockTable(const TableName& table_name,
 
 void Schema::AddMultiBlockTable(const TableName& table_name, int num_blocks,
     ReplicaPlacement replica_placement, int num_replicas) {
-  AddMultiBlockTable(table_name, num_blocks, replica_placement, num_replicas, 0);
+  AddMultiBlockTable(table_name, num_blocks, replica_placement, num_replicas, 0,
+      BlockNamingPolicy::UNPARTITIONED);
 }
 
 void Schema::AddMultiBlockTable(const TableName& table_name, int num_blocks,
-    ReplicaPlacement replica_placement, int num_replicas, int num_cached_replicas) {
+    ReplicaPlacement replica_placement, int num_replicas, int num_cached_replicas,
+    BlockNamingPolicy naming_policy) {
   DCHECK_GT(num_replicas, 0);
   DCHECK(num_cached_replicas <= num_replicas);
   Table table;
+  table.naming_policy = naming_policy;
   for (int i = 0; i < num_blocks; ++i) {
     Block block;
     vector<int>& replica_idxs = block.replica_host_idxs;
@@ -238,25 +280,28 @@ void Plan::AddTableScan(const TableName& table_name) {
   for (int i = 0; i < blocks.size(); ++i) {
     const Block& block = blocks[i];
     TScanRangeLocationList scan_range_locations;
-    BuildTScanRangeLocationList(table_name, block, i, &scan_range_locations);
+    BuildTScanRangeLocationList(table_name, block, i, table.naming_policy,
+        &scan_range_locations);
     scan_range_specs_.concrete_ranges.push_back(scan_range_locations);
   }
   const vector<FileSplitGeneratorSpec>& specs = table.specs;
   for (int i = 0; i < specs.size(); ++i) {
     const FileSplitGeneratorSpec& file_spec = specs[i];
     TFileSplitGeneratorSpec spec;
-    BuildScanRangeSpec(table_name, file_spec, i, &spec);
+    BuildScanRangeSpec(table_name, file_spec, i, table.naming_policy, &spec);
     scan_range_specs_.split_specs.push_back(spec);
   }
 }
 
 void Plan::BuildTScanRangeLocationList(const TableName& table_name, const Block& block,
-    int block_idx, TScanRangeLocationList* scan_range_locations) {
+    int block_idx, BlockNamingPolicy naming_policy,
+    TScanRangeLocationList* scan_range_locations) {
   const vector<int>& replica_idxs = block.replica_host_idxs;
   const vector<bool>& is_cached = block.replica_host_idx_is_cached;
   DCHECK_EQ(replica_idxs.size(), is_cached.size());
   int num_replicas = replica_idxs.size();
-  BuildScanRange(table_name, block, block_idx, &scan_range_locations->scan_range);
+  BuildScanRange(table_name, block, block_idx, naming_policy,
+      &scan_range_locations->scan_range);
   scan_range_locations->locations.resize(num_replicas);
   for (int i = 0; i < num_replicas; ++i) {
     TScanRangeLocation& location = scan_range_locations->locations[i];
@@ -265,16 +310,68 @@ void Plan::BuildTScanRangeLocationList(const TableName& table_name, const Block&
   }
 }
 
+void Plan::GetBlockPaths(const TableName& table_name, bool is_spec, int index,
+    BlockNamingPolicy naming_policy, string* relative_path, int64_t* partition_id,
+    string* partition_path) {
+  // For debugging, it is useful to differentiate between Blocks and
+  // FileSplitGeneratorSpecs.
+  string spec_or_block = is_spec ? "_spec_" : "_block_";
+
+  switch (naming_policy) {
+  case BlockNamingPolicy::UNPARTITIONED:
+    // For unpartitioned tables, use unique file names and set partition_id = 0
+    // Encoding the table name and index in the file helps debugging.
+    // For example, an unpartitioned table may contain two files with paths like:
+    // /warehouse/{table_name}/file1.csv
+    // /warehouse/{table_name}/file2.csv
+    *relative_path = table_name + spec_or_block + std::to_string(index);
+    *partition_id = 0;
+    *partition_path = "/warehouse/" + table_name;
+    break;
+  case BlockNamingPolicy::PARTITIONED_SINGLE_FILENAME:
+    // For partitioned tables with simple names, use a simple file name, but vary the
+    // partition id and partition_path by using the index as the partition_id and as
+    // part of the partition_path.
+    // For example, a partitioned table with two partitions might have paths like:
+    // /warehouse/{table_name}/year=2010/000001_0
+    // /warehouse/{table_name}/year=2009/000001_0
+    *relative_path = "000001_0";
+    *partition_id = index;
+    *partition_path = "/warehouse/" + table_name + "/part=" + std::to_string(index);
+    break;
+  case BlockNamingPolicy::PARTITIONED_UNIQUE_FILENAMES:
+    // For partitioned tables with unique names, the file name, partition_id, and
+    // partition_path all incorporate the index.
+    // For example, a partitioned table with two partitions might have paths like:
+    // /warehouse/{table_name}/year=2010/6541856e3fb0583d_654267678_data.0.parq
+    // /warehouse/{table_name}/year=2009/6541856e3fb0583d_627636719_data.0.parq
+    *relative_path = table_name + spec_or_block + std::to_string(index);
+    *partition_id = index;
+    *partition_path = "/warehouse/" + table_name + "/part=" + std::to_string(index);
+    break;
+  default:
+    DCHECK(false) << "Invalid naming_policy";
+  }
+}
+
 void Plan::BuildScanRange(const TableName& table_name, const Block& block, int block_idx,
-    TScanRange* scan_range) {
+    BlockNamingPolicy naming_policy, TScanRange* scan_range) {
   // Initialize locations.scan_range correctly.
   THdfsFileSplit file_split;
-  // 'length' is the only member considered by the scheduler.
+  // 'length' is the only member considered by the scheduler for scheduling non-remote
+  // blocks.
   file_split.length = block.length;
-  // Encoding the table name and block index in the file helps debugging.
-  file_split.relative_path = table_name + "_block_" + std::to_string(block_idx);
+
+  // Consistent remote scheduling considers the partition_path_hash, relative_path,
+  // and offset when scheduling blocks.
+  string partition_path;
+  GetBlockPaths(table_name, false, block_idx, naming_policy, &file_split.relative_path,
+      &file_split.partition_id, &partition_path);
+  file_split.partition_path_hash =
+      static_cast<int32_t>(HashUtil::Hash(partition_path.data(),
+          partition_path.length(), 0));
   file_split.offset = 0;
-  file_split.partition_id = 0;
+
   // For now, we model each file by a single block.
   file_split.file_length = block.length;
   file_split.file_compression = THdfsCompression::NONE;
@@ -283,13 +380,19 @@ void Plan::BuildScanRange(const TableName& table_name, const Block& block, int b
 }
 
 void Plan::BuildScanRangeSpec(const TableName& table_name,
-    const FileSplitGeneratorSpec& spec, int spec_idx,
+    const FileSplitGeneratorSpec& spec, int spec_idx, BlockNamingPolicy naming_policy,
     TFileSplitGeneratorSpec* thrift_spec) {
   THdfsFileDesc thrift_file;
 
+  string relative_path;
+  int64_t partition_id;
+  string partition_path;
+  GetBlockPaths(table_name, true, spec_idx, naming_policy, &relative_path,
+      &partition_id, &partition_path);
+
   flatbuffers::FlatBufferBuilder fb_builder;
   auto rel_path =
-      fb_builder.CreateString(table_name + "_spec_" + std::to_string(spec_idx));
+      fb_builder.CreateString(relative_path);
   auto fb_file_desc = CreateFbFileDesc(fb_builder, rel_path, spec.length);
   fb_builder.Finish(fb_file_desc);
 
@@ -297,10 +400,13 @@ void Plan::BuildScanRangeSpec(const TableName& table_name,
       reinterpret_cast<const char*>(fb_builder.GetBufferPointer()), fb_builder.GetSize());
   thrift_file.__set_file_desc_data(buffer);
 
-  thrift_spec->__set_partition_id(0);
+  thrift_spec->__set_partition_id(partition_id);
   thrift_spec->__set_file_desc(thrift_file);
   thrift_spec->__set_max_block_size(spec.block_size);
   thrift_spec->__set_is_splittable(spec.is_splittable);
+  int32_t partition_path_hash = static_cast<int32_t>(HashUtil::Hash(partition_path.data(),
+      partition_path.length(), 0));
+  thrift_spec->__set_partition_path_hash(partition_path_hash);
 }
 
 int Plan::FindOrInsertDatanodeIndex(int cluster_datanode_idx) {

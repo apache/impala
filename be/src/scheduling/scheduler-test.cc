@@ -31,6 +31,10 @@ class SchedulerTest : public testing::Test {
   SchedulerTest() { srand(0); }
 };
 
+static const vector<BlockNamingPolicy> BLOCK_NAMING_POLICIES(
+    {BlockNamingPolicy::UNPARTITIONED, BlockNamingPolicy::PARTITIONED_SINGLE_FILENAME,
+     BlockNamingPolicy::PARTITIONED_UNIQUE_FILENAMES});
+
 /// Smoke test to schedule a single table with a single scan range over a single host.
 TEST_F(SchedulerTest, SingleHostSingleFile) {
   Cluster cluster;
@@ -214,16 +218,14 @@ TEST_F(SchedulerTest, NoRemoteExecutorCandidates) {
 /// nodes for varying values of num_remote_executor_candidates. This includes cases
 /// where the num_remote_executor_candidates exceeds the number of Impala executors.
 TEST_F(SchedulerTest, RemoteExecutorCandidates) {
-  Cluster cluster;
   int num_data_nodes = 3;
   int num_impala_nodes = 5;
-  // Set of datanodes
-  cluster.AddHosts(num_data_nodes, false, true);
-  // Set of Impala hosts
-  cluster.AddHosts(num_impala_nodes, true, false);
+  Cluster cluster = Cluster::CreateRemoteCluster(num_impala_nodes, num_data_nodes);
 
   Schema schema(cluster);
-  schema.AddSingleBlockTable("T1", {0, 1, 2});
+  // CreateRemoteCluster places the Impala nodes first, so the data nodes have indices
+  // of 5, 6, and 7.
+  schema.AddSingleBlockTable("T1", {5, 6, 7});
 
   // Test a range of number of remote executor candidates, including cases where the
   // number of remote executor candidates exceeds the number of Impala nodes.
@@ -254,18 +256,116 @@ TEST_F(SchedulerTest, RemoteExecutorCandidates) {
   }
 }
 
-/// Verify basic consistency of remote executor candidates. Specifically, it schedules
-/// a set of blocks, then removes an executor that did not have any blocks assigned to
-/// it, and verifies that rerunning the scheduling results in the same assignments.
-TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
-  Cluster cluster;
+/// Helper function to verify that two things are treated as distinct for consistent
+/// remote placement. The input 'schema' should be created with a Cluster initialized
+/// by Cluster::CreateRemoteCluster() with 50 impalads and 3 data nodes. It should
+/// have a single table named "T" that contains two schedulable entities (blocks, specs,
+/// etc) with size Block::DEFAULT_BLOCK_SIZE that are expected to be distinct. It runs
+/// the scheduler 100 times with random replica set to true and verifies that the number
+/// of distinct backends is in the right range. If two things are distinct and each can
+/// be scheduled on up to 'num_candidates' distinct backends, then the number of distinct
+/// backends should be in the range ['num_candidates' + 1, 2 * 'num_candidates'].
+/// The probability of completely overlapping by chance is extremely low and
+/// SchedulerTests use srand(0) to be deterministic, so this test should only fail if
+/// the entities are no longer considered distinct.
+void RemotePlacementVerifyDistinct(const Schema& schema, int num_candidates) {
+  ASSERT_EQ(schema.cluster().NumHosts(), 53);
+  Plan plan(schema);
+  plan.AddTableScan("T");
+  plan.SetRandomReplica(true);
+  plan.SetNumRemoteExecutorCandidates(num_candidates);
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  for (int i = 0; i < 100; ++i) ASSERT_OK(scheduler.Compute(&result));
+
+  // This is not intended to be used with a larger number of candidates
+  ASSERT_LE(num_candidates, 10);
+  int min_distinct_backends = num_candidates + 1;
+  int max_distinct_backends = 2 * num_candidates;
+  ASSERT_EQ(100, result.NumAssignments());
+  EXPECT_EQ(200, result.NumTotalAssignments());
+  EXPECT_EQ(200 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
+  EXPECT_GE(result.NumDistinctBackends(), min_distinct_backends);
+  EXPECT_LE(result.NumDistinctBackends(), max_distinct_backends);
+}
+
+/// Test that consistent remote placement schedules distinct blocks differently
+TEST_F(SchedulerTest, RemotePlacementBlocksDistinct) {
   int num_data_nodes = 3;
   int num_impala_nodes = 50;
+  Cluster cluster = Cluster::CreateRemoteCluster(num_impala_nodes, num_data_nodes);
 
-  // Set of Impala hosts
-  cluster.AddHosts(num_impala_nodes, true, false);
-  // Set of datanodes
-  cluster.AddHosts(num_data_nodes, false, true);
+  // Two blocks (which translate to actual files for a table) should hash differently
+  // and result in different remote placement. This verifies various combinations
+  // corresponding to how files are named.
+  for (BlockNamingPolicy naming_policy : BLOCK_NAMING_POLICIES) {
+    SCOPED_TRACE(naming_policy);
+    Schema schema(cluster);
+    int num_blocks = 2;
+    int num_remote_candidates = 3;
+    schema.AddMultiBlockTable("T", num_blocks, ReplicaPlacement::RANDOM,
+        num_remote_candidates, 0, naming_policy);
+    RemotePlacementVerifyDistinct(schema, num_remote_candidates);
+  }
+}
+
+/// Test that consistent remote placement schedules distinct file split generator specs
+/// differently
+TEST_F(SchedulerTest, RemotePlacementSpecsDistinct) {
+  int num_data_nodes = 3;
+  int num_impala_nodes = 50;
+  Cluster cluster = Cluster::CreateRemoteCluster(num_impala_nodes, num_data_nodes);
+
+  // Two specs (which translate to actual files for a table) should hash differently
+  // and result in different remote placement. This verifies that is true for all
+  // the naming policies.
+  for (BlockNamingPolicy naming_policy : BLOCK_NAMING_POLICIES) {
+    SCOPED_TRACE(naming_policy);
+    Schema schema(cluster);
+    int num_remote_candidates = 3;
+    // Add the table with the appropriate naming policy, but without adding any blocks.
+    schema.AddEmptyTable("T", naming_policy);
+    // Add two splits with one block each (i.e. the total size of the split is the
+    // block size).
+    schema.AddFileSplitGeneratorSpecs("T",
+        {{Block::DEFAULT_BLOCK_SIZE, Block::DEFAULT_BLOCK_SIZE, false},
+         {Block::DEFAULT_BLOCK_SIZE, Block::DEFAULT_BLOCK_SIZE, false}});
+    RemotePlacementVerifyDistinct(schema, num_remote_candidates);
+  }
+}
+
+/// Tests that consistent remote placement schedules blocks with distinct offsets
+/// differently
+TEST_F(SchedulerTest, RemotePlacementOffsetsDistinct) {
+  int num_data_nodes = 3;
+  int num_impala_nodes = 50;
+  Cluster cluster = Cluster::CreateRemoteCluster(num_impala_nodes, num_data_nodes);
+
+  // A FileSplitGeneratorSpec that generates two scan ranges should hash the two scan
+  // ranges differently due to different offsets. This is true regardless of the
+  // naming_policy (which should not impact the outcome).
+  for (BlockNamingPolicy naming_policy : BLOCK_NAMING_POLICIES) {
+    SCOPED_TRACE(naming_policy);
+    Schema schema(cluster);
+    int num_remote_candidates = 3;
+    // Add the table with the appropriate naming policy, but without adding any blocks.
+    schema.AddEmptyTable("T", naming_policy);
+    // Add a splittable spec that will be split into two scan ranges each of
+    // the default block size.
+    schema.AddFileSplitGeneratorSpecs("T",
+        {{2 * Block::DEFAULT_BLOCK_SIZE, Block::DEFAULT_BLOCK_SIZE, true}});
+    RemotePlacementVerifyDistinct(schema, num_remote_candidates);
+  }
+}
+
+/// Verify basic consistency of remote executor candidates. Specifically, it schedules
+/// a set of blocks, then removes some executors that did not have any blocks assigned to
+/// them, and verifies that rerunning the scheduling results in the same assignments.
+TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
+  int num_data_nodes = 3;
+  int num_impala_nodes = 50;
+  Cluster cluster = Cluster::CreateRemoteCluster(num_impala_nodes, num_data_nodes);
 
   // Replica placement is unimportant for this test. All blocks will be on
   // all datanodes, but Impala is runnning remotely.
@@ -275,28 +375,40 @@ TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
   Plan plan(schema);
   plan.AddTableScan("T1");
   plan.SetRandomReplica(false);
-  plan.SetNumRemoteExecutorCandidates(3);
+  // TODO: Consistent scheduling is only completely consistent to removing an unused
+  // node when the number of executor candidates is 1. See IMPALA-8677.
+  plan.SetNumRemoteExecutorCandidates(1);
 
   Result result_base(plan);
   SchedulerWrapper scheduler(plan);
   ASSERT_OK(scheduler.Compute(&result_base));
   EXPECT_EQ(25, result_base.NumTotalAssignments());
   EXPECT_EQ(25 * Block::DEFAULT_BLOCK_SIZE, result_base.NumTotalAssignedBytes());
+  EXPECT_GT(result_base.NumDistinctBackends(), 3);
 
-  // There are 25 blocks and 50 Impala hosts. There will be Impala hosts without
-  // any assigned bytes. Removing one of them should not change the outcome.
-  Result result_empty_removed(plan);
-  // Find an Impala host that was not assigned any bytes and remove it
-  bool removed_one = false;
+  // There are 25 blocks and 50 Impala hosts. There will be at least 25 Impala hosts
+  // without any assigned bytes. Removing some of them should not change the outcome.
+  // Generate a list of the hosts without bytes assigned.
+  vector<int> zerobyte_indices;
   for (int i = 0; i < num_impala_nodes; ++i) {
     if (result_base.NumTotalAssignedBytes(i) == 0) {
-      scheduler.RemoveBackend(cluster.hosts()[i]);
-      removed_one = true;
-      break;
+      zerobyte_indices.push_back(i);
     }
   }
-  ASSERT_TRUE(removed_one);
-  // Rerun the scheduling with the node removed.
+  EXPECT_GE(zerobyte_indices.size(), 25);
+
+  // Remove 5 nodes with zero bytes by picking several indices in the list of
+  // nodes with zero bytes and removing the corresponding backends.
+  vector<int> zerobyte_indices_to_remove({3, 7, 12, 15, 19});
+  int num_removed = 0;
+  for (int index_to_remove : zerobyte_indices_to_remove) {
+    int node_index = zerobyte_indices[index_to_remove];
+    scheduler.RemoveBackend(cluster.hosts()[node_index]);
+    num_removed++;
+  }
+  ASSERT_EQ(num_removed, 5);
+  // Rerun the scheduling with the nodes removed.
+  Result result_empty_removed(plan);
   ASSERT_OK(scheduler.Compute(&result_empty_removed));
   EXPECT_EQ(25, result_empty_removed.NumTotalAssignments());
   EXPECT_EQ(25 * Block::DEFAULT_BLOCK_SIZE, result_empty_removed.NumTotalAssignedBytes());
@@ -304,7 +416,8 @@ TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
   // Verify that the outcome is identical.
   for (int i = 0; i < num_impala_nodes; ++i) {
     EXPECT_EQ(result_base.NumRemoteAssignedBytes(i),
-              result_empty_removed.NumRemoteAssignedBytes(i));
+        result_empty_removed.NumRemoteAssignedBytes(i))
+        << "Mismatch at index " << std::to_string(i);
   }
 }
 

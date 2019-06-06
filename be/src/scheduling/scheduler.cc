@@ -109,6 +109,7 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       hdfs_scan_range.__set_offset(scan_range_offset);
       hdfs_scan_range.__set_partition_id(spec.partition_id);
       hdfs_scan_range.__set_is_erasure_coded(fb_desc->is_ec());
+      hdfs_scan_range.__set_partition_path_hash(spec.partition_path_hash);
       TScanRange scan_range;
       scan_range.__set_hdfs_file_split(hdfs_scan_range);
       TScanRangeLocationList scan_range_list;
@@ -794,10 +795,12 @@ void Scheduler::AssignmentCtx::GetRemoteExecutorCandidates(
   // than 'num_candidates'.
   set<IpAddr> distinct_backends;
   // Generate multiple hashes of the file split by using the hash as a seed to a PRNG.
-  // Note: This hashes both the filename and the offset to allow very large files
-  // to be spread across more executors.
-  uint32_t hash = HashUtil::Hash(hdfs_file_split->relative_path.data(),
-      hdfs_file_split->relative_path.length(), 0);
+  // Note: The hash includes the partition path hash, the filename (relative to the
+  // partition directory), and the offset. The offset is used to allow very large files
+  // that have multiple splits to be spread across more executors.
+  uint32_t hash = static_cast<uint32_t>(hdfs_file_split->partition_path_hash);
+  hash = HashUtil::Hash(hdfs_file_split->relative_path.data(),
+      hdfs_file_split->relative_path.length(), hash);
   hash = HashUtil::Hash(&hdfs_file_split->offset, sizeof(hdfs_file_split->offset), hash);
   pcg32 prng(hash);
   // To avoid any problem scenarios, limit the total number of iterations

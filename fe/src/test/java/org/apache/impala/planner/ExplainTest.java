@@ -161,6 +161,7 @@ public class ExplainTest extends FrontendTestBase {
 
     when(mockHdfsPartition.getLocationPath())
         .thenReturn(new org.apache.hadoop.fs.Path(path));
+    when(mockHdfsPartition.getLocation()).thenReturn(path);
     when(mockHdfsPartition.getFileDescriptors()).thenReturn(mockFilesDescs);
     when(mockHdfsPartition.getFileFormat()).thenReturn(HdfsFileFormat.PARQUET);
     when(mockHdfsPartition.getFsType()).thenReturn(fsType);

@@ -985,7 +985,8 @@ public class HdfsScanNode extends ScanNode {
     boolean splittable = partition.getFileFormat().isSplittable(
         HdfsCompression.fromFileName(fileDesc.getRelativePath()));
     TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
-        fileDesc.toThrift(), maxBlockSize, splittable, partition.getId());
+        fileDesc.toThrift(), maxBlockSize, splittable, partition.getId(),
+        partition.getLocation().hashCode());
     scanRangeSpecs_.addToSplit_specs(splitSpec);
     long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
     if (splittable) {
@@ -1051,7 +1052,7 @@ public class HdfsScanNode extends ScanNode {
         scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getRelativePath(),
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
-            fileDesc.getIsEc()));
+            fileDesc.getIsEc(), partition.getLocation().hashCode()));
         TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
         scanRangeLocations.scan_range = scanRange;
         scanRangeLocations.locations = locations;

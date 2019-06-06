@@ -191,6 +191,12 @@ struct THdfsFileSplit {
 
   // whether this file is erasure-coded
   8: required bool is_erasure_coded
+
+  // Hash of the partition's path. This must be hashed with a hash algorithm that is
+  // consistent across different processes and machines. This is currently using
+  // Java's String.hashCode(), which is consistent. For testing purposes, this can use
+  // any consistent hash.
+  9: required i32 partition_path_hash
 }
 
 // key range for single THBaseScanNode
@@ -223,6 +229,9 @@ struct TFileSplitGeneratorSpec {
 
   // ID of partition within the THdfsTable associated with this scan node.
   4: required i64 partition_id
+
+  // Hash of the partition path
+  5: required i32 partition_path_hash
 }
 
 // Specification of an individual data range which is held in its entirety
