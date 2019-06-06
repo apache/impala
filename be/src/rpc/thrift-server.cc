@@ -106,60 +106,6 @@ bool SSLProtoVersions::IsSupported(const SSLProtocol& protocol) {
   }
 }
 
-// Helper class that starts a server in a separate thread, and handles
-// the inter-thread communication to monitor whether it started
-// correctly.
-class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
- public:
-  ThriftServerEventProcessor(ThriftServer* thrift_server)
-      : thrift_server_(thrift_server),
-        signal_fired_(false) { }
-
-  // Called by the Thrift server implementation when it has acquired its resources and is
-  // ready to serve, and signals to StartAndWaitForServer that start-up is finished. From
-  // TServerEventHandler.
-  virtual void preServe();
-
-  // Called when a client connects; we create per-client state and call any
-  // ConnectionHandlerIf handler.
-  virtual void* createContext(boost::shared_ptr<TProtocol> input,
-      boost::shared_ptr<TProtocol> output);
-
-  // Called when a client starts an RPC; we set the thread-local connection context.
-  virtual void processContext(void* context, boost::shared_ptr<TTransport> output);
-
-  // Called when a client disconnects; we call any ConnectionHandlerIf handler.
-  virtual void deleteContext(void* serverContext, boost::shared_ptr<TProtocol> input,
-      boost::shared_ptr<TProtocol> output);
-
-  // Waits for a timeout of TIMEOUT_MS for a server to signal that it has started
-  // correctly.
-  Status StartAndWaitForServer();
-
- private:
-  // Lock used to ensure that there are no missed notifications between starting the
-  // supervision thread and calling signal_cond_.WaitUntil. Also used to ensure
-  // thread-safe access to members of thrift_server_
-  boost::mutex signal_lock_;
-
-  // Condition variable that is notified by the supervision thread once either
-  // a) all is well or b) an error occurred.
-  ConditionVariable signal_cond_;
-
-  // The ThriftServer under management. This class is a friend of ThriftServer, and
-  // reaches in to change member variables at will.
-  ThriftServer* thrift_server_;
-
-  // Guards against spurious condition variable wakeups
-  bool signal_fired_;
-
-  // The time, in milliseconds, to wait for a server to come up
-  static const int TIMEOUT_MS = 2500;
-
-  // Called in a separate thread
-  void Supervise();
-};
-
 Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
   // Locking here protects against missed notifications if Supervise executes quickly
   unique_lock<mutex> lock(signal_lock_);
@@ -310,9 +256,17 @@ void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
   __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 }
 
-void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext,
+bool ThriftServer::ThriftServerEventProcessor::IsIdleContext(void* context) {
+  __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
+  if (thrift_server_->connection_handler_ != nullptr) {
+    return thrift_server_->connection_handler_->IsIdleConnection(*__connection_context__);
+  }
+  return false;
+}
+
+void ThriftServer::ThriftServerEventProcessor::deleteContext(void* context,
     boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
-  __connection_context__ = (ConnectionContext*) serverContext;
+  __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 
   if (thrift_server_->connection_handler_ != NULL) {
     thrift_server_->connection_handler_->ConnectionEnd(*__connection_context__);
@@ -331,12 +285,13 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 ThriftServer::ThriftServer(const string& name,
     const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
     MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms,
-    TransportType transport_type)
+    int64_t idle_poll_period_ms, TransportType transport_type)
   : started_(false),
     port_(port),
     ssl_enabled_(false),
     max_concurrent_connections_(max_concurrent_connections),
     queue_timeout_ms_(queue_timeout_ms),
+    idle_poll_period_ms_(idle_poll_period_ms),
     name_(name),
     metrics_name_(Substitute("impala.thrift-server.$0", name_)),
     server_(NULL),
@@ -497,7 +452,7 @@ Status ThriftServer::Start() {
 
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
       protocol_factory, thread_factory, name_, max_concurrent_connections_,
-      queue_timeout_ms_));
+      queue_timeout_ms_, idle_poll_period_ms_));
   if (metrics_ != NULL) {
     (static_cast<TAcceptQueueServer*>(server_.get()))
         ->InitMetrics(metrics_, metrics_name_);

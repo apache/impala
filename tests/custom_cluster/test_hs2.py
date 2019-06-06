@@ -76,8 +76,8 @@ class TestHS2(CustomClusterTestSuite):
     assert status == "Session closed because it has no active connections"
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      "--idle_session_timeout=1 --disconnected_session_timeout=5")
+  @CustomClusterTestSuite.with_args("--idle_session_timeout=1 "
+       "--disconnected_session_timeout=5 --idle_client_poll_period_s=0")
   def test_expire_disconnected_session(self):
     """Test for the interaction between idle_session_timeout and
     disconnected_session_timeout"""

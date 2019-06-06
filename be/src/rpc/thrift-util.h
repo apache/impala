@@ -145,8 +145,11 @@ void PrintTColumnValue(std::ostream& out, const TColumnValue& colval);
 /// string representation
 bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b);
 
-/// Returns true if the TTransportException corresponds to a TCP socket recv timeout.
-bool IsRecvTimeoutTException(const apache::thrift::transport::TTransportException& e);
+/// Returns true if the TTransportException corresponds to a TCP socket read timeout.
+bool IsReadTimeoutTException(const apache::thrift::transport::TTransportException& e);
+
+/// Returns true if the TTransportException corresponds to a TCP socket peek timeout.
+bool IsPeekTimeoutTException(const apache::thrift::transport::TTransportException& e);
 
 /// Returns true if the exception indicates the other end of the TCP socket was closed.
 bool IsConnResetTException(const apache::thrift::transport::TTransportException& e);

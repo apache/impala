@@ -58,9 +58,10 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::concurrency;
 
-// IsRecvTimeoutTException() and IsConnResetTException() make assumption about the
-// implementation of read(), write() and write_partial() in TSocket.cpp and those
-// functions may change between different versions of Thrift.
+// IsReadTimeoutTException(), IsPeekTimeoutTException() and IsConnResetTException() make
+// assumption about the implementation of read(), peek(), write() and write_partial() in
+// TSocket.cpp and TSSLSocket.cpp. Those functions may change between different versions
+// of Thrift.
 static_assert(PACKAGE_VERSION[0] == '0', "");
 static_assert(PACKAGE_VERSION[1] == '.', "");
 static_assert(PACKAGE_VERSION[2] == '9', "");
@@ -158,12 +159,20 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
   return false;
 }
 
-bool IsRecvTimeoutTException(const TTransportException& e) {
-  // String taken from TSocket::read() Thrift's TSocket.cpp.
+bool IsReadTimeoutTException(const TTransportException& e) {
+  // String taken from TSocket::read() Thrift's TSocket.cpp and TSSLSocket.cpp.
   return (e.getType() == TTransportException::TIMED_OUT &&
              strstr(e.what(), "EAGAIN (timed out)") != nullptr) ||
          (e.getType() == TTransportException::INTERNAL_ERROR &&
              strstr(e.what(), "SSL_read: Resource temporarily unavailable") != nullptr);
+}
+
+bool IsPeekTimeoutTException(const TTransportException& e) {
+  // String taken from TSocket::peek() Thrift's TSocket.cpp and TSSLSocket.cpp.
+  return (e.getType() == TTransportException::UNKNOWN &&
+             strstr(e.what(), "recv(): Resource temporarily unavailable") != nullptr) ||
+         (e.getType() == TTransportException::INTERNAL_ERROR &&
+             strstr(e.what(), "SSL_peek: Resource temporarily unavailable") != nullptr);
 }
 
 bool IsConnResetTException(const TTransportException& e) {

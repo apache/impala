@@ -32,6 +32,17 @@
 #include "util/metrics-fwd.h"
 #include "util/thread.h"
 
+namespace apache {
+namespace thrift {
+namespace protocol {
+class TProtocol;
+}
+namespace server {
+class TAcceptQueueServer;
+}
+}
+}
+
 namespace impala {
 
 class AuthProvider;
@@ -99,6 +110,11 @@ class ThriftServer {
     /// valid and clients must not refer to it again.
     virtual void ConnectionEnd(const ConnectionContext& connection_context) = 0;
 
+    /// Returns true if the connection is considered idle. A connection is considered
+    /// idle if all the sessions associated with it have expired due to idle timeout.
+    /// Called when a client has been inactive for --idle_client_poll_period_s seconds.
+    virtual bool IsIdleConnection(const ConnectionContext& connection_context) = 0;
+
     virtual ~ConnectionHandlerIf() = default;
   };
 
@@ -147,6 +163,74 @@ class ThriftServer {
 
  private:
   friend class ThriftServerBuilder;
+  friend class apache::thrift::server::TAcceptQueueServer;
+
+  /// Helper class which monitors starting servers. Needs access to internal members, and
+  /// is not used outside of this class.
+  friend class ThriftServerEventProcessor;
+
+  /// Helper class that starts a server in a separate thread, and handles
+  /// the inter-thread communication to monitor whether it started
+  /// correctly.
+  class ThriftServerEventProcessor : public apache::thrift::server::TServerEventHandler {
+   public:
+    ThriftServerEventProcessor(ThriftServer* thrift_server)
+      : thrift_server_(thrift_server),
+        signal_fired_(false) { }
+
+    /// Called by the Thrift server implementation when it has acquired its resources and
+    /// is ready to serve, and signals to StartAndWaitForServer that start-up is finished.
+    /// From TServerEventHandler.
+    virtual void preServe();
+
+    /// Called when a client connects; we create per-client state and call any
+    /// ConnectionHandlerIf handler.
+    virtual void* createContext(
+        boost::shared_ptr<apache::thrift::protocol::TProtocol> input,
+        boost::shared_ptr<apache::thrift::protocol::TProtocol> output);
+
+    /// Called when a client starts an RPC; we set the thread-local connection context.
+    virtual void processContext(void* context,
+        boost::shared_ptr<apache::thrift::transport::TTransport> output);
+
+    /// Called when a client disconnects; we call any ConnectionHandlerIf handler.
+    virtual void deleteContext(void* context,
+        boost::shared_ptr<apache::thrift::protocol::TProtocol> input,
+        boost::shared_ptr<apache::thrift::protocol::TProtocol> output);
+
+    /// Returns true if a client's connection is idle. A client's connection is idle iff
+    /// all the sessions associated with it have expired due to idle timeout. Called from
+    /// TAcceptQueueServer::Task::run() after clients have been inactive for
+    /// --idle_client_poll_period_s seconds.
+    bool IsIdleContext(void* context);
+
+    /// Waits for a timeout of TIMEOUT_MS for a server to signal that it has started
+    /// correctly.
+    Status StartAndWaitForServer();
+
+   private:
+    /// Lock used to ensure that there are no missed notifications between starting the
+    /// supervision thread and calling signal_cond_.WaitUntil. Also used to ensure
+    /// thread-safe access to members of thrift_server_
+    boost::mutex signal_lock_;
+
+    /// Condition variable that is notified by the supervision thread once either
+    /// a) all is well or b) an error occurred.
+    ConditionVariable signal_cond_;
+
+    /// The ThriftServer under management. This class is a friend of ThriftServer, and
+    /// reaches in to change member variables at will.
+    ThriftServer* thrift_server_;
+
+    /// Guards against spurious condition variable wakeups
+    bool signal_fired_;
+
+    /// The time, in milliseconds, to wait for a server to come up
+    static const int TIMEOUT_MS = 2500;
+
+    /// Called in a separate thread
+    void Supervise();
+  };
 
   /// Creates, but does not start, a new server on the specified port
   /// that exports the supplied interface.
@@ -158,13 +242,17 @@ class ThriftServer {
   ///  - metrics: if not nullptr, the server will register metrics on this object
   ///  - max_concurrent_connections: The maximum number of concurrent connections allowed.
   ///    If 0, there will be no enforced limit on the number of concurrent connections.
-  ///  - amount of time in milliseconds an accepted client connection will be held in
-  ///    the accepted queue, after which the request will be rejected if a server
-  ///    thread can't be found. If 0, no timeout is enforced.
+  ///  - queue_timeout_ms: amount of time in milliseconds an accepted client connection
+  ///    will be held in the accepted queue, after which the request will be rejected if
+  ///    a service thread can't be found. If 0, no timeout is enforced.
+  ///  - idle_poll_period_ms: Amount of time, in milliseconds, of client's inactivity
+  ///    before the service thread wakes up to check if the connection should be closed
+  ///    due to inactivity. If 0, no polling happens.
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
       int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0,
+      int64_t idle_poll_period_ms = 0,
       TransportType server_transport = TransportType::BINARY);
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
@@ -218,6 +306,11 @@ class ThriftServer {
   /// Used in TAcceptQueueServer.
   int64_t queue_timeout_ms_;
 
+  /// Amount of time, in milliseconds, of client's inactivity before the service thread
+  /// wakes up to check if the connection should be closed due to inactivity. If 0, no
+  /// polling happens.
+  int64_t idle_poll_period_ms_;
+
   /// User-specified identifier that shows up in logs
   const std::string name_;
 
@@ -263,11 +356,6 @@ class ThriftServer {
 
   /// Underlying transport type used by this thrift server.
   TransportType transport_type_;
-
-  /// Helper class which monitors starting servers. Needs access to internal members, and
-  /// is not used outside of this class.
-  class ThriftServerEventProcessor;
-  friend class ThriftServerEventProcessor;
 };
 
 /// Helper class to build new ThriftServer instances.
@@ -297,8 +385,13 @@ class ThriftServerBuilder {
     return *this;
   }
 
-  ThriftServerBuilder& queue_timeout(int64_t timeout_ms) {
+  ThriftServerBuilder& queue_timeout_ms(int64_t timeout_ms) {
     queue_timeout_ms_ = timeout_ms;
+    return *this;
+  }
+
+  ThriftServerBuilder& idle_poll_period_ms(int64_t timeout_ms) {
+    idle_poll_period_ms_ = timeout_ms;
     return *this;
   }
 
@@ -344,7 +437,8 @@ class ThriftServerBuilder {
   Status Build(ThriftServer** server) {
     std::unique_ptr<ThriftServer> ptr(
         new ThriftServer(name_, processor_, port_, auth_provider_, metrics_,
-            max_concurrent_connections_, queue_timeout_ms_, server_transport_type_));
+            max_concurrent_connections_, queue_timeout_ms_, idle_poll_period_ms_,
+            server_transport_type_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
@@ -355,6 +449,7 @@ class ThriftServerBuilder {
 
  private:
   int64_t queue_timeout_ms_ = 0;
+  int64_t idle_poll_period_ms_ = 0;
   int max_concurrent_connections_ = 0;
   std::string name_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;

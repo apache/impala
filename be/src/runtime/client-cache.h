@@ -241,7 +241,7 @@ class ClientConnection {
     try {
       (client_->*f)(*response, request, &send_done);
     } catch (const apache::thrift::transport::TTransportException& e) {
-      if (send_done && IsRecvTimeoutTException(e)) {
+      if (send_done && IsReadTimeoutTException(e)) {
         return RecvTimeoutStatus(typeid(*response).name());
       }
 
@@ -310,7 +310,7 @@ class ClientConnection {
     try {
       (client_->*recv_func)(*response);
     } catch (const apache::thrift::transport::TTransportException& e) {
-      if (IsRecvTimeoutTException(e)) {
+      if (IsReadTimeoutTException(e)) {
         return RecvTimeoutStatus(typeid(*response).name());
       }
       // If it's not timeout exception, then the connection is broken, stop retrying.

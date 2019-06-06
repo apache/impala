@@ -23,8 +23,11 @@
 #include "rpc/TAcceptQueueServer.h"
 
 #include <thrift/concurrency/PlatformThreadFactory.h>
+#include <thrift/transport/TSocket.h>
 
 #include "util/metrics.h"
+#include "rpc/thrift-util.h"
+#include "rpc/thrift-server.h"
 #include "util/thread-pool.h"
 
 DEFINE_int32(accepted_cnxn_queue_depth, 10000,
@@ -72,8 +75,10 @@ class TAcceptQueueServer::Task : public Runnable {
         if (eventHandler != nullptr) {
           eventHandler->processContext(connectionContext, transport_);
         }
-        if (!processor_->process(input_, output_, connectionContext)
-            || !input_->getTransport()->peek()) {
+        // Setting a socket timeout for process() may lead to false positive
+        // and prematurely closes a slow client's connection.
+        if (!processor_->process(input_, output_, connectionContext) ||
+            !Peek(input_, connectionContext, eventHandler)) {
           break;
         }
       }
@@ -114,6 +119,56 @@ class TAcceptQueueServer::Task : public Runnable {
   }
 
  private:
+
+  // This function blocks until some bytes show up from the client.
+  // Returns true if some bytes are available from client;
+  // Returns false upon reading EOF, in which case the connection
+  // will be closed by the caller.
+  //
+  // If idle_poll_period_ms_ is not 0, this function will block up
+  // to idle_poll_period_ms_ milliseconds before waking up to check
+  // if the sessions associated with the connection have all expired
+  // due to inactivity. If so, it will return false and the connection
+  // will be closed by the caller.
+  bool Peek(shared_ptr<TProtocol> input, void* connectionContext,
+      boost::shared_ptr<TServerEventHandler> eventHandler) {
+    // Set a timeout on input socket if idle_poll_period_ms_ is non-zero.
+    TSocket* socket = static_cast<TSocket*>(transport_.get());
+    if (server_.idle_poll_period_ms_ > 0) {
+      socket->setRecvTimeout(server_.idle_poll_period_ms_);
+    }
+
+    // Block until some bytes show up or EOF or timeout.
+    bool bytes_pending = true;
+    for (;;) {
+      try {
+        bytes_pending = input_->getTransport()->peek();
+        break;
+      } catch (const TTransportException& ttx) {
+        // Implementaion of the underlying transport's peek() may call either
+        // read() or peek() of the socket.
+        if (eventHandler != nullptr && server_.idle_poll_period_ms_ > 0 &&
+            (IsReadTimeoutTException(ttx) || IsPeekTimeoutTException(ttx))) {
+          ThriftServer::ThriftServerEventProcessor* thriftServerHandler =
+              static_cast<ThriftServer::ThriftServerEventProcessor*>(eventHandler.get());
+          if (thriftServerHandler->IsIdleContext(connectionContext)) {
+            const string& client = socket->getSocketInfo();
+            GlobalOutput.printf(
+               "TAcceptQueueServer closing connection to idle client %s", client.c_str());
+            bytes_pending = false;
+            break;
+          }
+        } else {
+          // Rethrow the exception to be handled by callers.
+          throw;
+        }
+      }
+    }
+    // Unset the socket timeout.
+    if (server_.idle_poll_period_ms_ > 0) socket->setRecvTimeout(0);
+    return bytes_pending;
+  }
+
   TAcceptQueueServer& server_;
   friend class TAcceptQueueServer;
 
@@ -128,10 +183,10 @@ TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<TProcessor>& proc
     const boost::shared_ptr<TTransportFactory>& transportFactory,
     const boost::shared_ptr<TProtocolFactory>& protocolFactory,
     const boost::shared_ptr<ThreadFactory>& threadFactory, const string& name,
-    int32_t maxTasks, int64_t timeout_ms)
+    int32_t maxTasks, int64_t queue_timeout_ms, int64_t idle_poll_period_ms)
     : TServer(processor, serverTransport, transportFactory, protocolFactory),
       threadFactory_(threadFactory), name_(name), maxTasks_(maxTasks),
-      queue_timeout_ms_(timeout_ms) {
+      queue_timeout_ms_(queue_timeout_ms), idle_poll_period_ms_(idle_poll_period_ms) {
   init();
 }
 

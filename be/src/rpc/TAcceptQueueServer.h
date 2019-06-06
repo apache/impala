@@ -62,7 +62,8 @@ class TAcceptQueueServer : public TServer {
       const boost::shared_ptr<TTransportFactory>& transportFactory,
       const boost::shared_ptr<TProtocolFactory>& protocolFactory,
       const boost::shared_ptr<ThreadFactory>& threadFactory,
-      const std::string& name, int32_t maxTasks = 0, int64_t timeout_ms = 0);
+      const std::string& name, int32_t maxTasks = 0,
+      int64_t queue_timeout_ms = 0, int64_t idle_poll_period_ms = 0);
 
   ~TAcceptQueueServer() override = default;
 
@@ -116,6 +117,11 @@ class TAcceptQueueServer : public TServer {
   /// Amount of time in milliseconds after which a connection request will be timed out.
   /// Default value is 0, which means no timeout.
   int64_t queue_timeout_ms_;
+
+  /// Amount of time, in milliseconds, of client's inactivity before the service thread
+  /// wakes up to check if the connection should be closed due to inactivity. If 0, no
+  /// polling happens.
+  int64_t idle_poll_period_ms_;
 };
 
 } // namespace server

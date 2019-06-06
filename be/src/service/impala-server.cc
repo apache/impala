@@ -30,6 +30,7 @@
 #include <boost/lexical_cast.hpp>
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
+#include <gutil/walltime.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
 #include <rapidjson/rapidjson.h>
@@ -217,7 +218,12 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
 DEFINE_int32(disconnected_session_timeout, 15 * 60, "The time, in seconds, that a "
     "hiveserver2 session will be maintained after the last connection that it has been "
     "used over is disconnected.");
-
+DEFINE_int32(idle_client_poll_period_s, 30, "The poll period, in seconds, after "
+    "no activity from an Impala client which an Impala service thread (beeswax and HS2) "
+    "wakes up to check if the connection should be closed. If --idle_session_timeout is "
+    "also set, a client connection will be closed if all the sessions associated with it "
+    "have become idle. Set this to 0 to disable the polling behavior and clients' "
+    "connection will remain opened until they are explicitly closed.");
 DEFINE_int32(status_report_interval_ms, 5000, "(Advanced) Interval between profile "
     "reports in milliseconds. If set to <= 0, periodic reporting is disabled and only "
     "the final report is sent.");
@@ -2058,6 +2064,10 @@ void ImpalaServer::ConnectionEnd(
     // Not every connection must have an associated session
     if (it == connection_to_sessions_map_.end()) return;
 
+    // Sessions are not removed from the map even after they are closed and an entry
+    // won't be added to the map unless a session is established.
+    DCHECK(!it->second.empty());
+
     // We don't expect a large number of sessions per connection, so we copy it, so that
     // we can drop the map lock early.
     disconnected_sessions = std::move(it->second);
@@ -2097,6 +2107,42 @@ void ImpalaServer::ConnectionEnd(
       }
     }
   }
+}
+
+bool ImpalaServer::IsIdleConnection(
+    const ThriftServer::ConnectionContext& connection_context) {
+  // The set of sessions associated with this connection.
+  std::set<TUniqueId> session_ids;
+  {
+    TUniqueId connection_id = connection_context.connection_id;
+    unique_lock<mutex> l(connection_to_sessions_map_lock_);
+    ConnectionToSessionMap::iterator it = connection_to_sessions_map_.find(connection_id);
+
+    // Not every connection must have an associated session
+    if (it == connection_to_sessions_map_.end()) return false;
+
+    session_ids = it->second;
+
+    // Sessions are not removed from the map even after they are closed and an entry
+    // won't be added to the map unless a session is established. The code below relies
+    // on this invariant to not mark a connection with no session yet as idle.
+    DCHECK(!session_ids.empty());
+  }
+
+  // Check if all the sessions associated with the connection are idle.
+  {
+    lock_guard<mutex> map_lock(session_state_map_lock_);
+    for (const TUniqueId& session_id : session_ids) {
+      const auto it = session_state_map_.find(session_id);
+      if (it == session_state_map_.end()) continue;
+
+      // If any session associated with this connection is not idle,
+      // the connection is not idle.
+      lock_guard<mutex> state_lock(it->second->lock);
+      if (!it->second->expired) return false;
+    }
+  }
+  return true;
 }
 
 void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
@@ -2468,7 +2514,8 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
           builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
           .metrics(exec_env_->metrics())
           .max_concurrent_connections(FLAGS_fe_service_threads)
-          .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
+          .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
+          .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
           .Build(&server));
       beeswax_server_.reset(server);
       beeswax_server_->SetConnectionHandler(this);
@@ -2496,7 +2543,8 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
           builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
           .metrics(exec_env_->metrics())
           .max_concurrent_connections(FLAGS_fe_service_threads)
-          .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
+          .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
+          .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
           .Build(&server));
       hs2_server_.reset(server);
       hs2_server_->SetConnectionHandler(this);
@@ -2529,7 +2577,8 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
               .transport_type(ThriftServer::TransportType::HTTP)
               .metrics(exec_env_->metrics())
               .max_concurrent_connections(FLAGS_fe_service_threads)
-              .queue_timeout(FLAGS_accepted_client_cnxn_timeout)
+              .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
+              .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
               .Build(&http_server));
       hs2_http_server_.reset(http_server);
       hs2_http_server_->SetConnectionHandler(this);
