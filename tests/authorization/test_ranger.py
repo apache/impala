@@ -548,3 +548,57 @@ class TestRanger(CustomClusterTestSuite):
                        error_msg.format("SHOW ROLE GRANT GROUP"))]:
       result = self.execute_query_expect_failure(impala_client, statement[0], user=user)
       assert statement[1] in str(result)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_grant_revoke_invalid_principal(self):
+    """Tests grant/revoke to/from invalid principal should return more readable
+       error messages."""
+    valid_user = "admin"
+    invalid_user = "invalid_user"
+    invalid_group = "invalid_group"
+    # TODO(IMPALA-8640): Create two different Impala clients because the users to
+    # workaround the bug.
+    invalid_impala_client = self.create_impala_client()
+    valid_impala_client = self.create_impala_client()
+    for statement in ["grant select on table functional.alltypes to user {0}"
+                      .format(getuser()),
+                      "revoke select on table functional.alltypes from user {0}"
+                      .format(getuser())]:
+      result = self.execute_query_expect_failure(invalid_impala_client,
+                                                 statement,
+                                                 user=invalid_user)
+      if "grant" in statement:
+        assert "Error granting a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantor user invalid_user doesn't exist" in str(result)
+      else:
+        assert "Error revoking a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantor user invalid_user doesn't exist" in str(result)
+
+    for statement in ["grant select on table functional.alltypes to user {0}"
+                      .format(invalid_user),
+                      "revoke select on table functional.alltypes from user {0}"
+                      .format(invalid_user)]:
+      result = self.execute_query_expect_failure(valid_impala_client,
+                                                 statement,
+                                                 user=valid_user)
+      if "grant" in statement:
+        assert "Error granting a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantee user invalid_user doesn't exist" in str(result)
+      else:
+        assert "Error revoking a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantee user invalid_user doesn't exist" in str(result)
+
+    for statement in ["grant select on table functional.alltypes to group {0}"
+                      .format(invalid_group),
+                      "revoke select on table functional.alltypes from group {0}"
+                      .format(invalid_group)]:
+      result = self.execute_query_expect_failure(valid_impala_client,
+                                                 statement,
+                                                 user=valid_user)
+      if "grant" in statement:
+        assert "Error granting a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantee group invalid_group doesn't exist" in str(result)
+      else:
+        assert "Error revoking a privilege in Ranger. Ranger error message: " \
+               "HTTP 403 Error: Grantee group invalid_group doesn't exist" in str(result)

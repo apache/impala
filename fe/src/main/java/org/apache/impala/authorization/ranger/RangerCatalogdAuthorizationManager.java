@@ -40,6 +40,8 @@ import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +59,8 @@ import java.util.function.Supplier;
  * Operations not supported by Ranger will throw an {@link UnsupportedFeatureException}.
  */
 public class RangerCatalogdAuthorizationManager implements AuthorizationManager {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      RangerCatalogdAuthorizationManager.class);
   private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
@@ -171,7 +175,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         }
       }
     } catch (Exception e) {
-      throw new InternalException(e.getMessage());
+      LOG.error("Error granting a privilege in Ranger: ", e);
+      throw new InternalException("Error granting a privilege in Ranger. " +
+          "Ranger error message: " + e.getMessage());
     }
   }
 
@@ -184,7 +190,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         }
       }
     } catch (Exception e) {
-      throw new InternalException(e.getMessage());
+      LOG.error("Error revoking a privilege in Ranger: ", e);
+      throw new InternalException("Error revoking a privilege in Ranger. " +
+          "Ranger error message: " + e.getMessage());
     }
   }
 
