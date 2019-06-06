@@ -560,9 +560,8 @@ class TestCreateExternalTable(KuduTestSuite):
         assert ["", "EXTERNAL", "TRUE"] in table_desc
         assert ["", "kudu.master_addresses", KUDU_MASTER_HOSTS] in table_desc
         assert ["", "kudu.table_name", kudu_table.name] in table_desc
-        # TODO(IMPALA-8629): Uncomment tests after Kudu adjusts its StorageHandler logic.
-        # assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
-        #     in table_desc
+        assert ["", "storage_handler", "org.apache.hadoop.hive.kudu.KuduStorageHandler"] \
+            in table_desc
 
   @SkipIfKudu.hms_integration_enabled
   def test_col_types(self, cursor, kudu_client):

@@ -315,8 +315,11 @@ public class PlannerTestBase extends FrontendTestBase {
             Preconditions.checkNotNull(kuduClient_,
                 "Test should not be invoked on platforms that do not support Kudu.");
             try {
-              result.append(KuduScanToken.stringifySerializedToken(
-                  locations.scan_range.kudu_scan_token.array(), kuduClient_));
+              String token = KuduScanToken.stringifySerializedToken(
+                  locations.scan_range.kudu_scan_token.array(), kuduClient_);
+              // Don't match against the table id as its nondeterministic.
+              token = token.replaceAll(" table-id=.*?,", "");
+              result.append(token);
             } catch (IOException e) {
               throw new IllegalStateException("Unable to parse Kudu scan token", e);
             }

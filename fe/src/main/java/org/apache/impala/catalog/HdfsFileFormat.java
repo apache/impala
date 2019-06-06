@@ -67,9 +67,10 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat",
       "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
       true, true, false),
-  KUDU("org.apache.kudu.mapreduce.KuduTableInputFormat",
-      "org.apache.kudu.mapreduce.KuduTableOutputFormat",
-      "", false, false, false);
+  KUDU("org.apache.hadoop.hive.kudu.KuduInputFormat",
+       "org.apache.hadoop.hive.kudu.KuduOutputFormat",
+       "org.apache.hadoop.hive.kudu.KuduSerDe",
+       false, false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;

@@ -85,12 +85,6 @@ public class KuduTable extends Table implements FeKuduTable {
   // Kudu specific value for the storage handler table property keyed by
   // KEY_STORAGE_HANDLER.
   public static final String KUDU_STORAGE_HANDLER =
-      "org.apache.kudu.hive.KuduStorageHandler";
-
-  // TODO(IMPALA-8629): Remove this after Kudu adjusts its StorageHandler logic.
-  // Once that is done KUDU_STORAGE_HANDLER will be
-  // "org.apache.hadoop.hive.kudu.KuduStorageHandler".
-  public static final String TEMP_KUDU_STORAGE_HANDLER =
       "org.apache.hadoop.hive.kudu.KuduStorageHandler";
 
   // Key to specify the number of tablet replicas.
@@ -146,8 +140,7 @@ public class KuduTable extends Table implements FeKuduTable {
 
   public static boolean isKuduStorageHandler(String handler) {
     return handler != null && (handler.equals(KUDU_LEGACY_STORAGE_HANDLER) ||
-                               handler.equals(KUDU_STORAGE_HANDLER) ||
-                               handler.equals(TEMP_KUDU_STORAGE_HANDLER));
+                               handler.equals(KUDU_STORAGE_HANDLER));
   }
 
   public static boolean isKuduTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {

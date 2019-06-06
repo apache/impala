@@ -168,9 +168,8 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
         assert ["", "EXTERNAL", "TRUE"] in table_desc
         assert ["", "kudu.master_addresses", KUDU_MASTER_HOSTS] in table_desc
         assert ["", "kudu.table_name", kudu_table.name] in table_desc
-        # TODO(IMPALA-8629): Uncomment tests after Kudu adjusts its StorageHandler logic.
-        # assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
-        #     in table_desc
+        assert ["", "storage_handler", "org.apache.hadoop.hive.kudu.KuduStorageHandler"] \
+            in table_desc
 
   @pytest.mark.execute_serially
   def test_implicit_managed_table_props(self, cursor, kudu_client, unique_database):
@@ -191,9 +190,8 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
     assert any("kudu.master_addresses" in s for s in table_desc)
     assert ["Table Type:", "MANAGED_TABLE", None] in table_desc
     assert ["", "kudu.table_name", "%s.foo" % unique_database] in table_desc
-    # TODO(IMPALA-8629): Uncomment tests after Kudu adjusts its StorageHandler logic.
-    # assert ["", "storage_handler", "org.apache.kudu.hive.KuduStorageHandler"] \
-    #     in table_desc
+    assert ["", "storage_handler", "org.apache.hadoop.hive.kudu.KuduStorageHandler"] \
+        in table_desc
 
   @pytest.mark.execute_serially
   def test_drop_non_empty_db(self, unique_cursor, kudu_client):

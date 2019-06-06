@@ -338,7 +338,8 @@ public class ToSqlTest extends FrontendTestBase {
         String.format("CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
         "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
         "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='%s', " +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler')", kuduMasters),
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
+        kuduMasters),
         true);
   }
 
@@ -372,7 +373,7 @@ public class ToSqlTest extends FrontendTestBase {
         String.format("CREATE TABLE default.p PRIMARY KEY (a, b) " +
         "PARTITION BY HASH (a) PARTITIONS 3, RANGE (b) (PARTITION VALUE = 1) " +
         "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='%s', " +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler') AS SELECT " +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler') AS SELECT " +
         "int_col a, bigint_col b FROM functional.alltypes", kuduMasters), true);
   }
 

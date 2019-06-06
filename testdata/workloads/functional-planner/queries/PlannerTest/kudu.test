@@ -6,9 +6,9 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -26,9 +26,9 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -181,7 +181,7 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -204,9 +204,9 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -230,9 +230,9 @@ PLAN-ROOT SINK
    row-size=28B cardinality=0
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
-  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |

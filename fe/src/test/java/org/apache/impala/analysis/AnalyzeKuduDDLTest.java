@@ -198,14 +198,13 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partition 30 < values) stored as kudu tblproperties" +
         "('kudu.master_addresses' = '%s')", kuduMasters));
     // Not using the STORED AS KUDU syntax to specify a Kudu table
-    // TODO(IMPALA-8629): Uncomment tests after Kudu adjusts its StorageHandler logic.
-    // AnalysisError("create table tab (x int) tblproperties (" +
-    //     "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
-    //     CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
+        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     // Creating unpartitioned table results in a warning.
-    // AnalyzesOk("create table tab (x int primary key) stored as kudu " +
-    //     "tblproperties ('storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
-    //     "Unpartitioned Kudu tables are inefficient for large data sizes.");
+    AnalyzesOk("create table tab (x int primary key) stored as kudu tblproperties (" +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     // Invalid value for number of replicas
     AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
         "'kudu.num_tablet_replicas'='1.1')",
@@ -445,14 +444,15 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     // Use all allowed optional table props.
     AnalyzesOk(String.format("create external table t stored as kudu tblproperties (" +
         "'kudu.table_name'='tab', 'kudu.master_addresses' = '%s', " +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler')", kuduMasters));
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
+        kuduMasters));
     // Kudu table should be specified using the STORED AS KUDU syntax.
     AnalysisError("create external table t tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler'," +
         "'kudu.table_name'='t')",
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create external table t tblproperties (" +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler'," +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler'," +
         "'kudu.table_name'='t')",
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     // Columns should not be specified in an external Kudu table
@@ -468,7 +468,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler'," +
         "'kudu.table_name'='t')", CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create external table t (x int) stored as parquet tblproperties (" +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler'," +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler'," +
         "'kudu.table_name'='t')", CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create external table t stored as kudu tblproperties (" +
         "'storage_handler'='foo', 'kudu.table_name'='t')",
