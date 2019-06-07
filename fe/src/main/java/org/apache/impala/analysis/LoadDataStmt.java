@@ -110,6 +110,7 @@ public class LoadDataStmt extends StatementBase {
           dbName_ + "." + getTbl());
     }
     analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
+    analyzer.ensureTableNotTransactional(table);
 
     // Analyze the partition spec, if one was specified.
     if (partitionSpec_ != null) {

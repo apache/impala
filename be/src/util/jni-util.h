@@ -424,6 +424,12 @@ inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method
   return JniCall::instance_method(obj, method).with_thrift_arg(arg).Call();
 }
 
+template <>
+inline Status JniUtil::CallJniMethod<int64_t>(const jobject& obj, const jmethodID& method,
+    const int64_t& arg) {
+  return JniCall::instance_method(obj, method).with_primitive_arg(arg).Call();
+}
+
 template <typename T, typename R>
 inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
     const T& arg, R* response) {

@@ -28,6 +28,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -61,6 +63,7 @@ import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.HiveMetadataFormatUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
@@ -445,6 +448,70 @@ public class MetastoreShim {
   }
 
   /**
+   * Opens a new transaction.
+   * @param client is the HMS client to be used.
+   * @param userId of user who is opening this transaction.
+   * @return the new transaction id.
+   * @throws TransactionException
+   */
+  public static long openTransaction(IMetaStoreClient client, String userId)
+      throws TransactionException {
+    try {
+      return client.openTxn(userId);
+    } catch (Exception e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Commits a transaction.
+   * @param client is the HMS client to be used.
+   * @param txnId is the transaction id.
+   * @throws TransactionException
+   */
+  public static void commitTransaction(IMetaStoreClient client, long txnId)
+      throws TransactionException {
+    try {
+      client.commitTxn(txnId);
+    } catch (Exception e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Aborts a transaction.
+   * @param client is the HMS client to be used.
+   * @param txnId is the transaction id.
+   * @throws TransactionException
+   */
+  public static void abortTransaction(IMetaStoreClient client, long txnId)
+      throws TransactionException {
+    try {
+      client.abortTxns(Arrays.asList(txnId));
+    } catch (Exception e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Allocates a write id for the given table.
+   * @param client is the HMS client to be used.
+   * @param txnId is the transaction id.
+   * @param dbName is the database name.
+   * @param tableName is the target table name.
+   * @return the allocated write id.
+   * @throws TransactionException
+   */
+  public static long allocateTableWriteId(IMetaStoreClient client, long txnId,
+      String dbName, String tableName) throws TransactionException {
+    try {
+      return client.allocateTableWriteId(txnId, dbName, tableName);
+    } catch (Exception e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
    * Set impala capabilities to hive client
    * Impala supports:
    * - external table read/write
@@ -464,12 +531,12 @@ public class MetastoreShim {
         BackendConfig.INSTANCE.getImpalaBuildVersion() : String.valueOf(MAJOR_VERSION);
     if (buildVersion == null) buildVersion = String.valueOf(MAJOR_VERSION);
 
-    // TODO: Add HIVEMANAGEDINSERTWRITE once IMPALA-8636 goes in.
     String impalaId = String.format("Impala%s@%s", buildVersion, hostName);
     String[] capabilities = new String[] {
         EXTWRITE, // External table write
         EXTREAD,  // External table read
-        HIVEMANAGEDINSERTREAD,
+        HIVEMANAGEDINSERTREAD, // Insert-only table read
+        HIVEMANAGEDINSERTWRITE, // Insert-only table write
         HIVESQL,
         HIVEMQT,
         HIVEBUCKET2 // Includes the capability to get the correct bucket number.

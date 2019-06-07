@@ -109,7 +109,8 @@ Frontend::Frontend() {
     {"getTableFiles", "([B)[B", &get_table_files_id_},
     {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
-    {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_}
+    {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_},
+    {"abortTransaction", "(J)V", &abort_txn_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -263,6 +264,10 @@ Status Frontend::GetHadoopGroups(const TGetHadoopGroupsRequest& request,
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
   return JniUtil::CallJniMethod(fe_, load_table_data_id_, request, response);
+}
+
+Status Frontend::AbortTransaction(int64_t transaction_id) {
+  return JniUtil::CallJniMethod(fe_, abort_txn_, transaction_id);
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {

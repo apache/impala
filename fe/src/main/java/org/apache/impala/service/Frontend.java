@@ -33,6 +33,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -86,12 +89,15 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
+import org.apache.impala.catalog.MetaStoreClientPool;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hooks.QueryCompleteContext;
 import org.apache.impala.hooks.QueryEventHook;
@@ -141,6 +147,7 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.PatternMatcher;
@@ -247,6 +254,9 @@ public class Frontend {
 
   private final QueryEventHookManager queryHookManager_;
 
+  // Stores metastore clients for direct accesses to HMS.
+  private final MetaStoreClientPool metaStoreClientPool_;
+
   public Frontend(AuthorizationFactory authzFactory) throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig());
   }
@@ -279,6 +289,7 @@ public class Frontend {
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
+    metaStoreClientPool_ = new MetaStoreClientPool(1, 0);
   }
 
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
@@ -1254,108 +1265,131 @@ public class Frontend {
 
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
-    AnalysisResult analysisResult =
-        analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache, authzChecker_.get());
+    AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache,
+        authzChecker_.get());
     LOG.info("Analysis and authorization finished.");
     Preconditions.checkNotNull(analysisResult.getStmt());
-
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
 
-    TQueryOptions queryOptions = queryCtx.client_request.query_options;
-    if (analysisResult.isCatalogOp()) {
-      result.stmt_type = TStmtType.DDL;
-      createCatalogOpRequest(analysisResult, result);
-      TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
-      if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
-        result.catalog_op_request.setLineage_graph(thriftLineageGraph);
-      }
-      setMtDopForCatalogOp(analysisResult, queryOptions);
-      // All DDL operations except for CTAS are done with analysis at this point.
-      if (!analysisResult.isCreateTableAsSelectStmt()) {
+    try {
+      TQueryOptions queryOptions = queryCtx.client_request.query_options;
+      if (analysisResult.isCatalogOp()) {
+        result.stmt_type = TStmtType.DDL;
+        createCatalogOpRequest(analysisResult, result);
+        TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
+        if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
+          result.catalog_op_request.setLineage_graph(thriftLineageGraph);
+        }
+        setMtDopForCatalogOp(analysisResult, queryOptions);
+        // All DDL operations except for CTAS are done with analysis at this point.
+        if (!analysisResult.isCreateTableAsSelectStmt()) {
+          return result;
+        }
+      } else if (analysisResult.isInsertStmt() ||
+          analysisResult.isCreateTableAsSelectStmt()) {
+        InsertStmt insertStmt = analysisResult.getInsertStmt();
+        FeTable targetTable = insertStmt.getTargetTable();
+        if (AcidUtils.isTransactionalTable(
+            targetTable.getMetaStoreTable().getParameters())) {
+          // TODO (IMPALA-8788): should load table write ids in transaction context.
+          long txnId = openTransaction();
+          queryCtx.setTransaction_id(txnId);
+          timeline.markEvent("Transaction opened");
+          Long writeId = allocateWriteIdIfNeeded(queryCtx, targetTable);
+          if (writeId != null) insertStmt.setWriteId(writeId);
+        }
+      } else if (analysisResult.isLoadDataStmt()) {
+        result.stmt_type = TStmtType.LOAD;
+        result.setResult_set_metadata(new TResultSetMetadata(
+            Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
+        result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
+        return result;
+      } else if (analysisResult.isSetStmt()) {
+        result.stmt_type = TStmtType.SET;
+        result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+            new TColumn("option", Type.STRING.toThrift()),
+            new TColumn("value", Type.STRING.toThrift()),
+            new TColumn("level", Type.STRING.toThrift()))));
+        result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
+        return result;
+      } else if (analysisResult.isAdminFnStmt()) {
+        result.stmt_type = TStmtType.ADMIN_FN;
+        result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+            new TColumn("summary", Type.STRING.toThrift()))));
+        result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
+        return result;
+      } else if (analysisResult.isTestCaseStmt()) {
+        CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) stmt);
+        if (testCaseStmt.isTestCaseExport()) {
+          result.setStmt_type(TStmtType.TESTCASE);
+          result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+            new TColumn("Test case data output path", Type.STRING.toThrift()))));
+          result.setTestcase_data_path(testCaseStmt.writeTestCaseData());
+        } else {
+          // Mimic it as a DDL.
+          result.setStmt_type(TStmtType.DDL);
+          createCatalogOpRequest(analysisResult, result);
+        }
         return result;
       }
-    } else if (analysisResult.isLoadDataStmt()) {
-      result.stmt_type = TStmtType.LOAD;
-      result.setResult_set_metadata(new TResultSetMetadata(
-          Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
-      result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
-      return result;
-    } else if (analysisResult.isSetStmt()) {
-      result.stmt_type = TStmtType.SET;
-      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
-          new TColumn("option", Type.STRING.toThrift()),
-          new TColumn("value", Type.STRING.toThrift()),
-          new TColumn("level", Type.STRING.toThrift()))));
-      result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
-      return result;
-    } else if (analysisResult.isAdminFnStmt()) {
-      result.stmt_type = TStmtType.ADMIN_FN;
-      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
-          new TColumn("summary", Type.STRING.toThrift()))));
-      result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
-      return result;
-    } else if (analysisResult.isTestCaseStmt()) {
-      CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) stmt);
-      if (testCaseStmt.isTestCaseExport()) {
-        result.setStmt_type(TStmtType.TESTCASE);
-        result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
-          new TColumn("Test case data output path", Type.STRING.toThrift()))));
-        result.setTestcase_data_path(testCaseStmt.writeTestCaseData());
+
+      // If unset, set MT_DOP to 0 to simplify the rest of the code.
+      if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
+
+      // create TQueryExecRequest
+      TQueryExecRequest queryExecRequest =
+          getPlannedExecRequest(planCtx, analysisResult, timeline);
+
+      TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
+      if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
+        queryExecRequest.setLineage_graph(thriftLineageGraph);
+      }
+
+      // Override the per_host_mem_estimate sent to the backend if needed. The explain
+      // string is already generated at this point so this does not change the estimate
+      // shown in the plan.
+      checkAndOverrideMemEstimate(queryExecRequest, queryOptions);
+
+      if (analysisResult.isExplainStmt()) {
+        // Return the EXPLAIN request
+        createExplainRequest(planCtx.getExplainString(), result);
+        return result;
+      }
+
+      result.setQuery_exec_request(queryExecRequest);
+      if (analysisResult.isQueryStmt()) {
+        result.stmt_type = TStmtType.QUERY;
+        result.query_exec_request.stmt_type = result.stmt_type;
+        // fill in the metadata
+        result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
+      } else if (analysisResult.isInsertStmt() ||
+          analysisResult.isCreateTableAsSelectStmt()) {
+        // For CTAS the overall TExecRequest statement type is DDL, but the
+        // query_exec_request should be DML
+        result.stmt_type =
+            analysisResult.isCreateTableAsSelectStmt() ? TStmtType.DDL : TStmtType.DML;
+        result.query_exec_request.stmt_type = TStmtType.DML;
+        // create finalization params of insert stmt
+        addFinalizationParamsForInsert(
+            queryCtx, queryExecRequest, analysisResult.getInsertStmt());
       } else {
-        // Mimic it as a DDL.
-        result.setStmt_type(TStmtType.DDL);
-        createCatalogOpRequest(analysisResult, result);
+        Preconditions.checkState(
+            analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
+        result.stmt_type = TStmtType.DML;
+        result.query_exec_request.stmt_type = TStmtType.DML;
       }
       return result;
+    } catch (Exception e) {
+      if (queryCtx.isSetTransaction_id()) {
+        try {
+          abortTransaction(queryCtx.getTransaction_id());
+          timeline.markEvent("Transaction aborted");
+        } catch (TransactionException te) {
+          LOG.error("Could not abort transaction because: " + te.getMessage());
+        }
+      }
+      throw e;
     }
-
-    // If unset, set MT_DOP to 0 to simplify the rest of the code.
-    if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
-
-    // create TQueryExecRequest
-    TQueryExecRequest queryExecRequest =
-        getPlannedExecRequest(planCtx, analysisResult, timeline);
-
-    TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
-    if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
-      queryExecRequest.setLineage_graph(thriftLineageGraph);
-    }
-
-    // Override the per_host_mem_estimate sent to the backend if needed. The explain
-    // string is already generated at this point so this does not change the estimate
-    // shown in the plan.
-    checkAndOverrideMemEstimate(queryExecRequest, queryOptions);
-
-    if (analysisResult.isExplainStmt()) {
-      // Return the EXPLAIN request
-      createExplainRequest(planCtx.getExplainString(), result);
-      return result;
-    }
-
-    result.setQuery_exec_request(queryExecRequest);
-    if (analysisResult.isQueryStmt()) {
-      result.stmt_type = TStmtType.QUERY;
-      result.query_exec_request.stmt_type = result.stmt_type;
-      // fill in the metadata
-      result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
-    } else if (analysisResult.isInsertStmt() ||
-        analysisResult.isCreateTableAsSelectStmt()) {
-      // For CTAS the overall TExecRequest statement type is DDL, but the
-      // query_exec_request should be DML
-      result.stmt_type =
-          analysisResult.isCreateTableAsSelectStmt() ? TStmtType.DDL : TStmtType.DML;
-      result.query_exec_request.stmt_type = TStmtType.DML;
-      // create finalization params of insert stmt
-      addFinalizationParamsForInsert(
-          queryCtx, queryExecRequest, analysisResult.getInsertStmt());
-    } else {
-      Preconditions.checkState(
-          analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
-      result.stmt_type = TStmtType.DML;
-      result.query_exec_request.stmt_type = TStmtType.DML;
-    }
-
-    return result;
   }
 
   /**
@@ -1402,6 +1436,11 @@ public class Frontend {
       finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
       finalizeParams.setStaging_dir(
           hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
+      if (insertStmt.getWriteId() != -1) {
+        Preconditions.checkState(queryCtx.isSetTransaction_id());
+        finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
+        finalizeParams.setWrite_id(insertStmt.getWriteId());
+      }
       queryExecRequest.setFinalize_params(finalizeParams);
     }
   }
@@ -1597,5 +1636,50 @@ public class Frontend {
     // logs-then-rethrows any exception thrown from a hook.postQueryExecute
     final List<Future<QueryEventHook>> futures
         = this.queryHookManager_.executeQueryCompleteHooks(context);
+  }
+
+  /**
+   * Opens a new transaction.
+   * @return the transaction id.
+   * @throws TransactionException
+   */
+  private long openTransaction() throws TransactionException {
+    IMetaStoreClient hmsClient = metaStoreClientPool_.getClient().getHiveClient();
+    return MetastoreShim.openTransaction(hmsClient, "Impala");
+  }
+
+  /**
+   * Aborts a transaction.
+   * @param transactionId is the id of the transaction to abort.
+   * @throws TransactionException
+   * TODO: maybe we should make it async.
+   */
+  public void abortTransaction(long transactionId) throws TransactionException {
+    Long txnId = transactionId;
+    LOG.error("Aborting transaction: " + txnId.toString());
+    IMetaStoreClient hmsClient = metaStoreClientPool_.getClient().getHiveClient();
+    MetastoreShim.abortTransaction(hmsClient, transactionId);
+  }
+
+  /**
+   * Checks whether we should allocate a write id for 'table'. If so, it does the
+   * allocation and returns the write id, otherwise returns null.
+   * @param queryCtx the query context that contains the transaction id.
+   * @param table the target table of the write operation.
+   * @return the allocated write id, or null
+   * @throws TransactionException
+   */
+  private Long allocateWriteIdIfNeeded(TQueryCtx queryCtx, FeTable table)
+      throws TransactionException {
+    if (!queryCtx.isSetTransaction_id()) return null;
+    if (!(table instanceof FeFsTable)) return null;
+    if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+      return null;
+    }
+
+    IMetaStoreClient hmsClient = this.metaStoreClientPool_.getClient().getHiveClient();
+    long txnId = queryCtx.getTransaction_id();
+    return MetastoreShim.allocateTableWriteId(hmsClient, txnId, table.getDb().getName(),
+        table.getName());
   }
 }

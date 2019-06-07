@@ -304,6 +304,9 @@ protected:
   /// True if the query expired by timing out.
   bool is_expired_ = false;
 
+  /// True if there was a transaction and it got committed or aborted.
+  bool transaction_closed_ = false;
+
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
 
@@ -490,7 +493,11 @@ protected:
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows)
       WARN_UNUSED_RESULT;
 
-  /// Gather and publish all required updates to the metastore
+  /// Gather and publish all required updates to the metastore.
+  /// For transactional queries:
+  /// If everything goes well the transaction is committed by the Catalogd.
+  /// If an error occurs the transaction gets aborted by this function. Either way
+  /// the transaction will be closed when this function returns.
   Status UpdateCatalog() WARN_UNUSED_RESULT;
 
   /// Copies results into request_result_set_
@@ -533,6 +540,19 @@ protected:
   /// and populates the result set with them. It covers the subset of options for
   /// 'SET' and all of them for 'SET ALL'
   void PopulateResultForSet(bool is_set_all);
+
+  /// Returns the transaction id for this client request. 'InTransaction()' must be
+  /// true when invoked.
+  int64_t GetTransactionId() const;
+
+  /// Returns true if there is an open transaction for this client request.
+  bool InTransaction() const;
+
+  /// Aborts the transaction of this client request.
+  void AbortTransaction();
+
+  /// Invoke this function when the transaction is committed or aborted.
+  void ClearTransactionState();
 };
 
 }

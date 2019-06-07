@@ -568,12 +568,13 @@ void Coordinator::HandleExecStateTransition(
   ComputeQuerySummary();
 }
 
-Status Coordinator::FinalizeHdfsInsert() {
+Status Coordinator::FinalizeHdfsDml() {
   // All instances must have reported their final statuses before finalization, which is a
   // post-condition of Wait. If the query was not successful, still try to clean up the
   // staging directory.
   DCHECK(has_called_wait_);
   DCHECK(finalize_params() != nullptr);
+  bool is_transactional = finalize_params()->__isset.write_id;
 
   VLOG_QUERY << "Finalizing query: " << PrintId(query_id());
   SCOPED_TIMER(finalization_timer_);
@@ -587,10 +588,17 @@ Status Coordinator::FinalizeHdfsInsert() {
     DCHECK(hdfs_table != nullptr)
         << "INSERT target table not known in descriptor table: "
         << finalize_params()->table_id;
-    return_status = dml_exec_state_.FinalizeHdfsInsert(*finalize_params(),
-        query_ctx().client_request.query_options.s3_skip_insert_staging,
-        hdfs_table, query_profile_);
+    // There is no need for finalization for transactional inserts.
+    if (!is_transactional) {
+      // 'write_id' is NOT set, therefore we need to do some finalization, e.g. moving
+      // files or delete old files in case of INSERT OVERWRITE.
+      return_status = dml_exec_state_.FinalizeHdfsInsert(*finalize_params(),
+          query_ctx().client_request.query_options.s3_skip_insert_staging,
+          hdfs_table, query_profile_);
+    }
     hdfs_table->ReleaseResources();
+  } else if (is_transactional) {
+    parent_request_state_->AbortTransaction();
   }
 
   stringstream staging_dir;
@@ -631,7 +639,7 @@ Status Coordinator::Wait() {
   WaitForBackends();
   if (finalize_params() != nullptr) {
     RETURN_IF_ERROR(UpdateExecState(
-            FinalizeHdfsInsert(), nullptr, FLAGS_hostname));
+            FinalizeHdfsDml(), nullptr, FLAGS_hostname));
   }
   // DML requests are finished at this point.
   RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));

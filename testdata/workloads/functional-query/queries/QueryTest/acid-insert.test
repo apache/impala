@@ -1,0 +1,129 @@
+====
+---- SETUP
+RESET insertonly_nopart_insert
+---- QUERY
+insert into insertonly_nopart_insert values (1), (2);
+====
+---- QUERY
+select i from insertonly_nopart_insert order by i;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+insert into insertonly_nopart_insert values (3);
+====
+---- QUERY
+select i from insertonly_nopart_insert order by i;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+insert overwrite insertonly_nopart_insert values (10);
+====
+---- QUERY
+select i from insertonly_nopart_insert order by i;
+---- RESULTS
+10
+---- TYPES
+INT
+====
+---- QUERY
+insert overwrite insertonly_nopart_insert select 100;
+====
+---- QUERY
+select i from insertonly_nopart_insert order by i;
+---- RESULTS
+100
+---- TYPES
+INT
+====
+---- QUERY
+insert overwrite insertonly_nopart_insert
+select * from insertonly_nopart_insert limit 0;
+====
+---- QUERY
+select i from insertonly_nopart_insert order by i;
+---- RESULTS
+---- TYPES
+INT
+====
+---- SETUP
+RESET insertonly_part_insert
+---- QUERY
+insert into insertonly_part_insert partition (p=1) values (10), (11);
+insert into insertonly_part_insert partition (p=2) values (20);
+====
+---- QUERY
+select p, i from insertonly_part_insert order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert into insertonly_part_insert partition (p=2) values (21);
+insert into insertonly_part_insert partition (p=3) values (30);
+====
+---- QUERY
+select p, i from insertonly_part_insert order by i;
+---- RESULTS
+1,10
+1,11
+2,20
+2,21
+3,30
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert overwrite insertonly_part_insert partition (p=2) values (22);
+insert overwrite insertonly_part_insert partition (p=3) values (31);
+====
+---- QUERY
+select p, i from insertonly_part_insert order by i;
+---- RESULTS
+1,10
+1,11
+2,22
+3,31
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert overwrite insertonly_part_insert partition (p=1)
+select * from insertonly_nopart_insert limit 0;
+insert overwrite insertonly_part_insert partition (p=2)
+select * from insertonly_nopart_insert limit 0;
+====
+---- QUERY
+select p, i from insertonly_part_insert order by i;
+---- RESULTS
+3,31
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert overwrite insertonly_part_insert partition (p)
+values (1000, 1), (2000, 2), (4000, 4), (5000, 5), (5001, 5);
+====
+---- QUERY
+select p, i from insertonly_part_insert order by p, i;
+---- RESULTS
+1,1000
+2,2000
+3,31
+4,4000
+5,5000
+5,5001
+---- TYPES
+INT,INT
+====

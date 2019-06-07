@@ -474,7 +474,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// INSERT. Called by Wait() only after all fragment instances have returned, or if
   /// the query has failed, in which case it only cleans up temporary data rather than
   /// finishing the INSERT in flight.
-  Status FinalizeHdfsInsert() WARN_UNUSED_RESULT;
+  Status FinalizeHdfsDml() WARN_UNUSED_RESULT;
 
   /// Helper for Exec(). Populates backend_states_, starts query execution at all
   /// backends in parallel, and blocks until startup completes.

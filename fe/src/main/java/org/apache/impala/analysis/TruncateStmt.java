@@ -68,6 +68,7 @@ public class TruncateStmt extends StatementBase {
           "TRUNCATE TABLE not supported on non-HDFS table: %s", table_.getFullName()));
     }
     analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
+    analyzer.ensureTableNotTransactional(table_);
   }
 
   @Override

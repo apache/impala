@@ -67,14 +67,19 @@ public class HdfsTableSink extends TableSink {
   // populate the RowGroup::sorting_columns list in parquet files.
   private List<Integer> sortColumns_ = new ArrayList<>();
 
+  // Stores the allocated write id if the target table is transactional, otherwise -1.
+  private long writeId_;
+
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
-      boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
+      boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns,
+      long writeId) {
     super(targetTable, Op.INSERT);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
     inputIsClustered_ = inputIsClustered;
     sortColumns_ = sortColumns;
+    writeId_ = writeId;
   }
 
   @Override
@@ -191,6 +196,8 @@ public class HdfsTableSink extends TableSink {
       hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
     }
     hdfsTableSink.setSort_columns(sortColumns_);
+    if (writeId_ != -1) hdfsTableSink.setWrite_id(writeId_);
+
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;

@@ -723,6 +723,9 @@ void ClientRequestState::Done() {
     }
   }
 
+  // If the transaction didn't get committed by this point then we should just abort it.
+  if (InTransaction()) AbortTransaction();
+
   UpdateEndTime();
   unique_lock<mutex> l(lock_);
   query_events_->MarkEvent("Unregister query");
@@ -1097,6 +1100,9 @@ Status ClientRequestState::UpdateCatalog() {
       catalog_update.target_table = finalize_params.table_name;
       catalog_update.db_name = finalize_params.table_db;
       catalog_update.is_overwrite = finalize_params.is_overwrite;
+      if (InTransaction()) {
+        catalog_update.__set_transaction_id(finalize_params.transaction_id);
+      }
 
       Status cnxn_status;
       const TNetworkAddress& address =
@@ -1107,12 +1113,22 @@ Status ClientRequestState::UpdateCatalog() {
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateCatalogResponse resp;
-      RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClientWrapper::UpdateCatalog,
-          catalog_update, &resp));
-
-      Status status(resp.result.status);
-      if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();
-      RETURN_IF_ERROR(status);
+      Status status = DebugAction(query_options(), "CLIENT_REQUEST_UPDATE_CATALOG");
+      if (status.ok()) {
+        status = client.DoRpc(
+            &CatalogServiceClientWrapper::UpdateCatalog, catalog_update, &resp);
+      }
+      if (status.ok()) status = Status(resp.result.status);
+      if (!status.ok()) {
+        if (InTransaction()) AbortTransaction();
+        LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();
+        return status;
+      }
+      if (InTransaction()) {
+        // UpdateCatalog() succeeded and already committed the transaction for us.
+        ClearTransactionState();
+        query_events_->MarkEvent("Transaction committed");
+      }
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result,
           exec_request_.query_options.sync_ddl));
     }
@@ -1326,4 +1342,30 @@ void ClientRequestState::UpdateEndTime() {
         "End Time", ToStringFromUnixMicros(end_time_us(), TimePrecision::Nanosecond));
   }
 }
+
+int64_t ClientRequestState::GetTransactionId() const {
+  DCHECK(InTransaction());
+  return exec_request_.query_exec_request.finalize_params.transaction_id;
+}
+
+bool ClientRequestState::InTransaction() const {
+  return exec_request_.query_exec_request.finalize_params.__isset.transaction_id &&
+      !transaction_closed_;
+}
+
+void ClientRequestState::AbortTransaction() {
+  DCHECK(InTransaction());
+  if (frontend_->AbortTransaction(GetTransactionId()).ok()) {
+    query_events_->MarkEvent("Transaction aborted");
+  } else {
+    VLOG(1) << Substitute("Unable to abort transaction with id: $0", GetTransactionId());
+  }
+  ClearTransactionState();
+}
+
+void ClientRequestState::ClearTransactionState() {
+  DCHECK(InTransaction());
+  transaction_closed_ = true;
+}
+
 }

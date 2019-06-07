@@ -1,0 +1,69 @@
+====
+---- QUERY
+create table insertonly_acid (i int)
+  tblproperties('transactional'='true', 'transactional_properties'='insert_only');
+insert into insertonly_acid values (1), (2);
+create table plain (i int);
+====
+---- QUERY
+# INSERT from ACID to PLAIN
+insert into plain select * from insertonly_acid;
+select * from plain;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# INSERT from PLAIN to ACID
+insert into insertonly_acid select cast(i + 2 as int) from plain;
+select * from insertonly_acid;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# CTAS PLAIN from ACID
+create table plain_ctas as select * from insertonly_acid;
+select * from plain_ctas;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# CTAS ACID from PLAIN
+create table insertonly_acid_ctas
+  tblproperties('transactional'='true', 'transactional_properties'='insert_only')
+  as select * from plain_ctas;
+select * from insertonly_acid_ctas;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# CTAS ACID from ACID
+create table insertonly_acid_ctas_2
+  tblproperties('transactional'='true', 'transactional_properties'='insert_only')
+  as select * from insertonly_acid;
+select * from insertonly_acid_ctas_2;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====

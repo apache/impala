@@ -206,6 +206,9 @@ struct TUpdateCatalogRequest {
 
   // True if the update corresponds to an "insert overwrite" operation
   7: required bool is_overwrite;
+
+  // ACID transaction ID for transactional inserts.
+  8: optional i64 transaction_id;
 }
 
 // Response from a TUpdateCatalogRequest

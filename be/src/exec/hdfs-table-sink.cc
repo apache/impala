@@ -68,6 +68,10 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
     sort_columns_(tsink.table_sink.hdfs_table_sink.sort_columns),
     current_clustered_partition_(nullptr) {
   DCHECK(tsink.__isset.table_sink);
+  if (tsink.table_sink.hdfs_table_sink.__isset.write_id) {
+    write_id_ = tsink.table_sink.hdfs_table_sink.write_id;
+    DCHECK_GT(write_id_, 0);
+  }
 }
 
 OutputPartition::OutputPartition()
@@ -209,6 +213,10 @@ void HdfsTableSink::BuildHdfsFileNames(
 
   // Create final_hdfs_file_name_prefix and tmp_hdfs_file_name_prefix.
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
+  // Or, for transactional tables:
+  // Path: <hdfs_base_dir>/<partition_values>/<transaction_directory>/<unique_id_str>
+  // Where <transaction_directory> is either a 'base' or a 'delta' directory in Hive ACID
+  // terminology.
 
   // Temporary files are written under the following path which is unique to this sink:
   // <table_dir>/_impala_insert_staging/<query_id>/<per_fragment_unique_id>_dir/
@@ -229,15 +237,20 @@ void HdfsTableSink::BuildHdfsFileNames(
       query_suffix);
 
   if (partition_descriptor.location().empty()) {
-    output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1$2",
-        table_desc_->hdfs_base_dir(), output_partition->partition_name, query_suffix);
+    output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1",
+        table_desc_->hdfs_base_dir(), output_partition->partition_name);
   } else {
     // If the partition descriptor has a location (as set by alter table add partition
     // with a location clause), that provides the complete directory path for this
     // partition. No partition key suffix ("p=1/j=foo/") should be added.
     output_partition->final_hdfs_file_name_prefix =
-        Substitute("$0/$1", partition_descriptor.location(), query_suffix);
+        Substitute("$0/", partition_descriptor.location());
   }
+  if (IsTransactional()) {
+    string acid_dir = Substitute(overwrite_ ? "/base_$0/" : "/delta_$0_$0/", write_id_);
+    output_partition->final_hdfs_file_name_prefix += acid_dir;
+  }
+  output_partition->final_hdfs_file_name_prefix += query_suffix;
 
   output_partition->num_files = 0;
 }
@@ -484,7 +497,9 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
 
   // It is incorrect to initialize a writer if there are no rows to feed it. The writer
   // could incorrectly create an empty file or empty partition.
-  if (empty_partition) return Status::OK();
+  // However, for transactional tables we should create a new empty base directory in
+  // case of INSERT OVERWRITEs.
+  if (empty_partition && (!overwrite_ || !IsTransactional())) return Status::OK();
 
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT:
@@ -606,6 +621,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
       }
     }
   }
+
   return Status::OK();
 }
 
@@ -658,8 +674,8 @@ Status HdfsTableSink::FlushFinal(RuntimeState* state) {
       ++cur_partition) {
     RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first.get()));
   }
-
-  return Status::OK();
+  // Returns OK if there is no debug action.
+  return DebugAction(state->query_options(), "FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL");
 }
 
 void HdfsTableSink::Close(RuntimeState* state) {
@@ -683,8 +699,9 @@ void HdfsTableSink::Close(RuntimeState* state) {
 }
 
 bool HdfsTableSink::ShouldSkipStaging(RuntimeState* state, OutputPartition* partition) {
-  return IsS3APath(partition->final_hdfs_file_name_prefix.c_str()) && !overwrite_ &&
-      state->query_options().s3_skip_insert_staging;
+  if (IsTransactional()) return true;
+  return (IsS3APath(partition->final_hdfs_file_name_prefix.c_str()) && !overwrite_ &&
+      state->query_options().s3_skip_insert_staging);
 }
 
 string HdfsTableSink::DebugString() const {
@@ -694,6 +711,7 @@ string HdfsTableSink::DebugString() const {
       << " partition_key_exprs="
       << ScalarExpr::DebugString(partition_key_exprs_)
       << " output_exprs=" << ScalarExpr::DebugString(output_exprs_)
+      << " write_id=" << write_id_
       << ")";
   return out.str();
 }

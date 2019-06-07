@@ -565,10 +565,8 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalyzesOk("insert into functional.testtbl select *,'test',1 " +
             "from functional.insert_only_transactional_table");
 
-    AnalysisError(
-        "insert into functional.insert_only_transactional_table select * " +
-          "from functional.insert_only_transactional_table",
-        insertOnlyErrorMsg);
+    AnalyzesOk("insert into functional.insert_only_transactional_table select * " +
+        "from functional.insert_only_transactional_table");
 
     AnalysisError(
         "compute stats functional_orc_def.full_transactional_table",

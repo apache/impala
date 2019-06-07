@@ -31,7 +31,8 @@ from subprocess import call
 
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfHive2,
+    SkipIfIsilon, SkipIfLocal)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -658,6 +659,69 @@ class TestHmsIntegration(ImpalaTestSuite):
         self.assert_sql_error(
             self.client.execute, 'select * from %s' % table_name,
             "Column type: INT, Parquet schema:")
+
+  @SkipIfHive2.acid
+  def test_acid_inserts(self, vector, unique_database):
+    """
+    Insert data to insert-only ACID table from Impala and checks that Hive is able to
+    see the data.
+    """
+    table_name = "%s.acid_insert" % unique_database
+    self.client.execute(
+      "create table %s (i int) "
+      "TBLPROPERTIES('transactional'='true', "
+      "'transactional_properties'='insert_only')" % table_name)
+    self.client.execute("insert into table %s values (1)" % table_name)
+    assert '1' == self.run_stmt_in_hive("select * from %s" % table_name).split('\n')[1]
+    self.client.execute("insert into table %s values (2)" % table_name)
+    assert '2' == self.run_stmt_in_hive(
+      "select * from %s order by i" % table_name).split('\n')[2]
+    self.client.execute("insert overwrite table %s values (10)" % table_name)
+    assert '10' == self.run_stmt_in_hive("select * from %s" % table_name).split('\n')[1]
+    self.client.execute("insert into table %s values (11)" % table_name)
+    assert '11' == self.run_stmt_in_hive(
+      "select * from %s order by i" % table_name).split('\n')[2]
+    assert '2' == self.run_stmt_in_hive("select count(*) from %s"
+                                        % table_name).split('\n')[1]
+
+    # CTAS ACID table with Impala and select from Hive
+    ctas_table_name = "%s.acid_insert_ctas" % unique_database
+    self.client.execute(
+      "create table %s "
+      "TBLPROPERTIES('transactional'='true', "
+      "'transactional_properties'='insert_only') "
+      "as select * from %s" % (ctas_table_name, table_name))
+    assert '11' == self.run_stmt_in_hive(
+      "select * from %s order by i" % ctas_table_name).split('\n')[2]
+    assert '2' == self.run_stmt_in_hive("select count(*) from %s"
+                                        % ctas_table_name).split('\n')[1]
+
+    # Insert into partitioned ACID table
+    part_table_name = "%s.part_acid_insert" % unique_database
+    self.client.execute(
+      "create table %s (i int) partitioned by (p int)"
+      "TBLPROPERTIES('transactional'='true', "
+      "'transactional_properties'='insert_only')" % part_table_name)
+    self.client.execute("insert into %s partition (p=1) values (10)" % part_table_name)
+    self.client.execute("insert into %s partition (p=2) values (20)" % part_table_name)
+    hive_result = self.run_stmt_in_hive(
+      "select p, i from %s order by p, i" % part_table_name).split('\n')
+    assert '1,10' == hive_result[1]
+    assert '2,20' == hive_result[2]
+    self.client.execute(
+      "insert into %s partition (p) values (30,3),(40,4)" % part_table_name)
+    hive_result = self.run_stmt_in_hive(
+      "select p, i from %s order by p, i" % part_table_name).split('\n')
+    assert '3,30' == hive_result[3]
+    assert '4,40' == hive_result[4]
+    self.client.execute(
+      "insert overwrite %s partition (p) values (11,1),(41,4)" % part_table_name)
+    hive_result = self.run_stmt_in_hive(
+      "select p, i from %s order by p, i" % part_table_name).split('\n')
+    assert '1,11' == hive_result[1]
+    assert '2,20' == hive_result[2]
+    assert '3,30' == hive_result[3]
+    assert '4,41' == hive_result[4]
 
   @pytest.mark.execute_serially
   def test_change_table_name(self, vector):

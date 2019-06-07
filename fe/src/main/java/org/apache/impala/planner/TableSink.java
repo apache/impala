@@ -93,6 +93,17 @@ public abstract class TableSink extends DataSink {
   public static TableSink create(FeTable table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
+    return create(table, sinkAction, partitionKeyExprs, referencedColumns, overwrite,
+        inputIsClustered, sortColumns, -1);
+  }
+
+  /**
+   * Same as above, plus it takes an ACID write id in parameter 'writeId'.
+   */
+  public static TableSink create(FeTable table, Op sinkAction,
+      List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
+      boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns,
+      long writeId) {
     Preconditions.checkNotNull(partitionKeyExprs);
     Preconditions.checkNotNull(referencedColumns);
     Preconditions.checkNotNull(sortColumns);
@@ -102,7 +113,7 @@ public abstract class TableSink extends DataSink {
       // Referenced columns don't make sense for an Hdfs table.
       Preconditions.checkState(referencedColumns.isEmpty());
       return new HdfsTableSink(table, partitionKeyExprs, overwrite, inputIsClustered,
-          sortColumns);
+          sortColumns, writeId);
     } else if (table instanceof FeHBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);

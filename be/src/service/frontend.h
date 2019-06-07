@@ -167,6 +167,9 @@ class Frontend {
   /// completed successfully.
   Status LoadData(const TLoadDataReq& load_data_request, TLoadDataResp* response);
 
+  /// Aborts transaction with the given transaction id.
+  Status AbortTransaction(int64_t transaction_id);
+
   /// Returns true if the error returned by the FE was due to an AuthorizationException.
   static bool IsAuthorizationError(const Status& status);
 
@@ -218,6 +221,7 @@ class Frontend {
   jmethodID get_table_files_id_; // JniFrontend.getTableFiles
   jmethodID show_create_function_id_; // JniFrontend.showCreateFunction
   jmethodID call_query_complete_hooks_id_; // JniFrontend.callQueryCompleteHooks
+  jmethodID abort_txn_; // JniFrontend.abortTransaction()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

@@ -76,6 +76,9 @@ struct THdfsTableSink {
   // are stored in the 'sort.columns' table property. This is used in the backend to
   // populate the RowGroup::sorting_columns list in parquet files.
   5: optional list<i32> sort_columns
+
+  // Stores the allocated ACID write id if the target table is transactional.
+  6: optional i64 write_id
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

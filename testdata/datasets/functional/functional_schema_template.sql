@@ -2649,3 +2649,26 @@ date_part DATE
 id_col INT
 date_col DATE
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+insertonly_nopart_insert
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i int)
+STORED AS {file_format}
+TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only');
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+insertonly_part_insert
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i int)
+PARTITIONED BY (p int)
+STORED AS {file_format}
+TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only');
+====

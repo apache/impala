@@ -175,6 +175,9 @@ public class InsertStmt extends StatementBase {
   // non-Kudu tables.
   private List<Expr> primaryKeyExprs_ = new ArrayList<>();
 
+  // Set by the Frontend if the target table is transactional.
+  private long writeId_ = -1;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -232,6 +235,7 @@ public class InsertStmt extends StatementBase {
     columnPermutation_ = other.columnPermutation_;
     table_ = other.table_;
     isUpsert_ = other.isUpsert_;
+    writeId_ = other.writeId_;
   }
 
   @Override
@@ -252,6 +256,7 @@ public class InsertStmt extends StatementBase {
     resultExprs_.clear();
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
+    writeId_ = -1;
   }
 
   @Override
@@ -902,6 +907,7 @@ public class InsertStmt extends StatementBase {
   public TableName getTargetTableName() { return targetTableName_; }
   public FeTable getTargetTable() { return table_; }
   public void setTargetTable(FeTable table) { this.table_ = table; }
+  public void setWriteId(long writeId) { this.writeId_ = writeId; }
   public boolean isOverwrite() { return overwrite_; }
 
   /**
@@ -916,6 +922,7 @@ public class InsertStmt extends StatementBase {
   public boolean hasNoClusteredHint() { return hasNoClusteredHint_; }
   public List<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
   public List<Expr> getSortExprs() { return sortExprs_; }
+  public long getWriteId() { return writeId_; }
 
   // Clustering is enabled by default. If the table has a 'sort.columns' property and the
   // query has a 'noclustered' hint, we issue a warning during analysis and ignore the
@@ -936,7 +943,7 @@ public class InsertStmt extends StatementBase {
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
         partitionKeyExprs_, mentionedColumns_, overwrite_, requiresClustering(),
-        sortColumns_);
+        sortColumns_, writeId_);
   }
 
   /**

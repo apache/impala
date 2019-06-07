@@ -357,6 +357,12 @@ struct TFinalizeParams {
   // Identifier for the target table in the query-wide descriptor table (see
   // TDescriptorTable and TTableDescriptor).
   6: optional i64 table_id;
+
+  // Stores the ACID transaction id of the target table for transactional INSERTs.
+  7: optional i64 transaction_id;
+
+  // Stores the ACID write id of the target table for transactional INSERTs.
+  8: optional i64 write_id;
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.

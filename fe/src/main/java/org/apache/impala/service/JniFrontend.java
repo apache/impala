@@ -51,6 +51,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.hooks.QueryCompleteContext;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.thrift.TBackendGflags;
@@ -634,6 +635,15 @@ public class JniFrontend {
     final QueryCompleteContext context =
         new QueryCompleteContext(request.getLineage_string());
     this.frontend_.callQueryCompleteHooks(context);
+  }
+
+  /**
+   * Aborts a transaction.
+   * @param transactionId the id of the transaction to commit.
+   * @throws TransactionException
+   */
+  public void abortTransaction(long transactionId) throws TransactionException {
+    this.frontend_.abortTransaction(transactionId);
   }
 
   /**

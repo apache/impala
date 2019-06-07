@@ -1,10 +1,5 @@
 ====
 ---- QUERY
-insert into functional.insert_only_transactional_table values (1);
----- CATCH
-AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
-====
----- QUERY
 alter table functional.insert_only_transactional_table change column x y bigint;
 ---- CATCH
 AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.

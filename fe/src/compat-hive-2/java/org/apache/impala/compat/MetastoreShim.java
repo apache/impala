@@ -53,6 +53,7 @@ import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
@@ -298,6 +299,38 @@ public class MetastoreShim {
 
   public static void setHiveClientCapabilities() {
     throw new UnsupportedOperationException("setHiveClientCapabilities not supported");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static long openTransaction(IMetaStoreClient client, String userId)
+      throws TransactionException {
+    throw new UnsupportedOperationException("openTransaction is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static void commitTransaction(IMetaStoreClient client, long txnId)
+      throws TransactionException {
+    throw new UnsupportedOperationException("commitTransaction is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static void abortTransaction(IMetaStoreClient client, long txnId)
+      throws TransactionException {
+    throw new UnsupportedOperationException("abortTransaction is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static long allocateTableWriteId(IMetaStoreClient client, long txnId,
+      String dbName, String tableName) throws TransactionException {
+    throw new UnsupportedOperationException("allocateTableWriteId is not supported.");
   }
 
   /**

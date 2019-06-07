@@ -521,6 +521,9 @@ struct TQueryCtx {
   // coordinator and executors for a given query always agree this value.
   22: optional i32 status_report_interval_ms
   23: optional i32 status_report_max_retry_s
+
+  // Stores the transaction id if the query is transactional.
+  25: optional i64 transaction_id
 }
 
 // Specification of one output destination of a plan fragment

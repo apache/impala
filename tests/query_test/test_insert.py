@@ -25,7 +25,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, \
-    SkipIfNotHdfsMinicluster, SkipIfS3, SkipIfDockerizedCluster
+    SkipIfHive2, SkipIfNotHdfsMinicluster, SkipIfS3, SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -134,6 +134,34 @@ class TestInsertQueries(ImpalaTestSuite):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+  @pytest.mark.execute_serially
+  @SkipIfHive2.acid
+  def test_acid_insert(self, vector):
+    if (vector.get_value('table_format').file_format == 'parquet'):
+      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
+          vector.get_value('compression_codec')
+    # We need to turn off capability checks. Otherwise we get an error from HMS because
+    # this python client doesn't have the capability for handling ACID tables. But we only
+    # need to drop and create such tables, and table properties are preserved during
+    # those operations and this is enough for the tests (A table is ACID if it has the
+    # relevant table properties).
+    capability_check = self.hive_client.getMetaConf("metastore.client.capability.check")
+    self.hive_client.setMetaConf("metastore.client.capability.check", "false")
+    self.run_test_case('QueryTest/acid-insert', vector,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+    # Reset original state.
+    self.hive_client.setMetaConf("metastore.client.capability.check", capability_check)
+
+  @SkipIfHive2.acid
+  def test_acid_nonacid_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-nonacid-insert', vector, unique_database,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+  @SkipIfHive2.acid
+  def test_acid_insert_fail(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-insert-fail', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @pytest.mark.execute_serially

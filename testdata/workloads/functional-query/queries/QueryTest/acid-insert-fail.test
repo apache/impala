@@ -1,0 +1,85 @@
+====
+---- QUERY
+create table insertonly_acid (i int)
+  tblproperties('transactional'='true', 'transactional_properties'='insert_only');
+insert into insertonly_acid values (1), (2);
+select * from insertonly_acid;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+set DEBUG_ACTION="FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0";
+insert into insertonly_acid values (42);
+---- CATCH
+Query aborted:Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
+====
+---- QUERY
+select * from insertonly_acid;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+set DEBUG_ACTION="CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0";
+insert into insertonly_acid values (42);
+---- CATCH
+Query aborted:Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
+====
+---- QUERY
+select * from insertonly_acid;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+create table part (n int)
+partitioned by (p int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+insert into table part (p, n) select 1, 10;
+insert into table part (p, n) select 2, 20;
+select p, n from part;
+---- RESULTS
+1,10
+2,20
+----
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Dynamic partition insert into existing and non-existing partitions.
+set DEBUG_ACTION="FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0";
+insert into part (p, n) select cast(i + 1 as INT), 11 from insertonly_acid;
+---- CATCH
+Query aborted:Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
+====
+---- QUERY
+select p, n from part;
+---- RESULTS
+1,10
+2,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Dynamic partition insert into existing and non-existing partitions.
+set DEBUG_ACTION="CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0";
+insert into part (p, n) select cast(i + 1 as INT), 11 from insertonly_acid;
+---- CATCH
+Query aborted:Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
+====
+---- QUERY
+select p, n from part;
+---- RESULTS
+1,10
+2,20
+---- TYPES
+INT,INT
+====

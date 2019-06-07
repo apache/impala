@@ -125,6 +125,13 @@ struct OutputPartition {
 /// The temporary directory is <table base dir>/<unique_id.hi>-<unique_id.lo>_data
 /// such that an external tool can easily clean up incomplete inserts.
 /// This is consistent with Hive's behavior.
+//
+/// ACID tables:
+/// In case of ACID tables the sink writes the files into their final destination which
+/// is an ACID base or delta directory. No additional moves are required at the end, only
+/// a commit for the ACID transaction.
+/// The name of the output directory will be
+/// <table base dir>/<partition dirs>/<ACID base or delta directory>
 class HdfsTableSink : public DataSink {
  public:
   HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
@@ -144,9 +151,8 @@ class HdfsTableSink : public DataSink {
   /// TODO: IMPALA-2988: Move calls to functions that can fail in Close() to FlushFinal()
   virtual Status FlushFinal(RuntimeState* state);
 
-  /// Move temporary Hdfs files to final locations.
-  /// Remove original Hdfs files if overwrite was specified.
-  /// Closes output_exprs and partition_key_exprs.
+  /// Closes writers, output_exprs and partition_key_exprs and releases resources.
+  /// The temporary files will be moved to their final destination by the Coordinator.
   virtual void Close(RuntimeState* state);
 
   int skip_header_line_count() const { return skip_header_line_count_; }
@@ -239,6 +245,9 @@ class HdfsTableSink : public DataSink {
   // to the final location and need to write to the temporary staging location.
   bool ShouldSkipStaging(RuntimeState* state, OutputPartition* partition);
 
+  /// Returns TRUE if the target table is an insert-only ACID table.
+  bool IsTransactional() const { return write_id_ != -1; }
+
   /// Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_;
 
@@ -256,6 +265,10 @@ class HdfsTableSink : public DataSink {
 
   /// Indicates whether the existing partitions should be overwritten.
   bool overwrite_;
+
+  /// The allocated write ID for the target table. -1 means that the target table is
+  /// a plain, non-ACID table.
+  int64_t write_id_ = -1;
 
   /// Indicates whether the input is ordered by the partition keys, meaning partitions can
   /// be opened, written, and closed one by one.

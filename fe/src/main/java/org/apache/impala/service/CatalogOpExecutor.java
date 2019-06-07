@@ -20,6 +20,7 @@ package org.apache.impala.service;
 import static org.apache.impala.analysis.Analyzer.ACCESSTYPE_READWRITE;
 
 import com.google.common.collect.Iterables;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -98,6 +99,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
@@ -184,6 +186,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.slf4j.LoggerFactory;
 
 /**
@@ -3840,7 +3843,14 @@ public class CatalogOpExecutor {
         response.getResult().setStatus(
             new TStatus(TErrorCode.OK, new ArrayList<String>()));
       }
-
+      // Commit transactional inserts on success. We don't abort the transaction
+      // here in case of failures, because the client, i.e. query coordinator, is
+      // always responsible for aborting transactions when queries hit errors.
+      if (update.isSetTransaction_id()) {
+        if (response.getResult().getStatus().getStatus_code() == TErrorCode.OK) {
+          commitTransaction(update.getTransaction_id());
+        }
+      }
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,
           "INSERT");
       // After loading metadata, fire insert events if external event processing is
@@ -4188,6 +4198,17 @@ public class CatalogOpExecutor {
     if (!catalog_.tryLockTable(tbl)) {
       throw new InternalException(String.format("Error altering %s %s due to " +
           "lock contention.", type, tbl.getFullName()));
+    }
+  }
+
+  /**
+   * Commits ACID transaction with given transaction id.
+   * @param transactionId is the id of the transaction.
+   * @throws TransactionException
+   */
+  private void commitTransaction(long transactionId) throws TransactionException {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      MetastoreShim.commitTransaction(msClient.getHiveClient(), transactionId);
     }
   }
 }
