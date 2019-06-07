@@ -40,8 +40,12 @@ import com.google.common.collect.Lists;
  * Represents a table with incomplete metadata. The metadata may be incomplete because
  * it has not yet been loaded or because of errors encountered during the loading
  * process.
+ *
+ * NOTE: this is used on the catalogd (CatalogServiceCatalog) and on the "v1"
+ * ImpaladCatalog. LocalCatalog does not use this, and instead uses
+ * FailedLoadLocalTable to represent a failed table.
  */
-public class IncompleteTable extends Table {
+public class IncompleteTable extends Table implements FeIncompleteTable {
   // The cause for the incomplete metadata. If there is no cause given (cause_ = null),
   // then this is assumed to be an uninitialized table (table that does not have
   // its metadata loaded).
@@ -57,6 +61,7 @@ public class IncompleteTable extends Table {
    * Returns the cause (ImpalaException) which led to this table's metadata being
    * incomplete.
    */
+  @Override
   public ImpalaException getCause() { return cause_; }
 
   /**

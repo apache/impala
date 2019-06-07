@@ -261,13 +261,6 @@ class SkipIfCatalogV2:
       reason="IMPALA-8489: TestRecoverPartitions.test_post_invalidate "
              "IllegalStateException.")
 
-  # TODO: IMPALA-8459: fix this bug.
-  @classmethod
-  def impala_8459(self):
-    return pytest.mark.skipif(
-      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
-      reason="IMPALA-8459: some kudu DDL is broken for local catalog")
-
   # TODO: IMPALA-7539: fix this bug.
   @classmethod
   def impala_7539(self):

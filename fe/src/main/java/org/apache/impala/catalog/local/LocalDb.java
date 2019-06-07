@@ -34,6 +34,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.FunctionUtils;
@@ -62,7 +63,7 @@ class LocalDb implements FeDb {
    * Map from lower-cased table name to table object. Values will be
    * null for tables which have not yet been loaded.
    */
-  private Map<String, LocalTable> tables_;
+  private Map<String, FeTable> tables_;
 
   /**
    * Map of function name to list of signatures for that function name.
@@ -110,10 +111,18 @@ class LocalDb implements FeDb {
       // Table doesn't exist.
       return null;
     }
-    LocalTable tbl = tables_.get(tblName);
+    FeTable tbl = tables_.get(tblName);
     if (tbl == null) {
       // The table exists but hasn't been loaded yet.
-      tbl = LocalTable.load(this, tblName);
+      try{
+        tbl = LocalTable.load(this, tblName);
+      } catch (TableLoadingException tle) {
+        // If the table fails to load (eg a Kudu table that doesn't have
+        // a backing table, or some other catalogd-side issue), turn it into
+        // an IncompleteTable. This allows statements like DROP TABLE to still
+        // analyze.
+        tbl = new FailedLoadLocalTable(this, tblName, tle);
+      }
       tables_.put(tblName, tbl);
     }
     return tbl;
@@ -146,7 +155,7 @@ class LocalDb implements FeDb {
    */
   private void loadTableNames() {
     if (tables_ != null) return;
-    Map<String, LocalTable> newMap = new HashMap<>();
+    Map<String, FeTable> newMap = new HashMap<>();
     try {
       List<String> names = catalog_.getMetaProvider().loadTableNames(name_);
       for (String tableName : names) {

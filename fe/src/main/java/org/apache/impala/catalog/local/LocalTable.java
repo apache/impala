@@ -82,7 +82,7 @@ abstract class LocalTable implements FeTable {
   @Nullable
   protected final TableMetaRef ref_;
 
-  public static LocalTable load(LocalDb db, String tblName) {
+  public static LocalTable load(LocalDb db, String tblName) throws TableLoadingException {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     LocalTable t = null;
@@ -119,14 +119,15 @@ abstract class LocalTable implements FeTable {
   /**
    * Load the Table instance from the metastore.
    */
-  private static Pair<Table, TableMetaRef> loadTableMetadata(LocalDb db, String tblName) {
+  private static Pair<Table, TableMetaRef> loadTableMetadata(LocalDb db, String tblName)
+      throws TableLoadingException {
     Preconditions.checkArgument(tblName.toLowerCase().equals(tblName));
 
     try {
       return db.getCatalog().getMetaProvider().loadTable(db.getName(), tblName);
     } catch (TException e) {
-      throw new LocalCatalogException(String.format(
-          "Could not load table %s.%s from metastore",
+      throw new TableLoadingException(String.format(
+          "Could not load table %s.%s from catalog",
           db.getName(), tblName), e);
     }
   }
@@ -147,6 +148,16 @@ abstract class LocalTable implements FeTable {
   public LocalTable(LocalDb db, Table msTbl, TableMetaRef ref) {
     this(db, msTbl, ref, ColumnMap.fromMsTable(msTbl));
   }
+
+  protected LocalTable(LocalDb db, String tblName) {
+    this.db_ = Preconditions.checkNotNull(db);
+    this.name_ = tblName;
+    this.ref_ = null;
+    this.msTable_ = null;
+    this.cols_ = null;
+    this.tableStats_ = null;
+  }
+
 
   @Override
   public boolean isLoaded() {

@@ -26,11 +26,8 @@ import java.util.Set;
 
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
-import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
@@ -169,6 +166,9 @@ public class StmtMetadataLoader {
     boolean issueLoadRequest = true;
     // Loop until all the missing tables are loaded in the Impalad's catalog cache.
     // In every iteration of this loop we wait for one catalog update to arrive.
+    //
+    // This isn't relevant for LocalCatalog, since we loaded all of the table references
+    // on-demand in the first recursive call to 'getMissingTables' above.
     while (!missingTbls.isEmpty()) {
       if (issueLoadRequest) {
         catalog.prioritizeLoad(missingTbls);
@@ -177,8 +177,6 @@ public class StmtMetadataLoader {
       }
 
       // Catalog may have been restarted, always use the latest reference.
-      // TODO(todd) is this necessary in the case of the LocalCatalog impl?
-      // or maybe the whole loadTables() function is unnecessarily complex in that case?
       FeCatalog currCatalog = fe_.getCatalog();
       boolean hasCatalogRestarted = currCatalog != catalog;
       if (hasCatalogRestarted && LOG.isWarnEnabled()) {

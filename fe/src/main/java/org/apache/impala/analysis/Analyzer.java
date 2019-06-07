@@ -47,10 +47,10 @@ import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -2536,10 +2536,10 @@ public class Analyzer {
       }
     }
     Preconditions.checkState(table.isLoaded());
-    if (table instanceof IncompleteTable) {
+    if (table instanceof FeIncompleteTable) {
       // If there were problems loading this table's metadata, throw an exception
       // when it is accessed.
-      ImpalaException cause = ((IncompleteTable) table).getCause();
+      ImpalaException cause = ((FeIncompleteTable) table).getCause();
       if (cause instanceof TableLoadingException) throw (TableLoadingException) cause;
       throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }

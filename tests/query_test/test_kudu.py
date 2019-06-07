@@ -40,7 +40,7 @@ from pytz import utc
 from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfCatalogV2
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -1097,7 +1097,6 @@ class TestImpalaKuduIntegration(KuduTestSuite):
              ("c", "string", "", "false", "true", "", "AUTO_ENCODING",
               "DEFAULT_COMPRESSION", "0")]
 
-  @SkipIfCatalogV2.impala_8459()
   @SkipIfKudu.hms_integration_enabled
   def test_delete_external_kudu_table(self, cursor, kudu_client):
     """Check that Impala can recover from the case where the underlying Kudu table of
@@ -1125,7 +1124,6 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("SHOW TABLES")
       assert (impala_table_name,) not in cursor.fetchall()
 
-  @SkipIfCatalogV2.impala_8459()
   @SkipIfKudu.hms_integration_enabled
   def test_delete_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table

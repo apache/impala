@@ -31,6 +31,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TKuduTable;
@@ -56,7 +57,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
    * Create a new instance based on the table metadata 'msTable' stored
    * in the metastore.
    */
-  static LocalTable loadFromKudu(LocalDb db, Table msTable, TableMetaRef ref) {
+  static LocalTable loadFromKudu(LocalDb db, Table msTable, TableMetaRef ref)
+      throws TableLoadingException {
     Preconditions.checkNotNull(db);
     Preconditions.checkNotNull(msTable);
     String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
@@ -212,15 +214,15 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
       return Lists.newArrayList(masters_.split(","));
     }
 
-    public org.apache.kudu.client.KuduTable openTable() {
+    public org.apache.kudu.client.KuduTable openTable() throws TableLoadingException {
       KuduClient kuduClient = KuduUtil.getKuduClient(masters_);
       org.apache.kudu.client.KuduTable kuduTable;
       try {
         kuduTable = kuduClient.openTable(kuduTableName_);
       } catch (KuduException e) {
-        throw new LocalCatalogException(
-            String.format("Error opening Kudu table '%s', Kudu error: %s",
-                kuduTableName_, e.getMessage()));
+        throw new TableLoadingException(
+          String.format("Error opening Kudu table '%s', Kudu error: %s",
+              kuduTableName_, e.getMessage()));
       }
       return kuduTable;
     }

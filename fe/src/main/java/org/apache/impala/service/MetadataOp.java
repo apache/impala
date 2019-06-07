@@ -31,6 +31,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.MapType;
@@ -313,7 +314,7 @@ public class MetadataOp {
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
           String tableType = TABLE_TYPE_TABLE;
-          if (!table.isLoaded()) {
+          if (!table.isLoaded() || table instanceof FeIncompleteTable) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
             if (table.getMetaStoreTable() != null) {

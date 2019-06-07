@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ToSqlUtils;
@@ -358,8 +359,8 @@ public class LocalCatalogTest {
   }
 
   /**
-   * Test GET_TABLES request on an Impala incompatible table. It should be silently
-   * ignored.
+   * Test GET_TABLES request on an Impala incompatible table. The table should be
+   * listed even though it failed to load.
    */
   @Test
   public void testGetTables() throws Exception {
@@ -369,6 +370,8 @@ public class LocalCatalogTest {
     req.get_tables_req.setSchemaName("functional");
     req.get_tables_req.setTableName("bad_serde");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
-    assertEquals(0, resp.rows.size());
+    assertEquals(1, resp.rows.size());
+    assertEquals(resp.rows.get(0).colVals.get(1).string_val, "functional");
+    assertEquals(resp.rows.get(0).colVals.get(2).string_val, "bad_serde");
   }
 }
