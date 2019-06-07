@@ -21,7 +21,7 @@ namespace mustache {
 // 'context'. Alternately finds a tag and then evaluates it. Returns when an error is
 // signalled (TODO: probably doesn't work in all paths), and evaluates that tag. Output is
 // accumulated in 'out'.
-void RenderTemplate(const std::string& document, const std::string& document_root,
+bool RenderTemplate(const std::string& document, const std::string& document_root,
     const rapidjson::Value& context, std::stringstream* out);
 
 }

@@ -541,8 +541,10 @@ void Webserver::RenderUrlWithTemplate(const WebRequest& req,
     } else {
       stringstream buffer;
       buffer << tmpl.rdbuf();
-      RenderTemplate(buffer.str(), Substitute("$0/", FLAGS_webserver_doc_root), document,
+      bool success = RenderTemplate(buffer.str(),
+          Substitute("$0/", FLAGS_webserver_doc_root), document,
           output);
+      LOG_IF(WARNING, !success) << "could not render template " << full_template_path;
     }
   }
 }
