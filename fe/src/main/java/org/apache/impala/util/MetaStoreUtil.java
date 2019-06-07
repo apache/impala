@@ -88,6 +88,8 @@ public class MetaStoreUtil {
   // The default value for the above configuration key.
   public static final String DEFAULT_HIVE_METASTORE_URIS = "";
 
+  public static final String hiveMetastoreUris_;
+
   static {
     // Get the value from the Hive configuration, if present.
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
@@ -105,6 +107,9 @@ public class MetaStoreUtil {
           "default: %d", maxPartitionsPerRpc_, DEFAULT_MAX_PARTITIONS_PER_RPC));
       maxPartitionsPerRpc_ = DEFAULT_MAX_PARTITIONS_PER_RPC;
     }
+
+    hiveMetastoreUris_ = hiveConf.get(HIVE_METASTORE_URIS_KEY,
+        DEFAULT_HIVE_METASTORE_URIS);
   }
 
   /**
@@ -119,10 +124,8 @@ public class MetaStoreUtil {
   /**
    * Return the value of thrift URI for the remote Hive Metastore.
    */
-  public static String getHiveMetastoreUrisKeyValue(IMetaStoreClient client)
-      throws ConfigValSecurityException, TException {
-    return client.getConfigValue(
-        HIVE_METASTORE_URIS_KEY, DEFAULT_HIVE_METASTORE_URIS);
+  public static String getHiveMetastoreUris() {
+    return hiveMetastoreUris_;
   }
 
   /**

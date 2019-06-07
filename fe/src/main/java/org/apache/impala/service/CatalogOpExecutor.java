@@ -1515,14 +1515,7 @@ public class CatalogOpExecutor {
     // the configuration.
     Preconditions.checkState(KuduTable.isKuduTable(msTbl));
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    String hmsUris;
-    try {
-      hmsUris = MetaStoreUtil.getHiveMetastoreUrisKeyValue(
-          catalog_.getMetaStoreClient().getHiveClient());
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to get the Hive Metastore " +
-          "configuration for table '%s' ", msTbl.getTableName()), e);
-    }
+    String hmsUris = MetaStoreUtil.getHiveMetastoreUris();
     return KuduTable.isHMSIntegrationEnabledAndValidate(masterHosts, hmsUris);
   }
 

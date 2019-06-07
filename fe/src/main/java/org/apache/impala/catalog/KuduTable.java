@@ -212,11 +212,7 @@ public class KuduTable extends Table implements FeKuduTable {
   public static boolean isHMSIntegrationEnabledAndValidate(String kuduMasters,
       String hmsUris) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(hmsUris);
-    // Skip validation if the HMS URIs in impala is empty for some reason.
-    // TODO: Is this a valid case?
-    if (hmsUris.isEmpty()) {
-      return true;
-    }
+    Preconditions.checkArgument(!hmsUris.isEmpty());
     HiveMetastoreConfig hmsConfig = getHiveMetastoreConfig(kuduMasters);
     if (hmsConfig == null) {
       return false;
