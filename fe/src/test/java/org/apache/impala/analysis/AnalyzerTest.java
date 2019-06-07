@@ -877,4 +877,46 @@ public class AnalyzerTest extends FrontendTestBase {
         FunctionUtils.resolveFunction(Arrays.asList(fns), fnDate,
             Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
   }
+
+  @Test
+  public void testAnalyzeBucketed() {
+    AnalyzesOk("select count(*) from functional.bucketed_table");
+    AnalyzesOk("select count(*) from functional.bucketed_ext_table");
+    AnalyzesOk("drop stats functional.bucketed_table");
+    AnalyzesOk("describe functional.bucketed_table");
+    AnalyzesOk("show column stats functional.bucketed_table");
+    AnalyzesOk("create table test as select * from functional.bucketed_table");
+    AnalyzesOk("compute stats functional.bucketed_table");
+
+    String errorMsgBucketed = "functional.bucketed_table " +
+        "is a bucketed table. Only read operations are supported on such tables.";
+    String errorMsgExtBucketed = "functional.bucketed_ext_table " +
+        "is a bucketed table. Only read operations are supported on such tables.";
+    String errorMsgInsertOnlyBucketed =
+        "functional.insert_only_transactional_bucketed_table " +
+        "is a bucketed table. Only read operations are supported on such tables.";
+    String errorMsg = "Table bucketed_ext_table write not supported";
+
+    if (MetastoreShim.getMajorVersion() > 2) {
+      AnalyzesOk(
+          "select count(*) from functional.insert_only_transactional_bucketed_table");
+      AnalysisError("insert into functional.insert_only_transactional_bucketed_table " +
+          "select * from functional.insert_only_transactional_bucketed_table",
+          errorMsgInsertOnlyBucketed);
+      // Separates from Hive 2 as the error message may different after Hive
+      // provides error message needed information.
+      AnalysisError("insert into functional.bucketed_ext_table select * from " +
+          "functional.bucketed_ext_table", errorMsgExtBucketed);
+    } else {
+      AnalysisError("insert into functional.bucketed_ext_table select * from " +
+         "functional.bucketed_ext_table", errorMsgExtBucketed);
+    }
+    AnalysisError("insert into functional.bucketed_table select * from " +
+       "functional.bucketed_table", errorMsgBucketed);
+    AnalysisError("create table test like functional.bucketed_table", errorMsgBucketed);
+    AnalysisError("drop table functional.bucketed_table", errorMsgBucketed);
+    AnalysisError("truncate table functional.bucketed_table", errorMsgBucketed);
+    AnalysisError("alter table functional.bucketed_table add columns(col3 int)",
+        errorMsgBucketed);
+  }
 }

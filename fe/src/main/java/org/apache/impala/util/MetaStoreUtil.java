@@ -34,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.HdfsTable;
@@ -345,5 +346,13 @@ public class MetaStoreUtil {
     if (partVals != null) rqst.setPartitionVals(partVals);
 
     msClient.fireListenerEvent(rqst);
+  }
+
+  /**
+   * Check if the hms table is a bucketed table or not
+   */
+  public static boolean isBucketedTable(Table msTbl) {
+    Preconditions.checkNotNull(msTbl);
+    return msTbl.getSd().getNumBuckets() > 0;
   }
 }

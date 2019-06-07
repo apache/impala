@@ -17,17 +17,24 @@
 
 package org.apache.impala.compat;
 
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_NONE;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READONLY;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_READWRITE;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.ACCESSTYPE_WRITEONLY;
 import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
 import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -55,6 +62,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.HiveMetadataFormatUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
@@ -68,6 +76,20 @@ import com.google.common.base.Preconditions;
  * between major versions of Hive. This implements the shimmed methods for Hive 3.
  */
 public class MetastoreShim {
+  private static final String EXTWRITE = "EXTWRITE";
+  private static final String EXTREAD = "EXTREAD";
+  private static final String HIVEBUCKET2 = "HIVEBUCKET2";
+  private static final String HIVEFULLACIDREAD = "HIVEFULLACIDREAD";
+  private static final String HIVEFULLACIDWRITE = "HIVEFULLACIDWRITE";
+  private static final String HIVEMANAGEDINSERTREAD = "HIVEMANAGEDINSERTREAD";
+  private static final String HIVEMANAGEDINSERTWRITE = "HIVEMANAGEDINSERTWRITE";
+  private static final String HIVEMANAGESTATS = "HIVEMANAGESTATS";
+  // Materialized View
+  private static final String HIVEMQT = "HIVEMQT";
+  // Virtual View
+  private static final String HIVESQL = "HIVESQL";
+  private static final long MAJOR_VERSION = 3;
+  private static boolean capabilitiestSet_ = false;
   /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
    */
@@ -423,9 +445,97 @@ public class MetastoreShim {
   }
 
   /**
-   * @return the shim major version
+   * Set impala capabilities to hive client
+   * Impala supports:
+   * - external table read/write
+   * - insert-only Acid table read
+   * - virtual view read
+   * - materialized view read
+   */
+  public static synchronized void setHiveClientCapabilities() {
+    String hostName;
+    if (capabilitiestSet_) return;
+    try {
+      hostName = InetAddress.getLocalHost().getCanonicalHostName();
+    } catch (UnknownHostException ue) {
+      hostName = "unknown";
+    }
+    String buildVersion = BackendConfig.INSTANCE != null ?
+        BackendConfig.INSTANCE.getImpalaBuildVersion() : String.valueOf(MAJOR_VERSION);
+    if (buildVersion == null) buildVersion = String.valueOf(MAJOR_VERSION);
+
+    // TODO: Add HIVEMANAGEDINSERTWRITE once IMPALA-8636 goes in.
+    String impalaId = String.format("Impala%s@%s", buildVersion, hostName);
+    String[] capabilities = new String[] {
+        EXTWRITE, // External table write
+        EXTREAD,  // External table read
+        HIVEMANAGEDINSERTREAD,
+        HIVESQL,
+        HIVEMQT,
+        HIVEBUCKET2 // Includes the capability to get the correct bucket number.
+                    // Currently, without this capability, for an external bucketed
+                    // table, Hive will return the table as Read-only with bucket
+                    // number -1. It makes clients unable to know it is a bucketed table.
+                    // TODO: will remove this capability when Hive can provide
+                    // API calls to tell the changing of bucket number.
+        };
+
+    HiveMetaStoreClient.setProcessorIdentifier(impalaId);
+    HiveMetaStoreClient.setProcessorCapabilities(capabilities);
+    capabilitiestSet_ = true;
+  }
+
+  /**
+   * Check if a table has a capability
+   * @param msTble hms table
+   * @param requireCapability hive access types or combination of them
+   * @return true if the table has the capability
+   */
+  public static boolean hasTableCapability(Table msTbl, byte requiredCapability) {
+    Preconditions.checkNotNull(msTbl);
+    // access types in binary:
+    // ACCESSTYPE_NONE:      00000001
+    // ACCESSTYPE_READONLY:  00000010
+    // ACCESSTYPE_WRITEONLY: 00000100
+    // ACCESSTYPE_READWRITE: 00001000
+    return requiredCapability != ACCESSTYPE_NONE
+        && ((msTbl.getAccessType() & requiredCapability) != 0);
+  }
+
+  /**
+   * Get Access type in string
+   * @param msTble hms table
+   * @return the string represents the table access type.
+   */
+  public static String getTableAccessType(Table msTbl) {
+    Preconditions.checkNotNull(msTbl);
+    switch (msTbl.getAccessType()) {
+      case ACCESSTYPE_READONLY:
+        return "READONLY";
+      case ACCESSTYPE_WRITEONLY:
+        return "WRITEONLY";
+      case ACCESSTYPE_READWRITE:
+        return "READWRITE";
+      case ACCESSTYPE_NONE:
+      default:
+        return "NONE";
+    }
+  }
+
+  /**
+   * Set table access type. This is useful for hms Table object constructed for create
+   * table statement. For example, to create a table, we need Read/Write capabilities
+   * not default 0(not defined)
+   */
+  public static void setTableAccessType(Table msTbl, byte accessType) {
+    Preconditions.checkNotNull(msTbl);
+    msTbl.setAccessType(accessType);
+  }
+
+  /**
+   * @return the hive major version
    */
   public static long getMajorVersion() {
-    return 3;
+    return MAJOR_VERSION;
   }
 }

@@ -36,7 +36,7 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "numRows", "rawDataSize", "totalSize", "COLUMN_STATS_ACCURATE",
                            "STATS_GENERATED_VIA_STATS_TASK", "last_modified_by",
                            "last_modified_time", "numFilesErasureCoded",
-                           "bucketing_version"]
+                           "bucketing_version", "OBJCAPABILITIES"]
 
   @classmethod
   def get_workload(self):

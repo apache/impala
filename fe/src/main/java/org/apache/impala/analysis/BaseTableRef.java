@@ -64,7 +64,7 @@ public class BaseTableRef extends TableRef {
         requireGrantOption_);
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;
-    analyzer.ensureTableNotFullAcid(getTable());
+    analyzer.checkTableCapability(getTable(), Analyzer.OperationType.ANY);
     analyzeTableSample(analyzer);
     analyzeHints(analyzer);
     analyzeJoin(analyzer);

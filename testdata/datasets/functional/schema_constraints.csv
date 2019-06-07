@@ -254,3 +254,13 @@ table_name:insert_only_transactional_table, constraint:exclude, table_format:kud
 # excluded.
 table_name:materialized_view, constraint:exclude, table_format:hbase/none/none
 table_name:materialized_view, constraint:exclude, table_format:kudu/none/none
+
+table_name:insert_only_transactional_bucketed_table, constraint:exclude, table_format:hbase/none/none
+table_name:insert_only_transactional_bucketed_table, constraint:exclude, table_format:kudu/none/none
+
+# Bucketed tables only work for file-format based tables
+table_name:bucketed_ext_table, constraint:exclude, table_format:hbase/none/none
+table_name:bucketed_ext_table, constraint:exclude, table_format:kudu/none/none
+table_name:bucketed_table, constraint:exclude, table_format:hbase/none/none
+table_name:bucketed_table, constraint:exclude, table_format:kudu/none/none
+table_name:bucketed_table, constraint:exclude, table_format:text/lzo/block

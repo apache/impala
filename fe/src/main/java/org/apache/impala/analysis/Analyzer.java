@@ -51,8 +51,10 @@ import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
@@ -85,6 +87,7 @@ import org.apache.impala.util.Graph.SccCondensedGraph;
 import org.apache.impala.util.Graph.WritableGraph;
 import org.apache.impala.util.IntIterator;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.TSessionStateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,6 +127,9 @@ import com.google.common.collect.Sets;
  * more accurately and consistently here and elsewhere.
  */
 public class Analyzer {
+  public static final byte ACCESSTYPE_READ = (byte)2;
+  public static final byte ACCESSTYPE_WRITE = (byte)4;
+  public static final byte ACCESSTYPE_READWRITE = (byte)8;
   // Common analysis error messages
   public final static String DB_DOES_NOT_EXIST_ERROR_MSG = "Database does not exist: ";
   public final static String DB_ALREADY_EXISTS_ERROR_MSG = "Database already exists: ";
@@ -141,6 +147,10 @@ public class Analyzer {
   private static final String TRANSACTIONAL_TABLE_NOT_SUPPORTED =
       "Table %s not supported. Transactional (ACID) tables are " +
       "only supported for read.";
+  private static final String BUCKETED_TABLE_NOT_SUPPORTED =
+      "%s is a bucketed table. Only read operations are supported on such tables.";
+  private static final String TABLE_NOT_SUPPORTED =
+      "%s not supported. Table %s  access type is: %s";
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
@@ -185,6 +195,13 @@ public class Analyzer {
   // except its own. Therefore, only a single semi-joined tuple can be visible at a time.
   private TupleId visibleSemiJoinedTupleId_ = null;
 
+  // Required Operation type: Read, write, any(read or write).
+  public enum OperationType {
+    READ,
+    WRITE,
+    ANY
+  };
+
   public void setIsSubquery() {
     isSubquery_ = true;
     globalState_.containsSubquery = true;
@@ -224,6 +241,88 @@ public class Analyzer {
     if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
       throw new AnalysisException(String.format(TRANSACTIONAL_TABLE_NOT_SUPPORTED,
           table.getFullName()));
+    }
+  }
+
+  /**
+   * @param table Table need to be checked
+   * @throws AnalysisException If table is a bucketed table.
+   */
+  public static void ensureTableNotBucketed(FeTable table)
+      throws AnalysisException {
+    if (MetaStoreUtil.isBucketedTable(table.getMetaStoreTable())) {
+      throw new AnalysisException(String.format(BUCKETED_TABLE_NOT_SUPPORTED,
+              table.getFullName()));
+    }
+  }
+
+  /**
+   * Check if the table supports the operation
+   * @param table Table need to check
+   * @param operationType The type of operation
+   * @throws AnalysisException If the table does not support the operation
+   */
+  public static void checkTableCapability(FeTable table, OperationType type)
+      throws AnalysisException {
+    switch(type) {
+      case WRITE:
+        ensureTableWriteSupported(table);
+        break;
+      case READ:
+      case ANY:
+      default:
+        ensureTableSupported(table);
+        break;
+    }
+  }
+
+  /**
+   * Check if the table supports write operations
+   * @param table Table need to check
+   * @throws AnalysisException If the table does not support write.
+   */
+  private static void ensureTableWriteSupported(FeTable table)
+      throws AnalysisException {
+    ensureTableNotBucketed(table);
+    if (MetastoreShim.getMajorVersion() > 2) {
+      byte writeRequires = ACCESSTYPE_WRITE | ACCESSTYPE_READWRITE;
+      // Kudu tables do not put new table properties to HMS and HMS need
+      // OBJCAPABILIES to grant managed unacid table write permission
+      // TODO: remove following kudu check when these issues are fixed
+      if (KuduTable.isKuduTable(table.getMetaStoreTable())) return;
+      if (!MetastoreShim.hasTableCapability(table.getMetaStoreTable(), writeRequires)) {
+        // Error messages with explanations.
+        ensureTableNotTransactional(table);
+        throw new AnalysisException(String.format(TABLE_NOT_SUPPORTED, "Write",
+            table.getFullName(),
+            MetastoreShim.getTableAccessType(table.getMetaStoreTable())));
+      }
+    } else {
+      ensureTableNotTransactional(table);
+    }
+  }
+
+  /**
+   * Check if the table type is supported
+   * @param table Table need to check capabilities
+   * @throws AnalysisException if the table type is not supported.
+   */
+  private static void ensureTableSupported(FeTable table)
+      throws AnalysisException {
+    if (MetastoreShim.getMajorVersion() > 2) {
+      byte capabilities = ACCESSTYPE_READ | ACCESSTYPE_WRITE | ACCESSTYPE_READWRITE;
+      if (!MetastoreShim.hasTableCapability(table.getMetaStoreTable(), capabilities)) {
+        // Return error messages by table type checking
+        // TODO: After Hive provides API calls to send back hints on why
+        // the operations are not supported, we will generate error messages
+        // accordingly.
+        ensureTableNotFullAcid(table);
+        throw new AnalysisException(String.format(TABLE_NOT_SUPPORTED, "Operations",
+            table.getFullName(),
+            MetastoreShim.getTableAccessType(table.getMetaStoreTable())));
+      }
+    } else {
+      ensureTableNotTransactional(table);
     }
   }
 

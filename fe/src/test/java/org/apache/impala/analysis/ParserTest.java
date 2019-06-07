@@ -4015,4 +4015,10 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("--test\nSELECT 1\n");
     ParsesOk("--test\nSELECT 1\n  ");
   }
+
+  @Test
+  public void TestCreateBucketedTable() {
+    ParserError("Create table bucketed_tbl(order_id int, order_name string)"
+            + "clustered by (order_id) into 5 buckets", "Syntax error");
+  }
 }

@@ -23,6 +23,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TUniqueId;
@@ -61,6 +62,9 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     FeSupport.loadLibrary();
     CatalogServiceCatalog cs;
     try {
+      if (MetastoreShim.getMajorVersion() > 2) {
+        MetastoreShim.setHiveClientCapabilities();
+      }
       cs = new CatalogServiceTestCatalog(false, 16, new TUniqueId(),
           new MetaStoreClientPool(0, 0));
       cs.setAuthzManager(authzFactory.newAuthorizationManager(cs));
@@ -81,6 +85,9 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     FeSupport.loadLibrary();
     Path derbyPath = Paths.get(System.getProperty("java.io.tmpdir"),
         UUID.randomUUID().toString());
+    if (MetastoreShim.getMajorVersion() > 2) {
+      MetastoreShim.setHiveClientCapabilities();
+    }
     CatalogServiceCatalog cs = new CatalogServiceTestCatalog(false, 16,
         new TUniqueId(), new EmbeddedMetastoreClientPool(0, derbyPath));
     cs.setAuthzManager(new NoopAuthorizationManager());

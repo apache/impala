@@ -23,10 +23,11 @@ import time
 
 from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2)
+                               SkipIfCatalogV2, SkipIfHive2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import (
     WAREHOUSE,
@@ -665,6 +666,9 @@ class TestDdlStatements(TestDdlBase):
     tblproperties ('p1'='v0', 'p1'='v1')""".format(fq_tbl_name))
     properties = self._get_tbl_properties(fq_tbl_name)
 
+    if HIVE_MAJOR_VERSION > 2:
+      assert properties['OBJCAPABILITIES'] == 'EXTREAD,EXTWRITE'
+      del properties['OBJCAPABILITIES']
     assert len(properties) == 2
     # The transient_lastDdlTime is variable, so don't verify the value.
     assert 'transient_lastDdlTime' in properties
@@ -685,11 +689,22 @@ class TestDdlStatements(TestDdlBase):
         "('prop1'='val1', 'p2'='val2', 'p2'='val3', ''='')".format(fq_tbl_name))
     properties = self._get_tbl_properties(fq_tbl_name)
 
+    if HIVE_MAJOR_VERSION > 2:
+      assert 'OBJCAPABILITIES' in properties
     assert 'transient_lastDdlTime' in properties
     assert properties['p1'] == 'v1'
     assert properties['prop1'] == 'val1'
     assert properties['p2'] == 'val3'
     assert properties[''] == ''
+
+  @SkipIfHive2.acid
+  def test_create_insertonly_tbl(self, vector, unique_database):
+    insertonly_tbl = unique_database + ".test_insertonly"
+    self.client.execute("""create table {0} (coli int) stored as parquet tblproperties(
+        'transactional'='true', 'transactional_properties'='insert_only')"""
+        .format(insertonly_tbl))
+    properties = self._get_tbl_properties(insertonly_tbl)
+    assert properties['OBJCAPABILITIES'] == 'HIVEMANAGEDINSERTREAD,HIVEMANAGEDINSERTWRITE'
 
   def test_alter_tbl_properties_reload(self, vector, unique_database):
     # IMPALA-8734: Force a table schema reload when setting table properties.

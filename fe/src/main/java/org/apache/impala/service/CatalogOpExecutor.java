@@ -17,6 +17,8 @@
 
 package org.apache.impala.service;
 
+import static org.apache.impala.analysis.Analyzer.ACCESSTYPE_READWRITE;
+
 import com.google.common.collect.Iterables;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -87,6 +89,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -165,6 +168,7 @@ import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.CompressionUtil;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.KuduUtil;
@@ -254,6 +258,14 @@ public class CatalogOpExecutor {
   // Format string for exceptions returned by Hive Metastore RPCs.
   private final static String HMS_RPC_ERROR_FORMAT_STR =
       "Error making '%s' RPC to Hive Metastore: ";
+
+  // Table capabilities property name
+  private static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
+
+  // Table default capabilities
+  private static final String ACIDINSERTONLY_CAPABILITIES =
+      "HIVEMANAGEDINSERTREAD,HIVEMANAGEDINSERTWRITE";
+  private static final String NONACID_CAPABILITIES = "EXTREAD,EXTWRITE";
 
   // The maximum number of partitions to update in one Hive Metastore RPC.
   // Used when persisting the results of COMPUTE STATS statements.
@@ -1864,11 +1876,13 @@ public class CatalogOpExecutor {
     tbl.setDbName(tableName.getDb());
     tbl.setTableName(tableName.getTbl());
     tbl.setOwner(params.getOwner());
+
     if (params.isSetTable_properties()) {
       tbl.setParameters(params.getTable_properties());
     } else {
       tbl.setParameters(new HashMap<String, String>());
     }
+
     if (params.isSetSort_columns() && !params.sort_columns.isEmpty()) {
       tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
           Joiner.on(",").join(params.sort_columns));
@@ -1890,6 +1904,8 @@ public class CatalogOpExecutor {
     } else {
       tbl.setPartitionKeys(new ArrayList<FieldSchema>());
     }
+
+    setDefaultTableCapabilities(tbl);
     return tbl;
   }
 
@@ -2173,8 +2189,32 @@ public class CatalogOpExecutor {
     }
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
+    setDefaultTableCapabilities(tbl);
     LOG.trace(String.format("Creating table %s LIKE %s", tblName, srcTblName));
     createTable(tbl, params.if_not_exists, null, params.server_name, response);
+  }
+
+  private static void setDefaultTableCapabilities(
+      org.apache.hadoop.hive.metastore.api.Table tbl) {
+    if (MetastoreShim.getMajorVersion() > 2) {
+      // This hms table is for create table.
+      // It needs read/write access type,  not default value(0, undefined)
+      MetastoreShim.setTableAccessType(tbl, ACCESSTYPE_READWRITE);
+      // Set table default capabilities in HMS
+      if (tbl.getParameters().containsKey(CAPABILITIES_KEY)) return;
+      if (AcidUtils.isTransactionalTable(tbl.getParameters())) {
+        Preconditions.checkState(!AcidUtils.isFullAcidTable(tbl.getParameters()));
+        tbl.getParameters().put(CAPABILITIES_KEY, ACIDINSERTONLY_CAPABILITIES);
+      } else {
+        // Managed KUDU table has issues with extra table properties:
+        // 1. The property is not stored. 2. The table cannot be found after created.
+        // Related jira: IMPALA-8751
+        // Skip adding default capabilities for KUDU tables before the issues are fixed.
+        if (!KuduTable.isKuduTable(tbl)) {
+          tbl.getParameters().put(CAPABILITIES_KEY, NONACID_CAPABILITIES);
+        }
+      }
+    }
   }
 
   /**

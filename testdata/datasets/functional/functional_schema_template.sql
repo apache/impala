@@ -2162,6 +2162,46 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+insert_only_transactional_bucketed_table
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE_HIVE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col1 int, col2 int)
+CLUSTERED BY (col1) INTO 5 BUCKETS
+STORED AS ORC
+TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only');
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bucketed_ext_table
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col1 int, col2 int)
+CLUSTERED BY (col1) INTO 5 BUCKETS
+STORED AS {file_format}
+LOCATION '/test-warehouse/{db_name}{db_suffix}{table_name}';
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bucketed_table
+---- CREATE_HIVE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col1 int, col2 int)
+CLUSTERED BY (col1) INTO 5 BUCKETS
+STORED AS {file_format};
+---- LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, int_col from functional.alltypes;
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * from functional.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 testescape_16_lf
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (

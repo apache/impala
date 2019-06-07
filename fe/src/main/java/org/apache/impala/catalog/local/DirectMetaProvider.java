@@ -71,6 +71,9 @@ class DirectMetaProvider implements MetaProvider {
     // TODO(todd): this should probably be a process-wide singleton.
     if (msClientPool_ == null) {
       TBackendGflags cfg = BackendConfig.INSTANCE.getBackendCfg();
+      if (MetastoreShim.getMajorVersion() > 2) {
+        MetastoreShim.setHiveClientCapabilities();
+      }
       msClientPool_ = new MetaStoreClientPool(cfg.num_metadata_loading_threads,
           cfg.initial_hms_cnxn_timeout_s);
     }

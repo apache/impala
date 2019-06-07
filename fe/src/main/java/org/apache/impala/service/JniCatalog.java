@@ -35,6 +35,7 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
@@ -119,6 +120,10 @@ public class JniCatalog {
     LOG.info(JniUtil.getJavaVersion());
 
     final AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
+
+    if (MetastoreShim.getMajorVersion() > 2) {
+      MetastoreShim.setHiveClientCapabilities();
+    }
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
         cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s, getServiceId(),

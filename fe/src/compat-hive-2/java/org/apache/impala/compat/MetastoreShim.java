@@ -284,6 +284,22 @@ public class MetastoreShim {
     return -1L;
   }
 
+  public static boolean hasTableCapability(Table msTbl, byte requiredCapability) {
+    throw new UnsupportedOperationException("hasTableCapability not supported");
+  }
+
+  public static String getTableAccessType(Table msTbl) {
+    throw new UnsupportedOperationException("getTableAccessType not supported");
+  }
+
+  public static void setTableAccessType(Table msTbl, byte accessType) {
+    throw new UnsupportedOperationException("setTableAccessType not supported");
+  }
+
+  public static void setHiveClientCapabilities() {
+    throw new UnsupportedOperationException("setHiveClientCapabilities not supported");
+  }
+
   /**
    * @return the shim version.
    */

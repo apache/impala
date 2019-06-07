@@ -425,14 +425,14 @@ public class InsertStmt extends StatementBase {
               .build());
     }
 
-    analyzer.ensureTableNotTransactional(table_);
-
     // We do not support (in|up)serting into views.
     if (table_ instanceof FeView) {
       throw new AnalysisException(
           String.format("Impala does not support %sing into views: %s", getOpName(),
               table_.getFullName()));
     }
+
+    analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
 
     // We do not support (in|up)serting into tables with unsupported column types.
     for (Column c: table_.getColumns()) {
