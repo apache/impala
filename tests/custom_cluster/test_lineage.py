@@ -16,15 +16,12 @@
 # under the License.
 #
 # Tests for column lineage.
-# TODO: add verification for more fields.
 
 import json
 import logging
 import os
 import pytest
 import re
-import shutil
-import stat
 import tempfile
 import time
 
@@ -34,22 +31,20 @@ LOG = logging.getLogger(__name__)
 
 
 class TestLineage(CustomClusterTestSuite):
-  lineage_log_dir = tempfile.mkdtemp()
+  START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
+  CREATE_TABLE_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="create_table_time")
 
   @classmethod
   def setup_class(cls):
     super(TestLineage, cls).setup_class()
 
-  @classmethod
-  def teardown_class(cls):
-    shutil.rmtree(cls.lineage_log_dir)
-
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--lineage_event_log_dir=%s" % lineage_log_dir)
+  @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
+                                    .format(START_END_TIME_LINEAGE_LOG_DIR))
   def test_start_end_timestamp(self, vector):
     """Test that 'timestamp' and 'endTime' in the lineage graph are populated with valid
        UNIX times."""
-    LOG.info("lineage_event_log_dir is " + self.lineage_log_dir)
+    LOG.info("lineage_event_log_dir is {0}".format(self.START_END_TIME_LINEAGE_LOG_DIR))
     before_time = int(time.time())
     query = "select count(*) from functional.alltypes"
     result = self.execute_query_expect_success(self.client, query)
@@ -60,8 +55,8 @@ class TestLineage(CustomClusterTestSuite):
     # Stop the cluster in order to flush the lineage log files.
     self._stop_impala_cluster()
 
-    for log_filename in os.listdir(self.lineage_log_dir):
-      log_path = os.path.join(self.lineage_log_dir, log_filename)
+    for log_filename in os.listdir(self.START_END_TIME_LINEAGE_LOG_DIR):
+      log_path = os.path.join(self.START_END_TIME_LINEAGE_LOG_DIR, log_filename)
       # Only the coordinator's log file will be populated.
       if os.path.getsize(log_path) > 0:
         LOG.info("examining file: " + log_path)
@@ -77,7 +72,8 @@ class TestLineage(CustomClusterTestSuite):
         LOG.info("empty file: " + log_path)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}".format(lineage_log_dir))
+  @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
+                                    .format(CREATE_TABLE_TIME_LINEAGE_LOG_DIR))
   def test_create_table_timestamp(self, vector, unique_database):
     """Test that 'createTableTime' in the lineage graph are populated with valid value
        from HMS."""
@@ -89,8 +85,8 @@ class TestLineage(CustomClusterTestSuite):
     # Wait to flush the lineage log files.
     time.sleep(3)
 
-    for log_filename in os.listdir(self.lineage_log_dir):
-      log_path = os.path.join(self.lineage_log_dir, log_filename)
+    for log_filename in os.listdir(self.CREATE_TABLE_TIME_LINEAGE_LOG_DIR):
+      log_path = os.path.join(self.CREATE_TABLE_TIME_LINEAGE_LOG_DIR, log_filename)
       # Only the coordinator's log file will be populated.
       if os.path.getsize(log_path) > 0:
         with open(log_path) as log_file:
