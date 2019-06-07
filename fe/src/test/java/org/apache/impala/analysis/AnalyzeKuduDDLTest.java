@@ -198,13 +198,14 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partition 30 < values) stored as kudu tblproperties" +
         "('kudu.master_addresses' = '%s')", kuduMasters));
     // Not using the STORED AS KUDU syntax to specify a Kudu table
-    AnalysisError("create table tab (x int) tblproperties (" +
-        "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
-        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    // TODO(IMPALA-8629): Uncomment tests after Kudu adjusts its StorageHandler logic.
+    // AnalysisError("create table tab (x int) tblproperties (" +
+    //     "'storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
+    //     CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     // Creating unpartitioned table results in a warning.
-    AnalyzesOk("create table tab (x int primary key) stored as kudu " +
-        "tblproperties ('storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
-        "Unpartitioned Kudu tables are inefficient for large data sizes.");
+    // AnalyzesOk("create table tab (x int primary key) stored as kudu " +
+    //     "tblproperties ('storage_handler'='org.apache.kudu.hive.KuduStorageHandler')",
+    //     "Unpartitioned Kudu tables are inefficient for large data sizes.");
     // Invalid value for number of replicas
     AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
         "'kudu.num_tablet_replicas'='1.1')",
