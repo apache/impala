@@ -449,10 +449,10 @@ under the License.
         underlying compression is controlled by the <codeph>COMPRESSION_CODEC</codeph> query
         option. (Prior to Impala 2.0, the query option name was
         <codeph>PARQUET_COMPRESSION_CODEC</codeph>.) The allowed values for this query option
-        are <codeph>snappy</codeph> (the default), <codeph>gzip</codeph>, and
-        <codeph>none</codeph>. The option value is not case-sensitive. If the option is set to
-        an unrecognized value, all kinds of queries will fail due to the invalid option setting,
-        not just queries involving Parquet tables.
+        are <codeph>snappy</codeph> (the default), <codeph>gzip</codeph>, <codeph>zstd</codeph>
+        and <codeph>none</codeph>. The option value is not case-sensitive. If the option is set
+        to an unrecognized value, all kinds of queries will fail due to the invalid option
+        setting, not just queries involving Parquet tables.
       </p>
 
     </conbody>

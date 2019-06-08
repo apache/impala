@@ -31,6 +31,7 @@ under the License.
       <data name="Category" value="Parquet"/>
       <data name="Category" value="Snappy"/>
       <data name="Category" value="Gzip"/>
+      <data name="Category" value="Zstd"/>
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
     </metadata>
@@ -56,11 +57,20 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock>SET COMPRESSION_CODEC=<varname>codec_name</varname>;</codeblock>
+<codeblock>SET COMPRESSION_CODEC=<varname>codec_name</varname>; // Supported for all codecs.
+SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</varname>; // Only supported for ZSTD.
+</codeblock>
 
     <p>
       The allowed values for this query option are <codeph>SNAPPY</codeph> (the default), <codeph>GZIP</codeph>,
-      and <codeph>NONE</codeph>.
+      <codeph>ZSTD</codeph>, and <codeph>NONE</codeph>.
+    </p>
+
+    <p>
+      <codeph>ZSTD</codeph> also supports setting a compression level. The lower the level, the faster the speed at
+      the cost of compression ratio. Compression levels from 1 up to 22 are supported for <codeph>ZSTD</codeph>.
+      The default compression level 3 is used, if one is not passed using the <codeph>compression_codec</codeph>
+      query option.
     </p>
 
     <note>
@@ -92,7 +102,14 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
-<codeblock>set compression_codec=gzip;
+<codeblock>
+set compression_codec=zstd; // Default compression level 3.
+insert into parquet_table_zstd_default_compressed select * from t1;
+
+set compression_codec=zstd:12; // Compression level 12.
+insert into parquet_table_zstd_highly_compressed select * from t1;
+
+set compression_codec=gzip;
 insert into parquet_table_highly_compressed select * from t1;
 
 set compression_codec=snappy;
