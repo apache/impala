@@ -29,12 +29,19 @@
 #include "util/promise.h"
 
 #include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/data_stream_service.pb.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
 #include "runtime/row-batch.h"
 #include "util/condition-variable.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
+
+namespace kudu {
+namespace rpc {
+class RpcContext;
+} // namespace rpc
+} // namespace kudu
 
 namespace impala {
 
@@ -90,7 +97,7 @@ class FragmentInstanceState {
   Status WaitForOpen();
 
   /// Publishes filter with ID 'filter_id' to this fragment instance's filter bank.
-  void PublishFilter(const TPublishFilterParams& params);
+  void PublishFilter(const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
   /// Called periodically by query state thread to get the current status of this fragment
   /// instance. The fragment instance's status is stored in 'instance_status' and its

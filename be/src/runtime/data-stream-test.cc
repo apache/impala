@@ -122,6 +122,12 @@ class ImpalaKRPCTestBackend : public DataStreamServiceIf {
     stream_mgr_->CloseSender(request, response, rpc_context);
   }
 
+  virtual void UpdateFilter(
+      const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp, RpcContext* context) {}
+
+  virtual void PublishFilter(const PublishFilterParamsPB* req,
+      PublishFilterResultPB* resp, RpcContext* context) {}
+
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
  private:

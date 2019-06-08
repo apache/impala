@@ -1409,9 +1409,10 @@ Status ClientRequestState::UpdateBackendExecStatus(
   return coord_->UpdateBackendExecStatus(request, thrift_profiles);
 }
 
-void ClientRequestState::UpdateFilter(const TUpdateFilterParams& params) {
+void ClientRequestState::UpdateFilter(
+    const UpdateFilterParamsPB& params, RpcContext* context) {
   DCHECK(coord_.get());
-  coord_->UpdateFilter(params);
+  coord_->UpdateFilter(params, context);
 }
 
 bool ClientRequestState::GetDmlStats(TDmlResult* dml_result, Status* query_status) {

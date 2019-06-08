@@ -23,6 +23,7 @@
 #include "exec/exec-node.h"
 #include "exec/kudu-util.h"
 #include "exec/scan-node.h"
+#include "gen-cpp/data_stream_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
@@ -37,6 +38,7 @@
 #include "runtime/fragment-instance-state.h"
 #include "runtime/krpc-data-stream-sender.h"
 #include "service/control-service.h"
+#include "service/data-stream-service.h"
 #include "util/counting-barrier.h"
 #include "util/error-util-internal.h"
 #include "util/network-util.h"
@@ -549,21 +551,35 @@ bool Coordinator::BackendState::Cancel() {
   return true;
 }
 
-void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
-  DCHECK(rpc_params.dst_query_id == query_id_);
+void Coordinator::BackendState::PublishFilter(
+    const PublishFilterParamsPB& rpc_params, RpcController& controller) {
+  DCHECK_EQ(ProtoToQueryId(rpc_params.dst_query_id()), query_id_);
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
   if (IsDone()) return;
 
-  if (fragments_.count(rpc_params.dst_fragment_idx) == 0) return;
+  if (fragments_.count(rpc_params.dst_fragment_idx()) == 0) return;
   Status status;
-  ImpalaBackendConnection backend_client(
-      ExecEnv::GetInstance()->impalad_client_cache(), host_, &status);
-  if (!status.ok()) return;
-  TPublishFilterResult res;
-  status = backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, rpc_params, &res);
-  if (!status.ok()) {
-    LOG(WARNING) << "Error publishing filter, continuing..." << status.GetDetail();
+
+  std::unique_ptr<DataStreamServiceProxy> proxy;
+  Status get_proxy_status =
+      DataStreamService::GetProxy(krpc_host_, host_.hostname, &proxy);
+  if (!get_proxy_status.ok()) {
+    // Failing to send a filter is not a query-wide error - the remote fragment will
+    // continue regardless.
+    LOG(ERROR) << "Couldn't get proxy: " << get_proxy_status.msg().msg();
+    return;
+  }
+
+  PublishFilterResultPB res;
+  kudu::Status rpc_status = proxy->PublishFilter(rpc_params, &res, &controller);
+  if (!rpc_status.ok()) {
+    LOG(ERROR) << "PublishFilter() rpc failed: " << rpc_status.ToString();
+    return;
+  }
+  if (res.status().status_code() != TErrorCode::OK) {
+    LOG(ERROR) << "PublishFilter() operation failed: "
+               << Status(res.status()).GetDetail();
   }
 }
 

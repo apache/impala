@@ -39,29 +39,6 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     : ImpalaInternalServiceClient(iprot, oprot) {
   }
 
-/// We intentionally disable this clang warning as we intend to hide the
-/// the same-named functions defined in the base class.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Woverloaded-virtual"
-
-  void UpdateFilter(TUpdateFilterResult& _return, const TUpdateFilterParams& params,
-      bool* send_done) {
-    DCHECK(!*send_done);
-    ImpalaInternalServiceClient::send_UpdateFilter(params);
-    *send_done = true;
-    ImpalaInternalServiceClient::recv_UpdateFilter(_return);
-  }
-
-  void PublishFilter(TPublishFilterResult& _return, const TPublishFilterParams& params,
-      bool* send_done) {
-    DCHECK(!*send_done);
-    ImpalaInternalServiceClient::send_PublishFilter(params);
-    *send_done = true;
-    ImpalaInternalServiceClient::recv_PublishFilter(_return);
-  }
-
-#pragma clang diagnostic pop
-
 };
 
 }

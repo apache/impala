@@ -27,11 +27,18 @@
 #include "common/object-pool.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/data_stream_service.pb.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
 #include "runtime/tmp-file-mgr.h"
 #include "util/container-util.h"
 #include "util/counting-barrier.h"
 #include "util/uid-util.h"
+
+namespace kudu {
+namespace rpc {
+class RpcContext;
+} // namespace rpc
+} // namespace kudu
 
 namespace impala {
 
@@ -192,7 +199,7 @@ class QueryState {
       const TUniqueId& instance_id, FragmentInstanceState** fi_state);
 
   /// Blocks until all fragment instances have finished their Prepare phase.
-  void PublishFilter(const TPublishFilterParams& params);
+  void PublishFilter(const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
   /// Cancels all actively executing fragment instances. Blocks until all fragment
   /// instances have finished their Prepare phase. Idempotent.

@@ -21,6 +21,7 @@
 #include <iostream>
 #include <vector>
 
+#include "kudu/rpc/rpc_controller.h"
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -35,6 +36,8 @@
 
 using namespace std;
 using namespace impala;
+
+using kudu::rpc::RpcController;
 
 // Tests Bloom filter performance on:
 //
@@ -283,18 +286,44 @@ struct TestData {
   explicit TestData(int log_bufferpool_size, BufferPool::ClientHandle* client) {
     BloomFilter bf(client);
     CHECK(bf.Init(log_bufferpool_size).ok());
-    BloomFilter::ToThrift(&bf, &tbf1);
-    BloomFilter::ToThrift(&bf, &tbf2);
+
+    RpcController controller1;
+    RpcController controller2;
+    BloomFilter::ToProtobuf(&bf, &controller1, &pbf1);
+    BloomFilter::ToProtobuf(&bf, &controller2, &pbf2);
+
+    // Need to set 'always_false_' of pbf2 to false because
+    // (i) 'always_false_' of a BloomFilter is set to true when the Bloom filter
+    // hasn't had any elements inserted (since nothing is inserted to the
+    /// BloomFilter bf),
+    // (ii) ToProtobuf() will set 'always_false_' of a BloomFilterPB
+    // to true, and
+    // (iii) Or() will check 'always_false_' of the output BloomFilterPB is not true
+    /// before performing the corresponding bit operations.
+    /// The field 'always_false_' was added by IMPALA-5789, which aims to allow
+    /// an HdfsScanner to early terminate the scan at file and split granularities.
+    pbf2.set_always_false(false);
+
+    int64_t directory_size = BloomFilter::GetExpectedMemoryUsed(log_bufferpool_size);
+    string d1(reinterpret_cast<const char*>(bf.directory_), directory_size);
+    string d2(reinterpret_cast<const char*>(bf.directory_), directory_size);
+
+    directory1 = d1;
+    directory2 = d2;
+
     bf.Close();
   }
 
-  TBloomFilter tbf1, tbf2;
+  BloomFilterPB pbf1, pbf2;
+  string directory1, directory2;
 };
 
 void Benchmark(int batch_size, void* data) {
   TestData* d = reinterpret_cast<TestData*>(data);
   for (int i = 0; i < batch_size; ++i) {
-    BloomFilter::Or(d->tbf1, &d->tbf2);
+    BloomFilter::Or(d->pbf1, reinterpret_cast<const uint8_t*>((d->directory1).data()),
+        &(d->pbf2), reinterpret_cast<uint8_t*>(const_cast<char*>((d->directory2).data())),
+        d->directory1.size());
   }
 }
 

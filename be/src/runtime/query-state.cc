@@ -23,6 +23,7 @@
 #include "common/thread-debug-info.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
+#include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
@@ -40,6 +41,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
 #include "service/control-service.h"
+#include "service/data-stream-service.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
@@ -50,7 +52,6 @@
 #include "gen-cpp/control_service.proxy.h"
 
 using kudu::MonoDelta;
-using kudu::rpc::RpcController;
 using kudu::rpc::RpcSidecar;
 
 #include "common/names.h"
@@ -675,11 +676,11 @@ void QueryState::Cancel() {
   for (auto entry: fis_map_) entry.second->Cancel();
 }
 
-void QueryState::PublishFilter(const TPublishFilterParams& params) {
+void QueryState::PublishFilter(const PublishFilterParamsPB& params, RpcContext* context) {
   if (!WaitForPrepare().ok()) return;
-  DCHECK_EQ(fragment_map_.count(params.dst_fragment_idx), 1);
-  for (FragmentInstanceState* fis : fragment_map_[params.dst_fragment_idx]) {
-    fis->PublishFilter(params);
+  DCHECK_EQ(fragment_map_.count(params.dst_fragment_idx()), 1);
+  for (FragmentInstanceState* fis : fragment_map_[params.dst_fragment_idx()]) {
+    fis->PublishFilter(params, context);
   }
 }
 

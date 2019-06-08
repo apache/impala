@@ -53,6 +53,7 @@
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/CatalogService_constants.h"
+#include "kudu/rpc/rpc_context.h"
 #include "kudu/util/random_util.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
@@ -95,7 +96,6 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/ImpalaService_types.h"
-#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/LineageGraph_types.h"
 #include "gen-cpp/Frontend_types.h"
 
@@ -113,6 +113,7 @@ using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
 using kudu::GetRandomSeed32;
+using kudu::rpc::RpcContext;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -2537,17 +2538,18 @@ Status ImpalaServer::CheckClientRequestSession(
   return Status::OK();
 }
 
-void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
-    const TUpdateFilterParams& params) {
-  DCHECK(params.__isset.query_id);
-  DCHECK(params.__isset.filter_id);
+void ImpalaServer::UpdateFilter(UpdateFilterResultPB* result,
+    const UpdateFilterParamsPB& params, RpcContext* context) {
+  DCHECK(params.has_query_id());
+  DCHECK(params.has_filter_id());
   shared_ptr<ClientRequestState> client_request_state =
-      GetClientRequestState(params.query_id);
+      GetClientRequestState(ProtoToQueryId(params.query_id()));
   if (client_request_state.get() == nullptr) {
-    LOG(INFO) << "Could not find client request state: " << PrintId(params.query_id);
+    LOG(INFO) << "Could not find client request state: "
+              << PrintId(ProtoToQueryId(params.query_id()));
     return;
   }
-  client_request_state->UpdateFilter(params);
+  client_request_state->UpdateFilter(params, context);
 }
 
 Status ImpalaServer::CheckNotShuttingDown() const {

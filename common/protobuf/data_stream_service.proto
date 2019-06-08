@@ -78,6 +78,77 @@ message EndDataStreamResponsePB {
   optional int64 receiver_latency_ns = 2;
 }
 
+message BloomFilterPB {
+  // Log_2 of the bufferpool space required for this filter.
+  // See BloomFilter::BloomFilter() for details.
+  optional int32 log_bufferpool_space = 1;
+
+  // If always_true or always_false is true, 'directory' and 'log_bufferpool_space' are
+  // not meaningful.
+  optional bool always_true = 2;
+  optional bool always_false = 3;
+
+  // The sidecar index associated with the directory of a Bloom filter.
+  // A directory is a list of buckets representing the Bloom Filter contents,
+  // laid out contiguously in one string for efficiency of (de)serialisation.
+  // See BloomFilter::Bucket and BloomFilter::directory_.
+  optional int32 directory_sidecar_idx = 4;
+}
+
+message MinMaxFilterPB {
+  // If true, filter allows all elements to pass and 'min'/'max' will not be set.
+  optional bool always_true = 1;
+
+  // If true, filter doesn't allow any elements to pass and 'min'/'max' will not be set.
+  optional bool always_false = 2;
+
+  optional ColumnValuePB min = 3;
+  optional ColumnValuePB max = 4;
+}
+
+message UpdateFilterParamsPB {
+  // Filter ID, unique within a query.
+  optional int32 filter_id = 1;
+
+  // Query that this filter is for.
+  optional UniqueIdPB query_id = 2;
+
+  optional BloomFilterPB bloom_filter = 3;
+
+  optional MinMaxFilterPB min_max_filter = 4;
+}
+
+message UpdateFilterResultPB {
+  optional StatusPB status = 1;
+
+  // Latency for response in the receiving daemon in nanoseconds.
+  optional int64 receiver_latency_ns = 2;
+}
+
+message PublishFilterParamsPB {
+  // Filter ID, unique within a query.
+  optional int32 filter_id = 1;
+
+  // Query that this filter is for.
+  optional UniqueIdPB dst_query_id = 2;
+
+  // Index of fragment to receive this filter
+  optional int32 dst_fragment_idx = 3;
+
+  // Actual bloom_filter payload
+  optional BloomFilterPB bloom_filter = 4;
+
+  // Actual min_max_filter payload
+  optional MinMaxFilterPB min_max_filter = 5;
+}
+
+message PublishFilterResultPB {
+  optional StatusPB status = 1;
+
+  // Latency for response in the receiving daemon in nanoseconds.
+  optional int64 receiver_latency_ns = 2;
+}
+
 // Handles data transmission between fragment instances.
 service DataStreamService {
   // Override the default authorization method.
@@ -90,4 +161,12 @@ service DataStreamService {
 
   // Called by a sender to close the channel between fragment instances.
   rpc EndDataStream(EndDataStreamRequestPB) returns (EndDataStreamResponsePB);
+
+  // Called by fragment instances that produce local runtime filters to deliver them to
+  // the coordinator for aggregation and broadcast.
+  rpc UpdateFilter(UpdateFilterParamsPB) returns (UpdateFilterResultPB);
+
+  // Called by the coordinator to deliver global runtime filters to fragments for
+  // application at plan nodes.
+  rpc PublishFilter(PublishFilterParamsPB) returns (PublishFilterResultPB);
 }
