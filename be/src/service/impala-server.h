@@ -49,6 +49,12 @@
 #include "util/thread-pool.h"
 #include "util/time.h"
 
+namespace kudu {
+namespace rpc {
+class RpcContext;
+} // namespace rpc
+} // namespace kudu
+
 namespace impala {
 using kudu::ThreadSafeRandom;
 
@@ -57,12 +63,7 @@ class DataSink;
 class CancellationWork;
 class ImpalaHttpHandler;
 class RowDescriptor;
-class TCatalogUpdate;
-class TPlanExecRequest;
-class TPlanExecParams;
 class TDmlResult;
-class TReportExecStatusArgs;
-class TReportExecStatusResult;
 class TNetworkAddress;
 class TClientRequest;
 class TExecRequest;
@@ -339,8 +340,8 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void CloseImpalaOperation(
       TCloseImpalaOperationResp& return_val, const TCloseImpalaOperationReq& request);
 
-  /// ImpalaInternalService rpcs
-  void UpdateFilter(TUpdateFilterResult& return_val, const TUpdateFilterParams& params);
+  void UpdateFilter(UpdateFilterResultPB* return_val, const UpdateFilterParamsPB& params,
+      kudu::rpc::RpcContext* context);
 
   /// Generates a unique id for this query and sets it in the given query context.
   /// Prepares the given query context by populating fields required for evaluating

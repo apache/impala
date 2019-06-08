@@ -749,82 +749,6 @@ struct TPoolConfig {
   11: required i64 max_memory_multiple = 0;
 }
 
-struct TBloomFilter {
-  // Log_2 of the bufferpool space required for this filter.
-  // See BloomFilter::BloomFilter() for details.
-  1: required i32 log_bufferpool_space
-
-  // List of buckets representing the Bloom Filter contents, laid out contiguously in one
-  // string for efficiency of (de)serialisation. See BloomFilter::Bucket and
-  // BloomFilter::directory_.
-  2: binary directory
-
-  // If always_true or always_false is true, 'directory' and 'log_bufferpool_space' are
-  // not meaningful.
-  3: required bool always_true
-  4: required bool always_false
-}
-
-struct TMinMaxFilter {
-  // If true, filter allows all elements to pass and 'min'/'max' will not be set.
-  1: required bool always_true
-
-  // If true, filter doesn't allow any elements to pass and 'min'/'max' will not be set.
-  2: required bool always_false
-
-  3: optional Data.TColumnValue min
-  4: optional Data.TColumnValue max
-}
-
-// UpdateFilter
-
-struct TUpdateFilterParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // Filter ID, unique within a query.
-  // required in V1
-  2: optional i32 filter_id
-
-  // Query that this filter is for.
-  // required in V1
-  3: optional Types.TUniqueId query_id
-
-  // required in V1
-  4: optional TBloomFilter bloom_filter
-
-  5: optional TMinMaxFilter min_max_filter
-}
-
-struct TUpdateFilterResult {
-}
-
-
-// PublishFilter
-
-struct TPublishFilterParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // Filter ID to update
-  // required in V1
-  2: optional i32 filter_id
-
-  // required in V1
-  3: optional Types.TUniqueId dst_query_id
-
-  // Index of fragment to receive this filter
-  // required in V1
-  4: optional Types.TFragmentIdx dst_fragment_idx
-
-  // Actual bloom_filter payload
-  // required in V1
-  5: optional TBloomFilter bloom_filter
-
-  6: optional TMinMaxFilter min_max_filter
-}
-
-struct TPublishFilterResult {
-}
-
 struct TParseDateStringResult {
   // True iff date string was successfully parsed
   1: required bool valid
@@ -837,11 +761,4 @@ struct TParseDateStringResult {
 
 service ImpalaInternalService {
 
-  // Called by fragment instances that produce local runtime filters to deliver them to
-  // the coordinator for aggregation and broadcast.
-  TUpdateFilterResult UpdateFilter(1:TUpdateFilterParams params);
-
-  // Called by the coordinator to deliver global runtime filters to fragments for
-  // application at plan nodes.
-  TPublishFilterResult PublishFilter(1:TPublishFilterParams params);
 }

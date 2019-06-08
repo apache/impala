@@ -18,6 +18,7 @@
 #include "testutil/gtest-util.h"
 #include "util/min-max-filter.h"
 
+#include "gen-cpp/data_stream_service.pb.h"
 #include "runtime/decimal-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.inline.h"
@@ -50,15 +51,15 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   EXPECT_EQ(*reinterpret_cast<bool*>(filter->GetMax()), b1);
 
   // Check the behavior of Or.
-  TMinMaxFilter tFilter1;
-  tFilter1.min.__set_bool_val(false);
-  tFilter1.max.__set_bool_val(true);
-  TMinMaxFilter tFilter2;
-  tFilter2.min.__set_bool_val(false);
-  tFilter2.max.__set_bool_val(false);
-  MinMaxFilter::Or(tFilter1, &tFilter2, ColumnType(PrimitiveType::TYPE_BOOLEAN));
-  EXPECT_FALSE(tFilter2.min.bool_val);
-  EXPECT_TRUE(tFilter2.max.bool_val);
+  MinMaxFilterPB pFilter1;
+  pFilter1.mutable_min()->set_bool_val(false);
+  pFilter1.mutable_max()->set_bool_val(true);
+  MinMaxFilterPB pFilter2;
+  pFilter2.mutable_min()->set_bool_val(false);
+  pFilter2.mutable_max()->set_bool_val(false);
+  MinMaxFilter::Or(pFilter1, &pFilter2, ColumnType(PrimitiveType::TYPE_BOOLEAN));
+  EXPECT_FALSE(pFilter2.min().bool_val());
+  EXPECT_TRUE(pFilter2.max().bool_val());
 
   filter->Close();
 }
@@ -84,14 +85,14 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   // Test the behavior of an empty filter.
   EXPECT_TRUE(int_filter->AlwaysFalse());
   EXPECT_FALSE(int_filter->AlwaysTrue());
-  TMinMaxFilter tFilter;
-  int_filter->ToThrift(&tFilter);
-  EXPECT_TRUE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_FALSE(tFilter.min.__isset.int_val);
-  EXPECT_FALSE(tFilter.max.__isset.int_val);
+  MinMaxFilterPB pFilter;
+  int_filter->ToProtobuf(&pFilter);
+  EXPECT_TRUE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_FALSE(pFilter.min().has_int_val());
+  EXPECT_FALSE(pFilter.max().has_int_val());
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, int_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -109,25 +110,25 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   int_filter->Insert(&i4);
   CheckIntVals(int_filter, i4, i2);
 
-  int_filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_EQ(tFilter.min.int_val, i4);
-  EXPECT_EQ(tFilter.max.int_val, i2);
+  int_filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_EQ(pFilter.min().int_val(), i4);
+  EXPECT_EQ(pFilter.max().int_val(), i2);
   MinMaxFilter* int_filter2 =
-      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, int_type, &obj_pool, &mem_tracker);
   CheckIntVals(int_filter2, i4, i2);
 
   // Check the behavior of Or.
-  TMinMaxFilter tFilter1;
-  tFilter1.min.__set_int_val(4);
-  tFilter1.max.__set_int_val(8);
-  TMinMaxFilter tFilter2;
-  tFilter2.min.__set_int_val(2);
-  tFilter2.max.__set_int_val(7);
-  MinMaxFilter::Or(tFilter1, &tFilter2, int_type);
-  EXPECT_EQ(tFilter2.min.int_val, 2);
-  EXPECT_EQ(tFilter2.max.int_val, 8);
+  MinMaxFilterPB pFilter1;
+  pFilter1.mutable_min()->set_int_val(4);
+  pFilter1.mutable_max()->set_int_val(8);
+  MinMaxFilterPB pFilter2;
+  pFilter2.mutable_min()->set_int_val(2);
+  pFilter2.mutable_max()->set_int_val(7);
+  MinMaxFilter::Or(pFilter1, &pFilter2, int_type);
+  EXPECT_EQ(pFilter2.min().int_val(), 2);
+  EXPECT_EQ(pFilter2.max().int_val(), 8);
 
   int_filter->Close();
   empty_filter->Close();
@@ -162,13 +163,13 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   filter->MaterializeValues();
   EXPECT_TRUE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
-  TMinMaxFilter tFilter;
-  filter->ToThrift(&tFilter);
-  EXPECT_TRUE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
+  MinMaxFilterPB pFilter;
+  filter->ToProtobuf(&pFilter);
+  EXPECT_TRUE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
 
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, string_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -191,11 +192,11 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   filter->MaterializeValues();
   CheckStringVals(filter, c, d);
 
-  filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_EQ(tFilter.min.string_val, c);
-  EXPECT_EQ(tFilter.max.string_val, d);
+  filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_EQ(pFilter.min().string_val(), c);
+  EXPECT_EQ(pFilter.max().string_val(), d);
 
   // Test that strings longer than 1024 are truncated.
   string b1030(1030, 'b');
@@ -227,14 +228,14 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   for (int i = trailIndex; i < 1024; ++i) truncTrailMaxChar[i] = 0;
   CheckStringVals(filter, b1024, truncTrailMaxChar);
 
-  filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_EQ(tFilter.min.string_val, b1024);
-  EXPECT_EQ(tFilter.max.string_val, truncTrailMaxChar);
+  filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_EQ(pFilter.min().string_val(), b1024);
+  EXPECT_EQ(pFilter.max().string_val(), truncTrailMaxChar);
 
   MinMaxFilter* filter2 =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, string_type, &obj_pool, &mem_tracker);
   CheckStringVals(filter2, b1024, truncTrailMaxChar);
 
   // Check that if the entire string is the max char and therefore after truncating for
@@ -249,12 +250,12 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   filter->Insert(&cVal);
   EXPECT_TRUE(filter->AlwaysTrue());
 
-  filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_TRUE(tFilter.always_true);
+  filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_TRUE(pFilter.always_true());
 
   MinMaxFilter* always_true_filter =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, string_type, &obj_pool, &mem_tracker);
   EXPECT_FALSE(always_true_filter->AlwaysFalse());
   EXPECT_TRUE(always_true_filter->AlwaysTrue());
 
@@ -276,20 +277,20 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   limit_filter->MaterializeValues();
   EXPECT_TRUE(limit_filter->AlwaysTrue());
 
-  limit_filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_TRUE(tFilter.always_true);
+  limit_filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_TRUE(pFilter.always_true());
 
   // Check the behavior of Or.
-  TMinMaxFilter tFilter1;
-  tFilter1.min.__set_string_val("a");
-  tFilter1.max.__set_string_val("d");
-  TMinMaxFilter tFilter2;
-  tFilter2.min.__set_string_val("b");
-  tFilter2.max.__set_string_val("e");
-  MinMaxFilter::Or(tFilter1, &tFilter2, string_type);
-  EXPECT_EQ(tFilter2.min.string_val, "a");
-  EXPECT_EQ(tFilter2.max.string_val, "e");
+  MinMaxFilterPB pFilter1;
+  pFilter1.mutable_min()->set_string_val("a");
+  pFilter1.mutable_max()->set_string_val("d");
+  MinMaxFilterPB pFilter2;
+  pFilter2.mutable_min()->set_string_val("b");
+  pFilter2.mutable_max()->set_string_val("e");
+  MinMaxFilter::Or(pFilter1, &pFilter2, string_type);
+  EXPECT_EQ(pFilter2.min().string_val(), "a");
+  EXPECT_EQ(pFilter2.max().string_val(), "e");
 
   filter->Close();
   empty_filter->Close();
@@ -317,14 +318,14 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   // Test the behavior of an empty filter.
   EXPECT_TRUE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
-  TMinMaxFilter tFilter;
-  filter->ToThrift(&tFilter);
-  EXPECT_TRUE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_FALSE(tFilter.min.__isset.timestamp_val);
-  EXPECT_FALSE(tFilter.max.__isset.timestamp_val);
+  MinMaxFilterPB pFilter;
+  filter->ToProtobuf(&pFilter);
+  EXPECT_TRUE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_FALSE(pFilter.min().has_timestamp_val());
+  EXPECT_FALSE(pFilter.max().has_timestamp_val());
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, timestamp_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -342,25 +343,25 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   filter->Insert(&t4);
   CheckTimestampVals(filter, t2, t3);
 
-  filter->ToThrift(&tFilter);
-  EXPECT_FALSE(tFilter.always_false);
-  EXPECT_FALSE(tFilter.always_true);
-  EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter.min), t2);
-  EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter.max), t3);
+  filter->ToProtobuf(&pFilter);
+  EXPECT_FALSE(pFilter.always_false());
+  EXPECT_FALSE(pFilter.always_true());
+  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter.min()), t2);
+  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter.max()), t3);
   MinMaxFilter* filter2 =
-      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_tracker);
+      MinMaxFilter::Create(pFilter, timestamp_type, &obj_pool, &mem_tracker);
   CheckTimestampVals(filter2, t2, t3);
 
   // Check the behavior of Or.
-  TMinMaxFilter tFilter1;
-  t2.ToTColumnValue(&tFilter1.min);
-  t4.ToTColumnValue(&tFilter1.max);
-  TMinMaxFilter tFilter2;
-  t1.ToTColumnValue(&tFilter2.min);
-  t3.ToTColumnValue(&tFilter2.max);
-  MinMaxFilter::Or(tFilter1, &tFilter2, timestamp_type);
-  EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.min), t2);
-  EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.max), t3);
+  MinMaxFilterPB pFilter1;
+  t2.ToColumnValuePB(pFilter1.mutable_min());
+  t4.ToColumnValuePB(pFilter1.mutable_max());
+  MinMaxFilterPB pFilter2;
+  t1.ToColumnValuePB(pFilter2.mutable_min());
+  t3.ToColumnValuePB(pFilter2.mutable_max());
+  MinMaxFilter::Or(pFilter1, &pFilter2, timestamp_type);
+  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter2.min()), t2);
+  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter2.max()), t3);
 
   filter->Close();
   empty_filter->Close();
@@ -391,16 +392,16 @@ void CheckDecimalVals(
 }
 
 void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type,
-    TMinMaxFilter* tFilter, ObjectPool* obj_pool, MemTracker* mem_tracker) {
+    MinMaxFilterPB* pFilter, ObjectPool* obj_pool, MemTracker* mem_tracker) {
   EXPECT_TRUE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
-  filter->ToThrift(tFilter);
-  EXPECT_TRUE(tFilter->always_false);
-  EXPECT_FALSE(tFilter->always_true);
-  EXPECT_FALSE(tFilter->min.__isset.decimal_val);
-  EXPECT_FALSE(tFilter->max.__isset.decimal_val);
+  filter->ToProtobuf(pFilter);
+  EXPECT_TRUE(pFilter->always_false());
+  EXPECT_FALSE(pFilter->always_true());
+  EXPECT_FALSE(pFilter->min().has_decimal_val());
+  EXPECT_FALSE(pFilter->max().has_decimal_val());
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(*tFilter, column_type, obj_pool, mem_tracker);
+      MinMaxFilter::Create(*pFilter, column_type, obj_pool, mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
   empty_filter->Close();
@@ -427,30 +428,30 @@ void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type
     CheckDecimalVals(filter##SIZE, d3##SIZE, d2##SIZE);                              \
   } while (false)
 
-#define DECIMAL_CHECK_THRIFT(SIZE)                                                  \
-  do {                                                                              \
-    filter##SIZE->ToThrift(&tFilter##SIZE);                                         \
-    EXPECT_FALSE(tFilter##SIZE.always_false);                                       \
-    EXPECT_FALSE(tFilter##SIZE.always_true);                                        \
-    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter##SIZE.min), d3##SIZE); \
-    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter##SIZE.max), d2##SIZE); \
-    MinMaxFilter* filter##SIZE##2 = MinMaxFilter::Create(                           \
-        tFilter##SIZE, decimal##SIZE##_type, &obj_pool, &mem_tracker);              \
-    CheckDecimalVals(filter##SIZE##2, d3##SIZE, d2##SIZE);                          \
-    filter##SIZE##2->Close();                                                       \
+#define DECIMAL_CHECK_PROTOBUF(SIZE)                                                   \
+  do {                                                                                 \
+    filter##SIZE->ToProtobuf(&pFilter##SIZE);                                          \
+    EXPECT_FALSE(pFilter##SIZE.always_false());                                        \
+    EXPECT_FALSE(pFilter##SIZE.always_true());                                         \
+    EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter##SIZE.min()), d3##SIZE); \
+    EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter##SIZE.max()), d2##SIZE); \
+    MinMaxFilter* filter##SIZE##2 = MinMaxFilter::Create(                              \
+        pFilter##SIZE, decimal##SIZE##_type, &obj_pool, &mem_tracker);                 \
+    CheckDecimalVals(filter##SIZE##2, d3##SIZE, d2##SIZE);                             \
+    filter##SIZE##2->Close();                                                          \
   } while (false)
 
-#define DECIMAL_CHECK_OR(SIZE)                                                       \
-  do {                                                                               \
-    TMinMaxFilter tFilter1##SIZE;                                                    \
-    d3##SIZE.ToTColumnValue(&tFilter1##SIZE.min);                                    \
-    d2##SIZE.ToTColumnValue(&tFilter1##SIZE.max);                                    \
-    TMinMaxFilter tFilter2##SIZE;                                                    \
-    d1##SIZE.ToTColumnValue(&tFilter2##SIZE.min);                                    \
-    d1##SIZE.ToTColumnValue(&tFilter2##SIZE.max);                                    \
-    MinMaxFilter::Or(tFilter1##SIZE, &tFilter2##SIZE, decimal##SIZE##_type);         \
-    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter2##SIZE.min), d3##SIZE); \
-    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter2##SIZE.max), d2##SIZE); \
+#define DECIMAL_CHECK_OR(SIZE)                                                          \
+  do {                                                                                  \
+    MinMaxFilterPB pFilter1##SIZE;                                                      \
+    d3##SIZE.ToColumnValuePB(pFilter1##SIZE.mutable_min());                             \
+    d2##SIZE.ToColumnValuePB(pFilter1##SIZE.mutable_max());                             \
+    MinMaxFilterPB pFilter2##SIZE;                                                      \
+    d1##SIZE.ToColumnValuePB(pFilter2##SIZE.mutable_min());                             \
+    d1##SIZE.ToColumnValuePB(pFilter2##SIZE.mutable_max());                             \
+    MinMaxFilter::Or(pFilter1##SIZE, &pFilter2##SIZE, decimal##SIZE##_type);            \
+    EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter2##SIZE.min()), d3##SIZE); \
+    EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter2##SIZE.max()), d2##SIZE); \
   } while (false)
 
 // Tests that a DecimalMinMaxFilter returns the expected min/max after having values
@@ -475,13 +476,13 @@ TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
   MinMaxFilter* filter8 = MinMaxFilter::Create(decimal8_type, &obj_pool, &mem_tracker);
   MinMaxFilter* filter16 = MinMaxFilter::Create(decimal16_type, &obj_pool, &mem_tracker);
 
-  // Create thrift minmax filters
-  TMinMaxFilter tFilter4, tFilter8, tFilter16;
+  // Create protobuf minmax filters
+  MinMaxFilterPB pFilter4, pFilter8, pFilter16;
 
   // Test the behavior of an empty filter.
-  CheckDecimalEmptyFilter(filter4, decimal4_type, &tFilter4, &obj_pool, &mem_tracker);
-  CheckDecimalEmptyFilter(filter8, decimal8_type, &tFilter8, &obj_pool, &mem_tracker);
-  CheckDecimalEmptyFilter(filter16, decimal16_type, &tFilter16, &obj_pool, &mem_tracker);
+  CheckDecimalEmptyFilter(filter4, decimal4_type, &pFilter4, &obj_pool, &mem_tracker);
+  CheckDecimalEmptyFilter(filter8, decimal8_type, &pFilter8, &obj_pool, &mem_tracker);
+  CheckDecimalEmptyFilter(filter16, decimal16_type, &pFilter16, &obj_pool, &mem_tracker);
 
   // Insert and check
   DECIMAL_INSERT_AND_CHECK(4, 9, 5, 2345.67891, 3456.78912, 1234.56789);
@@ -490,10 +491,10 @@ TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
   DECIMAL_INSERT_AND_CHECK(16, 38, 19, 2345678912345678912.2345678912345678912,
       3456789123456789123.3456789123456789123, 1234567891234567891.1234567891234567891);
 
-  // Thrift check
-  DECIMAL_CHECK_THRIFT(4);
-  DECIMAL_CHECK_THRIFT(8);
-  DECIMAL_CHECK_THRIFT(16);
+  // Protobuf check
+  DECIMAL_CHECK_PROTOBUF(4);
+  DECIMAL_CHECK_PROTOBUF(8);
+  DECIMAL_CHECK_PROTOBUF(16);
 
   // Check the behavior of Or.
   DECIMAL_CHECK_OR(4);

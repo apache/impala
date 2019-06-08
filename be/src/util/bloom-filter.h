@@ -27,10 +27,34 @@
 
 #include "common/compiler-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/data_stream_service.pb.h"
 #include "gutil/macros.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
+
+namespace kudu {
+namespace rpc {
+class RpcController;
+} // namespace rpc
+} // namespace kudu
+
+namespace impala {
+class BloomFilter;
+} // namespace impala
+
+// Need this forward declaration since we make bloom_filter_test_util::BfUnion() a friend
+// function.
+namespace bloom_filter_test_util {
+void BfUnion(const impala::BloomFilter& x, const impala::BloomFilter& y,
+    int64_t directory_size, bool* success, impala::BloomFilterPB* protobuf,
+    std::string* directory);
+} // namespace bloom_filter_test_util
+
+// Need this forward declaration since we make either::TestData a friend struct.
+namespace either {
+struct TestData;
+} // namespace either
 
 namespace impala {
 
@@ -66,17 +90,21 @@ class BloomFilter {
 
   /// Reset the filter state, allocate/reallocate and initialize the 'directory_'. All
   /// calls to Insert() and Find() should only be done between the calls to Init() and
-  /// Close().Init and Close are safe to call multiple times.
+  /// Close(). Init and Close are safe to call multiple times.
   Status Init(const int log_bufferpool_space);
-  Status Init(const TBloomFilter& thrift);
+  Status Init(const BloomFilterPB& protobuf, const uint8_t* directory_in,
+      size_t directory_in_size);
   void Close();
 
   /// Representation of a filter which allows all elements to pass.
   static constexpr BloomFilter* const ALWAYS_TRUE_FILTER = NULL;
 
-  /// Converts 'filter' to its corresponding Thrift representation. If the first argument
-  /// is NULL, it is interpreted as a complete filter which contains all elements.
-  static void ToThrift(const BloomFilter* filter, TBloomFilter* thrift);
+  /// Converts 'filter' to its corresponding Protobuf representation.
+  /// If the first argument is NULL, it is interpreted as a complete filter which
+  /// contains all elements.
+  /// Also sets a sidecar on 'controller' containing the Bloom filter's directory.
+  static void ToProtobuf(const BloomFilter* filter, kudu::rpc::RpcController* controller,
+      BloomFilterPB* protobuf);
 
   bool AlwaysFalse() const { return always_false_; }
 
@@ -91,8 +119,12 @@ class BloomFilter {
   /// high probabilty) if it is not.
   bool Find(const uint32_t hash) const noexcept;
 
-  /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
-  static void Or(const TBloomFilter& in, TBloomFilter* out);
+  /// This function computes the logical OR of 'directory_in' with 'directory_out'
+  /// and stores the result in 'directory_out'.
+  /// Additional checks are also performed to make sure the related fields of
+  /// 'in' and 'out' are well-defined.
+  static void Or(const BloomFilterPB& in, const uint8_t* directory_in, BloomFilterPB* out,
+      uint8_t* directory_out, size_t directory_size);
 
   /// As more distinct items are inserted into a BloomFilter, the false positive rate
   /// rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter
@@ -118,6 +150,20 @@ class BloomFilter {
   static int64_t GetExpectedMemoryUsed(int log_heap_size) {
     return sizeof(Bucket) * (1LL << std::max(1, log_heap_size - LOG_BUCKET_WORD_BITS));
   }
+
+  /// The following two functions set a sidecar on 'controller' containing the Bloom
+  /// filter's directory. Two interfaces are provided because this function may be called
+  /// in different contexts depending on whether or not the caller has access to an
+  /// instantiated BloomFilter. It is also required that 'rpc_params' is neither an
+  /// always false nor an always true Bloom filter when calling this function. Moreover,
+  /// since we directly pass the reference to Bloom filter's directory when instantiating
+  /// the corresponding RpcSidecar, we have to make sure that 'directory' is alive until
+  /// the RPC is done.
+  static void AddDirectorySidecar(BloomFilterPB* rpc_params,
+      kudu::rpc::RpcController* controller, const char* directory,
+      unsigned long directory_size);
+  static void AddDirectorySidecar(BloomFilterPB* rpc_params,
+      kudu::rpc::RpcController* controller, const string& directory);
 
  private:
   // always_false_ is true when the bloom filter hasn't had any elements inserted.
@@ -182,8 +228,8 @@ class BloomFilter {
     return 1uLL << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
   }
 
-  /// Serializes this filter as Thrift.
-  void ToThrift(TBloomFilter* thrift) const;
+  /// Serializes this filter as Protobuf.
+  void ToProtobuf(BloomFilterPB* protobuf, kudu::rpc::RpcController* controller) const;
 
 /// Some constants used in hashing. #defined for efficiency reasons.
 #define IMPALA_BLOOM_HASH_CONSTANTS                                             \
@@ -196,6 +242,23 @@ class BloomFilter {
       __attribute__((aligned(32))) = {IMPALA_BLOOM_HASH_CONSTANTS};
 
   DISALLOW_COPY_AND_ASSIGN(BloomFilter);
+
+  /// List 'BloomFilterTest_Protobuf_Test' as a friend class to run the backend
+  /// test in 'bloom-filter-test.cc' since it has to access the private field of
+  /// 'directory_' in BloomFilter.
+  friend class BloomFilterTest_Protobuf_Test;
+
+  /// List 'bloom_filter_test_util::BfUnion()' as a friend function to run the backend
+  /// test in 'bloom-filter-test.cc' since it has to access the private field of
+  /// 'directory_' in BloomFilter.
+  friend void bloom_filter_test_util::BfUnion(const impala::BloomFilter& x,
+      const impala::BloomFilter& y, int64_t directory_size, bool* success,
+      impala::BloomFilterPB* protobuf, std::string* directory);
+
+  /// List 'either::Test' as a friend struct to run the benchmark in
+  /// 'bloom-filter-benchmark.cc' since it has to access the private field of
+  /// 'directory_' in BloomFilter.
+  friend struct either::TestData;
 };
 
 // To set 8 bits in an 32-byte Bloom filter, we set one bit in each 32-bit uint32_t. This

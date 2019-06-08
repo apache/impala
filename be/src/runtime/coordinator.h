@@ -31,11 +31,18 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/data_stream_service.pb.h"
 #include "runtime/dml-exec-state.h"
 #include "util/counting-barrier.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
+
+namespace kudu {
+namespace rpc {
+class RpcContext;
+} // namespace rpc
+} // namespace kudu
 
 namespace impala {
 
@@ -171,7 +178,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// with others for the same filter ID into a global filter. If all updates for that
   /// filter ID have been received (may be 1 or more per filter), broadcast the global
   /// filter to fragment instances.
-  void UpdateFilter(const TUpdateFilterParams& params);
+  void UpdateFilter(const UpdateFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
   /// Adds to 'document' a serialized array of all backends in a member named
   /// 'backend_states'.

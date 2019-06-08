@@ -29,7 +29,6 @@
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
-#include "gen-cpp/ImpalaInternalService.h"
 
 #include "common/names.h"
 using namespace apache::thrift;

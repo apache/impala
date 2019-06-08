@@ -82,61 +82,55 @@ IRFunction::Type MinMaxFilter::GetInsertIRFunctionType(ColumnType column_type) {
   }
 }
 
-#define NUMERIC_MIN_MAX_FILTER_FUNCS(NAME, TYPE, THRIFT_TYPE, PRIMITIVE_TYPE)  \
-  const char* NAME##MinMaxFilter::LLVM_CLASS_NAME =                            \
-      "class.impala::" #NAME "MinMaxFilter";                                   \
-  NAME##MinMaxFilter::NAME##MinMaxFilter(const TMinMaxFilter& thrift) {        \
-    DCHECK(!thrift.always_true);                                               \
-    if (thrift.always_false) {                                                 \
-      min_ = numeric_limits<TYPE>::max();                                      \
-      max_ = numeric_limits<TYPE>::lowest();                                   \
-    } else {                                                                   \
-      DCHECK(thrift.__isset.min);                                              \
-      DCHECK(thrift.__isset.max);                                              \
-      DCHECK(thrift.min.__isset.THRIFT_TYPE##_val);                            \
-      DCHECK(thrift.max.__isset.THRIFT_TYPE##_val);                            \
-      min_ = thrift.min.THRIFT_TYPE##_val;                                     \
-      max_ = thrift.max.THRIFT_TYPE##_val;                                     \
-    }                                                                          \
-  }                                                                            \
-  PrimitiveType NAME##MinMaxFilter::type() {                                   \
-    return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                               \
-  }                                                                            \
-  void NAME##MinMaxFilter::ToThrift(TMinMaxFilter* thrift) const {             \
-    if (!AlwaysFalse()) {                                                      \
-      thrift->min.__set_##THRIFT_TYPE##_val(min_);                             \
-      thrift->__isset.min = true;                                              \
-      thrift->max.__set_##THRIFT_TYPE##_val(max_);                             \
-      thrift->__isset.max = true;                                              \
-    }                                                                          \
-    thrift->__set_always_false(AlwaysFalse());                                 \
-    thrift->__set_always_true(false);                                          \
-  }                                                                            \
-  string NAME##MinMaxFilter::DebugString() const {                             \
-    stringstream out;                                                          \
-    out << #NAME << "MinMaxFilter(min=" << min_ << ", max=" << max_            \
-        << ", always_false=" << (AlwaysFalse() ? "true" : "false") << ")";     \
-    return out.str();                                                          \
-  }                                                                            \
-  void NAME##MinMaxFilter::Or(const TMinMaxFilter& in, TMinMaxFilter* out) {   \
-    if (out->always_false) {                                                   \
-      out->min.__set_##THRIFT_TYPE##_val(in.min.THRIFT_TYPE##_val);            \
-      out->__isset.min = true;                                                 \
-      out->max.__set_##THRIFT_TYPE##_val(in.max.THRIFT_TYPE##_val);            \
-      out->__isset.max = true;                                                 \
-      out->__set_always_false(false);                                          \
-    } else {                                                                   \
-      out->min.__set_##THRIFT_TYPE##_val(                                      \
-          std::min(in.min.THRIFT_TYPE##_val, out->min.THRIFT_TYPE##_val));     \
-      out->max.__set_##THRIFT_TYPE##_val(                                      \
-          std::max(in.max.THRIFT_TYPE##_val, out->max.THRIFT_TYPE##_val));     \
-    }                                                                          \
-  }                                                                            \
-  void NAME##MinMaxFilter::Copy(const TMinMaxFilter& in, TMinMaxFilter* out) { \
-    out->min.__set_##THRIFT_TYPE##_val(in.min.THRIFT_TYPE##_val);              \
-    out->__isset.min = true;                                                   \
-    out->max.__set_##THRIFT_TYPE##_val(in.max.THRIFT_TYPE##_val);              \
-    out->__isset.max = true;                                                   \
+#define NUMERIC_MIN_MAX_FILTER_FUNCS(NAME, TYPE, PROTOBUF_TYPE, PRIMITIVE_TYPE)        \
+  const char* NAME##MinMaxFilter::LLVM_CLASS_NAME =                                    \
+      "class.impala::" #NAME "MinMaxFilter";                                           \
+  NAME##MinMaxFilter::NAME##MinMaxFilter(const MinMaxFilterPB& protobuf) {             \
+    DCHECK(!protobuf.always_true());                                                   \
+    if (protobuf.always_false()) {                                                     \
+      min_ = numeric_limits<TYPE>::max();                                              \
+      max_ = numeric_limits<TYPE>::lowest();                                           \
+    } else {                                                                           \
+      DCHECK(protobuf.has_min());                                                      \
+      DCHECK(protobuf.has_max());                                                      \
+      DCHECK(protobuf.min().has_##PROTOBUF_TYPE##_val());                              \
+      DCHECK(protobuf.max().has_##PROTOBUF_TYPE##_val());                              \
+      min_ = protobuf.min().PROTOBUF_TYPE##_val();                                     \
+      max_ = protobuf.max().PROTOBUF_TYPE##_val();                                     \
+    }                                                                                  \
+  }                                                                                    \
+  PrimitiveType NAME##MinMaxFilter::type() {                                           \
+    return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
+  }                                                                                    \
+  void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
+    if (!AlwaysFalse()) {                                                              \
+      protobuf->mutable_min()->set_##PROTOBUF_TYPE##_val(min_);                        \
+      protobuf->mutable_max()->set_##PROTOBUF_TYPE##_val(max_);                        \
+    }                                                                                  \
+    protobuf->set_always_false(AlwaysFalse());                                         \
+    protobuf->set_always_true(false);                                                  \
+  }                                                                                    \
+  string NAME##MinMaxFilter::DebugString() const {                                     \
+    stringstream out;                                                                  \
+    out << #NAME << "MinMaxFilter(min=" << min_ << ", max=" << max_                    \
+        << ", always_false=" << (AlwaysFalse() ? "true" : "false") << ")";             \
+    return out.str();                                                                  \
+  }                                                                                    \
+  void NAME##MinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {         \
+    if (out->always_false()) {                                                         \
+      out->mutable_min()->set_bool_val(in.min().PROTOBUF_TYPE##_val());                \
+      out->mutable_max()->set_bool_val(in.max().PROTOBUF_TYPE##_val());                \
+      out->set_always_false(false);                                                    \
+    } else {                                                                           \
+      out->mutable_min()->set_##PROTOBUF_TYPE##_val(                                   \
+          std::min(in.min().PROTOBUF_TYPE##_val(), out->min().PROTOBUF_TYPE##_val())); \
+      out->mutable_max()->set_##PROTOBUF_TYPE##_val(                                   \
+          std::max(in.max().PROTOBUF_TYPE##_val(), out->max().PROTOBUF_TYPE##_val())); \
+    }                                                                                  \
+  }                                                                                    \
+  void NAME##MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {       \
+    out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val());     \
+    out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());     \
   }
 
 NUMERIC_MIN_MAX_FILTER_FUNCS(Bool, bool, bool, BOOLEAN);
@@ -222,19 +216,17 @@ const char* StringMinMaxFilter::LLVM_CLASS_NAME = "class.impala::StringMinMaxFil
 const int StringMinMaxFilter::MAX_BOUND_LENGTH = 1024;
 
 StringMinMaxFilter::StringMinMaxFilter(
-    const TMinMaxFilter& thrift, MemTracker* mem_tracker)
-  : mem_pool_(mem_tracker),
-    min_buffer_(&mem_pool_),
-    max_buffer_(&mem_pool_) {
-  always_false_ = thrift.always_false;
-  always_true_ = thrift.always_true;
+    const MinMaxFilterPB& protobuf, MemTracker* mem_tracker)
+  : mem_pool_(mem_tracker), min_buffer_(&mem_pool_), max_buffer_(&mem_pool_) {
+  always_false_ = protobuf.always_false();
+  always_true_ = protobuf.always_true();
   if (!always_true_ && !always_false_) {
-    DCHECK(thrift.__isset.min);
-    DCHECK(thrift.__isset.max);
-    DCHECK(thrift.min.__isset.string_val);
-    DCHECK(thrift.max.__isset.string_val);
-    min_ = StringValue(thrift.min.string_val);
-    max_ = StringValue(thrift.max.string_val);
+    DCHECK(protobuf.has_min());
+    DCHECK(protobuf.has_max());
+    DCHECK(protobuf.min().has_string_val());
+    DCHECK(protobuf.max().has_string_val());
+    min_ = StringValue(protobuf.min().string_val());
+    max_ = StringValue(protobuf.max().string_val());
     CopyToBuffer(&min_buffer_, &min_, min_.len);
     CopyToBuffer(&max_buffer_, &max_, max_.len);
   }
@@ -277,17 +269,13 @@ void StringMinMaxFilter::MaterializeValues() {
   }
 }
 
-void StringMinMaxFilter::ToThrift(TMinMaxFilter* thrift) const {
+void StringMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
   if (!always_true_ && !always_false_) {
-    thrift->min.string_val.assign(static_cast<char*>(min_.ptr), min_.len);
-    thrift->min.__isset.string_val = true;
-    thrift->__isset.min = true;
-    thrift->max.string_val.assign(static_cast<char*>(max_.ptr), max_.len);
-    thrift->max.__isset.string_val = true;
-    thrift->__isset.max = true;
+    protobuf->mutable_min()->set_string_val(static_cast<char*>(min_.ptr), min_.len);
+    protobuf->mutable_max()->set_string_val(static_cast<char*>(max_.ptr), max_.len);
   }
-  thrift->__set_always_false(always_false_);
-  thrift->__set_always_true(always_true_);
+  protobuf->set_always_false(always_false_);
+  protobuf->set_always_true(always_true_);
 }
 
 string StringMinMaxFilter::DebugString() const {
@@ -298,28 +286,26 @@ string StringMinMaxFilter::DebugString() const {
   return out.str();
 }
 
-void StringMinMaxFilter::Or(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  if (out->always_false) {
-    out->min.__set_string_val(in.min.string_val);
-    out->__isset.min = true;
-    out->max.__set_string_val(in.max.string_val);
-    out->__isset.max = true;
-    out->__set_always_false(false);
+void StringMinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  if (out->always_false()) {
+    out->mutable_min()->set_string_val(in.min().string_val());
+    out->mutable_max()->set_string_val(in.max().string_val());
+    out->set_always_false(false);
   } else {
-    StringValue in_min_val = StringValue(in.min.string_val);
-    StringValue out_min_val = StringValue(out->min.string_val);
-    if (in_min_val < out_min_val) out->min.__set_string_val(in.min.string_val);
-    StringValue in_max_val = StringValue(in.max.string_val);
-    StringValue out_max_val = StringValue(out->max.string_val);
-    if (in_max_val > out_max_val) out->max.__set_string_val(in.max.string_val);
+    StringValue in_min_val = StringValue(in.min().string_val());
+    StringValue out_min_val = StringValue(out->min().string_val());
+    if (in_min_val < out_min_val)
+      out->mutable_min()->set_string_val(in.min().string_val());
+    StringValue in_max_val = StringValue(in.max().string_val());
+    StringValue out_max_val = StringValue(out->max().string_val());
+    if (in_max_val > out_max_val)
+      out->mutable_max()->set_string_val(in.max().string_val());
   }
 }
 
-void StringMinMaxFilter::Copy(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  out->min.__set_string_val(in.min.string_val);
-  out->__isset.min = true;
-  out->max.__set_string_val(in.max.string_val);
-  out->__isset.max = true;
+void StringMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  out->mutable_min()->set_string_val(in.min().string_val());
+  out->mutable_max()->set_string_val(in.max().string_val());
 }
 
 void StringMinMaxFilter::CopyToBuffer(
@@ -349,13 +335,13 @@ void StringMinMaxFilter::SetAlwaysTrue() {
 const char* TimestampMinMaxFilter::LLVM_CLASS_NAME =
     "class.impala::TimestampMinMaxFilter";
 
-TimestampMinMaxFilter::TimestampMinMaxFilter(const TMinMaxFilter& thrift) {
-  always_false_ = thrift.always_false;
+TimestampMinMaxFilter::TimestampMinMaxFilter(const MinMaxFilterPB& protobuf) {
+  always_false_ = protobuf.always_false();
   if (!always_false_) {
-    DCHECK(thrift.min.__isset.timestamp_val);
-    DCHECK(thrift.max.__isset.timestamp_val);
-    min_ = TimestampValue::FromTColumnValue(thrift.min);
-    max_ = TimestampValue::FromTColumnValue(thrift.max);
+    DCHECK(protobuf.min().has_timestamp_val());
+    DCHECK(protobuf.max().has_timestamp_val());
+    min_ = TimestampValue::FromColumnValuePB(protobuf.min());
+    max_ = TimestampValue::FromColumnValuePB(protobuf.max());
   }
 }
 
@@ -363,15 +349,13 @@ PrimitiveType TimestampMinMaxFilter::type() {
   return PrimitiveType::TYPE_TIMESTAMP;
 }
 
-void TimestampMinMaxFilter::ToThrift(TMinMaxFilter* thrift) const {
+void TimestampMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
   if (!always_false_) {
-    min_.ToTColumnValue(&thrift->min);
-    thrift->__isset.min = true;
-    max_.ToTColumnValue(&thrift->max);
-    thrift->__isset.max = true;
+    min_.ToColumnValuePB(protobuf->mutable_min());
+    max_.ToColumnValuePB(protobuf->mutable_max());
   }
-  thrift->__set_always_false(always_false_);
-  thrift->__set_always_true(false);
+  protobuf->set_always_false(always_false_);
+  protobuf->set_always_true(false);
 }
 
 string TimestampMinMaxFilter::DebugString() const {
@@ -381,45 +365,46 @@ string TimestampMinMaxFilter::DebugString() const {
   return out.str();
 }
 
-void TimestampMinMaxFilter::Or(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  if (out->always_false) {
-    out->min.__set_timestamp_val(in.min.timestamp_val);
-    out->__isset.min = true;
-    out->max.__set_timestamp_val(in.max.timestamp_val);
-    out->__isset.max = true;
-    out->__set_always_false(false);
+void TimestampMinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  if (out->always_false()) {
+    out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
+    out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
+    out->set_always_false(false);
   } else {
-    TimestampValue in_min_val = TimestampValue::FromTColumnValue(in.min);
-    TimestampValue out_min_val = TimestampValue::FromTColumnValue(out->min);
-    if (in_min_val < out_min_val) out->min.__set_timestamp_val(in.min.timestamp_val);
-    TimestampValue in_max_val = TimestampValue::FromTColumnValue(in.max);
-    TimestampValue out_max_val = TimestampValue::FromTColumnValue(out->max);
-    if (in_max_val > out_max_val) out->max.__set_timestamp_val(in.max.timestamp_val);
+    TimestampValue in_min_val = TimestampValue::FromColumnValuePB(in.min());
+    TimestampValue out_min_val = TimestampValue::FromColumnValuePB(out->min());
+    if (in_min_val < out_min_val) {
+      out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
+    }
+    TimestampValue in_max_val = TimestampValue::FromColumnValuePB(in.max());
+    TimestampValue out_max_val = TimestampValue::FromColumnValuePB(out->max());
+    if (in_max_val > out_max_val) {
+      out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
+    }
   }
 }
 
-void TimestampMinMaxFilter::Copy(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  out->min.__set_timestamp_val(in.min.timestamp_val);
-  out->__isset.min = true;
-  out->max.__set_timestamp_val(in.max.timestamp_val);
-  out->__isset.max = true;
+void TimestampMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
+  out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
 }
 
 // DECIMAL
 const char* DecimalMinMaxFilter::LLVM_CLASS_NAME = "class.impala::DecimalMinMaxFilter";
-#define DECIMAL_SET_MINMAX(SIZE)                                       \
-  do {                                                                 \
-    DCHECK(thrift.min.__isset.decimal_val);                            \
-    DCHECK(thrift.max.__isset.decimal_val);                            \
-    min##SIZE##_ = Decimal##SIZE##Value::FromTColumnValue(thrift.min); \
-    max##SIZE##_ = Decimal##SIZE##Value::FromTColumnValue(thrift.max); \
+#define DECIMAL_SET_MINMAX(SIZE)                                            \
+  do {                                                                      \
+    DCHECK(protobuf.min().has_decimal_val());                               \
+    DCHECK(protobuf.max().has_decimal_val());                               \
+    min##SIZE##_ = Decimal##SIZE##Value::FromColumnValuePB(protobuf.min()); \
+    max##SIZE##_ = Decimal##SIZE##Value::FromColumnValuePB(protobuf.max()); \
   } while (false)
 
 // Construct the Decimal min-max filter when the min-max filter information
 // comes in through thrift.  This can get called in coordinator, after the filter
 // is sent by executor
-DecimalMinMaxFilter::DecimalMinMaxFilter(const TMinMaxFilter& thrift, int precision)
-  : size_(ColumnType::GetDecimalByteSize(precision)), always_false_(thrift.always_false) {
+DecimalMinMaxFilter::DecimalMinMaxFilter(const MinMaxFilterPB& protobuf, int precision)
+  : size_(ColumnType::GetDecimalByteSize(precision)),
+    always_false_(protobuf.always_false()) {
   if (!always_false_) {
     switch (size_) {
       case DECIMAL_SIZE_4BYTE:
@@ -441,34 +426,32 @@ PrimitiveType DecimalMinMaxFilter::type() {
   return PrimitiveType::TYPE_DECIMAL;
 }
 
-#define DECIMAL_TO_THRIFT(SIZE)                \
-  do {                                         \
-    min##SIZE##_.ToTColumnValue(&thrift->min); \
-    max##SIZE##_.ToTColumnValue(&thrift->max); \
+#define DECIMAL_TO_PROTOBUF(SIZE)                          \
+  do {                                                     \
+    min##SIZE##_.ToColumnValuePB(protobuf->mutable_min()); \
+    max##SIZE##_.ToColumnValuePB(protobuf->mutable_max()); \
   } while (false)
 
 // Construct a thrift min-max filter.  Will be called by the executor
 // to be sent to the coordinator
-void DecimalMinMaxFilter::ToThrift(TMinMaxFilter* thrift) const {
+void DecimalMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
   if (!always_false_) {
     switch (size_) {
       case DECIMAL_SIZE_4BYTE:
-        DECIMAL_TO_THRIFT(4);
+        DECIMAL_TO_PROTOBUF(4);
         break;
       case DECIMAL_SIZE_8BYTE:
-        DECIMAL_TO_THRIFT(8);
+        DECIMAL_TO_PROTOBUF(8);
         break;
       case DECIMAL_SIZE_16BYTE:
-        DECIMAL_TO_THRIFT(16);
+        DECIMAL_TO_PROTOBUF(16);
         break;
       default:
         DCHECK(false) << "DecimalMinMaxFilter: Unknown decimal byte size: " << size_;
     }
-    thrift->__isset.min = true;
-    thrift->__isset.max = true;
   }
-  thrift->__set_always_false(always_false_);
-  thrift->__set_always_true(false);
+  protobuf->set_always_false(always_false_);
+  protobuf->set_always_true(false);
 }
 
 void DecimalMinMaxFilter::Insert(void* val) {
@@ -514,25 +497,24 @@ string DecimalMinMaxFilter::DebugString() const {
   return out.str();
 }
 
-#define DECIMAL_OR(SIZE)                                    \
-  do {                                                      \
-    if (Decimal##SIZE##Value::FromTColumnValue(in.min)      \
-        < Decimal##SIZE##Value::FromTColumnValue(out->min)) \
-      out->min.__set_decimal_val(in.min.decimal_val);       \
-    if (Decimal##SIZE##Value::FromTColumnValue(in.max)      \
-        > Decimal##SIZE##Value::FromTColumnValue(out->max)) \
-      out->max.__set_decimal_val(in.max.decimal_val);       \
+#define DECIMAL_OR(SIZE)                                           \
+  do {                                                             \
+    if (Decimal##SIZE##Value::FromColumnValuePB(in.min())          \
+        < Decimal##SIZE##Value::FromColumnValuePB(out->min()))     \
+      out->mutable_min()->set_decimal_val(in.min().decimal_val()); \
+    if (Decimal##SIZE##Value::FromColumnValuePB(in.max())          \
+        > Decimal##SIZE##Value::FromColumnValuePB(out->max()))     \
+      out->mutable_max()->set_decimal_val(in.max().decimal_val()); \
   } while (false)
 
-void DecimalMinMaxFilter::Or(const TMinMaxFilter& in, TMinMaxFilter* out, int precision) {
-  if (in.always_false) {
+void DecimalMinMaxFilter::Or(
+    const MinMaxFilterPB& in, MinMaxFilterPB* out, int precision) {
+  if (in.always_false()) {
     return;
-  } else if (out->always_false) {
-    out->min.__set_decimal_val(in.min.decimal_val);
-    out->__isset.min = true;
-    out->max.__set_decimal_val(in.max.decimal_val);
-    out->__isset.max = true;
-    out->__set_always_false(false);
+  } else if (out->always_false()) {
+    out->mutable_min()->set_decimal_val(in.min().decimal_val());
+    out->mutable_max()->set_decimal_val(in.max().decimal_val());
+    out->set_always_false(false);
   } else {
     int size = ColumnType::GetDecimalByteSize(precision);
     switch (size) {
@@ -551,11 +533,9 @@ void DecimalMinMaxFilter::Or(const TMinMaxFilter& in, TMinMaxFilter* out, int pr
   }
 }
 
-void DecimalMinMaxFilter::Copy(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  out->min.__set_decimal_val(in.min.decimal_val);
-  out->__isset.min = true;
-  out->max.__set_decimal_val(in.max.decimal_val);
-  out->__isset.max = true;
+void DecimalMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  out->mutable_min()->set_decimal_val(in.min().decimal_val());
+  out->mutable_max()->set_decimal_val(in.max().decimal_val());
 }
 
 // MinMaxFilter
@@ -595,29 +575,29 @@ MinMaxFilter* MinMaxFilter::Create(
   return nullptr;
 }
 
-MinMaxFilter* MinMaxFilter::Create(const TMinMaxFilter& thrift, ColumnType type,
+MinMaxFilter* MinMaxFilter::Create(const MinMaxFilterPB& protobuf, ColumnType type,
     ObjectPool* pool, MemTracker* mem_tracker) {
   switch (type.type) {
     case PrimitiveType::TYPE_BOOLEAN:
-      return pool->Add(new BoolMinMaxFilter(thrift));
+      return pool->Add(new BoolMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_TINYINT:
-      return pool->Add(new TinyIntMinMaxFilter(thrift));
+      return pool->Add(new TinyIntMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_SMALLINT:
-      return pool->Add(new SmallIntMinMaxFilter(thrift));
+      return pool->Add(new SmallIntMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_INT:
-      return pool->Add(new IntMinMaxFilter(thrift));
+      return pool->Add(new IntMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_BIGINT:
-      return pool->Add(new BigIntMinMaxFilter(thrift));
+      return pool->Add(new BigIntMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_FLOAT:
-      return pool->Add(new FloatMinMaxFilter(thrift));
+      return pool->Add(new FloatMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_DOUBLE:
-      return pool->Add(new DoubleMinMaxFilter(thrift));
+      return pool->Add(new DoubleMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_STRING:
-      return pool->Add(new StringMinMaxFilter(thrift, mem_tracker));
+      return pool->Add(new StringMinMaxFilter(protobuf, mem_tracker));
     case PrimitiveType::TYPE_TIMESTAMP:
-      return pool->Add(new TimestampMinMaxFilter(thrift));
+      return pool->Add(new TimestampMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_DECIMAL:
-      return pool->Add(new DecimalMinMaxFilter(thrift, type.precision));
+      return pool->Add(new DecimalMinMaxFilter(protobuf, type.precision));
     default:
       DCHECK(false) << "Unsupported MinMaxFilter type: " << type;
   }
@@ -625,93 +605,93 @@ MinMaxFilter* MinMaxFilter::Create(const TMinMaxFilter& thrift, ColumnType type,
 }
 
 void MinMaxFilter::Or(
-    const TMinMaxFilter& in, TMinMaxFilter* out, const ColumnType& columnType) {
-  if (in.always_false || out->always_true) return;
-  if (in.always_true) {
-    out->__set_always_true(true);
+    const MinMaxFilterPB& in, MinMaxFilterPB* out, const ColumnType& columnType) {
+  if (in.always_false() || out->always_true()) return;
+  if (in.always_true()) {
+    out->set_always_true(true);
     return;
   }
-  if (in.min.__isset.bool_val) {
-    DCHECK(out->min.__isset.bool_val);
+  if (in.min().has_bool_val()) {
+    DCHECK(out->min().has_bool_val());
     BoolMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.byte_val) {
-    DCHECK(out->min.__isset.byte_val);
+  } else if (in.min().has_byte_val()) {
+    DCHECK(out->min().has_byte_val());
     TinyIntMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.short_val) {
-    DCHECK(out->min.__isset.short_val);
+  } else if (in.min().has_short_val()) {
+    DCHECK(out->min().has_short_val());
     SmallIntMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.int_val) {
-    DCHECK(out->min.__isset.int_val);
+  } else if (in.min().has_int_val()) {
+    DCHECK(out->min().has_int_val());
     IntMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.long_val) {
-    DCHECK(out->min.__isset.long_val);
+  } else if (in.min().has_long_val()) {
+    DCHECK(out->min().has_long_val());
     BigIntMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.double_val) {
+  } else if (in.min().has_double_val()) {
     // Handles FloatMinMaxFilter also as TColumnValue doesn't have a float type.
-    DCHECK(out->min.__isset.double_val);
+    DCHECK(out->min().has_double_val());
     DoubleMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.string_val) {
-    DCHECK(out->min.__isset.string_val);
+  } else if (in.min().has_string_val()) {
+    DCHECK(out->min().has_string_val());
     StringMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.timestamp_val) {
-    DCHECK(out->min.__isset.timestamp_val);
+  } else if (in.min().has_timestamp_val()) {
+    DCHECK(out->min().has_timestamp_val());
     TimestampMinMaxFilter::Or(in, out);
     return;
-  } else if (in.min.__isset.decimal_val) {
-    DCHECK(out->min.__isset.decimal_val);
+  } else if (in.min().has_decimal_val()) {
+    DCHECK(out->min().has_decimal_val());
     DecimalMinMaxFilter::Or(in, out, columnType.precision);
     return;
   }
   DCHECK(false) << "Unsupported MinMaxFilter type.";
 }
 
-void MinMaxFilter::Copy(const TMinMaxFilter& in, TMinMaxFilter* out) {
-  out->__set_always_false(in.always_false);
-  out->__set_always_true(in.always_true);
-  if (in.always_false || in.always_true) return;
-  if (in.min.__isset.bool_val) {
-    DCHECK(!out->min.__isset.bool_val);
+void MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
+  out->set_always_false(in.always_false());
+  out->set_always_true(in.always_true());
+  if (in.always_false() || in.always_true()) return;
+  if (in.min().has_bool_val()) {
+    DCHECK(!out->min().has_bool_val());
     BoolMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.byte_val) {
-    DCHECK(!out->min.__isset.byte_val);
+  } else if (in.min().has_byte_val()) {
+    DCHECK(!out->min().has_byte_val());
     TinyIntMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.short_val) {
-    DCHECK(!out->min.__isset.short_val);
+  } else if (in.min().has_short_val()) {
+    DCHECK(!out->min().has_short_val());
     SmallIntMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.int_val) {
-    DCHECK(!out->min.__isset.int_val);
+  } else if (in.min().has_int_val()) {
+    DCHECK(!out->min().has_int_val());
     IntMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.long_val) {
-    // Handles TimestampMinMaxFilter also as TColumnValue doesn't have a timestamp type.
-    DCHECK(!out->min.__isset.long_val);
+  } else if (in.min().has_long_val()) {
+    // Handles TimestampMinMaxFilter also as ColumnValuePB doesn't have a timestamp type.
+    DCHECK(!out->min().has_long_val());
     BigIntMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.double_val) {
-    // Handles FloatMinMaxFilter also as TColumnValue doesn't have a float type.
-    DCHECK(!out->min.__isset.double_val);
+  } else if (in.min().has_double_val()) {
+    // Handles FloatMinMaxFilter also as ColumnValuePB doesn't have a float type.
+    DCHECK(!out->min().has_double_val());
     DoubleMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.string_val) {
-    DCHECK(!out->min.__isset.string_val);
+  } else if (in.min().has_string_val()) {
+    DCHECK(!out->min().has_string_val());
     StringMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.timestamp_val) {
-    DCHECK(!out->min.__isset.timestamp_val);
+  } else if (in.min().has_timestamp_val()) {
+    DCHECK(!out->min().has_timestamp_val());
     TimestampMinMaxFilter::Copy(in, out);
     return;
-  } else if (in.min.__isset.decimal_val) {
-    DCHECK(!out->min.__isset.decimal_val);
+  } else if (in.min().has_decimal_val()) {
+    DCHECK(!out->min().has_decimal_val());
     DecimalMinMaxFilter::Copy(in, out);
     return;
   }

@@ -176,7 +176,7 @@ class ClientRequestState {
   /// object.
   Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
       const TRuntimeProfileForest& thrift_profiles) WARN_UNUSED_RESULT;
-  void UpdateFilter(const TUpdateFilterParams& params);
+  void UpdateFilter(const UpdateFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
   /// Populate DML stats in 'dml_result' if this request succeeded.
   /// Sets 'query_status' to the overall query status.

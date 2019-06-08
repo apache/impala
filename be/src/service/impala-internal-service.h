@@ -30,10 +30,6 @@ class ImpalaServer;
 class ImpalaInternalService : public ImpalaInternalServiceIf {
  public:
   ImpalaInternalService();
-  virtual void UpdateFilter(TUpdateFilterResult& return_val,
-      const TUpdateFilterParams& params);
-  virtual void PublishFilter(TPublishFilterResult& return_val,
-      const TPublishFilterParams& params);
 
  private:
   ImpalaServer* impala_server_;

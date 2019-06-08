@@ -44,24 +44,3 @@ template <typename T> void SetUnknownIdError(
       Substitute("Unknown $0 id: $1", id_type, PrintId(id))));
   status.SetTStatus(status_container);
 }
-
-void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
-    const TUpdateFilterParams& params) {
-  DebugActionNoFail(FLAGS_debug_actions, "UPDATE_FILTER_DELAY");
-  DCHECK(params.__isset.filter_id);
-  DCHECK(params.__isset.query_id);
-  DCHECK(params.__isset.bloom_filter || params.__isset.min_max_filter);
-  impala_server_->UpdateFilter(return_val, params);
-}
-
-void ImpalaInternalService::PublishFilter(TPublishFilterResult& return_val,
-    const TPublishFilterParams& params) {
-  DebugActionNoFail(FLAGS_debug_actions, "PUBLISH_FILTER_DELAY");
-  DCHECK(params.__isset.filter_id);
-  DCHECK(params.__isset.dst_query_id);
-  DCHECK(params.__isset.dst_fragment_idx);
-  DCHECK(params.__isset.bloom_filter || params.__isset.min_max_filter);
-  QueryState::ScopedRef qs(params.dst_query_id);
-  if (qs.get() == nullptr) return;
-  qs->PublishFilter(params);
-}

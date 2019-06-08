@@ -22,6 +22,7 @@
 #include <ostream>
 
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/data_stream_service.pb.h"
 #include "runtime/multi-precision.h"
 #include "runtime/types.h"
 
@@ -59,8 +60,8 @@ class DecimalValue {
     return FromDouble(t.precision, t.scale, d, round, overflow);
   }
 
-  /// Returns a new DecimalValue created from the value in 'tvalue'.
-  static inline DecimalValue FromTColumnValue(const TColumnValue& tvalue);
+  /// Returns a new DecimalValue created from the value in 'value_pb'.
+  static inline DecimalValue FromColumnValuePB(const ColumnValuePB& value_pb);
 
   static inline DecimalValue FromDouble(int precision, int scale, double d,
       bool round, bool* overflow);
@@ -196,11 +197,10 @@ class DecimalValue {
 
   inline DecimalValue<T> Abs() const;
 
-  /// Store the binary representation of this DecimalValue in 'tvalue'.
-  void ToTColumnValue(TColumnValue* tvalue) const {
+  /// Store the binary representation of this DecimalValue in 'value_pb'.
+  void ToColumnValuePB(ColumnValuePB* value_pb) const {
     const uint8_t* data = reinterpret_cast<const uint8_t*>(&value_);
-    tvalue->decimal_val.assign(data, data + sizeof(T));
-    tvalue->__isset.decimal_val = true;
+    value_pb->mutable_decimal_val()->assign(data, data + sizeof(T));
   }
 
  private:
