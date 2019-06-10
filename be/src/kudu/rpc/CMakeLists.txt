@@ -96,6 +96,8 @@ add_executable(protoc-gen-krpc protoc-gen-krpc.cc
   # TODO: Consider either removing code that depends on these flags, or namespacing them
   # somehow.
   ${CMAKE_CURRENT_SOURCE_DIR}/../../common/global-flags.cc)
+# IMPALA-8642: kudu_version.cc depends on gen-cpp/Status_types.h in target thrift-deps
+add_dependencies(protoc-gen-krpc thrift-deps)
 target_link_libraries(protoc-gen-krpc
     ${KUDU_BASE_LIBS}
     rpc_header_proto
