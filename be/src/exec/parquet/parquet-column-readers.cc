@@ -1340,8 +1340,13 @@ Status BaseScalarColumnReader::InitDictionary() {
 
   if (decompressor_.get() != nullptr) {
     int uncompressed_size = current_page_header_.uncompressed_page_size;
-    RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, data_size, data_,
-                    &uncompressed_size, &dict_values));
+    const Status& status = decompressor_->ProcessBlock32(true, data_size, data_,
+        &uncompressed_size, &dict_values);
+    if (!status.ok()) {
+      return Status(Substitute("Error decompressing parquet file '$0' column '$1'"
+               " data_page_offset $2: $3", filename(), node_.element->name,
+               metadata_->data_page_offset, status.GetDetail()));
+    }
     VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
     if (current_page_header_.uncompressed_page_size != uncompressed_size) {
       return Status(Substitute("Error decompressing dictionary page in file '$0'. "
@@ -1465,9 +1470,15 @@ Status BaseScalarColumnReader::ReadDataPage() {
       uint8_t* decompressed_buffer;
       RETURN_IF_ERROR(AllocateUncompressedDataPage(
             uncompressed_size, "decompressed data", &decompressed_buffer));
-      RETURN_IF_ERROR(decompressor_->ProcessBlock32(true,
+      const Status& status = decompressor_->ProcessBlock32(true,
           current_page_header_.compressed_page_size, data_, &uncompressed_size,
-          &decompressed_buffer));
+          &decompressed_buffer);
+      if (!status.ok()) {
+        return Status(Substitute("Error decompressing parquet file '$0' column '$1'"
+                 " data_page_offset $2: $3", filename(), node_.element->name,
+                 metadata_->data_page_offset, status.GetDetail()));
+      }
+
       VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
                 << " to " << uncompressed_size;
       if (current_page_header_.uncompressed_page_size != uncompressed_size) {

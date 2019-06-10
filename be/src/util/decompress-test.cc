@@ -22,6 +22,7 @@
 
 #include "gen-cpp/Descriptors_types.h"
 
+#include "exec/read-write-util.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
 #include "testutil/gtest-util.h"
@@ -72,7 +73,8 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
     // LZ4 & ZSTD are not implemented to work without an allocated output
-    if (format == THdfsCompression::LZ4 || format == THdfsCompression::ZSTD) {
+    if (format == THdfsCompression::LZ4 || format == THdfsCompression::ZSTD ||
+        format == THdfsCompression::LZ4_BLOCKED) {
       CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
           sizeof(input_), input_);
       CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
@@ -371,7 +373,6 @@ class DecompressorTest : public ::testing::Test {
   // Buffer to hold generated random data that contains repeated letter [a..z] and [A..Z]
   // for compressor/decompressor testing.
   uint8_t input_[2 * 26 * 1024];
-
   // Buffer for testing ProcessBlockStreaming() which allocates STREAM_OUT_BUF_SIZE output
   // buffer. This is 4x the size of the output buffers to ensure that the decompressed output
   // requires several calls and doesn't need to be nicely aligned (the last call gets a
@@ -488,6 +489,78 @@ TEST_F(DecompressorTest, ZSTD) {
   // zstd supports compression levels from 1 up to ZSTD_maxCLevel()
   const int clevel = uniform_int_distribution<int>(1, ZSTD_maxCLevel())(rng);
   RunTest(THdfsCompression::ZSTD, clevel);
+}
+
+TEST_F(DecompressorTest, LZ4HadoopCompat) {
+  scoped_ptr<Codec> compressor;
+  scoped_ptr<Codec> decompressor;
+
+  THdfsCompression::type format = THdfsCompression::LZ4_BLOCKED;
+  Codec::CodecInfo codec_info(format);
+  EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
+  EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
+
+  // Hadoop uses a block compression scheme on top of lz4. The input stream could be
+  // split into blocks and each block contains the uncompressed length for the block
+  // followed by one of more length-prefixed blocks of compressed data.
+  // Block layout:
+  //     <4 byte big endian uncompressed_size><inner block 1>...<inner block N>
+  //     inner block <i> layout: <4-byte big endian compressed_size><lz4 compressed block>
+  // For this unit test we assume an inner block size of 8K.
+  const int64_t input_len = sizeof(input_);
+  const int64_t block_len = 8192;
+  const int64_t num_blocks = ceil((double)input_len/(double)block_len);
+  const int64_t max_compressed_block_length = compressor->MaxOutputLen(block_len, NULL);
+  const int64_t total_compressed_buffer_length =
+      max_compressed_block_length * num_blocks;
+  uint8_t* const compressed_buffer = mem_pool_.Allocate(total_compressed_buffer_length);
+  // Write the total uncompressed_size
+  ReadWriteUtil::PutInt(compressed_buffer, static_cast<uint32_t>(input_len));
+  int64_t compressed_buffer_index = sizeof(uint32_t);
+  // Preallocate output buffers for compressor
+  uint8_t* const compressed_block = mem_pool_.Allocate(max_compressed_block_length);
+  // Generate Hadoop's compressed block layout
+  const int num_8K_inner_blocks = input_len / block_len;
+  for (int i=0; i < (num_8K_inner_blocks * block_len); i += block_len) {
+    uint8_t* input = &input_[i];
+    uint8_t* compressed = compressed_block;
+    int64_t compressed_length = max_compressed_block_length;
+    EXPECT_OK(compressor->ProcessBlock(true, block_len, input, &compressed_length,
+        &compressed));
+    compressed += sizeof(uint32_t);
+    compressed_length -= sizeof(uint32_t);
+    memcpy(compressed_buffer + compressed_buffer_index, compressed, compressed_length);
+    compressed_buffer_index += compressed_length;
+  }
+  // Compress the last block (not a multiple of 8K bytes), if any
+  if (input_len % block_len != 0) {
+    const int64_t last_block_sz = input_len % block_len;
+    const uint64_t last_block_index = input_len - last_block_sz;
+    uint8_t* input = &input_[last_block_index];
+    uint8_t* compressed = compressed_block;
+    int64_t compressed_length = max_compressed_block_length;
+    EXPECT_OK(compressor->ProcessBlock(true, last_block_sz, input, &compressed_length,
+        &compressed));
+    compressed += sizeof(uint32_t);
+    compressed_length -= sizeof(uint32_t);
+    memcpy(compressed_buffer + compressed_buffer_index, compressed, compressed_length);
+    compressed_buffer_index += compressed_length;
+  }
+  DCHECK_LE(compressed_buffer_index, total_compressed_buffer_length);
+
+  // Now that we have a compressed block using Hadoop's lz4 block compression scheme,
+  // let's decompress it using Impala's LZ4BlockDecompressor.
+  int64_t output_len = input_len;
+  uint8_t* output = mem_pool_.Allocate(output_len);
+  EXPECT_OK(decompressor->ProcessBlock(true, compressed_buffer_index, compressed_buffer,
+      &output_len, &output));
+
+  EXPECT_EQ(output_len, input_len);
+  EXPECT_EQ(memcmp(input_, output, input_len), 0);
+}
+
+TEST_F(DecompressorTest, LZ4Blocked) {
+  RunTest(THdfsCompression::LZ4_BLOCKED);
 }
 }
 

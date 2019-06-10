@@ -79,6 +79,7 @@ enum THdfsCompression {
   ZLIB = 9
   ZSTD = 10
   BROTLI = 11
+  LZ4_BLOCKED = 12
 }
 
 enum TColumnEncoding {

@@ -626,3 +626,67 @@ Status ZstandardDecompressor::ProcessBlock(bool output_preallocated, int64_t inp
   *output_length = ret;
   return Status::OK();
 }
+
+Lz4BlockDecompressor::Lz4BlockDecompressor(MemPool* mem_pool, bool reuse_buffer)
+  : Codec(mem_pool, reuse_buffer) {
+}
+
+int64_t Lz4BlockDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
+  DCHECK(input != nullptr) << "Passed null input to Lz4 Decompressor";
+  return -1;
+}
+
+// Decompresses a block compressed using Hadoop's lz4 block compression scheme. The
+// compressed block layout is similar to Hadoop's snappy block compression scheme, with
+// the only difference being the compression codec used. For more details please refer
+// to the comment section for the SnappyBlockDecompress above.
+Status Lz4BlockDecompressor::ProcessBlock(bool output_preallocated, int64_t input_len,
+    const uint8_t* input, int64_t* output_len, uint8_t** output) {
+  DCHECK(output_preallocated) << "Lz4 Codec implementation must have allocated output";
+  if(*output_len == 0) return Status::OK();
+  uint8_t* out_ptr = *output;
+  int64_t uncompressed_total_len = 0;
+  const int64_t buffer_size = *output_len;
+  *output_len = 0;
+
+  while (input_len > 0) {
+    uint32_t uncompressed_block_len = ReadWriteUtil::GetInt<uint32_t>(input);
+    input += sizeof(uint32_t);
+    input_len -= sizeof(uint32_t);
+    int64_t remaining_output_size = buffer_size - uncompressed_total_len;
+    if (remaining_output_size < uncompressed_block_len) {
+      return Status(TErrorCode::LZ4_BLOCK_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
+    }
+
+    while (uncompressed_block_len > 0) {
+      // Check that input length should not be negative.
+      if (input_len < 0) {
+        return Status(TErrorCode::LZ4_BLOCK_DECOMPRESS_INVALID_INPUT_LENGTH);
+      }
+      // Read the length of the next lz4 compressed block.
+      size_t compressed_len = ReadWriteUtil::GetInt<uint32_t>(input);
+      input += sizeof(uint32_t);
+      input_len -= sizeof(uint32_t);
+
+      if (compressed_len == 0 || compressed_len > input_len) {
+        return Status(TErrorCode::LZ4_BLOCK_DECOMPRESS_INVALID_COMPRESSED_LENGTH);
+      }
+
+      // Decompress this block.
+      int64_t remaining_output_size = buffer_size - uncompressed_total_len;
+      int uncompressed_len = LZ4_decompress_safe(reinterpret_cast<const char*>(input),
+          reinterpret_cast<char*>(out_ptr), compressed_len, remaining_output_size);
+      if (uncompressed_len < 0) {
+        return Status(TErrorCode::LZ4_DECOMPRESS_SAFE_FAILED);
+      }
+
+      out_ptr += uncompressed_len;
+      input += compressed_len;
+      input_len -= compressed_len;
+      uncompressed_block_len -= uncompressed_len;
+      uncompressed_total_len += uncompressed_len;
+    }
+  }
+  *output_len = uncompressed_total_len;
+  return Status::OK();
+}

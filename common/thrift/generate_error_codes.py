@@ -416,6 +416,19 @@ error_codes = (
    "The user authorized on the connection '$0' does not match the session username '$1'"),
 
   ("ZSTD_ERROR", 137, "$0 failed with error: $1"),
+
+  ("LZ4_BLOCK_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT", 138,
+   "LZ4Block: Decompressed size is not correct."),
+
+  ("LZ4_BLOCK_DECOMPRESS_INVALID_INPUT_LENGTH", 139,
+   "LZ4Block: Invalid input length."),
+
+  ("LZ4_BLOCK_DECOMPRESS_INVALID_COMPRESSED_LENGTH", 140,
+   "LZ4Block: Invalid compressed length.  Data is likely corrupt."),
+
+  ("LZ4_DECOMPRESS_SAFE_FAILED", 141, "LZ4: LZ4_decompress_safe failed"),
+
+  ("LZ4_COMPRESS_DEFAULT_FAILED", 142, "LZ4: LZ4_compress_default failed"),
 )
 
 import sys

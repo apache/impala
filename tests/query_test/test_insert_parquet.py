@@ -37,7 +37,7 @@ from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (decode_stats_value,
     get_parquet_metadata_from_hdfs_folder)
 
-PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd']
+PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'lz4']
 
 
 class RoundFloat():

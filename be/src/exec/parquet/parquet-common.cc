@@ -26,8 +26,9 @@ const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::GZIP,
   THdfsCompression::LZO,
   THdfsCompression::BROTLI,
-  THdfsCompression::LZ4,
-  THdfsCompression::ZSTD};
+  THdfsCompression::LZ4_BLOCKED,
+  THdfsCompression::ZSTD
+};
 
 const int PARQUET_TO_IMPALA_CODEC_SIZE =
     sizeof(PARQUET_TO_IMPALA_CODEC) / sizeof(PARQUET_TO_IMPALA_CODEC[0]);
@@ -46,7 +47,9 @@ const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
   parquet::CompressionCodec::LZ4,
   parquet::CompressionCodec::GZIP,   // ZLIB
   parquet::CompressionCodec::ZSTD,
-  parquet::CompressionCodec::BROTLI};
+  parquet::CompressionCodec::BROTLI,
+  parquet::CompressionCodec::LZ4     // LZ4_BLOCKED
+};
 
 const int IMPALA_TO_PARQUET_CODEC_SIZE =
     sizeof(IMPALA_TO_PARQUET_CODEC) / sizeof(IMPALA_TO_PARQUET_CODEC[0]);

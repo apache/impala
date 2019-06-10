@@ -35,7 +35,7 @@ from tests.common.test_result_verifier import (
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
-PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd']
+PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'lz4']
 
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod

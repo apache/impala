@@ -284,7 +284,8 @@ Status ParquetMetadataUtils::ValidateRowGroupColumn(
   if (codec != parquet::CompressionCodec::UNCOMPRESSED &&
       codec != parquet::CompressionCodec::SNAPPY &&
       codec != parquet::CompressionCodec::GZIP &&
-      codec != parquet::CompressionCodec::ZSTD) {
+      codec != parquet::CompressionCodec::ZSTD &&
+      codec != parquet::CompressionCodec::LZ4) {
     return Status(Substitute("File '$0' uses an unsupported compression: $1 for column "
         "'$2'.", filename, codec, schema_element.name));
   }

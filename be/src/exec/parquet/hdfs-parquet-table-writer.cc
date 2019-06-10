@@ -94,7 +94,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
  public:
   // expr - the expression to generate output values for this column.
   BaseColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* expr_eval,
-      const Codec::CodecInfo& codec_info)
+      const Codec::CodecInfo& codec_info, const string column_name)
     : parent_(parent),
       expr_eval_(expr_eval),
       codec_info_(codec_info),
@@ -108,7 +108,8 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       values_buffer_len_(DEFAULT_DATA_PAGE_SIZE),
       page_stats_base_(nullptr),
       row_group_stats_base_(nullptr),
-      table_sink_mem_tracker_(parent_->parent_->mem_tracker()) {
+      table_sink_mem_tracker_(parent_->parent_->mem_tracker()),
+      column_name_(std::move(column_name)) {
     static_assert(std::is_same<decltype(parent_->parent_), HdfsTableSink*>::value,
         "'table_sink_mem_tracker_' must point to the mem tracker of an HdfsTableSink");
     def_levels_ = parent_->state_->obj_pool()->Add(
@@ -205,6 +206,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   parquet::CompressionCodec::type GetParquetCodec() const {
     return ConvertImpalaToParquetCodec(codec_info_.format_);
   }
+  const std::string& column_name() { return column_name_; }
 
  protected:
   friend class HdfsParquetTableWriter;
@@ -393,6 +395,9 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // True, if we should write the page index.
   bool write_page_index_;
+
+  // Column name in the HdfsTableDescriptor.
+  const string column_name_;
 };
 
 // Per type column writer.
@@ -401,8 +406,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     public HdfsParquetTableWriter::BaseColumnWriter {
  public:
   ColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
-      const Codec::CodecInfo& codec_info)
-    : BaseColumnWriter(parent, eval, codec_info),
+      const Codec::CodecInfo& codec_info, const std::string& col_name)
+    : BaseColumnWriter(parent, eval, codec_info, col_name),
       num_values_since_dict_size_check_(0),
       plain_encoded_value_size_(
           ParquetPlainEncoder::EncodedByteSize(eval->root().type())) {
@@ -521,8 +526,8 @@ class HdfsParquetTableWriter::BoolColumnWriter :
     public HdfsParquetTableWriter::BaseColumnWriter {
  public:
   BoolColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
-      const Codec::CodecInfo& codec_info)
-    : BaseColumnWriter(parent, eval, codec_info),
+      const Codec::CodecInfo& codec_info, const std::string& col_name)
+    : BaseColumnWriter(parent, eval, codec_info, col_name),
       page_stats_(parent_->reusable_col_mem_pool_.get(), -1),
       row_group_stats_(parent_->reusable_col_mem_pool_.get(), -1) {
     DCHECK_EQ(eval->root().type().type, TYPE_BOOLEAN);
@@ -577,8 +582,8 @@ class HdfsParquetTableWriter::Int64TimestampColumnWriterBase :
     public HdfsParquetTableWriter::ColumnWriter<int64_t> {
 public:
  Int64TimestampColumnWriterBase(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
-     const Codec::CodecInfo& codec_info)
-   : HdfsParquetTableWriter::ColumnWriter<int64_t>(parent, eval, codec_info) {
+     const Codec::CodecInfo& codec_info, const std::string& col_name)
+   : HdfsParquetTableWriter::ColumnWriter<int64_t>(parent, eval, codec_info, col_name) {
    int64_t dummy;
    plain_encoded_value_size_ = ParquetPlainEncoder::ByteSize(dummy);
   }
@@ -604,8 +609,10 @@ class HdfsParquetTableWriter::Int64MilliTimestampColumnWriter :
     public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
 public:
  Int64MilliTimestampColumnWriter(HdfsParquetTableWriter* parent,
-     ScalarExprEvaluator* eval, const Codec::CodecInfo& codec_info)
-   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec_info) {}
+     ScalarExprEvaluator* eval, const Codec::CodecInfo& codec_info,
+     const std::string& col_name)
+   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(
+       parent, eval, codec_info, col_name) {}
 
 protected:
   virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
@@ -618,8 +625,10 @@ class HdfsParquetTableWriter::Int64MicroTimestampColumnWriter :
     public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
 public:
  Int64MicroTimestampColumnWriter(HdfsParquetTableWriter* parent,
-     ScalarExprEvaluator* eval, const Codec::CodecInfo& codec_info)
-   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec_info) {}
+     ScalarExprEvaluator* eval, const Codec::CodecInfo& codec_info,
+     const std::string& col_name)
+   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(
+       parent, eval, codec_info, col_name) {}
 
 protected:
   virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
@@ -633,8 +642,9 @@ class HdfsParquetTableWriter::Int64NanoTimestampColumnWriter :
     public HdfsParquetTableWriter::Int64TimestampColumnWriterBase {
 public:
  Int64NanoTimestampColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
-     const Codec::CodecInfo& codec_info)
-   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(parent, eval, codec_info) {}
+     const Codec::CodecInfo& codec_info, const std::string& col_name)
+   : HdfsParquetTableWriter::Int64TimestampColumnWriterBase(
+       parent, eval, codec_info, col_name) {}
 
 protected:
   virtual bool ConvertTimestamp(const TimestampValue& ts, int64_t* result) {
@@ -756,8 +766,13 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
       uint8_t* compressed_data =
           parent_->per_file_mem_pool_->Allocate(max_compressed_size);
       header.compressed_page_size = max_compressed_size;
-      RETURN_IF_ERROR(compressor_->ProcessBlock32(true, header.uncompressed_page_size,
-          dict_buffer, &header.compressed_page_size, &compressed_data));
+      const Status& status =
+          compressor_->ProcessBlock32(true, header.uncompressed_page_size, dict_buffer,
+              &header.compressed_page_size, &compressed_data);
+      if (!status.ok()) {
+        return Status(Substitute("Error writing parquet file '$0' column '$1': $2",
+            parent_->output_->current_file_name, column_name(), status.GetDetail()));
+      }
       dict_buffer = compressed_data;
       // We allocated the output based on the guessed size, return the extra allocated
       // bytes back to the mem pool.
@@ -881,8 +896,13 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
     DCHECK_GT(max_compressed_size, 0);
     uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
     header.compressed_page_size = max_compressed_size;
-    RETURN_IF_ERROR(compressor_->ProcessBlock32(true, header.uncompressed_page_size,
-        uncompressed_data, &header.compressed_page_size, &compressed_data));
+    const Status& status =
+        compressor_->ProcessBlock32(true, header.uncompressed_page_size,
+            uncompressed_data, &header.compressed_page_size, &compressed_data);
+    if (!status.ok()) {
+      return Status(Substitute("Error writing parquet file '$0' column '$1': $2",
+          parent_->output_->current_file_name, column_name(), status.GetDetail()));
+    }
     current_page_->data = compressed_data;
 
     // We allocated the output based on the guessed size, return the extra allocated
@@ -963,14 +983,29 @@ Status HdfsParquetTableWriter::Init() {
     codec = query_options.compression_codec.codec;
     clevel = query_options.compression_codec.compression_level;
   }
+
   if (!(codec == THdfsCompression::NONE ||
         codec == THdfsCompression::GZIP ||
         codec == THdfsCompression::SNAPPY ||
-        codec == THdfsCompression::ZSTD)) {
+        codec == THdfsCompression::ZSTD ||
+        codec == THdfsCompression::LZ4)) {
     stringstream ss;
     ss << "Invalid parquet compression codec " << Codec::GetCodecName(codec);
     return Status(ss.str());
   }
+
+  // Map parquet codecs to Impala codecs. Its important to do the above check before
+  // we do any mapping.
+  // Parquet supports codecs enumerated in parquet::CompressionCodec. Impala supports
+  // codecs enumerated in impala::THdfsCompression. In most cases, Impala codec and
+  // Parquet codec refer to the same codec. The only exception is LZ4. For Hadoop
+  // compatibility parquet::CompressionCodec::LZ4 refers to THdfsCompression::LZ4_BLOCKED
+  // and not THdfsCompression::LZ4. Hence, the following mapping and re-mapping to ensure
+  // that the input THdfsCompression::LZ4 codec gets mapped to
+  // THdfsCompression::LZ4_BLOCKED for parquet.
+  parquet::CompressionCodec::type parquet_codec = ConvertImpalaToParquetCodec(codec);
+  codec = ConvertParquetToImpalaCodec(parquet_codec);
+
   VLOG_FILE << "Using compression codec: " << codec;
   if (codec == THdfsCompression::ZSTD) {
     VLOG_FILE << "Using compression level: " << clevel;
@@ -999,45 +1034,55 @@ Status HdfsParquetTableWriter::Init() {
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = nullptr;
     const ColumnType& type = output_expr_evals_[i]->root().type();
+    const int num_clustering_cols = table_desc_->num_clustering_cols();
+    const string& col_name = table_desc_->col_descs()[i + num_clustering_cols].name();
     switch (type.type) {
       case TYPE_BOOLEAN:
-        writer = new BoolColumnWriter(this, output_expr_evals_[i], codec_info);
+        writer =
+          new BoolColumnWriter(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_TINYINT:
-        writer = new ColumnWriter<int8_t>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<int8_t>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_SMALLINT:
-        writer = new ColumnWriter<int16_t>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<int16_t>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_INT:
-        writer = new ColumnWriter<int32_t>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<int32_t>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_BIGINT:
-        writer = new ColumnWriter<int64_t>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<int64_t>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_FLOAT:
-        writer = new ColumnWriter<float>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<float>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_DOUBLE:
-        writer = new ColumnWriter<double>(this, output_expr_evals_[i], codec_info);
+        writer =
+          new ColumnWriter<double>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_TIMESTAMP:
         switch (state_->query_options().parquet_timestamp_type) {
           case TParquetTimestampType::INT96_NANOS:
             writer =
-                new ColumnWriter<TimestampValue>(this, output_expr_evals_[i], codec_info);
+                new ColumnWriter<TimestampValue>(
+                    this, output_expr_evals_[i], codec_info, col_name);
             break;
           case TParquetTimestampType::INT64_MILLIS:
             writer = new Int64MilliTimestampColumnWriter(
-                this, output_expr_evals_[i], codec_info);
+                this, output_expr_evals_[i], codec_info, col_name);
             break;
           case TParquetTimestampType::INT64_MICROS:
             writer = new Int64MicroTimestampColumnWriter(
-                this, output_expr_evals_[i], codec_info);
+                this, output_expr_evals_[i], codec_info, col_name);
             break;
           case TParquetTimestampType::INT64_NANOS:
             writer = new Int64NanoTimestampColumnWriter(
-                this, output_expr_evals_[i], codec_info);
+                this, output_expr_evals_[i], codec_info, col_name);
             break;
           default:
             DCHECK(false);
@@ -1046,28 +1091,33 @@ Status HdfsParquetTableWriter::Init() {
       case TYPE_VARCHAR:
       case TYPE_STRING:
       case TYPE_CHAR:
-        writer = new ColumnWriter<StringValue>(this, output_expr_evals_[i], codec_info);
+        writer = new ColumnWriter<StringValue>(
+            this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_DECIMAL:
         switch (output_expr_evals_[i]->root().type().GetByteSize()) {
           case 4:
             writer =
-                new ColumnWriter<Decimal4Value>(this, output_expr_evals_[i], codec_info);
+                new ColumnWriter<Decimal4Value>(
+                    this, output_expr_evals_[i], codec_info, col_name);
             break;
           case 8:
             writer =
-                new ColumnWriter<Decimal8Value>(this, output_expr_evals_[i], codec_info);
+                new ColumnWriter<Decimal8Value>(
+                    this, output_expr_evals_[i], codec_info, col_name);
             break;
           case 16:
             writer =
-                new ColumnWriter<Decimal16Value>(this, output_expr_evals_[i], codec_info);
+                new ColumnWriter<Decimal16Value>(
+                    this, output_expr_evals_[i], codec_info, col_name);
             break;
           default:
             DCHECK(false);
         }
         break;
       case TYPE_DATE:
-        writer = new ColumnWriter<DateValue>(this, output_expr_evals_[i], codec_info);
+        writer = new ColumnWriter<DateValue>(
+            this, output_expr_evals_[i], codec_info, col_name);
         break;
       default:
         DCHECK(false);
@@ -1080,8 +1130,6 @@ Status HdfsParquetTableWriter::Init() {
 }
 
 Status HdfsParquetTableWriter::CreateSchema() {
-  int num_clustering_cols = table_desc_->num_clustering_cols();
-
   // Create flattened tree with a single root.
   file_metadata_.schema.resize(columns_.size() + 1);
   file_metadata_.schema[0].__set_num_children(columns_.size());
@@ -1090,7 +1138,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::SchemaElement& col_schema = file_metadata_.schema[i + 1];
     const ColumnType& col_type = output_expr_evals_[i]->root().type();
-    col_schema.name = table_desc_->col_descs()[i + num_clustering_cols].name();
+    col_schema.name = columns_[i]->column_name();
     ParquetMetadataUtils::FillSchemaElement(col_type, state_->query_options(),
                                             &col_schema);
   }
@@ -1104,14 +1152,12 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   current_row_group_ = &file_metadata_.row_groups[file_metadata_.row_groups.size() - 1];
 
   // Initialize new row group metadata.
-  int num_clustering_cols = table_desc_->num_clustering_cols();
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::ColumnMetaData metadata;
     metadata.type = ParquetMetadataUtils::ConvertInternalToParquetType(
         columns_[i]->type().type, state_->query_options());
-    metadata.path_in_schema.push_back(
-        table_desc_->col_descs()[i + num_clustering_cols].name());
+    metadata.path_in_schema.push_back(columns_[i]->column_name());
     metadata.codec = columns_[i]->GetParquetCodec();
     current_row_group_->columns[i].__set_meta_data(metadata);
   }
@@ -1274,7 +1320,6 @@ Status HdfsParquetTableWriter::WriteFileHeader() {
 Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   if (current_row_group_ == nullptr) return Status::OK();
 
-  int num_clustering_cols = table_desc_->num_clustering_cols();
   for (int i = 0; i < columns_.size(); ++i) {
     int64_t data_page_offset, dict_page_offset;
     // Flush this column.  This updates the final metadata sizes for this column.
@@ -1295,7 +1340,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     current_row_group_->total_byte_size += col_writer->total_compressed_size();
     current_row_group_->num_rows = col_writer->num_values();
     current_row_group_->columns[i].file_offset = file_pos_;
-    const string& col_name = table_desc_->col_descs()[i + num_clustering_cols].name();
+    const string& col_name = col_writer->column_name();
     google::protobuf::Map<string,int64>* column_size_map =
         parquet_dml_stats_.mutable_per_column_size();
     (*column_size_map)[col_name] += col_writer->total_compressed_size();

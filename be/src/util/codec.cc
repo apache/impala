@@ -47,7 +47,7 @@ const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {GZIP_COMPRESSION, THdfsCompression::GZIP},
     {BZIP2_COMPRESSION, THdfsCompression::BZIP2},
     {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED},
-    {LZ4_COMPRESSION, THdfsCompression::LZ4},
+    {LZ4_COMPRESSION, THdfsCompression::LZ4_BLOCKED},
     {ZSTD_COMPRESSION, THdfsCompression::ZSTD}};
 
 string Codec::GetCodecName(THdfsCompression::type type) {
@@ -114,6 +114,9 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& c
       compressor->reset(new ZstandardCompressor(mem_pool, reuse,
           codec_info.compression_level_));
       break;
+    case THdfsCompression::LZ4_BLOCKED:
+      compressor->reset(new Lz4BlockCompressor(mem_pool, reuse));
+      break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);
       return Status(Substitute("Unsupported codec: $0", format));
@@ -162,6 +165,9 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
       break;
     case THdfsCompression::ZSTD:
       decompressor->reset(new ZstandardDecompressor(mem_pool, reuse));
+      break;
+    case THdfsCompression::LZ4_BLOCKED:
+      decompressor->reset(new Lz4BlockDecompressor(mem_pool, reuse));
       break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);

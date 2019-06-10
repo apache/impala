@@ -468,7 +468,7 @@ TEST(QueryOptions, CompressionCodec) {
 #define CASE(enumtype, enums) {ENTRIES(enumtype, BOOST_PP_TUPLE_TO_SEQ(enums))}
   TQueryOptions options;
   vector<THdfsCompression::type> codecs = CASE(THdfsCompression, (NONE, DEFAULT, GZIP,
-      DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB, ZSTD, BROTLI));
+      DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB, ZSTD, BROTLI, LZ4_BLOCKED));
   // Test valid values for compression_codec.
   for (auto& codec : codecs) {
     EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0",codec), &options,

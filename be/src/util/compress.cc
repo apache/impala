@@ -340,3 +340,48 @@ Status ZstandardCompressor::ProcessBlock(bool output_preallocated, int64_t input
   }
   return Status::OK();
 }
+
+Lz4BlockCompressor::Lz4BlockCompressor(MemPool* mem_pool, bool reuse_buffer)
+  : Codec(mem_pool, reuse_buffer) {
+}
+
+int64_t Lz4BlockCompressor::MaxOutputLen(int64_t input_length, const uint8_t* input) {
+  // Hadoop uses a block compression scheme. For more details look at the comments for
+  // the SnappyBlockCompressor implementation above.
+  // If input_length == 0 then only the input_length will be stored in the compressed
+  // block.
+  if (input_length == 0) { return sizeof(int32_t); }
+
+  // The length estimation includes upper bound on LZ4 compressed data for the given
+  // input_length and two int storage for uncompressed length and compressed
+  // length.
+  return LZ4_compressBound(input_length) + 2 * sizeof(int32_t);
+}
+
+Status Lz4BlockCompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
+    const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  DCHECK_GE(input_length, 0);
+  size_t length = MaxOutputLen(input_length, input);
+
+  CHECK(output_preallocated && length <= *output_length)
+    << " Output was not allocated for Lz4 Codec or is not sufficient."
+    << " output_preallocated " << output_preallocated << " length: " << length
+    << " output_length " << *output_length;
+
+  uint8_t* outp = *output;
+  ReadWriteUtil::PutInt(outp, static_cast<uint32_t>(input_length));
+  outp += sizeof(int32_t);
+  if (input_length > 0) {
+    uint8_t* sizep = outp;
+    outp += sizeof(int32_t);
+    const int64_t size = LZ4_compress_default(reinterpret_cast<const char*>(input),
+        reinterpret_cast<char*>(outp), input_length, *output_length - (outp - *output));
+    if (size == 0) { return Status(TErrorCode::LZ4_COMPRESS_DEFAULT_FAILED); }
+    ReadWriteUtil::PutInt(sizep, static_cast<uint32_t>(size));
+    outp += size;
+    DCHECK_LE(outp - *output, length);
+  }
+
+  *output_length = outp - *output;
+  return Status::OK();
+}

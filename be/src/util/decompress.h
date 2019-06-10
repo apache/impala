@@ -144,5 +144,19 @@ class ZstandardDecompressor : public Codec {
       uint8_t** output) override WARN_UNUSED_RESULT;
   virtual std::string file_extension() const override { return "zstd"; }
 };
+
+/// Hadoop's block compression scheme on top of LZ4.
+class Lz4BlockDecompressor : public Codec {
+ public:
+  virtual ~Lz4BlockDecompressor() { }
+  Lz4BlockDecompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "lz4"; }
+};
 }
 #endif
