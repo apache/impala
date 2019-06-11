@@ -31,8 +31,15 @@ CONFIG.update({
   # IMPALA-781: Impala doesn't support the default LazyBinaryColumnarSerde for RCFile.
   'hive.default.rcfile.serde': 'org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe',
 
-  'hive.metastore.client.connect.retry.delay': '0',
-  'hive.metastore.client.socket.timeout': '120',
+  # IMPALA-7154: Some of the HMS operations on S3 can take long time and any timeouts
+  # on the HMS Client side can result in flaky test failures
+  # Following configuration specifies the time in seconds between successive retry
+  # attempts by metastore client in case of failures. By default, metastore client
+  # retries once based on the config value of hive.metastore.failure.retries
+  'hive.metastore.client.connect.retry.delay': '1',
+  # set the metastore client timeout to 10 min
+  'hive.metastore.client.socket.timeout': '600',
+
   'hive.metastore.uris': 'thrift://${INTERNAL_LISTEN_HOST}:9083',
   'hive.metastore.warehouse.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse',
 
