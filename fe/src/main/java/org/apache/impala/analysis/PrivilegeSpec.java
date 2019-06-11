@@ -201,9 +201,9 @@ public class PrivilegeSpec extends StmtNode {
         try {
           analyzer.getDb(dbName_, true);
         } catch (AnalysisException e) {
-          throw new AnalysisException(String.format("Error setting privileges for " +
-              "database '%s'. Verify that the database exists and that you have " +
-              "permissions to issue a GRANT/REVOKE statement.", dbName_));
+          throw new AnalysisException(String.format("Error setting/showing privileges " +
+              "for database '%s'. Verify that the database exists and that you have " +
+              "permissions to issue a GRANT/REVOKE/SHOW GRANT statement.", dbName_));
         }
         break;
       case URI:
@@ -252,9 +252,9 @@ public class PrivilegeSpec extends StmtNode {
     for (String columnName: columnNames_) {
       if (table.getColumn(columnName) == null) {
         // The error message should not reveal the existence or absence of a column.
-        throw new AnalysisException(String.format("Error setting column-level " +
+        throw new AnalysisException(String.format("Error setting/showing column-level " +
             "privileges for table '%s'. Verify that both table and columns exist " +
-            "and that you have permissions to issue a GRANT/REVOKE statement.",
+            "and that you have permissions to issue a GRANT/REVOKE/SHOW GRANT statement.",
             tableName_.toString()));
       }
     }
@@ -284,9 +284,9 @@ public class PrivilegeSpec extends StmtNode {
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     } catch (AnalysisException e) {
-      throw new AnalysisException(String.format("Error setting privileges for " +
+      throw new AnalysisException(String.format("Error setting/showing privileges for " +
           "table '%s'. Verify that the table exists and that you have permissions " +
-          "to issue a GRANT/REVOKE statement.", tableName_.toString()));
+          "to issue a GRANT/REVOKE/SHOW GRANT statement.", tableName_.toString()));
     }
     Preconditions.checkNotNull(table);
     return table;

@@ -115,6 +115,20 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
           "Authorization is not enabled.");
       AnalysisError("SHOW GRANT ROLE myRole ON SERVER", authDisabledCtx,
           "Authorization is not enabled.");
+
+      // Database, table, and column do not exist.
+      AnalysisError(String.format("SHOW GRANT %s on DATABASE foo", type),
+          "Error setting/showing privileges for database 'foo'. " +
+              "Verify that the database exists and that you have permissions to issue " +
+              "a GRANT/REVOKE/SHOW GRANT statement.");
+      AnalysisError(String.format("SHOW GRANT %s on TABLE foo.bar", type),
+          "Error setting/showing privileges for table 'foo.bar'. Verify that the " +
+              "table exists and that you have permissions to issue a " +
+              "GRANT/REVOKE/SHOW GRANT statement.");
+      AnalysisError(String.format("SHOW GRANT %s on COLUMN foo.bar.baz", type),
+          "Error setting/showing privileges for table 'foo.bar'. Verify that the " +
+              "table exists and that you have permissions to issue a " +
+              "GRANT/REVOKE/SHOW GRANT statement.");
     }
 
     // Determining if a user exists on the system is done in the AuthorizationPolicy and
@@ -173,13 +187,13 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format("%s ALL ON URI 'xxxx:////abc//123' %s %s",
             formatArgs), "No FileSystem for scheme: xxxx");
         AnalysisError(String.format("%s ALL ON DATABASE does_not_exist %s %s",
-            formatArgs), "Error setting privileges for database 'does_not_exist'. " +
-            "Verify that the database exists and that you have permissions to issue " +
-            "a GRANT/REVOKE statement.");
+            formatArgs), "Error setting/showing privileges for " +
+            "database 'does_not_exist'. Verify that the database exists and that you " +
+            "have permissions to issue a GRANT/REVOKE/SHOW GRANT statement.");
         AnalysisError(String.format("%s ALL ON TABLE does_not_exist %s %s",
-            formatArgs), "Error setting privileges for table 'does_not_exist'. " +
+            formatArgs), "Error setting/showing privileges for table 'does_not_exist'. " +
             "Verify that the table exists and that you have permissions to issue " +
-            "a GRANT/REVOKE statement.");
+            "a GRANT/REVOKE/SHOW GRANT statement.");
         AnalysisError(String.format("%s ALL ON SERVER does_not_exist %s %s",
             formatArgs), "Specified server name 'does_not_exist' does not match the " +
             "configured server name 'server1'");
@@ -237,14 +251,15 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
             "are allowed in a column privilege spec.");
         // Columns/table that don't exist
         AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
-            "functional.alltypes %s %s", formatArgs), "Error setting column-level " +
-            "privileges for table 'functional.alltypes'. Verify that both table and " +
-            "columns exist and that you have permissions to issue a GRANT/REVOKE " +
-            "statement.");
+            "functional.alltypes %s %s", formatArgs), "Error setting/showing " +
+            "column-level privileges for table 'functional.alltypes'. Verify that " +
+            "both table and columns exist and that you have permissions to issue a " +
+            "GRANT/REVOKE/SHOW GRANT statement.");
         AnalysisError(String.format("%s SELECT (id, int_col) ON TABLE " +
-            "functional.does_not_exist %s %s", formatArgs), "Error setting " +
+            "functional.does_not_exist %s %s", formatArgs), "Error setting/showing " +
             "privileges for table 'functional.does_not_exist'. Verify that the table " +
-            "exists and that you have permissions to issue a GRANT/REVOKE statement.");
+            "exists and that you have permissions to issue a " +
+            "GRANT/REVOKE/SHOW GRANT statement.");
 
         // REFRESH privilege
         AnalyzesOk(String.format(
