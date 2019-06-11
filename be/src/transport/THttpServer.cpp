@@ -41,39 +41,41 @@ using namespace std;
 using strings::Substitute;
 
 THttpServerTransportFactory::THttpServerTransportFactory(const std::string server_name,
-    impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos)
+    impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies)
   : has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
+    use_cookies_(use_cookies),
     metrics_enabled_(metrics != nullptr) {
   if (metrics_enabled_) {
     if (has_ldap_) {
-      total_basic_auth_success_ =
+      http_metrics_.total_basic_auth_success_ =
           metrics->AddCounter(Substitute("$0.total-basic-auth-success", server_name), 0);
-      total_basic_auth_failure_ =
+      http_metrics_.total_basic_auth_failure_ =
           metrics->AddCounter(Substitute("$0.total-basic-auth-failure", server_name), 0);
     }
     if (has_kerberos_) {
-      total_negotiate_auth_success_ = metrics->AddCounter(
+      http_metrics_.total_negotiate_auth_success_ = metrics->AddCounter(
           Substitute("$0.total-negotiate-auth-success", server_name), 0);
-      total_negotiate_auth_failure_ = metrics->AddCounter(
+      http_metrics_.total_negotiate_auth_failure_ = metrics->AddCounter(
           Substitute("$0.total-negotiate-auth-failure", server_name), 0);
+    }
+    if (use_cookies_) {
+      http_metrics_.total_cookie_auth_success_ =
+          metrics->AddCounter(Substitute("$0.total-cookie-auth-success", server_name), 0);
+      http_metrics_.total_cookie_auth_failure_ =
+          metrics->AddCounter(Substitute("$0.total-cookie-auth-failure", server_name), 0);
     }
   }
 }
 
 THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap,
-    bool has_kerberos, bool metrics_enabled, impala::IntCounter* total_basic_auth_success,
-    impala::IntCounter* total_basic_auth_failure,
-    impala::IntCounter* total_negotiate_auth_success,
-    impala::IntCounter* total_negotiate_auth_failure)
+    bool has_kerberos, bool use_cookies, bool metrics_enabled, HttpMetrics* http_metrics)
   : THttpTransport(transport),
     has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
+    use_cookies_(use_cookies),
     metrics_enabled_(metrics_enabled),
-    total_basic_auth_success_(total_basic_auth_success),
-    total_basic_auth_failure_(total_basic_auth_failure),
-    total_negotiate_auth_success_(total_negotiate_auth_success),
-    total_negotiate_auth_failure_(total_negotiate_auth_failure) {}
+    http_metrics_(http_metrics) {}
 
 THttpServer::~THttpServer() {
 }
@@ -106,6 +108,8 @@ void THttpServer::parseHeader(char* header) {
   } else if ((has_ldap_ || has_kerberos_)
       && THRIFT_strncasecmp(header, "Authorization", sz) == 0) {
     auth_value_ = string(value);
+  } else if (use_cookies_ && THRIFT_strncasecmp(header, "Cookie", sz) == 0) {
+    cookie_value_ = string(value);
   }
 }
 
@@ -168,49 +172,68 @@ void THttpServer::headersDone() {
     return;
   }
 
-  // Determine what type of auth header we got.
-  StripWhiteSpace(&auth_value_);
-  string stripped_basic_auth_token;
-  bool got_basic_auth =
-      TryStripPrefixString(auth_value_, "Basic ", &stripped_basic_auth_token);
-  string basic_auth_token = got_basic_auth ? move(stripped_basic_auth_token) : "";
-  string stripped_negotiate_auth_token;
-  bool got_negotiate_auth =
-      TryStripPrefixString(auth_value_, "Negotiate ", &stripped_negotiate_auth_token);
-  string negotiate_auth_token =
-      got_negotiate_auth ? move(stripped_negotiate_auth_token) : "";
-  // We can only have gotten one type of auth header.
-  DCHECK(!got_basic_auth || !got_negotiate_auth);
-
-  // For each auth type we support, we call the auth callback if the didn't get a header
-  // of the other auth type or if the other auth type isn't supported. This way, if a
-  // client select a supported auth method, they'll only get return headers for that
-  // method, but if they didn't specify a valid auth method or they didn't provide a
-  // 'Authorization' header at all, they'll get back 'WWW-Authenticate' return headers for
-  // all supported auth types.
   bool authorized = false;
-  if (has_ldap_ && (!got_negotiate_auth || !has_kerberos_)) {
-    if (callbacks_.basic_auth_fn(basic_auth_token)) {
+  // Try authenticating with cookies first.
+  if (use_cookies_ && !cookie_value_.empty()) {
+    StripWhiteSpace(&cookie_value_);
+    if (callbacks_.cookie_auth_fn(cookie_value_)) {
       authorized = true;
-      if (metrics_enabled_) total_basic_auth_success_->Increment(1);
-    } else {
-      if (got_basic_auth && metrics_enabled_) total_basic_auth_failure_->Increment(1);
+      if (metrics_enabled_) http_metrics_->total_cookie_auth_success_->Increment(1);
+    } else if (metrics_enabled_) {
+      http_metrics_->total_cookie_auth_failure_->Increment(1);
     }
   }
-  if (has_kerberos_ && (!got_basic_auth || !has_ldap_)) {
-    bool is_complete;
-    if (callbacks_.negotiate_auth_fn(negotiate_auth_token, &is_complete)) {
-      // If 'is_complete' is false we want to return a 401.
-      authorized = is_complete;
-      if (is_complete && metrics_enabled_) total_negotiate_auth_success_->Increment(1);
-    } else {
-      if (got_negotiate_auth && metrics_enabled_) {
-        total_negotiate_auth_failure_->Increment(1);
+
+  // If cookie auth wasn't successful, try to auth with the 'Authorization' header.
+  if (!authorized) {
+    // Determine what type of auth header we got.
+    StripWhiteSpace(&auth_value_);
+    string stripped_basic_auth_token;
+    bool got_basic_auth =
+        TryStripPrefixString(auth_value_, "Basic ", &stripped_basic_auth_token);
+    string basic_auth_token = got_basic_auth ? move(stripped_basic_auth_token) : "";
+    string stripped_negotiate_auth_token;
+    bool got_negotiate_auth =
+        TryStripPrefixString(auth_value_, "Negotiate ", &stripped_negotiate_auth_token);
+    string negotiate_auth_token =
+        got_negotiate_auth ? move(stripped_negotiate_auth_token) : "";
+    // We can only have gotten one type of auth header.
+    DCHECK(!got_basic_auth || !got_negotiate_auth);
+
+    // For each auth type we support, we call the auth callback if the didn't get a header
+    // of the other auth type or if the other auth type isn't supported. This way, if a
+    // client select a supported auth method, they'll only get return headers for that
+    // method, but if they didn't specify a valid auth method or they didn't provide a
+    // 'Authorization' header at all, they'll get back 'WWW-Authenticate' return headers
+    // for all supported auth types.
+    if (has_ldap_ && (!got_negotiate_auth || !has_kerberos_)) {
+      if (callbacks_.basic_auth_fn(basic_auth_token)) {
+        authorized = true;
+        if (metrics_enabled_) http_metrics_->total_basic_auth_success_->Increment(1);
+      } else {
+        if (got_basic_auth && metrics_enabled_) {
+          http_metrics_->total_basic_auth_failure_->Increment(1);
+        }
+      }
+    }
+    if (has_kerberos_ && (!got_basic_auth || !has_ldap_)) {
+      bool is_complete;
+      if (callbacks_.negotiate_auth_fn(negotiate_auth_token, &is_complete)) {
+        // If 'is_complete' is false we want to return a 401.
+        authorized = is_complete;
+        if (is_complete && metrics_enabled_) {
+          http_metrics_->total_negotiate_auth_success_->Increment(1);
+        }
+      } else {
+        if (got_negotiate_auth && metrics_enabled_) {
+          http_metrics_->total_negotiate_auth_failure_->Increment(1);
+        }
       }
     }
   }
 
   auth_value_ = "";
+  cookie_value_ = "";
   if (!authorized) {
     returnUnauthorized();
     throw TTransportException("HTTP auth failed.");

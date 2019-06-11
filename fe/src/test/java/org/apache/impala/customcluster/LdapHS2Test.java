@@ -105,6 +105,16 @@ public class LdapHS2Test {
     assertEquals(expectedBasicAuthFailure, actualBasicAuthFailure);
   }
 
+  private void verifyCookieMetrics(
+      long expectedCookieAuthSuccess, long expectedCookieAuthFailure) throws Exception {
+    long actualCookieAuthSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
+    assertEquals(expectedCookieAuthSuccess, actualCookieAuthSuccess);
+    long actualCookieAuthFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
+    assertEquals(expectedCookieAuthFailure, actualCookieAuthFailure);
+  }
+
   /**
    * Tests LDAP authentication to the HTTP hiveserver2 endpoint.
    */
@@ -166,18 +176,67 @@ public class LdapHS2Test {
     // - invalid base64 encoded value
     // - Invalid mechanism
     int numFailures = 0;
-    for (String authStr : new String[] {"Basic VGVzdDJMZGFwOjEyMzQ1",
-             "Basic invalid-base64", "Negotiate VGVzdDFMZGFwOjEyMzQ1"}) {
+    for (String authStr :
+        new String[] {"Basic VGVzdDJMZGFwOjEyMzQ1", "Basic invalid-base64"}) {
       // Attempt to authenticate with an invalid password.
       headers.put("Authorization", authStr);
       transport.setCustomHeaders(headers);
       try {
         TOpenSessionReq openReq3 = new TOpenSessionReq();
         TOpenSessionResp openResp3 = client.OpenSession(openReq);
-        ++numFailures;
-        verifyMetrics(8, numFailures);
         fail("Exception exception.");
       } catch (Exception e) {
+        ++numFailures;
+        verifyMetrics(8, numFailures);
+        assertEquals(e.getMessage(), "HTTP Response code: 401");
+      }
+    }
+
+    // Attempt to authenticate with a different mechanism. SHould fail, but won't
+    // increment the total-basic-auth-failure metric because its not considered a 'Basic'
+    // auth attempt.
+    headers.put("Authorization", "Negotiate VGVzdDFMZGFwOjEyMzQ1");
+    transport.setCustomHeaders(headers);
+    try {
+      TOpenSessionReq openReq3 = new TOpenSessionReq();
+      TOpenSessionResp openResp3 = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      verifyMetrics(8, numFailures);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+
+    // Attempt to authenticate with a bad cookie and valid user/password, should succeed.
+    headers.put("Authorization", "Basic VGVzdDJMZGFwOmFiY2Rl");
+    headers.put("Cookie", "invalid-cookie");
+    transport.setCustomHeaders(headers);
+    TOpenSessionReq openReq4 = new TOpenSessionReq();
+    TOpenSessionResp openResp4 = client.OpenSession(openReq);
+    // We should see one more successful connection and one failed cookie attempt.
+    verifyMetrics(9, numFailures);
+    int numCookieFailures = 1;
+    verifyCookieMetrics(0, numCookieFailures);
+
+    // Attempt to authenticate with no username/password and some bad cookies.
+    headers.remove("Authorization");
+    String[] badCookies = new String[] {
+        "invalid-format", // invalid cookie format
+        "x&impala&0&0", // signature value that is invalid base64
+        "eA==&impala&0&0", // signature decodes to an incorrect length
+        "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=&impala&0&0" // incorrect signature
+    };
+    for (String cookieStr : badCookies) {
+      headers.put("Cookie", "impala.hs2.auth=" + cookieStr);
+      transport.setCustomHeaders(headers);
+      try {
+        TOpenSessionReq openReq5 = new TOpenSessionReq();
+        TOpenSessionResp openResp5 = client.OpenSession(openReq);
+        fail("Exception exception from cookie: " + cookieStr);
+      } catch (Exception e) {
+        // We should see both another failed cookie attempt.
+        ++numCookieFailures;
+        verifyMetrics(9, numFailures);
+        verifyCookieMetrics(0, numCookieFailures);
         assertEquals(e.getMessage(), "HTTP Response code: 401");
       }
     }

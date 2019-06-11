@@ -24,6 +24,7 @@
 
 #include "common/status.h"
 #include "rpc/thrift-server.h"
+#include "util/openssl-util.h"
 #include "util/promise.h"
 
 namespace sasl { class TSasl; }
@@ -168,6 +169,9 @@ class SecureAuthProvider : public AuthProvider {
   /// we're an auth provider for an "internal" connection, because we may
   /// function as a client.
   bool needs_kinit_;
+
+  /// Used to generate and verify signatures for cookies.
+  AuthenticationHash hash_;
 
   /// One-time kerberos-specific environment variable setup.  Called by InitKerberos().
   Status InitKerberosEnv() WARN_UNUSED_RESULT;

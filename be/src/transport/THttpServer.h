@@ -27,8 +27,26 @@ namespace apache {
 namespace thrift {
 namespace transport {
 
+struct HttpMetrics {
+  // If 'has_ldap_' is true, metrics for the number of successful and failed Basic
+  // auth attempts.
+  impala::IntCounter* total_basic_auth_success_ = nullptr;
+  impala::IntCounter* total_basic_auth_failure_ = nullptr;
+
+  // If 'has_kerberos_' is true, metrics for the number of successful and failed Negotiate
+  // auth attempts.
+  impala::IntCounter* total_negotiate_auth_success_ = nullptr;
+  impala::IntCounter* total_negotiate_auth_failure_ = nullptr;
+
+  // If 'use_cookies_' is true, metrics for the number of successful and failed cookie
+  // auth attempts.
+  impala::IntCounter* total_cookie_auth_success_ = nullptr;
+  impala::IntCounter* total_cookie_auth_failure_ = nullptr;
+};
+
 /*
- * Implements server side work for http connections, including support for BASIC auth.
+ * Implements server side work for http connections, including support for Basic auth,
+ * SPNEGO, and cookies.
  */
 class THttpServer : public THttpTransport {
 public:
@@ -54,13 +72,15 @@ public:
     // 'err_msg' if an error is encountered.
     std::function<bool(const std::string& path, std::string* err_msg)> path_fn =
         [&](const std::string&, std::string*) { return true; };
+
+    // Function that takes the value from the 'Cookie' header and returns true if
+    // authentication is successful.
+    std::function<bool(const std::string&)> cookie_auth_fn =
+        [&](const std::string&) { return false; };
   };
 
   THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
-      bool metrics_enabled, impala::IntCounter* total_basic_auth_success,
-      impala::IntCounter* total_basic_auth_failure,
-      impala::IntCounter* total_negotiate_auth_success,
-      impala::IntCounter* total_negotiate_auth_failure);
+      bool use_cookies, bool metrics_enabled, HttpMetrics* http_metrics);
 
   virtual ~THttpServer();
 
@@ -90,12 +110,15 @@ protected:
   // The value from the 'Authorization' header.
   std::string auth_value_ = "";
 
-  // Metrics
-  bool metrics_enabled_;
-  impala::IntCounter* total_basic_auth_success_ = nullptr;
-  impala::IntCounter* total_basic_auth_failure_ = nullptr;
-  impala::IntCounter* total_negotiate_auth_success_ = nullptr;
-  impala::IntCounter* total_negotiate_auth_failure_ = nullptr;
+  // If true, the value of any 'Cookie' header will be passed to 'cookie_auth_fn' to
+  // attempt to authenticate before calling other auth functions.
+  bool use_cookies_ = false;
+
+  // The value from the 'Cookie' header.
+  std::string cookie_value_ = "";
+
+  bool metrics_enabled_ = false;
+  HttpMetrics* http_metrics_ = nullptr;
 };
 
 /**
@@ -106,34 +129,23 @@ public:
  THttpServerTransportFactory() {}
 
  THttpServerTransportFactory(const std::string server_name, impala::MetricGroup* metrics,
-     bool has_ldap, bool has_kerberos);
+     bool has_ldap, bool has_kerberos, bool use_cookies);
 
  virtual ~THttpServerTransportFactory() {}
 
- /**
-  * Wraps the transport into a buffered one.
-  */
  virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
-   return boost::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
-       metrics_enabled_, total_basic_auth_success_, total_basic_auth_failure_,
-       total_negotiate_auth_success_, total_negotiate_auth_failure_));
+   return boost::shared_ptr<TTransport>(new THttpServer(
+       trans, has_ldap_, has_kerberos_, use_cookies_, metrics_enabled_, &http_metrics_));
   }
 
  private:
   bool has_ldap_ = false;
   bool has_kerberos_ = false;
+  bool use_cookies_ = false;
 
+  // Metrics for every transport produced by this factory.
   bool metrics_enabled_ = false;
-
-  // If 'has_ldap_' is true, metrics for the number of successful and failed Basic
-  // auth ettempts for every transport produced by this factory.
-  impala::IntCounter* total_basic_auth_success_ = nullptr;
-  impala::IntCounter* total_basic_auth_failure_ = nullptr;
-
-  // If 'has_kerberos_' is true, metrics for the number of successful and failed Negotiate
-  // auth ettempts for every transport produced by this factory.
-  impala::IntCounter* total_negotiate_auth_success_ = nullptr;
-  impala::IntCounter* total_negotiate_auth_failure_ = nullptr;
+  HttpMetrics http_metrics_;
 };
 }
 }

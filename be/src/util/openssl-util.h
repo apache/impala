@@ -80,6 +80,30 @@ class IntegrityHash {
   uint8_t hash_[SHA256_DIGEST_LENGTH];
 };
 
+/// Stores a random key that it can use to calculate and verify HMACs of data buffers for
+/// authentication, eg. checking signatures of cookies. A SHA256 hash is used internally.
+class AuthenticationHash {
+ public:
+  AuthenticationHash();
+
+  /// Computes the HMAC of 'data', which has length 'len', and stores it in 'out', which
+  /// must already be allocated with a length of HashLen() bytes. Returns an error if
+  /// computing the hash was unsuccessful.
+  Status Compute(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
+
+  /// Computes the HMAC of 'data', which has length 'len', and returns true if it matches
+  /// 'signature', which is expected to have length HashLen().
+  bool Verify(const uint8_t* data, int64_t len,
+      const uint8_t* signature) const WARN_UNUSED_RESULT;
+
+  /// Returns the length in bytes of the generated hashes. Currently we always use SHA256.
+  static int HashLen() { return SHA256_DIGEST_LENGTH; }
+
+ private:
+  /// An AES 256-bit key.
+  uint8_t key_[SHA256_DIGEST_LENGTH];
+};
+
 /// The key and initialization vector (IV) required to encrypt and decrypt a buffer of
 /// data. This should be regenerated for each buffer of data.
 ///

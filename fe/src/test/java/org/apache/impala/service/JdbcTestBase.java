@@ -65,18 +65,20 @@ public abstract class JdbcTestBase {
       dropTestTable(tableName);
     }
 
-    con_.close();
-    assertTrue("Connection should be closed", con_.isClosed());
+    if (con_ != null) {
+      con_.close();
+      assertTrue("Connection should be closed", con_.isClosed());
 
-    Exception expectedException = null;
-    try {
-      con_.createStatement();
-    } catch (Exception e) {
-      expectedException = e;
+      Exception expectedException = null;
+      try {
+        con_.createStatement();
+      } catch (Exception e) {
+        expectedException = e;
+      }
+
+      assertNotNull("createStatement() on closed connection should throw exception",
+          expectedException);
     }
-
-    assertNotNull("createStatement() on closed connection should throw exception",
-        expectedException);
   }
 
   protected static Connection createConnection(String connStr) throws Exception {

@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import com.google.common.collect.Range;
 import org.apache.directory.server.core.annotations.CreateDS;
 import org.apache.directory.server.core.annotations.CreatePartition;
 import org.apache.directory.server.annotations.CreateLdapServer;
@@ -33,7 +34,8 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.ImpalaJdbcClient;
-import org.junit.After;
+import org.apache.impala.util.Metrics;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -56,31 +58,60 @@ public class LdapJdbcTest extends JdbcTestBase {
   private static final String testUser_ = "Test1Ldap";
   private static final String testPassword_ = "12345";
 
+  private static final Range<Long> zero = Range.closed(0L, 0L);
+  private static final Range<Long> one = Range.closed(1L, 1L);
+
+  Metrics metrics = new Metrics();
+
   public LdapJdbcTest(String connectionType) { super(connectionType); }
 
-  @Before
-  public void setUp() throws Exception {
+  public void setUp(String extraArgs) throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
-    String ldapArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
-        + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok", uri, dn);
-    int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
+    String impalaArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
+        + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok %s", uri, dn, extraArgs);
+    int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs);
     assertEquals(ret, 0);
 
     con_ = createConnection(
         ImpalaJdbcClient.getLdapConnectionStr(connectionType_, testUser_, testPassword_));
+    if (connectionType_.equals("http")) {
+      // There should have been one successful connection auth to create the session.
+      verifyMetrics(one, zero, zero, zero);
+    }
   }
 
-  @After
-  public void cleanUp() throws Exception {
-    super.cleanUp();
-    CustomClusterRunner.StartImpalaCluster();
+  private void verifyMetrics(Range<Long> expectedBasicSuccess,
+      Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
+      Range<Long> expectedCookieFailure) throws Exception {
+    long actualBasicSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
+    assertTrue("Expected: " + expectedBasicSuccess + ", Actual: " + actualBasicSuccess,
+        expectedBasicSuccess.contains(actualBasicSuccess));
+    long actualBasicFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
+    assertTrue("Expected: " + expectedBasicFailure + ", Actual: " + actualBasicFailure,
+        expectedBasicFailure.contains(actualBasicFailure));
+
+    long actualCookieSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
+    assertTrue("Expected: " + expectedCookieSuccess + ", Actual: " + actualCookieSuccess,
+        expectedCookieSuccess.contains(actualCookieSuccess));
+    long actualCookieFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
+    assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
+        expectedCookieFailure.contains(actualCookieFailure));
   }
 
   @Test
   public void testLoggedInUser() throws Exception {
+    setUp("");
     ResultSet rs = con_.createStatement().executeQuery("select logged_in_user() user");
+    if (connectionType_.equals("http")) {
+      // After the initial auth, the driver should use cookies for all other requests.
+      verifyMetrics(one, zero, Range.atLeast(1L), zero);
+    }
     assertTrue(rs.next());
     assertEquals(rs.getString("user"), testUser_);
     assertFalse(rs.next());
@@ -88,6 +119,7 @@ public class LdapJdbcTest extends JdbcTestBase {
 
   @Test
   public void testFailedConnection() throws Exception {
+    setUp("");
     try {
       Connection con = createConnection(ImpalaJdbcClient.getLdapConnectionStr(
           connectionType_, testUser_, "invalid-password"));
@@ -102,6 +134,23 @@ public class LdapJdbcTest extends JdbcTestBase {
       fail("Connecting with an invalid user name should throw an error.");
     } catch (SQLException e) {
       assertTrue(e.getMessage().contains("Could not open client transport"));
+    }
+  }
+
+  @Test
+  public void testExpireCookies() throws Exception {
+    if (connectionType_.equals("http")) {
+      setUp("--max_cookie_lifetime_s=1");
+      // Sleep long enough for the cookie returned in the initial connection to expire.
+      Thread.sleep(2000);
+      ResultSet rs = con_.createStatement().executeQuery("select logged_in_user() user");
+      // The driver should have supplied an incorrect cookie at least once, requiring at
+      // least one more auth to LDAP. There may also have been some successful cookie
+      // attempts, depending on timing.
+      verifyMetrics(Range.atLeast(2L), zero, Range.atLeast(0L), Range.atLeast(1L));
+      assertTrue(rs.next());
+      assertEquals(rs.getString("user"), testUser_);
+      assertFalse(rs.next());
     }
   }
 }

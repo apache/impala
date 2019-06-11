@@ -28,6 +28,7 @@ set_source_files_properties(${RPC_TEST_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(Rpc
   authentication.cc
   ${COMMON_PROTO_SRCS}
+  cookie-util.cc
   impala-service-pool.cc
   rpc-mgr.cc
   rpc-trace.cc

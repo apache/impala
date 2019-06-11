@@ -1141,6 +1141,26 @@
     "kind": "COUNTER",
     "key": "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure"
   },
+    {
+    "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that were successfully authenticated using a cookie.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API Connection Cookie Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success"
+  },
+  {
+    "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that provided an invalid cookie.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API Connection Cookie Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure"
+  },
   {
     "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that were successfully authenticated with Kerberos",
     "contexts": [

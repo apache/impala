@@ -156,6 +156,37 @@ bool IntegrityHash::Verify(const uint8_t* data, int64_t len) const {
   return memcmp(hash_, test_hash.hash_, sizeof(hash_)) == 0;
 }
 
+AuthenticationHash::AuthenticationHash() {
+  uint64_t next_key_num = keys_generated.Add(1);
+  if (next_key_num % RNG_RESEED_INTERVAL == 0) {
+    SeedOpenSSLRNG();
+  }
+  RAND_bytes(key_, sizeof(key_));
+}
+
+Status AuthenticationHash::Compute(const uint8_t* data, int64_t len, uint8_t* out) const {
+  uint32_t out_len;
+  uint8_t* result =
+      HMAC(EVP_sha256(), key_, SHA256_DIGEST_LENGTH, data, len, out, &out_len);
+  if (result == nullptr) {
+    return OpenSSLErr("HMAC", "computing");
+  }
+  DCHECK_EQ(out_len, HashLen());
+  DCHECK_EQ(ERR_peek_error(), 0) << "Did not clear OpenSSL error queue";
+  return Status::OK();
+}
+
+bool AuthenticationHash::Verify(
+    const uint8_t* data, int64_t len, const uint8_t* signature) const {
+  uint8_t out[HashLen()];
+  Status compute_status = Compute(data, len, out);
+  if (!compute_status.ok()) {
+    LOG(ERROR) << "Failed to compute hash for verification: " << compute_status;
+    return false;
+  }
+  return memcmp(signature, out, HashLen()) == 0;
+}
+
 void EncryptionKey::InitializeRandom() {
   uint64_t next_key_num = keys_generated.Add(1);
   if (next_key_num % RNG_RESEED_INTERVAL == 0) {

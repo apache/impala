@@ -44,6 +44,7 @@
 #include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"
 #include "rpc/auth-provider.h"
+#include "rpc/cookie-util.h"
 #include "rpc/thrift-server.h"
 #include "transport/THttpServer.h"
 #include "transport/TSaslClientTransport.h"
@@ -82,6 +83,8 @@ DECLARE_string(krb5_debug_file);
 
 // Defined in kudu/security/init.cc
 DECLARE_bool(use_system_auth_to_local);
+
+DECLARE_int64(max_cookie_lifetime_s);
 
 DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
@@ -500,8 +503,8 @@ static int SaslGetPath(void* context, const char** path) {
   return SASL_OK;
 }
 
-bool BasicAuth(
-    ThriftServer::ConnectionContext* connection_context, const std::string& base64) {
+bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const std::string& base64) {
   if (base64.empty()) {
     connection_context->return_headers.push_back("WWW-Authenticate: Basic");
     return false;
@@ -526,6 +529,9 @@ bool BasicAuth(
   if (ret) {
     // Authenication was successful, so set the username on the connection.
     connection_context->username = username;
+    // Create a cookie to return.
+    connection_context->return_headers.push_back(
+        Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
     return true;
   }
   connection_context->return_headers.push_back("WWW-Authenticate: Basic");
@@ -538,7 +544,7 @@ bool BasicAuth(
 // 'is_complete' to indicate if more steps are needed. Returns false if an error was
 // encountered and the connection should be closed.
 bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
-    const std::string& header_token, bool* is_complete) {
+    const AuthenticationHash& hash, const std::string& header_token, bool* is_complete) {
   std::string token;
   // Note: according to RFC 2616, the correct format for the header is:
   // 'Authorization: Negotiate <token>'. However, beeline incorrectly adds an additional
@@ -565,6 +571,9 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
       } else {
         // Authentication was successful, so set the username on the connection.
         connection_context->username = username;
+        // Create a cookie to return.
+        connection_context->return_headers.push_back(
+            Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
       }
     }
   } else {
@@ -954,8 +963,9 @@ Status SecureAuthProvider::GetServerTransportFactory(
 
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
-    factory->reset(
-        new THttpServerTransportFactory(server_name, metrics, has_ldap_, has_kerberos));
+    bool use_cookies = FLAGS_max_cookie_lifetime_s > 0;
+    factory->reset(new THttpServerTransportFactory(
+        server_name, metrics, has_ldap_, has_kerberos, use_cookies));
     return Status::OK();
   }
 
@@ -1047,13 +1057,15 @@ void SecureAuthProvider::SetupConnectionContext(
       callbacks.path_fn = std::bind(
           HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
+      callbacks.cookie_auth_fn = std::bind(
+          AuthenticateCookie, connection_ptr.get(), hash_, std::placeholders::_1);
       if (has_ldap_) {
         callbacks.basic_auth_fn =
-            std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1);
+            std::bind(BasicAuth, connection_ptr.get(), hash_, std::placeholders::_1);
       }
       if (!principal_.empty()) {
         callbacks.negotiate_auth_fn = std::bind(NegotiateAuth, connection_ptr.get(),
-            std::placeholders::_1, std::placeholders::_2);
+            hash_, std::placeholders::_1, std::placeholders::_2);
       }
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
