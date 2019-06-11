@@ -62,6 +62,13 @@ class UnionPlanNode : public PlanNode {
   /// materialized.
   int first_materialized_child_idx_ = -1;
 
+  /// Number of const scalar expressions which will be codegened.
+  /// This is only used for observability.
+  int64_t num_const_scalar_expr_to_be_codegened_ = 0;
+
+  /// Set as TRUE if codegen status is added.
+  bool is_codegen_status_added_ = false;
+
   typedef void (*UnionMaterializeBatchFn)(UnionNode*, RowBatch*, uint8_t**);
   /// Vector of pointers to codegen'ed MaterializeBatch functions. The vector contains one
   /// function for each child. The size of the vector should be equal to the number of
@@ -104,6 +111,12 @@ class UnionNode : public ExecNode {
   /// 0 when all children are materialized, 'children_.size()' when no children are
   /// materialized.
   const int first_materialized_child_idx_;
+
+  /// Number of const scalar expressions which will be codegened.
+  const int64_t num_const_scalar_expr_to_be_codegened_;
+
+  /// Reference to UnionPlanNode::is_codegen_status_added_.
+  const bool& is_codegen_status_added_;
 
   /// Const exprs materialized by this node. These exprs don't refer to any children.
   /// Only materialized by the first fragment instance to avoid duplication.

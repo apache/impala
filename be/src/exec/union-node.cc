@@ -41,6 +41,8 @@ Status UnionPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   DCHECK(tuple_desc_ != nullptr);
   first_materialized_child_idx_ = tnode_->union_node.first_materialized_child_idx;
   DCHECK_GT(first_materialized_child_idx_, -1);
+  const int64_t num_nonconst_scalar_expr_to_be_codegened =
+      state->NumScalarExprNeedsCodegen();
   // Create const_exprs_lists_ from thrift exprs.
   const vector<vector<TExpr>>& const_texpr_lists = tnode_->union_node.const_expr_lists;
   for (const vector<TExpr>& texprs : const_texpr_lists) {
@@ -49,6 +51,8 @@ Status UnionPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
     DCHECK_EQ(const_exprs.size(), tuple_desc_->slots().size());
     const_exprs_lists_.push_back(const_exprs);
   }
+  num_const_scalar_expr_to_be_codegened_ =
+      state->NumScalarExprNeedsCodegen() - num_nonconst_scalar_expr_to_be_codegened;
   // Create child_exprs_lists_ from thrift exprs.
   const vector<vector<TExpr>>& thrift_result_exprs = tnode_->union_node.result_expr_lists;
   for (int i = 0; i < thrift_result_exprs.size(); ++i) {
@@ -85,6 +89,8 @@ UnionNode::UnionNode(
   : ExecNode(pool, pnode, descs),
     tuple_desc_(pnode.tuple_desc_),
     first_materialized_child_idx_(pnode.first_materialized_child_idx_),
+    num_const_scalar_expr_to_be_codegened_(pnode.num_const_scalar_expr_to_be_codegened_),
+    is_codegen_status_added_(pnode.is_codegen_status_added_),
     const_exprs_lists_(pnode.const_exprs_lists_),
     child_exprs_lists_(pnode.child_exprs_lists_),
     codegend_union_materialize_batch_fns_(pnode.codegend_union_materialize_batch_fns_),
@@ -158,6 +164,7 @@ void UnionPlanNode::Codegen(FragmentState* state){
         &(codegend_union_materialize_batch_fns_.data()[i]));
   }
   AddCodegenStatus(codegen_status, codegen_message.str());
+  is_codegen_status_added_ = true;
 }
 
 Status UnionNode::Open(RuntimeState* state) {
@@ -177,6 +184,10 @@ Status UnionNode::Open(RuntimeState* state) {
   // succeeded.
   if (!children_.empty()) RETURN_IF_ERROR(child(child_idx_)->Open(state));
 
+  if (is_codegen_status_added_ && num_const_scalar_expr_to_be_codegened_ == 0
+      && !const_exprs_lists_.empty()) {
+    runtime_profile_->AppendExecOption("Codegen Disabled for const scalar expressions");
+  }
   return Status::OK();
 }
 

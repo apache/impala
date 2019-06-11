@@ -256,7 +256,7 @@ class ScalarExpr : public Expr {
   static Status CreateNode(const TExprNode& texpr_node, ObjectPool* pool,
       ScalarExpr** expr) WARN_UNUSED_RESULT;
 
-  ScalarExpr(const ColumnType& type, bool is_constant);
+  ScalarExpr(const ColumnType& type, bool is_constant, bool is_codegen_disabled = false);
   ScalarExpr(const TExprNode& node);
 
   /// Implementation of GetCodegendComputeFn() to be overridden by each subclass of
@@ -393,6 +393,10 @@ class ScalarExpr : public Expr {
   /// to the JIT'd function produced by GetCodegendComputeFn() after LLVM compilation.
   /// Set in GetCodegendComputeFn().
   bool added_to_jit_ = false;
+
+  /// True if codegen should be disabled for this scalar expression. Typical use case
+  /// is const expressions in VALUES clause, which are evaluated only once.
+  const bool is_codegen_disabled_;
 
   /// Static wrappers which call the compute function of the given ScalarExpr, passing
   /// it the ScalarExprEvaluator and TupleRow. These are cross-compiled and used by

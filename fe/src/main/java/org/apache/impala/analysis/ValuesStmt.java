@@ -22,6 +22,8 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 
 /**
  * Representation of a values() statement with a list of constant-expression lists.
@@ -81,4 +83,10 @@ public class ValuesStmt extends UnionStmt {
 
   @Override
   public ValuesStmt clone() { return new ValuesStmt(this); }
+
+  /**
+   * Intentionally left empty to disable expression rewrite for values clause.
+   */
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) {}
 }

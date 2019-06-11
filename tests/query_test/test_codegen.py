@@ -92,3 +92,10 @@ class TestCodegen(ImpalaTestSuite):
     profile_str = str(result.runtime_profile)
     assert "Probe Side Codegen Enabled" in profile_str, profile_str
     assert "Build Side Codegen Enabled" in profile_str, profile_str
+
+  def test_const_scalar_expr_in_union(self, vector, unique_database):
+    """Test that codegen is disabled for const scalar expressions in a UNION node.
+    if, however the UNION node is under a subplan then codegen is not disabled for
+    const expressions."""
+    self.run_test_case('QueryTest/union-const-scalar-expr-codegen', vector,
+        use_db=unique_database)

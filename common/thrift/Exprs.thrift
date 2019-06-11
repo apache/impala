@@ -177,6 +177,9 @@ struct TExprNode {
   20: optional TTimestampLiteral timestamp_literal
   21: optional TKuduPartitionExpr kudu_partition_expr
   22: optional TCastExpr cast_expr
+
+  // If codegen is disabled for this Expr
+  23: optional bool is_codegen_disabled
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

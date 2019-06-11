@@ -295,7 +295,12 @@ public class UnionNode extends PlanNode {
       Preconditions.checkState(exprList.size() == slots.size());
       List<Expr> newExprList = new ArrayList<>();
       for (int i = 0; i < exprList.size(); ++i) {
-        if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));
+        if (slots.get(i).isMaterialized()) {
+          Expr constExpr = exprList.get(i);
+          // Disable codegen for const expressions which will only ever be evaluated once.
+          if (!isInSubplan_) constExpr.disableCodegen();
+          newExprList.add(constExpr);
+        }
       }
       materializedConstExprLists_.add(newExprList);
     }

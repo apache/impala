@@ -135,8 +135,8 @@ public class ExprRewriterTest extends AnalyzerTest {
         stmt_, stmt_), 47, 23);
     // Constant select.
     RewritesOk("select 1, 2, 3, 4", 4, 4);
-    // Values stmt.
-    RewritesOk("values(1, '2', 3, 4.1), (1, '2', 3, 4.1)", 8, 8);
+    // Values stmt - expression rewrites are disabled.
+    RewritesOk("values(1, '2', 3, 4.1), (1, '2', 3, 4.1)", 0, 0);
     // Test WHERE-clause subqueries.
     RewritesOk("select id, int_col from functional.alltypes a " +
         "where exists (select 1 from functional.alltypes " +

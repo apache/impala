@@ -1,0 +1,80 @@
+====
+---- QUERY
+# Test union with multiple legs each having const expressions.
+# Expect codegen to be disabled for const expressions.
+set DISABLE_CODEGEN_ROWS_THRESHOLD=1;
+select 1,2,3 union all select 4,5,6 union all select 7,8,9 order by 1;
+---- TYPES
+tinyint,tinyint,tinyint
+---- RESULTS
+1,2,3
+4,5,6
+7,8,9
+---- RUNTIME_PROFILE
+00:UNION
+   constant-operands=3
+#SORT_NODE
+ExecOption: Codegen Enabled
+#UNION_NODE
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
+====
+---- QUERY
+# Test insert statement with values (translated into UNION with const expressions).
+# Expect codegen to be disabled for const expressions.
+set DISABLE_CODEGEN_ROWS_THRESHOLD=1;
+drop table if exists test_values_codegen;
+create table test_values_codegen (c1 int, c2 timestamp, c3 string);
+insert into test_values_codegen(c1) values (CAST(1+ceil(2.5)*3 as tinyint));
+---- RUNTIME_PROFILE
+00:UNION
+   constant-operands=1
+#UNION_NODE
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
+====
+---- QUERY
+# Test insert statement with values having const scalar expressions.
+# Expect codegen to be disabled for const expressions.
+set DISABLE_CODEGEN_ROWS_THRESHOLD=1;
+insert into test_values_codegen values
+  (1+1, '2015-04-09 14:07:46.580465000', base64encode('hello world')),
+  (CAST(1*2+2-5 as INT), CAST(1428421382 as timestamp),
+   regexp_extract('abcdef123ghi456jkl','.*?(\\d+)',0));
+---- RUNTIME_PROFILE
+00:UNION
+   constant-operands=2
+#UNION_NODE
+ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
+====
+---- QUERY
+# Test the result of above inserts with codegen disabled.
+select * from test_values_codegen order by c1;
+---- TYPES
+int, timestamp, string
+---- RESULTS
+-1,2015-04-07 15:43:02,'abcdef123ghi456'
+2,2015-04-09 14:07:46.580465000,'aGVsbG8gd29ybGQ='
+10,NULL,'NULL'
+====
+---- QUERY
+# Test union with const expressions in a subplan.
+# Expect codegen enabled.
+select count(c.c_custkey), count(v.tot_price)
+from tpch_nested_parquet.customer c, (
+  select sum(o_totalprice) tot_price from c.c_orders
+  union
+  select 9.99 tot_price) v;
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS
+300000,249996
+---- RUNTIME_PROFILE
+01:SUBPLAN
+|  03:UNION
+|  |  constant-operands=1
+#AGGREGATION_NODE (id=6)
+ExecOption: Codegen Enabled
+#UNION_NODE (id=3)
+ExecOption: Codegen Enabled
+#AGGREGATION_NODE (id=5)
+ExecOption: Codegen Enabled
+====

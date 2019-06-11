@@ -115,6 +115,9 @@ class FragmentState {
   /// created, init'ed in which all expressions' Prepare() are invoked.
   bool ScalarExprNeedsCodegen() const { return !scalar_exprs_to_codegen_.empty(); }
 
+  /// Returns the number of scalar expressions to be codegen'd.
+  int64_t NumScalarExprNeedsCodegen() const { return scalar_exprs_to_codegen_.size(); }
+
   /// Check if codegen was disabled and if so, add a message to the runtime profile.
   /// Call this only after expressions have been have been created.
   void CheckAndAddCodegenDisabledMessage(std::vector<std::string>& codegen_status_msgs) {
