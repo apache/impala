@@ -204,7 +204,8 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
       public void invalidateAuthorizationCache() {}
 
       @Override
-      public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+      public AuthorizationContext createAuthorizationContext(boolean doAudits,
+          String sqlStmt) {
         return new AuthorizationContext();
       }
     };

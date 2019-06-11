@@ -87,7 +87,8 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
-  public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+  public AuthorizationContext createAuthorizationContext(boolean doAudits,
+      String sqlStmt) {
     return new AuthorizationContext();
   }
 

@@ -297,6 +297,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
   protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
       throws ImpalaException {
+    ctx.getQueryCtx().getClient_request().setStmt(stmt);
     StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
     StmtMetadataLoader mdLoader =
         new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
@@ -374,7 +375,8 @@ public class FrontendTestBase extends AbstractFrontendTest {
           public void invalidateAuthorizationCache() {}
 
           @Override
-          public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+          public AuthorizationContext createAuthorizationContext(boolean doAudits,
+              String sqlStmt) {
             return new AuthorizationContext();
           }
         };

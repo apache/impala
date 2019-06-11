@@ -420,7 +420,8 @@ public class AnalysisContext {
     AuthorizationException authException = null;
     AuthorizationContext authzCtx = null;
     try {
-      authzCtx = authzChecker.createAuthorizationContext(true);
+      authzCtx = authzChecker.createAuthorizationContext(true,
+          queryCtx_.client_request.stmt);
       authzChecker.authorize(authzCtx, analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;

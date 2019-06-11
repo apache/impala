@@ -39,8 +39,9 @@ public interface AuthorizationChecker {
    * created per authorization execution.
    *
    * @param doAudits a flag whether or not to do the audits
+   * @param sqlStmt the SQL statement to be logged for auditing
    */
-  AuthorizationContext createAuthorizationContext(boolean doAudits);
+  AuthorizationContext createAuthorizationContext(boolean doAudits, String sqlStmt);
 
   /**
    * Authorize an analyzed statement.

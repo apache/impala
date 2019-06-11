@@ -41,21 +41,37 @@ import java.util.Optional;
 public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
   private final RangerDefaultAuditHandler auditHandler_ = new RangerDefaultAuditHandler();
   private final List<AuthzAuditEvent> auditEvents_ = new ArrayList<>();
+  private final String sqlStmt_; // The SQL statement to be logged
+
+  public RangerBufferAuditHandler() {
+    // This can be empty but should not be null to avoid NPE. See RANGER-2463.
+    this("");
+  }
+
+  public RangerBufferAuditHandler(String sqlStmt) {
+    sqlStmt_= sqlStmt;
+  }
 
   public static class AutoFlush extends RangerBufferAuditHandler
       implements AutoCloseable {
+    public AutoFlush(String sqlStmt) {
+      super(sqlStmt);
+    }
+
     @Override
     public void close() {
       super.flush();
     }
   }
 
+  public String getSqlStmt() { return sqlStmt_; }
+
   /**
    * Creates an instance of {@link RangerBufferAuditHandler} that will do an auto-flush.
    * Use it with try-resource.
    */
   public static AutoFlush autoFlush() {
-    return new AutoFlush();
+    return new AutoFlush("");
   }
 
   @Override
@@ -90,6 +106,7 @@ public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
 
     AuthzAuditEvent auditEvent = auditHandler_.getAuthzEvents(result);
     auditEvent.setAccessType(request.getAccessType());
+    auditEvent.setRequestData(sqlStmt_);
     auditEvent.setResourcePath(resource != null ? resource.getAsString() : null);
     if (resourceType != null) {
       auditEvent.setResourceType("@" + resourceType);

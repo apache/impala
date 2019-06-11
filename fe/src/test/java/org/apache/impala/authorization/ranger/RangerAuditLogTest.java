@@ -62,11 +62,14 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     authzOk(events -> {
       assertEquals(1, events.size());
       assertEventEquals("@database", "create", "test_db", 1, events.get(0));
+      assertEquals("create database test_db", events.get(0).getRequestData());
     }, "create database test_db", onServer(TPrivilegeLevel.CREATE));
 
     authzOk(events -> {
       assertEquals(1, events.size());
       assertEventEquals("@table", "create", "functional/test_tbl", 1, events.get(0));
+      assertEquals("create table functional.test_tbl(i int)",
+          events.get(0).getRequestData());
     }, "create table functional.test_tbl(i int)", onDatabase("functional",
         TPrivilegeLevel.CREATE));
 
@@ -75,6 +78,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEventEquals("@udf", "create", "functional/f()", 1, events.get(0));
       assertEventEquals("@url", "all",
           "hdfs://localhost:20500/test-warehouse/libTestUdfs.so", 1, events.get(1));
+      assertEquals("create function functional.f() returns int location " +
+          "'hdfs://localhost:20500/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+          events.get(0).getRequestData());
     }, "create function functional.f() returns int location " +
         "'hdfs://localhost:20500/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
         onDatabase("functional", TPrivilegeLevel.CREATE),
@@ -86,6 +92,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEventEquals("@table", "create", "functional/new_table", 1, events.get(0));
       assertEventEquals("@url", "all", "hdfs://localhost:20500/test-warehouse/new_table",
           1, events.get(1));
+      assertEquals("create table functional.new_table(i int) location " +
+          "'hdfs://localhost:20500/test-warehouse/new_table'",
+          events.get(0).getRequestData());
     }, "create table functional.new_table(i int) location " +
         "'hdfs://localhost:20500/test-warehouse/new_table'",
         onDatabase("functional", TPrivilegeLevel.CREATE),
@@ -95,6 +104,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // Only the table event.
       assertEquals(1, events.size());
       assertEventEquals("@table", "select", "functional/alltypes", 1, events.get(0));
+      assertEquals("select id, string_col from functional.alltypes",
+          events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes",
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
 
@@ -103,8 +114,12 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // short circuiting.
       assertEquals(2, events.size());
       assertEventEquals("@column", "select", "functional/alltypes/id", 1, events.get(0));
+      assertEquals("select id, string_col from functional.alltypes",
+          events.get(0).getRequestData());
       assertEventEquals("@column", "select", "functional/alltypes/string_col", 1,
           events.get(1));
+      assertEquals("select id, string_col from functional.alltypes",
+          events.get(1).getRequestData());
     }, "select id, string_col from functional.alltypes",
         onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT),
         onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.SELECT));
@@ -112,8 +127,11 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     authzOk(events -> {
       assertEquals(3, events.size());
       assertEventEquals("@column", "refresh", "*/*/*", 1, events.get(0));
+      assertEquals("invalidate metadata", events.get(0).getRequestData());
       assertEventEquals("@udf", "refresh", "*/*", 1, events.get(1));
+      assertEquals("invalidate metadata", events.get(1).getRequestData());
       assertEventEquals("@url", "refresh", "*", 1, events.get(2));
+      assertEquals("invalidate metadata", events.get(2).getRequestData());
     }, "invalidate metadata", onServer(TPrivilegeLevel.REFRESH));
   }
 
@@ -122,17 +140,23 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     authzError(events -> {
       assertEquals(1, events.size());
       assertEventEquals("@database", "create", "test_db", 0, events.get(0));
+      assertEquals("create database test_db", events.get(0).getRequestData());
     }, "create database test_db");
 
     authzError(events -> {
       assertEquals(1, events.size());
       assertEventEquals("@table", "create", "functional/test_tbl", 0, events.get(0));
+      assertEquals("create table functional.test_tbl(i int)",
+          events.get(0).getRequestData());
     }, "create table functional.test_tbl(i int)");
 
     authzError(events -> {
       // Only log first the first failure.
       assertEquals(1, events.size());
       assertEventEquals("@udf", "create", "functional/f()", 0, events.get(0));
+      assertEquals("create function functional.f() returns int location " +
+          "'hdfs://localhost:20500/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+          events.get(0).getRequestData());
     }, "create function functional.f() returns int location " +
         "'hdfs://localhost:20500/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
 
@@ -140,6 +164,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEquals(1, events.size());
       assertEventEquals("@url", "all", "hdfs://localhost:20500/test-warehouse/new_table",
           0, events.get(0));
+      assertEquals("create table functional.new_table(i int) location " +
+              "'hdfs://localhost:20500/test-warehouse/new_table'",
+          events.get(0).getRequestData());
     }, "create table functional.new_table(i int) location " +
         "'hdfs://localhost:20500/test-warehouse/new_table'",
         onDatabase("functional", TPrivilegeLevel.CREATE));
@@ -149,6 +176,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // short-circuiting.
       assertEquals(1, events.size());
       assertEventEquals("@column", "select", "functional/alltypes/id", 0, events.get(0));
+      assertEquals("select id, string_col from functional.alltypes",
+          events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes");
   }
 

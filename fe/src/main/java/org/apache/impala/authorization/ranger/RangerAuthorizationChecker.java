@@ -206,11 +206,16 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
-  public AuthorizationContext createAuthorizationContext(boolean doAudits) {
+  public AuthorizationContext createAuthorizationContext(boolean doAudits,
+      String sqlStmt) {
     RangerAuthorizationContext authzCtx = new RangerAuthorizationContext();
     if (doAudits) {
       // Any statement that goes through {@link authorize} will need to have audit logs.
-      authzCtx.setAuditHandler(new RangerBufferAuditHandler());
+      if (sqlStmt != null) {
+        authzCtx.setAuditHandler(new RangerBufferAuditHandler(sqlStmt));
+      } else {
+        authzCtx.setAuditHandler(new RangerBufferAuditHandler());
+      }
     }
     return authzCtx;
   }
@@ -226,7 +231,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // case 4: table (select) ERROR, columns (select) ERROR --> only add the first column
     //                                                          event
     RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext();
-    tmpCtx.setAuditHandler(new RangerBufferAuditHandler());
+    tmpCtx.setAuditHandler(new RangerBufferAuditHandler(
+        originalCtx.getAuditHandler().getSqlStmt()));
     try {
       super.authorizeTableAccess(tmpCtx, analysisResult, catalog, requests);
     } catch (AuthorizationException e) {

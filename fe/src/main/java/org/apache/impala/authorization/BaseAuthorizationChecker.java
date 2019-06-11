@@ -63,7 +63,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     // We don't want to do an audit log here. This method is used by "show databases",
     // "show tables", "describe" to filter out unauthorized database, table, or column
     // names.
-    return hasAccess(createAuthorizationContext(false), user, request);
+    return hasAccess(createAuthorizationContext(false /*no audit log*/,
+        null /*no SQL statement*/), user, request);
   }
 
   private boolean hasAccess(AuthorizationContext authzCtx, User user,
