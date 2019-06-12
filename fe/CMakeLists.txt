@@ -19,22 +19,3 @@ add_custom_target(fe ALL DEPENDS
   shaded-deps thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
   COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
 )
-
-# Timestamp file is touched by bin/create-test-configuration.sh. This is used
-# for downstream targets like the docker build that need to pick up regenerated configs
-# when they change.
-set(TEST_CONFIGURATION_TIMESTAMP
-  ${CMAKE_SOURCE_DIR}/fe/src/test/resources/.test_config_timestamp
-)
-
-add_custom_command(
-  OUTPUT ${TEST_CONFIGURATION_TIMESTAMP}
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/create-test-configuration.sh
-  DEPENDS ${CMAKE_SOURCE_DIR}/bin/create-test-configuration.sh
-  COMMENT "Creating test configuration."
-  VERBATIM
-)
-
-add_custom_target(test-configuration
-  DEPENDS ${TEST_CONFIGURATION_TIMESTAMP}
-)

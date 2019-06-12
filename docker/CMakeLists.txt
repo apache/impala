@@ -31,7 +31,6 @@ add_custom_command(
   COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
   COMMAND touch ${IMPALA_BASE_BUILD_CONTEXT_TIMESTAMP}
   DEPENDS daemons fe ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
-  DEPENDS ${CMAKE_SOURCE_DIR}/fe/src/test/resources/.test_config_timestamp
   COMMENT "Creating impala base build context."
   VERBATIM
 )
