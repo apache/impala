@@ -47,6 +47,12 @@ const string CATALOG_TOPIC_V2_PREFIX = "2:";
 struct TCatalogServiceRequestHeader {
   // The effective user who submitted this request.
   1: optional string requesting_user
+
+  // The redacted SQL statement to be logged.
+  2: optional string redacted_sql_stmt
+
+  // The client IP address.
+  3: optional string client_ip
 }
 
 // Returns details on the result of an operation that updates the catalog. Information

@@ -57,6 +57,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSessionState;
 import org.junit.Assert;
 
 import com.google.common.base.Preconditions;
@@ -376,7 +377,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
           @Override
           public AuthorizationContext createAuthorizationContext(boolean doAudits,
-              String sqlStmt) {
+              String sqlStmt, TSessionState sessionState) {
             return new AuthorizationContext();
           }
         };

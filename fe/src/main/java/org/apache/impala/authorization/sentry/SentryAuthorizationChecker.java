@@ -29,6 +29,7 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TSessionState;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
@@ -88,7 +89,7 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public AuthorizationContext createAuthorizationContext(boolean doAudits,
-      String sqlStmt) {
+      String sqlStmt, TSessionState sessionState) {
     return new AuthorizationContext();
   }
 

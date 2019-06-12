@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class RangerAuditLogTest extends AuthorizationTestBase {
   private RangerAuthorizationCheckerSpy authzChecker_;
@@ -200,9 +201,11 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
   private static void assertEventEquals(String resourceType, String accessType,
       String resourcePath, int accessResult, AuthzAuditEvent event) {
     assertEquals(resourceType, event.getResourceType());
-    assertEquals(accessType, event.getAccessType());
+    assertEquals(accessType.toUpperCase(), event.getAccessType());
     assertEquals(resourcePath, event.getResourcePath());
     assertEquals(accessResult, event.getAccessResult());
+    assertEquals("test-cluster", event.getClusterName());
+    assertTrue(!event.getClientIP().isEmpty());
   }
 
   @Override

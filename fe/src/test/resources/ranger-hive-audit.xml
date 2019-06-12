@@ -20,4 +20,11 @@
     <name>xasecure.audit.is.enabled</name>
     <value>false</value>
   </property>
+  <!-- RANGER-2458: This property may need to be updated to
+       "ranger.plugin.hive.access.cluster.name" and added to
+       "ranger-hive-security.xml". -->
+  <property>
+    <name>ranger.plugin.hive.ambari.cluster.name</name>
+    <value>test-cluster</value>
+  </property>
 </configuration>

@@ -116,6 +116,7 @@ import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnName;
@@ -360,11 +361,11 @@ public class CatalogOpExecutor {
             response);
         break;
       case GRANT_PRIVILEGE:
-        grantPrivilege(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+        grantPrivilege(ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(),
             response);
         break;
       case REVOKE_PRIVILEGE:
-        revokePrivilege(requestingUser, ddlRequest.getGrant_revoke_priv_params(),
+        revokePrivilege(ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(),
             response);
         break;
       case COMMENT_ON:
@@ -3351,23 +3352,25 @@ public class CatalogOpExecutor {
   /**
    * Grants one or more privileges to role on behalf of the requestingUser.
    */
-  private void grantPrivilege(User requestingUser,
+  private void grantPrivilege(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
       throws ImpalaException {
-    Preconditions.checkNotNull(requestingUser);
+    Preconditions.checkNotNull(header);
     Preconditions.checkNotNull(grantRevokePrivParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(grantRevokePrivParams.isIs_grant());
 
     switch (grantRevokePrivParams.principal_type) {
       case ROLE:
-        authzManager_.grantPrivilegeToRole(requestingUser, grantRevokePrivParams, resp);
+        authzManager_.grantPrivilegeToRole(header, grantRevokePrivParams, resp);
         break;
       case USER:
-        authzManager_.grantPrivilegeToUser(requestingUser, grantRevokePrivParams, resp);
+        authzManager_.grantPrivilegeToUser(header, grantRevokePrivParams,
+            resp);
         break;
       case GROUP:
-        authzManager_.grantPrivilegeToGroup(requestingUser, grantRevokePrivParams, resp);
+        authzManager_.grantPrivilegeToGroup(header, grantRevokePrivParams,
+            resp);
         break;
       default:
         throw new IllegalArgumentException("Unexpected principal type: " +
@@ -3380,26 +3383,23 @@ public class CatalogOpExecutor {
   /**
    * Revokes one or more privileges to role on behalf of the requestingUser.
    */
-  private void revokePrivilege(User requestingUser,
+  private void revokePrivilege(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
       throws ImpalaException {
-    Preconditions.checkNotNull(requestingUser);
+    Preconditions.checkNotNull(header);
     Preconditions.checkNotNull(grantRevokePrivParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(!grantRevokePrivParams.isIs_grant());
 
     switch (grantRevokePrivParams.principal_type) {
       case ROLE:
-        authzManager_.revokePrivilegeFromRole(requestingUser, grantRevokePrivParams,
-            resp);
+        authzManager_.revokePrivilegeFromRole(header, grantRevokePrivParams, resp);
         break;
       case USER:
-        authzManager_.revokePrivilegeFromUser(requestingUser, grantRevokePrivParams,
-            resp);
+        authzManager_.revokePrivilegeFromUser(header, grantRevokePrivParams, resp);
         break;
       case GROUP:
-        authzManager_.revokePrivilegeFromGroup(requestingUser, grantRevokePrivParams,
-            resp);
+        authzManager_.revokePrivilegeFromGroup(header, grantRevokePrivParams, resp);
         break;
       default:
         throw new IllegalArgumentException("Unexpected principal type: " +

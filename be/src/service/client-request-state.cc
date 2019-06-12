@@ -1070,6 +1070,10 @@ Status ClientRequestState::UpdateCatalog() {
     catalog_update.__set_sync_ddl(exec_request().query_options.sync_ddl);
     catalog_update.__set_header(TCatalogServiceRequestHeader());
     catalog_update.header.__set_requesting_user(effective_user());
+    catalog_update.header.__set_client_ip(session()->network_address.hostname);
+    catalog_update.header.__set_redacted_sql_stmt(
+        query_ctx_.client_request.__isset.redacted_stmt ?
+            query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);
     if (!GetCoordinator()->dml_exec_state()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << PrintId(query_id()) << ")";

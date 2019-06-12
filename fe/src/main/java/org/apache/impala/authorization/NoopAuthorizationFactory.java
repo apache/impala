@@ -25,11 +25,13 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
@@ -107,42 +109,42 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
     }
 
     @Override
-    public void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
-        TDdlExecResponse response) throws ImpalaException {
-      throw new UnsupportedOperationException(String.format("%s is not supported",
-          ClassUtil.getMethodName()));
-    }
-
-    @Override
-    public void revokePrivilegeFromRole(User requestingUser,
+    public void grantPrivilegeToRole(TCatalogServiceRequestHeader header,
         TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
 
     @Override
-    public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
-        TDdlExecResponse response) throws ImpalaException {
-      throw new UnsupportedOperationException(String.format("%s is not supported",
-          ClassUtil.getMethodName()));
-    }
-
-    @Override
-    public void revokePrivilegeFromUser(User requestingUser,
+    public void revokePrivilegeFromRole(TCatalogServiceRequestHeader header,
         TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
 
     @Override
-    public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
-        TDdlExecResponse response) throws ImpalaException {
+    public void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
+        TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
 
     @Override
-    public void revokePrivilegeFromGroup(User requestingUser,
+    public void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
+        TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
+        TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
+    public void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
         TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
@@ -205,7 +207,7 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
 
       @Override
       public AuthorizationContext createAuthorizationContext(boolean doAudits,
-          String sqlStmt) {
+          String sqlStmt, TSessionState sessionState) {
         return new AuthorizationContext();
       }
     };

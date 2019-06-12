@@ -218,7 +218,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
             }).collect(Collectors.toList()));
       }
 
-      authzManager.grantPrivilege(grants);
+      authzManager.grantPrivilege(grants, "", "127.0.0.1");
       rangerImpalaPlugin_.refreshPoliciesAndTags();
     }
 
@@ -229,7 +229,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
     @Override
     public void cleanUp() throws ImpalaException {
-      authzManager.revokePrivilege(grants);
+      authzManager.revokePrivilege(grants, "", "127.0.0.1");
     }
 
     @Override
@@ -241,7 +241,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
           RANGER_ADMIN.getName(), true, USER.getName(), Collections.emptyList(),
-          rangerImpalaPlugin_.getClusterName(), privileges);
+          rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }
   }
 
@@ -252,7 +252,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
           RANGER_ADMIN.getName(), true, null, groups,
-          rangerImpalaPlugin_.getClusterName(), privileges);
+          rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }
   }
 

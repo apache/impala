@@ -100,11 +100,11 @@ import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
-import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
+import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
@@ -577,6 +577,11 @@ public class Frontend {
     if (ddl.getOp_type() == TCatalogOpType.DDL) {
       TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
       header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
+      TQueryCtx queryCtx = analysis.getAnalyzer().getQueryCtx();
+      header.setClient_ip(queryCtx.getSession().getNetwork_address().getHostname());
+      TClientRequest clientRequest = queryCtx.getClient_request();
+      header.setRedacted_sql_stmt(clientRequest.isSetRedacted_stmt() ?
+          clientRequest.getRedacted_stmt() : clientRequest.getStmt());
       ddl.getDdl_params().setHeader(header);
       ddl.getDdl_params().setSync_ddl(ddl.isSync_ddl());
     }

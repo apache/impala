@@ -35,6 +35,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -192,7 +193,7 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void grantPrivilegeToRole(User requestingUser,
+  public void grantPrivilegeToRole(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
 
@@ -209,8 +210,8 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     List<PrincipalPrivilege> removedGrantOptPrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
     List<PrincipalPrivilege> addedRolePrivileges =
-        sentryProxy_.grantRolePrivileges(requestingUser, roleName, privileges,
-            params.isHas_grant_opt(), removedGrantOptPrivileges);
+        sentryProxy_.grantRolePrivileges(new User(header.getRequesting_user()), roleName,
+            privileges, params.isHas_grant_opt(), removedGrantOptPrivileges);
 
     Preconditions.checkNotNull(addedRolePrivileges);
     List<TCatalogObject> updatedPrivs =
@@ -238,8 +239,8 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void revokePrivilegeFromRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     verifySentryServiceEnabled();
     Preconditions.checkArgument(!params.getPrivileges().isEmpty());
 
@@ -270,8 +271,8 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
     List<PrincipalPrivilege> addedRolePrivileges =
         Lists.newArrayListWithExpectedSize(privileges.size());
     List<PrincipalPrivilege> removedGrantOptPrivileges =
-        sentryProxy_.revokeRolePrivileges(requestingUser, roleName, privileges,
-            params.isHas_grant_opt(), addedRolePrivileges);
+        sentryProxy_.revokeRolePrivileges(new User(header.getRequesting_user()), roleName,
+            privileges, params.isHas_grant_opt(), addedRolePrivileges);
     Preconditions.checkNotNull(addedRolePrivileges);
 
     List<TCatalogObject> updatedPrivs =
@@ -303,29 +304,29 @@ public class SentryCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "GRANT <privilege> TO USER is not supported by Sentry.");
   }
 
   @Override
-  public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "REVOKE <privilege> FROM USER is not supported by Sentry.");
   }
 
   @Override
-  public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "GRANT <privilege> TO GROUP is not supported by Sentry.");
   }
 
   @Override
-  public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "REVOKE <privilege> FROM GROUP is not supported by Sentry.");
   }

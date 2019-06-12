@@ -34,6 +34,7 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TSessionState;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
@@ -207,12 +208,14 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public AuthorizationContext createAuthorizationContext(boolean doAudits,
-      String sqlStmt) {
-    RangerAuthorizationContext authzCtx = new RangerAuthorizationContext();
+      String sqlStmt, TSessionState sessionState) throws InternalException {
+    RangerAuthorizationContext authzCtx = new RangerAuthorizationContext(sessionState);
     if (doAudits) {
       // Any statement that goes through {@link authorize} will need to have audit logs.
       if (sqlStmt != null) {
-        authzCtx.setAuditHandler(new RangerBufferAuditHandler(sqlStmt));
+        authzCtx.setAuditHandler(new RangerBufferAuditHandler(
+            sqlStmt, plugin_.getClusterName(),
+            sessionState.getNetwork_address().getHostname()));
       } else {
         authzCtx.setAuditHandler(new RangerBufferAuditHandler());
       }
@@ -225,21 +228,24 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       AnalysisResult analysisResult, FeCatalog catalog, List<PrivilegeRequest> requests)
       throws AuthorizationException, InternalException {
     RangerAuthorizationContext originalCtx = (RangerAuthorizationContext) authzCtx;
+    RangerBufferAuditHandler originalAuditHandler = originalCtx.getAuditHandler();
     // case 1: table (select) OK --> add the table event
     // case 2: table (non-select) ERROR --> add the table event
     // case 3: table (select) ERROR, columns (select) OK -> only add the column events
     // case 4: table (select) ERROR, columns (select) ERROR --> only add the first column
     //                                                          event
-    RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext();
+    RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext(
+        originalCtx.getSessionState());
     tmpCtx.setAuditHandler(new RangerBufferAuditHandler(
-        originalCtx.getAuditHandler().getSqlStmt()));
+        originalAuditHandler.getSqlStmt(), originalAuditHandler.getClusterName(),
+        originalAuditHandler.getClientIp()));
     try {
       super.authorizeTableAccess(tmpCtx, analysisResult, catalog, requests);
     } catch (AuthorizationException e) {
       tmpCtx.getAuditHandler().getAuthzEvents().stream()
           .filter(evt ->
               // case 2: get the first failing non-select table
-              (!"select".equals(evt.getAccessType()) &&
+              (!"select".equalsIgnoreCase(evt.getAccessType()) &&
                   "@table".equals(evt.getResourceType())) ||
               // case 4: get the first failing column
               ("@column".equals(evt.getResourceType()) && evt.getAccessResult() == 0))
@@ -337,8 +343,13 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     } else {
       accessType = privilege.name().toLowerCase();
     }
-    RangerAccessRequest request = new RangerAccessRequestImpl(resource,
+    RangerAccessRequestImpl request = new RangerAccessRequestImpl(resource,
         accessType, user.getShortName(), getUserGroups(user));
+    request.setClusterName(plugin_.getClusterName());
+    if (authzCtx.getSessionState() != null) {
+      request.setClientIPAddress(
+          authzCtx.getSessionState().getNetwork_address().getHostname());
+    }
     RangerAccessResult result = plugin_.isAccessAllowed(request,
         authzCtx.getAuditHandler());
     return result != null && result.getIsAllowed();

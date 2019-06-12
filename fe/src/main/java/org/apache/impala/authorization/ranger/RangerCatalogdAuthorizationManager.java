@@ -28,6 +28,7 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -105,72 +106,76 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "GRANT <privilege> TO ROLE is not supported by Ranger.");
   }
 
   @Override
-  public void revokePrivilegeFromRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedFeatureException(
         "REVOKE <privilege> FROM ROLE is not supported by Ranger.");
   }
 
   @Override
-  public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), true, params.getPrincipal_name(),
-        Collections.emptyList(), plugin_.get().getClusterName(), params.getPrivileges());
+        header.getRequesting_user(), true, params.getPrincipal_name(),
+        Collections.emptyList(), plugin_.get().getClusterName(),
+        header.getClient_ip(), params.getPrivileges());
 
-    grantPrivilege(requests);
+    grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
   }
 
   @Override
-  public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), false, params.getPrincipal_name(),
-        Collections.emptyList(), plugin_.get().getClusterName(), params.getPrivileges());
+        header.getRequesting_user(), false, params.getPrincipal_name(),
+        Collections.emptyList(), plugin_.get().getClusterName(),
+        header.getClient_ip(), params.getPrivileges());
 
-    revokePrivilege(requests);
+    revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
   }
 
   @Override
-  public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), true, null,
+        header.getRequesting_user(), true, null,
         Collections.singletonList(params.getPrincipal_name()),
-        plugin_.get().getClusterName(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
-    grantPrivilege(requests);
+    grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
   }
 
   @Override
-  public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        requestingUser.getName(), false, null,
+        header.getRequesting_user(), false, null,
         Collections.singletonList(params.getPrincipal_name()),
-        plugin_.get().getClusterName(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
-    revokePrivilege(requests);
+    revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
     refreshAuthorization(response);
   }
 
   @VisibleForTesting
-  public void grantPrivilege(List<GrantRevokeRequest> requests) throws ImpalaException {
+  public void grantPrivilege(List<GrantRevokeRequest> requests, String sqlStmt,
+      String clientIp) throws ImpalaException {
     try {
       for (GrantRevokeRequest request : requests) {
-        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush()) {
+        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush(sqlStmt,
+            plugin_.get().getClusterName(), clientIp)) {
           plugin_.get().grantAccess(request, auditHandler);
         }
       }
@@ -182,10 +187,12 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @VisibleForTesting
-  public void revokePrivilege(List<GrantRevokeRequest> requests) throws ImpalaException {
+  public void revokePrivilege(List<GrantRevokeRequest> requests, String sqlStmt,
+      String clientIp) throws ImpalaException {
     try {
       for (GrantRevokeRequest request : requests) {
-        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush()) {
+        try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush(sqlStmt,
+            plugin_.get().getClusterName(), clientIp)) {
           plugin_.get().revokeAccess(request, auditHandler);
         }
       }
@@ -237,13 +244,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,
       boolean isGrant, String user, List<String> groups, String clusterName,
-      List<TPrivilege> privileges) {
+      String clientIp, List<TPrivilege> privileges) {
     List<GrantRevokeRequest> requests = new ArrayList<>();
 
     for (TPrivilege p: privileges) {
       Function<Map<String, String>, GrantRevokeRequest> createRequest = (resource) ->
           createGrantRevokeRequest(grantor, user, groups, clusterName, p.has_grant_opt,
-              isGrant, p.privilege_level, resource);
+              isGrant, p.privilege_level, resource, clientIp);
 
       // Ranger Impala service definition defines 3 resources:
       // [DB -> Table -> Column]
@@ -273,7 +280,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,
       List<String> groups, String clusterName, boolean withGrantOpt, boolean isGrant,
-      TPrivilegeLevel level, Map<String, String> resource) {
+      TPrivilegeLevel level, Map<String, String> resource, String clientIp) {
     GrantRevokeRequest request = new GrantRevokeRequest();
     request.setGrantor(grantor);
     if (user != null) request.getUsers().add(user);
@@ -283,6 +290,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     request.setReplaceExistingPermissions(Boolean.FALSE);
     request.setClusterName(clusterName);
     request.setResource(resource);
+    request.setClientIPAddress(clientIp);
 
     // For revoke grant option, omit the privilege
     if (!(!isGrant && withGrantOpt)) {

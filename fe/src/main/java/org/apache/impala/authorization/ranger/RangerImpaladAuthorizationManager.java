@@ -26,6 +26,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
@@ -122,43 +123,43 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
-  public void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void revokePrivilegeFromRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }

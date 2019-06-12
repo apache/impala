@@ -20,6 +20,7 @@ package org.apache.impala.authorization;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TSessionState;
 
 import java.util.Set;
 
@@ -40,8 +41,10 @@ public interface AuthorizationChecker {
    *
    * @param doAudits a flag whether or not to do the audits
    * @param sqlStmt the SQL statement to be logged for auditing
+   * @param sessionState the client session state
    */
-  AuthorizationContext createAuthorizationContext(boolean doAudits, String sqlStmt);
+  AuthorizationContext createAuthorizationContext(boolean doAudits, String sqlStmt,
+      TSessionState sessionState) throws InternalException;
 
   /**
    * Authorize an analyzed statement.

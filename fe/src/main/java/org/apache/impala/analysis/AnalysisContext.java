@@ -36,6 +36,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
@@ -420,8 +421,11 @@ public class AnalysisContext {
     AuthorizationException authException = null;
     AuthorizationContext authzCtx = null;
     try {
+      TClientRequest clientRequest = queryCtx_.getClient_request();
       authzCtx = authzChecker.createAuthorizationContext(true,
-          queryCtx_.client_request.stmt);
+          clientRequest.isSetRedacted_stmt() ?
+              clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
+          queryCtx_.getSession());
       authzChecker.authorize(authzCtx, analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;

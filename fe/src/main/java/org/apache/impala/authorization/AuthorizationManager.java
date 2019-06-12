@@ -18,8 +18,8 @@
 package org.apache.impala.authorization;
 
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -68,38 +68,38 @@ public interface AuthorizationManager {
   /**
    * Grant a privilege to a role.
    */
-  void grantPrivilegeToRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void grantPrivilegeToRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Revokes a privilege from a role.
    */
-  void revokePrivilegeFromRole(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void revokePrivilegeFromRole(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Grants a privilege to a user.
    */
-  void grantPrivilegeToUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Revokes a privilege from a user.
    */
-  void revokePrivilegeFromUser(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Grants a privilege to a group.
    */
-  void grantPrivilegeToGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Revokes a privilege from a group.
    */
-  void revokePrivilegeFromGroup(User requestingUser, TGrantRevokePrivParams params,
-      TDdlExecResponse response) throws ImpalaException;
+  void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
+      TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Gets all privileges granted to the given principal.

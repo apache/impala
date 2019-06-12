@@ -17,12 +17,15 @@
 
 package org.apache.impala.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessResource;
 import org.apache.ranger.plugin.policyengine.RangerAccessResult;
 import org.apache.ranger.plugin.policyengine.RangerAccessResultProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -39,23 +42,29 @@ import java.util.Optional;
  * multiple threads.
  */
 public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      RangerBufferAuditHandler.class);
   private final RangerDefaultAuditHandler auditHandler_ = new RangerDefaultAuditHandler();
   private final List<AuthzAuditEvent> auditEvents_ = new ArrayList<>();
   private final String sqlStmt_; // The SQL statement to be logged
+  private final String clusterName_;
+  private final String clientIp_;
 
   public RangerBufferAuditHandler() {
     // This can be empty but should not be null to avoid NPE. See RANGER-2463.
-    this("");
+    this("", "", "");
   }
 
-  public RangerBufferAuditHandler(String sqlStmt) {
-    sqlStmt_= sqlStmt;
+  public RangerBufferAuditHandler(String sqlStmt, String clusterName, String clientIp) {
+    sqlStmt_ = Preconditions.checkNotNull(sqlStmt);
+    clusterName_ = Preconditions.checkNotNull(clusterName);
+    clientIp_ = Preconditions.checkNotNull(clientIp);
   }
 
   public static class AutoFlush extends RangerBufferAuditHandler
       implements AutoCloseable {
-    public AutoFlush(String sqlStmt) {
-      super(sqlStmt);
+    public AutoFlush(String sqlStmt, String clusterName, String clientIp) {
+      super(sqlStmt, clusterName, clientIp);
     }
 
     @Override
@@ -66,12 +75,16 @@ public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
 
   public String getSqlStmt() { return sqlStmt_; }
 
+  public String getClusterName() { return clusterName_; }
+
+  public String getClientIp() { return clientIp_; }
+
   /**
    * Creates an instance of {@link RangerBufferAuditHandler} that will do an auto-flush.
    * Use it with try-resource.
    */
-  public static AutoFlush autoFlush() {
-    return new AutoFlush("");
+  public static AutoFlush autoFlush(String sqlStmt, String clusterName, String clientIp) {
+    return new AutoFlush(sqlStmt, clusterName, clientIp);
   }
 
   @Override
@@ -105,8 +118,10 @@ public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
     String resourceType = resource != null ? resource.getLeafName() : null;
 
     AuthzAuditEvent auditEvent = auditHandler_.getAuthzEvents(result);
-    auditEvent.setAccessType(request.getAccessType());
+    auditEvent.setAccessType(request.getAccessType().toUpperCase());
     auditEvent.setRequestData(sqlStmt_);
+    auditEvent.setClientIP(clientIp_);
+    auditEvent.setClusterName(clusterName_);
     auditEvent.setResourcePath(resource != null ? resource.getAsString() : null);
     if (resourceType != null) {
       auditEvent.setResourceType("@" + resourceType);

@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TPrincipalType;
