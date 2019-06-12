@@ -44,7 +44,13 @@
       { "hash": "df78eaec0b42d7fa5d148238f40fa57fcfcb25b5",
         "comment": "Don't need to revert c01efd0 since we've ignored it"},
       { "hash": "a203733fac3e1e37df8abeee39a88d187153a8c5",
-        "comment": "Only apply to master: 2.x branch only supports hadoop 2.x"}
+        "comment": "Only apply to master: 2.x branch only supports hadoop 2.x"},
+      { "hash": "8c284e771c6933f51e0010379bc98c43e4407867",
+        "comment": "Only apply to master: build of 2.x branch is not broken"},
+      { "hash": "8d7f63865405c50981647ae3198bd4d39b465bf8",
+        "comment": "Not applicable to 2.x: breaking change. Still keep the --use_krpc flag in branch 2.x"},
+      { "hash": "73be15409a6fffe45b1423e847c0d2e737c186ca",
+        "comment": "Not applicable to 2.x Docs: the breaking change was ignored in 2.x"}
     ]
   }
 ]
