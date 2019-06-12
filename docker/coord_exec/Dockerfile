@@ -31,4 +31,4 @@ ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
      "-log_dir=/opt/impala/logs",\
      "-abort_on_config_error=false", "-state_store_host=statestored",\
      "-catalog_service_host=catalogd", "-mem_limit_includes_jvm=true",\
-     "-use_local_catalog=false"]
+     "-use_local_catalog=false", "--rpc_use_loopback=true"]

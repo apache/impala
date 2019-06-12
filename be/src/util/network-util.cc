@@ -49,7 +49,7 @@ using std::random_device;
 
 namespace impala {
 
-static const string LOCALHOST("127.0.0.1");
+const string LOCALHOST_IP_STR("127.0.0.1");
 
 Status GetHostname(string* hostname) {
   char name[HOST_NAME_MAX];
@@ -122,7 +122,7 @@ bool IsResolvedAddress(const TNetworkAddress& addr) {
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {
   for (const string& candidate: addresses) {
-    if (candidate != LOCALHOST) {
+    if (candidate != LOCALHOST_IP_STR) {
       *addr = candidate;
       return true;
     }

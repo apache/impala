@@ -82,6 +82,9 @@ DEFINE_int32(rpc_negotiation_timeout_ms, 300000,
     "Time in milliseconds of waiting for a negotiation to complete before timing out.");
 DEFINE_int32(rpc_negotiation_thread_count, 64,
     "Maximum number of threads dedicated to handling RPC connection negotiations.");
+DEFINE_bool(rpc_use_loopback, false,
+    "Always use loopback for local connections. This requires binding to all addresses, "
+    "not just the KRPC address.");
 
 namespace impala {
 
@@ -187,7 +190,14 @@ Status RpcMgr::StartServices(const TNetworkAddress& address) {
   // Convert 'address' to Kudu's Sockaddr
   DCHECK(IsResolvedAddress(address));
   Sockaddr sockaddr;
-  RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
+  if (FLAGS_rpc_use_loopback) {
+    // Listen on all addresses, including loopback.
+    sockaddr.set_port(address.port);
+    DCHECK(sockaddr.IsWildcard()) << sockaddr.ToString();
+  } else {
+    // Only listen on the canonical address for KRPC.
+    RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
+  }
 
   // Call the messenger to create an AcceptorPool for us.
   KUDU_RETURN_IF_ERROR(messenger_->AddAcceptorPool(sockaddr, &acceptor_pool_),

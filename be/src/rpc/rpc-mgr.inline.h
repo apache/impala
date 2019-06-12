@@ -20,13 +20,17 @@
 
 #include "rpc/rpc-mgr.h"
 
+#include <gflags/gflags.h>
+
 #include "exec/kudu-util.h"
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/service_pool.h"
 #include "kudu/rpc/user_credentials.h"
+#include "runtime/exec-env.h"
 #include "util/network-util.h"
 
+DECLARE_bool(rpc_use_loopback);
 namespace impala {
 
 /// Always inline to avoid having to provide a definition for each use type P.
@@ -36,8 +40,14 @@ Status RpcMgr::GetProxy(const TNetworkAddress& address, const std::string& hostn
   DCHECK(proxy != nullptr);
   DCHECK(is_inited()) << "Must call Init() before GetProxy()";
   DCHECK(IsResolvedAddress(address));
+  TNetworkAddress address_to_use = address;
+  // Talk to self via loopback.
+  if (FLAGS_rpc_use_loopback &&
+      address_to_use.hostname == ExecEnv::GetInstance()->krpc_address().hostname) {
+    address_to_use.__set_hostname(LOCALHOST_IP_STR);
+  }
   kudu::Sockaddr sockaddr;
-  RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
+  RETURN_IF_ERROR(TNetworkAddressToSockaddr(address_to_use, &sockaddr));
   proxy->reset(new P(messenger_, sockaddr, hostname));
 
   // Always set the user credentials as Proxy ctor may fail in GetLoggedInUser().

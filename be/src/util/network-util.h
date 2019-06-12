@@ -73,4 +73,6 @@ Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
 /// a free ephemeral port can't be found after 100 tries.
 int FindUnusedEphemeralPort();
 
+extern const std::string LOCALHOST_IP_STR;
+
 } // namespace impala
