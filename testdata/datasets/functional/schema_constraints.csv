@@ -248,3 +248,9 @@ table_name:full_transactional_table, constraint:restrict_to, table_format:orc/de
 # Insert-only transactional tables only work for file-format based tables
 table_name:insert_only_transactional_table, constraint:exclude, table_format:hbase/none/none
 table_name:insert_only_transactional_table, constraint:exclude, table_format:kudu/none/none
+
+# 'materialized_view' is based on 'insert_only_transactional_table' from the same
+# database, so it needs to be excluded where 'insert_only_transactional_table' is
+# excluded.
+table_name:materialized_view, constraint:exclude, table_format:hbase/none/none
+table_name:materialized_view, constraint:exclude, table_format:kudu/none/none
