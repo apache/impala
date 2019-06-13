@@ -338,6 +338,7 @@ ThriftServer::ThriftServer(const string& name,
     max_concurrent_connections_(max_concurrent_connections),
     queue_timeout_ms_(queue_timeout_ms),
     name_(name),
+    metrics_name_(Substitute("impala.thrift-server.$0", name_)),
     server_(NULL),
     processor_(processor),
     connection_handler_(NULL),
@@ -350,10 +351,10 @@ ThriftServer::ThriftServer(const string& name,
   if (metrics != NULL) {
     metrics_enabled_ = true;
     stringstream count_ss;
-    count_ss << "impala.thrift-server." << name << ".connections-in-use";
+    count_ss << metrics_name_ << ".connections-in-use";
     num_current_connections_metric_ = metrics->AddGauge(count_ss.str(), 0);
     stringstream max_ss;
-    max_ss << "impala.thrift-server." << name << ".total-connections";
+    max_ss << metrics_name_ << ".total-connections";
     total_connections_metric_ = metrics->AddCounter(max_ss.str(), 0);
     metrics_ = metrics;
   } else {
@@ -491,15 +492,15 @@ Status ThriftServer::Start() {
   boost::shared_ptr<TServerSocket> server_socket;
   boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
-  RETURN_IF_ERROR(
-      auth_provider_->GetServerTransportFactory(transport_type_, &transport_factory));
+  RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(
+      transport_type_, metrics_name_, metrics_, &transport_factory));
 
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
       protocol_factory, thread_factory, name_, max_concurrent_connections_,
       queue_timeout_ms_));
   if (metrics_ != NULL) {
-    (static_cast<TAcceptQueueServer*>(server_.get()))->InitMetrics(metrics_,
-        Substitute("impala.thrift-server.$0", name_));
+    (static_cast<TAcceptQueueServer*>(server_.get()))
+        ->InitMetrics(metrics_, metrics_name_);
   }
   boost::shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
       new ThriftServer::ThriftServerEventProcessor(this));

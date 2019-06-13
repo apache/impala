@@ -46,6 +46,7 @@ class AuthProvider {
   /// around another transport type, eg. a TSaslServerTransport.
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
+      const std::string& server_name, MetricGroup* metrics,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory)
       WARN_UNUSED_RESULT = 0;
 
@@ -100,6 +101,7 @@ class SecureAuthProvider : public AuthProvider {
   /// This is only applicable to Thrift connections and not KRPC connections.
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
+      const std::string& server_name, MetricGroup* metrics,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   /// IF sasl was used, the username will be available from the handshake, and we set it
@@ -176,6 +178,7 @@ class NoAuthProvider : public AuthProvider {
 
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
+      const std::string& server_name, MetricGroup* metrics,
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   virtual Status WrapClientTransport(const std::string& hostname,

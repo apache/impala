@@ -864,8 +864,8 @@ Status SecureAuthProvider::Start() {
 }
 
 Status SecureAuthProvider::GetServerTransportFactory(
-    ThriftServer::TransportType underlying_transport_type,
-    boost::shared_ptr<TTransportFactory>* factory) {
+    ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
+    MetricGroup* metrics, boost::shared_ptr<TTransportFactory>* factory) {
   DCHECK(!principal_.empty() || has_ldap_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
@@ -878,7 +878,8 @@ Status SecureAuthProvider::GetServerTransportFactory(
 
     factory->reset(new ThriftServer::BufferedTransportFactory(
         ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
-        new THttpServerTransportFactory(/* requireBasicAuth */ true)));
+        new THttpServerTransportFactory(
+            server_name, metrics, /* requireBasicAuth */ true)));
     return Status::OK();
   }
 
@@ -972,8 +973,8 @@ void SecureAuthProvider::SetupConnectionContext(
 }
 
 Status NoAuthProvider::GetServerTransportFactory(
-    ThriftServer::TransportType underlying_transport_type,
-    boost::shared_ptr<TTransportFactory>* factory) {
+    ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
+    MetricGroup* metrics, boost::shared_ptr<TTransportFactory>* factory) {
   // No Sasl - yawn.  Here, have a regular old buffered transport.
   switch (underlying_transport_type) {
     case ThriftServer::BINARY:

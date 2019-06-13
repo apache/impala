@@ -221,6 +221,9 @@ class ThriftServer {
   /// User-specified identifier that shows up in logs
   const std::string name_;
 
+  /// Identifier used to prefix all metric names that are produced by this server.
+  const std::string metrics_name_;
+
   /// Thread that runs ThriftServerEventProcessor::Supervise() in a separate loop
   std::unique_ptr<Thread> server_thread_;
 

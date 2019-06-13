@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include <gutil/strings/strip.h>
+#include <gutil/strings/substitute.h>
 #include <gutil/strings/util.h>
 
 #include "transport/THttpServer.h"
@@ -30,15 +31,33 @@
 #include <Shlwapi.h>
 #endif
 
+#include "util/metrics.h"
+
 namespace apache {
 namespace thrift {
 namespace transport {
 
 using namespace std;
+using strings::Substitute;
 
-THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool requireBasicAuth)
-  : THttpTransport(transport), requireBasicAuth_(requireBasicAuth) {
+THttpServerTransportFactory::THttpServerTransportFactory(
+    const std::string server_name, impala::MetricGroup* metrics, bool requireBasicAuth)
+  : requireBasicAuth_(requireBasicAuth) {
+  if (requireBasicAuth_) {
+    total_basic_auth_success_ =
+        metrics->AddCounter(Substitute("$0.total-basic-auth-success", server_name), 0);
+    total_basic_auth_failure_ =
+        metrics->AddCounter(Substitute("$0.total-basic-auth-failure", server_name), 0);
+  }
 }
+
+THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool requireBasicAuth,
+    impala::IntCounter* total_basic_auth_success,
+    impala::IntCounter* total_basic_auth_failure)
+  : THttpTransport(transport),
+    requireBasicAuth_(requireBasicAuth),
+    total_basic_auth_success_(total_basic_auth_success),
+    total_basic_auth_failure_(total_basic_auth_failure) {}
 
 THttpServer::~THttpServer() {
 }
@@ -130,10 +149,12 @@ void THttpServer::headersDone() {
       if (TryStripPrefixString(authValue_, "Basic ", &base64)) {
         if (authFn_(base64.c_str())) {
           authorized = true;
+          total_basic_auth_success_->Increment(1);
         }
       }
     }
     if (!authorized) {
+      total_basic_auth_failure_->Increment(1);
       returnUnauthorized();
       throw TTransportException("HTTP Basic auth failed.");
     }

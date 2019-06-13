@@ -21,6 +21,7 @@
 #define IMPALA_TRANSPORT_THTTPSERVER_H
 
 #include "transport/THttpTransport.h"
+#include "util/metrics-fwd.h"
 
 namespace apache {
 namespace thrift {
@@ -36,7 +37,9 @@ public:
   // returns true if authentication is successful.
   typedef std::function<bool(const char*)> BasicAuthFn;
 
-  THttpServer(boost::shared_ptr<TTransport> transport, bool requireBasicAuth = false);
+  THttpServer(boost::shared_ptr<TTransport> transport, bool requireBasicAuth,
+      impala::IntCounter* total_basic_auth_success,
+      impala::IntCounter* total_basic_auth_failure);
 
   virtual ~THttpServer();
 
@@ -65,6 +68,10 @@ protected:
 
   // The value from the 'Authorization' header.
   std::string authValue_ = "";
+
+  // Metrics
+  impala::IntCounter* total_basic_auth_success_;
+  impala::IntCounter* total_basic_auth_failure_;
 };
 
 /**
@@ -72,21 +79,28 @@ protected:
  */
 class THttpServerTransportFactory : public TTransportFactory {
 public:
+ THttpServerTransportFactory() : requireBasicAuth_(false) {}
 
-  explicit THttpServerTransportFactory(bool requireBasicAuth = false)
-    : requireBasicAuth_(requireBasicAuth) {}
+ THttpServerTransportFactory(
+     const std::string server_name, impala::MetricGroup* metrics, bool requireBasicAuth);
 
-  virtual ~THttpServerTransportFactory() {}
+ virtual ~THttpServerTransportFactory() {}
 
-  /**
-   * Wraps the transport into a buffered one.
-   */
-  virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
-    return boost::shared_ptr<TTransport>(new THttpServer(trans, requireBasicAuth_));
+ /**
+  * Wraps the transport into a buffered one.
+  */
+ virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
+   return boost::shared_ptr<TTransport>(new THttpServer(
+       trans, requireBasicAuth_, total_basic_auth_success_, total_basic_auth_failure_));
   }
 
  private:
   bool requireBasicAuth_ = false;
+
+  // If 'requireBasicAuth_' is true, metrics for the number of successful and failed Basic
+  // auth ettempts for every transport produced by this factory.
+  impala::IntCounter* total_basic_auth_success_;
+  impala::IntCounter* total_basic_auth_failure_;
 };
 }
 }

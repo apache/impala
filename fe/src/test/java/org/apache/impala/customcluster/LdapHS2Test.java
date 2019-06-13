@@ -32,6 +32,7 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
+import org.apache.impala.util.Metrics;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.Before;
@@ -50,6 +51,8 @@ import org.junit.Test;
 public class LdapHS2Test {
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
+
+  Metrics metrics = new Metrics();
 
   @Before
   public void setUp() throws Exception {
@@ -92,11 +95,22 @@ public class LdapHS2Test {
     return execResp.getOperationHandle();
   }
 
+  private void verifyMetrics(long expectedBasicAuthSuccess, long expectedBasicAuthFailure)
+      throws Exception {
+    long actualBasicAuthSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
+    assertEquals(expectedBasicAuthSuccess, actualBasicAuthSuccess);
+    long actualBasicAuthFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
+    assertEquals(expectedBasicAuthFailure, actualBasicAuthFailure);
+  }
+
   /**
    * Tests LDAP authentication to the HTTP hiveserver2 endpoint.
    */
   @Test
   public void testHiveserver2() throws Exception {
+    verifyMetrics(0, 0);
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
     // Authenticate as 'Test1Ldap' with password '12345'
@@ -108,9 +122,13 @@ public class LdapHS2Test {
     // Open a session which will get username 'Test1Ldap'.
     TOpenSessionReq openReq = new TOpenSessionReq();
     TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(1, 0);
     // Running a query should succeed.
     TOperationHandle operationHandle = execAndFetch(
         client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(3, 0);
 
     // Authenticate as 'Test2Ldap' with password 'abcde'
     headers.put("Authorization", "Basic VGVzdDJMZGFwOmFiY2Rl");
@@ -123,25 +141,31 @@ public class LdapHS2Test {
       fail("Expected error: " + expectedError);
     } catch (Exception e) {
       assertTrue(e.getMessage().contains(expectedError));
+      // The connection for the Exec() will be successful.
+      verifyMetrics(4, 0);
     }
 
     // Try to cancel the first query, which should fail.
     TCancelOperationReq cancelReq = new TCancelOperationReq(operationHandle);
     TCancelOperationResp cancelResp = client.CancelOperation(cancelReq);
+    verifyMetrics(5, 0);
     assertEquals(cancelResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
     assertEquals(cancelResp.getStatus().getErrorMessage(), expectedError);
 
     // Open another session which will get username 'Test2Ldap'.
     TOpenSessionReq openReq2 = new TOpenSessionReq();
     TOpenSessionResp openResp2 = client.OpenSession(openReq);
+    verifyMetrics(6, 0);
     // Running a query with the new session should succeed.
     execAndFetch(
         client, openResp2.getSessionHandle(), "select logged_in_user()", "Test2Ldap");
+    verifyMetrics(8, 0);
 
     // Attempt to authenticate with some bad headers:
     // - invalid username/password combination
     // - invalid base64 encoded value
     // - Invalid mechanism
+    int numFailures = 0;
     for (String authStr : new String[] {"Basic VGVzdDJMZGFwOjEyMzQ1",
              "Basic invalid-base64", "Negotiate VGVzdDFMZGFwOjEyMzQ1"}) {
       // Attempt to authenticate with an invalid password.
@@ -150,6 +174,8 @@ public class LdapHS2Test {
       try {
         TOpenSessionReq openReq3 = new TOpenSessionReq();
         TOpenSessionResp openResp3 = client.OpenSession(openReq);
+        ++numFailures;
+        verifyMetrics(8, numFailures);
         fail("Exception exception.");
       } catch (Exception e) {
         assertEquals(e.getMessage(), "HTTP Response code: 401");
