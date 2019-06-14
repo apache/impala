@@ -410,6 +410,7 @@ add_subdirectory(shaded-deps)
 add_subdirectory(fe)
 add_subdirectory(impala-parent)
 add_subdirectory(ext-data-source)
+add_subdirectory(query-event-hook-api)
 
 # Build target for all generated files which most backend code depends on
 add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps)

@@ -45,6 +45,12 @@ under the License.
 
     <dependency>
       <groupId>org.apache.impala</groupId>
+      <artifactId>query-event-hook-api</artifactId>
+      <version>${impala.query.event.hook.api.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
       <version>${impala.extdatasrc.api.version}</version>
     </dependency>

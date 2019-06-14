@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(fe ALL DEPENDS
-  shaded-deps thrift-deps fb-deps yarn-extras function-registry ext-data-source
-      query-event-hook-api impala-parent
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
+add_custom_target(query-event-hook-api ALL DEPENDS gen-deps impala-parent
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )
