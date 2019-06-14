@@ -32,8 +32,7 @@ Directory $(pwd)
 EOF
 
 if ! mvn $IMPALA_MAVEN_OPTIONS "$@" | \
-  tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test | \
-    grep -v "Could not transfer"; then
+  tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1
 fi
