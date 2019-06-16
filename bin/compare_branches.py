@@ -101,6 +101,8 @@ def create_parser():
   parser.add_argument('--target_remote_name', default=None,
       help='Name of the target git remote; defaults to source remote. ' +
            'Empty strings are handled the same way as --source_remote_name.')
+  parser.add_argument('--source_terminal_commit', default=None,
+      help='If set, cherrypick till this commit in the source branch.')
   default_ignored_commits_path = os.path.join(
       os.path.dirname(os.path.abspath(__file__)), 'ignored_commits.json')
   parser.add_argument('--ignored_commits_file', default=default_ignored_commits_path,
@@ -161,7 +163,8 @@ def build_commit_map(branch, merge_base):
   logging.debug("Commit map for branch %s has size %d.", branch, len(result))
   return result
 
-def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
+
+def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok, terminal_commit):
   """Cherrypicks the given commits.
 
   Also, asserts that full_target_branch_name matches the current HEAD.
@@ -199,6 +202,9 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
         return
       else:
         raise Exception("Failed to cherry-pick: %s" % (cherry_pick_hash,))
+    if terminal_commit == cherry_pick_hash:
+      logging.debug("Stop at terminal commit {0}".format(cherry_pick_hash))
+      break
 
 def main():
   parser = create_parser()
@@ -281,7 +287,8 @@ def main():
                .format(pformat(commits_ignored)))
 
   if options.cherry_pick:
-    cherrypick(cherry_pick_hashes, full_target_branch_name, options.partial_ok)
+    cherrypick(cherry_pick_hashes, full_target_branch_name, options.partial_ok,
+               options.source_terminal_commit)
 
 if __name__ == '__main__':
   main()
