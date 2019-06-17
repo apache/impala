@@ -17,6 +17,7 @@
 
 package org.apache.impala.common;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.IOUtils;
@@ -25,7 +26,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
@@ -564,13 +564,13 @@ public class FileSystemUtil {
         // even though it returns LocatedFileStatus objects with "fake" blocks which we
         // will ignore.
         if (isS3AFileSystem(fs)) {
-          return listFiles(fs, p, recursive);
+          return listFiles(fs, p, true);
         }
 
-        return new RecursingIterator(fs, p);
+        return new FilterIterator(p, new RecursingIterator(fs, p));
       }
 
-      return fs.listStatusIterator(p);
+      return new FilterIterator(p, fs.listStatusIterator(p));
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;
@@ -580,10 +580,10 @@ public class FileSystemUtil {
   /**
    * Wrapper around FileSystem.listFiles(), similar to the listStatus() wrapper above.
    */
-  public static RemoteIterator<LocatedFileStatus> listFiles(FileSystem fs, Path p,
+  public static RemoteIterator<? extends FileStatus> listFiles(FileSystem fs, Path p,
       boolean recursive) throws IOException {
     try {
-      return fs.listFiles(p, recursive);
+      return new FilterIterator(p, fs.listFiles(p, recursive));
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;
@@ -609,6 +609,93 @@ public class FileSystemUtil {
           path + " for a file within " + startPath);
     }
     return relUri.getPath();
+  }
+
+  /**
+   * Util method to check if the given file status relative to its parent is contained
+   * in a ignored directory. This is useful to ignore the files which seemingly are valid
+   * just by themselves but should still be ignored if they are contained in a
+   * directory which needs to be ignored
+   *
+   * @return true if the fileStatus should be ignored, false otherwise
+   */
+  @VisibleForTesting
+  static boolean isInIgnoredDirectory(Path parent, FileStatus fileStatus) {
+    Preconditions.checkNotNull(fileStatus);
+    Path currentPath = fileStatus.isDirectory() ? fileStatus.getPath() :
+        fileStatus.getPath().getParent();
+    while (currentPath != null && !currentPath.equals(parent)) {
+      if (isIgnoredDir(currentPath)) {
+        LOG.debug("Ignoring {} since it is either in a hidden directory or a temporary "
+                + "staging directory {}", fileStatus.getPath(), currentPath);
+        return true;
+      }
+      currentPath = currentPath.getParent();
+    }
+    return false;
+  }
+
+  /**
+   * Prefix string used by hive to write certain temporary or "non-data" files in the
+   * table location
+   */
+  public static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
+
+  public static final String DOT = ".";
+
+  /**
+   * Util method used to filter out hidden and temporary staging directories
+   * which tools like Hive create in the table/partition directories when a query is
+   * inserting data into them.
+   */
+  @VisibleForTesting
+  static boolean isIgnoredDir(Path path) {
+    String filename = path.getName();
+    return filename.startsWith(DOT) || filename.startsWith(HIVE_TEMP_FILE_PREFIX);
+  }
+
+  /**
+   * A remote iterator which takes in another Remote Iterator and a start path and filters
+   * all the ignored directories
+   * (See {@link org.apache.impala.common.FileSystemUtil#isInIgnoredDirectory}) from the
+   * listing of the remote iterator
+   */
+  static class FilterIterator implements RemoteIterator<FileStatus> {
+    private final RemoteIterator<? extends FileStatus> baseIterator_;
+    private FileStatus curFile_ = null;
+    private final Path startPath_;
+
+    FilterIterator(Path startPath, RemoteIterator<? extends FileStatus> baseIterator) {
+      startPath_ = Preconditions.checkNotNull(startPath);
+      baseIterator_ = Preconditions.checkNotNull(baseIterator);
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      // Pull the next file to be returned into 'curFile'. If we've already got one,
+      // we don't need to do anything (extra calls to hasNext() must not affect
+      // state)
+      while (curFile_ == null) {
+        if (!baseIterator_.hasNext()) return false;
+        // if the next fileStatus is in ignored directory skip it
+        FileStatus next = baseIterator_.next();
+        if (!isInIgnoredDirectory(startPath_, next)) {
+          curFile_ = next;
+          return true;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public FileStatus next() throws IOException {
+      if (hasNext()) {
+        FileStatus next = curFile_;
+        curFile_ = null;
+        return next;
+      }
+      throw new NoSuchElementException("No more entries");
+    }
   }
 
   /**

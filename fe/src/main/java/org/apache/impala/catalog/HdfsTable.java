@@ -1615,8 +1615,8 @@ public class HdfsTable extends Table implements FeFsTable {
       return;
     }
 
-    RemoteIterator<? extends FileStatus> statuses = FileSystemUtil.listStatus(fs, path,
-        /*recursive=*/false);
+    RemoteIterator <? extends FileStatus> statuses = fs.listStatusIterator(path);
+
     if (statuses == null) return;
     while (statuses.hasNext()) {
       FileStatus status = statuses.next();

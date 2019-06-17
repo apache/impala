@@ -92,6 +92,20 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._show_files(fq_tbl_name)) == 3
     assert len(self._get_rows(fq_tbl_name)) == 3
 
+    # Create files in the nested hidden directories and refresh. Make sure it does not
+    # show up
+    self.filesystem_client.make_dir("{0}/.hive-staging".format(part_path[1:]))
+    self.filesystem_client.create_file(
+        "{0}/.hive-staging/file3.txt".format(part_path[1:]),
+        "data-should-be-ignored-by-impala")
+    self.filesystem_client.make_dir("{0}/_tmp.base_000000_1".format(part_path[1:]))
+    self.filesystem_client.create_file(
+        "{0}/_tmp.base_000000_1/000000_0.manifest".format(part_path[1:]),
+        "manifest-file_contents")
+    self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
+    assert len(self._show_files(fq_tbl_name)) == 3
+    assert len(self._get_rows(fq_tbl_name)) == 3
+
     # Test that disabling recursive listings makes the nested files disappear.
     self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties(" +
         "'impala.disable.recursive.listing'='true')").format(fq_tbl_name))

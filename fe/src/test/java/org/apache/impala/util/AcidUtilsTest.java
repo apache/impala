@@ -84,6 +84,7 @@ public class AcidUtilsTest {
           "base_0000005/abc.txt",
           "base_0000005/0000/",
           "base_0000005/0000/abc.txt",
+          "_tmp.base_0000005/000000_0.manifest",
           "abc/",
           "abc/base_0000006/", // Not at root, so shouldn't be handled.
           "base_00000100/def.txt"},
@@ -103,6 +104,7 @@ public class AcidUtilsTest {
           "base_0000005/abc.txt",
           "base_0000005/0000/",
           "base_0000005/0000/abc.txt",
+          "_tmp.base_0000005/000000_0.manifest",
           "delta_0000006_0000006_0000/",
           "delta_0000006_0000006_0000/000000_0",
           "delta_0000007_0000007_0000/",
@@ -129,6 +131,7 @@ public class AcidUtilsTest {
           "base_0000005/abc.txt",
           "base_0000005/0000/",
           "base_0000005/0000/abc.txt",
+          "_tmp.base_0000005/000000_0.manifest",
           "delta_0000006_0000006_0000/",
           "delta_0000006_0000006_0000/000000_0",
           "delta_0000007_0000007_0000/",
