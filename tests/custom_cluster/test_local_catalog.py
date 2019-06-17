@@ -23,6 +23,8 @@ import random
 import threading
 import time
 
+from multiprocessing.pool import ThreadPool
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
@@ -313,9 +315,44 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
       client1.close()
       client2.close()
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true --inject_latency_after_catalog_fetch_ms=50",
+      catalogd_args="--catalog_topic_mode=minimal",
+      cluster_size=1)
+  def test_invalidation_races(self, unique_database):
+    """
+    Regression test for IMPALA-7534: races where invalidation of the table list
+    could be skipped, causing spurious "table not found" errors.
+    """
+    test_self = self
+
+    class ThreadLocalClient(threading.local):
+      def __init__(self):
+        self.c = test_self.create_impala_client()
+
+    t = ThreadPool(processes=8)
+    tls = ThreadLocalClient()
+
+    def do_table(i):
+      for q in [
+        "create table {db}.t{i} (i int)",
+        "describe {db}.t{i}",
+        "drop table {db}.t{i}",
+        "create database {db}_{i}",
+        "show tables in {db}_{i}",
+        "drop database {db}_{i}"]:
+        self.execute_query_expect_success(tls.c, q.format(
+            db=unique_database, i=i))
+
+    # Prior to fixing IMPALA-7534, this test would fail within 20-30 iterations,
+    # so 100 should be quite reliable as a regression test.
+    NUM_ITERS = 100
+    for i in t.imap_unordered(do_table, xrange(NUM_ITERS)):
+      pass
+
 
 class TestObservability(CustomClusterTestSuite):
-
   def get_catalog_cache_metrics(self, impalad):
     """ Returns catalog cache metrics as a dict by scraping the json metrics page on the
     given impalad"""

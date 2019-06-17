@@ -31,6 +31,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"
+#include "util/time.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
@@ -47,6 +48,9 @@ using namespace apache::thrift;
 DECLARE_bool(use_local_catalog);
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
+
+DEFINE_int32_hidden(inject_latency_after_catalog_fetch_ms, 0,
+    "Latency (ms) to be injected after fetching catalog data from the catalogd");
 
 Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   Status status;
@@ -296,6 +300,9 @@ Status CatalogOpExecutor::GetPartialCatalogObject(
   RETURN_IF_ERROR(status);
   RETURN_IF_ERROR(
       client.DoRpc(&CatalogServiceClientWrapper::GetPartialCatalogObject, req, resp));
+  if (FLAGS_inject_latency_after_catalog_fetch_ms > 0) {
+    SleepForMs(FLAGS_inject_latency_after_catalog_fetch_ms);
+  }
   return Status::OK();
 }
 

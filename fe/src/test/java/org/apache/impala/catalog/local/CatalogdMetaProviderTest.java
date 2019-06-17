@@ -19,9 +19,15 @@ package org.apache.impala.catalog.local;
 
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -45,6 +51,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheStats;
 import com.google.common.collect.ImmutableList;
 
@@ -241,4 +248,75 @@ public class CatalogdMetaProviderTest {
         prof.counters.get(1).toString());
     assertEquals("CatalogFetch.Tables.Time", prof.counters.get(2).name);
   }
+
+  @Test
+  public void testPiggybackSuccess() throws Exception {
+    doTestPiggyback(/*success=*/true);
+  }
+
+  @Test
+  public void testPiggybackFailure() throws Exception {
+    doTestPiggyback(/*success=*/false);
+  }
+
+  private void doTestPiggyback(boolean testSuccessCase) throws Exception {
+    // To test success, we load an existing table. Otherwise, load one that doesn't
+    // exist, which will throw an exception.
+    final String tableName = testSuccessCase ? "alltypes" : "table-does-not-exist";
+    final AtomicInteger counterToWatch = testSuccessCase ?
+        provider_.piggybackSuccessCountForTests :
+        provider_.piggybackExceptionCountForTests;
+
+    final int kNumThreads = 8;
+    ExecutorService exec = Executors.newFixedThreadPool(kNumThreads);
+    try {
+      // Run for at least 60 seconds to try to provoke the desired behavior.
+      Stopwatch sw = new Stopwatch().start();
+      while (sw.elapsed(TimeUnit.SECONDS) < 60) {
+        // Submit a wave of parallel tasks which all fetch the same table, concurently.
+        // One of these should win whereas the others are likely to piggy-back on the
+        // same request.
+        List<Future<Object>> futures = new ArrayList<>();
+        for (int i = 0; i < kNumThreads; i++) {
+          futures.add(exec.submit(() -> provider_.loadTable("functional", tableName)));
+        }
+        for (Future<Object> f : futures) {
+          try {
+            assertNotNull(f.get());
+            if (!testSuccessCase) fail("Did not get expected exception");
+          } catch (Exception e) {
+            // If we expected success, but got an exception, we should rethrow it.
+            if (testSuccessCase) throw e;
+          }
+        }
+        if (counterToWatch.get() > 20) {
+          return;
+        }
+
+        TCatalogObject obj = new TCatalogObject(TCatalogObjectType.TABLE, 0);
+        obj.setTable(new TTable("functional", tableName));
+        provider_.invalidateCacheForObject(obj);
+      }
+      fail("Did not see enough piggybacked loads!");
+    } finally {
+      exec.shutdown();
+      assertTrue(exec.awaitTermination(60, TimeUnit.SECONDS));
+    }
+
+    // Check that, in the success case, the table was left in the cache.
+    // In the failure case, we should not have any "failed" entry persisting.
+    diffStats();
+    try {
+      provider_.loadTable("functonal", tableName);
+    } catch (Exception e) {}
+    CacheStats stats = diffStats();
+    if (testSuccessCase) {
+      assertEquals(1, stats.hitCount());
+      assertEquals(0, stats.missCount());
+    } else {
+      assertEquals(0, stats.hitCount());
+      assertEquals(1, stats.missCount());
+    }
+  }
+
 }

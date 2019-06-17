@@ -26,8 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,7 +55,6 @@ import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.Reference;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -99,6 +101,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 
@@ -232,7 +235,34 @@ public class CatalogdMetaProvider implements MetaProvider {
   // to the "direct" provider for now and circumvent catalogd.
   private DirectMetaProvider directProvider_ = new DirectMetaProvider();
 
+  /**
+   * Number of requests which piggy-backed on a concurrent request for the same key,
+   * and resulted in success. Used only for test assertions.
+   */
+  @VisibleForTesting
+  final AtomicInteger piggybackSuccessCountForTests = new AtomicInteger();
 
+  /**
+   * Number of requests which piggy-backed on a concurrent request for the same key,
+   * and resulted in an exception. Used only for test assertions.
+   */
+  @VisibleForTesting
+  final AtomicInteger piggybackExceptionCountForTests = new AtomicInteger();
+
+  /**
+   * The underlying cache.
+   *
+   * The keys in this cache are various types of objects (strings, DbCacheKey, etc).
+   * The values are also variant depending on the type of cache key. While any key
+   * is being loaded, it is a Future<T>, which gets replaced with a non-wrapped object
+   * once it is successfully loaded (see {@link #getIfPresent(Object)} for a convenient
+   * wrapper).
+   *
+   * For details of the usage of Futures within the cache, see
+   * {@link #loadWithCaching(String, String, Object, Callable).
+   *
+
+   */
   final Cache<Object,Object> cache_;
 
   /**
@@ -393,29 +423,102 @@ public class CatalogdMetaProvider implements MetaProvider {
   private <CacheKeyType, ValueType> ValueType loadWithCaching(String itemString,
       String statsCategory, CacheKeyType key,
       final Callable<ValueType> loadCallable) throws TException {
-    // TODO(todd): there a race here if an invalidation comes in while we are
-    // fetching here. Perhaps we need some locking, or need to remember the
-    // version numbers of the invalidation messages and ensure that we don't
-    // 'put' an element with a too-old version? See:
-    // https://softwaremill.com/race-condition-cache-guava-caffeine/
-    final Reference<Boolean> hit = new Reference<>(true);
+
+    // We cache Futures during loading to deal with a particularly troublesome race
+    // around invalidation (IMPALA-7534). Namely, we have the following interleaving to
+    // worry about:
+    //
+    //  Thread 1: loadTableNames() misses and sends a request to fetch table names
+    //  Catalogd: sends a response with table list ['foo']
+    //  Thread 2:    creates a table 'bar'
+    //  Catalogd:    returns an invalidation for the table name list
+    //  Thread 2:    invalidates the table list
+    //  Thread 1: response arrives with ['foo'], which is stored in the cache
+    //
+    // In this case, we've "missed" an invalidation because it arrived concurrently
+    // with the loading of a value in the cache. This is a well-known issue with
+    // Guava:
+    //
+    //    https://softwaremill.com/race-condition-cache-guava-caffeine/
+    //
+    // In order to avoid this issue, if we don't find an element in the cache, we insert
+    // a Future while we load the value. Essentially, an entry can be in one of the
+    // following states:
+    //
+    // Missing (no entry in the cache):
+    //   invalidate would be ignored, but that's OK, because any future read would fetch
+    //   new data from the catalogd, and see a version newer than the invalidate
+    //
+    // Loading (a Future<> in the cache):
+    //    invalidate removes the future. When loading completes, its attempt to swap
+    //    in the value will fail. Any request after the invalidate will cause a second
+    //    load to be triggered, which sees the post-invalidated data in catalogd.
+    //
+    //    Any concurrent *read* of the cache (with no invalidation or prior to an
+    //    invalidation) will piggy-back on the e same Future and return its result when
+    //    it completes.
+    //
+    // Cached (non-Future in the cache):
+    //    no interesting race: an invalidation ensures that any future load will miss
+    //    and fetch a new value
+    //
+    // NOTE: we don't need to perform this dance for cache keys which embed a version
+    // number, because invalidation is not handled by removing cache entries, but
+    // rather by bumping top-level version numbers.
     Stopwatch sw = new Stopwatch().start();
+    boolean hit = false;
+    boolean isPiggybacked = false;
     try {
-      return (ValueType)cache_.get(key, new Callable<ValueType>() {
-        @Override
-        public ValueType call() throws Exception {
-          hit.setRef(false);
-          return loadCallable.call();
-        }
-      });
+      CompletableFuture<Object> f = new CompletableFuture<Object>();
+      // NOTE: the Cache ensures that this is an atomic operation of either returning
+      // an existing value or inserting our own. Only one thread can think it is the
+      // "loader" at a time.
+      Object inCache = cache_.get(key, () -> f);
+      if (!(inCache instanceof Future)) {
+        hit = true;
+        return (ValueType)inCache;
+      }
+
+      if (inCache != f) {
+        isPiggybacked = true;
+        Future<ValueType> existing = (Future<ValueType>)inCache;
+        ValueType ret = Uninterruptibles.getUninterruptibly(existing);
+        piggybackSuccessCountForTests.incrementAndGet();
+        return ret;
+      }
+
+      // No other thread was loading this value, so we need to fetch it ourselves.
+      try {
+        f.complete(loadCallable.call());
+        // Assuming we were able to load the value, store it back into the map
+        // as a plain-old object. This is important to get the proper weight in the
+        // map. If someone invalidated this load concurrently, this 'replace' will
+        // fail because 'f' will not be the current value.
+        cache_.asMap().replace(key, f, f.get());
+      } catch (Exception e) {
+        // If there was an exception, remove it from the map so that any later loads
+        // retry.
+        cache_.asMap().remove(key, f);
+        // Ensure any piggy-backed loaders get the exception. 'f.get()' below will
+        // throw to this caller.
+        f.completeExceptionally(e);
+      }
+      return (ValueType) Uninterruptibles.getUninterruptibly(f);
     } catch (ExecutionException | UncheckedExecutionException e) {
+      if (isPiggybacked) {
+        piggybackExceptionCountForTests.incrementAndGet();
+      }
+
       Throwables.propagateIfPossible(e.getCause(), TException.class);
+      // Since the loading code should only throw TException, we shouldn't get
+      // any other exceptions here. If for some reason we do, just rethrow as RTE.
       throw new RuntimeException(e);
     } finally {
       sw.stop();
-      addStatsToProfile(statsCategory, /*numHits=*/hit.getRef() ? 1 : 0,
-          /*numMisses=*/hit.getRef() ? 0 : 1, sw);
-      LOG.trace("Request for {}: {}", itemString, hit.getRef() ? "hit" : "miss");
+      addStatsToProfile(statsCategory, /*numHits=*/hit ? 1 : 0,
+          /*numMisses=*/hit ? 0 : 1, sw);
+      LOG.trace("Request for {}: {}{}", itemString, isPiggybacked ? "piggy-backed " : "",
+          hit ? "hit" : "miss");
     }
   }
 
@@ -431,7 +534,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     if (profile == null) return;
     final String prefix = CATALOG_FETCH_PREFIX + "." +
         Preconditions.checkNotNull(statsCategory) + ".";
-    profile.addToCounter(prefix + "Requests", TUnit.NONE, numHits + numMisses);;
+    profile.addToCounter(prefix + "Requests", TUnit.NONE, numHits + numMisses);
     profile.addToCounter(prefix + "Time", TUnit.TIME_MS,
         stopwatch.elapsed(TimeUnit.MILLISECONDS));
     if (numHits > 0) {
@@ -581,7 +684,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     List<String> missingCols = Lists.newArrayListWithCapacity(colNames.size());
     for (String colName: colNames) {
       ColStatsCacheKey cacheKey = new ColStatsCacheKey((TableMetaRefImpl)table, colName);
-      ColumnStatisticsObj val = (ColumnStatisticsObj)cache_.getIfPresent(cacheKey);
+      ColumnStatisticsObj val = (ColumnStatisticsObj) getIfPresent(cacheKey);
       if (val == null) {
         missingCols.add(colName);
       } else if (val == NEGATIVE_COLUMN_STATS_SENTINEL) {
@@ -620,6 +723,19 @@ public class CatalogdMetaProvider implements MetaProvider {
     LOG.trace("Request for column stats of {}: hit {}/ neg hit {} / miss {}",
         table, hitCount, negativeHitCount, missingCols.size());
     return ret;
+  }
+
+  @SuppressWarnings("unchecked")
+  private Object getIfPresent(Object cacheKey) throws TException {
+    Object existing = cache_.getIfPresent(cacheKey);
+    if (existing == null) return null;
+    if (!(existing instanceof Future)) return existing;
+    try {
+      return ((Future<Object>)existing).get();
+    } catch (InterruptedException | ExecutionException e) {
+      Throwables.propagateIfPossible(e, TException.class);
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -766,14 +882,14 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private Map<PartitionRef, PartitionMetadata> loadPartitionsFromCache(
       TableMetaRefImpl table, ListMap<TNetworkAddress> hostIndex,
-      List<PartitionRef> partitionRefs) {
+      List<PartitionRef> partitionRefs) throws TException {
 
     Map<PartitionRef, PartitionMetadata> ret = Maps.newHashMapWithExpectedSize(
         partitionRefs.size());
     for (PartitionRef ref: partitionRefs) {
       PartitionRefImpl prefImpl = (PartitionRefImpl)ref;
       PartitionCacheKey cacheKey = new PartitionCacheKey(table, prefImpl.getId());
-      PartitionMetadataImpl val = (PartitionMetadataImpl)cache_.getIfPresent(cacheKey);
+      PartitionMetadataImpl val = (PartitionMetadataImpl)getIfPresent(cacheKey);
       if (val == null) continue;
 
       // The entry in the cache has file descriptors that are relative to the cache's
