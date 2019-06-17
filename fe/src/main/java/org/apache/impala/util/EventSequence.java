@@ -41,11 +41,14 @@ public class EventSequence {
 
   /**
    * Saves an event at the current time with the given label.
+   * It returns the duration in nano seconds between the last and the current event.
    */
-  public void markEvent(String label) {
+  public long markEvent(String label) {
     // Timestamps should be in ns resolution
-    timestamps_.add(System.nanoTime() - startTime_);
+    long durationNs = System.nanoTime() - startTime_;
+    timestamps_.add(durationNs);
     labels_.add(label);
+    return durationNs;
   }
 
   // For testing

@@ -42,7 +42,8 @@ class TestLogFragments(ImpalaTestSuite):
     self.execute_query("select 1")
     # Logging may be buffered, so sleep to wait out the buffering.
     time.sleep(6)
-    self.assert_impalad_log_contains('INFO', query_id + "] Analysis finished.")
+    self.assert_impalad_log_contains('INFO', query_id +
+      "] Analysis and authorization finished.")
     assert query_id.endswith("000")
     # Looks for a fragment instance that doesn't end with "0" to make sure instances
     # are getting propagated too.

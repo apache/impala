@@ -22,6 +22,7 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -58,6 +59,7 @@ import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.util.EventSequence;
 import org.junit.Assert;
 
 import com.google.common.base.Preconditions;
@@ -377,8 +379,9 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
           @Override
           public AuthorizationContext createAuthorizationContext(boolean doAudits,
-              String sqlStmt, TSessionState sessionState) {
-            return new AuthorizationContext();
+              String sqlStmt, TSessionState sessionState,
+              Optional<EventSequence> timeline) {
+            return new AuthorizationContext(timeline);
           }
         };
       }

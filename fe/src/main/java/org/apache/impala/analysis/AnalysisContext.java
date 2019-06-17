@@ -21,6 +21,7 @@ import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -415,6 +416,7 @@ public class AnalysisContext {
     } catch (AnalysisException e) {
       analysisException = e;
     }
+    timeline_.markEvent("Analysis finished");
 
     // Authorize statement and record exception. Authorization relies on information
     // collected during analysis.
@@ -425,7 +427,7 @@ public class AnalysisContext {
       authzCtx = authzChecker.createAuthorizationContext(true,
           clientRequest.isSetRedacted_stmt() ?
               clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
-          queryCtx_.getSession());
+          queryCtx_.getSession(), Optional.of(timeline_));
       authzChecker.authorize(authzCtx, analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;

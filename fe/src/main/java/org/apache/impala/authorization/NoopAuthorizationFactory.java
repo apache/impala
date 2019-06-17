@@ -36,9 +36,11 @@ import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
+import org.apache.impala.util.EventSequence;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -207,8 +209,8 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
 
       @Override
       public AuthorizationContext createAuthorizationContext(boolean doAudits,
-          String sqlStmt, TSessionState sessionState) {
-        return new AuthorizationContext();
+          String sqlStmt, TSessionState sessionState, Optional<EventSequence> timeline) {
+        return new AuthorizationContext(timeline);
       }
     };
   }

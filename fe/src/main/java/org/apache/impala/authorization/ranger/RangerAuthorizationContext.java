@@ -20,8 +20,10 @@ package org.apache.impala.authorization.ranger;
 import com.google.common.base.Preconditions;
 import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.util.EventSequence;
 
 import javax.annotation.Nullable;
+import java.util.Optional;
 
 /**
  * Ranger specific {@link AuthorizationContext}.
@@ -31,7 +33,9 @@ public class RangerAuthorizationContext extends AuthorizationContext {
   // Audit handler can be null meaning we don't want to do an audit log.
   private @Nullable RangerBufferAuditHandler auditHandler_;
 
-  public RangerAuthorizationContext(TSessionState sessionState) {
+  public RangerAuthorizationContext(TSessionState sessionState,
+      Optional<EventSequence> timeline) {
+    super(timeline);
     sessionState_ = sessionState;
   }
 

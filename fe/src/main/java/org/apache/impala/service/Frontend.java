@@ -1248,8 +1248,7 @@ public class Frontend {
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult =
         analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache, authzChecker_.get());
-    LOG.info("Analysis finished.");
-    timeline.markEvent("Analysis finished");
+    LOG.info("Analysis and authorization finished.");
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);

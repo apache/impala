@@ -35,6 +35,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.util.EventSequence;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
@@ -48,6 +49,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -208,8 +210,10 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public AuthorizationContext createAuthorizationContext(boolean doAudits,
-      String sqlStmt, TSessionState sessionState) throws InternalException {
-    RangerAuthorizationContext authzCtx = new RangerAuthorizationContext(sessionState);
+      String sqlStmt, TSessionState sessionState, Optional<EventSequence> timeline)
+      throws InternalException {
+    RangerAuthorizationContext authzCtx =
+        new RangerAuthorizationContext(sessionState, timeline);
     if (doAudits) {
       // Any statement that goes through {@link authorize} will need to have audit logs.
       if (sqlStmt != null) {
@@ -235,7 +239,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // case 4: table (select) ERROR, columns (select) ERROR --> only add the first column
     //                                                          event
     RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext(
-        originalCtx.getSessionState());
+        originalCtx.getSessionState(), originalCtx.getTimeline());
     tmpCtx.setAuditHandler(new RangerBufferAuditHandler(
         originalAuditHandler.getSqlStmt(), originalAuditHandler.getClusterName(),
         originalAuditHandler.getClientIp()));

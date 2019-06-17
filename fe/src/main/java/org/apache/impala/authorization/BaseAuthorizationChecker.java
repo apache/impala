@@ -26,6 +26,7 @@ import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.util.EventSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 
 /**
  * A base class for the {@link AuthorizationChecker}.
@@ -60,11 +62,12 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    */
   @Override
   public boolean hasAccess(User user, PrivilegeRequest request) throws InternalException {
-    // We don't want to do an audit log here. This method is used by "show databases",
-    // "show tables", "describe" to filter out unauthorized database, table, or column
-    // names.
+    // We don't want to do an audit log or profile events logged here. This method is used
+    // by "show databases", "show tables", "describe" to filter out unauthorized database,
+    // table, or column names.
     return hasAccess(createAuthorizationContext(false /*no audit log*/,
-        null /*no SQL statement*/, null /*no session state*/), user, request);
+        null /*no SQL statement*/, null /*no session state*/,
+        Optional.empty()), user, request);
   }
 
   private boolean hasAccess(AuthorizationContext authzCtx, User user,
@@ -86,8 +89,12 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    */
   @Override
   public void postAuthorize(AuthorizationContext authzCtx) {
-    long durationMs = System.currentTimeMillis() - authzCtx.getStartTime();
-    LOG.debug("Authorization check took {} ms", durationMs);
+    if (authzCtx.getTimeline().isPresent()) {
+      EventSequence timeline = authzCtx.getTimeline().get();
+      long durationMs = timeline.markEvent(String.format("Authorization finished (%s)",
+          config_.getProviderName())) / 1000;
+      LOG.debug("Authorization check took {} ms", durationMs);
+    }
   }
 
   /**

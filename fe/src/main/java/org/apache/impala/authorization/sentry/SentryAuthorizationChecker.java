@@ -30,6 +30,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.util.EventSequence;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
@@ -38,6 +39,7 @@ import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -89,8 +91,8 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public AuthorizationContext createAuthorizationContext(boolean doAudits,
-      String sqlStmt, TSessionState sessionState) {
-    return new AuthorizationContext();
+      String sqlStmt, TSessionState sessionState, Optional<EventSequence> timeline) {
+    return new AuthorizationContext(timeline);
   }
 
   /*

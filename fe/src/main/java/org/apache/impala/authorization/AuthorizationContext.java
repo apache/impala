@@ -17,14 +17,23 @@
 
 package org.apache.impala.authorization;
 
+import org.apache.impala.util.EventSequence;
+
+import java.util.Optional;
+
 /**
  * An authorization context class that is created per authorization check.
  */
 public class AuthorizationContext {
-  private final long startTime_ = System.currentTimeMillis();
+  private final Optional<EventSequence> timeline_;
+
+  public AuthorizationContext(Optional<EventSequence> timeline) {
+    this.timeline_ = timeline;
+  }
 
   /**
-   * Gets the start time when the authorization check started.
+   * Gets the timeline which can be used to mark events in the query profile.
    */
-  public long getStartTime() { return startTime_; }
+  public Optional<EventSequence> getTimeline() { return timeline_; }
+
 }

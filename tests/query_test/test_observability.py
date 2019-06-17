@@ -279,7 +279,24 @@ class TestObservability(ImpalaTestSuite):
     assert results.runtime_profile.count("AGGREGATION_NODE") == 2
     assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
 
-  def test_query_profile_contains_query_events(self):
+  def test_query_profile_contains_query_compilation_events(self):
+    """Test that the expected events show up in a query profile.
+       If the table metadata is not cached this test will fail, as the metadata load
+       creates lines dynamically."""
+    event_regexes = [r'Query Compilation:',
+        r'Metadata of all .* tables cached:',
+        r'Analysis finished:',
+        r'Authorization finished (.*):',
+        r'Value transfer graph computed:',
+        r'Single node plan created:',
+        r'Runtime filters computed:',
+        r'Distributed plan created:',
+        r'Planning finished:']
+    query = "select * from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_query_timeline_events(self):
     """Test that the expected events show up in a query profile."""
     event_regexes = [r'Query Timeline:',
         r'Query submitted:',
