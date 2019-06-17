@@ -36,10 +36,12 @@ import java.util.function.Supplier;
  */
 public class RangerAuthorizationFactory implements AuthorizationFactory {
   private final AuthorizationConfig authzConfig_;
+  private final RangerAuthorizationChecker authzChecker_;
 
   public RangerAuthorizationFactory(BackendConfig backendConfig) {
     Preconditions.checkNotNull(backendConfig);
     authzConfig_ = newAuthorizationConfig(backendConfig);
+    authzChecker_ = new RangerAuthorizationChecker(authzConfig_);
   }
 
   /**
@@ -49,6 +51,7 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
   public RangerAuthorizationFactory(AuthorizationConfig authzConfig) {
     Preconditions.checkNotNull(authzConfig);
     authzConfig_ = authzConfig;
+    authzChecker_ = new RangerAuthorizationChecker(authzConfig_);
   }
 
   private static AuthorizationConfig newAuthorizationConfig(BackendConfig backendConfig) {
@@ -72,7 +75,11 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
 
   @Override
   public AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy) {
-    return new RangerAuthorizationChecker(authzConfig_);
+    // Do not create a new instance of RangerAuthorizationChecker. It is unnecessary
+    // since RangerAuthorizationChecker is stateless and creating a new instance of
+    // RangerAuthorizationChecker can be expensive due to the need to re-initialize the
+    // Ranger plugin.
+    return authzChecker_;
   }
 
   @Override
