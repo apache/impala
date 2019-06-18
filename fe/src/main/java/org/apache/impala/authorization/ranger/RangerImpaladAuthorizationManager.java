@@ -240,24 +240,6 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
     Optional<String> udf = getResourceName(RangerImpalaResourceBuilder.UDF, ANY,
         accessResult);
 
-    switch (privilege.getScope()) {
-      case COLUMN:
-        if (!column.isPresent() || column.get().equals("*")) return null;
-      case TABLE:
-        if (!table.isPresent() || table.get().equals("*")) return null;
-      case DATABASE:
-        if (!database.isPresent() || database.get().equals("*")) return null;
-        break;
-      case URI:
-        if (!uri.isPresent() || uri.get().equals("*")) return null;
-        break;
-      case SERVER:
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported privilege scope " +
-            privilege.getScope());
-    }
-
     return new RangerResultRow(type, principal, database.orElse(""), table.orElse(""),
         column.orElse(""), uri.orElse(""), udf.orElse(""), level, grantOption, longTime);
   }
@@ -343,14 +325,26 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
               "type %s.", params.principal_type));
       }
 
-      boolean all = resultRows.stream().anyMatch(row ->
-          row.privilege_ == TPrivilegeLevel.ALL);
+      RangerResourceResult resourceResult = new RangerResourceResult();
 
-      List<RangerResultRow> rows = all ? resultRows.stream()
-          .filter(row -> row.privilege_ == TPrivilegeLevel.ALL)
-          .collect(Collectors.toList()) : resultRows;
+      // Categorize 'resultRows' based on their lowest non-wildcard resource in the
+      // resource hierarchy. RangerResultRow's falling into the same category correspond
+      // to the same resource.
+      // TODO: To support displaying privileges on UDF's later.
+      for (RangerResultRow row : resultRows) {
+        if (!row.column_.equals("*") && !row.column_.isEmpty()) {
+          resourceResult.addColumnResult(row);
+        } else if (!row.table_.equals("*") && !row.table_.isEmpty()) {
+          resourceResult.addTableResult(row);
+        } else if (!row.database_.equals("*") && !row.database_.isEmpty()) {
+          resourceResult.addDatabaseResult(row);
+        } else {
+          resourceResult.addServerResult(row);
+        }
+      }
 
-      rows.forEach(principal -> resultSet.add(principal.toResultRow()));
+      resourceResult.getResultRows()
+          .forEach(principal -> resultSet.add(principal.toResultRow()));
     }
     resultSet.forEach(result::addToRows);
 
@@ -373,6 +367,68 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   public AuthorizationDelta refreshAuthorization(boolean resetVersions) {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
+  }
+
+  private static class RangerResourceResult {
+    private List<RangerResultRow> server = new ArrayList<>();
+    private List<RangerResultRow> database = new ArrayList<>();
+    private List<RangerResultRow> table = new ArrayList<>();
+    private List<RangerResultRow> column = new ArrayList<>();
+
+    public RangerResourceResult() { }
+
+    public RangerResourceResult addServerResult(RangerResultRow result) {
+      server.add(result);
+      return this;
+    }
+
+    public RangerResourceResult addDatabaseResult(RangerResultRow result) {
+      database.add(result);
+      return this;
+    }
+
+    public RangerResourceResult addTableResult(RangerResultRow result) {
+      table.add(result);
+      return this;
+    }
+
+    public RangerResourceResult addColumnResult(RangerResultRow result) {
+      column.add(result);
+      return this;
+    }
+
+    /**
+     * For each disjoint List corresponding to a given resource, if there exists a
+     * RangerResultRow indicating the specified principal's privilege of
+     * TPrivilegeLevel.ALL, we filter out other RangerResultRow's that could be deduced
+     * from this wildcard RangerResultRow.
+     */
+    public List<RangerResultRow> getResultRows() {
+      List<RangerResultRow> results = new ArrayList<>();
+
+      results.addAll(filterIfAll(server));
+      results.addAll(filterIfAll(database));
+      results.addAll(filterIfAll(table));
+      results.addAll(filterIfAll(column));
+      return results;
+    }
+
+    /**
+     * Given that the elements on 'resultRow' refer to the same resource, in the case
+     * when any of the granted privileges on this resource equals 'TPrivilegeLevel.ALL',
+     * we only keep this wildcard RangerResultRow since any other RangerResultRow in
+     * 'resultRow' could be inferred from this wildcard RangerResultRow.
+     */
+    private static List<RangerResultRow> filterIfAll(List<RangerResultRow> resultRows) {
+      boolean all = resultRows.stream().anyMatch(row ->
+          row.privilege_ == TPrivilegeLevel.ALL);
+
+      List<RangerResultRow> rows = all ? resultRows.stream()
+          .filter(row -> row.privilege_ == TPrivilegeLevel.ALL)
+          .collect(Collectors.toList()) : resultRows;
+
+      return rows;
+    }
   }
 
   private static class RangerResultRow {
