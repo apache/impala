@@ -317,7 +317,7 @@ public abstract class FeCatalogUtils {
   }
 
   public static THdfsPartition fsPartitionToThrift(FeFsPartition part,
-      ThriftObjectType type, boolean includePartitionStats) {
+      ThriftObjectType type) {
     HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
     THdfsPartition thriftHdfsPart = new THdfsPartition(
         sd.getLineDelim(),
@@ -341,10 +341,6 @@ public abstract class FeCatalogUtils {
       // and another thread doing DDL may modify the map.
       thriftHdfsPart.setHms_parameters(Maps.newHashMap(part.getParameters()));
       thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
-      if (includePartitionStats && part.getPartitionStatsCompressed() != null) {
-        thriftHdfsPart.setPartition_stats(
-            Preconditions.checkNotNull(part.getPartitionStatsCompressed()));
-      }
 
       // Add block location information
       long numBlocks = 0;

@@ -57,7 +57,6 @@ DECLARE_string(sentry_config);
 DECLARE_double(max_filter_error_rate);
 DECLARE_int64(min_buffer_size);
 DECLARE_bool(disable_catalog_data_ops_debug_only);
-DECLARE_bool(pull_incremental_statistics);
 DECLARE_int32(invalidate_tables_timeout_s);
 DECLARE_bool(invalidate_tables_on_memory_pressure);
 DECLARE_double(invalidate_tables_gc_old_gen_full_threshold);
@@ -125,7 +124,6 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_authorized_proxy_group_config(FLAGS_authorized_proxy_group_config);
   cfg.__set_disable_catalog_data_ops_debug_only(
       FLAGS_disable_catalog_data_ops_debug_only);
-  cfg.__set_pull_incremental_statistics(FLAGS_pull_incremental_statistics);
   cfg.__set_catalog_topic_mode(FLAGS_catalog_topic_mode);
   cfg.__set_invalidate_tables_timeout_s(FLAGS_invalidate_tables_timeout_s);
   cfg.__set_invalidate_tables_on_memory_pressure(

@@ -57,7 +57,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbFileBlock;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
@@ -1448,19 +1447,6 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Determines whether incremental stats should be sent from the catalogd to impalad.
-   * Incremental stats will be sent if their size is less than the configured limit
-   * (function of numPartitions) and they are sent via statestore (and not a direct
-   * fetch from catalogd).
-   */
-  private boolean shouldSendIncrementalStats(int numPartitions) {
-    long statsSizeEstimate =
-        numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
-    return statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize()
-        && !BackendConfig.INSTANCE.pullIncrementalStatistics();
-  }
-
-  /**
    * Create a THdfsTable corresponding to this HdfsTable. If serializing the "FULL"
    * information, then then all partitions and THdfsFileDescs of each partition should be
    * included. Otherwise, don't include any THdfsFileDescs, and include only those
@@ -1484,14 +1470,13 @@ public class HdfsTable extends Table implements FeFsTable {
     int numPartitions =
         (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
     memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
-    boolean includeIncrementalStats = shouldSendIncrementalStats(numPartitions);
     FileMetadataStats stats = new FileMetadataStats();
     Map<Long, THdfsPartition> idToPartition = new HashMap<>();
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
         THdfsPartition tHdfsPartition = FeCatalogUtils.fsPartitionToThrift(
-            partition, type, includeIncrementalStats);
+            partition, type);
         if (partition.hasIncrementalStats()) {
           memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
           hasIncrementalStats_ = true;
@@ -1510,7 +1495,7 @@ public class HdfsTable extends Table implements FeFsTable {
     if (type == ThriftObjectType.FULL) fileMetadataStats_.set(stats);
 
     THdfsPartition prototypePartition = FeCatalogUtils.fsPartitionToThrift(
-        prototypePartition_, ThriftObjectType.DESCRIPTOR_ONLY, false);
+        prototypePartition_, ThriftObjectType.DESCRIPTOR_ONLY);
 
     memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
         fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;

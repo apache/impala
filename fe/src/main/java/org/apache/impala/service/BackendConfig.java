@@ -90,10 +90,6 @@ public class BackendConfig {
     return backendCfg_.disable_catalog_data_ops_debug_only;
   }
 
-  public boolean pullIncrementalStatistics() {
-    return backendCfg_.pull_incremental_statistics;
-  }
-
   public int getInvalidateTablesTimeoutS() {
     return backendCfg_.invalidate_tables_timeout_s;
   }

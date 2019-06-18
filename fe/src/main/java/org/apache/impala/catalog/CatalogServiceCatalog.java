@@ -506,8 +506,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public Map<String, ByteBuffer> getPartitionStats(TGetPartitionStatsRequest request)
       throws CatalogException {
-    Preconditions.checkState(BackendConfig.INSTANCE.pullIncrementalStatistics()
-        && !RuntimeEnv.INSTANCE.isTestEnv());
+    Preconditions.checkState(!RuntimeEnv.INSTANCE.isTestEnv());
     TTableName tableName = request.table_name;
     LOG.info("Fetching partition statistics for: " + tableName.getDb_name() + "."
         + tableName.getTable_name());

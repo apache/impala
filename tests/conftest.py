@@ -127,10 +127,6 @@ def pytest_addoption(parser):
                    default=False, help="Run all tests against Impala configured with "
                    "LocalCatalog.")
 
-  parser.addoption("--pull_incremental_statistics", dest="pull_incremental_statistics",
-                   action="store_true", default=False, help="Run all tests against Impala"
-                   " where impalads pull incremental statistics directly from catalogd.")
-
   parser.addoption("--sanity", action="store_true", default=False,
                    help="Runs a single test vector from each test to provide a quick "
                    "sanity check at the cost of lower test coverage.")

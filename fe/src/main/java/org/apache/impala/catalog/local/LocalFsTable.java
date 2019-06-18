@@ -294,13 +294,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     for (FeFsPartition partition : partitions) {
       idToPartition.put(partition.getId(),
           FeCatalogUtils.fsPartitionToThrift(partition,
-              ThriftObjectType.DESCRIPTOR_ONLY,
-              /*includeIncrementalStats=*/false));
+              ThriftObjectType.DESCRIPTOR_ONLY));
     }
 
     THdfsPartition tPrototypePartition = FeCatalogUtils.fsPartitionToThrift(
-        createPrototypePartition(), ThriftObjectType.DESCRIPTOR_ONLY,
-        /*includeIncrementalStats=*/false);
+        createPrototypePartition(), ThriftObjectType.DESCRIPTOR_ONLY);
 
     THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
         getNullPartitionKeyValue(), nullColumnValue_, idToPartition,

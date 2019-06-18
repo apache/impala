@@ -86,8 +86,6 @@ struct TBackendGflags {
 
   30: required i32 local_catalog_cache_expiration_s
 
-  31: required bool pull_incremental_statistics
-
   32: required string catalog_topic_mode
 
   33: required i32 invalidate_tables_timeout_s

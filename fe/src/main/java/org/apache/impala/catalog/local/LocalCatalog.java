@@ -208,11 +208,8 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public TGetPartitionStatsResponse getPartitionStats(
       TableName table) throws InternalException {
-    // TODO(vercegovac): add validation to ensure that both pulling incremental
-    // statistics and a local catalog are not specified.
-    throw new UnsupportedOperationException("--pull_incremental_statistics and "
-        + "--use_local_catalog cannot both be enabled."
-    );
+    // TODO(IMPALA-7535) lazy-fetch incremental stats for LocalCatalog
+    throw new UnsupportedOperationException("Stats are eagerly fetched in LocalCatalog");
   }
 
   @Override

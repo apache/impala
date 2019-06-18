@@ -595,8 +595,9 @@ public class ComputeStatsStmt extends StatementBase {
   /**
    *  Get partition statistics from the list of partitions, omitting those in
    *  excludedPartitions and those for which incremental statistics are not present.
-   *  If configured to pull incremental statistics directly from the
-   *  catalog, partition statistics are fetched from the catalog.
+   *
+   *  If incremental stats data is not present already in the local catlaog,
+   *  partition statistics are fetched from the catalog daemon.
    */
   private static Map<Long, TPartitionStats> getOrFetchPartitionStats(Analyzer analyzer,
       FeFsTable table, Collection<? extends FeFsPartition> partitions,
@@ -606,12 +607,10 @@ public class ComputeStatsStmt extends StatementBase {
     int expectedNumStats = partitions.size() - excludedPartitions.size();
     Preconditions.checkArgument(expectedNumStats >= 0);
 
-    // Incremental stats are fetched only when configured to do so except
-    // when also using a local catalog or when testing. When using a local
-    // catalog, it makes more sense to use the getPartitions api which is
-    // designed to fetch specific fields and specific partitions.
-    if (BackendConfig.INSTANCE.pullIncrementalStatistics()
-        && !BackendConfig.INSTANCE.getBackendCfg().use_local_catalog
+    // Incremental stats are already present locally when using LocalCatalog
+    // or when testing. TODO(IMPALA-7535) fetch incremental stats separately
+    // for LocalCatlaog as well.
+    if (!BackendConfig.INSTANCE.getBackendCfg().use_local_catalog
         && !RuntimeEnv.INSTANCE.isTestEnv()) {
       // We're configured to fetch the statistics from catalogd, so collect the relevant
       // partition ids.
@@ -647,8 +646,7 @@ public class ComputeStatsStmt extends StatementBase {
   private static Map<Long, TPartitionStats> fetchPartitionStats(Analyzer analyzer,
       FeFsTable table, List<FeFsPartition> partitions) throws AnalysisException {
     Preconditions.checkNotNull(partitions);
-    Preconditions.checkState(BackendConfig.INSTANCE.pullIncrementalStatistics()
-        && !RuntimeEnv.INSTANCE.isTestEnv());
+    Preconditions.checkState(!RuntimeEnv.INSTANCE.isTestEnv());
     if (partitions.isEmpty()) return Collections.emptyMap();
     Stopwatch sw = new Stopwatch().start();
     int numCompressedBytes = 0;

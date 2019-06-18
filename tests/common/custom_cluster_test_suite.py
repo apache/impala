@@ -238,10 +238,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       cmd.append("--impalad_args=--use_local_catalog=1")
       cmd.append("--catalogd_args=--catalog_topic_mode=minimal")
 
-    if pytest.config.option.pull_incremental_statistics:
-      cmd.append("--impalad_args=%s --catalogd_args=%s" %
-                 ("--pull_incremental_statistics", "--pull_incremental_statistics"))
-
     default_query_option_kvs = []
     # Put any defaults first, then any arguments after that so they can override defaults.
     if os.environ.get("ERASURE_CODING") == "true":

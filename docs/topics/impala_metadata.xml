@@ -87,43 +87,6 @@ under the License.
 
   </concept>
 
-  <concept id="pull_incremental_statistics">
-
-    <title>Loading Incremental Statistics from Catalog Server</title>
-
-    <conbody>
-
-      <p>
-        Starting in Impala 3.1, a new configuration setting,
-        <codeph>&#8209;&#8209;pull_incremental_statistics</codeph>, was added and set to
-        <codeph>true</codeph> by default. When you start Impala <codeph>catalogd</codeph> and
-        <codeph>impalad</codeph> coordinators with this setting enabled:
-      </p>
-
-      <ul>
-        <li>
-          Newly created incremental stats will be smaller in size thus reducing memory pressure
-          on the <codeph>catalogd</codeph> daemon. Your users can keep more tables and
-          partitions in the same catalog and have lower chances of crashing
-          <codeph>catalogd</codeph> due to out-of-memory issues.
-        </li>
-
-        <li>
-          Incremental stats will not be replicated to <codeph>impalad</codeph> and will be
-          accessed on demand from <codeph>catalogd</codeph>, resulting in a reduced memory
-          footprint of <codeph>impalad</codeph>.
-        </li>
-      </ul>
-
-      <p>
-        We do not recommend you change the default setting of
-        <codeph>&#8209;&#8209;pull_incremental_statistics</codeph>.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept id="auto_poll_hms_notification">
 
     <title>Automatic Metadata Sync using Hive Metastore Notification Events</title>

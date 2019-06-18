@@ -54,10 +54,8 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.TestUtils;
-import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -639,41 +637,30 @@ public class CatalogTest {
 
   @Test
   public void testPullIncrementalStats() throws CatalogException {
-    // Save the current setting for pull_incremental_statistics.
-    TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
-    boolean pullStats = gflags.isSetPull_incremental_statistics();
+    // Partitioned table with stats. Load the table prior to fetching.
+    catalog_.getOrLoadTable("functional", "alltypesagg", "test");
+    expectStatistics("functional", "alltypesagg", 11);
 
-    try {
-      // Restored in the finally clause.
-      gflags.setPull_incremental_statistics(true);
+    // Partitioned table with stats. Invalidate the table prior to fetching.
+    Reference<Boolean> tblWasRemoved = new Reference<Boolean>();
+    Reference<Boolean> dbWasAdded = new Reference<Boolean>();
+    catalog_.invalidateTable(
+        new TTableName("functional", "alltypesagg"), tblWasRemoved, dbWasAdded);
+    expectStatistics("functional", "alltypesagg", 11);
 
-      // Partitioned table with stats. Load the table prior to fetching.
-      catalog_.getOrLoadTable("functional", "alltypesagg", "test");
-      expectStatistics("functional", "alltypesagg", 11);
+    // Unpartitioned table with no stats.
+    expectStatistics("functional", "table_no_newline", 0);
 
-      // Partitioned table with stats. Invalidate the table prior to fetching.
-      Reference<Boolean> tblWasRemoved = new Reference<Boolean>();
-      Reference<Boolean> dbWasAdded = new Reference<Boolean>();
-      catalog_.invalidateTable(
-          new TTableName("functional", "alltypesagg"), tblWasRemoved, dbWasAdded);
-      expectStatistics("functional", "alltypesagg", 11);
+    // Unpartitioned table with stats.
+    expectStatistics("functional", "dimtbl", 0);
 
-      // Unpartitioned table with no stats.
-      expectStatistics("functional", "table_no_newline", 0);
+    // Bogus table.
+    expectStatisticsException("functional", "doesnotexist",
+        "Requested partition statistics for table that does not exist");
 
-      // Unpartitioned table with stats.
-      expectStatistics("functional", "dimtbl", 0);
-
-      // Bogus table.
-      expectStatisticsException("functional", "doesnotexist",
-          "Requested partition statistics for table that does not exist");
-
-      // Case of IncompleteTable due to loading error.
-      expectStatisticsException("functional", "bad_serde",
-          "No statistics available for incompletely loaded table");
-    } finally {
-      gflags.setPull_incremental_statistics(pullStats);
-    }
+    // Case of IncompleteTable due to loading error.
+    expectStatisticsException("functional", "bad_serde",
+        "No statistics available for incompletely loaded table");
   }
 
   @Test
