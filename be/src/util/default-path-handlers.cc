@@ -22,7 +22,6 @@
 #include <sys/stat.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
-#include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
@@ -37,8 +36,8 @@
 #include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
+#include "util/memusage-path-handlers.h"
 #include "util/pprof-path-handlers.h"
-#include "util/pretty-printer.h"
 #include "util/process-state-info.h"
 
 #include "common/names.h"
@@ -126,76 +125,6 @@ void FlagsHandler(const Webserver::WebRequest& req, Document* document) {
   Value title("Command-line Flags", document->GetAllocator());
   document->AddMember("title", title, document->GetAllocator());
   document->AddMember("flags", flag_arr, document->GetAllocator());
-}
-
-// Registered to handle "/memz"
-void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
-    const Webserver::WebRequest& req, Document* document) {
-  DCHECK(mem_tracker != NULL);
-  Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TUnit::BYTES).c_str(),
-      document->GetAllocator());
-  document->AddMember("mem_limit", mem_limit, document->GetAllocator());
-  Value consumption(
-      PrettyPrinter::Print(mem_tracker->consumption(), TUnit::BYTES).c_str(),
-      document->GetAllocator());
-  document->AddMember("consumption", consumption, document->GetAllocator());
-
-  stringstream ss;
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  ss << "Memory tracking is not available with address or thread sanitizer builds.";
-#else
-  char buf[2048];
-  MallocExtension::instance()->GetStats(buf, 2048);
-  ss << string(buf);
-#endif
-
-  Value overview(ss.str().c_str(), document->GetAllocator());
-  document->AddMember("overview", overview, document->GetAllocator());
-
-  // Dump all mem trackers.
-  Value detailed(mem_tracker->LogUsage(MemTracker::UNLIMITED_DEPTH).c_str(),
-      document->GetAllocator());
-  document->AddMember("detailed", detailed, document->GetAllocator());
-
-  Value systeminfo(MemInfo::DebugString().c_str(), document->GetAllocator());
-  document->AddMember("systeminfo", systeminfo, document->GetAllocator());
-
-  if (metric_group != nullptr) {
-    MetricGroup* aggregate_group = metric_group->FindChildGroup("memory");
-    if (aggregate_group != nullptr) {
-      Value json_metrics(kObjectType);
-      aggregate_group->ToJson(false, document, &json_metrics);
-      document->AddMember(
-          "aggregate_metrics", json_metrics["metrics"], document->GetAllocator());
-    }
-    MetricGroup* jvm_group = metric_group->FindChildGroup("jvm");
-    if (jvm_group != nullptr) {
-      Value jvm(kObjectType);
-      jvm_group->ToJson(false, document, &jvm);
-      Value heap(kArrayType);
-      Value non_heap(kArrayType);
-      Value total(kArrayType);
-      for (SizeType i = 0; i < jvm["metrics"].Size(); ++i) {
-        if (strstr(jvm["metrics"][i]["name"].GetString(), "total") != nullptr) {
-          total.PushBack(jvm["metrics"][i], document->GetAllocator());
-        } else if (strstr(jvm["metrics"][i]["name"].GetString(), "non-heap") != nullptr) {
-          non_heap.PushBack(jvm["metrics"][i], document->GetAllocator());
-        } else if (strstr(jvm["metrics"][i]["name"].GetString(), "heap") != nullptr) {
-          heap.PushBack(jvm["metrics"][i], document->GetAllocator());
-        }
-      }
-      document->AddMember("jvm_total", total, document->GetAllocator());
-      document->AddMember("jvm_heap", heap, document->GetAllocator());
-      document->AddMember("jvm_non_heap", non_heap, document->GetAllocator());
-    }
-    MetricGroup* buffer_pool_group = metric_group->FindChildGroup("buffer-pool");
-    if (buffer_pool_group != nullptr) {
-      Value json_metrics(kObjectType);
-      buffer_pool_group->ToJson(false, document, &json_metrics);
-      document->AddMember(
-          "buffer_pool", json_metrics["metrics"], document->GetAllocator());
-    }
-  }
 }
 
 void JmxHandler(const Webserver::WebRequest& req, Document* document) {
@@ -301,8 +230,8 @@ void RootHandler(const Webserver::WebRequest& req, Document* document) {
   }
 }
 
-void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker,
-    MetricGroup* metric_group) {
+void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
+    MemTracker* process_mem_tracker) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
   if (JniUtil::is_jvm_inited()) {
@@ -311,13 +240,7 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracke
     // (TODO): Switch to RawUrlCallback when it supports JSON content-type.
     webserver->RegisterUrlCallback("/jmx", "raw_text.tmpl", JmxHandler, true);
   }
-  if (process_mem_tracker != NULL) {
-    auto callback = [process_mem_tracker, metric_group]
-        (const Webserver::WebRequest& req, Document* doc) {
-      MemUsageHandler(process_mem_tracker, metric_group, req, doc);
-    };
-    webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback, true);
-  }
+  AddMemUsageCallbacks(webserver, process_mem_tracker, metric_group);
 
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Remote (on-demand) profiling is disabled if the process is already being profiled.

@@ -26,7 +26,6 @@
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-server.h"
-#include "runtime/mem-tracker.h"
 #include "service/fe-support.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
@@ -63,12 +62,11 @@ int CatalogdMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
   InitFeSupport();
 
-  MemTracker process_mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
   scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
 
   if (FLAGS_enable_webserver) {
-    AddDefaultUrlCallbacks(webserver.get(), &process_mem_tracker, metrics.get());
+    AddDefaultUrlCallbacks(webserver.get(), metrics.get());
     ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";

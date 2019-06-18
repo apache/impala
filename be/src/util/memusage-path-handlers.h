@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
-#define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
+#ifndef IMPALA_UTIL_MEMUSAGE_PATH_HANDLERS_H
+#define IMPALA_UTIL_MEMUSAGE_PATH_HANDLERS_H
 
 #include <stdio.h>
 #include <rapidjson/document.h>
@@ -28,15 +28,12 @@ namespace impala {
 
 class MemTracker;
 class MetricGroup;
+class Webserver;
 
-/// Adds a set of default path handlers to the webserver to display
-/// logs and configuration flags
-void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group = NULL,
-    MemTracker* process_mem_tracker = NULL);
-
-/// Registered to handle "/"
-/// Populates document with various system-wide information.
-void RootHandler(const Webserver::WebRequest& req, rapidjson::Document* document);
+/// Creates the memory usage callback for the webserver and registers it. When the
+/// mem_tracker is null the mem tracker metrics will not be registered and displayed.
+void AddMemUsageCallbacks(Webserver* webserver, MemTracker* mem_tracker,
+    MetricGroup* metric_group);
 }
 
-#endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
+#endif // IMPALA_UTIL_MEMUSAGE_PATH_HANDLERS_H

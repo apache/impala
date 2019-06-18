@@ -26,7 +26,6 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "rpc/rpc-trace.h"
-#include "runtime/mem-tracker.h"
 #include "statestore/statestore.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
@@ -50,12 +49,11 @@ int StatestoredMain(int argc, char** argv) {
   FLAGS_webserver_port = 25010;
   InitCommonRuntime(argc, argv, false);
 
-  MemTracker mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
   scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
 
   if (FLAGS_enable_webserver) {
-    AddDefaultUrlCallbacks(webserver.get(), &mem_tracker, metrics.get());
+    AddDefaultUrlCallbacks(webserver.get(), metrics.get());
     ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";

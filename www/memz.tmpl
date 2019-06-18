@@ -20,10 +20,14 @@ under the License.
 
 <h2>Memory Usage</h2>
 
+{{#consumption}}
 Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_limit}}</strong>
+{{/consumption}}
 
+{{#detailed}}
 <h3>Breakdown</h3>
 <pre>{{detailed}}</pre>
+{{/detailed}}
 
 <h3>tcmalloc</h3>
 <pre>{{overview}}</pre>

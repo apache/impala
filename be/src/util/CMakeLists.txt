@@ -61,6 +61,7 @@ add_library(Util
   logging-support.cc
   mem-info.cc
   memory-metrics.cc
+  memusage-path-handlers.cc
   metrics.cc
   min-max-filter.cc
   min-max-filter-ir.cc
