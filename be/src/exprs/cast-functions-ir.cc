@@ -24,6 +24,7 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
 #include "exprs/decimal-functions.h"
@@ -308,9 +309,12 @@ TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, const DateV
 
 DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const StringVal& val) {
   if (val.is_null) return DateVal::null();
-  DateValue dv = DateValue::Parse(reinterpret_cast<char*>(val.ptr), val.len, true);
+  const char* stringVal = reinterpret_cast<const char*>(val.ptr);
+  DateValue dv = DateValue::Parse(stringVal, val.len, true);
   if (UNLIKELY(!dv.IsValid())) {
-    ctx->SetError("String to Date parse failed.");
+    string invalidVal = string(stringVal, val.len);
+    ctx->SetError(Substitute("String to Date parse failed. Invalid string val: \"$0\"",
+        invalidVal).c_str());
     return DateVal::null();
   }
   return dv.ToDateVal();

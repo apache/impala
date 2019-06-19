@@ -74,12 +74,12 @@ insert into $DATABASE.stbl partition (p='1500-01-1') values ('1500-01-1');
 # When the implicit cast fails, insert fails with error
 insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl where p='1400-01-01';
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "400-01-4"
 ====
 ---- QUERY
 insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl where p='1400-01-';
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "1400-01-"
 ====
 ---- QUERY
 # Use dynamic partition specification in insert.

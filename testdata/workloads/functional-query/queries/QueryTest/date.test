@@ -110,19 +110,19 @@ DATE
 # Test >=10000 date handling during string to date conversion.
 select CAST("10000-01-01" AS DATE);
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "10000-01-01"
 ====
 ---- QUERY
 # Test leap year checking during string to date conversion.
 select CAST("1900-02-29" AS DATE);
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "1900-02-29"
 ====
 ---- QUERY
 # Test invalid format handling during string to date conversion.
 select CAST("not a date" AS DATE);
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "not a date"
 ====
 ---- QUERY
 # Test 0000-01-01 and 9999-12-31 date literal
@@ -582,7 +582,7 @@ UDF ERROR: Date to Timestamp conversion failed. The valid date range for the Tim
 # STRING->DATE conversion fails because date string is invalid.
 select cast('not-a-date' as date);
 ---- CATCH
-UDF ERROR: String to Date parse failed.
+UDF ERROR: String to Date parse failed. Invalid string val: "not-a-date"
 ====
 ---- QUERY
 # TIMESTAMP->DATE conversion fails because timestamp has no date component. Note that
