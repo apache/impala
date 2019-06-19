@@ -1,0 +1,96 @@
+====
+---- QUERY
+# CTAS
+create table test as select id from functional.alltypes where id > 1
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=116MB.*
+row_regex: .*Cluster Memory Admitted: 32.00 MB.*
+====
+---- QUERY
+# Truncate table to run the following inserts.
+truncate table test
+====
+---- QUERY
+# Small insert(i.e. values list, runs on coordinator only).
+insert into test values (1), (2), (3)
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
+row_regex: .*Cluster Memory Admitted: 10.00 MB.*
+====
+---- QUERY
+# Large insert where it doesn't run on the coordinator.
+insert into test select id from functional.alltypes where id > 3
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=116MB.*
+row_regex: .*Cluster Memory Admitted: 32.00 MB.*
+====
+---- QUERY
+# SELECT with merging exchange (i.e. order by).
+select * from functional.alltypes order by int_col;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=28MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
+row_regex: .*Cluster Memory Admitted: 157.47 MB.*
+====
+---- QUERY
+# SELECT with non-merging exchange.
+select * from functional.alltypes;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
+row_regex: .*Cluster Memory Admitted: 133.47 MB.*
+====
+---- QUERY
+# SELECT with a non-grouping aggregate in the coordinator fragment.
+select avg(int_col) from functional.alltypes;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=36MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=110MB.*
+row_regex: .*Cluster Memory Admitted: 182.05 MB.*
+====
+---- QUERY
+# SELECT with num_nodes=1 and a complex plan in the coordinator.
+set num_nodes=1;
+select
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity) as sum_qty,
+  sum(l_extendedprice) as sum_base_price,
+  sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+  avg(l_quantity) as avg_qty,
+  avg(l_extendedprice) as avg_price,
+  avg(l_discount) as avg_disc,
+  count(*) as count_order
+from
+  tpch.lineitem
+where
+  l_shipdate <= '1998-09-02'
+group by
+  l_returnflag,
+  l_linestatus
+order by
+  l_returnflag,
+  l_linestatus
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=98MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=198MB.*
+row_regex: .*Cluster Memory Admitted: 198.00 MB.*
+====
+---- QUERY
+# SELECT with multiple unpartitioned analytic functions to force the sort and analytics
+# into the coordinator fragment.
+select id,
+min(int_col) over (order by year),
+min(int_col) over (order by bigint_col),
+avg(smallint_col) over (order by int_col),
+max(int_col) over (order by smallint_col rows between unbounded preceding and 1 following)
+from functional.alltypes;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=46MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=124MB.*
+row_regex: .*Cluster Memory Admitted: 216.00 MB.*
+====

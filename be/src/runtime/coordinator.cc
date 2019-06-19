@@ -111,8 +111,14 @@ Status Coordinator::Exec() {
   const string& str = Substitute("Query $0", PrintId(query_id()));
   progress_.Init(str, schedule_.num_scan_ranges());
 
+  // If there is no coord fragment then pick the mem limit computed for an executor.
+  // TODO: IMPALA-8791: make sure minimal or no limit is imposed for cases where no
+  // fragments are scheduled to run on the coordinator backend.
+  int64_t coord_mem_limit = schedule_.requiresCoordinatorFragment() ?
+      schedule_.coord_backend_mem_limit() :
+      schedule_.per_backend_mem_limit();
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(
-      query_ctx(), schedule_.per_backend_mem_limit());
+      query_ctx(), coord_mem_limit);
   filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
       -1, "Runtime Filter (Coordinator)", query_state_->query_mem_tracker(), false));
 

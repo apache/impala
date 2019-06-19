@@ -56,6 +56,8 @@ DEFINE_int64_hidden(admission_control_stale_topic_threshold_ms, 5 * 1000,
     "capture most cases where the Impala daemon is disconnected from the statestore "
     "or topic updates are seriously delayed.");
 
+DECLARE_bool(is_executor);
+
 namespace impala {
 
 const int64_t AdmissionController::PoolStats::HISTOGRAM_NUM_OF_BINS = 128;
@@ -202,7 +204,7 @@ const string REASON_REQ_OVER_POOL_MEM =
     "The total memory needed is the per-node MEM_LIMIT times the number of nodes "
     "executing the query. See the Admission Control documentation for more information.";
 const string REASON_REQ_OVER_NODE_MEM =
-    "request memory needed $0 per node is greater than memory available for admission $1 "
+    "request memory needed $0 is greater than memory available for admission $1 "
     "of $2.\n\nUse the MEM_LIMIT query option to indicate how much memory is required "
     "per node.";
 const string REASON_THREAD_RESERVATION_LIMIT_EXCEEDED =
@@ -230,7 +232,7 @@ const string POOL_MEM_NOT_AVAILABLE =
     "Not enough aggregate memory available in pool $0 "
     "with max mem resources $1 ($2). Needed $3 but only $4 was available.$5";
 // $0 = host name, $1 = host mem needed, $3 = host mem available, $4 = staleness detail
-const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0."
+const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0. "
     "Needed $1 but only $2 out of $3 was available.$4";
 
 // $0 = host name, $1 = num admitted, $2 = max requests
@@ -392,18 +394,20 @@ void AdmissionController::PoolStats::Dequeue(bool timed_out) {
 }
 
 void AdmissionController::UpdateHostStats(
-    const QuerySchedule& schedule, int64_t per_node_mem, int64_t num_queries) {
-  DCHECK_NE(per_node_mem, 0);
-  DCHECK(num_queries == 1 || num_queries == -1)
-      << "Invalid number of queries: " << num_queries;
+    const QuerySchedule& schedule, bool is_admitting) {
+  int64_t per_backend_mem_to_admit = schedule.per_backend_mem_to_admit();
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host_addr = entry.first;
+    int64_t mem_to_admit = entry.second.contains_coord_fragment ?
+        schedule.coord_backend_mem_to_admit() : per_backend_mem_to_admit;
+    if (!is_admitting) mem_to_admit *= -1;
     const string host = TNetworkAddressToString(host_addr);
     VLOG_ROW << "Update admitted mem reserved for host=" << host
              << " prev=" << PrintBytes(host_stats_[host].mem_admitted)
-             << " new=" << PrintBytes(host_stats_[host].mem_admitted + per_node_mem);
-    host_stats_[host].mem_admitted += per_node_mem;
+             << " new=" << PrintBytes(host_stats_[host].mem_admitted + mem_to_admit);
+    host_stats_[host].mem_admitted += mem_to_admit;
     DCHECK_GE(host_stats_[host].mem_admitted, 0);
+    int num_queries = is_admitting ? 1 : -1;
     VLOG_ROW << "Update admitted queries for host=" << host
              << " prev=" << host_stats_[host].num_admitted
              << " new=" << host_stats_[host].num_admitted + num_queries;
@@ -412,23 +416,34 @@ void AdmissionController::UpdateHostStats(
   }
 }
 
+// Helper method used by CanAccommodateMaxInitialReservation(). Returns true if the given
+// 'mem_limit' can accommodate 'buffer_reservation'. If not, returns false and the
+// details about the memory shortage in 'mem_unavailable_reason'.
+static bool CanMemLimitAccommodateReservation(
+    int64_t mem_limit, int64_t buffer_reservation, string* mem_unavailable_reason) {
+  if (mem_limit <= 0) return true; // No mem limit.
+  const int64_t max_reservation =
+      ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
+  if (buffer_reservation <= max_reservation) return true;
+  const int64_t required_mem_limit =
+      ReservationUtil::GetMinMemLimitFromReservation(buffer_reservation);
+  *mem_unavailable_reason = Substitute(REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
+      PrintBytes(buffer_reservation), PrintBytes(required_mem_limit));
+  return false;
+}
+
 bool AdmissionController::CanAccommodateMaxInitialReservation(
     const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
     string* mem_unavailable_reason) {
-  const int64_t per_backend_mem_limit = schedule.per_backend_mem_limit();
-  if (per_backend_mem_limit > 0) {
-    const int64_t max_reservation =
-        ReservationUtil::GetReservationLimitFromMemLimit(per_backend_mem_limit);
-    const int64_t largest_min_mem_reservation = schedule.largest_min_reservation();
-    if (largest_min_mem_reservation > max_reservation) {
-      const int64_t required_mem_limit =
-          ReservationUtil::GetMinMemLimitFromReservation(largest_min_mem_reservation);
-      *mem_unavailable_reason = Substitute(REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
-          PrintBytes(largest_min_mem_reservation), PrintBytes(required_mem_limit));
-      return false;
-    }
-  }
-  return true;
+  const int64_t executor_mem_limit = schedule.per_backend_mem_limit();
+  const int64_t executor_min_reservation = schedule.largest_min_reservation();
+  const int64_t coord_mem_limit = schedule.coord_backend_mem_limit();
+  const int64_t coord_min_reservation = schedule.coord_min_reservation();
+  return CanMemLimitAccommodateReservation(
+             executor_mem_limit, executor_min_reservation, mem_unavailable_reason)
+      && (!schedule.requiresCoordinatorFragment()
+             || CanMemLimitAccommodateReservation(
+                    coord_mem_limit, coord_min_reservation, mem_unavailable_reason));
 }
 
 bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule,
@@ -444,11 +459,10 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   //    specified.
   // 2) Each individual backend must have enough mem available within its process limit
   //    to execute the query.
-  int64_t per_host_mem_to_admit = schedule.per_backend_mem_to_admit();
-  int64_t cluster_mem_to_admit = schedule.GetClusterMemoryToAdmit();
 
   // Case 1:
   PoolStats* stats = GetPoolStats(schedule);
+  int64_t cluster_mem_to_admit = schedule.GetClusterMemoryToAdmit();
   VLOG_RPC << "Checking agg mem in pool=" << pool_name << " : " << stats->DebugString()
            << " executor_group=" << schedule.executor_group()
            << " cluster_mem_needed=" << PrintBytes(cluster_mem_to_admit)
@@ -464,6 +478,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   }
 
   // Case 2:
+  int64_t executor_mem_to_admit = schedule.per_backend_mem_to_admit();
+  int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
@@ -471,15 +487,17 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
     const HostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
     int64_t mem_admitted = host_stats.mem_admitted;
+    int64_t mem_to_admit = entry.second.contains_coord_fragment ?
+        coord_mem_to_admit : executor_mem_to_admit;
     VLOG_ROW << "Checking memory on host=" << host_id
              << " mem_reserved=" << PrintBytes(mem_reserved)
              << " mem_admitted=" << PrintBytes(mem_admitted)
-             << " needs=" << PrintBytes(per_host_mem_to_admit)
+             << " needs=" << PrintBytes(mem_to_admit)
              << " admit_mem_limit=" << PrintBytes(admit_mem_limit);
     int64_t effective_host_mem_reserved = std::max(mem_reserved, mem_admitted);
-    if (effective_host_mem_reserved + per_host_mem_to_admit > admit_mem_limit) {
+    if (effective_host_mem_reserved + mem_to_admit > admit_mem_limit) {
       *mem_unavailable_reason =
-          Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(per_host_mem_to_admit),
+          Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(mem_to_admit),
               PrintBytes(max(admit_mem_limit - effective_host_mem_reserved, 0L)),
               PrintBytes(admit_mem_limit), GetStalenessDetailLocked(" "));
       return false;
@@ -610,13 +628,15 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
     string* rejection_reason) {
   DCHECK(rejection_reason != nullptr && rejection_reason->empty());
 
-  // Compute the max (over all backends) and cluster total (across all backends) for
-  // min_mem_reservation_bytes and thread_reservation and the min (over all backends)
-  // min_admit_mem_limit.
+  // Compute the max (over all backends), the cluster totals (across all backends) for
+  // min_mem_reservation_bytes, thread_reservation, the min admit_mem_limit
+  // (over all executors) and the admit_mem_limit of the coordinator.
   pair<const TNetworkAddress*, int64_t> largest_min_mem_reservation(nullptr, -1);
   int64_t cluster_min_mem_reservation_bytes = 0;
   pair<const TNetworkAddress*, int64_t> max_thread_reservation(nullptr, 0);
-  pair<const TNetworkAddress*, int64_t> min_admit_mem_limit(
+  pair<const TNetworkAddress*, int64_t> min_executor_admit_mem_limit(
+      nullptr, std::numeric_limits<int64_t>::max());
+  pair<const TNetworkAddress*, int64_t> coord_admit_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
   int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
@@ -629,9 +649,12 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
     if (e.second.thread_reservation > max_thread_reservation.second) {
       max_thread_reservation = make_pair(&e.first, e.second.thread_reservation);
     }
-    if (e.second.admit_mem_limit < min_admit_mem_limit.second) {
-      min_admit_mem_limit.first = &e.first;
-      min_admit_mem_limit.second = e.second.admit_mem_limit;
+    if (e.second.contains_coord_fragment) {
+      coord_admit_mem_limit.first = &e.first;
+      coord_admit_mem_limit.second = e.second.admit_mem_limit;
+    } else if (e.second.admit_mem_limit < min_executor_admit_mem_limit.second) {
+      min_executor_admit_mem_limit.first = &e.first;
+      min_executor_admit_mem_limit.second = e.second.admit_mem_limit;
     }
   }
 
@@ -689,15 +712,29 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
               PrintBytes(max_mem), GetMaxMemForPoolDescription(pool_cfg, group_size));
       return true;
     }
-    int64_t per_backend_mem_to_admit = schedule.per_backend_mem_to_admit();
-    VLOG_ROW << "Checking backend mem with per_backend_mem_to_admit = "
-             << per_backend_mem_to_admit
-             << " and min_admit_mem_limit.second = " << min_admit_mem_limit.second;
-    if (per_backend_mem_to_admit > min_admit_mem_limit.second) {
-      *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
-          PrintBytes(per_backend_mem_to_admit), PrintBytes(min_admit_mem_limit.second),
-          TNetworkAddressToString(*min_admit_mem_limit.first));
+    int64_t executor_mem_to_admit = schedule.per_backend_mem_to_admit();
+    VLOG_ROW << "Checking executor mem with executor_mem_to_admit = "
+             << executor_mem_to_admit
+             << " and min_admit_mem_limit.second = "
+             << min_executor_admit_mem_limit.second;
+    if (executor_mem_to_admit > min_executor_admit_mem_limit.second) {
+      *rejection_reason =
+          Substitute(REASON_REQ_OVER_NODE_MEM, PrintBytes(executor_mem_to_admit),
+              PrintBytes(min_executor_admit_mem_limit.second),
+              TNetworkAddressToString(*min_executor_admit_mem_limit.first));
       return true;
+    }
+    if (schedule.requiresCoordinatorFragment()) {
+      int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
+      VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
+               << coord_mem_to_admit
+               << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
+      if (coord_mem_to_admit > coord_admit_mem_limit.second) {
+        *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
+            PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
+            TNetworkAddressToString(*coord_admit_mem_limit.first));
+        return true;
+      }
     }
   }
   return false;
@@ -710,8 +747,7 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(
   metrics_.pool_max_queued->SetValue(pool_cfg.max_queued);
   metrics_.max_query_mem_limit->SetValue(pool_cfg.max_query_mem_limit);
   metrics_.min_query_mem_limit->SetValue(pool_cfg.min_query_mem_limit);
-  metrics_.clamp_mem_limit_query_option->SetValue(
-      pool_cfg.clamp_mem_limit_query_option);
+  metrics_.clamp_mem_limit_query_option->SetValue(pool_cfg.clamp_mem_limit_query_option);
   metrics_.max_running_queries_multiple->SetValue(pool_cfg.max_running_queries_multiple);
   metrics_.max_queued_queries_multiple->SetValue(pool_cfg.max_queued_queries_multiple);
   metrics_.max_memory_multiple->SetValue(pool_cfg.max_memory_multiple);
@@ -896,7 +932,7 @@ void AdmissionController::ReleaseQuery(
     lock_guard<mutex> lock(admission_ctrl_lock_);
     PoolStats* stats = GetPoolStats(schedule);
     stats->Release(schedule, peak_mem_consumption);
-    UpdateHostStats(schedule, -schedule.per_backend_mem_to_admit(), -1);
+    UpdateHostStats(schedule, /*is_admitting=*/false);
     pools_for_updates_.insert(pool_name);
     VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
              << stats->DebugString();
@@ -1112,9 +1148,11 @@ Status AdmissionController::ComputeGroupSchedules(
   for (const ExecutorGroup* executor_group : executor_groups) {
     DCHECK(executor_group->IsHealthy());
     DCHECK_GT(executor_group->NumExecutors(), 0);
+    bool is_dedicated_coord = !FLAGS_is_executor;
     unique_ptr<QuerySchedule> group_schedule =
         make_unique<QuerySchedule>(request.query_id, request.request,
-            request.query_options, request.summary_profile, request.query_events);
+            request.query_options, is_dedicated_coord, request.summary_profile,
+            request.query_events);
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
@@ -1170,7 +1208,9 @@ bool AdmissionController::FindGroupToAdmitOrReject(int64_t cluster_size,
     VLOG_QUERY << "Trying to admit id=" << PrintId(schedule->query_id())
                << " in pool_name=" << pool_name << " executor_group_name=" << group_name
                << " per_host_mem_estimate="
-               << PrintBytes(schedule->GetPerHostMemoryEstimate())
+               << PrintBytes(schedule->GetPerExecutorMemoryEstimate())
+               << " dedicated_coord_mem_estimate="
+               << PrintBytes(schedule->GetDedicatedCoordMemoryEstimate())
                << " max_requests=" << max_requests << " ("
                << GetMaxRequestsForPoolDescription(pool_config, cluster_size) << ")"
                << " max_queued=" << max_queued << " ("
@@ -1408,10 +1448,14 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
            << " per_backend_mem_limit set to: "
            << PrintBytes(schedule->per_backend_mem_limit())
            << " per_backend_mem_to_admit set to: "
-           << PrintBytes(schedule->per_backend_mem_to_admit());
+           << PrintBytes(schedule->per_backend_mem_to_admit())
+           << " coord_backend_mem_limit set to: "
+           << PrintBytes(schedule->coord_backend_mem_limit())
+           << " coord_backend_mem_to_admit set to: "
+           << PrintBytes(schedule->coord_backend_mem_to_admit());;
   // Update memory and number of queries.
   pool_stats->Admit(*schedule);
-  UpdateHostStats(*schedule, schedule->per_backend_mem_to_admit(), 1);
+  UpdateHostStats(*schedule, /* is_admitting=*/true);
   // Update summary profile.
   const string& admission_result =
       was_queued ? PROFILE_INFO_VAL_ADMIT_QUEUED : PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
@@ -1487,6 +1531,10 @@ void AdmissionController::PoolToJsonLocked(const string& pool_name,
         "mem_limit", schedule->per_backend_mem_limit(), document->GetAllocator());
     query_info.AddMember("mem_limit_to_admit", schedule->per_backend_mem_to_admit(),
         document->GetAllocator());
+    query_info.AddMember("coord_mem_limit", schedule->coord_backend_mem_limit(),
+        document->GetAllocator());
+    query_info.AddMember("coord_mem_to_admit",
+        schedule->coord_backend_mem_to_admit(), document->GetAllocator());
     query_info.AddMember("num_backends", schedule->per_backend_exec_params().size(),
         document->GetAllocator());
     queued_queries.PushBack(query_info, document->GetAllocator());

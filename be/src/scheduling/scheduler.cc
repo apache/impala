@@ -673,21 +673,28 @@ void Scheduler::ComputeBackendExecParams(
       be_params.initial_mem_reservation_total_claims +=
           f.fragment.initial_mem_reservation_total_claims;
       be_params.thread_reservation += f.fragment.thread_reservation;
+      if (f.is_coord_fragment) be_params.contains_coord_fragment = true;
     }
   }
 
   int64_t largest_min_reservation = 0;
+  int64_t coord_min_reservation = 0;
   for (auto& backend : per_backend_params) {
     const TNetworkAddress& host = backend.first;
     const TBackendDescriptor be_desc = LookUpBackendDesc(executor_config, host);
     backend.second.admit_mem_limit = be_desc.admit_mem_limit;
     backend.second.admit_num_queries_limit = be_desc.admit_num_queries_limit;
     backend.second.be_desc = be_desc;
-    largest_min_reservation =
-        max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
+    if (backend.second.contains_coord_fragment) {
+      coord_min_reservation = backend.second.min_mem_reservation_bytes;
+    } else {
+      largest_min_reservation =
+          max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
+    }
   }
   schedule->set_per_backend_exec_params(per_backend_params);
   schedule->set_largest_min_reservation(largest_min_reservation);
+  schedule->set_coord_min_reservation(coord_min_reservation);
 
   stringstream min_mem_reservation_ss;
   stringstream num_fragment_instances_ss;

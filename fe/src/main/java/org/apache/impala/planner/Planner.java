@@ -49,6 +49,7 @@ import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.MathUtil;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,9 +70,20 @@ public class Planner {
   // estimates of zero, even if the contained PlanNodes have estimates of zero.
   public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
 
+  // The amount of memory added to a dedicated coordinator's memory estimate to
+  // compensate for underestimation. In the general case estimates for exec
+  // nodes tend to overestimate and should work fine but for estimates in the
+  // 100-500 MB space, underestimates can be a problem. We pick a value of 100MB
+  // because it is trivial for large estimates and small enough to not make a
+  // huge impact on the coordinator's process memory (which ideally would be
+  // large).
+  public static final long DEDICATED_COORD_SAFETY_BUFFER_BYTES = 100 * 1024 * 1024;
+
   public static final ResourceProfile MIN_PER_HOST_RESOURCES =
-      new ResourceProfileBuilder().setMemEstimateBytes(MIN_PER_HOST_MEM_ESTIMATE_BYTES)
-      .setMinMemReservationBytes(0).build();
+      new ResourceProfileBuilder()
+          .setMemEstimateBytes(MIN_PER_HOST_MEM_ESTIMATE_BYTES)
+          .setMinMemReservationBytes(0)
+          .build();
 
   private final PlannerContext ctx_;
 
@@ -287,6 +299,10 @@ public class Planner {
           request.getMax_per_host_thread_reservation()));
       str.append(String.format("Per-Host Resource Estimates: Memory=%s\n",
           PrintUtils.printBytesRoundedToMb(request.getPer_host_mem_estimate())));
+      if (BackendConfig.INSTANCE.useDedicatedCoordinatorEstimates()) {
+        str.append(String.format("Dedicated Coordinator Resource Estimate: Memory=%s\n",
+            PrintUtils.printBytesRoundedToMb(request.getDedicated_coord_mem_estimate())));
+      }
       hasHeader = true;
     }
     // Warn if the planner is running in DEBUG mode.
@@ -389,10 +405,12 @@ public class Planner {
     // are scheduled on all nodes. The actual per-host resource requirements are computed
     // after scheduling.
     ResourceProfile maxPerHostPeakResources = ResourceProfile.invalid();
+    long totalRuntimeFilterMemBytes = 0;
 
     // Do a pass over all the fragments to compute resource profiles. Compute the
     // profiles bottom-up since a fragment's profile may depend on its descendants.
-    List<PlanFragment> allFragments = planRoots.get(0).getNodesPostOrder();
+    PlanFragment rootFragment = planRoots.get(0);
+    List<PlanFragment> allFragments = rootFragment.getNodesPostOrder();
     for (PlanFragment fragment: allFragments) {
       // Compute the per-node, per-sink and aggregate profiles for the fragment.
       fragment.computeResourceProfile(ctx_.getRootAnalyzer());
@@ -405,8 +423,11 @@ public class Planner {
       // per-fragment-instance peak resources.
       maxPerHostPeakResources = maxPerHostPeakResources.sum(
           fragment.getResourceProfile().multiply(fragment.getNumInstancesPerHost(mtDop)));
+      // Coordinator has to have a copy of each of the runtime filters to perform filter
+      // aggregation.
+      totalRuntimeFilterMemBytes += fragment.getRuntimeFiltersMemReservationBytes();
     }
-    planRoots.get(0).computePipelineMembership();
+    rootFragment.computePipelineMembership();
 
     Preconditions.checkState(maxPerHostPeakResources.getMemEstimateBytes() >= 0,
         maxPerHostPeakResources.getMemEstimateBytes());
@@ -415,13 +436,17 @@ public class Planner {
 
     maxPerHostPeakResources = MIN_PER_HOST_RESOURCES.max(maxPerHostPeakResources);
 
-    // TODO: Remove per_host_mem_estimate from the TQueryExecRequest when AC no longer
-    // needs it.
     request.setPer_host_mem_estimate(maxPerHostPeakResources.getMemEstimateBytes());
     request.setMax_per_host_min_mem_reservation(
         maxPerHostPeakResources.getMinMemReservationBytes());
     request.setMax_per_host_thread_reservation(
         maxPerHostPeakResources.getThreadReservation());
+    // Assuming the root fragment will always run on the coordinator backend, which
+    // might not be true for queries that don't have a coordinator fragment
+    // (request.getStmt_type() != TStmtType.QUERY). TODO: Fix in IMPALA-8791.
+    request.setDedicated_coord_mem_estimate(MathUtil.saturatingAdd(rootFragment
+        .getResourceProfile().getMemEstimateBytes(), totalRuntimeFilterMemBytes +
+        DEDICATED_COORD_SAFETY_BUFFER_BYTES));
     if (LOG.isTraceEnabled()) {
       LOG.trace("Max per-host min reservation: " +
           maxPerHostPeakResources.getMinMemReservationBytes());

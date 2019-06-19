@@ -81,6 +81,9 @@ struct BackendExecParams {
 
   // The maximum number of queries that this backend can execute concurrently.
   int64_t admit_num_queries_limit = 0;
+
+  // Indicates whether this backend will run the coordinator fragment.
+  bool contains_coord_fragment = false;
 };
 
 /// Map from an impalad host address to the list of assigned fragment instance params.
@@ -159,12 +162,14 @@ struct FragmentExecParams {
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, RuntimeProfile* summary_profile,
+      const TQueryOptions& query_options, bool is_dedicated_coord,
+      RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
 
   /// For testing only: build a QuerySchedule object but do not run Init().
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, RuntimeProfile* summary_profile);
+      const TQueryOptions& query_options, bool is_dedicated_coord,
+      RuntimeProfile* summary_profile);
 
   /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
   /// - all fragments have a FragmentExecParams
@@ -179,7 +184,12 @@ class QuerySchedule {
   const std::string& request_pool() const { return request().query_ctx.request_pool; }
 
   /// Returns the estimated memory (bytes) per-node from planning.
-  int64_t GetPerHostMemoryEstimate() const;
+  int64_t GetPerExecutorMemoryEstimate() const;
+
+  /// Returns the estimated memory (bytes) for the coordinator backend returned by the
+  /// planner. This estimate is only meaningful if this schedule was generated on a
+  /// dedicated coordinator.
+  int64_t GetDedicatedCoordMemoryEstimate() const;
 
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void IncNumScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -239,13 +249,24 @@ class QuerySchedule {
 
   int64_t largest_min_reservation() const { return largest_min_reservation_; }
 
+  int64_t coord_min_reservation() const { return coord_min_reservation_; }
+
   /// Must call UpdateMemoryRequirements() at least once before calling this.
   int64_t per_backend_mem_limit() const { return per_backend_mem_limit_; }
 
   /// Must call UpdateMemoryRequirements() at least once before calling this.
   int64_t per_backend_mem_to_admit() const {
-    DCHECK_GT(per_backend_mem_to_admit_, 0);
+    DCHECK_GE(per_backend_mem_to_admit_, 0);
     return per_backend_mem_to_admit_;
+  }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  int64_t coord_backend_mem_limit() const { return coord_backend_mem_limit_; }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  int64_t coord_backend_mem_to_admit() const {
+    DCHECK_GT(coord_backend_mem_to_admit_, 0);
+    return coord_backend_mem_to_admit_;
   }
 
   void set_per_backend_exec_params(const PerBackendExecParams& params) {
@@ -256,9 +277,17 @@ class QuerySchedule {
     largest_min_reservation_ = largest_min_reservation;
   }
 
+  void set_coord_min_reservation(const int64_t coord_min_reservation) {
+    coord_min_reservation_ = coord_min_reservation;
+  }
+
   /// Returns the Cluster wide memory admitted by the admission controller.
   /// Must call UpdateMemoryRequirements() at least once before calling this.
   int64_t GetClusterMemoryToAdmit() const;
+
+  /// Returns true if coordinator estimates calculated by the planner and specialized for
+  /// dedicated a coordinator are to be used for estimating memory requirements.
+  bool UseDedicatedCoordEstimates() const;
 
   /// Populates or updates the per host query memory limit and the amount of memory to be
   /// admitted based on the pool configuration passed to it. Must be called at least once
@@ -269,6 +298,11 @@ class QuerySchedule {
   const string& executor_group() const { return executor_group_; }
 
   void set_executor_group(string executor_group);
+
+  /// Returns true if a coordinator fragment is required based on the query stmt type.
+  bool requiresCoordinatorFragment() const {
+    return request_.stmt_type == TStmtType::QUERY;
+  }
 
  private:
   /// These references are valid for the lifetime of this query schedule because they
@@ -304,19 +338,36 @@ class QuerySchedule {
   /// Used to generate consecutive fragment instance ids.
   TUniqueId next_instance_id_;
 
-  /// The largest min memory reservation across all backends. Set in
+  /// The largest min memory reservation across all executors. Set in
   /// Scheduler::Schedule().
   int64_t largest_min_reservation_ = 0;
 
-  /// The memory limit per backend that will be imposed on the query.
+  /// The memory limit per executor that will be imposed on the query.
   /// Set by the admission controller with a value that is only valid if it was admitted
   /// successfully. -1 means no limit.
-  int64_t per_backend_mem_limit_ = 0;
+  int64_t per_backend_mem_limit_ = -1;
 
-  /// The per backend memory used for admission accounting.
+  /// The per executor memory used for admission accounting.
+  /// Set by the admission controller with a value that is only valid if it was admitted
+  /// successfully. Can be zero if the query is only scheduled to run on the coordinator.
+  int64_t per_backend_mem_to_admit_ = -1;
+
+  /// The memory limit for the coordinator that will be imposed on the query. Used only if
+  /// the query has a coordinator fragment.
+  /// Set by the admission controller with a value that is only valid if it was admitted
+  /// successfully. -1 means no limit.
+  int64_t coord_backend_mem_limit_ = -1;
+
+  /// The coordinator memory used for admission accounting.
   /// Set by the admission controller with a value that is only valid if it was admitted
   /// successfully.
-  int64_t per_backend_mem_to_admit_ = 0;
+  int64_t coord_backend_mem_to_admit_ = -1;
+
+  /// The coordinator's backend memory reservation. Set in Scheduler::Schedule().
+  int64_t coord_min_reservation_ = 0;
+
+  /// Indicates whether coordinator fragment will be running on a dedicated coordinator.
+  bool is_dedicated_coord_ = false;
 
   /// The name of the executor group that this schedule was computed for. Set by the
   /// Scheduler and only valid after scheduling completes successfully.
@@ -327,7 +378,6 @@ class QuerySchedule {
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
   void Init();
 };
-
 }
 
 #endif

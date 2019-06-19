@@ -131,4 +131,8 @@ struct TBackendGflags {
   53: required string query_event_hook_classes
 
   54: required i32 query_event_hook_nthreads
+
+  55: required bool is_executor
+
+  56: required bool use_dedicated_coordinator_estimates
 }

@@ -935,8 +935,10 @@ void ImpalaHttpHandler::AdmissionStateHandler(
   // Now get running queries from CRS map.
   struct QueryInfo {
     TUniqueId query_id;
-    int64_t mem_limit;
-    int64_t mem_limit_for_admission;
+    int64_t executor_mem_limit;
+    int64_t executor_mem_to_admit;
+    int64_t coord_mem_limit;
+    int64_t coord_mem_to_admit;
     unsigned long num_backends;
   };
   unordered_map<string, vector<QueryInfo>> running_queries;
@@ -950,6 +952,8 @@ void ImpalaHttpHandler::AdmissionStateHandler(
       running_queries[request_state->request_pool()].push_back(
           {request_state->query_id(), request_state->schedule()->per_backend_mem_limit(),
               request_state->schedule()->per_backend_mem_to_admit(),
+              request_state->schedule()->coord_backend_mem_limit(),
+              request_state->schedule()->coord_backend_mem_to_admit(),
               static_cast<unsigned long>(
                   request_state->schedule()->per_backend_exec_params().size())});
   });
@@ -970,9 +974,14 @@ void ImpalaHttpHandler::AdmissionStateHandler(
       Value query_info(rapidjson::kObjectType);
       Value query_id(PrintId(info.query_id).c_str(), document->GetAllocator());
       query_info.AddMember("query_id", query_id, document->GetAllocator());
-      query_info.AddMember("mem_limit", info.mem_limit, document->GetAllocator());
       query_info.AddMember(
-          "mem_limit_to_admit", info.mem_limit_for_admission, document->GetAllocator());
+          "mem_limit", info.executor_mem_limit, document->GetAllocator());
+      query_info.AddMember(
+          "mem_limit_to_admit", info.executor_mem_to_admit, document->GetAllocator());
+      query_info.AddMember(
+          "coord_mem_limit", info.coord_mem_limit, document->GetAllocator());
+      query_info.AddMember(
+          "coord_mem_to_admit", info.coord_mem_to_admit, document->GetAllocator());
       query_info.AddMember("num_backends", info.num_backends, document->GetAllocator());
       queries_in_pool.PushBack(query_info, document->GetAllocator());
     }

@@ -444,6 +444,11 @@ struct TQueryExecRequest {
   // max DOP) required threads per host, i.e. the number of threads that this query
   // needs to execute successfully. Does not include "optional" threads.
   11: optional i64 max_per_host_thread_reservation;
+
+  // Estimated coordinator's memory consumption in bytes assuming that the coordinator
+  // fragment will run on a dedicated coordinator. Set by the planner and used by
+  // admission control.
+  12: optional i64 dedicated_coord_mem_estimate;
 }
 
 enum TCatalogOpType {

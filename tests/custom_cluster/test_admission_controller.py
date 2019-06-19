@@ -47,6 +47,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 
@@ -473,8 +474,169 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       exec_options['mem_limit'] = long(self.PROC_MEM_TEST_LIMIT * 1.1)
       ex = self.execute_query_expect_failure(self.client, query, exec_options)
       assert ("Rejected query from pool default-pool: request memory needed "
-              "1.10 GB per node is greater than memory available for admission 1.00 GB" in
+              "1.10 GB is greater than memory available for admission 1.00 GB" in
               str(ex)), str(ex)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_config_args(
+      fs_allocation_file="mem-limit-test-fair-scheduler.xml",
+      llama_site_file="mem-limit-test-llama-site.xml"), num_exclusive_coordinators=1,
+    cluster_size=2)
+  def test_dedicated_coordinator_mem_accounting(self, vector):
+    """Verify that when using dedicated coordinators, the memory admitted for and the
+    mem limit applied to the query fragments running on the coordinator is different than
+    the ones on executors."""
+    self.__verify_mem_accounting(vector, using_dedicated_coord_estimates=True)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_config_args(
+      fs_allocation_file="mem-limit-test-fair-scheduler.xml",
+      llama_site_file="mem-limit-test-llama-site.xml")
+    + " -use_dedicated_coordinator_estimates false",
+    num_exclusive_coordinators=1,
+    cluster_size=2)
+  def test_dedicated_coordinator_legacy_mem_accounting(self, vector):
+    """Verify that when using dedicated coordinators with specialized dedicated coord
+    estimates turned off using a hidden startup param, the memory admitted for and the
+    mem limit applied to the query fragments running on the coordinator is the same
+    (as expected from legacy behavior)."""
+    self.__verify_mem_accounting(vector, using_dedicated_coord_estimates=False)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_config_args(
+      fs_allocation_file="mem-limit-test-fair-scheduler.xml",
+      llama_site_file="mem-limit-test-llama-site.xml"), num_exclusive_coordinators=1,
+    cluster_size=2)
+  def test_sanity_checks_dedicated_coordinator(self, vector):
+    """Test for verifying targeted dedicated coordinator memory estimation behavior."""
+    self.client.set_configuration_option('request_pool', "root.regularPool")
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    exec_options = vector.get_value('exec_option')
+    # Make sure query option MAX_MEM_ESTIMATE_FOR_ADMISSION is enforced on the dedicated
+    # coord estimates. Without this query option the estimate would be > 100MB.
+    expected_mem = 60 * (1 << 20)  # 60MB
+    exec_options['MAX_MEM_ESTIMATE_FOR_ADMISSION'] = expected_mem
+    self.client.set_configuration(exec_options)
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    mem_to_admit = self.__get_mem_limits_admission_debug_page()
+    assert abs(mem_to_admit['coordinator'] - expected_mem) < 0.0001,\
+      "mem_to_admit:" + str(mem_to_admit)
+    assert abs(mem_to_admit['executor'] - expected_mem) < 0.0001, \
+      "mem_to_admit:" + str(mem_to_admit)
+    self.client.close_query(handle)
+
+    # If the query is only scheduled on the coordinator then the mem to admit on executor
+    # should be zero.
+    exec_options['NUM_NODES'] = 1
+    self.client.set_configuration(exec_options)
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    mem_to_admit = self.__get_mem_limits_admission_debug_page()
+    assert abs(mem_to_admit['coordinator'] - expected_mem) < 0.0001, \
+      "mem_to_admit:" + str(mem_to_admit)
+    assert abs(mem_to_admit['executor'] - 0) < 0.0001, \
+      "mem_to_admit:" + str(mem_to_admit)
+    self.client.close_query(handle)
+
+  def __verify_mem_accounting(self, vector, using_dedicated_coord_estimates):
+    """Helper method used by test_dedicated_coordinator_*_mem_accounting that verifies
+    the actual vs expected values for mem admitted and mem limit for both coord and
+    executor. Also verifies that those memory values are different if
+    'using_dedicated_coord_estimates' is true."""
+    self.client.set_configuration_option('request_pool', "root.regularPool")
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    expected_mem_limits = self.__get_mem_limits_admission_debug_page()
+    actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
+    mem_admitted = self.__get_mem_admitted_backends_debug_page()
+    debug_string = " expected_mem_limits:" + str(
+      expected_mem_limits) + " actual_mem_limits:" + str(
+      actual_mem_limits) + " mem_admitted:" + str(mem_admitted)
+    MB = 1 << 20
+    # Easiest way to check float in-equality.
+    assert abs(expected_mem_limits['coordinator'] - expected_mem_limits[
+      'executor']) > 0.0001 or not using_dedicated_coord_estimates, debug_string
+    # There may be some rounding errors so keep a margin of 5MB when verifying
+    assert abs(actual_mem_limits['coordinator'] - expected_mem_limits[
+      'coordinator']) < 5 * MB, debug_string
+    assert abs(actual_mem_limits['executor'] - expected_mem_limits[
+      'executor']) < 5 * MB, debug_string
+    assert abs(mem_admitted['coordinator'] - expected_mem_limits[
+      'coordinator']) < 5 * MB, debug_string
+    assert abs(
+      mem_admitted['executor'] - expected_mem_limits['executor']) < 5 * MB, debug_string
+
+  def __get_mem_limits_admission_debug_page(self):
+    """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
+    mem_limit calculated by the admission controller from the impala admission debug page
+    of the coordinator impala daemon. Returns a dictionary with the keys 'coordinator'
+    and 'executor' and their respective mem values in bytes."""
+    # Based on how the cluster is setup, the first impalad in the cluster is the
+    # coordinator.
+    response_json = self.cluster.impalads[0].service.get_debug_webpage_json("admission")
+    assert 'resource_pools' in response_json
+    assert len(response_json['resource_pools']) == 1
+    assert response_json['resource_pools'][0]['running_queries']
+    assert len(response_json['resource_pools'][0]['running_queries']) == 1
+    query_info = response_json['resource_pools'][0]['running_queries'][0]
+    return {'coordinator': float(query_info["coord_mem_to_admit"]),
+            'executor': float(query_info["mem_limit"])}
+
+  def __get_mem_limits_memz_debug_page(self, query_id):
+    """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
+    mem limits enforced on the query (identified by the 'query_id') extracted from
+    mem-tracker's output on the memz debug page of the dedicated coordinator and the
+    executor impala daemons. Returns a dictionary with the keys 'coordinator' and
+    'executor' and their respective mem values in bytes."""
+    metric_name = "Query({0})".format(query_id)
+    # Based on how the cluster is setup, the first impalad in the cluster is the
+    # coordinator.
+    mem_trackers = [MemUsageVerifier(i.service).get_mem_usage_values(metric_name) for i in
+                    self.cluster.impalads]
+    return {'coordinator': float(mem_trackers[0]['limit']),
+            'executor': float(mem_trackers[1]['limit'])}
+
+  def __get_mem_admitted_backends_debug_page(self):
+    """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
+    mem admitted to the backends extracted from the backends debug page of the coordinator
+    impala daemon. Returns a dictionary with the keys 'coordinator' and 'executor' and
+    their respective mem values in bytes."""
+    # Based on how the cluster is setup, the first impalad in the cluster is the
+    # coordinator.
+    response_json = self.cluster.impalads[0].service.get_debug_webpage_json("backends")
+    assert 'backends' in response_json
+    assert len(response_json['backends']) == 2
+    ret = dict()
+    from tests.verifiers.mem_usage_verifier import parse_mem_value
+    for backend in response_json['backends']:
+      if backend['is_coordinator']:
+        ret['coordinator'] = parse_mem_value(backend['mem_admitted'])
+      else:
+        ret['executor'] = parse_mem_value(backend['mem_admitted'])
+    return ret
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1)
+  def test_dedicated_coordinator_planner_estimates(self, vector, unique_database):
+    """Planner tests to add coverage for coordinator estimates when using dedicated
+    coordinators. Also includes coverage for verifying cluster memory admitted."""
+    vector_copy = copy(vector)
+    exec_options = vector.get_value('exec_option')
+    # Remove num_nodes from the options to allow test case runner to set it in one of
+    # the test cases.
+    del exec_options['num_nodes']
+    exec_options['num_scanner_threads'] = 1  # To make estimates consistently reproducible
+    self.run_test_case('QueryTest/dedicated-coord-mem-estimates', vector_copy,
+                       unique_database)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -510,8 +672,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       exec_options['mem_limit'] = "3G"
       self.execute_query(query, exec_options)
     except ImpalaBeeswaxException as e:
-      assert re.search("Rejected query from pool \S+: request memory needed 3.00 GB per "
-          "node is greater than memory available for admission 2.00 GB of \S+", str(e)), \
+      assert re.search("Rejected query from pool \S+: request memory needed 3.00 GB"
+          " is greater than memory available for admission 2.00 GB of \S+", str(e)), \
           str(e)
     # Exercise queuing checks in admission controller.
     try:

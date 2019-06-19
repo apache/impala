@@ -770,16 +770,19 @@ class AdmissionController {
   bool CanAdmitRequest(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
       int64_t cluster_size, bool admit_from_queue, std::string* not_admitted_reason);
 
-  /// Returns true if the per host mem limit for the query represented by 'schedule' is
-  /// large enough to accommodate the largest initial reservation required. Otherwise,
-  /// returns false with the details about the memory shortage in
-  /// 'mem_unavailable_reason'. Possible cases where it can return false are:
+  /// Returns true if all executors can accommodate the largest initial reservation of
+  /// any executor and the backend running the coordinator fragment can accommodate its
+  /// own initial reservation. Otherwise, returns false with the details about the memory
+  /// shortage in 'mem_unavailable_reason'. Possible cases where it can return false are:
   /// 1. The pool.max_query_mem_limit is set too low
   /// 2. mem_limit in query options is set low and no max/min_query_mem_limit is set in
   ///    the pool configuration.
   /// 3. mem_limit in query options is set low and min_query_mem_limit is also set low.
   /// 4. mem_limit in query options is set low and the pool.min_query_mem_limit is set
   ///    to a higher value but pool.clamp_mem_limit_query_option is false.
+  /// 5. If a dedicated coordinator is used and the mem_limit in query options is set
+  ///    lower than what is required to support the sum of initial memory reservations of
+  ///    the fragments scheduled on the coordinator.
   static bool CanAccommodateMaxInitialReservation(const QuerySchedule& schedule,
       const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
 
@@ -800,11 +803,10 @@ class AdmissionController {
   bool HasAvailableSlot(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
       string* unavailable_reason);
 
-  /// Adds 'per_node_mem' and 'num_queries' to the per-host stats in host_stats_ for each
-  /// host in 'schedule'. Must hold admission_ctrl_lock_. Note that 'per_node_mem' and
-  /// 'num_queries' may be negative when a query completes.
-  void UpdateHostStats(
-      const QuerySchedule& schedule, int64_t per_node_mem, int64_t num_queries);
+  /// Updates the memory admitted and the num of queries running for each host in
+  /// 'schedule'. If 'is_admitting' is true, the memory admitted and the num of queries is
+  /// increased, otherwise it is decreased.
+  void UpdateHostStats(const QuerySchedule& schedule, bool is_admitting);
 
   /// Rejection happens in several stages
   /// 1) Based on static pool configuration
@@ -938,6 +940,8 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
   FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
   FRIEND_TEST(AdmissionControllerTest, QueryRejection);
+  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordQuerySchedule);
+  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
   friend class AdmissionControllerTest;
 };
 

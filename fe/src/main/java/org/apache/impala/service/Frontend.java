@@ -1496,9 +1496,14 @@ public class Frontend {
       TQueryOptions queryOptions) {
     if (queryOptions.isSetMax_mem_estimate_for_admission()
         && queryOptions.getMax_mem_estimate_for_admission() > 0) {
-      long effectiveMemEstimate = Math.min(queryExecRequest.getPer_host_mem_estimate(),
+      long effectivePerHostMemEstimate = Math.min(
+          queryExecRequest.getPer_host_mem_estimate(),
               queryOptions.getMax_mem_estimate_for_admission());
-      queryExecRequest.setPer_host_mem_estimate(effectiveMemEstimate);
+      queryExecRequest.setPer_host_mem_estimate(effectivePerHostMemEstimate);
+      long effectiveCoordinatorMemEstimate = Math.min(
+          queryExecRequest.getDedicated_coord_mem_estimate(),
+              queryOptions.getMax_mem_estimate_for_admission());
+      queryExecRequest.setDedicated_coord_mem_estimate(effectiveCoordinatorMemEstimate);
     }
   }
 

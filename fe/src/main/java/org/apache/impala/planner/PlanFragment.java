@@ -113,6 +113,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // managed by this fragment.
   private long runtimeFiltersMemReservationBytes_ = 0;
 
+  public long getRuntimeFiltersMemReservationBytes() {
+    return runtimeFiltersMemReservationBytes_;
+  }
+
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
    */

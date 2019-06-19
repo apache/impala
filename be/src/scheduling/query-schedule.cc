@@ -35,10 +35,15 @@ using boost::uuids::random_generator;
 using boost::uuids::uuid;
 using namespace impala;
 
+DEFINE_bool_hidden(use_dedicated_coordinator_estimates, true,
+    "Hidden option to fall back to legacy memory estimation logic for dedicated"
+    " coordinators wherein the same per backend estimate is used for both coordinators "
+    "and executors.");
+
 namespace impala {
 
-QuerySchedule::QuerySchedule(const TUniqueId& query_id,
-    const TQueryExecRequest& request, const TQueryOptions& query_options,
+QuerySchedule::QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
+    const TQueryOptions& query_options, bool is_dedicated_coord,
     RuntimeProfile* summary_profile, RuntimeProfile::EventSequence* query_events)
   : query_id_(query_id),
     request_(request),
@@ -46,18 +51,21 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_scan_ranges_(0),
-    next_instance_id_(query_id) {
+    next_instance_id_(query_id),
+    is_dedicated_coord_(is_dedicated_coord) {
   Init();
 }
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-    const TQueryOptions& query_options, RuntimeProfile* summary_profile)
+    const TQueryOptions& query_options, bool is_dedicated_coord,
+    RuntimeProfile* summary_profile)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
     summary_profile_(summary_profile),
     num_scan_ranges_(0),
-    next_instance_id_(query_id) {
+    next_instance_id_(query_id),
+    is_dedicated_coord_(is_dedicated_coord) {
   // Init() is not called, this constructor is for white box testing only.
   DCHECK(TestInfo::is_test());
 }
@@ -81,7 +89,7 @@ void QuerySchedule::Init() {
 
   // mark coordinator fragment
   const TPlanFragment& root_fragment = request_.plan_exec_info[0].fragments[0];
-  if (request_.stmt_type == TStmtType::QUERY) {
+  if (requiresCoordinatorFragment()) {
     fragment_exec_params_[root_fragment.idx].is_coord_fragment = true;
     // the coordinator instance gets index 0, generated instance ids start at 1
     next_instance_id_ = CreateInstanceId(next_instance_id_, 1);
@@ -177,9 +185,14 @@ void QuerySchedule::Validate() const {
   // TODO: add validation for BackendExecParams
 }
 
-int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
+int64_t QuerySchedule::GetPerExecutorMemoryEstimate() const {
   DCHECK(request_.__isset.per_host_mem_estimate);
   return request_.per_host_mem_estimate;
+}
+
+int64_t QuerySchedule::GetDedicatedCoordMemoryEstimate() const {
+  DCHECK(request_.__isset.dedicated_coord_mem_estimate);
+  return request_.dedicated_coord_mem_estimate;
 }
 
 TUniqueId QuerySchedule::GetNextInstanceId() {
@@ -200,7 +213,6 @@ const TPlanFragment* QuerySchedule::GetCoordFragment() const {
   return fragment;
 }
 
-
 void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) const {
   fragments->clear();
   for (const TPlanExecInfo& plan_info: request_.plan_exec_info) {
@@ -211,7 +223,7 @@ void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) c
 }
 
 const FInstanceExecParams& QuerySchedule::GetCoordInstanceExecParams() const {
-  DCHECK_EQ(request_.stmt_type, TStmtType::QUERY);
+  DCHECK(requiresCoordinatorFragment());
   const TPlanFragment& coord_fragment =  request_.plan_exec_info[0].fragments[0];
   const FragmentExecParams& fragment_params = fragment_exec_params_[coord_fragment.idx];
   DCHECK_EQ(fragment_params.instance_exec_params.size(), 1);
@@ -235,32 +247,51 @@ int QuerySchedule::GetNumFragmentInstances() const {
 }
 
 int64_t QuerySchedule::GetClusterMemoryToAdmit() const {
-  return per_backend_mem_to_admit() *  per_backend_exec_params_.size();
+  if (!requiresCoordinatorFragment()) {
+    // For this case, there will be no coordinator fragment so only use the per
+    // executor mem to admit while accounting for admitted memory. This will also ensure
+    // the per backend mem admitted accounting is consistent with the cluster-wide mem
+    // admitted.
+    return per_backend_mem_to_admit() * per_backend_exec_params_.size();
+  } else {
+    return per_backend_mem_to_admit() * (per_backend_exec_params_.size() - 1)
+        + coord_backend_mem_to_admit();
+  }
+}
+
+bool QuerySchedule::UseDedicatedCoordEstimates() const {
+  return is_dedicated_coord_ && FLAGS_use_dedicated_coordinator_estimates;
 }
 
 void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
-  // then it falls back to traditional(old) behavior, which means that, if for_admission
-  // is false, it returns the mem_limit if it is set in the query options, else returns -1
-  // which means no limit; if for_admission is true, it returns the mem_limit if it is set
-  // in the query options, else returns the per host mem estimate calculated during
-  // planning.
+  // then it falls back to traditional(old) behavior, which means that, it sets the
+  // mem_limit if it is set in the query options, else sets it to -1 (no limit).
   bool mimic_old_behaviour =
       pool_cfg.min_query_mem_limit == 0 && pool_cfg.max_query_mem_limit == 0;
 
   per_backend_mem_to_admit_ = 0;
+  coord_backend_mem_to_admit_ = 0;
   bool has_query_option = false;
   if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
     per_backend_mem_to_admit_ = query_options().mem_limit;
+    coord_backend_mem_to_admit_ = query_options().mem_limit;
     has_query_option = true;
   }
 
   if (!has_query_option) {
-    per_backend_mem_to_admit_ = GetPerHostMemoryEstimate();
+    per_backend_mem_to_admit_ = GetPerExecutorMemoryEstimate();
+    coord_backend_mem_to_admit_ = UseDedicatedCoordEstimates() ?
+        GetDedicatedCoordMemoryEstimate() :
+        GetPerExecutorMemoryEstimate();
     if (!mimic_old_behaviour) {
-      int64_t min_mem_limit_required = ReservationUtil::GetMinMemLimitFromReservation(
-          largest_min_reservation());
+      int64_t min_mem_limit_required =
+          ReservationUtil::GetMinMemLimitFromReservation(largest_min_reservation());
       per_backend_mem_to_admit_ = max(per_backend_mem_to_admit_, min_mem_limit_required);
+      int64_t min_coord_mem_limit_required =
+          ReservationUtil::GetMinMemLimitFromReservation(coord_min_reservation());
+      coord_backend_mem_to_admit_ =
+          max(coord_backend_mem_to_admit_, min_coord_mem_limit_required);
     }
   }
 
@@ -268,21 +299,38 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     if (pool_cfg.min_query_mem_limit > 0) {
       per_backend_mem_to_admit_ =
           max(per_backend_mem_to_admit_, pool_cfg.min_query_mem_limit);
+      if (!UseDedicatedCoordEstimates() || has_query_option) {
+        // The minimum mem limit option does not apply to dedicated coordinators -
+        // this would result in over-reserving of memory. Treat coordinator and
+        // executor mem limits the same if the query option was explicitly set.
+        coord_backend_mem_to_admit_ =
+            max(coord_backend_mem_to_admit_, pool_cfg.min_query_mem_limit);
+      }
     }
     if (pool_cfg.max_query_mem_limit > 0) {
       per_backend_mem_to_admit_ =
           min(per_backend_mem_to_admit_, pool_cfg.max_query_mem_limit);
+      coord_backend_mem_to_admit_ =
+          min(coord_backend_mem_to_admit_, pool_cfg.max_query_mem_limit);
     }
   }
 
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.
   per_backend_mem_to_admit_ = min(per_backend_mem_to_admit_, MemInfo::physical_mem());
+  coord_backend_mem_to_admit_ = min(coord_backend_mem_to_admit_, MemInfo::physical_mem());
+
+  // If the query is only scheduled to run on the coordinator.
+  if (per_backend_exec_params_.size() == 1 && requiresCoordinatorFragment()) {
+    per_backend_mem_to_admit_ = 0;
+  }
 
   if (mimic_old_behaviour && !has_query_option) {
     per_backend_mem_limit_ = -1;
+    coord_backend_mem_limit_ = -1;
   } else {
     per_backend_mem_limit_ = per_backend_mem_to_admit_;
+    coord_backend_mem_limit_ = coord_backend_mem_to_admit_;
   }
 }
 

@@ -270,8 +270,10 @@ Time since last statestore update containing admission control topic state (ms):
   <table class='table table-hover table-border'>
     <tr>
       <th>Query ID</th>
-      <th>Memory limit</th>
-      <th>Memory limit used for admission</th>
+      <th>Memory limit for the executors</th>
+      <th>Memory admitted on the executors</th>
+      <th>Memory limit for the coordinator</th>
+      <th>Memory admitted on the coordinator</th>
       <th>Num of backends it will run on</th>
       <th>Details</th>
     </tr>
@@ -280,6 +282,8 @@ Time since last statestore update containing admission control topic state (ms):
       <td>{{query_id}}</td>
       <td class='memory'>{{mem_limit}}</td>
       <td class='memory'>{{mem_limit_to_admit}}</td>
+      <td class='memory'>{{coord_mem_limit}}</td>
+      <td class='memory'>{{coord_mem_to_admit}}</td>
       <td>{{num_backends}}</td>
       <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
     </tr>
@@ -290,8 +294,10 @@ Time since last statestore update containing admission control topic state (ms):
   <table class='table table-hover table-border'>
     <tr>
       <th>Query ID</th>
-      <th>Memory limit</th>
-      <th>Memory limit used for admission</th>
+      <th>Memory limit for the executors</th>
+      <th>Memory admitted on the executors</th>
+      <th>Memory limit for the coordinator</th>
+      <th>Memory admitted on the coordinator</th>
       <th>Num of backends it will run on</th>
       <th>Details</th>
     </tr>
@@ -300,6 +306,8 @@ Time since last statestore update containing admission control topic state (ms):
       <td>{{query_id}}</td>
       <td class='memory'>{{mem_limit}}</td>
       <td class='memory'>{{mem_limit_to_admit}}</td>
+      <td class='memory'>{{coord_mem_limit}}</td>
+      <td class='memory'>{{coord_mem_to_admit}}</td>
       <td>{{num_backends}}</td>
       <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
     </tr>
