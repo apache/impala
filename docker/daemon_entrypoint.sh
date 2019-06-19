@@ -56,10 +56,4 @@ if ! whoami ; then
   cat /etc/passwd
 fi
 
-"$@"
-EXIT_CODE=$?
-
-# Print out any INFO logs to help with debugging container startup failures.
-# TODO: remove once we have proper logging
-cat /tmp/*.INFO
-exit $EXIT_CODE
+exec "$@"
