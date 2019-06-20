@@ -52,10 +52,8 @@ class DelimitedOutputFormatter(object):
   def __init__(self, field_delim="\t"):
     if field_delim:
       self.field_delim = field_delim.decode('string-escape')
-      if len(self.field_delim) != 1:
-        error_msg = ("Illegal delimiter %s, the delimiter "
-                     "must be a 1-character string." % self.field_delim)
-        raise ValueError, error_msg
+      # IMPALA-8652, the delimiter should be a 1-character string and verified already
+      assert len(self.field_delim) == 1
 
   def format(self, rows):
     """Returns string containing UTF-8-encoded representation of the table data."""

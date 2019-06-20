@@ -1729,6 +1729,13 @@ def impala_shell_main():
     print VERSION_STRING
     return
 
+  if options.write_delimited:
+    delim = options.output_delimiter.decode('string-escape')
+    if len(delim) != 1:
+      print_to_stderr("Illegal delimiter %s, the delimiter "
+                      "must be a 1-character string." % delim)
+      raise FatalShellException()
+
   if options.use_kerberos and options.use_ldap:
     print_to_stderr("Please specify at most one authentication mechanism (-k or -l)")
     raise FatalShellException()
