@@ -204,7 +204,7 @@ class TestObservability(ImpalaTestSuite):
     expected_str = ("Query Options (set by configuration and planner): "
         "MEM_LIMIT=8589934592,"
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
-        "RUNTIME_FILTER_MODE=0,MT_DOP=0,TIMEZONE={timezone},{erasure_coding}"
+        "RUNTIME_FILTER_MODE=0,MT_DOP=0,{erasure_coding}TIMEZONE={timezone},"
         "CLIENT_IDENTIFIER="
         "query_test/test_observability.py::TestObservability::()::test_query_options"
         "\n")
