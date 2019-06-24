@@ -219,8 +219,9 @@ public class PlannerTest extends PlannerTestBase {
   public void testJoins() {
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_hdfs_num_rows_estimate(false);
-    runPlannerTestFile("joins-hdfs-num-rows-est-enabled", options,
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+    // Skip cardinality validation because some tables do not have stats
+    // and estimated file sizes are non-deterministic.
+    runPlannerTestFile("joins-hdfs-num-rows-est-enabled", options);
   }
 
   @Test
@@ -255,8 +256,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_hdfs_num_rows_estimate(false);
     runPlannerTestFile("fk-pk-join-detection-hdfs-num-rows-est-enabled",
-        options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
-            PlannerTestOption.VALIDATE_CARDINALITY));
+        options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
   }
 
   @Test
