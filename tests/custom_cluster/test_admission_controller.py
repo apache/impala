@@ -57,45 +57,7 @@ LOG = logging.getLogger('admission_test')
 # the query active and consuming resources by fetching one row at a time. The
 # where clause is for debugging purposes; each thread will insert its id so
 # that running queries can be correlated with the thread that submitted them.
-QUERY = """
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-union all
-select * from alltypesagg where id != {0}
-"""
+QUERY = " union all ".join(["select * from functional.alltypesagg where id != {0}"] * 30)
 
 # The statestore heartbeat and topic update frequency (ms). Set low for testing.
 STATESTORE_RPC_FREQUENCY_MS = 100
@@ -1436,7 +1398,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         # query. It needs to wait until the main thread requests it to end its query.
         while not self.shutdown:
           # The QUERY_TIMEOUT needs to stay active until the main thread requests it
-          # to end. Otherwise, the query may get cancelled early. Fetch rows 5 times
+          # to end. Otherwise, the query may get cancelled early. Fetch rows 2 times
           # per QUERY_TIMEOUT interval to keep the query active.
           if self.query_end_behavior == 'QUERY_TIMEOUT' and \
              self.query_state != 'COMPLETED':
@@ -1447,7 +1409,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             # The query has released admission control resources
             self.query_state = 'COMPLETED'
             self.query_handle = None
-          sleep(QUERY_END_TIMEOUT_S * 0.2)
+          sleep(QUERY_END_TIMEOUT_S * 0.5)
       except Exception as e:
         LOG.exception(e)
         # Unknown errors will be raised later
