@@ -23,7 +23,6 @@ import os
 import os.path
 import pipes
 import pytest
-import re
 import subprocess
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -50,11 +49,14 @@ CLUSTER_SIZE = "cluster_size"
 DEFAULT_QUERY_OPTIONS = 'default_query_options'
 IMPALA_LOG_DIR = 'impala_log_dir'
 NUM_EXCLUSIVE_COORDINATORS = 'num_exclusive_coordinators'
+STATESTORED_TIMEOUT_S = 'statestored_timeout_s'
+IMPALAD_TIMEOUT_S = 'impalad_timeout_s'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
     --statestore_priority_update_frequency_ms=50 \
     --statestore_heartbeat_frequency_ms=50'
+
 
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
@@ -102,7 +104,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
       start_args=None, sentry_config=None, default_query_options=None,
       impala_log_dir=None, sentry_log_dir=None, cluster_size=None,
-      num_exclusive_coordinators=None, kudu_args=None):
+      num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
+      impalad_timeout_s=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -131,6 +134,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[CLUSTER_SIZE] = cluster_size
       if num_exclusive_coordinators is not None:
         func.func_dict[NUM_EXCLUSIVE_COORDINATORS] = num_exclusive_coordinators
+      if statestored_timeout_s is not None:
+        func.func_dict[STATESTORED_TIMEOUT_S] = statestored_timeout_s
+      if impalad_timeout_s is not None:
+        func.func_dict[IMPALAD_TIMEOUT_S] = impalad_timeout_s
       return func
     return decorate
 
@@ -169,6 +176,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     }
     if IMPALA_LOG_DIR in method.func_dict:
       kwargs["impala_log_dir"] = method.func_dict[IMPALA_LOG_DIR]
+    if STATESTORED_TIMEOUT_S in method.func_dict:
+      kwargs["statestored_timeout_s"] = method.func_dict[STATESTORED_TIMEOUT_S]
+    if IMPALAD_TIMEOUT_S in method.func_dict:
+      kwargs["impalad_timeout_s"] = method.func_dict[IMPALAD_TIMEOUT_S]
     self._start_impala_cluster(cluster_args, **kwargs)
     super(CustomClusterTestSuite, self).setup_class()
 
@@ -217,10 +228,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                           close_fds=True)
 
   @classmethod
-  def _start_impala_cluster(cls, options, impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),
-      cluster_size=DEFAULT_CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
-      use_exclusive_coordinators=False, log_level=1,
-      expected_num_executors=DEFAULT_CLUSTER_SIZE, default_query_options=None):
+  def _start_impala_cluster(cls,
+                            options,
+                            impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),
+                            cluster_size=DEFAULT_CLUSTER_SIZE,
+                            num_coordinators=NUM_COORDINATORS,
+                            use_exclusive_coordinators=False,
+                            log_level=1,
+                            expected_num_executors=DEFAULT_CLUSTER_SIZE,
+                            default_query_options=None,
+                            statestored_timeout_s=60,
+                            impalad_timeout_s=60):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -265,6 +283,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # cluster_size (# of impalad) + 1 (for catalogd).
     expected_subscribers = cluster_size + 1
 
-    statestored.service.wait_for_live_subscribers(expected_subscribers, timeout=60)
+    statestored.service.wait_for_live_subscribers(expected_subscribers,
+                                                  timeout=statestored_timeout_s)
     for impalad in cls.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(expected_num_executors, timeout=60)
+      impalad.service.wait_for_num_known_live_backends(expected_num_executors,
+                                                       timeout=impalad_timeout_s)
