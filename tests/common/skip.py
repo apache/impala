@@ -267,3 +267,9 @@ class SkipIfCatalogV2:
     return pytest.mark.skipif(
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="IMPALA-7539: support HDFS permission checks for LocalCatalog")
+
+  @classmethod
+  def hms_event_polling_enabled(self):
+    return pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
+      reason="Table isn't invalidated with Local catalog and enabled hms_event_polling.")

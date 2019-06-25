@@ -17,7 +17,7 @@
 
 # Functional tests for ACID integration with Hive.
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfHive2
+from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
@@ -51,6 +51,14 @@ class TestAcid(ImpalaTestSuite):
   def test_acid_partitioned(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-partitioned', vector, use_db=unique_database)
 
+  # When local CatalogV2 combines with hms_enent_polling enabled, it seems
+  # that Catalog loads tables by itself, the query statement cannot trigger
+  # loading tables. As the ValidWriteIdlists is part of table loading profile,
+  # it can not be shown in the query profile.  Skip CatalogV2 to avoid flaky tests.
+  @SkipIfHive2.acid
+  @SkipIfCatalogV2.hms_event_polling_enabled()
+  def test_acid_profile(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-profile', vector, use_db=unique_database)
 # TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.

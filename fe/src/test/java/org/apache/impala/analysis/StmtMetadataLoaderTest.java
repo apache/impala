@@ -102,7 +102,7 @@ public class StmtMetadataLoaderTest {
     }
   }
 
-
+  // Assume tables in the stmt are not acid tables.
   private void validateUncached(StatementBase stmt, Frontend fe,
       int expectedNumLoadRequests, int expectedNumCatalogUpdates,
       String[] expectedDbs, String[] expectedTables) throws InternalException {
@@ -116,8 +116,7 @@ public class StmtMetadataLoaderTest {
     Assert.assertEquals(expectedNumCatalogUpdates,
         mdLoader.getNumCatalogUpdatesReceived());
     // Validate timeline.
-    long expectedNumEvents = MetastoreShim.getMajorVersion() >= 3 ? 3 : 2;
-    Assert.assertEquals(expectedNumEvents, mdLoader.getTimeline().getNumEvents());
+    Assert.assertEquals(2, mdLoader.getTimeline().getNumEvents());
     // Validate dbs and tables.
     validateDbs(stmtTableCache, expectedDbs);
     validateTables(stmtTableCache, expectedTables);

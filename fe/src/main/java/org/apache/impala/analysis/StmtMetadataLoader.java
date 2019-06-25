@@ -31,6 +31,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TUniqueIdUtil;
 import org.slf4j.Logger;
@@ -231,19 +232,23 @@ public class StmtMetadataLoader {
           numCatalogUpdatesReceived_));
 
       if (MetastoreShim.getMajorVersion() > 2) {
-        StringBuilder validIdsBuf = new StringBuilder("Loaded ValidWriteIdLists: ");
+        StringBuilder validIdsBuf = new StringBuilder("Loaded ValidWriteIdLists");
+        validIdsBuf.append(" for transactional tables: ");
+        boolean hasAcidTbls = false;
         for (FeTable iTbl : loadedTbls_.values()) {
-          validIdsBuf.append("\n");
-          validIdsBuf.append("           ");
-          validIdsBuf.append(iTbl.getValidWriteIds());
+          if (AcidUtils.isTransactionalTable(iTbl.getMetaStoreTable().getParameters())) {
+            validIdsBuf.append("\n");
+            validIdsBuf.append("           ");
+            validIdsBuf.append(iTbl.getValidWriteIds());
+            hasAcidTbls = true;
+          }
         }
         validIdsBuf.append("\n");
         validIdsBuf.append("             ");
-        timeline_.markEvent(validIdsBuf.toString());
+        if (hasAcidTbls) timeline_.markEvent(validIdsBuf.toString());
       }
     }
     fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
-
     return new StmtTableCache(catalog, dbs_, loadedTbls_);
   }
 

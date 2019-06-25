@@ -1,0 +1,18 @@
+====
+---- HIVE_QUERY
+use $DATABASE;
+create table tbl_ld (x int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+
+insert into tbl_ld values (1);
+====
+---- QUERY
+invalidate metadata tbl_ld;
+select * from tbl_ld
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+# Verify that ValidWriteIdLists is in the profile
+row_regex: .*Loaded ValidWriteIdLists for transactional tables:.*
+====
