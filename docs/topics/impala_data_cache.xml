@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="data_cache">
+
+  <title>Data Cache for Remote Reads</title>
+
+  <conbody>
+
+    <p>
+      When Impala compute nodes and its storage are not co-located, the network bandwidth
+      requirement goes up as the network traffic includes the data fetch as well as the
+      shuffling exchange traffic of intermediate results.
+    </p>
+
+    <p>
+      To mitigate the pressure on the network, you can enable the compute nodes to cache the
+      working set read from remote filesystems, such as, remote HDFS data node, S3, ABFS, ADLS.
+    </p>
+
+    <p>
+      To enable remote data cache, set the <codeph>--data_cache</codeph> Impala Daemon start-up
+      flag as below:
+    </p>
+
+<codeblock>--data_cache=<varname>dir1</varname>,<varname>dir2</varname>,<varname>dir3</varname>,...:<varname>quota</varname></codeblock>
+
+    <p>
+      The flag is set to a list of directories, separated by <codeph>,</codeph>, followed by a
+      <codeph>:</codeph>, and a capacity <codeph><varname>quota</varname></codeph> per
+      directory.
+    </p>
+
+    <p>
+      If set to an empty string, data caching is disabled.
+    </p>
+
+    <p>
+      Cached data is stored in the specified directories.
+    </p>
+
+    <p>
+      The specified directories must exist in the local filesystem of each Impala Daemon.
+    </p>
+
+    <p>
+      In addition, the filesystem which the directory resides in must support hole punching.
+    </p>
+
+    <p>
+      The cache can consume up to the <codeph>quota</codeph> bytes for each of the directories
+      specified.
+    </p>
+
+    <p>
+      The default setting for <codeph>--data_cache</codeph> is an empty string.
+    </p>
+
+    <p>
+      For example, with the following setting, the data cache may use up to 2 TB, with 1 TB max
+      in <codeph>/data/0</codeph> and <codeph>/data/1</codeph> respectively.
+    </p>
+
+<codeblock>--data_cache=/data/0,/data/1:1TB</codeblock>
+
+  </conbody>
+
+</concept>

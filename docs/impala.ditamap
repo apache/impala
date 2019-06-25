@@ -291,10 +291,10 @@ under the License.
     <topicref href="topics/impala_perf_resources.xml"/>
     <topicref rev="2.5.0" href="topics/impala_runtime_filtering.xml"/>
     <topicref href="topics/impala_perf_hdfs_caching.xml"/>
+    <topicref href="topics/impala_perf_skew.xml"/>
+    <topicref href="topics/impala_data_cache.xml"/>
     <topicref href="topics/impala_perf_testing.xml"/>
     <topicref href="topics/impala_explain_plan.xml"/>
-    <topicref href="topics/impala_perf_skew.xml"/>
-    <topicref audience="hidden" href="topics/impala_perf_ddl.xml"/>
   </topicref>
   <topicref href="topics/impala_scalability.xml">
     <topicref href="topics/impala_scaling_limits.xml"/>
