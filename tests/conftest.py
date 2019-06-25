@@ -42,6 +42,7 @@ DEFAULT_EXPLORATION_STRATEGY = 'core'
 DEFAULT_HDFS_XML_CONF = os.path.join(os.environ['HADOOP_CONF_DIR'], "hdfs-site.xml")
 DEFAULT_HIVE_SERVER2 = 'localhost:11050'
 DEFAULT_IMPALAD_HS2_PORT = '21050'
+DEFAULT_IMPALAD_HS2_HTTP_PORT = '28000'
 DEFAULT_IMPALADS = "localhost:21000,localhost:21001,localhost:21002"
 DEFAULT_KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_KUDU_MASTER_PORT = os.getenv('KUDU_MASTER_PORT', '7051')
@@ -85,6 +86,9 @@ def pytest_addoption(parser):
 
   parser.addoption("--impalad_hs2_port", default=DEFAULT_IMPALAD_HS2_PORT,
                    help="The impalad HiveServer2 port.")
+
+  parser.addoption("--impalad_hs2_http_port", default=DEFAULT_IMPALAD_HS2_HTTP_PORT,
+                   help="The impalad HiveServer2 HTTP port.")
 
   parser.addoption("--metastore_server", default=DEFAULT_METASTORE_SERVER,
                    help="The Hive Metastore server host:port to connect to.")

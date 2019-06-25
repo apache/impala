@@ -29,7 +29,7 @@ import time
 from tests.common.environ import IS_REDHAT_DERIVATIVE
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
-from tests.common.test_dimensions import create_beeswax_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_hs2http_dimension
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
     ImpalaShell
 
@@ -127,7 +127,7 @@ class TestClientSsl(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_hs2http_dimension())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=WEBSERVER_SSL_ARGS,

@@ -101,6 +101,8 @@ IMPALAD = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_BEESWAX_HOST_PORT = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_HS2_HOST_PORT =\
     IMPALAD.split(':')[0] + ":" + pytest.config.option.impalad_hs2_port
+IMPALAD_HS2_HTTP_HOST_PORT =\
+    IMPALAD.split(':')[0] + ":" + pytest.config.option.impalad_hs2_http_port
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
@@ -217,6 +219,8 @@ class ImpalaTestSuite(BaseTestSuite):
   def __get_default_host_port(cls, protocol):
     if protocol == 'beeswax':
       return IMPALAD
+    elif protocol == 'hs2-http':
+      return IMPALAD_HS2_HTTP_HOST_PORT
     else:
       assert protocol == 'hs2'
       return IMPALAD_HS2_HOST_PORT
@@ -227,7 +231,7 @@ class ImpalaTestSuite(BaseTestSuite):
     if protocol == 'beeswax':
       return IMPALAD_HOST_PORT_LIST
     else:
-      assert protocol == 'hs2'
+      assert protocol in ('hs2', 'hs2-http')
       # TODO: support running tests against multiple coordinators for HS2. It should work,
       # we just need to update all test runners to pass in all host/port combinations for
       # the cluster and then handle it here.

@@ -118,6 +118,13 @@ def create_beeswax_hs2_dimension():
   return ImpalaTestDimension('protocol', 'beeswax', 'hs2')
 
 
+# TODO: Get rid of this once Impyla supports http transport. Until then,
+# 'hs2-http' dimension is only covered for shell based tests, since they
+# do not rely on Impyla for connections.
+def create_beeswax_hs2_hs2http_dimension():
+  return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
+
+
 def create_beeswax_dimension():
   return ImpalaTestDimension('protocol', 'beeswax')
 

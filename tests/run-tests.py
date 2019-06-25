@@ -228,9 +228,10 @@ def print_metrics(substring):
   for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
     print ">" * 80
     port = impalad.get_webserver_port()
+    cert = impalad._get_webserver_certificate_file()
     print "connections metrics for impalad at port {0}:".format(port)
-    debug_info = json.loads(ImpaladService(impalad.hostname, webserver_port=port)
-        .read_debug_webpage('metrics?json'))
+    debug_info = json.loads(ImpaladService(impalad.hostname, webserver_port=port,
+        webserver_certificate_file=cert).read_debug_webpage('metrics?json'))
     for metric in debug_info['metric_group']['metrics']:
       if substring in metric['name']:
         print json.dumps(metric, indent=1)

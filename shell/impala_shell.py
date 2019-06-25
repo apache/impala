@@ -62,6 +62,7 @@ except Exception:
 
 DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
+DEFAULT_HS2_HTTP_PORT = 28000
 
 def strip_comments(sql):
   """sqlparse default implementation of strip comments has a bad performance when parsing
@@ -216,6 +217,8 @@ class ImpalaShell(object, cmd.Cmd):
     self.print_progress = options.print_progress
 
     self.ignore_query_failure = options.ignore_query_failure
+
+    self.http_path = options.http_path
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -526,15 +529,22 @@ class ImpalaShell(object, cmd.Cmd):
       return ImpalaHS2Client(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
                           self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password,
-                          self.use_ldap, self.client_connect_timeout_ms, self.verbose)
+                          self.use_ldap, self.client_connect_timeout_ms, self.verbose,
+                          use_http_base_transport=False, http_path=self.http_path)
+    elif protocol == 'hs2-http':
+      return ImpalaHS2Client(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
+                          self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password,
+                          self.use_ldap, self.client_connect_timeout_ms, self.verbose,
+                          use_http_base_transport=True, http_path=self.http_path)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
                           self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password,
                           self.use_ldap, self.client_connect_timeout_ms, self.verbose)
     else:
-      print_to_stderr("Invalid --protocol value {0}, must be beeswax or hs2.".format(
-                      protocol))
+      print_to_stderr("Invalid --protocol value {0}, must be beeswax, hs2 or hs2-http."
+              .format(protocol))
       raise FatalShellException()
 
   def close_connection(self):
@@ -785,11 +795,17 @@ class ImpalaShell(object, cmd.Cmd):
                       "<hostname[:port]>")
       return CmdStatus.ERROR
     elif len(host_port) == 1:
-      if options.protocol.lower() == 'hs2':
-        host_port.append(str(DEFAULT_HS2_PORT))
+      protocol = options.protocol.lower()
+      if protocol == 'hs2':
+        port = str(DEFAULT_HS2_PORT)
+      elif protocol == 'hs2-http':
+        port = str(DEFAULT_HS2_HTTP_PORT)
+      elif protocol == 'beeswax':
+        port = str(DEFAULT_BEESWAX_PORT)
       else:
-        assert options.protocol.lower() == 'beeswax'
-        host_port.append(str(DEFAULT_BEESWAX_PORT))
+        print_to_stderr("Invalid protocol specified: %s" % protocol)
+        raise FatalShellException()
+      host_port.append(port)
     self.impalad = tuple(host_port)
     self.close_connection()
     self.imp_client = self._new_impala_client()

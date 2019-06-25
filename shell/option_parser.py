@@ -258,9 +258,18 @@ def get_option_parser(defaults):
                     " if it fails to connect to Impala server. Set to 0 to disable any"
                     " timeout.")
   parser.add_option("--protocol", dest="protocol", default="beeswax",
-                    help="Protocol to use for client/server connection - either 'hs2' or "
-                         "'beeswax'. Beeswax support is deprecated and will be removed "
-                         "in the future.")
+                    help="Protocol to use for client/server connection. Valid inputs are "
+                         "['hs2', 'hs2-http', 'beeswax']. 'hs2-http' uses HTTP transport "
+                         "to speak to the coordinator while 'hs2' and 'beeswax' use the "
+                         "binary TCP based transport. Beeswax support is deprecated "
+                         "and will be removed in the future.")
+  parser.add_option("--http_path", dest="http_path", default="cliservice",
+                    help="Default http path on the coordinator to connect to. The final "
+                    "connection URL looks like <http(s)>://<coordinator-host>:<port>/"
+                    "<http_path>. While the coordinator server implementation does not "
+                    "enforce any http path for the incoming requests, deployments could "
+                    "still put it behind a loadbalancer that can expect the traffic at a "
+                    "certain path.")
 
   # add default values to the help text
   for option in parser.option_list:

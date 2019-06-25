@@ -2112,14 +2112,15 @@ void ImpalaServer::ConnectionEnd(
     connection_to_sessions_map_.erase(it);
   }
 
-  bool close = connection_context.server_name == BEESWAX_SERVER_NAME
-      || FLAGS_disconnected_session_timeout <= 0;
-  LOG(INFO) << "Connection from client "
+  const string connection_id = PrintId(connection_context.connection_id);
+  LOG(INFO) << "Connection " << connection_id << " from client "
             << TNetworkAddressToString(connection_context.network_address)
             << " to server " << connection_context.server_name << " closed."
-            << (close ? " Closing " : " Disconnecting ") << disconnected_sessions.size()
-            << " associated session(s)";
+            << " The connection had " << disconnected_sessions.size()
+            << " associated session(s).";
 
+  bool close = connection_context.server_name == BEESWAX_SERVER_NAME
+      || FLAGS_disconnected_session_timeout <= 0;
   if (close) {
     for (const TUniqueId& session_id : disconnected_sessions) {
       Status status = CloseSessionInternal(session_id, SecretArg::SkipSecretCheck(),

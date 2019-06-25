@@ -445,10 +445,13 @@ def create_connection(host_port, use_kerberos=False, protocol='beeswax',
     is_hive=False):
   if protocol == 'beeswax':
     c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
-  else:
-    assert protocol == 'hs2'
+  elif protocol == 'hs2':
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive)
+  else:
+    assert protocol == 'hs2-http'
+    raise NotImplementedError("Impyla does not support 'hs2-http' protocol")
+
 
   # A hook in conftest sets tests.common.current_node.
   if hasattr(tests.common, "current_node"):

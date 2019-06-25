@@ -18,9 +18,11 @@
 # under the License.
 
 from bitarray import bitarray
+import base64
 import operator
 import re
 import sasl
+import ssl
 import sys
 import time
 
@@ -38,6 +40,7 @@ from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
     TGetResultSetMetadataReq, TTypeId, TCancelOperationReq)
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
+from thrift.transport.THttpClient import THttpClient
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.Thrift import TApplicationException, TException
@@ -136,7 +139,7 @@ class ImpalaClient(object):
   def __init__(self, impalad, kerberos_host_fqdn, use_kerberos=False,
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
-               verbose=True):
+               verbose=True, use_http_base_transport=False, http_path=None):
     self.connected = False
     self.impalad_host = impalad[0].encode('ascii', 'ignore')
     self.impalad_port = int(impalad[1])
@@ -153,6 +156,8 @@ class ImpalaClient(object):
     self.default_query_options = {}
     self.query_option_levels = {}
     self.fetch_batch_size = 1024
+    self.use_http_base_transport = use_http_base_transport
+    self.http_path = http_path
     # This is set from ImpalaShell's signal handler when a query is cancelled
     # from command line via CTRL+C. It is used to suppress error messages of
     # query cancellation.
@@ -165,15 +170,15 @@ class ImpalaClient(object):
     was already connected, closes the previous connection."""
     self.close_connection()
 
-    sock, self.transport = self._get_socket_and_transport()
-    if self.client_connect_timeout_ms > 0:
-      sock.setTimeout(self.client_connect_timeout_ms)
-    self.transport.open()
+    if self.use_http_base_transport:
+        self.transport = self._get_http_transport(self.client_connect_timeout_ms)
+    else:
+        self.transport = self._get_transport(self.client_connect_timeout_ms)
+    assert self.transport and self.transport.isOpen()
+
     if self.verbose:
       print_to_stderr('Opened TCP connection to %s:%s' % (self.impalad_host,
           self.impalad_port))
-    # Setting a timeout of None disables timeouts on sockets
-    sock.setTimeout(None)
     protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
     self.imp_service = self._get_thrift_client(protocol)
     self.connected = True
@@ -220,7 +225,7 @@ class ImpalaClient(object):
   def _close_transport(self):
     """Closes transport if not closed and set self.connected to False. This is the last
     step of close_connection()."""
-    if self.transport:
+    if self.transport and not self.transport.isOpen():
       self.transport.close()
     self.connected = False
 
@@ -353,7 +358,48 @@ class ImpalaClient(object):
     (e.g. warnings)."""
     return self._get_warn_or_error_log(last_query_handle, False)
 
-  def _get_socket_and_transport(self):
+  def _get_http_transport(self, connect_timeout_ms):
+    """Creates a transport with HTTP as the base."""
+    # Current implementation of THttpClient does a close() and open() of the underlying
+    # http connection on every flush() (THRIFT-4600). Due to this, setting a connect
+    # timeout does not achieve the desirable result as the subsequent open() could block
+    # similary in case of problematic remote end points.
+    # TODO: Investigate connection reuse in THttpClient and revisit this.
+    if connect_timeout_ms > 0:
+      print_to_stderr("Warning: --connect_timeout_ms is currently ignored with" +
+          " HTTP transport.")
+
+    # HTTP server implemententations do not support SPNEGO yet.
+    if self.use_kerberos or self.kerberos_host_fqdn:
+      print_to_stderr("Kerberos not supported with HTTP endpoints.")
+      raise NotImplementedError()
+
+    host_and_port = "{0}:{1}".format(self.impalad_host, self.impalad_port)
+    assert self.http_path
+    # THttpClient relies on the URI scheme (http vs https) to open an appropriate
+    # connection to the server.
+    if self.use_ssl:
+      ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
+      if self.ca_cert:
+        ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+      else:
+        ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+      transport = THttpClient(
+          "https://{0}/{1}".format(host_and_port, self.http_path), ssl_context=ssl_ctx)
+    else:
+      transport = THttpClient("http://{0}/{1}".format(host_and_port, self.http_path))
+
+    if self.use_ldap:
+      # Set the BASIC auth header
+      auth = base64.encodestring(
+          "{0}:{1}".format(self.user, self.ldap_password)).strip('\n')
+      transport.setCustomHeaders({"Authorization": "Basic {0}".format(auth)})
+
+    transport.open()
+    return transport
+
+  def _get_transport(self, connect_timeout_ms):
     """Create a Transport.
 
        A non-kerberized impalad just needs a simple buffered transport. For
@@ -392,10 +438,10 @@ class ImpalaClient(object):
             sock_host, sock_port, validate=True, ca_certs=self.ca_cert)
     else:
       sock = TSocket(sock_host, sock_port)
-    if not (self.use_ldap or self.use_kerberos):
-      return sock, TBufferedTransport(sock)
 
-    # Initializes a sasl client
+    if connect_timeout_ms > 0: sock.setTimeout(connect_timeout_ms)
+
+    # Helper to initialize a sasl client
     def sasl_factory():
       sasl_client = sasl.Client()
       sasl_client.setAttr("host", sasl_host)
@@ -406,11 +452,20 @@ class ImpalaClient(object):
         sasl_client.setAttr("service", self.kerberos_service_name)
       sasl_client.init()
       return sasl_client
-    # GSSASPI is the underlying mechanism used by kerberos to authenticate.
-    if self.use_kerberos:
-      return sock, TSaslClientTransport(sasl_factory, "GSSAPI", sock)
+
+    transport = None
+    if not (self.use_ldap or self.use_kerberos):
+      transport = TBufferedTransport(sock)
+    # GSSASPI is  the underlying mechanism used by kerberos to authenticate.
+    elif self.use_kerberos:
+      transport = TSaslClientTransport(sasl_factory, "GSSAPI", sock)
     else:
-      return sock, TSaslClientTransport(sasl_factory, "PLAIN", sock)
+      transport = TSaslClientTransport(sasl_factory, "PLAIN", sock)
+    # Open the transport and reset the timeout so that it does not apply to the
+    # subsequent RPCs on the same socket.
+    transport.open()
+    sock.setTimeout(None)
+    return transport
 
   def build_summary_table(self, summary, idx, is_fragment_root, indent_level,
       new_indent_level, output):
@@ -827,6 +882,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
   TODO: remove once we've phased out beeswax."""
   def __init__(self, *args, **kwargs):
     super(ImpalaBeeswaxClient, self).__init__(*args, **kwargs)
+    assert not self.use_http_base_transport
     self.FINISHED_STATE = QueryState._NAMES_TO_VALUES["FINISHED"]
     self.ERROR_STATE = QueryState._NAMES_TO_VALUES["EXCEPTION"]
     self.CANCELED_STATE = QueryState._NAMES_TO_VALUES["EXCEPTION"]

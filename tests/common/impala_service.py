@@ -157,12 +157,13 @@ class BaseImpalaService(object):
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
   def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000,
-               hs2_port=21050, webserver_certificate_file=""):
+               hs2_port=21050, hs2_http_port=28000, webserver_certificate_file=""):
     super(ImpaladService, self).__init__(
         hostname, webserver_port, webserver_certificate_file)
     self.beeswax_port = beeswax_port
     self.be_port = be_port
     self.hs2_port = hs2_port
+    self.hs2_http_port = hs2_http_port
 
   def get_num_known_live_executors(self, timeout=30, interval=1,
       include_shutting_down=True):

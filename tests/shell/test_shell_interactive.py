@@ -37,14 +37,15 @@ from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.common.test_dimensions import create_beeswax_hs2_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_hs2http_dimension
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
                   get_open_sessions_metric)
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 # Regex to match the interactive shell prompt that is expected after each command.
-PROMPT_REGEX = r'\[[^:]+:210[0-9][0-9]\]'
+# Examples: hostname:21000, hostname:21050, hostname:28000
+PROMPT_REGEX = r'\[[^:]+:2(1|8)0[0-9][0-9]\]'
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_hs2http_dimension())
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -257,10 +258,14 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     hostname = socket.getfqdn()
     initial_impala_service = ImpaladService(hostname)
     target_impala_service = ImpaladService(hostname, webserver_port=25001,
-        beeswax_port=21001, be_port=22001, hs2_port=21051)
-    if vector.get_value("protocol") == "hs2":
+        beeswax_port=21001, be_port=22001, hs2_port=21051, hs2_http_port=28001)
+    protocol = vector.get_value("protocol").lower()
+    if protocol == "hs2":
       target_port = 21051
+    elif protocol == "hs2-http":
+      target_port = 28001
     else:
+      assert protocol == "beeswax"
       target_port = 21001
     # This test is running serially, so there shouldn't be any open sessions, but wait
     # here in case a session from a previous test hasn't been fully closed yet.
@@ -505,7 +510,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert "ABORT_ON_ERROR" in result.stdout
     assert "Advanced Query Options:" in result.stdout
     assert "APPX_COUNT_DISTINCT" in result.stdout
-    assert vector.get_value("protocol") == "hs2" or "SUPPORT_START_OVER" in result.stdout
+    assert vector.get_value("protocol") in ("hs2", "hs2-http")\
+        or "SUPPORT_START_OVER" in result.stdout
     # Development, deprecated and removed options should not be shown.
     # Note: there are currently no deprecated options
     assert "Development Query Options:" not in result.stdout
@@ -526,7 +532,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     development_part = result.stdout[development_part_start_idx:deprecated_part_start_idx]
     assert "ABORT_ON_ERROR" in result.stdout[:advanced_part_start_idx]
     assert "APPX_COUNT_DISTINCT" in advanced_part
-    assert vector.get_value("protocol") == "hs2" or "SUPPORT_START_OVER" in advanced_part
+    assert vector.get_value("protocol") in ("hs2", "hs2-http")\
+        or "SUPPORT_START_OVER" in advanced_part
     assert "DEBUG_ACTION" in development_part
     # Removed options should not be shown.
     assert "MAX_IO_BUFFERS" not in result.stdout

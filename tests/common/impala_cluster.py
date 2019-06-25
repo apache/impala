@@ -441,7 +441,7 @@ class ImpaladProcess(BaseImpalaProcess):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
     self.service = ImpaladService(self.hostname, self.get_webserver_port(),
                                   self.__get_beeswax_port(), self.__get_be_port(),
-                                  self.__get_hs2_port(),
+                                  self.__get_hs2_port(), self.__get_hs2_http_port(),
                                   self._get_webserver_certificate_file())
 
   def _get_default_webserver_port(self):
@@ -455,6 +455,9 @@ class ImpaladProcess(BaseImpalaProcess):
 
   def __get_hs2_port(self):
     return int(self._get_port('hs2_port', DEFAULT_HS2_PORT))
+
+  def __get_hs2_http_port(self):
+    return int(self._get_port('hs2_http_port', DEFAULT_HS2_HTTP_PORT))
 
   def start(self, wait_until_ready=True):
     """Starts the impalad and waits until the service is ready to accept connections."""

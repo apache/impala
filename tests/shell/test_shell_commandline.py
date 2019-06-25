@@ -31,7 +31,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
-from tests.common.test_dimensions import create_beeswax_hs2_dimension
+from tests.common.test_dimensions import create_beeswax_hs2_hs2http_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE)
@@ -120,7 +120,7 @@ class TestImpalaShell(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_hs2http_dimension())
 
   def test_no_args(self, vector):
     args = ['-q', DEFAULT_QUERY]
@@ -480,7 +480,7 @@ class TestImpalaShell(ImpalaTestSuite):
       assert 'Reverting to tab delimited text' in result.stderr
     else:
       # HS2 does not need to fall back, but should behave appropriately.
-      assert protocol == 'hs2', protocol
+      assert protocol in ('hs2', 'hs2-http'), protocol
       assert 'Reverting to tab delimited text' not in result.stderr
     assert 'UnicodeDecodeError' not in result.stderr
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
@@ -757,6 +757,7 @@ class TestImpalaShell(ImpalaTestSuite):
     if protocol == 'beeswax':
       expected_output = "get_default_configuration"
     else:
+      assert protocol == 'hs2'
       expected_output = "OpenSession"
     with open(os.devnull, 'w') as devnull:
       try:
@@ -775,6 +776,8 @@ class TestImpalaShell(ImpalaTestSuite):
     ''' Tests that impala-shell will always open a socket against
     the host[:port] specified by the -i option with or without the
     -b option '''
+    if vector.get_value('protocol') == 'hs2-http':
+      pytest.skip("--kerberos_host_fqdn not yet supported.")
     try:
       socket.setdefaulttimeout(10)
       s = socket.socket()
@@ -873,6 +876,11 @@ class TestImpalaShell(ImpalaTestSuite):
        socket through the impala-shell. The impala-shell should timeout and not hang
        indefinitely while connecting
     """
+
+    # --connect_timeout_ms not supported with HTTP transport. Refer to the comment
+    # in ImpalaClient::_get_http_transport() for details.
+    if vector.get_value('protocol') == 'hs2-http': pytest.skip("THRIFT-4600")
+
     with closing(socket.socket()) as s:
       s.bind(("", 0))
       # maximum number of queued connections on this socket is 1.
@@ -922,7 +930,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # Note that Beeswax formats results differently (i.e. the "fix" for IMPALA-266 stopped
     # working for Beeswax at some point.
     protocol = vector.get_value("protocol")
-    if protocol == 'hs2':
+    if protocol in ('hs2', 'hs2-http'):
       assert "DOUBLE\t0.5\t8.072\t8.0\t8.072\t8.0\t8.072" in result.stdout
     else:
       assert protocol == 'beeswax'
