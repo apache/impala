@@ -108,6 +108,7 @@ public class AvroSchemaParser {
     Schema.Type type = schema.getType();
     if (type == INT) {
       String logicalType = schema.getProp("logicalType");
+      // DATE is stored in Avro as INT.
       if (logicalType != null && logicalType.equalsIgnoreCase("date")) return Type.DATE;
     }
     if (avroToImpalaPrimitiveTypeMap_.containsKey(type)) {

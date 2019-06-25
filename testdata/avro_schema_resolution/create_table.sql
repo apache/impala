@@ -36,6 +36,7 @@ WITH SERDEPROPERTIES ('avro.schema.literal'='{
   {"name":"long1",    "type":"long",    "default": 1},
   {"name":"float1",   "type":"float",   "default": 1.0},
   {"name":"double1",  "type":"double",  "default": 1.0},
+  {"name":"date1",    "type": {"type": "int", "logicalType": "date"}, "default": 1},
   {"name":"string1",  "type":"string",  "default": "default string"},
   {"name":"string2",  "type": ["string", "null"],  "default": ""},
   {"name":"string3",  "type": ["null", "string"],  "default": null}

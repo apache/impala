@@ -54,11 +54,12 @@ public class AvroSchemaConverter {
   private static final String DEFAULT_SCHEMA_NAME = "baseRecord";
   private static final String RECORD_NAME_PREFIX = "record_";
 
-  // Constants for Avro logical types, in particular, for DECIMAL.
+  // Constants for Avro logical types, in particular, for DECIMAL and DATE.
   private static final String AVRO_LOGICAL_TYPE = "logicalType";
   private static final String PRECISION_PROP_NAME = "precision";
   private static final String SCALE_PROP_NAME = "scale";
   private static final String AVRO_DECIMAL_TYPE = "decimal";
+  private static final String AVRO_DATE_TYPE = "date";
 
   // Used to generate unique record names as required by Avro.
   private int recordCounter_ = 0;
@@ -168,7 +169,7 @@ public class AvroSchemaConverter {
 
   private Schema createDateSchema() {
     Schema dateSchema = Schema.create(Schema.Type.INT);
-    dateSchema.addProp(AVRO_LOGICAL_TYPE, "date");
+    dateSchema.addProp(AVRO_LOGICAL_TYPE, AVRO_DATE_TYPE);
     return dateSchema;
   }
 

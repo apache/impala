@@ -1605,6 +1605,36 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/invalid_decimal_sch
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_avro_date_out_of_range
+---- COLUMNS
+d DATE
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/out_of_range_date.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hive2_bad_avro_date_pre_gregorian
+---- COLUMNS
+d DATE
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/hive2_pre_gregorian_date.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hive3_avro_date_pre_gregorian
+---- COLUMNS
+d DATE
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/hive3_pre_gregorian_date.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
 -- IMPALA-694: uses data file produced by parquet-mr version 1.2.5-cdh4.5.0
 -- (can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh)
 functional

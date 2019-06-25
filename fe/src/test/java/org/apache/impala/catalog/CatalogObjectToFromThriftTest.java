@@ -135,14 +135,14 @@ public class CatalogObjectToFromThriftTest {
     TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
     Assert.assertTrue(thriftTable.isSetTable_type());
-    Assert.assertEquals(thriftTable.getColumns().size(), 8);
+    Assert.assertEquals(thriftTable.getColumns().size(), 9);
     Assert.assertEquals(thriftTable.getClustering_columns().size(), 0);
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HDFS_TABLE);
 
     // Now try to load the thrift struct.
     Table newTable = Table.fromThrift(catalog_.getDb("functional_avro_snap"),
         thriftTable);
-    Assert.assertEquals(newTable.getColumns().size(), 8);
+    Assert.assertEquals(newTable.getColumns().size(), 9);
 
     // The table schema does not match the Avro schema - it has only 2 columns.
     Assert.assertEquals(newTable.getMetaStoreTable().getSd().getCols().size(), 2);

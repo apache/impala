@@ -3,10 +3,10 @@
 # see testdata/avro_schema_resolution
 select * from functional_avro_snap.schema_resolution_test
 ---- TYPES
-boolean, int, long, float, double, string, string, string
+boolean, int, long, float, double, date, string, string, string
 ---- RESULTS
-true,1,1,1,1,'default string','','NULL'
-false,2,2,2,2,'serialized string','','NULL'
+true,1,1,1,1,1970-01-02,'default string','','NULL'
+false,2,2,2,2,1970-01-03,'serialized string','','NULL'
 ====
 ---- QUERY
 # IMPALA-1136: Tests that Impala can read Hive-created Avro tables that have

@@ -93,17 +93,18 @@ float_col float,
 double_col double,
 timestamp_col timestamp,
 decimal_col decimal(2,0),
-string_col string)
+string_col string,
+date_col date)
 ====
 ---- QUERY
 # Every new column just added should have NULL filled
 select * from avro_alter_table_add_new_column
 ---- RESULTS
-'aaaaaaa','bbbbbbb',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
-'ccccc','dddd',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
-'eeeeeeee','f',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
+'aaaaaaa','bbbbbbb',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL',NULL
+'ccccc','dddd',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL',NULL
+'eeeeeeee','f',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL',NULL
 ---- TYPES
-string, string, boolean, int, bigint, float, double, string, decimal, string
+string, string, boolean, int, bigint, float, double, string, decimal, string, date
 ====
 ---- QUERY
 # IMPALA-3776: Create an Avro table, add a column to the Avro schema and make sure

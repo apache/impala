@@ -31,6 +31,7 @@ bool IsSupportedAvroType(const avro_schema_t& schema) {
     case AVRO_STRING:
     case AVRO_BYTES:
     case AVRO_INT32:
+    case AVRO_DATE:
     case AVRO_INT64:
     case AVRO_FLOAT:
     case AVRO_DOUBLE:
@@ -112,6 +113,9 @@ Status AvroSchemaToColumnType(
       return Status::OK();
     case AVRO_INT32:
       *column_type = TYPE_INT;
+      return Status::OK();
+    case AVRO_DATE:
+      *column_type = TYPE_DATE;
       return Status::OK();
     case AVRO_INT64:
       *column_type = TYPE_BIGINT;

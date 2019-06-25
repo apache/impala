@@ -20,7 +20,9 @@
 
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
+#include "runtime/date-value.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 
 using namespace impala;
@@ -97,6 +99,25 @@ bool HdfsAvroScanner::ReadAvroBoolean(PrimitiveType type, uint8_t** data,
     *reinterpret_cast<bool*>(slot) = *reinterpret_cast<bool*>(*data);
   }
   *data += 1;
+  return true;
+}
+
+bool HdfsAvroScanner::ReadAvroDate(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+    bool write_slot, void* slot, MemPool* pool) {
+  ReadWriteUtil::ZIntResult r = ReadWriteUtil::ReadZInt(data, data_end);
+  if (UNLIKELY(!r.ok)) {
+    SetStatusCorruptData(TErrorCode::SCANNER_INVALID_INT);
+    return false;
+  }
+  if (write_slot) {
+    DCHECK_EQ(type, TYPE_DATE);
+    DateValue dv(r.val);
+    if (UNLIKELY(!dv.IsValid())) {
+      SetStatusInvalidValue(TErrorCode::AVRO_INVALID_DATE, r.val);
+      return false;
+    }
+    *reinterpret_cast<DateValue*>(slot) = dv;
+  }
   return true;
 }
 

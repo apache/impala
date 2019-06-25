@@ -267,6 +267,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   ///
   bool ReadAvroBoolean(PrimitiveType type, uint8_t** data, uint8_t* data_end,
       bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroDate(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
   bool ReadAvroInt32(PrimitiveType type, uint8_t** data, uint8_t* data_end,
       bool write_slot, void* slot, MemPool* pool);
   bool ReadAvroInt64(PrimitiveType type, uint8_t** data, uint8_t* data_end,

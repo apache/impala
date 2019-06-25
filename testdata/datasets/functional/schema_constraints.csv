@@ -39,6 +39,9 @@ table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:bad_avro_snap_strings, constraint:restrict_to, table_format:avro/snap/block
 table_name:bad_avro_snap_floats, constraint:restrict_to, table_format:avro/snap/block
 table_name:bad_avro_decimal_schema, constraint:restrict_to, table_format:avro/snap/block
+table_name:bad_avro_date_out_of_range, constraint:restrict_to, table_format:avro/snap/block
+table_name:hive2_bad_avro_date_pre_gregorian, constraint:restrict_to, table_format:avro/snap/block
+table_name:hive3_avro_date_pre_gregorian, constraint:restrict_to, table_format:avro/snap/block
 table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_parquet_strings_negative_len, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_parquet_strings_out_of_bounds, constraint:restrict_to, table_format:parquet/none/none
@@ -226,9 +229,10 @@ table_name:table_with_header_insert, constraint:restrict_to, table_format:text/g
 # property, so we test parquet format as well.
 table_name:table_with_header_insert, constraint:restrict_to, table_format:parquet/none/none
 
-# IMPALA-7368/IMPALA-7370 adds DATE support for text, hbase and parquet.
+# IMPALA-7368/IMPALA-7370/IMPALA-8198 adds DATE support for text, hbase, parquet and avro.
 # Other file-formats will be introduced later.
 table_name:date_tbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:date_tbl, constraint:restrict_to, table_format:avro/snap/block
 table_name:date_tbl, constraint:restrict_to, table_format:hbase/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block

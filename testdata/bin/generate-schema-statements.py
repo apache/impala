@@ -404,6 +404,8 @@ def avro_schema(columns):
       hive_type = column_spec.split()[1].upper()
       if hive_type.startswith('CHAR(') or hive_type.startswith('VARCHAR('):
         type = 'string'
+      elif hive_type == 'DATE':
+        type = {"type": "int", "logicalType": "date"}
       else:
         type = HIVE_TO_AVRO_TYPE_MAP[hive_type]
 

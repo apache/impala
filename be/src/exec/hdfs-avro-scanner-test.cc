@@ -21,6 +21,7 @@
 #include <limits.h>
 
 #include "exec/read-write-util.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
@@ -111,6 +112,12 @@ class HdfsAvroScannerTest : public testing::Test {
     double expected_double = expected_val;
     TestReadAvroType(&HdfsAvroScanner::ReadAvroInt32, TYPE_DOUBLE, data, data_len,
         expected_double, expected_encoded_len, expected_error);
+  }
+
+  void TestReadAvroDate(uint8_t* data, int64_t data_len, const DateValue& expected_val,
+      int expected_encoded_len, TErrorCode::type expected_error = TErrorCode::OK) {
+    TestReadAvroType(&HdfsAvroScanner::ReadAvroDate, TYPE_DATE, data, data_len,
+        expected_val, expected_encoded_len, expected_error);
   }
 
   void TestReadAvroInt64(uint8_t* data, int64_t data_len, int64_t expected_val,
@@ -269,6 +276,63 @@ TEST_F(HdfsAvroScannerTest, Int32Test) {
   TestReadAvroInt32(data, len - 1, -1, -1, TErrorCode::SCANNER_INVALID_INT);
 
   // TODO: we don't handle invalid values (e.g. overflow) (IMPALA-3659)
+}
+
+TEST_F(HdfsAvroScannerTest, DateTest) {
+  uint8_t data[100];
+  data[0] = 1; // decodes to -1 which corresponds to 1969-12-31.
+  TestReadAvroDate(data, 1, DateValue(1969, 12, 31), 1);
+  TestReadAvroDate(data, 10, DateValue(1969, 12, 31), 1);
+
+  // Empty data.
+  DateValue invalid_dv;
+  TestReadAvroDate(data, 0, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  data[0] = 2; // decodes to 1 which corresponds to 1970-01-02.
+  TestReadAvroDate(data, 1, DateValue(1970, 1, 2), 1);
+  TestReadAvroDate(data, 10, DateValue(1970, 1, 2), 1);
+  TestReadAvroDate(data, 0, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  data[0] = 0x80; // decodes to 64 which corresponds to 1970-03-06.
+  data[1] = 0x01;
+  TestReadAvroDate(data, 2, DateValue(1970, 3, 6), 2);
+  TestReadAvroDate(data, 10, DateValue(1970, 3, 6), 2);
+  TestReadAvroDate(data, 0, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+  TestReadAvroDate(data, 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  // Test upper limit: 9999-12-31.
+  const int32_t MAX_DATE_DAYS_SINCE_EPOCH = 2932896;
+  int len = ReadWriteUtil::PutZInt(MAX_DATE_DAYS_SINCE_EPOCH, data);
+  TestReadAvroDate(data, len, DateValue(9999, 12 ,31), len);
+  TestReadAvroDate(data, len + 1, DateValue(9999, 12, 31), len);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  len = ReadWriteUtil::PutZInt(MAX_DATE_DAYS_SINCE_EPOCH + 1, data);
+  TestReadAvroDate(data, len, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len + 1, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  len = ReadWriteUtil::PutZInt(INT_MAX, data);
+  TestReadAvroDate(data, len, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len + 1, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  // Test lower limit: 0000-01-01.
+  const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719528;
+  len = ReadWriteUtil::PutZInt(MIN_DATE_DAYS_SINCE_EPOCH, data);
+  TestReadAvroDate(data, len, DateValue(0, 1, 1), len);
+  TestReadAvroDate(data, len + 1, DateValue(0, 1, 1), len);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  len = ReadWriteUtil::PutZInt(MIN_DATE_DAYS_SINCE_EPOCH - 1, data);
+  TestReadAvroDate(data, len, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len + 1, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
+
+  len = ReadWriteUtil::PutZInt(INT_MIN, data);
+  TestReadAvroDate(data, len, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len + 1, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
+  TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
 }
 
 TEST_F(HdfsAvroScannerTest, Int64Test) {

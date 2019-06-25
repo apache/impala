@@ -1,5 +1,6 @@
 {"boolean2": false,
  "string1": "serialized string",
+ "date1": 2,
  "double1": 2,
  "float1": 2,
  "long1": 2,

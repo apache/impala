@@ -435,6 +435,9 @@ error_codes = (
 
   ("MAX_STATEMENT_LENGTH_EXCEEDED", 143, "Statement length of $0 bytes exceeds the "
    "maximum statement length ($1 bytes)"),
+
+  ("AVRO_INVALID_DATE", 144, "Avro file '$0' is corrupt: out of range date value $1 "
+   "at offset $2. The valid date range is -719528..2932896 (0000-01-01..9999-12-31)."),
 )
 
 import sys

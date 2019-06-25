@@ -157,6 +157,8 @@ ir_functions = [
    "_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhS1_Pb"],
   ["READ_AVRO_BOOLEAN",
    "_ZN6impala15HdfsAvroScanner15ReadAvroBooleanENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE"],
+  ["READ_AVRO_DATE",
+   "_ZN6impala15HdfsAvroScanner12ReadAvroDateENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE"],
   ["READ_AVRO_INT32",
    "_ZN6impala15HdfsAvroScanner13ReadAvroInt32ENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE"],
   ["READ_AVRO_INT64",

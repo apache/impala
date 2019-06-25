@@ -58,7 +58,7 @@ public enum HdfsFileFormat {
   AVRO("org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat",
       "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat",
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe",
-      false, false, false),
+      false, false, true),
   PARQUET("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",

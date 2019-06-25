@@ -4,6 +4,7 @@
  "fields": [
     {"name":"boolean2", "type":"boolean"},
     {"name":"string1",  "type":"string"},
+    {"name":"date1",    "type":"int", "comment": "type promotion"},
     {"name":"double1",  "type":"int", "comment": "type promotion"},
     {"name":"float1",   "type":"int", "comment": "type promotion"},
     {"name":"long1",    "type":"int", "comment": "type promotion"},

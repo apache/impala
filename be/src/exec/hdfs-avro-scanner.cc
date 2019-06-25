@@ -308,7 +308,8 @@ Status HdfsAvroScanner::WriteDefaultValue(
       RawValue::Write(&v, avro_header_->template_tuple, slot_desc, nullptr);
       break;
     }
-    case AVRO_INT32: {
+    case AVRO_INT32:
+    case AVRO_DATE: {
       RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, default_value));
       int32_t v;
       if (avro_int32_get(default_value, &v)) DCHECK(false);
@@ -431,8 +432,10 @@ bool HdfsAvroScanner::VerifyTypesMatch(
       return true;
     case TYPE_STRING: return reader_type.IsStringType();
     case TYPE_INT:
+    case TYPE_DATE:
       switch(reader_type.type) {
         case TYPE_INT:
+        case TYPE_DATE:
         // Type promotion
         case TYPE_BIGINT:
         case TYPE_FLOAT:
@@ -617,8 +620,13 @@ bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
       case AVRO_BOOLEAN:
         success = ReadAvroBoolean(slot_type, data, data_end, write_slot, slot, pool);
         break;
+      case AVRO_DATE:
       case AVRO_INT32:
-        success = ReadAvroInt32(slot_type, data, data_end, write_slot, slot, pool);
+        if (slot_type == TYPE_DATE) {
+          success = ReadAvroDate(slot_type, data, data_end, write_slot, slot, pool);
+        } else {
+          success = ReadAvroInt32(slot_type, data, data_end, write_slot, slot, pool);
+        }
         break;
       case AVRO_INT64:
         success = ReadAvroInt64(slot_type, data, data_end, write_slot, slot, pool);
@@ -689,7 +697,8 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
   if (TestInfo::is_test()) {
     parse_status_ = Status(error_code, "test file", len, limit, 123);
   } else {
-    parse_status_ = Status(error_code, stream_->filename(), len, limit, stream_->file_offset());
+    parse_status_ = Status(error_code, stream_->filename(), len, limit,
+        stream_->file_offset());
   }
 }
 
@@ -1012,8 +1021,19 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
     case AVRO_BOOLEAN:
       read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_BOOLEAN, false);
       break;
+    case AVRO_DATE:
+      if (slot_desc != nullptr && slot_desc->type().type == TYPE_INT) {
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT32, false);
+      } else {
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DATE, false);
+      }
+      break;
     case AVRO_INT32:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT32, false);
+      if (slot_desc != nullptr && slot_desc->type().type == TYPE_DATE) {
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DATE, false);
+      } else {
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT32, false);
+      }
       break;
     case AVRO_INT64:
       read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT64, false);
