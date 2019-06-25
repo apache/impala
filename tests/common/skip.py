@@ -210,8 +210,6 @@ class SkipIfDockerizedCluster:
 class SkipIfHive3:
   sentry_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
-  slow_nested_types = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
-      reason="Deeply nested types can be slow in Hive 3. See HIVE-21796 for details")
 
 
 class SkipIfHive2:
