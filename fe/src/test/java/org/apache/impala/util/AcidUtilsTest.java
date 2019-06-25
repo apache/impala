@@ -114,8 +114,6 @@ public class AcidUtilsTest {
           "delta_0000009_0000009_0000/0000/def.txt"},
         "default.test:10:6:6,7,8:", // 6,7,8 are open write ids
         new String[]{
-          "base_01.txt",
-          "post_upgrade.txt",
           "base_0000005/abc.txt",
           "base_0000005/0000/abc.txt",
           "delta_0000009_0000009_0000/000000_0",
@@ -142,8 +140,6 @@ public class AcidUtilsTest {
           "delta_0000009_0000009_0000/0000/def.txt"},
         "default.test:10:1337::7,8,9", // 7,8,9 are aborted write ids
         new String[]{
-          "base_01.txt",
-          "post_upgrade.txt",
           "base_0000005/abc.txt",
           "base_0000005/0000/abc.txt",
           "delta_0000006_0000006_0000/000000_0"});
