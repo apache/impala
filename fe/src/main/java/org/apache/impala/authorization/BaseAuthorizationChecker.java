@@ -92,7 +92,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     if (authzCtx.getTimeline().isPresent()) {
       EventSequence timeline = authzCtx.getTimeline().get();
       long durationMs = timeline.markEvent(String.format("Authorization finished (%s)",
-          config_.getProviderName())) / 1000;
+          config_.getProviderName())) / 1000000;
       LOG.debug("Authorization check took {} ms", durationMs);
     }
   }
