@@ -128,6 +128,7 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MIN_SIZE=4KB;
 SET RUNTIME_BLOOM_FILTER_SIZE=4KB;
+SET DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 # The min buffer size is set to 8KB for end to end tests. This query would
 # produce a 4KB filter if the min buffer size limit bound is not enforced.
 select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id = b.id;
