@@ -879,7 +879,9 @@ class ImpalaTestSuite(BaseTestSuite):
         raise RuntimeError(stderr)
       return stdout
     finally:
-      if tmpdir is not None: shutil.rmtree(tmpdir)
+      # IMPALA-8315: removing the directory may race with Hive's own cleanup and cause
+      # errors.
+      if tmpdir is not None: shutil.rmtree(tmpdir, ignore_errors=True)
 
   def hive_partition_names(self, table_name):
     """Find the names of the partitions of a table, as Hive sees them.
