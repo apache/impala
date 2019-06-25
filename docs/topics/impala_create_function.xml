@@ -78,6 +78,7 @@ under the License.
 
 <codeblock>CREATE [AGGREGATE] FUNCTION [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>function_name</varname>([<varname>arg_type</varname>[, <varname>arg_type</varname>...])
   RETURNS <varname>return_type</varname>
+  <ph rev="2.3.0 IMPALA-1829">[INTERMEDIATE <varname>type_spec</varname>]</ph>
   LOCATION '<varname>hdfs_path</varname>'
   [INIT_FN='<varname>function</varname>]
   UPDATE_FN='<varname>function</varname>
@@ -85,8 +86,7 @@ under the License.
   [PREPARE_FN='<varname>function</varname>]
   [CLOSEFN='<varname>function</varname>]
   <ph rev="2.0.0">[SERIALIZE_FN='<varname>function</varname>]</ph>
-  [FINALIZE_FN='<varname>function</varname>]
-  <ph rev="2.3.0 IMPALA-1829">[INTERMEDIATE <varname>type_spec</varname>]</ph></codeblock>
+  [FINALIZE_FN='<varname>function</varname>]</codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
 
