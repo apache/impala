@@ -490,10 +490,6 @@ struct TTable {
   // For example ValidReaderWriteIdList object's format is:
   // <table_name>:<highwatermark>:<minOpenWriteId>:<open_writeids>:<abort_writeids>
   14: optional string valid_write_ids
-
-  // Set if this table needs storage access during metadata load.
-  // Time used for storage loading in nanoseconds.
-  15: optional i64 storage_metadata_load_time
 }
 
 // Represents a database.

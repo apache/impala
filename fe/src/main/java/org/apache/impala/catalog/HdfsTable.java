@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -88,7 +87,6 @@ import org.apache.impala.util.ThreadNameAnnotator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codahale.metrics.Clock;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -506,18 +504,16 @@ public class HdfsTable extends Table implements FeFsTable {
    * Create HdfsPartition objects corresponding to 'msPartitions' and add them to this
    * table's partition list. Any partition metadata will be reset and loaded from
    * scratch. For each partition created, we load the block metadata for each data file
-   * under it. Returns time spent loading the filesystem metadata in nanoseconds.
+   * under it.
    *
    * If there are no partitions in the Hive metadata, a single partition is added with no
    * partition keys.
    */
-  private long loadAllPartitions(
+  private void loadAllPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws IOException,
       CatalogException {
     Preconditions.checkNotNull(msTbl);
-    final Clock clock = Clock.defaultClock();
-    long startTime = clock.getTick();
     initializePartitionMetadata(msTbl);
     FsPermissionCache permCache = preloadPermissionsCache(msPartitions);
 
@@ -545,7 +541,6 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     // Load the file metadata from scratch.
     loadFileMetadataForPartitions(partitionMap_.values(), /*isRefresh=*/false);
-    return clock.getTick() - startTime;
   }
 
 
@@ -931,10 +926,7 @@ public class HdfsTable extends Table implements FeFsTable {
         loadTableSchema ? "table definition and " : "",
         partitionsToUpdate == null ? "all" : String.valueOf(partitionsToUpdate.size()),
         msTbl.getDbName(), msTbl.getTableName(), reason);
-    LOG.info(annotation);
-    final Timer storageLdTimer =
-        getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC);
-    storageMetadataLoadTime_ = 0;
+    LOG.info(annotation);;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       // turn all exceptions into TableLoadingException
       msTable_ = msTbl;
@@ -948,19 +940,16 @@ public class HdfsTable extends Table implements FeFsTable {
             //TODO writeIDs may also be loaded in other code paths.
             loadValidWriteIdList(client);
         }
-
         // Load partition and file metadata
         if (reuseMetadata) {
           // Incrementally update this table's partitions and file metadata
           Preconditions.checkState(
               partitionsToUpdate == null || loadParitionFileMetadata);
-          storageMetadataLoadTime_ += updateMdFromHmsTable(msTbl);
+          updateMdFromHmsTable(msTbl);
           if (msTbl.getPartitionKeysSize() == 0) {
-            if (loadParitionFileMetadata) {
-              storageMetadataLoadTime_ += updateUnpartitionedTableFileMd();
-            }
+            if (loadParitionFileMetadata) updateUnpartitionedTableFileMd();
           } else {
-            storageMetadataLoadTime_ += updatePartitionsFromHms(
+            updatePartitionsFromHms(
                 client, partitionsToUpdate, loadParitionFileMetadata);
           }
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
@@ -971,7 +960,7 @@ public class HdfsTable extends Table implements FeFsTable {
               MetaStoreUtil.fetchAllPartitions(
                   client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
           LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
-          storageMetadataLoadTime_ = loadAllPartitions(msPartitions, msTbl);
+          loadAllPartitions(msPartitions, msTbl);
         }
         if (loadTableSchema) setAvroSchema(client, msTbl);
         setTableStats(msTbl);
@@ -984,47 +973,37 @@ public class HdfsTable extends Table implements FeFsTable {
             + getFullName(), e);
       }
     } finally {
-      storageLdTimer.update(storageMetadataLoadTime_, TimeUnit.NANOSECONDS);
       context.stop();
     }
   }
 
   /**
    * Updates the table metadata, including 'hdfsBaseDir_', 'isMarkedCached_',
-   * and 'accessLevel_' from 'msTbl'. Returns time spent accessing file system
-   * in nanoseconds. Throws an IOException if there was an error accessing
-   * the table location path.
+   * and 'accessLevel_' from 'msTbl'. Throws an IOException if there was an error
+   * accessing the table location path.
    */
-  private long  updateMdFromHmsTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
+  private void updateMdFromHmsTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws IOException {
     Preconditions.checkNotNull(msTbl);
-    final Clock clock = Clock.defaultClock();
-    long filesystemAccessTime = 0;
-    long startTime = clock.getTick();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
     isMarkedCached_ = HdfsCachingUtil.validateCacheParams(msTbl.getParameters());
     Path location = new Path(hdfsBaseDir_);
     accessLevel_ = getAvailableAccessLevel(getFullName(), location,
         new FsPermissionCache());
-    filesystemAccessTime = clock.getTick() - startTime;
     setMetaStoreTable(msTbl);
-    return filesystemAccessTime;
   }
 
   /**
    * Incrementally updates the file metadata of an unpartitioned HdfsTable.
-   * Returns time spent updating the file metadata in nanoseconds.
    *
    * This is optimized for the case where few files have changed. See
    * {@link #refreshFileMetadata(Path, List)} above for details.
    */
-  private long updateUnpartitionedTableFileMd() throws CatalogException {
+  private void updateUnpartitionedTableFileMd() throws CatalogException {
     Preconditions.checkState(getNumClusteringCols() == 0);
     if (LOG.isTraceEnabled()) {
       LOG.trace("update unpartitioned table: " + getFullName());
     }
-    final Clock clock = Clock.defaultClock();
-    long startTime = clock.getTick();
     HdfsPartition oldPartition = Iterables.getOnlyElement(partitionMap_.values());
 
     // Instead of updating the existing partition in place, we create a new one
@@ -1042,21 +1021,18 @@ public class HdfsTable extends Table implements FeFsTable {
     addPartition(part);
     if (isMarkedCached_) part.markCached();
     loadFileMetadataForPartitions(ImmutableList.of(part), /*isRefresh=*/true);
-    return clock.getTick() - startTime;
   }
 
   /**
-   * Updates the partitions of an HdfsTable so that they are in sync with the
-   * Hive Metastore. It reloads partitions that were marked 'dirty' by doing a
-   * DROP + CREATE. It removes from this table partitions that no longer exist
-   * in the Hive Metastore and adds partitions that were added externally (e.g.
-   * using Hive) to the Hive Metastore but do not exist in this table. If
-   * 'loadParitionFileMetadata' is true, it triggers file/block metadata reload
-   * for the partitions specified in 'partitionsToUpdate', if any, or for all
-   * the table partitions if 'partitionsToUpdate' is null. Returns time
-   * spent loading file metadata in nanoseconds.
+   * Updates the partitions of an HdfsTable so that they are in sync with the Hive
+   * Metastore. It reloads partitions that were marked 'dirty' by doing a DROP + CREATE.
+   * It removes from this table partitions that no longer exist in the Hive Metastore and
+   * adds partitions that were added externally (e.g. using Hive) to the Hive Metastore
+   * but do not exist in this table. If 'loadParitionFileMetadata' is true, it triggers
+   * file/block metadata reload for the partitions specified in 'partitionsToUpdate', if
+   * any, or for all the table partitions if 'partitionsToUpdate' is null.
    */
-  private long updatePartitionsFromHms(IMetaStoreClient client,
+  private void updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadPartitionFileMetadata)
       throws Exception {
     if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + getFullName());
@@ -1120,19 +1096,14 @@ public class HdfsTable extends Table implements FeFsTable {
     // Load file metadata. Until we have a notification mechanism for when a
     // file changes in hdfs, it is sometimes required to reload all the file
     // descriptors and block metadata of a table (e.g. REFRESH statement).
-    long fileLoadMdTime = 0;
     if (loadPartitionFileMetadata) {
-      final Clock clock = Clock.defaultClock();
-      long startTime = clock.getTick();
       if (partitionsToUpdate != null) {
         Preconditions.checkState(partitionsToLoadFiles.isEmpty());
         // Only reload file metadata of partitions specified in 'partitionsToUpdate'
         partitionsToLoadFiles = getPartitionsForNames(partitionsToUpdate);
       }
       loadFileMetadataForPartitions(partitionsToLoadFiles, /* isRefresh=*/true);
-      fileLoadMdTime = clock.getTick() - startTime;
     }
-    return fileLoadMdTime;
   }
 
   /**

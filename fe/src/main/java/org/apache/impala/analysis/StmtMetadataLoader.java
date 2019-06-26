@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,7 +28,6 @@ import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
@@ -226,25 +224,11 @@ public class StmtMetadataLoader {
       missingTbls = newMissingTbls;
       ++numCatalogUpdatesReceived_;
     }
-
     if (timeline_ != null) {
-      long storageLoadTimeNano = 0;
-      // Calculate the total storage loading time for this query (not including
-      // the tables already loaded before the query was called).
-      storageLoadTimeNano =
-          loadedTbls_.values()
-              .stream()
-              .filter(Table.class::isInstance)
-              .map(Table.class::cast)
-              .filter(loadedTbl -> requestedTbls.contains(loadedTbl.getTableName()))
-              .mapToLong(Table::getStorageLoadTime)
-              .sum();
-      timeline_.markEvent(String.format("Metadata load finished. "
-              + "loaded-tables=%d/%d load-requests=%d catalog-updates=%d "
-              + "storage-load-time=%dms",
+      timeline_.markEvent(String.format("Metadata load finished. " +
+          "loaded-tables=%d/%d load-requests=%d catalog-updates=%d",
           requestedTbls.size(), loadedTbls_.size(), numLoadRequestsSent_,
-          numCatalogUpdatesReceived_,
-          TimeUnit.MILLISECONDS.convert(storageLoadTimeNano, TimeUnit.NANOSECONDS)));
+          numCatalogUpdatesReceived_));
 
       if (MetastoreShim.getMajorVersion() > 2) {
         StringBuilder validIdsBuf = new StringBuilder("Loaded ValidWriteIdLists: ");
