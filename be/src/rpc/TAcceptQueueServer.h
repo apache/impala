@@ -93,7 +93,7 @@ class TAcceptQueueServer : public TServer {
       boost::shared_ptr<TTransport> client);
 
   boost::shared_ptr<ThreadFactory> threadFactory_;
-  volatile bool stop_;
+  volatile bool stop_ = false;
 
   /// Name of the thrift server.
   const std::string name_;
@@ -105,20 +105,27 @@ class TAcceptQueueServer : public TServer {
   // The maximum number of running tasks allowed at a time.
   const int32_t maxTasks_;
 
-  /// New - True if metrics are enabled
-  bool metrics_enabled_;
+  /// True if metrics are enabled
+  bool metrics_enabled_ = false;
 
-  /// New - Number of connections that have been accepted and are waiting to be setup.
-  impala::IntGauge* queue_size_metric_;
+  /// Number of connections that have been accepted and are waiting to be setup.
+  impala::IntGauge* queue_size_metric_ = nullptr;
 
   /// Number of connections rejected due to timeout.
-  impala::IntGauge* timedout_cnxns_metric_;
+  impala::IntGauge* timedout_cnxns_metric_ = nullptr;
+
+  /// Distribution of connection setup time in microseconds. This does not include the
+  /// time spent waiting for a service thread to be available.
+  impala::HistogramMetric* cnxns_setup_time_us_metric_ = nullptr;
+
+  /// Distribution of wait time in microseconds for service threads to be available.
+  impala::HistogramMetric* thread_wait_time_us_metric_ = nullptr;
 
   /// Amount of time in milliseconds after which a connection request will be timed out.
   /// Default value is 0, which means no timeout.
   int64_t queue_timeout_ms_;
 
-  /// Amount of time, in milliseconds, of client's inactivity before the service thread
+  /// Amount of time in milliseconds of client's inactivity before the service thread
   /// wakes up to check if the connection should be closed due to inactivity. If 0, no
   /// polling happens.
   int64_t idle_poll_period_ms_;

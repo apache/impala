@@ -772,6 +772,26 @@
     "key": "impala.thrift-server.CatalogService.connections-in-use"
   },
   {
+    "description": "Amount of time clients of Catalog Service spent waiting for connection to be set up",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Service client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.CatalogService.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of Catalog Service spent waiting for service threads",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Service clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.CatalogService.svc-thread-wait-time"
+  },
+  {
     "description": "The total number of connections made to this Catalog Server's catalog service  over its lifetime.",
     "contexts": [
       "CATALOGSERVER"
@@ -784,7 +804,7 @@
   {
     "description": "The number of connections to the Catalog Service that have been accepted and are waiting to be setup.",
     "contexts": [
-      "IMPALAD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Service Connections Queued for Setup",
     "units": "NONE",
@@ -794,7 +814,7 @@
   {
     "description": "The number of connection requests to the Catalog Service that have been timed out waiting to be setup.",
     "contexts": [
-      "IMPALAD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Service Connection Requests Timed Out",
     "units": "NONE",
@@ -802,7 +822,7 @@
     "key": "impala.thrift-server.CatalogService.timedout-cnxn-requests"
   },
   {
-    "description": "The number of active connections to this StateStore's StateStore service.",
+    "description": "The number of active connections to this StateStore's service.",
     "contexts": [
       "STATESTORE"
     ],
@@ -810,6 +830,26 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.StatestoreService.connections-in-use"
+  },
+  {
+    "description": "Amount of time clients of StateStore Service spent waiting for connection to be set up",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore Service client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.StatestoreService.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of StateStore Service spent waiting for service threads",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "StateStore Service clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.StatestoreService.svc-thread-wait-time"
   },
   {
     "description": "The total number of connections made to this StateStore's StateStore service over its lifetime.",
@@ -852,6 +892,26 @@
     "key": "impala.thrift-server.backend.connections-in-use"
   },
   {
+    "description": "Amount of time clients of Impala Backend Server spent waiting for connection to be set up",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend client connections setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.backend.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of Impala Backend Server spent waiting for service threads",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Server clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.backend.svc-thread-wait-time"
+  },
+  {
     "description": "The total number of Impala Backend client connections made to this Impala Daemon over its lifetime.",
     "contexts": [
       "IMPALAD"
@@ -890,6 +950,26 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.beeswax-frontend.connections-in-use"
+  },
+  {
+    "description": "Amount of time clients of Beeswax API spent waiting for connection to be set up",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.beeswax-frontend.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of Beeswax API spent waiting for service threads",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.beeswax-frontend.svc-thread-wait-time"
   },
   {
     "description": "The total number of Beeswax API connections made to this Impala Daemon over its lifetime.",
@@ -932,6 +1012,26 @@
     "key": "impala.thrift-server.hiveserver2-frontend.connections-in-use"
   },
   {
+    "description": "Amount of time clients of HiveServer2 API spent waiting for connection to be set up",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.hiveserver2-frontend.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of HiveServer2 API spent waiting for service threads",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.hiveserver2-frontend.svc-thread-wait-time"
+  },
+  {
     "description": "The total number of HiveServer2 API connections made to this Impala Daemon over its lifetime.",
     "contexts": [
       "IMPALAD"
@@ -970,6 +1070,26 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala.thrift-server.hiveserver2-http-frontend.connections-in-use"
+  },
+  {
+    "description": "Amount of time clients of HiveServer2 HTTP API spent waiting for connection to be set up",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of HiveServer2 HTTP API spent waiting for service threads",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.svc-thread-wait-time"
   },
   {
     "description": "The total number of HiveServer2 HTTP API connections made to this Impala Daemon over its lifetime.",
