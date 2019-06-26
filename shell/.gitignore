@@ -8,6 +8,8 @@ ext-py/prettytable-0.7.1/prettytable.egg-info
 ext-py/sqlparse-0.1.19/dist/
 ext-py/sqlparse-0.1.19/build/
 ext-py/sqlparse-0.1.19/sqlparse.egg-info/
+ext-py/bitarray-0.9.0/bitarray.egg-info/
+ext-py/bitarray-0.9.0/dist/
 
 # This file is used by buildall.sh to find files that need to be removed during the
 # clean phase. Previous version of deps should be kept here for cleaning otherwise they
