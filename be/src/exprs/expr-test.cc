@@ -5531,6 +5531,9 @@ TEST_P(ExprTest, MathConversionFunctions) {
   TestStringValue("unhex('30GA')", "");
   // Uneven number of chars results in empty string.
   TestStringValue("unhex('30A')", "");
+  // IMPALA-8713: stack overflow in unhex().
+  TestValue("length(unhex(repeat('a', 1024 * 1024 * 1024)))",
+      TYPE_INT, 512 * 1024 * 1024);
 
   // Run the test suite twice, once with a bigint parameter, and once with
   // string parameters.

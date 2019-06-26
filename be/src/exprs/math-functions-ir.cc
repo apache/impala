@@ -258,7 +258,7 @@ StringVal MathFunctions::Unhex(FunctionContext* ctx, const StringVal& s) {
   if (s.len % 2 != 0) return StringVal();
 
   int result_len = s.len / 2;
-  char result[result_len];
+  StringVal result(ctx, result_len);
   int res_index = 0;
   int s_index = 0;
   while (s_index < s.len) {
@@ -300,10 +300,10 @@ StringVal MathFunctions::Unhex(FunctionContext* ctx, const StringVal& s) {
           return StringVal();
       }
     }
-    result[res_index] = c;
+    result.ptr[res_index] = c;
     ++res_index;
   }
-  return AnyValUtil::FromBuffer(ctx, result, result_len);
+  return result;
 }
 
 StringVal MathFunctions::ConvInt(FunctionContext* ctx, const BigIntVal& num,
