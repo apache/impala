@@ -61,6 +61,16 @@ public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
     clientIp_ = Preconditions.checkNotNull(clientIp);
   }
 
+  /**
+   * A copy constructor for {@link RangerBufferAuditHandler}.
+   */
+  public RangerBufferAuditHandler(RangerBufferAuditHandler auditHandler) {
+    Preconditions.checkNotNull(auditHandler);
+    sqlStmt_ = Preconditions.checkNotNull(auditHandler.getSqlStmt());
+    clusterName_ = Preconditions.checkNotNull(auditHandler.getClusterName());
+    clientIp_ = Preconditions.checkNotNull(auditHandler.getClientIp());
+  }
+
   public static class AutoFlush extends RangerBufferAuditHandler
       implements AutoCloseable {
     public AutoFlush(String sqlStmt, String clusterName, String clientIp) {

@@ -134,6 +134,15 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEventEquals("@url", "refresh", "*", 1, events.get(2));
       assertEquals("invalidate metadata", events.get(2).getRequestData());
     }, "invalidate metadata", onServer(TPrivilegeLevel.REFRESH));
+
+    authzOk(events -> {
+      // Show the actual view_metadata audit log.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "view_metadata", "functional/alltypes", 1,
+          events.get(0));
+      assertEquals("show partitions functional.alltypes", events.get(0).getRequestData());
+    }, "show partitions functional.alltypes",
+        onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
   }
 
   @Test
@@ -180,6 +189,14 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEquals("select id, string_col from functional.alltypes",
           events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes");
+
+    authzError(events -> {
+      // Show the actual view_metadata audit log.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "view_metadata", "functional/alltypes", 0,
+          events.get(0));
+      assertEquals("show partitions functional.alltypes", events.get(0).getRequestData());
+    }, "show partitions functional.alltypes");
   }
 
   private void authzOk(Consumer<List<AuthzAuditEvent>> resultChecker, String stmt,
@@ -201,7 +218,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
   private static void assertEventEquals(String resourceType, String accessType,
       String resourcePath, int accessResult, AuthzAuditEvent event) {
     assertEquals(resourceType, event.getResourceType());
-    assertEquals(accessType.toUpperCase(), event.getAccessType());
+    assertEquals(accessType, event.getAccessType());
     assertEquals(resourcePath, event.getResourcePath());
     assertEquals(accessResult, event.getAccessResult());
     assertEquals("test-cluster", event.getClusterName());
