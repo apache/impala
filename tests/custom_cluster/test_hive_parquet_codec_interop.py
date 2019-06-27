@@ -49,9 +49,11 @@ class TestParquetInterop(CustomClusterTestSuite):
   def test_hive_impala_interop(self, vector, unique_database, cluster_properties):
     # Setup source table.
     source_table = "{0}.{1}".format(unique_database, "t1_source")
+    # TODO: Once IMPALA-8721 is fixed add coverage for TimeStamp data type.
     self.execute_query_expect_success(self.client,
-        "create table {0} as select * from functional_parquet.alltypes"
-        .format(source_table))
+        "create table {0} as select id, bool_col, tinyint_col, smallint_col, int_col, "
+        "bigint_col, float_col, double_col, date_string_col, string_col, year, month "
+        "from functional_parquet.alltypes".format(source_table))
     self.execute_query_expect_success(self.client,
         "insert into {0}(id) values (7777), (8888), (9999), (11111), (22222), (33333)"
         .format(source_table))
