@@ -188,6 +188,62 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testInsertDefaultClustered() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("clustered");
+    runPlannerTestFile("insert-default-clustered", options);
+  }
+
+  @Test
+  public void testInsertDefaultNoClustered() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("noclustered  ");
+    runPlannerTestFile("insert-default-noclustered", options);
+  }
+
+  @Test
+  public void testInsertDefaultShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("shuffle");
+    runPlannerTestFile("insert-default-shuffle", options);
+  }
+
+  @Test
+  public void testInsertDefaultNoShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("  noshuffle ");
+    runPlannerTestFile("insert-default-noshuffle", options);
+  }
+
+  @Test
+  public void testInsertDefaultClusteredShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("clustered:shuffle");
+    runPlannerTestFile("insert-default-clustered-shuffle", options);
+  }
+
+  @Test
+  public void testInsertDefaultClusteredNoShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("clustered : noshuffle");
+    runPlannerTestFile("insert-default-clustered-noshuffle", options);
+  }
+
+  @Test
+  public void testInsertDefaultNoClusteredShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("  noclustered:  shuffle");
+    runPlannerTestFile("insert-default-noclustered-shuffle", options);
+  }
+
+  @Test
+  public void testInsertDefaultNoClusteredNoShuffle() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDefault_hints_insert_statement("  noclustered  :  noshuffle  ");
+    runPlannerTestFile("insert-default-noclustered-noshuffle", options);
+  }
+
+  @Test
   public void testInsertSortBy() {
     // Add a test table with a SORT BY clause to test that the corresponding sort nodes
     // are added by the insert statements in insert-sort-by.test.

@@ -2187,6 +2187,26 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "select * from functional.alltypes", prefix, suffix),
           "Conflicting INSERT hints: shuffle and noshuffle");
     }
+
+    // Test default hints using query option.
+    AnalysisContext insertCtx = createAnalysisCtx();
+    // Test default hints for partitioned Hdfs tables.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("SHUFFLE");
+    AnalyzesOk("create table t partitioned by (year, month) " +
+        "as select * from functional.alltypes",
+        insertCtx);
+    // Warn on unrecognized hints.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("badhint");
+    AnalyzesOk("create table t partitioned by (year, month) " +
+        "as select * from functional.alltypes",
+        insertCtx,
+        "INSERT hint not recognized: badhint");
+    // Conflicting plan hints.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("shuffle:noshuFFLe");
+    AnalysisError("create table t partitioned by (year, month) " +
+        "as select * from functional.alltypes",
+        insertCtx,
+        "Conflicting INSERT hints: shuffle and noshuffle");
   }
 
   @Test

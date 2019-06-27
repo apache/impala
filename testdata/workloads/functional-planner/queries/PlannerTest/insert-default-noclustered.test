@@ -1,0 +1,119 @@
+# PARTITIONED; DEFAULT: NOCLUSTERED; EXPECT: NO SORT, EXCHANGE;
+insert into table functional.alltypes partition(year, month)
+select * from functional.alltypes;
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# NON-PARTITIONED; DEFAULT: NOCLUSTERED; EXPECT: NO SORT, NO EXCHANGE;
+insert into table functional.alltypesnopart select * from functional.alltypesnopart;
+---- PLAN
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypesnopart]
+   HDFS partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypesnopart]
+   HDFS partitions=1/1 files=0 size=0B
+   row-size=72B cardinality=0
+====
+# PARTITIONED; DEFAULT: NOCLUSTERED; PLAN HINT: CLUSTERED; EXPECT: SORT, EXCHANGE;
+insert into table functional.alltypes partition(year, month) /* +clustered */
+select * from functional.alltypes;
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# PARTITIONED; DEFAULT: NOCLUSTERED; PLAN HINT: SHUFFLE; EXPECT: SORT, EXCHANGE;
+insert into table functional.alltypes partition(year, month) /* +shuffle */
+select * from functional.alltypes;
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# PARTITIONED; DEFAULT: NOCLUSTERED; PLAN HINT: NOSHUFFLE; EXPECT: SORT, NO EXCHANGE;
+insert into table functional.alltypes partition(year, month) /* +noshuffle */
+select * from functional.alltypes;
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====

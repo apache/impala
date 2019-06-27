@@ -521,4 +521,10 @@ public class AnalysisContext {
 
   public Analyzer getAnalyzer() { return analysisResult_.getAnalyzer(); }
   public EventSequence getTimeline() { return timeline_; }
+  // This should only be called after analyzeAndAuthorize().
+  public AnalysisResult getAnalysisResult() {
+    Preconditions.checkNotNull(analysisResult_);
+    Preconditions.checkNotNull(analysisResult_.stmt_);
+    return analysisResult_;
+  }
 }

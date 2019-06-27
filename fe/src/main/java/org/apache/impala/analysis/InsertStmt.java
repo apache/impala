@@ -837,11 +837,30 @@ public class InsertStmt extends StatementBase {
   }
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
-    if (planHints_.isEmpty()) return;
+    // If there are no hints then early exit.
+    if (planHints_.isEmpty() &&
+        !(analyzer.getQueryOptions().isSetDefault_hints_insert_statement())) return;
+
     if (table_ instanceof FeHBaseTable) {
-      throw new AnalysisException(String.format("INSERT hints are only supported for " +
-          "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
+      if (!planHints_.isEmpty()) {
+        throw new AnalysisException(String.format("INSERT hints are only supported for " +
+            "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
+      }
+      // Insert hints are not supported for HBase table so ignore any default hints.
+      return;
     }
+
+    // Set up the plan hints from query option DEFAULT_HINTS_INSERT_STATEMENT.
+    // Default hint is ignored, if the original statement had hints.
+    if (planHints_.isEmpty() &&
+        analyzer.getQueryOptions().isSetDefault_hints_insert_statement()) {
+      String defaultHints =
+        analyzer.getQueryOptions().getDefault_hints_insert_statement();
+      for (String hint: defaultHints.trim().split(":")) {
+        planHints_.add(new PlanHint(hint.trim()));
+      }
+    }
+
     for (PlanHint hint: planHints_) {
       if (hint.is("SHUFFLE")) {
         hasShuffleHint_ = true;

@@ -225,6 +225,41 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
   }
 
+  /**
+   * Test default hints applied during analysis.
+   */
+  public void testDefaultHintApplied(AnalysisContext insertCtx) {
+    String defaultHints =
+        insertCtx.getQueryOptions().getDefault_hints_insert_statement();
+    List<PlanHint> planHints =
+        insertCtx.getAnalysisResult().getInsertStmt().getPlanHints();
+    String[] defaultHintsArray = defaultHints.trim().split(":");
+    Assert.assertEquals(defaultHintsArray.length, planHints.size());
+    for (String hint: defaultHintsArray) {
+      Assert.assertTrue(planHints.contains(new PlanHint(hint.trim())));
+    }
+  }
+
+  /**
+   * Test default hints ignored when query has plan hints.
+   */
+  public void testDefaultHintIgnored(String query, String defaultHints) {
+    // Analyze query with out default hints.
+    AnalysisContext insertCtx = createAnalysisCtx();
+    AnalyzesOk(query, insertCtx);
+    List<PlanHint> planHints =
+        insertCtx.getAnalysisResult().getInsertStmt().getPlanHints();
+
+    // Analyze query with default hints.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement(defaultHints);
+    AnalyzesOk(query, insertCtx);
+    List<PlanHint> planHintsWithDefaultHints =
+        insertCtx.getAnalysisResult().getInsertStmt().getPlanHints();
+
+    // Default hint should be ignored when plan hints exist.
+    Assert.assertEquals(planHints, planHintsWithDefaultHints);
+  }
+
   @Test
   public void TestCollectionTableRefs() throws AnalysisException {
     // Test ARRAY type referenced as a table.
@@ -1990,6 +2025,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "functional.alltypes", prefix, suffix),
           "Insert statement has 'noclustered' hint, but table has 'sort.columns' " +
           "property. The 'noclustered' hint will be ignored.");
+
+      // Default hints should be ignored when query has plan hints.
+      testDefaultHintIgnored(String.format(
+          "insert into functional.alltypes partition (year, month) " +
+          "%snoclustered,shuffle%s select * from functional.alltypes",
+          prefix, suffix),
+          "CLUSTERED");
+      testDefaultHintIgnored(String.format(
+          "insert into functional_kudu.alltypes " +
+          "%snoclustered,shuffle%s select * from functional.alltypes",
+          prefix, suffix),
+          "CLUSTERED : NOSHUFFLE ");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.
@@ -1999,6 +2046,59 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("insert into table functional.alltypessmall " +
         "partition (year, month) [shuffle, ShUfFlE] " +
         "select * from functional.alltypes");
+
+    // Test default hints.
+    AnalysisContext insertCtx = createAnalysisCtx();
+    // Bad hint returns a warning.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("badhint");
+    AnalyzesOk("insert into functional.alltypessmall partition (year, month) " +
+        "select * from functional.alltypes",
+        insertCtx,
+        "INSERT hint not recognized: badhint");
+    // Bad hint returns a warning.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement(
+        "clustered:noshuffle:badhint");
+    AnalyzesOk("insert into functional.alltypessmall partition (year, month) " +
+        "select * from functional.alltypes",
+        insertCtx,
+        "INSERT hint not recognized: badhint");
+    // Conflicting hints return an error.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement(
+        "clustered:noclustered");
+    AnalysisError("insert into functional.alltypessmall partition (year, month) " +
+        "select * from functional.alltypes",
+        insertCtx,
+        "Conflicting INSERT hints: clustered and noclustered");
+    // Conflicting hints return an error.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("shuffle:noshuffle");
+    AnalysisError("insert into functional.alltypessmall partition (year, month) " +
+        "select * from functional.alltypes",
+        insertCtx,
+        "Conflicting INSERT hints: shuffle and noshuffle");
+    // Default hints ignored for HBase table.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("noclustered");
+    AnalyzesOk("insert into table functional_hbase.alltypes " +
+        "select * from functional_hbase.alltypes",
+        insertCtx);
+    // Default hints are ok for Kudu table.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("clustered:noshuffle");
+    AnalyzesOk(String.format("insert into table functional_kudu.alltypes " +
+        "select * from functional_kudu.alltypes"),
+        insertCtx);
+    testDefaultHintApplied(insertCtx);
+    // Default hints are ok for partitioned Hdfs tables.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement(
+        "NOCLUSTERED:noshuffle");
+    AnalyzesOk("insert into functional.alltypessmall partition (year, month) " +
+        "select * from functional.alltypes",
+        insertCtx);
+    testDefaultHintApplied(insertCtx);
+    // Default hints are ok for non partitioned Hdfs tables.
+    insertCtx.getQueryOptions().setDefault_hints_insert_statement("CLUSTERED:SHUFFLE");
+    AnalyzesOk("insert into functional.alltypesnopart " +
+        "select * from functional.alltypesnopart",
+        insertCtx);
+    testDefaultHintApplied(insertCtx);
   }
 
   @Test

@@ -400,6 +400,10 @@ enum TImpalaQueryOptions {
   // Disable the attempt to compute an estimated number of rows in an
   // hdfs table.
   DISABLE_HDFS_NUM_ROWS_ESTIMATE = 83
+
+  // Default hints for insert statement. Will be overridden by hints in the INSERT
+  // statement, if any.
+  DEFAULT_HINTS_INSERT_STATEMENT = 84
 }
 
 // The summary of a DML statement.
