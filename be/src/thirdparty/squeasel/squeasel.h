@@ -88,18 +88,29 @@ struct sq_request_info {
   } http_headers[64];         // Maximum 64 headers
 };
 
+typedef enum sq_callback_result {
+  // The callback didn't handle the request, and squeasel should
+  // continue with request processing.
+  SQ_CONTINUE_HANDLING = 0,
+  // The callback handled the request, and the connection is still
+  // in a valid state.
+  SQ_HANDLED_OK = 1,
+  // The callback handled the request, but no more requests should
+  // be read from this connection (eg the request was invalid).
+  SQ_HANDLED_CLOSE_CONNECTION = 2
+} sq_callback_result_t;
 
 // This structure needs to be passed to sq_start(), to let squeasel know
 // which callbacks to invoke. For detailed description, see
 // https://github.com/cloudera/squeasel/blob/master/UserManual.md
 struct sq_callbacks {
   // Called when squeasel has received new HTTP request.
-  // If callback returns non-zero,
+  // If callback returns one of the SQ_HANDLED_* results,
   // callback must process the request by sending valid HTTP headers and body,
   // and squeasel will not do any further processing.
-  // If callback returns 0, squeasel processes the request itself. In this case,
-  // callback must not send any data to the client.
-  int  (*begin_request)(struct sq_connection *);
+  // If callback returns SQ_CONTINUE_HANDLING, squeasel processes the request itself.
+  // In this case, callback must not send any data to the client.
+  sq_callback_result_t (*begin_request)(struct sq_connection *);
 
   // Called when squeasel has finished processing request.
   void (*end_request)(const struct sq_connection *, int reply_status_code);

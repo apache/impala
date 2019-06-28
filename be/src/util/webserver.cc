@@ -112,10 +112,6 @@ DECLARE_string(ssl_cipher_list);
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
 
-// Easy-to-read constants for Squeasel return codes
-static const uint32_t PROCESSING_COMPLETE = 1;
-static const uint32_t NOT_PROCESSED = 0;
-
 // Standard key in the json document sent to templates for rendering. Must be kept in
 // sync with the templates themselves.
 static const char* COMMON_JSON_KEY = "__common__";
@@ -391,23 +387,24 @@ int Webserver::LogMessageCallbackStatic(const struct sq_connection* connection,
   if (message != nullptr) {
     LOG(INFO) << "Webserver: " << message;
   }
-  return PROCESSING_COMPLETE;
+  return SQ_HANDLED_OK;
 }
 
-int Webserver::BeginRequestCallbackStatic(struct sq_connection* connection) {
+sq_callback_result_t Webserver::BeginRequestCallbackStatic(
+    struct sq_connection* connection) {
   struct sq_request_info* request_info = sq_get_request_info(connection);
   Webserver* instance = reinterpret_cast<Webserver*>(request_info->user_data);
   return instance->BeginRequestCallback(connection, request_info);
 }
 
-int Webserver::BeginRequestCallback(struct sq_connection* connection,
+sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* connection,
     struct sq_request_info* request_info) {
   if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
     if (strncmp(DOC_FOLDER, request_info->uri, DOC_FOLDER_LEN) == 0) {
       VLOG(2) << "HTTP File access: " << request_info->uri;
       // Let Squeasel deal with this request; returning NULL will fall through
       // to the default handler which will serve files.
-      return NOT_PROCESSED;
+      return SQ_CONTINUE_HANDLING;
     }
   }
 
@@ -445,7 +442,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
       sq_printf(connection,
                 "HTTP/1.1 %s\r\n",
                 HttpStatusCodeToString(HttpStatusCode::LengthRequired).c_str());
-      return 1;
+      return SQ_HANDLED_OK;
     }
     if (content_len > FLAGS_webserver_max_post_length_bytes) {
       // TODO: for this and other HTTP requests, we should log the
@@ -454,7 +451,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
       sq_printf(connection,
                 "HTTP/1.1 %s\r\n",
                 HttpStatusCodeToString(HttpStatusCode::RequestEntityTooLarge).c_str());
-      return 1;
+      return SQ_HANDLED_CLOSE_CONNECTION;
     }
 
     char buf[8192];
@@ -468,7 +465,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
         sq_printf(connection,
                   "HTTP/1.1 %s\r\n",
                   HttpStatusCodeToString(HttpStatusCode::InternalServerError).c_str());
-        return 1;
+        return SQ_HANDLED_CLOSE_CONNECTION;
       }
 
       req.post_data.append(buf, n);
@@ -501,7 +498,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
 
   // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
   sq_write(connection, str.c_str(), str.length());
-  return PROCESSING_COMPLETE;
+  return SQ_HANDLED_OK;
 }
 
 void Webserver::RenderUrlWithTemplate(const WebRequest& req,

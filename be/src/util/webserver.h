@@ -156,10 +156,11 @@ class Webserver {
 
   /// Squeasel callback for HTTP request events. Static so that it can act as a function
   /// pointer, and then call the next method. Returns squeasel success code.
-  static int BeginRequestCallbackStatic(struct sq_connection* connection);
+  static sq_callback_result_t BeginRequestCallbackStatic(
+      struct sq_connection* connection);
 
   /// Dispatch point for all incoming requests. Returns squeasel success code.
-  int BeginRequestCallback(struct sq_connection* connection,
+  sq_callback_result_t BeginRequestCallback(struct sq_connection* connection,
       struct sq_request_info* request_info);
 
   /// Renders URLs through the Mustache templating library.

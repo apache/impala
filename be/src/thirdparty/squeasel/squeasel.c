@@ -923,6 +923,18 @@ static int64_t push(FILE *fp, SOCKET sock, SSL *ssl, const char *buf,
   return sent;
 }
 
+// Wait for either 'fd' or 'wakeup_fds' to have readable data.
+static void wait_for_readable_or_wakeup(struct sq_context *ctx,
+    int fd, int timeout_ms) {
+  struct pollfd pfd[2];
+  pfd[0].fd = fd;
+  pfd[0].events = POLLIN;
+  pfd[1].fd = ctx->wakeup_fds[0];
+  pfd[1].events = POLLIN;
+  int poll_rc;
+  RETRY_ON_EINTR(poll_rc, poll(pfd, 2, timeout_ms));
+}
+
 // Read from IO channel - opened file descriptor, socket, or SSL descriptor.
 // Return negative value on error, or number of bytes read on success.
 static int pull(FILE *fp, struct sq_connection *conn, char *buf, int len) {
@@ -939,7 +951,7 @@ static int pull(FILE *fp, struct sq_connection *conn, char *buf, int len) {
 #endif
   } else {
     RETRY_ON_EINTR(nread, recv(conn->client.sock, buf, (size_t) len, 0));
-    if (nread == -1) {
+    if (nread == -1 && errno != EAGAIN) {
       cry(conn, "error reading: %s", strerror(errno));
     }
   }
@@ -2535,6 +2547,14 @@ static int read_request(FILE *fp, struct sq_connection *conn,
   int request_len, n = 0;
 
   request_len = get_request_len(buf, *nread);
+  if (request_len == 0) {
+    // If we are starting to read a new request, with nothing buffered,
+    // wait for either the beginning of the request, or for the shutdown
+    // signal.
+    wait_for_readable_or_wakeup(conn->ctx, fp ? fileno(fp) : conn->client.sock,
+        atoi(conn->ctx->config[REQUEST_TIMEOUT]));
+  }
+
   while (conn->ctx->stop_flag == 0 &&
          *nread < bufsiz && request_len == 0 &&
          (n = pull(fp, conn, buf + *nread, bufsiz - *nread)) > 0) {
@@ -3850,6 +3870,7 @@ static void handle_request(struct sq_connection *conn) {
   char path[PATH_MAX];
   int uri_len, ssl_index;
   struct file file = STRUCT_FILE_INITIALIZER;
+  sq_callback_result_t callback_result = SQ_HANDLED_OK;
 
   if ((conn->request_info.query_string = strchr(ri->uri, '?')) != NULL) {
     * ((char *) conn->request_info.query_string++) = '\0';
@@ -3871,8 +3892,10 @@ static void handle_request(struct sq_connection *conn) {
              !check_authorization(conn, path)) {
     send_authorization_request(conn);
   } else if (conn->ctx->callbacks.begin_request != NULL &&
-      conn->ctx->callbacks.begin_request(conn)) {
+      ((callback_result = conn->ctx->callbacks.begin_request(conn))
+          != SQ_CONTINUE_HANDLING)) {
     // Do nothing, callback has served the request
+    conn->must_close = (callback_result == SQ_HANDLED_CLOSE_CONNECTION);
 #if defined(USE_WEBSOCKET)
   } else if (is_websocket_request(conn)) {
     handle_websocket_request(conn);
@@ -4313,11 +4336,12 @@ static int set_ssl_option(struct sq_context *ctx) {
     EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
     if (ecdh == NULL) {
       cry(fc(ctx), "EC_KEY_new_by_curve_name: %s", ssl_error());
-    }
-
-    int rc = SSL_CTX_set_tmp_ecdh(ctx->ssl_ctx, ecdh);
-    if (rc <= 0) {
-      cry(fc(ctx), "SSL_CTX_set_tmp_ecdh: %s", ssl_error());
+    } else {
+      int rc = SSL_CTX_set_tmp_ecdh(ctx->ssl_ctx, ecdh);
+      if (rc <= 0) {
+        cry(fc(ctx), "SSL_CTX_set_tmp_ecdh: %s", ssl_error());
+      }
+      EC_KEY_free(ecdh);
     }
 #elif OPENSSL_VERSION_NUMBER < 0x10100000L
     // OpenSSL 1.0.2 provides the set_ecdh_auto API which internally figures out
@@ -4459,7 +4483,14 @@ static int is_valid_uri(const char *uri) {
   return uri[0] == '/' || (uri[0] == '*' && uri[1] == '\0');
 }
 
-static int getreq(struct sq_connection *conn, char *ebuf, size_t ebuf_len) {
+
+typedef enum {
+  GETREQ_OK,
+  GETREQ_KEEPALIVE_TIMEOUT,
+  GETREQ_ERROR
+} GetReqResult;
+
+static GetReqResult getreq(struct sq_connection *conn, char *ebuf, size_t ebuf_len) {
   const char *cl;
 
   ebuf[0] = '\0';
@@ -4470,11 +4501,13 @@ static int getreq(struct sq_connection *conn, char *ebuf, size_t ebuf_len) {
 
   if (conn->request_len == 0 && conn->data_len == conn->buf_size) {
     snprintf(ebuf, ebuf_len, "%s", "Request Too Large");
+    return GETREQ_ERROR;
   } else if (conn->request_len <= 0) {
-    snprintf(ebuf, ebuf_len, "%s", "Client closed connection");
+    return GETREQ_KEEPALIVE_TIMEOUT;
   } else if (parse_http_message(conn->buf, conn->buf_size,
                                 &conn->request_info) <= 0) {
     snprintf(ebuf, ebuf_len, "Bad request: [%.*s]", conn->data_len, conn->buf);
+    return GETREQ_ERROR;
   } else {
     // Request is valid
     if ((cl = get_header(&conn->request_info, "Content-Length")) != NULL) {
@@ -4487,7 +4520,7 @@ static int getreq(struct sq_connection *conn, char *ebuf, size_t ebuf_len) {
     }
     conn->birth_time = time(NULL);
   }
-  return ebuf[0] == '\0';
+  return GETREQ_OK;
 }
 
 struct sq_connection *sq_download(const char *host, int port, int use_ssl,
@@ -4517,6 +4550,7 @@ static void process_new_connection(struct sq_connection *conn) {
   struct sq_request_info *ri = &conn->request_info;
   int keep_alive_enabled, keep_alive, discard_len;
   char ebuf[100];
+  GetReqResult getreq_status;
 
   keep_alive_enabled = !strcmp(conn->ctx->config[ENABLE_KEEP_ALIVE], "yes");
   keep_alive = 0;
@@ -4525,8 +4559,11 @@ static void process_new_connection(struct sq_connection *conn) {
   // to crule42.
   conn->data_len = 0;
   do {
-    if (!getreq(conn, ebuf, sizeof(ebuf))) {
-      send_http_error(conn, 500, "Server Error", "%s", ebuf);
+    getreq_status = getreq(conn, ebuf, sizeof(ebuf));
+    if (getreq_status != GETREQ_OK) {
+      if (getreq_status == GETREQ_ERROR) {
+        send_http_error(conn, 500, "Server Error", "%s", ebuf);
+      }
       conn->must_close = 1;
     } else if (!is_valid_uri(conn->request_info.uri)) {
       char* encoded = (char*) malloc(SQ_BUF_LEN);
@@ -4540,7 +4577,7 @@ static void process_new_connection(struct sq_connection *conn) {
       send_http_error(conn, 505, "Bad HTTP version", "%s", ebuf);
     }
 
-    if (ebuf[0] == '\0') {
+    if (getreq_status == GETREQ_OK) {
       handle_request(conn);
       if (conn->ctx->callbacks.end_request != NULL) {
         conn->ctx->callbacks.end_request(conn, conn->status_code);
