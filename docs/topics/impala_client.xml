@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intro_client">
+
+  <title>Impala Client Access</title>
+
+  <conbody>
+
+    <p>
+      Application developers have a number of options to interface with Impala. The core
+      development language with Impala is SQL. You can also use Java or other languages to
+      interact with Impala through the standard JDBC and ODBC interfaces used by many business
+      intelligence tools. For specialized kinds of analysis, you can supplement the Impala
+      built-in functions by writing user-defined functions in C++ or Java.
+    </p>
+
+    <p>
+      You can connect and submit requests to the Impala through:
+    </p>
+
+    <ul>
+      <li>
+        The impala-shell interactive command interpreter
+      </li>
+
+      <li>
+        The Hue web-based user interface
+      </li>
+
+      <li>
+        JDBC
+      </li>
+
+      <li>
+        ODBC
+      </li>
+    </ul>
+
+    <p>
+      Each <codeph>impalad</codeph> daemon process, running on separate nodes in a cluster,
+      listens to <xref href="impala_ports.xml#ports">several ports</xref> for incoming requests:
+    </p>
+
+    <ul>
+      <li>
+        Requests from <codeph>impala-shell</codeph> and Hue are routed to the
+        <codeph>impalad</codeph> daemons through the same port.
+      </li>
+
+      <li>
+        The <codeph>impalad</codeph> daemons listen on separate ports for JDBC and ODBC
+        requests.
+      </li>
+    </ul>
+
+    <section id="section_egg_wjt_f3b">
+
+      <title>Impala Startup Options for Client Connections</title>
+
+      <p>
+        The following options control client connections to Impala.
+      </p>
+
+      <dl>
+        <dlentry>
+
+          <dt>
+            --fe_service_threads
+          </dt>
+
+          <dd>
+            Specifies the maximum number of concurrent client connections allowed. The default
+            value is 64 with which 64 queries can run simultaneously.
+            <p>
+              If you have more clients trying to connect to Impala than the value of this
+              setting, the later arriving clients have to wait for the duration specified by
+              <codeph>--accepted_client_cnxn_timeout</codeph>. You can increase this value to
+              allow more client connections. However, a large value means more threads to be
+              maintained even if most of the connections are idle, and it could negatively
+              impact query latency. Client applications should use the connection pool to avoid
+              need for large number of sessions.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --accepted_client_cnxn_timeout
+          </dt>
+
+          <dd>
+            Controls how Impala treats new connection requests if it has run out of the number
+            of threads configured by <codeph>--fe_service_threads</codeph>.
+            <p>
+              If <codeph>--accepted_client_cnxn_timeout > 0</codeph>, new connection requests
+              are rejected if Impala can't get a server thread within the specified (in seconds)
+              timeout.
+            </p>
+
+            <p>
+              If <codeph>--accepted_client_cnxn_timeout=0</codeph>, i.e. no timeout, clients
+              wait indefinitely to open the new session until more threads are available.
+            </p>
+
+            <p>
+              The default timeout is 5 minutes.
+            </p>
+
+            <p>
+              The timeout applies only to client facing thrift servers, i.e., HS2 and Beeswax
+              servers.
+            </p>
+          </dd>
+
+        </dlentry>
+      </dl>
+
+    </section>
+
+  </conbody>
+
+</concept>

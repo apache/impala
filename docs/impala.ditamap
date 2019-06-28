@@ -56,8 +56,6 @@ under the License.
   </topicref>
   <topicref audience="standalone" href="topics/impala_config.xml">
     <topicref href="topics/impala_config_performance.xml"/>
-    <topicref href="topics/impala_odbc.xml"/>
-    <topicref href="topics/impala_jdbc.xml"/>
   </topicref>
   <topicref audience="standalone" href="topics/impala_upgrading.xml"/>
   <topicref audience="standalone" href="topics/impala_processes.xml">
@@ -277,12 +275,7 @@ under the License.
     <topicref href="topics/impala_langref_unsupported.xml"/>
     <topicref href="topics/impala_porting.xml"/>
   </topicref>
-  <topicref href="topics/impala_impala_shell.xml">
-    <topicref href="topics/impala_shell_options.xml"/>
-    <topicref href="topics/impala_connecting.xml"/>
-    <topicref href="topics/impala_shell_running_commands.xml"/>
-    <topicref href="topics/impala_shell_commands.xml"/>
-  </topicref>
+  
   <topicref href="topics/impala_performance.xml">
     <topicref href="topics/impala_perf_cookbook.xml"/>
     <topicref href="topics/impala_perf_joins.xml"/>
@@ -320,6 +313,16 @@ under the License.
   <topicref rev="2.9.0" href="topics/impala_adls.xml"/>
   <topicref href="topics/impala_isilon.xml"/>
   <topicref href="topics/impala_logging.xml"/>
+  <topicref href="topics/impala_client.xml">
+    <topicref href="topics/impala_impala_shell.xml">
+      <topicref href="topics/impala_shell_options.xml"/>
+      <topicref href="topics/impala_connecting.xml"/>
+      <topicref href="topics/impala_shell_running_commands.xml"/>
+      <topicref href="topics/impala_shell_commands.xml"/>
+    </topicref>
+    <topicref href="topics/impala_odbc.xml"/>
+    <topicref href="topics/impala_jdbc.xml"/>
+  </topicref>
   <topicref href="topics/impala_troubleshooting.xml">
     <topicref href="topics/impala_webui.xml"/>
     <topicref href="topics/impala_breakpad.xml"/>

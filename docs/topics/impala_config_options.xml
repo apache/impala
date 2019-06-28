@@ -294,53 +294,6 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
   </concept>
 
-  <concept id="config_options_impalad">
-
-    <title>Startup Options for impalad Daemon</title>
-
-    <conbody>
-
-      <p>
-        The <codeph>impalad</codeph> daemon implements the main Impala service, which performs
-        query processing and reads from and writes to the data files. Some of the noteworthy
-        options are:
-        <ul>
-          <li>
-            The <codeph>&#8209;&#8209;fe_service_threads</codeph> option specifies the maximum
-            number of concurrent client connections allowed. The default value is 64 with which
-            64 queries can run simultaneously.
-            <p>
-              If you have more clients trying to connect to Impala than the value of this
-              setting, the later arriving clients have to wait until previous clients
-              disconnect. You can increase this value to allow more client connections. However,
-              a large value means more threads to be maintained even if most of the connections
-              are idle, and it could negatively impact query latency. Client applications should
-              use the connection pool to avoid need for large number of sessions.
-            </p>
-          </li>
-        </ul>
-      </p>
-
-    </conbody>
-
-  </concept>
-
-  <concept id="config_options_statestored">
-
-    <title>Startup Options for statestored Daemon</title>
-
-    <conbody>
-
-      <p>
-        The <cmdname>statestored</cmdname> daemon implements the Impala StateStore service,
-        which monitors the availability of Impala services across the cluster, and handles
-        situations such as nodes becoming unavailable or becoming available again.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept rev="1.2" id="config_options_catalogd">
 
     <title>Startup Options for catalogd Daemon</title>
