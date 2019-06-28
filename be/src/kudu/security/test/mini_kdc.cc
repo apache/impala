@@ -25,6 +25,7 @@
 #include <string>
 #include <utility>
 
+#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 
 #include "kudu/gutil/strings/strip.h"
@@ -37,6 +38,7 @@
 #include "kudu/util/subprocess.h"
 #include "kudu/util/test_util.h"
 
+using boost::none;
 using std::map;
 using std::string;
 using std::unique_ptr;
@@ -61,9 +63,7 @@ MiniKdc::MiniKdc(MiniKdcOptions options)
     options_.realm = "KRBTEST.COM";
   }
   if (options_.data_root.empty()) {
-    // We hardcode "/tmp" here since the original function which initializes a random test
-    // directory (GetTestDataDirectory()), depends on gmock.
-    options_.data_root = JoinPathSegments("/tmp", "krb5kdc");
+    options_.data_root = JoinPathSegments(GetTestDataDirectory(), "krb5kdc");
   }
   if (options_.ticket_lifetime.empty()) {
     options_.ticket_lifetime = "24h";
@@ -152,8 +152,10 @@ Status MiniKdc::Start() {
   RETURN_NOT_OK(kdc_process_->Start());
 
   const bool need_config_update = (options_.port == 0);
-  // Wait for KDC to start listening on its ports and commencing operation.
-  RETURN_NOT_OK(WaitForUdpBind(kdc_process_->pid(), &options_.port, MonoDelta::FromSeconds(1)));
+  // Wait for KDC to start listening on its ports and commencing operation
+  // with a wildcard binding.
+  RETURN_NOT_OK(WaitForUdpBind(kdc_process_->pid(), &options_.port,
+                               /*addr=*/none, MonoDelta::FromSeconds(1)));
 
   if (need_config_update) {
     // If we asked for an ephemeral port, grab the actual ports and
@@ -271,6 +273,28 @@ Status MiniKdc::CreateServiceKeytab(const string& spn,
   RETURN_NOT_OK(Subprocess::Call(MakeArgv({
           kadmin, "-q", Substitute("ktadd -k $0 $1", kt_path, spn)})));
   *path = kt_path;
+  return Status::OK();
+}
+
+Status MiniKdc::RandomizePrincipalKey(const string& spn) {
+  SCOPED_LOG_SLOW_EXECUTION(WARNING, 100, Substitute("randomizing key for $0", spn));
+  string kadmin;
+  RETURN_NOT_OK(GetBinaryPath("kadmin.local", &kadmin));
+  RETURN_NOT_OK(Subprocess::Call(MakeArgv({
+          kadmin, "-q", Substitute("change_password -randkey $0", spn)})));
+  return Status::OK();
+}
+
+Status MiniKdc::CreateKeytabForExistingPrincipal(const string& spn) {
+  SCOPED_LOG_SLOW_EXECUTION(WARNING, 100, Substitute("creating keytab for $0", spn));
+  string kt_path = spn;
+  StripString(&kt_path, "/", '_');
+  kt_path = JoinPathSegments(options_.data_root, kt_path) + ".keytab";
+
+  string kadmin;
+  RETURN_NOT_OK(GetBinaryPath("kadmin.local", &kadmin));
+  RETURN_NOT_OK(Subprocess::Call(MakeArgv({
+          kadmin, "-q", Substitute("xst -norandkey -k $0 $1", kt_path, spn)})));
   return Status::OK();
 }
 

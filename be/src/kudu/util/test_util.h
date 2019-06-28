@@ -26,10 +26,18 @@
 #include <memory>
 #include <string>
 
+#include <boost/optional/optional.hpp>
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/port.h"
 #include "kudu/util/monotime.h"
+
+#define SKIP_IF_SLOW_NOT_ALLOWED() do { \
+  if (!AllowSlowTests()) { \
+    LOG(WARNING) << "test is skipped; set KUDU_ALLOW_SLOW_TESTS=1 to run"; \
+    return; \
+  } \
+} while (0)
 
 #define ASSERT_EVENTUALLY(expr) do { \
   AssertEventually(expr); \
@@ -136,11 +144,26 @@ void AssertEventually(const std::function<void(void)>& f,
 // unlike the usual behavior of path globs.
 int CountOpenFds(Env* env, const std::string& path_pattern);
 
-// Waits for the subprocess to bind to any listening TCP port, and returns the port.
-Status WaitForTcpBind(pid_t pid, uint16_t* port, MonoDelta timeout) WARN_UNUSED_RESULT;
+// Waits for the subprocess to bind to any listening TCP port on the provided
+// IP address (if the address is not provided, it is a wildcard binding), and
+// returns the port.
+Status WaitForTcpBind(pid_t pid, uint16_t* port,
+                      const boost::optional<const std::string&>& addr,
+                      MonoDelta timeout) WARN_UNUSED_RESULT;
 
-// Waits for the subprocess to bind to any listening UDP port, and returns the port.
-Status WaitForUdpBind(pid_t pid, uint16_t* port, MonoDelta timeout) WARN_UNUSED_RESULT;
+// Similar to above but binds to any listening UDP port.
+Status WaitForUdpBind(pid_t pid, uint16_t* port,
+                      const boost::optional<const std::string&>& addr,
+                      MonoDelta timeout) WARN_UNUSED_RESULT;
+
+// Find the home directory of a Java-style application, e.g. JAVA_HOME or
+// HADOOP_HOME.
+//
+// Checks the environment, or falls back to a symlink in the bin installation
+// directory.
+Status FindHomeDir(const std::string& name,
+                   const std::string& bin_dir,
+                   std::string* home_dir) WARN_UNUSED_RESULT;
 
 } // namespace kudu
 #endif
