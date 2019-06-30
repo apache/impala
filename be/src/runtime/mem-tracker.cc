@@ -412,13 +412,14 @@ MemTracker* MemTracker::GetQueryMemTracker() {
   return tracker;
 }
 
-Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& details,
-    int64_t failed_allocation_size) {
+Status MemTracker::MemLimitExceeded(MemTracker* mtracker, RuntimeState* state,
+    const std::string& details, int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
   stringstream ss;
   if (details.size() != 0) ss << details << endl;
   if (failed_allocation_size != 0) {
-    ss << label() << " could not allocate "
+    if (mtracker != nullptr) ss << mtracker->label();
+    ss << " could not allocate "
        << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
        << " without exceeding limit." << endl;
   }
@@ -432,14 +433,18 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
      << PrettyPrinter::Print(process_capacity, TUnit::BYTES) << endl;
 
   // Always log the query tracker (if available).
-  MemTracker* query_tracker = GetQueryMemTracker();
-  if (query_tracker != nullptr) {
-    if (query_tracker->has_limit()) {
-      const int64_t query_capacity = query_tracker->limit() - query_tracker->consumption();
-      ss << "Memory left in query limit: "
-         << PrettyPrinter::Print(query_capacity, TUnit::BYTES) << endl;
+  MemTracker* query_tracker = nullptr;
+  if (mtracker != nullptr) {
+    query_tracker = mtracker->GetQueryMemTracker();
+    if (query_tracker != nullptr) {
+      if (query_tracker->has_limit()) {
+        const int64_t query_capacity =
+            query_tracker->limit() - query_tracker->consumption();
+        ss << "Memory left in query limit: "
+           << PrettyPrinter::Print(query_capacity, TUnit::BYTES) << endl;
+      }
+      ss << query_tracker->LogUsage(UNLIMITED_DEPTH);
     }
-    ss << query_tracker->LogUsage(UNLIMITED_DEPTH);
   }
 
   // Log the process level if the process tracker is close to the limit or

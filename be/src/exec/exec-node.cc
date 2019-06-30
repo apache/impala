@@ -393,7 +393,8 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
         ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
     return Status::OK();
   } else if (debug_options_.action == TDebugAction::MEM_LIMIT_EXCEEDED) {
-    return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
+    return MemTracker::MemLimitExceeded(
+        mem_tracker(), state, "Debug Action: MEM_LIMIT_EXCEEDED");
   } else if (debug_options_.action == TDebugAction::SET_DENY_RESERVATION_PROBABILITY) {
     // We can only enable the debug action if the buffer pool client is registered.
     // If the buffer client is not registered at this point (e.g. if phase is PREPARE or
