@@ -190,6 +190,12 @@ public class Frontend {
     protected final StringBuilder explainBuf_;
     // Flag to indicate whether to capture (return) the plan.
     protected boolean capturePlan_;
+    // Flag to control whether the descriptor table is serialized. This defaults to
+    // true, but some frontend tests set it to false because they are operating on
+    // incomplete structures (e.g. THdfsTable without nullPartitionKeyValue) that cannot
+    // be serialized.
+    protected boolean serializeDescTbl_ = true;
+
     // The physical plan, divided by fragment, before conversion to
     // Thrift. For unit testing.
     protected List<PlanFragment> plan_;
@@ -209,6 +215,8 @@ public class Frontend {
      */
     public void requestPlanCapture() { capturePlan_ = true; }
     public boolean planCaptureRequested() { return capturePlan_; }
+    public void disableDescTblSerialization() { serializeDescTbl_ = false; }
+    public boolean serializeDescTbl() { return serializeDescTbl_; }
     public TQueryCtx getQueryContext() { return queryCtx_; }
 
     /**
@@ -1428,8 +1436,13 @@ public class Frontend {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     Planner planner = new Planner(analysisResult, queryCtx, timeline);
     TQueryExecRequest queryExecRequest = createExecRequest(planner, planCtx);
-    queryCtx.setDesc_tbl(
-        planner.getAnalysisResult().getAnalyzer().getDescTbl().toThrift());
+    if (planCtx.serializeDescTbl()) {
+      queryCtx.setDesc_tbl_serialized(
+          planner.getAnalysisResult().getAnalyzer().getDescTbl().toSerializedThrift());
+    } else {
+      queryCtx.setDesc_tbl_testonly(
+          planner.getAnalysisResult().getAnalyzer().getDescTbl().toThrift());
+    }
     queryExecRequest.setQuery_ctx(queryCtx);
     queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());
     return queryExecRequest;

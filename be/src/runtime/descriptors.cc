@@ -32,6 +32,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "rpc/thrift-util.h"
 #include "runtime/runtime-state.h"
 
 #include "common/names.h"
@@ -520,8 +521,19 @@ Status DescriptorTbl::CreatePartKeyExprs(
   return Status::OK();
 }
 
-Status DescriptorTbl::CreateHdfsTblDescriptor(const TDescriptorTable& thrift_tbl,
+Status DescriptorTbl::DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
+    TDescriptorTable* desc_tbl) {
+  uint32_t serial_tbl_len = serial_tbl.thrift_desc_tbl.length();
+  return DeserializeThriftMsg(
+      reinterpret_cast<const uint8_t*>(serial_tbl.thrift_desc_tbl.data()),
+      &serial_tbl_len, false, desc_tbl);
+}
+
+Status DescriptorTbl::CreateHdfsTblDescriptor(
+    const TDescriptorTableSerialized& serialized_thrift_tbl,
     TableId tbl_id, ObjectPool* pool, HdfsTableDescriptor** desc) {
+  TDescriptorTable thrift_tbl;
+  RETURN_IF_ERROR(DeserializeThrift(serialized_thrift_tbl, &thrift_tbl));
   for (const TTableDescriptor& tdesc: thrift_tbl.tableDescriptors) {
     if (tdesc.id == tbl_id) {
       DCHECK(tdesc.__isset.hdfsTable);
@@ -560,7 +572,14 @@ Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
   return Status::OK();
 }
 
-Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
+Status DescriptorTbl::Create(ObjectPool* pool,
+    const TDescriptorTableSerialized& serialized_thrift_tbl, DescriptorTbl** tbl) {
+  TDescriptorTable thrift_tbl;
+  RETURN_IF_ERROR(DeserializeThrift(serialized_thrift_tbl, &thrift_tbl));
+  return CreateInternal(pool, thrift_tbl, tbl);
+}
+
+Status DescriptorTbl::CreateInternal(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
     DescriptorTbl** tbl) {
   *tbl = pool->Add(new DescriptorTbl());
   // deserialize table descriptors first, they are being referenced by tuple descriptors

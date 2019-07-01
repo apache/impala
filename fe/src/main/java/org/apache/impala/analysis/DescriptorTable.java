@@ -31,8 +31,11 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.IdGenerator;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TDescriptorTable;
+import org.apache.impala.thrift.TDescriptorTableSerialized;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -195,6 +198,13 @@ public class DescriptorTable {
       result.addToTableDescriptors(
           tbl.toThriftDescriptor(tableIdMap.get(tbl), referencedPartitions));
     }
+    return result;
+  }
+
+  public TDescriptorTableSerialized toSerializedThrift() throws ImpalaException {
+    TDescriptorTableSerialized result = new TDescriptorTableSerialized();
+    TDescriptorTable desc_tbl = toThrift();
+    result.setThrift_desc_tbl(JniUtil.serializeToThrift(desc_tbl));
     return result;
   }
 

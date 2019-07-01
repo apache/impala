@@ -326,7 +326,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_nullIndicatorBit(-1);
     slot_desc.__set_slotIdx(0);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
-    EXPECT_OK(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_));
+    EXPECT_OK(DescriptorTbl::CreateInternal(&obj_pool_, thrift_desc_tbl, &desc_tbl_));
 
     vector<TTupleId> row_tids;
     row_tids.push_back(0);

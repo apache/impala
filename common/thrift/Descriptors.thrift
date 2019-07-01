@@ -97,3 +97,10 @@ struct TDescriptorTable {
   // the fragment.
   3: optional list<TTableDescriptor> tableDescriptors
 }
+
+// Binary blob containing a serialized TDescriptorTable. See desc_tbl_* fields on
+// TQueryCtx for more context on when this is used.
+struct TDescriptorTableSerialized {
+  // TDescriptorTable serialized
+  1: required binary thrift_desc_tbl
+}

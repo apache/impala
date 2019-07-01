@@ -477,14 +477,17 @@ class TupleDescriptor {
 class DescriptorTbl {
  public:
   /// Creates an HdfsTableDescriptor (allocated in 'pool' and returned via 'desc') for
-  /// table with id 'table_id' within thrift_tbl. DCHECKs if no such descriptor is
-  /// present.
-  static Status CreateHdfsTblDescriptor(const TDescriptorTable& thrift_tbl,
-      TableId table_id, ObjectPool* pool, HdfsTableDescriptor** desc);
+  /// table with id 'table_id' within serialized_thrift_tbl. DCHECKs if no such
+  /// descriptor is present.
+  static Status CreateHdfsTblDescriptor(
+      const TDescriptorTableSerialized& serialized_thrift_tbl,
+      TableId table_id, ObjectPool* pool, HdfsTableDescriptor** desc) WARN_UNUSED_RESULT;
 
-  /// Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
-  /// Returns OK on success, otherwise error (in which case 'tbl' will be unset).
-  static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
+  /// Creates a descriptor tbl within 'pool' from serialized_thrift_tbl and returns it
+  /// via 'tbl'. Returns OK on success, otherwise error (in which case 'tbl' will be
+  /// unset).
+  static Status Create(ObjectPool* pool,
+      const TDescriptorTableSerialized& serialized_thrift_tbl,
       DescriptorTbl** tbl) WARN_UNUSED_RESULT;
 
   /// Free memory allocated in Create().
@@ -500,6 +503,9 @@ class DescriptorTbl {
   std::string DebugString() const;
 
  private:
+  // The friend classes use CreateInternal().
+  friend class DescriptorTblBuilder;
+  friend class DataStreamTest;
   typedef std::unordered_map<TableId, TableDescriptor*> TableDescriptorMap;
   typedef std::unordered_map<TupleId, TupleDescriptor*> TupleDescriptorMap;
   typedef std::unordered_map<SlotId, SlotDescriptor*> SlotDescriptorMap;
@@ -513,10 +519,24 @@ class DescriptorTbl {
   static Status CreatePartKeyExprs(
       const HdfsTableDescriptor& hdfs_tbl, ObjectPool* pool) WARN_UNUSED_RESULT;
 
+  /// Converts a TDescriptorTableSerialized to a TDescriptorTable. Returns
+  /// an error if deserialization fails.
+  static Status DeserializeThrift(const TDescriptorTableSerialized& serial_tbl,
+      TDescriptorTable* desc_tbl) WARN_UNUSED_RESULT;
+
   /// Creates a TableDescriptor (allocated in 'pool', returned via 'desc')
   /// corresponding to tdesc. Returns error status on failure.
   static Status CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
-    ObjectPool* pool, TableDescriptor** desc);
+    ObjectPool* pool, TableDescriptor** desc) WARN_UNUSED_RESULT;
+
+  /// Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
+  /// Returns OK on success, otherwise error (in which case 'tbl' will be unset).
+  /// This is the same as Create(), except that it takes the deserialized thrift
+  /// structure. This is useful for tests that produce their own thrift structures,
+  /// as it avoids serialization and allows for incomplete thrift structures
+  /// that cannot be serialized.
+  static Status CreateInternal(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
+      DescriptorTbl** tbl) WARN_UNUSED_RESULT;
 };
 
 /// Records positions of tuples within row produced by ExecNode. RowDescriptors are

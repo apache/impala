@@ -580,8 +580,10 @@ Status Coordinator::FinalizeHdfsInsert() {
   Status return_status = UpdateExecState(Status::OK(), nullptr, FLAGS_hostname);
   if (return_status.ok()) {
     HdfsTableDescriptor* hdfs_table;
-    RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(query_ctx().desc_tbl,
-            finalize_params()->table_id, obj_pool(), &hdfs_table));
+    DCHECK(query_ctx().__isset.desc_tbl_serialized);
+    RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(
+            query_ctx().desc_tbl_serialized, finalize_params()->table_id, obj_pool(),
+            &hdfs_table));
     DCHECK(hdfs_table != nullptr)
         << "INSERT target table not known in descriptor table: "
         << finalize_params()->table_id;

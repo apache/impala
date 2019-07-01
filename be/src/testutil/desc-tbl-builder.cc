@@ -61,7 +61,7 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
   DCHECK(buildDescTblStatus.ok()) << buildDescTblStatus.GetDetail();
 
   DescriptorTbl* desc_tbl;
-  Status status = DescriptorTbl::Create(obj_pool_, thrift_desc_tbl_, &desc_tbl);
+  Status status = DescriptorTbl::CreateInternal(obj_pool_, thrift_desc_tbl_, &desc_tbl);
   DCHECK(status.ok()) << status.GetDetail();
   return desc_tbl;
 }

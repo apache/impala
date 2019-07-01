@@ -462,7 +462,18 @@ struct TQueryCtx {
   12: optional i64 snapshot_timestamp = -1;
 
   // Optional for frontend tests.
-  13: optional Descriptors.TDescriptorTable desc_tbl
+  // The descriptor table can be included in one of two forms:
+  //  - TDescriptorTable - standard Thrift object
+  //  - TDescriptorTableSerialized - binary blob with a serialized TDescriptorTable
+  // Normal end-to-end query execution uses the serialized form to avoid copying a large
+  // number of objects when sending RPCs. For this case, desc_tbl_serialized is set and
+  // desc_tbl_testonly is not set. See IMPALA-8732.
+  // Frontend tests cannot use the serialized form, because some frontend tests deal with
+  // incomplete structures (e.g. THdfsTable without the required nullPartitionKeyValue
+  // field) that cannot be serialized. In this case, desc_tbl_testonly is set and
+  // desc_tbl_serialized is not set. See Frontend.PlanCtx.serializeDescTbl_.
+  13: optional Descriptors.TDescriptorTable desc_tbl_testonly
+  24: optional Descriptors.TDescriptorTableSerialized desc_tbl_serialized
 
   // Milliseconds since UNIX epoch at the start of query execution.
   14: required i64 start_unix_millis

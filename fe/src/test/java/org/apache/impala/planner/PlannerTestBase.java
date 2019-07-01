@@ -160,8 +160,8 @@ public class PlannerTestBase extends FrontendTestBase {
         }
       }
     }
-    if (execRequest.query_ctx.isSetDesc_tbl()) {
-      TDescriptorTable descTbl = execRequest.query_ctx.desc_tbl;
+    if (execRequest.query_ctx.isSetDesc_tbl_testonly()) {
+      TDescriptorTable descTbl = execRequest.query_ctx.desc_tbl_testonly;
       for (TTupleDescriptor tupleDesc: descTbl.tupleDescriptors) {
         tupleMap_.put(tupleDesc.id, tupleDesc);
       }
@@ -241,9 +241,10 @@ public class PlannerTestBase extends FrontendTestBase {
     boolean first = true;
     // Iterate through all partitions of the descriptor table and verify all partitions
     // are referenced.
-    if (execRequest.query_ctx.isSetDesc_tbl()
-        && execRequest.query_ctx.desc_tbl.isSetTableDescriptors()) {
-      for (TTableDescriptor tableDesc: execRequest.query_ctx.desc_tbl.tableDescriptors) {
+    if (execRequest.query_ctx.isSetDesc_tbl_testonly()
+        && execRequest.query_ctx.desc_tbl_testonly.isSetTableDescriptors()) {
+      for (TTableDescriptor tableDesc:
+           execRequest.query_ctx.desc_tbl_testonly.tableDescriptors) {
         // All partitions of insertTableId are okay.
         if (tableDesc.getId() == insertTableId) continue;
         if (!tableDesc.isSetHdfsTable()) continue;
@@ -443,8 +444,8 @@ public class PlannerTestBase extends FrontendTestBase {
     if (request == null || !request.isSetQuery_exec_request()) return;
     TQueryExecRequest execRequest = request.query_exec_request;
     HashSet<Integer> seenTableIds = Sets.newHashSet();
-    if (execRequest.query_ctx.isSetDesc_tbl()) {
-      TDescriptorTable descTbl = execRequest.query_ctx.desc_tbl;
+    if (execRequest.query_ctx.isSetDesc_tbl_testonly()) {
+      TDescriptorTable descTbl = execRequest.query_ctx.desc_tbl_testonly;
       if (descTbl.isSetTableDescriptors()) {
         for (TTableDescriptor tableDesc: descTbl.tableDescriptors) {
           if (seenTableIds.contains(tableDesc.id)) {
@@ -516,6 +517,7 @@ public class PlannerTestBase extends FrontendTestBase {
     String explainStr = "";
     try {
       PlanCtx planCtx = new PlanCtx(queryCtx);
+      planCtx.disableDescTblSerialization();
       execRequest = frontend_.createExecRequest(planCtx);
       explainStr = planCtx.getExplainString();
     } catch (Exception e) {
@@ -574,6 +576,7 @@ public class PlannerTestBase extends FrontendTestBase {
     try {
       queryCtx.client_request.getQuery_options().setExplain_level(TExplainLevel.VERBOSE);
       PlanCtx planCtx = new PlanCtx(queryCtx);
+      planCtx.disableDescTblSerialization();
       execRequest = frontend_.createExecRequest(planCtx);
       explainStr = planCtx.getExplainString();
     } catch (ImpalaException e) {
@@ -693,6 +696,7 @@ public class PlannerTestBase extends FrontendTestBase {
         System.getProperty("user.name"));
     queryCtx.client_request.setStmt(query);
     PlanCtx planCtx = new PlanCtx(queryCtx);
+    planCtx.disableDescTblSerialization();
     TExecRequest execRequest = frontend_.createExecRequest(planCtx);
 
     if (!execRequest.isSetQuery_exec_request()

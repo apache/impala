@@ -512,9 +512,9 @@ bool QueryState::StartFInstances() {
   int fragment_ctx_idx = 0;
 
   // set up desc tbl
-  DCHECK(query_ctx().__isset.desc_tbl);
+  DCHECK(query_ctx().__isset.desc_tbl_serialized);
   Status start_finstances_status =
-      DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
+      DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl_serialized, &desc_tbl_);
   if (UNLIKELY(!start_finstances_status.ok())) goto error;
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
