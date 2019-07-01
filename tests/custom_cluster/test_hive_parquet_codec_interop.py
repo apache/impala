@@ -20,6 +20,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.util.filesystem_utils import get_fs_path
@@ -43,6 +44,7 @@ class TestParquetInterop(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
+  @SkipIfS3.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-convert_legacy_hive_parquet_utc_timestamps=true "
       "-hdfs_zone_info_zip=%s" % get_fs_path("/test-warehouse/tzdb/2017c.zip"))
