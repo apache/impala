@@ -398,6 +398,15 @@ endif()
 find_package(kuduClient REQUIRED NO_DEFAULT_PATH)
 include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
 
+# Use "thin archives" for our static libraries. We only use static libraries
+# internal to our own build, so thin ones are just as good and much smaller.
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> qcT <TARGET> <LINK_FLAGS> <OBJECTS>")
+  set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> qcT <TARGET> <LINK_FLAGS> <OBJECTS>")
+  set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> qT <TARGET> <LINK_FLAGS> <OBJECTS>")
+  set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> qT <TARGET> <LINK_FLAGS> <OBJECTS>")
+endif()
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
