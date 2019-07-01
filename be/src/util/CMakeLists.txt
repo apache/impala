@@ -201,4 +201,5 @@ ADD_UNIFIED_BE_LSAN_TEST(time-test "TimeTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(uid-util-test "UidUtil.*")
 # Using standalone webserver-test for now, nonstandard main() passes in a port.
 ADD_BE_LSAN_TEST(webserver-test)
+TARGET_LINK_LIBRARIES(webserver-test mini_kdc)
 ADD_UNIFIED_BE_LSAN_TEST(zip-util-test "ZipUtilTest.*")

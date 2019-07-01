@@ -21,32 +21,15 @@
 // TODO: Remove when toolchain callbacks.h properly defines ::tm.
 struct tm;
 
-#include <gutil/strings/substitute.h>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 #include <kudu/client/value.h>
 
-#include "common/status.h"
+#include "util/kudu-status-util.h"
 #include "runtime/string-value.h"
 #include "runtime/types.h"
 
 namespace impala {
-
-/// Takes a Kudu status and returns an impala one, if it's not OK.
-/// Evaluates the prepend argument only if the status is not OK.
-#define KUDU_RETURN_IF_ERROR(expr, prepend) \
-  do { \
-    const kudu::Status& _s = (expr); \
-    if (UNLIKELY(!_s.ok())) {                                      \
-      return Status(strings::Substitute("$0: $1", prepend, _s.ToString())); \
-    } \
-  } while (0)
-
-#define KUDU_ASSERT_OK(status)                                     \
-  do {                                                             \
-    const Status& _s = FromKuduStatus(status);                     \
-    ASSERT_TRUE(_s.ok()) << "Error: " << _s.GetDetail();           \
-  } while (0)
 
 class TimestampValue;
 
@@ -93,21 +76,6 @@ Status CreateKuduValue(const ColumnType& col_type, void* value,
 /// returns the corresponding Impala ColumnType.
 ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type,
     const kudu::client::KuduColumnTypeAttributes& type_attributes);
-
-/// Utility function for creating an Impala Status object based on a kudu::Status object.
-/// 'k_status' is the kudu::Status object.
-/// 'prepend' is a string to be prepended to details of 'k_status' when creating the
-/// Impala Status object.
-/// Note that we don't translate the kudu::Status error code to Impala error code
-/// so the returned status' type is always of TErrorCode::GENERAL.
-inline Status FromKuduStatus(
-    const kudu::Status& k_status, const std::string prepend = "") {
-  if (LIKELY(k_status.ok())) return Status::OK();
-  const std::string& err_msg = prepend.empty() ? k_status.ToString() :
-      strings::Substitute("$0: $1", prepend, k_status.ToString());
-  VLOG(1) << err_msg;
-  return Status::Expected(err_msg);
-}
 
 /// Converts 'mode' to its equivalent ReadMode, stored in 'out'. Possible values for
 /// 'mode' are 'READ_LATEST' and 'READ_AT_SNAPSHOT'. If 'mode' is invalid, an error is

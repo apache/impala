@@ -163,6 +163,13 @@ class Webserver {
   sq_callback_result_t BeginRequestCallback(struct sq_connection* connection,
       struct sq_request_info* request_info);
 
+  // Handle SPNEGO authentication for this request. Returns SQ_CONTINUE_HANDLING
+  // if authentication was successful, otherwise responds to the request and
+  // returns SQ_HANDLED_OK.
+  sq_callback_result_t HandleSpnego(
+      struct sq_connection* connection,
+      struct sq_request_info* request_info);
+
   /// Renders URLs through the Mustache templating library.
   /// - Default ContentType is HTML.
   /// - Argument 'raw' renders the page with PLAIN ContentType.

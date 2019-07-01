@@ -25,9 +25,14 @@
 #include "common/init.h"
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
-#include "util/webserver.h"
-#include "util/default-path-handlers.h"
 
+#include "util/default-path-handlers.h"
+#include "util/kudu-status-util.h"
+#include "util/webserver.h"
+
+#include "kudu/security/test/mini_kdc.h"
+
+DECLARE_bool(webserver_require_spnego);
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
 DECLARE_string(webserver_certificate_file);
@@ -320,6 +325,32 @@ TEST(Webserver, SslGoodTlsVersion) {
   }
 }
 
+using kudu::MiniKdc;
+using kudu::MiniKdcOptions;
+
+TEST(Webserver, TestWithSpnego) {
+  MiniKdc kdc(MiniKdcOptions{});
+  KUDU_ASSERT_OK(kdc.Start());
+  kdc.SetKrb5Environment();
+
+  string kt_path;
+  KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
+  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1));
+  KUDU_ASSERT_OK(kdc.CreateUserPrincipal("alice"));
+
+  gflags::FlagSaver saver;
+  FLAGS_webserver_require_spnego = true;
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_OK(webserver.Start());
+
+  // Don't expect HTTP requests to work without Kerberos credentials.
+  stringstream contents;
+  ASSERT_FALSE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
+
+  // TODO(todd): import curl into native-toolchain and test this with
+  // authentication.
+}
 
 TEST(Webserver, StartWithPasswordFileTest) {
   stringstream password_file;
