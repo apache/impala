@@ -263,18 +263,16 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
           </p>
         </li>
 
-        <li>
-          Otherwise, the file names are not significant. When you put files into an HDFS directory through ETL
-          jobs, or point Impala to an existing HDFS directory with the <codeph>CREATE EXTERNAL TABLE</codeph>
-          statement, or move data files under external control with the <codeph>LOAD DATA</codeph> statement,
-          Impala preserves the original filenames.
-        </li>
+        <li> Otherwise, the file names are not significant. When you put files
+          into an HDFS directory through ETL jobs, or point Impala to an
+          existing HDFS directory with the <codeph>CREATE EXTERNAL
+            TABLE</codeph> statement, or move data files under external control
+          with the <codeph>LOAD DATA</codeph> statement, Impala preserves the
+          original file names. </li>
       </ul>
 
-      <p>
-        Filenames for data produced through Impala <codeph>INSERT</codeph> statements are given unique names to
-        avoid filename conflicts.
-      </p>
+      <p> File names for data produced through Impala <codeph>INSERT</codeph>
+        statements are given unique names to avoid file name conflicts. </p>
 
       <p>
         An <codeph>INSERT ... SELECT</codeph> statement produces one data file from each node that processes the
@@ -299,15 +297,23 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         </li>
 
         <li>
-          <p>
-            Impala recognizes the literal string <codeph>\N</codeph> to represent <codeph>NULL</codeph>. When using
-            Sqoop, specify the options <codeph>--null-non-string</codeph> and <codeph>--null-string</codeph> to
-            ensure all <codeph>NULL</codeph> values are represented correctly in the Sqoop output files. By default,
-            Sqoop writes <codeph>NULL</codeph> values using the string <codeph>null</codeph>, which causes a
-            conversion error when such rows are evaluated by Impala. (A workaround for existing tables and data files
-            is to change the table properties through <codeph>ALTER TABLE <varname>name</varname> SET
-            TBLPROPERTIES("serialization.null.format"="null")</codeph>.)
+          <p> Impala recognizes the literal string <codeph>\N</codeph> to
+            represent <codeph>NULL</codeph>. When using Sqoop, specify the
+            options <codeph>--null-non-string</codeph> and
+              <codeph>--null-string</codeph> to ensure all <codeph>NULL</codeph>
+            values are represented correctly in the Sqoop output files.
+              <codeph>\N</codeph> needs to be escaped as in the below example: </p>
+          <p><codeph>--null-string '\\N' <codeph>--null-non-string
+                '\\N'</codeph></codeph>
           </p>
+        </li>
+        <li>
+          <p>By default, Sqoop writes <codeph>NULL</codeph> values using the
+            string <codeph>null</codeph>, which causes a conversion error when
+            such rows are evaluated by Impala. A workaround for existing tables
+            and data files is to change the table properties through
+              <codeph>ALTER TABLE <varname>name</varname> SET
+              TBLPROPERTIES("serialization.null.format"="null")</codeph>.</p>
         </li>
 
         <li>
@@ -381,11 +387,10 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
         same fragmentation issues as tables stored on HDFS.
       </note>
 
-      <p>
-        When you create a text file for use with an Impala text table, specify <codeph>\N</codeph> to represent a
-        <codeph>NULL</codeph> value. For the differences between <codeph>NULL</codeph> and empty strings, see
-        <xref href="impala_literals.xml#null"/>.
-      </p>
+      <p> When you create a text file for use with an Impala text table, specify
+          <codeph>\N</codeph> to represent a <codeph>NULL</codeph> value. For
+        the differences between <codeph>NULL</codeph> and empty strings, see
+          <xref href="impala_literals.xml#null"/>. </p>
 
       <p>
         If a text file has fewer fields than the columns in the corresponding Impala table, all the corresponding
