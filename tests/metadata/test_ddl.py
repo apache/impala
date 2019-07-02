@@ -691,6 +691,25 @@ class TestDdlStatements(TestDdlBase):
     assert properties['p2'] == 'val3'
     assert properties[''] == ''
 
+  def test_alter_tbl_properties_reload(self, vector, unique_database):
+    # IMPALA-8734: Force a table schema reload when setting table properties.
+    tbl_name = "test_tbl"
+    self.execute_query_expect_success(self.client, "create table {0}.{1} (c1 string)"
+                                      .format(unique_database, tbl_name))
+    self.filesystem_client.create_file("test-warehouse/{0}.db/{1}/f".
+                                       format(unique_database, tbl_name),
+                                       file_data="\nfoo\n")
+    self.execute_query_expect_success(self.client,
+                                      "alter table {0}.{1} set tblproperties"
+                                      "('serialization.null.format'='foo')"
+                                      .format(unique_database, tbl_name))
+    result = self.execute_query_expect_success(self.client,
+                                               "select * from {0}.{1}"
+                                               .format(unique_database, tbl_name))
+    assert len(result.data) == 2
+    assert result.data[0] == ''
+    assert result.data[1] == 'NULL'
+
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_partition_ddl_predicates(self, vector, unique_database):
     self.run_test_case('QueryTest/partition-ddl-predicates-all-fs', vector,

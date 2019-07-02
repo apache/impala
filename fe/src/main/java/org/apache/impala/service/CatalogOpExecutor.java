@@ -654,6 +654,7 @@ public class CatalogOpExecutor {
         case SET_TBL_PROPERTIES:
           alterTableSetTblProperties(tbl, params.getSet_tbl_properties_params(),
               numUpdatedPartitions);
+          reloadTableSchema = true;
           if (params.getSet_tbl_properties_params().isSetPartition_set()) {
             addSummary(response,
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
