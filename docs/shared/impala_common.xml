@@ -2102,17 +2102,18 @@ SELECT udf_created_by_hive(c1) FROM ...
         <codeph>Location</codeph> field displays the path of the table directory as an HDFS URI.
       </p>
 
-      <p id="switch_internal_external_table">
-        You can switch a table from internal to external, or from external to internal, by using
-        the <codeph>ALTER TABLE</codeph> statement:
-<codeblock xml:space="preserve">
+      <p id="switch_internal_external_table"> You can switch a table from
+        internal to external, or from external to internal, by using the
+          <codeph>ALTER TABLE</codeph> statement:
+        <codeblock xml:space="preserve">
 -- Switch a table from internal to external.
 ALTER TABLE <varname>table_name</varname> SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 -- Switch a table from external to internal.
 ALTER TABLE <varname>table_name</varname> SET TBLPROPERTIES('EXTERNAL'='FALSE');
-</codeblock>
-      </p>
+</codeblock>If
+        the Kudu service is integrated with the Hive Metastore, the above
+        operations are not supported.</p>
 
 <!-- The data to show sensible output from these queries is in the TPC-DS schema 'CUSTOMER' table.
      If you want to show real output, add a LIMIT 5 or similar clause to each query to avoid
@@ -4536,12 +4537,14 @@ sudo pip-python install ssl</codeblock>
         attribute to that column.
       </p>
 
-      <p id="kudu_metadata_intro" rev="kudu">
-        Much of the metadata for Kudu tables is handled by the underlying storage layer. Kudu
-        tables have less reliance on the metastore database, and require less metadata caching
-        on the Impala side. For example, information about partitions in Kudu tables is managed
-        by Kudu, and Impala does not cache any block locality metadata for Kudu tables.
-      </p>
+      <p id="kudu_metadata_intro" rev="kudu">By default, much of the metadata
+        for Kudu tables is handled by the underlying storage layer. Kudu tables
+        have less reliance on the Metastore database, and require less metadata
+        caching on the Impala side. For example, information about partitions in
+        Kudu tables is managed by Kudu, and Impala does not cache any block
+        locality metadata for Kudu tables. If the Kudu service is not integrated
+        with the Hive Metastore, Impala will manage Kudu table metadata in the
+        Hive Metastore.</p>
 
       <p id="kudu_metadata_details" rev="kudu">
         The <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements are
@@ -4553,22 +4556,25 @@ sudo pip-python install ssl</codeblock>
         the Kudu table schema, such as adding or dropping a column.
       </p>
 
-      <p id="kudu_internal_external_tables">
-        The distinction between internal and external tables has some special details for Kudu
-        tables. Tables created entirely through Impala are internal tables. The table name as
-        represented within Kudu includes notation such as an <codeph>impala::</codeph> prefix
-        and the Impala database name. External Kudu tables are those created by a non-Impala
-        mechanism, such as a user application calling the Kudu APIs. For these tables, the
-        <codeph>CREATE EXTERNAL TABLE</codeph> syntax lets you establish a mapping from Impala
-        to the existing Kudu table:
-<codeblock>
+      <p id="kudu_internal_external_tables"> If the Kudu service is not
+        integrated with the Hive Metastore, the distinction between internal and
+        external tables has some special details for Kudu tables. Tables created
+        entirely through Impala are internal tables. The table name as
+        represented within Kudu includes notation such as an
+          <codeph>impala::</codeph> prefix and the Impala database name.
+        External Kudu tables are those created by a non-Impala mechanism, such
+        as a user application calling the Kudu APIs. For these tables, the
+          <codeph>CREATE EXTERNAL TABLE</codeph> syntax lets you establish a
+        mapping from Impala to the existing Kudu table:
+        <codeblock>
 CREATE EXTERNAL TABLE impala_name STORED AS KUDU
   TBLPROPERTIES('kudu.table_name' = 'original_kudu_name');
 </codeblock>
-        External Kudu tables differ in one important way from other external tables: adding or
-        dropping a column or range partition changes the data in the underlying Kudu table, in
-        contrast to an HDFS-backed external table where existing data files are left untouched.
       </p>
+      <p> External Kudu tables differ in one important way from other external
+        tables: adding or dropping a column or range partition changes the data
+        in the underlying Kudu table, in contrast to an HDFS-backed external
+        table where existing data files are left untouched.</p>
 
       <p id="kudu_sentry_limitations" rev="IMPALA-4000">
         Access to Kudu tables must be granted to and revoked from roles with the following

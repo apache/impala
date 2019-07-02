@@ -284,28 +284,28 @@ under the License.
       </metadata>
     </prolog>
     <conbody>
-      <p>
-        Tables stored in Apache Kudu are treated specially, because Kudu
-        manages its data independently of HDFS files. Some information about the
-        table is stored in the metastore database for use by Impala. Other table
-        metadata is managed internally by Kudu.
-      </p>
-      <p>
-        When you create a Kudu table through Impala, the table is assigned an
-        internal Kudu table name of the form
+      <p> By default, tables stored in Apache Kudu are treated specially,
+        because Kudu manages its data independently of HDFS files. </p>
+      <p>All metadata that Impala needs is stored in the HMS.</p>
+      <p> When Kudu is not integrated with the HMS, when you create a Kudu table
+        through Impala, the table is assigned an internal Kudu table name of the
+        form
             <codeph>impala::<varname>db_name</varname>.<varname>table_name</varname></codeph>.
         You can see the Kudu-assigned name in the output of <codeph>DESCRIBE
           FORMATTED</codeph>, in the <codeph>kudu.table_name</codeph> field of
-        the table properties.
+        the table properties. </p>
+      <p> 
+        For Impala-Kudu managed tables, <codeph>ALTER TABLE ...
+          RENAME</codeph> renames both the Impala and the Kudu table. 
       </p>
-      <p> For Impala-Kudu managed tables, <codeph>ALTER TABLE ...
-          RENAME</codeph> renames both the Impala and the Kudu table. </p>
-      <p> For Impala-Kudu external tables, <codeph>ALTER TABLE ...
+      <p> 
+        For Impala-Kudu external tables, <codeph>ALTER TABLE ...
           RENAME</codeph> renames just the Impala table. To change the Kudu
         table that an Impala external table points to, use <codeph>ALTER TABLE
             <varname>impala_name</varname> SET TBLPROPERTIES('kudu.table_name' =
             '<varname>different_kudu_table_name</varname>')</codeph>. The
-        underlying Kudu table must already exist. </p>
+        underlying Kudu table must already exist. 
+      </p>
       <p>
         In practice, external tables are typically used to access underlying
         Kudu tables that were created outside of Impala, that is, through the
@@ -323,9 +323,7 @@ under the License.
         distribution of values within each column, is the same for Kudu tables
         as for HDFS-backed tables.
       </p>
-      <p
-        conref="../shared/impala_common.xml#common/kudu_internal_external_tables"
-      />
+      <p conref="../shared/impala_common.xml#common/kudu_internal_external_tables"/>
     </conbody>
   </concept>
 
