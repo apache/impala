@@ -44,34 +44,54 @@ under the License.
 
   <concept id="auto_invalidate_metadata">
 
-    <title>Startup Options for Automatic Invalidation of Metadata</title>
+    <title>Automatic Invalidation of Metadata Cache</title>
 
     <conbody>
 
       <p>
         To keep the size of metadata bounded, <codeph>catalogd</codeph> periodically scans all
         the tables and invalidates those not recently used. There are two types of
-        configurations in <codeph>catalogd</codeph>.
+        configurations for <codeph>catalogd</codeph> and <codeph>impalad</codeph>.
       </p>
 
-      <ul>
-        <li>
-          Time-based invalidation with the
-          <codeph>&#8209;&#8209;invalidate_tables_timeout_s</codeph> flag:
-          <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
-          specified time period (in seconds). This flag needs to be applied to both
-          <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
-        </li>
+      <dl>
+        <dlentry>
 
-        <li>
-          Memory-based invalidation with the
-          <codeph>&#8209;&#8209;invalidate_tables_on_memory_pressure</codeph> flag: When the
-          memory pressure reaches 60% of JVM heap size after a Java garbage collection in
-          <codeph>catalogd</codeph>, Impala invalidates 10% of the least recently used tables.
-          This flag needs to be applied to both <codeph>impalad</codeph> and
-          <codeph>catalogd</codeph>.
-        </li>
-      </ul>
+          <dt>
+            Time-based cache invalidation
+          </dt>
+
+          <dd>
+            <codeph>Catalogd</codeph> invalidates tables that are not recently used in the
+            specified time period (in seconds).
+          </dd>
+
+          <dd>
+            The <codeph>&#8209;&#8209;invalidate_tables_timeout_s</codeph> flag needs to be
+            applied to both <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            Memory-based cache invalidation
+          </dt>
+
+          <dd>
+            When the memory pressure reaches 60% of JVM heap size after a Java garbage
+            collection in <codeph>catalogd</codeph>, Impala invalidates 10% of the least
+            recently used tables.
+          </dd>
+
+          <dd>
+            The <codeph>&#8209;&#8209;invalidate_tables_on_memory_pressure</codeph> flag needs
+            to be applied to both <codeph>impalad</codeph> and <codeph>catalogd</codeph>.
+          </dd>
+
+        </dlentry>
+      </dl>
 
       <p>
         Automatic invalidation of metadata provides more stability with lower chances of running
@@ -79,23 +99,28 @@ under the License.
         require tuning.
       </p>
 
-      <note>
-        This is a preview feature in Impala 3.1 and not generally available.
-      </note>
-
     </conbody>
 
   </concept>
 
   <concept id="auto_poll_hms_notification">
 
-    <title>Automatic Metadata Sync using Hive Metastore Notification Events</title>
+    <title>Automatic Invalidation/Refresh of Metadata</title>
 
     <conbody>
 
       <p>
-        When this feature is enabled, <codeph>catalogd</codeph> polls Hive Metastore (HMS)
-        notification events at a configurable interval and processes the following changes:
+        When tools such as Hive and Spark are used to process the raw data ingested into Hive
+        tables, new HMS metadata (database, tables, partitions) and filesystem metadata (new
+        files in existing partitions/tables) is generated. In previous versions of Impala, in
+        order to pick up this new information, Impala users needed to manually issue an
+        <codeph>INVALIDATE</codeph> or <codeph>REFRESH</codeph> commands.
+      </p>
+
+      <p>
+        When automatic invalidate/refresh of metadata is enabled, <codeph>catalogd</codeph>
+        polls Hive Metastore (HMS) notification events at a configurable interval and processes
+        the following changes:
       </p>
 
       <note>
@@ -109,8 +134,8 @@ under the License.
         </li>
 
         <li>
-          Refreshes the table when it receives the <codeph>ALTER</codeph>, <codeph>ADD</codeph>,
-          or <codeph>DROP</codeph> its partitions.
+          Refreshes the partition when it receives the <codeph>ALTER</codeph>,
+          <codeph>ADD</codeph>, or <codeph>DROP</codeph> partitions.
         </li>
 
         <li>
@@ -176,11 +201,6 @@ under the License.
 
       <ul>
         <li>
-          The operations that do not generate events in HMS, such as adding new data to existing
-          tables/partitions from Spark, are not supported.
-        </li>
-
-        <li>
           When you bypass HMS and add or remove data into table by adding files directly on the
           filesystem, HMS does not generate the <codeph>INSERT</codeph> event, and the event
           processor will not invalidate the corresponding table or refresh the corresponding
@@ -190,6 +210,12 @@ under the License.
             load in such cases, so that event processor can act on the events generated by the
             <codeph>LOAD</codeph> command.
           </p>
+        </li>
+
+        <li>
+          The Spark APIs that saves data to a specified location does not generate events in
+          HMS, thus is not supported. For example:
+<codeblock>Seq((1, 2)).toDF("i", "j").write.save("/user/hive/warehouse/spark_etl.db/customers/date=01012019")</codeblock>
         </li>
       </ul>
 
@@ -236,7 +262,15 @@ under the License.
           </li>
 
           <li>
-            Restart the HiveServer2 and Hive Metastore services.
+            If applicable, set the <codeph>hive.metastore.dml.events</codeph> configuration key
+            to <codeph>true</codeph> in <codeph>hive-site.xml</codeph> used by the Spark
+            applications (typically, <codeph>/etc/hive/conf/hive-site.xml</codeph>) so that the
+            <codeph>INSERT</codeph> events are generated when the Spark application inserts data
+            into existing tables and partitions.
+          </li>
+
+          <li>
+            Restart the HiveServer2, Hive Metastore, and Spark (if applicable) services.
           </li>
         </ol>
 
