@@ -30,6 +30,10 @@ under the License.
       shuffling exchange traffic of intermediate results.
     </p>
 
+    <note>
+      This is an experimental feature in Impala 3.3 and not generally supported.
+    </note>
+
     <p>
       To mitigate the pressure on the network, you can enable the compute nodes to cache the
       working set read from remote filesystems, such as, remote HDFS data node, S3, ABFS, ADLS.
