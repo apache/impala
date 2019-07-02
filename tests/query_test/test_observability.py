@@ -331,6 +331,7 @@ class TestObservability(ImpalaTestSuite):
         r'CatalogFetch.RPCs.Bytes',
         r'CatalogFetch.RPCs.Requests',
         r'CatalogFetch.RPCs.Time',
+        r'CatalogFetch.StorageLoad.Time',
         r'CatalogFetch.TableNames.Hits',
         r'CatalogFetch.TableNames.Requests',
         r'CatalogFetch.TableNames.Time',
@@ -666,3 +667,45 @@ class TestObservability(ImpalaTestSuite):
     query = "select count (*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
     assert "Executor Group:" in runtime_profile
+
+  def test_query_profile_storage_load_time_filesystem(self, unique_database,
+      cluster_properties):
+    """Test that when a query needs load metadata for table(s), the
+    storage load time should be in the profile. Tests file systems."""
+    table_name = 'ld_prof'
+    self.execute_query(
+        "create table {0}.{1}(col1 int)".format(unique_database, table_name))
+    self.__check_query_profile_storage_load_time(unique_database, table_name,
+        cluster_properties)
+
+  @SkipIfS3.hbase
+  @SkipIfLocal.hbase
+  @SkipIfIsilon.hbase
+  @SkipIfABFS.hbase
+  @SkipIfADLS.hbase
+  @pytest.mark.execute_serially
+  def test_query_profile_storage_load_time(self, cluster_properties):
+    """Test that when a query needs load metadata for table(s), the
+    storage load time should be in the profile. Tests kudu and hbase."""
+    # KUDU table
+    self.__check_query_profile_storage_load_time("functional_kudu", "alltypes",
+        cluster_properties)
+
+    # HBASE table
+    self.__check_query_profile_storage_load_time("functional_hbase", "alltypes",
+        cluster_properties)
+
+  def __check_query_profile_storage_load_time(self, db_name, table_name,
+      cluster_properties):
+    """Check query profile for storage load time with a given database."""
+    self.execute_query("invalidate metadata {0}.{1}".format(db_name, table_name))
+    query = "select count (*) from {0}.{1}".format(db_name, table_name)
+    runtime_profile = self.execute_query(query).runtime_profile
+    if cluster_properties.is_catalog_v2_cluster():
+      storageLoadTime = "StorageLoad.Time"
+    else:
+      storageLoadTime = "storage-load-time"
+    assert storageLoadTime in runtime_profile
+    # Call the second time, no metastore loading needed.
+    runtime_profile = self.execute_query(query).runtime_profile
+    assert storageLoadTime not in runtime_profile

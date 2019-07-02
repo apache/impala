@@ -115,6 +115,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // True if this object is stored in an Impalad catalog cache.
   protected boolean storedInImpaladCatalogCache_ = false;
 
+  // Time spent in the source systems loading/reloading the fs metadata for the table.
+  protected long storageMetadataLoadTime_ = 0;
+
   // Last used time of this table in nanoseconds as returned by
   // CatalogdTableInvalidator.nanoTime(). This is only set in catalogd and not used by
   // impalad.
@@ -138,6 +141,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public static final String REFRESH_DURATION_METRIC = "refresh-duration";
   public static final String ALTER_DURATION_METRIC = "alter-duration";
   public static final String LOAD_DURATION_METRIC = "load-duration";
+  public static final String STORAGE_METADATA_LOAD_DURATION_METRIC =
+      "storage-metadata-load-duration";
 
   // Table property key for storing the time of the last DDL operation.
   public static final String TBL_PROP_LAST_DDL_TIME = "transient_lastDdlTime";
@@ -197,9 +202,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     metrics_.addTimer(REFRESH_DURATION_METRIC);
     metrics_.addTimer(ALTER_DURATION_METRIC);
     metrics_.addTimer(LOAD_DURATION_METRIC);
+    metrics_.addTimer(STORAGE_METADATA_LOAD_DURATION_METRIC);
   }
 
   public Metrics getMetrics() { return metrics_; }
+
+  // Returns storage wait time during metadata load.
+  public long getStorageLoadTime() { return storageMetadataLoadTime_; }
 
   // Returns true if this table reference comes from the impalad catalog cache or if it
   // is loaded from the testing framework. Returns false if this table reference points
@@ -400,6 +409,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     accessLevel_ = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
         TAccessLevel.READ_WRITE;
 
+    storageMetadataLoadTime_ = thriftTable.getStorage_metadata_load_time_ns();
+
     storedInImpaladCatalogCache_ = true;
     validWriteIds_ = thriftTable.isSetValid_write_ids() ?
         thriftTable.getValid_write_ids() : null;
@@ -436,6 +447,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
     TTable table = new TTable(db_.getName(), name_);
     table.setAccess_level(accessLevel_);
+    table.setStorage_metadata_load_time_ns(storageMetadataLoadTime_);
 
     // Populate both regular columns and clustering columns (if there are any).
     table.setColumns(new ArrayList<>());
@@ -485,6 +497,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
     resp.setObject_version_number(getCatalogVersion());
     resp.table_info = new TPartialTableInfo();
+    resp.table_info.setStorage_metadata_load_time_ns(storageMetadataLoadTime_);
+    storageMetadataLoadTime_ = 0;
     if (selector.want_hms_table) {
       // TODO(todd): the deep copy could be a bit expensive. Unfortunately if we took
       // a reference to this object, and let it escape out of the lock, it would be

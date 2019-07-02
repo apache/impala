@@ -209,6 +209,7 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static final String FUNCTION_LIST_STATS_CATEGORY = "FunctionLists";
   private static final String FUNCTIONS_STATS_CATEGORY = "Functions";
   private static final String RPC_STATS_CATEGORY = "RPCs";
+  private static final String STORAGE_METADATA_LOAD_CATEGORY = "StorageLoad";
   private static final String RPC_REQUESTS =
       CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Requests";
   private static final String RPC_BYTES =
@@ -543,6 +544,20 @@ public class CatalogdMetaProvider implements MetaProvider {
     }
   }
 
+  /**
+   * Adds tables metadata storage access time to query's profile.
+   * The access time is aggregated for the tables which need to be loaded.
+   */
+  private void addTableMetadatStorageLoadTimeToProfile(long storageLoadTimeNano) {
+    FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+    if (profile == null) return;
+    // Storage-load-time for the table and its partitions
+    final String storageAccessTimeCounter = CATALOG_FETCH_PREFIX + "." +
+         STORAGE_METADATA_LOAD_CATEGORY + "." + "Time";
+    profile.addToCounter(storageAccessTimeCounter, TUnit.TIME_MS,
+       TimeUnit.MILLISECONDS.convert(storageLoadTimeNano, TimeUnit.NANOSECONDS));
+  }
+
   @Override
   public ImmutableList<String> loadDbList() throws TException {
     return loadWithCaching("database list", DB_LIST_STATS_CATEGORY, DB_LIST_CACHE_KEY,
@@ -663,6 +678,8 @@ public class CatalogdMetaProvider implements MetaProvider {
             TGetPartialCatalogObjectResponse resp = sendRequest(req);
             checkResponse(resp.table_info != null && resp.table_info.hms_table != null,
                 req, "missing expected HMS table");
+            addTableMetadatStorageLoadTimeToProfile(
+                resp.table_info.storage_metadata_load_time_ns);
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number);
            }
@@ -830,7 +847,8 @@ public class CatalogdMetaProvider implements MetaProvider {
     checkResponse(resp.table_info.partitions.size() == ids.size(),
         req, "returned %d partitions instead of expected %d",
         resp.table_info.partitions.size(), ids.size());
-
+    addTableMetadatStorageLoadTimeToProfile(
+        resp.table_info.storage_metadata_load_time_ns);
     Map<PartitionRef, PartitionMetadata> ret = new HashMap<>();
     for (int i = 0; i < ids.size(); i++) {
       PartitionRef partRef = partRefs.get(i);

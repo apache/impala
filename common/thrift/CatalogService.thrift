@@ -361,6 +361,10 @@ struct TPartialTableInfo {
 
   3: optional list<hive_metastore.ColumnStatisticsObj> column_stats
 
+  // Set if this table needs storage access during metadata load.
+  // Time used for storage loading in nanoseconds.
+  4: optional i64 storage_metadata_load_time_ns
+
   // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
   // Used so that each THdfsFileBlock can just reference an index in this list rather
   // than duplicate the list of network address, which helps reduce memory usage.
