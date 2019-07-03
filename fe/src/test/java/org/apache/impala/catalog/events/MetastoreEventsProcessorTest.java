@@ -57,6 +57,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
@@ -1408,9 +1409,10 @@ public class MetastoreEventsProcessorTest {
     fakeEvent.setTableName(tblName);
     fakeEvent.setDbName(dbName);
     fakeEvent.setEventId(eventIdGenerator.incrementAndGet());
+    AlterTableMessage alterTableMessage =
+        MetastoreShim.buildAlterTableMessage(tableBefore, tableAfter, false, -1L);
     fakeEvent.setMessage(
-        MetastoreShim.buildAlterTableMessage(tableBefore, tableAfter, false, -1L)
-            .toString());
+        MetastoreShim.serializeEventMessage(alterTableMessage));
     fakeEvent.setEventType("ALTER_TABLE");
     return fakeEvent;
   }

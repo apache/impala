@@ -42,6 +42,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.EventMessage;
 import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.hadoop.hive.metastore.messaging.json.ExtendedJSONMessageFactory;
@@ -215,11 +216,14 @@ public class MetastoreShim {
     return ExtendedJSONMessageFactory.getInstance().buildAlterTableMessage(before, after);
   }
 
+  /**
+   * Wrapper around HMS-2 message serializer
+   * @param message
+   * @return serialized string to use used in the NotificationEvent's message field
+   */
   @VisibleForTesting
-  public static InsertMessage buildInsertMessage(Table msTbl, Partition partition,
-      boolean isInsertOverwrite, List<String> newFiles) {
-    return ExtendedJSONMessageFactory.getInstance().buildInsertMessage(msTbl, partition,
-        isInsertOverwrite, newFiles);
+  public static String serializeEventMessage(EventMessage message) {
+    return message.toString();
   }
 
   public static String getAllColumnsInformation(List<FieldSchema> tabCols,

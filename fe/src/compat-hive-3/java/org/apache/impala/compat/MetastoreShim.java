@@ -38,11 +38,13 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.EventMessage;
 import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageBuilder;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.hadoop.hive.metastore.messaging.MessageEncoder;
 import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
+import org.apache.hadoop.hive.metastore.messaging.MessageSerializer;
 import org.apache.hadoop.hive.metastore.utils.FileUtils;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
@@ -206,6 +208,14 @@ public class MetastoreShim {
   }
 
   /**
+   * Wrapper around HMS-3 message encoder to get the serializer
+   * @return
+   */
+  public static MessageSerializer getMessageSerializer() {
+    return eventMessageEncoder_.getSerializer();
+  }
+
+  /**
    * Wrapper around FileUtils.makePartName to deal with package relocation in Hive 3.
    * This method uses the metastore's FileUtils method instead of one from hive-exec
    * @param partitionColNames
@@ -227,11 +237,14 @@ public class MetastoreShim {
         isTruncateOp, writeId);
   }
 
+  /**
+   * Wrapper around HMS-3 message serializer
+   * @param message
+   * @return serialized string to use used in the NotificationEvent's message field
+   */
   @VisibleForTesting
-  public static InsertMessage buildInsertMessage(Table msTbl, Partition partition,
-      boolean isInsertOverwrite, List<String> newFiles) {
-    return MessageBuilder.getInstance().buildInsertMessage(msTbl, partition,
-        isInsertOverwrite, newFiles.iterator());
+  public static String serializeEventMessage(EventMessage message) {
+    return getMessageSerializer().serialize(message);
   }
 
   /**

@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -114,6 +115,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
         rangerImpalaPlugin_ =
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
                 .getRangerImpalaPlugin();
+        assertEquals("test-cluster", rangerImpalaPlugin_.getClusterName());
         sentryService_ = null;
         rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null);
         rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
