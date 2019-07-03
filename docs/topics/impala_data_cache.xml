@@ -31,7 +31,7 @@ under the License.
     </p>
 
     <note>
-      This is an experimental feature in Impala 3.3 and not generally supported.
+      This is an experimental feature in Impala 3.3 and is not generally supported.
     </note>
 
     <p>
@@ -61,7 +61,8 @@ under the License.
     </p>
 
     <p>
-      The specified directories must exist in the local filesystem of each Impala Daemon.
+      The specified directories must exist in the local filesystem of each Impala Daemon, or
+      Impala will fail to start.
     </p>
 
     <p>
