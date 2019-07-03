@@ -46,6 +46,8 @@
 DECLARE_int32(status_report_interval_ms);
 DECLARE_int32(periodic_counter_update_period_ms);
 
+using namespace rapidjson;
+
 namespace impala {
 
 // Thread counters name
@@ -696,6 +698,179 @@ RuntimeProfile::EventSequence* RuntimeProfile::GetEventSequence(const string& na
   EventSequenceMap::const_iterator it = event_sequence_map_.find(name);
   if (it == event_sequence_map_.end()) return NULL;
   return it->second;
+}
+
+void RuntimeProfile::ToJson(Document* d) const{
+  // queryObj that stores all JSON format profile information
+  Value queryObj(kObjectType);
+  RuntimeProfile::ToJsonHelper(&queryObj, d);
+  d->RemoveMember("contents");
+  d->AddMember("contents", queryObj, d->GetAllocator());
+}
+
+void RuntimeProfile::ToJsonCounters(Value* parent, Document* d,
+    const string& counter_name, const CounterMap& counter_map,
+    const ChildCounterMap& child_counter_map) const{
+  auto& allocator = d->GetAllocator();
+  ChildCounterMap::const_iterator itr = child_counter_map.find(counter_name);
+  if (itr != child_counter_map.end()) {
+    const set<string>& child_counters = itr->second;
+    for (const string& child_counter: child_counters) {
+      CounterMap::const_iterator iter = counter_map.find(child_counter);
+      if (iter == counter_map.end()) continue;
+
+      Value counter(kObjectType);
+      iter->second->ToJson(*d, &counter);
+      counter.AddMember("counter_name", StringRef(child_counter.c_str()), allocator);
+
+      Value child_counters_json(kArrayType);
+      RuntimeProfile::ToJsonCounters(&child_counters_json, d,
+          child_counter, counter_map,child_counter_map);
+      if (!child_counters_json.Empty()){
+        counter.AddMember("child_counters", child_counters_json, allocator);
+      }
+      parent->PushBack(counter, allocator);
+    }
+  }
+}
+
+void RuntimeProfile::ToJsonHelper(Value* parent, Document* d) const{
+  Document::AllocatorType& allocator = d->GetAllocator();
+  // Create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
+  // while we call value() on the counters (some of those might be DerivedCounters).
+  CounterMap counter_map;
+  ChildCounterMap child_counter_map;
+  {
+    lock_guard<SpinLock> l(counter_map_lock_);
+    counter_map = counter_map_;
+    child_counter_map = child_counter_map_;
+  }
+
+  // 1. Name
+  Value name(name_.c_str(), allocator);
+  parent->AddMember("profile_name", name, allocator);
+
+  // 2. Num_children
+  parent->AddMember("num_children", children_.size(), allocator);
+
+  // 3. Metadata
+  // Set the required metadata field to the plan node ID for compatibility with any tools
+  // that rely on the plan node id being set there.
+  // Legacy field. May contain the node ID for plan nodes.
+  // Replaced by node_metadata, which contains richer metadata.
+  parent->AddMember("metadata",
+      metadata_.__isset.plan_node_id ? metadata_.plan_node_id : -1, allocator);
+  // requires exactly one field of a union to be set so we only mark node_metadata
+  // as set if that is the case.
+  if (metadata_.__isset.plan_node_id || metadata_.__isset.data_sink_id){
+    Value node_metadata_json(kObjectType);
+    if (metadata_.__isset.plan_node_id){
+      node_metadata_json.AddMember("plan_node_id", metadata_.plan_node_id, allocator);
+    }
+    if (metadata_.__isset.data_sink_id){
+      node_metadata_json.AddMember("data_sink_id", metadata_.data_sink_id, allocator);
+    }
+    parent->AddMember("node_metadata", node_metadata_json, allocator);
+  }
+
+  // 4. Info_strings
+  {
+    lock_guard<SpinLock> l(info_strings_lock_);
+    if (!info_strings_.empty()) {
+      Value info_strings_json(kArrayType);
+      for (const string& key : info_strings_display_order_) {
+        Value info_string_json(kObjectType);
+        Value key_json(key.c_str(), allocator);
+        auto value_itr = info_strings_.find(key);
+        DCHECK(value_itr != info_strings_.end());
+        Value value_json(value_itr->second.c_str(), allocator);
+        info_string_json.AddMember("key", key_json, allocator);
+        info_string_json.AddMember("value", value_json, allocator);
+        info_strings_json.PushBack(info_string_json, allocator);
+      }
+      parent->AddMember("info_strings", info_strings_json, allocator);
+    }
+  }
+
+  // 5. Events
+  {
+    lock_guard<SpinLock> l(event_sequence_lock_);
+    if (!event_sequence_map_.empty()) {
+      Value event_sequences_json(kArrayType);
+      for (EventSequenceMap::const_iterator it = event_sequence_map_.begin();
+           it != event_sequence_map_.end(); ++it) {
+        Value event_sequence_json(kObjectType);
+        it->second->ToJson(*d, &event_sequence_json);
+        event_sequences_json.PushBack(event_sequence_json, allocator);
+      }
+      parent->AddMember("event_sequences", event_sequences_json, allocator);
+    }
+  }
+
+
+  // 6. Counters
+  Value counters(kArrayType);
+  RuntimeProfile::ToJsonCounters(&counters , d, "", counter_map, child_counter_map);
+  if (!counters.Empty()) {
+    parent->AddMember("counters", counters, allocator);
+  }
+
+  // 7. SummaryStatsCounter
+  {
+    lock_guard<SpinLock> l(summary_stats_map_lock_);
+    if (!summary_stats_map_.empty()) {
+      Value summary_stats_counters_json(kArrayType);
+      for (const SummaryStatsCounterMap::value_type& v : summary_stats_map_) {
+        Value summary_stats_counter(kObjectType);
+        Value summary_name(v.first.c_str(), allocator);
+        v.second->ToJson(*d, &summary_stats_counter);
+        // Remove Kind here because it would be redundant information for users
+        summary_stats_counter.RemoveMember("kind");
+        summary_stats_counter.AddMember("counter_name", summary_name, allocator);
+        summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
+      }
+      parent->AddMember(
+          "summary_stats_counters", summary_stats_counters_json, allocator);
+    }
+  }
+
+  // 8. Time_series_counter_map
+  {
+    // Print all time series counters as following:
+    //    - <Name> (<period>): <val1>, <val2>, <etc>
+    lock_guard<SpinLock> l(counter_map_lock_);
+    if (!time_series_counter_map_.empty()) {
+      Value time_series_counters_json(kArrayType);
+      for (const TimeSeriesCounterMap::value_type& v : time_series_counter_map_) {
+        TimeSeriesCounter* counter = v.second;
+        Value time_series_json(kObjectType);
+        counter->ToJson(*d, &time_series_json);
+        time_series_counters_json.PushBack(time_series_json, allocator);
+      }
+      parent->AddMember("time_series_counters", time_series_counters_json, allocator);
+    }
+  }
+
+  // 9. Children Runtime Profiles
+  //
+  // Create copy of children_ so we don't need to hold lock while we call
+  // ToJsonHelper() on the children.
+  ChildVector children;
+  {
+    lock_guard<SpinLock> l(children_lock_);
+    children = children_;
+  }
+
+  if (!children.empty()) {
+    Value child_profiles(kArrayType);
+    for (int i = 0; i < children.size(); ++i) {
+      RuntimeProfile* profile = children[i].first;
+      Value child_profile(kObjectType);
+      profile->ToJsonHelper(&child_profile, d);
+      child_profiles.PushBack(child_profile, allocator);
+    }
+    parent->AddMember("child_profiles", child_profiles, allocator);
+  }
 }
 
 // Print the profile:
@@ -1401,6 +1576,69 @@ int64_t RuntimeProfile::SummaryStatsCounter::MaxValue() {
 int32_t RuntimeProfile::SummaryStatsCounter::TotalNumValues() {
   lock_guard<SpinLock> l(lock_);
   return total_num_values_;
+}
+
+void RuntimeProfile::Counter::ToJson(Document& document, Value* val) const {
+  Value counter_json(kObjectType);
+  counter_json.AddMember("value", value(), document.GetAllocator());
+  auto unit_itr = _TUnit_VALUES_TO_NAMES.find(unit_);
+  DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
+  Value unit_json(unit_itr->second, document.GetAllocator());
+  counter_json.AddMember("unit", unit_json, document.GetAllocator());
+  Value kind_json(CounterType().c_str(), document.GetAllocator());
+  counter_json.AddMember("kind", kind_json, document.GetAllocator());
+  *val = counter_json;
+}
+
+void RuntimeProfile::TimeSeriesCounter::ToJson(Document& document, Value* val) {
+  lock_guard<SpinLock> lock(lock_);
+  Value counter_json(kObjectType);
+  counter_json.AddMember("counter_name",
+      StringRef(name_.c_str()), document.GetAllocator());
+  auto unit_itr = _TUnit_VALUES_TO_NAMES.find(unit_);
+  DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
+  Value unit_json(unit_itr->second, document.GetAllocator());
+  counter_json.AddMember("unit", unit_json, document.GetAllocator());
+
+  int num, period;
+  const int64_t* samples = GetSamplesLocked(&num, &period);
+
+  counter_json.AddMember("num", num, document.GetAllocator());
+  counter_json.AddMember("period", period, document.GetAllocator());
+  stringstream stream;
+  // Clamp number of printed values at 64, the maximum number of values in the
+  // SamplingTimeSeriesCounter.
+  int step = 1 + (num - 1) / 64;
+  period *= step;
+
+  for (int i = 0; i < num; i += step) {
+    stream << samples[i];
+    if (i + step < num) stream << ",";
+  }
+
+  Value samples_data_json(stream.str().c_str(), document.GetAllocator());
+  counter_json.AddMember("data", samples_data_json, document.GetAllocator());
+  *val = counter_json;
+}
+
+void RuntimeProfile::EventSequence::ToJson(Document& document, Value* value) {
+  boost::lock_guard<SpinLock> event_lock(lock_);
+  SortEvents();
+
+  Value event_sequence_json(kObjectType);
+  event_sequence_json.AddMember("offset", offset_, document.GetAllocator());
+
+  Value events_json(kArrayType);
+
+  for (const Event& ev: events_) {
+    Value event_json(kObjectType);
+    event_json.AddMember("label", StringRef(ev.first.c_str()), document.GetAllocator());
+    event_json.AddMember("timestamp", ev.second, document.GetAllocator());
+    events_json.PushBack(event_json, document.GetAllocator());
+  }
+
+  event_sequence_json.AddMember("events", events_json, document.GetAllocator());
+  *value = event_sequence_json;
 }
 
 }

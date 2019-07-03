@@ -42,6 +42,9 @@ enum TRuntimeProfileFormat {
 
   // TRuntimeProfileTree.
   THRIFT = 2
+
+  // JSON profile
+  JSON = 3
 }
 
 // Counter data

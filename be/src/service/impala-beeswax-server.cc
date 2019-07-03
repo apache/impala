@@ -418,7 +418,8 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
   // GetRuntimeProfile() will validate that the user has access to 'query_id'.
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
   Status status = GetRuntimeProfileOutput(
-      query_id, GetEffectiveUser(*session), TRuntimeProfileFormat::STRING, &ss, nullptr);
+      query_id, GetEffectiveUser(*session), TRuntimeProfileFormat::STRING,
+      &ss, nullptr, nullptr);
   if (!status.ok()) {
     ss << "GetRuntimeProfile error: " << status.GetDetail();
     RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);

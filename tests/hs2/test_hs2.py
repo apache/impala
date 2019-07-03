@@ -652,6 +652,29 @@ class TestHS2(HS2TestSuite):
     assert statement in get_profile_resp.profile
     assert "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
+    # Check get JSON format profile
+    get_profile_req.format = 3  # json format
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    TestHS2.check_response(get_profile_resp)
+
+    try:
+      json_res = json.loads(get_profile_resp.profile)
+    except ValueError:
+      assert False, "Download JSON format query profile cannot be parsed." \
+          "Response text:{0}".format(get_profile_resp.profile)
+
+    # The query statement should exist in json info_strings
+    if ("child_profiles" not in json_res["contents"]) or \
+        ("info_strings" not in json_res["contents"]["child_profiles"][0]):
+      assert False, "JSON content is invalid. Content: {0}"\
+        .format(get_profile_resp.profile)
+
+    for info_string in json_res["contents"]["child_profiles"][0]["info_strings"]:
+      if info_string["key"] == "Sql Statement":
+        assert statement in info_string["value"], \
+          "JSON content is invalid. Content: {0}".format(get_profile_resp.profile)
+        break
+
   @needs_session(conf_overlay={"use:database": "functional"})
   def test_change_default_database(self):
     statement = "SELECT 1 FROM alltypes LIMIT 1"

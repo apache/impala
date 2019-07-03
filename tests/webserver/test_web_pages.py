@@ -553,27 +553,47 @@ class TestWebPage(ImpalaTestSuite):
     assert not backend_row['is_quiescing']
     assert len(backend_row['admit_mem_limit']) > 0
 
-  def test_download_text_profile(self):
+  def test_download_profile(self):
     """Test download text profile for a query"""
     query = "select count(*) from functional.alltypes"
     query_id = self.client.execute(query).query_id
     profile_page_url = "{0}query_profile?query_id={1}".format(
         self.ROOT_URL, query_id)
-    # Check the text download tag is there.
-    responses = self.get_and_check_status(
-        profile_page_url, "Download Text Profile",
+    # Check the download tag is there.
+    for profile_format in ["Text", "Json"]:
+      responses = self.get_and_check_status(
+        profile_page_url, profile_format,
         ports_to_test=self.IMPALAD_TEST_PORT)
-    assert len(responses) == 1
-    download_link = "query_profile_plain_text?query_id={0}".format(
-        query_id)
-    assert download_link in responses[0].text
-    # Get the response from download link and validate it by checking
-    # the query is in the file.
-    responses = self.get_and_check_status(
-        self.ROOT_URL + download_link, query, self.IMPALAD_TEST_PORT)
-    # Check the query id is in the content of the reponse.
-    assert len(responses) == 1
-    assert query_id in responses[0].text
+
+      assert len(responses) == 1
+
+      if profile_format == 'Text':
+        download_link = "query_profile_plain_text?query_id={0}".format(query_id)
+        assert download_link in responses[0].text
+        # Get the response from download link and validate it by checking
+        # the query is in the file.
+        responses = self.get_and_check_status(
+            self.ROOT_URL + download_link, query, self.IMPALAD_TEST_PORT)
+        # Check the query id is in the content of the reponse.
+        assert len(responses) == 1
+        assert query_id in responses[0].text
+      elif profile_format == 'Json':
+        download_link = "query_profile_json?query_id={0}".format(query_id)
+        assert download_link in responses[0].text
+        # Get the response from download link and validate it by checking
+        # the query is in the file.
+        responses = self.get_and_check_status(
+            self.ROOT_URL + download_link, query, self.IMPALAD_TEST_PORT)
+
+        assert len(responses) == 1
+        # Check the return content is valid json
+        try:
+          json_res = json.loads(responses[0].text)
+        except ValueError:
+          assert False, "Downloaded JSON format query profile cannot be parsed. " \
+              "Json profile:{0}".format(responses[0].text)
+        # Find the query id in json
+        assert query_id in json_res["contents"]["profile_name"], json_res
 
   def test_prometheus_metrics(self):
     """Test to check prometheus metrics"""

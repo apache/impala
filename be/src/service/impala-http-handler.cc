@@ -131,6 +131,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   webserver->RegisterUrlCallback("/query_profile_plain_text", "raw_text.tmpl",
         MakeCallback(this, &ImpalaHttpHandler::QueryProfileTextHandler), false);
 
+  webserver->RegisterUrlCallback("/query_profile_json", "raw_text.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryProfileJsonHandler), false);
+
   webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::InflightQueryIdsHandler), false);
 
@@ -237,7 +240,7 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
 
   stringstream ss;
   Status status = server_->GetRuntimeProfileOutput(
-      unique_id, "", TRuntimeProfileFormat::STRING, &ss, nullptr);
+      unique_id, "", TRuntimeProfileFormat::STRING, &ss, nullptr, nullptr);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -260,25 +263,37 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
     ss << status.GetDetail();
   } else {
     Status status = server_->GetRuntimeProfileOutput(
-      unique_id, "", format, &ss, nullptr);
+      unique_id, "", format, &ss, nullptr, document);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
   }
-  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
-      document->GetAllocator());
-  Value profile(ss.str().c_str(), document->GetAllocator());
-  document->AddMember("contents", profile, document->GetAllocator());
+  // JSON format contents already been added inside document in GetRuntimeProfileOutput()
+  if (format != TRuntimeProfileFormat::JSON){
+    Value profile(ss.str().c_str(), document->GetAllocator());
+    document->AddMember("contents", profile, document->GetAllocator());
+  }
 }
 
 void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::WebRequest& req,
     Document* document) {
   QueryProfileHelper(req, document, TRuntimeProfileFormat::BASE64);
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+      document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryProfileTextHandler(const Webserver::WebRequest& req,
     Document* document) {
   QueryProfileHelper(req, document, TRuntimeProfileFormat::STRING);
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+      document->GetAllocator());
+}
+
+void ImpalaHttpHandler::QueryProfileJsonHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  QueryProfileHelper(req, document, TRuntimeProfileFormat::JSON);
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_PLAIN_JSON_KEY), true,
+      document->GetAllocator());
 }
 
 void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::WebRequest& req,

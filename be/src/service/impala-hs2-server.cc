@@ -32,6 +32,8 @@
 #include <gperftools/malloc_extension.h>
 #include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
@@ -975,12 +977,19 @@ void ImpalaServer::GetRuntimeProfile(
 
   stringstream ss;
   TRuntimeProfileTree thrift_profile;
+  rapidjson::Document json_profile(rapidjson::kObjectType);
   HS2_RETURN_IF_ERROR(return_val,
-      GetRuntimeProfileOutput(
-          query_id, GetEffectiveUser(*session), request.format, &ss, &thrift_profile),
+      GetRuntimeProfileOutput(query_id, GetEffectiveUser(*session), request.format, &ss,
+          &thrift_profile, &json_profile),
       SQLSTATE_GENERAL_ERROR);
   if (request.format == TRuntimeProfileFormat::THRIFT) {
     return_val.__set_thrift_profile(thrift_profile);
+  } else if (request.format == TRuntimeProfileFormat::JSON) {
+    rapidjson::StringBuffer sb;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+    json_profile.Accept(writer);
+    ss << sb.GetString();
+    return_val.__set_profile(ss.str());
   } else {
     DCHECK(request.format == TRuntimeProfileFormat::STRING
         || request.format == TRuntimeProfileFormat::BASE64);

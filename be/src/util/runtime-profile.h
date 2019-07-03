@@ -22,7 +22,7 @@
 #include <boost/function.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <iostream>
-
+#include <rapidjson/document.h>
 #include "common/atomic.h"
 #include "common/status.h"
 #include "util/spinlock.h"
@@ -116,6 +116,16 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
     virtual double double_value() const {
       int64_t v = value_.Load();
       return *reinterpret_cast<const double*>(&v);
+    }
+
+    /// Builds a new Value into 'val', using (if required) the allocator from
+    /// 'document'. Should set the following fields where appropriate:
+    /// counter_name, value, kind, unit
+    virtual void ToJson(rapidjson::Document& document, rapidjson::Value* val) const;
+
+    ///  Return the name of the counter type
+    virtual string CounterType() const {
+      return "Counter";
     }
 
     TUnit::type unit() const { return unit_; }
@@ -314,6 +324,10 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Does not hold locks when it makes any function calls.
   void ToThrift(TRuntimeProfileTree* tree) const;
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
+
+  /// Store profile into JSON format into a document
+  void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
+  void ToJson(rapidjson::Document* d) const;
 
   /// Serializes the runtime profile to a string.  This first serializes the
   /// object using thrift compact binary format, then gzip compresses it and
@@ -599,6 +613,17 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   static void PrintChildCounters(const std::string& prefix,
       const std::string& counter_name, const CounterMap& counter_map,
       const ChildCounterMap& child_counter_map, std::ostream* s);
+
+  /// Add all the counters of this instance into the given parent node in JSON format
+  /// Args:
+  ///   parent: the root node to add all the counters
+  ///   d: document of this json, could be used to get Allocator
+  ///   counter_name: this will be used to find its child counters in child_counter_map
+  ///   counter_map: A map of counters name to counter
+  ///   child_counter_map: A map of counter to its child counters
+  void ToJsonCounters(rapidjson::Value* parent, rapidjson::Document* d,
+      const string& counter_name, const CounterMap& counter_map,
+      const ChildCounterMap& child_counter_map) const;
 };
 
 }

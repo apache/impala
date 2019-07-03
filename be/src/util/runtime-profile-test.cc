@@ -84,7 +84,7 @@ TEST(CountersTest, Basic) {
   from_thrift->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);
 
-  // Seralize/deserialize to archive string
+  // Serialize/deserialize to archive string
   string archive_str;
   EXPECT_OK(profile_a->SerializeToArchiveString(&archive_str));
   TRuntimeProfileTree deserialized_thrift_profile;
@@ -1157,6 +1157,174 @@ TEST(ToThrift, NodeMetadataIsSetCorrectly) {
   profile->SetPlanNodeId(1);
   profile->ToThrift(&thrift_profile);
   EXPECT_TRUE(thrift_profile.nodes[0].__isset.node_metadata);
+}
+
+TEST(ToJson, RuntimeProfileToJsonTest) {
+  ObjectPool pool;
+  RuntimeProfile* profile_a = RuntimeProfile::Create(&pool, "ProfileA");
+  RuntimeProfile* profile_a1 = RuntimeProfile::Create(&pool, "ProfileA1");
+  RuntimeProfile* profile_ab = RuntimeProfile::Create(&pool, "ProfileAb");
+  RuntimeProfile::Counter* counter_a;
+
+  // Initialize for further validation
+  profile_a->AddChild(profile_a1);
+  profile_a->AddChild(profile_ab);
+  profile_a->AddInfoString("Key", "Value");
+
+  counter_a = profile_a->AddCounter("A", TUnit::UNIT);
+  counter_a->Set(1);
+  RuntimeProfile::HighWaterMarkCounter* high_water_counter =
+      profile_a->AddHighWaterMarkCounter("high_water_counter", TUnit::BYTES);
+  high_water_counter->Set(10);
+  high_water_counter->Add(10);
+  high_water_counter->Set(10);
+
+  RuntimeProfile::SummaryStatsCounter* summary_stats_counter =
+      profile_a->AddSummaryStatsCounter("summary_stats_counter", TUnit::TIME_NS);
+  summary_stats_counter->UpdateCounter(10);
+  summary_stats_counter->UpdateCounter(20);
+
+  // Serialize to json
+  rapidjson::Document doc(rapidjson::kObjectType);
+  profile_a->ToJson(&doc);
+  rapidjson::Value& content = doc["contents"];
+
+  // Check profile correct
+  EXPECT_EQ("ProfileA", content["profile_name"]);
+  EXPECT_EQ("ProfileA1", content["child_profiles"][0]["profile_name"]);
+  EXPECT_EQ("ProfileAb", content["child_profiles"][1]["profile_name"]);
+
+  // Check Info String correct
+  EXPECT_EQ(1, content["info_strings"].Size());
+  EXPECT_EQ("Key", content["info_strings"][0]["key"]);
+  EXPECT_EQ("Value", content["info_strings"][0]["value"]);
+
+  // Check counter value matches
+  EXPECT_EQ(2, content["counters"].Size());
+  for (auto& itr : content["counters"].GetArray()) {
+    // check normal Counter
+    if (itr["counter_name"] == "A") {
+      EXPECT_EQ(1, itr["value"].GetInt());
+      EXPECT_EQ("UNIT", itr["unit"]);
+      EXPECT_EQ("Counter", itr["kind"]);
+    }// check HighWaterMarkCounter
+    else if (itr["counter_name"] == "high_water_counter") {
+      EXPECT_EQ(20, itr["value"].GetInt());
+      EXPECT_EQ("BYTES", itr["unit"]);
+      EXPECT_EQ("HighWaterMarkCounter", itr["kind"]);
+    } else {
+      DCHECK(false);
+    }
+  }
+
+  // Check SummaryStatsCounter
+  EXPECT_EQ(1, content["summary_stats_counters"].Size());
+  for (auto& itr : content["summary_stats_counters"].GetArray()) {
+    if (itr["counter_name"] == "summary_stats_counter") {
+      EXPECT_EQ(10, itr["min"].GetInt());
+      EXPECT_EQ(20, itr["max"].GetInt());
+      EXPECT_EQ(15, itr["avg"].GetInt());
+      EXPECT_EQ(2, itr["num_of_samples"].GetInt());
+      EXPECT_EQ("TIME_NS", itr["unit"]);
+      EXPECT_TRUE(!itr.HasMember("kind"));
+    }
+  }
+}
+
+// Test when some fields are not set. ToJson will not add them as a member
+TEST(ToJson, EmptyTest) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+
+  // Serialize to json
+  rapidjson::Document doc(rapidjson::kObjectType);
+  profile->ToJson(&doc);
+  rapidjson::Value& content = doc["contents"];
+
+  EXPECT_EQ("Profile", content["profile_name"]);
+  EXPECT_TRUE(content.HasMember("num_children"));
+
+  // Empty profile should not have following members
+  EXPECT_TRUE(!content.HasMember("info_strings"));
+  EXPECT_TRUE(!content.HasMember("event_sequences"));
+  EXPECT_TRUE(!content.HasMember("counters"));
+  EXPECT_TRUE(!content.HasMember("summary_stats_counters"));
+  EXPECT_TRUE(!content.HasMember("time_series_counters"));
+  EXPECT_TRUE(!content.HasMember("child_profiles"));
+
+}
+
+TEST(ToJson, EventSequenceToJsonTest) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  RuntimeProfile::EventSequence* seq = profile->AddEventSequence("event sequence");
+  seq->MarkEvent("aaaa");
+  seq->MarkEvent("bbbb");
+  seq->MarkEvent("cccc");
+
+  // Serialize to json
+  rapidjson::Document doc(rapidjson::kObjectType);
+  rapidjson::Value event_sequence_json(rapidjson::kObjectType);
+  seq->ToJson(doc, &event_sequence_json);
+
+  EXPECT_EQ(0, event_sequence_json["offset"].GetInt());
+
+  uint64_t last_timestamp = 0;
+  string last_string = "";
+  for (auto& itr : event_sequence_json["events"].GetArray()) {
+    EXPECT_TRUE(itr["timestamp"].GetInt() >= last_timestamp);
+    last_timestamp = itr["timestamp"].GetInt();
+    string label = string(itr["label"].GetString());
+    EXPECT_TRUE(label > last_string);
+    last_string = label;
+  }
+}
+
+TEST(ToJson, TimeSeriesCounterToJsonTest) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+
+  // 1. TimeSeriesCounter should be empty
+  rapidjson::Document doc(rapidjson::kObjectType);
+  profile->ToJson(&doc);
+  EXPECT_TRUE(!doc["contents"].HasMember("time_series_counters"));
+
+  // 2. Check Serialize to json
+  const int test_period = FLAGS_periodic_counter_update_period_ms;
+
+  // Add a counter with a sample function that counts up, starting from 0.
+  int value = 0;
+  auto sample_fn = [&value]() { return value++; };
+
+  // We increase the value of this flag to allow the counter to store enough samples.
+  FLAGS_status_report_interval_ms = 50000;
+  RuntimeProfile::TimeSeriesCounter* counter =
+      profile->AddChunkedTimeSeriesCounter("TimeSeriesCounter", TUnit::UNIT, sample_fn);
+  RuntimeProfile::TimeSeriesCounter* counter2 =
+      profile->AddSamplingTimeSeriesCounter("SamplingCounter", TUnit::UNIT, sample_fn);
+
+  // Stop counter updates from interfering with the rest of the test.
+  StopAndClearCounter(profile, counter);
+
+  // Reset value after previous values have been retrieved.
+  value = 0;
+  for (int i = 0; i < 64; ++i) counter->AddSample(test_period);
+
+  value = 0;
+  for (int i = 0; i < 80; ++i) counter2->AddSample(test_period);
+
+  profile->ToJson(&doc);
+  EXPECT_STR_CONTAINS(
+      doc["contents"]["time_series_counters"][1]["data"].GetString(), "0,1,2,3,4");
+
+  EXPECT_STR_CONTAINS(
+      doc["contents"]["time_series_counters"][1]["data"].GetString(), "60,61,62,63");
+
+  EXPECT_STR_CONTAINS(
+      doc["contents"]["time_series_counters"][0]["data"].GetString(), "0,2,4,6");
+
+  EXPECT_STR_CONTAINS(
+      doc["contents"]["time_series_counters"][0]["data"].GetString(), "72,74,76,78");
 }
 
 } // namespace impala

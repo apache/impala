@@ -549,7 +549,8 @@ struct TGetRuntimeProfileReq {
 struct TGetRuntimeProfileResp {
   1: required TCLIService.TStatus status
 
-  // Will be set on success if TGetRuntimeProfileReq.format was STRING or BASE64.
+  // Will be set on success if TGetRuntimeProfileReq.format
+  // was STRING, BASE64 or JSON.
   2: optional string profile
 
   // Will be set on success if TGetRuntimeProfileReq.format was THRIFT.

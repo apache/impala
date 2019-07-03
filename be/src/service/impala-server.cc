@@ -40,6 +40,7 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <rapidjson/error/en.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -794,7 +795,7 @@ Status ImpalaServer::InitProfileLogging() {
 
 Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     const string& user, TRuntimeProfileFormat::type format, stringstream* output,
-    TRuntimeProfileTree* thrift_output) {
+    TRuntimeProfileTree* thrift_output, Document* json_output) {
   DCHECK(output != nullptr);
   // Search for the query id in the active query map
   {
@@ -814,8 +815,10 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
         RETURN_IF_ERROR(request_state->profile()->SerializeToArchiveString(output));
       } else if (format == TRuntimeProfileFormat::THRIFT) {
         request_state->profile()->ToThrift(thrift_output);
+      } else if (format == TRuntimeProfileFormat::JSON) {
+        request_state->profile()->ToJson(json_output);
       } else {
-        DCHECK(format == TRuntimeProfileFormat::STRING);
+        DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
         request_state->profile()->PrettyPrint(output);
       }
       return Status::OK();
@@ -840,8 +843,19 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     } else if (format == TRuntimeProfileFormat::THRIFT) {
       RETURN_IF_ERROR(RuntimeProfile::DeserializeFromArchiveString(
           query_record->second->encoded_profile_str, thrift_output));
+    } else if (format == TRuntimeProfileFormat::JSON) {
+      ParseResult parse_ok = json_output->Parse(
+          query_record->second->json_profile_str.c_str());
+      // When there is an error, the json_output will stay unchanged
+      // based on rapidjson parse API
+      if (!parse_ok){
+        string err = strings::Substitute("JSON parse error: $0 (Offset: $1)",
+            GetParseError_En(parse_ok.Code()), parse_ok.Offset());
+        VLOG(1) << err;
+        return Status::Expected(err);
+      }
     } else {
-      DCHECK(format == TRuntimeProfileFormat::STRING);
+      DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
       (*output) << query_record->second->profile_str;
     }
   }
@@ -2012,6 +2026,15 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
     stringstream ss;
     request_state.profile()->PrettyPrint(&ss);
     profile_str = ss.str();
+
+    Document json_profile(rapidjson::kObjectType);
+    request_state.profile()->ToJson(&json_profile);
+
+    StringBuffer buffer;
+    Writer<StringBuffer> writer(buffer);
+    json_profile.Accept(writer);
+    json_profile_str = buffer.GetString();
+
     if (encoded_profile.empty()) {
       Status status =
           request_state.profile()->SerializeToArchiveString(&encoded_profile_str);

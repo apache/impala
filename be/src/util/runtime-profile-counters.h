@@ -99,7 +99,7 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
  public:
   HighWaterMarkCounter(TUnit::type unit) : Counter(unit) {}
 
-  virtual void Add(int64_t delta) {
+  void Add(int64_t delta) override {
     int64_t new_val = current_value_.Add(delta);
     UpdateMax(new_val);
   }
@@ -118,9 +118,13 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
     }
   }
 
-  virtual void Set(int64_t v) {
+  void Set(int64_t v) override {
     current_value_.Store(v);
     UpdateMax(v);
+  }
+
+  string CounterType() const override {
+    return "HighWaterMarkCounter";
   }
 
   int64_t current_value() const { return current_value_.Load(); }
@@ -150,8 +154,12 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
     : Counter(unit),
       counter_fn_(counter_fn) {}
 
-  virtual int64_t value() const {
+  int64_t value() const override {
     return counter_fn_();
+  }
+
+  string CounterType() const override {
+    return "DerivedCounter";
   }
 
  private:
@@ -198,11 +206,15 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
     }
   }
 
+  string CounterType() const override {
+    return "AveragedCounter";
+  }
+
   /// The value for this counter should be updated through UpdateCounter().
   /// Set() and Add() should not be used.
-  virtual void Set(double value) { DCHECK(false); }
-  virtual void Set(int64_t value) { DCHECK(false); }
-  virtual void Add(int64_t delta) { DCHECK(false); }
+  void Set(double value) override { DCHECK(false); }
+  void Set(int64_t value) override { DCHECK(false); }
+  void Add(int64_t delta) override { DCHECK(false); }
 
  private:
   /// Map from counters to their existing values. Modified via UpdateCounter().
@@ -250,14 +262,26 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
 
   /// The value for this counter should be updated through UpdateCounter() or SetStats().
   /// Set() and Add() should not be used.
-  virtual void Set(double value) { DCHECK(false); }
-  virtual void Set(int64_t value) { DCHECK(false); }
-  virtual void Add(int64_t delta) { DCHECK(false); }
+  void Set(double value) override { DCHECK(false); }
+  void Set(int64_t value) override { DCHECK(false); }
+  void Add(int64_t delta) override { DCHECK(false); }
 
   /// Overwrites the existing counter with 'counter'
   void SetStats(const TSummaryStatsCounter& counter);
 
   void ToThrift(TSummaryStatsCounter* counter, const std::string& name);
+
+  void ToJson(rapidjson::Document& document, rapidjson::Value* val) const override {
+    Counter::ToJson(document, val);
+    val->AddMember("min", min_, document.GetAllocator());
+    val->AddMember("max", max_, document.GetAllocator());
+    val->AddMember("avg", value(), document.GetAllocator());
+    val->AddMember("num_of_samples", total_num_values_, document.GetAllocator());
+  }
+
+  string CounterType() const override {
+    return "SummaryStatsCounter";
+  }
 
  private:
   /// The total number of values seen so far.
@@ -366,6 +390,17 @@ class RuntimeProfile::EventSequence {
 
   void ToThrift(TEventSequence* seq);
 
+  /// Builds a new Value into 'value', using (if required) the allocator from
+  /// 'document'. Should set the following fields where appropriate:
+  /// {
+  ///   “offset” : xxx,
+  ///   “events”: [{
+  ///       “label”: xxx,
+  ///       “timestamp”: xxx
+  ///   },{...}]
+  /// }
+  void ToJson(rapidjson::Document& document, rapidjson::Value* value);
+
  private:
   /// Sorts events by their timestamp. Caller must hold lock_.
   void SortEvents() {
@@ -409,6 +444,17 @@ class RuntimeProfile::TimeSeriesCounter {
   friend class RuntimeProfile;
 
   void ToThrift(TTimeSeriesCounter* counter);
+
+  /// Builds a new Value into 'value', using (if required) the allocator from
+  /// 'document'. Should set the following fields where appropriate:
+  /// {
+  ///   “counter_name” : xxx,
+  ///   “unit” : xxx,
+  ///   “num” : xxx,
+  ///   “period” : xxx,
+  ///   “data”: “x,x,x,x”
+  /// }
+  virtual void ToJson(rapidjson::Document& document, rapidjson::Value* val);
 
   /// Adds a sample to the counter. Caller must hold lock_.
   virtual void AddSampleLocked(int64_t value, int ms_elapsed) = 0;
@@ -512,7 +558,7 @@ class RuntimeProfile::ConcurrentTimerCounter : public Counter {
  public:
   ConcurrentTimerCounter(TUnit::type unit) : Counter(unit) {}
 
-  virtual int64_t value() const { return csw_.TotalRunningTime(); }
+  int64_t value() const override { return csw_.TotalRunningTime(); }
 
   void Start() { csw_.Start(); }
 
@@ -523,20 +569,24 @@ class RuntimeProfile::ConcurrentTimerCounter : public Counter {
 
   /// The value for this counter should come from internal ConcurrentStopWatch.
   /// Set() and Add() should not be used.
-  virtual void Set(double value) {
+  void Set(double value) override {
     DCHECK(false);
   }
 
-  virtual void Set(int64_t value) {
+  void Set(int64_t value) override {
     DCHECK(false);
   }
 
-  virtual void Set(int value) {
+  void Set(int value) override {
     DCHECK(false);
   }
 
-  virtual void Add(int64_t delta) {
+  void Add(int64_t delta) override {
     DCHECK(false);
+  }
+
+  string CounterType() const override {
+    return "ConcurrentTimerCounter";
   }
 
  private:

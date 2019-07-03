@@ -123,6 +123,11 @@ class ImpalaHttpHandler {
   void QueryProfileTextHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
+  /// Upon return, 'document' will contain the query profile as a JSON object in
+  /// 'contents'.
+  void QueryProfileJsonHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
+
   /// Produces a list of inflight query IDs printed as text in 'contents'.
   void InflightQueryIdsHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
