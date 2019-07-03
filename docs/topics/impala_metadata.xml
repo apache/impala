@@ -42,6 +42,104 @@ under the License.
 
   </conbody>
 
+  <concept id="on_demand_metadata">
+
+    <title>On-demand Metadata</title>
+
+    <conbody>
+
+      <p>
+        In previous versions of Impala, every coordinator kept a replica of all the cache in
+        <codeph>catalogd</codeph>, consuming large memory on each coordinator with no option to
+        evict. Metadata always propagated through the <codeph>statestored</codeph> and suffers
+        from head-of-line blocking, for example, one user loading a big table blocking another
+        user loading a small table.
+      </p>
+
+      <p>
+        With this new feature, the coordinators pull metadata as needed from
+        <codeph>catalogd</codeph> and cache it locally. The cached metadata gets evicted
+        automatically under memory pressure.
+      </p>
+
+      <p>
+        The granularity of on-demand metadata fetches is now at the partition level between the
+        coordinator and <codeph>catalogd</codeph>. Common use cases like add/drop partitions do
+        not trigger unnecessary serialization/deserialization of large metadata.
+      </p>
+
+      <p>
+        This feature is disabled by default.
+      </p>
+
+      <p>
+        The feature can be used in either of the following modes.
+        <dl>
+          <dlentry>
+
+            <dt>
+              Metadata on-demand mode
+            </dt>
+
+            <dd>
+              In this mode, all coordinators use the metadata on-demand.
+            </dd>
+
+            <dd>
+              Set the following on <codeph>catalogd</codeph>:
+<codeblock>--catalog_topic_mode=minimal</codeblock>
+            </dd>
+
+            <dd>
+              Set the following on all <codeph>impalad</codeph> coordinators:
+<codeblock>--use_local_catalog=true</codeblock>
+            </dd>
+
+          </dlentry>
+
+          <dlentry>
+
+            <dt>
+              Mixed mode
+            </dt>
+
+            <dd>
+              In this mode, only some coordinators are enabled to use the metadata on-demand.
+            </dd>
+
+            <dd>
+              We recommend that you use the mixed mode only for testing local catalog’s impact
+              on heap usage.
+            </dd>
+
+            <dd>
+              Set the following on <codeph>catalogd</codeph>:
+<codeblock>--catalog_topic_mode=mixed</codeblock>
+            </dd>
+
+            <dd>
+              Set the following on <codeph>impalad</codeph> coordinators with metdadata
+              on-demand:
+<codeblock>--use_local_catalog=true </codeblock>
+            </dd>
+
+          </dlentry>
+        </dl>
+      </p>
+
+      <p>
+        <b>Limitation:</b>
+      </p>
+
+      <p>
+        Global <codeph>INVALIDATES</codeph> are not supported when this feature is enabled. If
+        your workload requires global <codeph>INVALIDATES</codeph>, do not use this feature.
+      </p>
+
+    </conbody>
+
+  </concept>
+
   <concept id="auto_invalidate_metadata">
 
     <title>Automatic Invalidation of Metadata Cache</title>
