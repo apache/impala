@@ -213,8 +213,8 @@ under the License.
         </li>
 
         <li>
-          The Spark APIs that saves data to a specified location does not generate events in
-          HMS, thus is not supported. For example:
+          The Spark API that saves data to a specified location does not generate events in HMS,
+          thus is not supported. For example:
 <codeblock>Seq((1, 2)).toDF("i", "j").write.save("/user/hive/warehouse/spark_etl.db/customers/date=01012019")</codeblock>
         </li>
       </ul>
