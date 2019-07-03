@@ -302,9 +302,8 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
             options <codeph>--null-non-string</codeph> and
               <codeph>--null-string</codeph> to ensure all <codeph>NULL</codeph>
             values are represented correctly in the Sqoop output files.
-              <codeph>\N</codeph> needs to be escaped as in the below example: </p>
-          <p><codeph>--null-string '\\N' <codeph>--null-non-string
-                '\\N'</codeph></codeph>
+              <codeph>\N</codeph> needs to be escaped as in the below example:
+            <codeblock>--null-string '\\N' --null-non-string '\\N'</codeblock>
           </p>
         </li>
         <li>
