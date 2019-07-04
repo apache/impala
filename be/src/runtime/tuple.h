@@ -103,6 +103,10 @@ class Tuple {
     ClearNullBits(tuple_desc.null_bytes_offset(), tuple_desc.num_null_bytes());
   }
 
+  static void ClearNullBits(Tuple* that, int null_bytes_offset, int num_null_bytes) {
+    if (that != nullptr) that->ClearNullBits(null_bytes_offset, num_null_bytes);
+  }
+
   void ClearNullBits(int null_bytes_offset, int num_null_bytes) {
     Ubsan::MemSet(
         reinterpret_cast<uint8_t*>(this) + null_bytes_offset, 0, num_null_bytes);

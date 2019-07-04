@@ -509,7 +509,7 @@ class HdfsScanner {
     if (has_template_tuple(template_tuple)) {
       InitTupleFromTemplate(template_tuple, tuple, tuple_byte_size(*desc));
     } else {
-      tuple->ClearNullBits(desc->null_bytes_offset(), desc->num_null_bytes());
+      Tuple::ClearNullBits(tuple, desc->null_bytes_offset(), desc->num_null_bytes());
     }
   }
 
