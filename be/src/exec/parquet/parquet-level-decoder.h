@@ -52,7 +52,7 @@ class ParquetLevelDecoder {
   /// Initialize the LevelDecoder. Reads and advances the provided data buffer if the
   /// encoding requires reading metadata from the page header. 'cache_size' will be
   /// rounded up to a multiple of 32 internally.
-  Status Init(const string& filename, parquet::Encoding::type encoding,
+  Status Init(const string& filename, const parquet::Encoding::type* encoding,
       MemPool* cache_pool, int cache_size, int max_level, uint8_t** data, int* data_size);
 
   /// Returns the next level or INVALID_LEVEL if there was an error. Not as efficient

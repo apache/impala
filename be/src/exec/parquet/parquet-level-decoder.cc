@@ -21,6 +21,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "util/bit-util.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -32,7 +33,7 @@ const int16_t ParquetLevel::ROW_GROUP_END;
 const int16_t ParquetLevel::INVALID_LEVEL;
 const int16_t ParquetLevel::INVALID_POS;
 
-Status ParquetLevelDecoder::Init(const string& filename, Encoding::type encoding,
+Status ParquetLevelDecoder::Init(const string& filename, const Encoding::type* encoding,
     MemPool* cache_pool, int cache_size, int max_level, uint8_t** data, int* data_size) {
   DCHECK(*data != nullptr);
   DCHECK_GE(*data_size, 0);
@@ -46,7 +47,12 @@ Status ParquetLevelDecoder::Init(const string& filename, Encoding::type encoding
   if (max_level == 0) return Status::OK();
 
   int32_t num_bytes = 0;
-  switch (encoding) {
+  if (Ubsan::EnumToInt(encoding) > Encoding::MAX_ENUM_VALUE) {
+    stringstream ss;
+    ss << "Unsupported encoding: " << Ubsan::EnumToInt(encoding);
+    return Status(ss.str());
+  }
+  switch (*encoding) {
     case Encoding::RLE: {
       Status status;
       if (!ReadWriteUtil::Read(data, data_size, &num_bytes, &status)) {
@@ -63,7 +69,7 @@ Status ParquetLevelDecoder::Init(const string& filename, Encoding::type encoding
       return Status(TErrorCode::PARQUET_BIT_PACKED_LEVELS, filename);
     default: {
       stringstream ss;
-      ss << "Unsupported encoding: " << encoding;
+      ss << "Unsupported encoding: " << *encoding;
       return Status(ss.str());
     }
   }

@@ -450,6 +450,15 @@ enum Encoding {
   /** Dictionary encoding: the ids are encoded using the RLE encoding
    */
   RLE_DICTIONARY = 8;
+
+  /**
+   * Useful for checking an integer's value before casting it to an enum of this type.
+   * That check has value in avoiding undefined behavior in the [expr] section of the
+   * C++14 standard: "If during the evaluation of an expression, the result is not
+   * mathematically defined or not in the range of representable values for its type,
+   * the behavior is undefined."
+   */
+  MAX_ENUM_VALUE = 8;
 }
 
 /**
