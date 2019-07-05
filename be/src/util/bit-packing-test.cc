@@ -32,8 +32,8 @@ using std::mt19937;
 namespace impala {
 
 namespace {
-uint64_t ComputeMask(int bit_width) {
-  return (bit_width < 64) ? ((1UL << bit_width) - 1) : ~0UL;
+uint32_t ComputeMask(int bit_width) {
+  return (bit_width < 32) ? ((1U << bit_width) - 1) : ~0U;
 }
 }
 
@@ -45,19 +45,19 @@ uint64_t ComputeMask(int bit_width) {
 ///
 /// This is to test that we do not overrun either the input or output buffer for smaller
 /// batch sizes.
-void UnpackSubset(const uint64_t* in, const uint8_t* packed, int num_in_values,
+void UnpackSubset(const uint32_t* in, const uint8_t* packed, int num_in_values,
     int bit_width, bool aligned);
 
 /// Test a packing/unpacking round-trip of the 'num_in_values' values in 'in',
 /// packed with 'bit_width'. If 'aligned' is true, buffers for packed and unpacked data
 /// are allocated at a 64-byte aligned address. Otherwise the buffers are misaligned
 /// by 1 byte from a 64-byte aligned address.
-void PackUnpack(const uint64_t* in, int num_in_values, int bit_width, bool aligned) {
+void PackUnpack(const uint32_t* in, int num_in_values, int bit_width, bool aligned) {
   LOG(INFO) << "num_in_values = " << num_in_values << " bit_width = " << bit_width
             << " aligned = " << aligned;
 
   // Mask out higher bits so that the values to pack are in range.
-  const uint64_t mask = ComputeMask(bit_width);
+  const uint32_t mask = ComputeMask(bit_width);
   const int misalignment = aligned ? 0 : 1;
 
   const int bytes_required = BitUtil::RoundUpNumBytes(bit_width * num_in_values);
@@ -79,8 +79,8 @@ void PackUnpack(const uint64_t* in, int num_in_values, int bit_width, bool align
   for (const int num_to_unpack : {num_in_values, num_in_values + 1, num_in_values + 77}) {
     LOG(INFO) << "Unpacking " << num_to_unpack;
     // Size buffer exactly so that ASAN can detect reads/writes that overrun the buffer.
-    AlignedAllocation out_storage(num_to_unpack * sizeof(uint64_t) + misalignment);
-    uint64_t* out = reinterpret_cast<uint64_t*>(out_storage.data() + misalignment);
+    AlignedAllocation out_storage(num_to_unpack * sizeof(uint32_t) + misalignment);
+    uint32_t* out = reinterpret_cast<uint32_t*>(out_storage.data() + misalignment);
     const auto result = BitPacking::UnpackValues(
         bit_width, packed, writer.bytes_written(), num_to_unpack, out);
     ASSERT_EQ(packed + writer.bytes_written(), result.first)
@@ -105,7 +105,7 @@ void PackUnpack(const uint64_t* in, int num_in_values, int bit_width, bool align
   UnpackSubset(in, packed, num_in_values, bit_width, aligned);
 }
 
-void UnpackSubset(const uint64_t* in, const uint8_t* packed, int num_in_values,
+void UnpackSubset(const uint32_t* in, const uint8_t* packed, int num_in_values,
     int bit_width, bool aligned) {
   const int misalignment = aligned ? 0 : 1;
   for (int num_to_unpack : {1, 10, 77, num_in_values - 7}) {
@@ -116,8 +116,8 @@ void UnpackSubset(const uint64_t* in, const uint8_t* packed, int num_in_values,
     AlignedAllocation packed_copy_storage(bytes_to_read + misalignment);
     uint8_t* packed_copy = packed_copy_storage.data() + misalignment;
     memcpy(packed_copy, packed, bytes_to_read);
-    AlignedAllocation out_storage(num_to_unpack * sizeof(uint64_t) + misalignment);
-    uint64_t* out = reinterpret_cast<uint64_t*>(out_storage.data() + misalignment);
+    AlignedAllocation out_storage(num_to_unpack * sizeof(uint32_t) + misalignment);
+    uint32_t* out = reinterpret_cast<uint32_t*>(out_storage.data() + misalignment);
     const auto result = BitPacking::UnpackValues(
         bit_width, packed_copy, bytes_to_read, num_to_unpack, out);
     ASSERT_EQ(packed_copy + bytes_to_read, result.first) << "Read wrong # of bytes";
@@ -132,9 +132,9 @@ void UnpackSubset(const uint64_t* in, const uint8_t* packed, int num_in_values,
 
 TEST(BitPackingTest, RandomUnpack) {
   constexpr int NUM_IN_VALUES = 64 * 1024;
-  uint64_t in[NUM_IN_VALUES];
+  uint32_t in[NUM_IN_VALUES];
   mt19937 rng;
-  uniform_int_distribution<uint64_t> dist;
+  uniform_int_distribution<uint32_t> dist;
   std::generate(std::begin(in), std::end(in), [&rng, &dist] { return dist(rng); });
 
   // Test various odd input lengths to exercise boundary cases for full and partial
@@ -145,7 +145,7 @@ TEST(BitPackingTest, RandomUnpack) {
     lengths.push_back(i);
   }
 
-  for (int bit_width = 0; bit_width <= 64; ++bit_width) {
+  for (int bit_width = 0; bit_width <= 32; ++bit_width) {
     for (const int length : lengths) {
       // Test that unpacking to/from aligned and unaligned memory works.
       for (const bool aligned : {true, false}) {

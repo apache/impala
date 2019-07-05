@@ -23,17 +23,16 @@
 #include <string.h>
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "util/bit-packing.h"
 #include "util/bit-util.h"
 
 namespace impala {
 
-/// Utility class to write bit/byte streams. This class can write data to either be
+/// Utility class to write bit/byte streams.  This class can write data to either be
 /// bit packed or byte aligned (and a single stream that has a mix of both).
 /// This class does not allocate memory.
 class BitWriter {
  public:
-  /// buffer: buffer to write bits to. Buffer should be preallocated with
+  /// buffer: buffer to write bits to.  Buffer should be preallocated with
   /// 'buffer_len' bytes.
   BitWriter(uint8_t* buffer, int buffer_len) :
       buffer_(buffer),
@@ -65,16 +64,7 @@ class BitWriter {
   /// Write an unsigned ULEB-128 encoded int to the buffer. Return false if there was not
   /// enough room. The value is written byte aligned. For more details on ULEB-128:
   /// https://en.wikipedia.org/wiki/LEB128
-  /// UINT_T must be an unsigned integer type.
-  template<typename UINT_T>
-  bool PutUleb128(UINT_T v);
-
-  /// Write a ZigZag encoded int to the buffer. Return false if there was not enough
-  /// room. The value is written byte aligned. For more details on ZigZag encoding:
-  /// https://developers.google.com/protocol-buffers/docs/encoding#signed-integers
-  /// INT_T must be a signed integer type.
-  template<typename INT_T>
-  bool PutZigZagInteger(INT_T v);
+  bool PutUleb128Int(uint32_t v);
 
   /// Get a pointer to the next aligned byte and advance the underlying buffer
   /// by num_bytes.
@@ -87,7 +77,7 @@ class BitWriter {
   void Flush(bool align=false);
 
   /// Maximum supported bitwidth for writer.
-  static const int MAX_BITWIDTH = 64;
+  static const int MAX_BITWIDTH = 32;
 
  private:
   uint8_t* buffer_;
@@ -167,29 +157,16 @@ class BatchedBitReader {
   /// at the beginning of a byte. Return false if there were not enough bytes in the
   /// buffer or the int is invalid. For more details on ULEB-128:
   /// https://en.wikipedia.org/wiki/LEB128
-  /// UINT_T must be an unsigned integer type.
-  template<typename UINT_T>
-  bool GetUleb128(UINT_T* v);
-
-  /// Read a ZigZag encoded int from the stream. The encoded int must start at the
-  /// beginning of a byte. Return false if there were not enough bytes in the buffer or
-  /// the int is invalid. For more details on ZigZag encoding:
-  /// https://developers.google.com/protocol-buffers/docs/encoding#signed-integers
-  /// INT_T must be a signed integer type.
-  template<typename INT_T>
-  bool GetZigZagInteger(INT_T* v);
+  bool GetUleb128Int(uint32_t* v);
 
   /// Returns the number of bytes left in the stream.
   int bytes_left() { return buffer_end_ - buffer_pos_; }
 
-  /// Maximum byte length of a vlq encoded integer of type T.
-  template <typename T>
-  static constexpr int max_vlq_byte_len() {
-    return BitUtil::Ceil(sizeof(T) * 8, 7);
-  }
+  /// Maximum byte length of a vlq encoded int
+  static const int MAX_VLQ_BYTE_LEN = 5;
 
   /// Maximum supported bitwidth for reader.
-  static const int MAX_BITWIDTH = BitPacking::MAX_BITWIDTH;
+  static const int MAX_BITWIDTH = 32;
 
  private:
   /// Current read position in the buffer.
