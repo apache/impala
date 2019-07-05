@@ -44,6 +44,7 @@
 #include "util/dict-encoding.h"
 #include "util/pretty-printer.h"
 #include "util/rle-encoding.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -1266,7 +1267,9 @@ Status BaseScalarColumnReader::InitDictionary() {
   if (eos) return Status::OK();
   // The dictionary must be the first data page, so if the first page
   // is not a dictionary, then there is no dictionary.
-  if (next_page_header.type != parquet::PageType::DICTIONARY_PAGE) return Status::OK();
+  if (Ubsan::EnumToInt(&next_page_header.type) != parquet::PageType::DICTIONARY_PAGE) {
+    return Status::OK();
+  }
 
   current_page_header_ = next_page_header;
   Status status;
