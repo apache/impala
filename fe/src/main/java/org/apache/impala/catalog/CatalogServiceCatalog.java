@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.google.common.base.Stopwatch;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -54,6 +53,8 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.catalog.monitor.CatalogTableMetrics;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -73,6 +74,7 @@ import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
+import org.apache.impala.thrift.TGetOperationUsageResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
@@ -1581,8 +1583,6 @@ public class CatalogServiceCatalog extends Catalog {
           try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
             dbName = dbName.toLowerCase();
             Db oldDb = oldDbCache.get(dbName);
-            // invalidateDb() will return empty table list
-            // if loadInBackground_ is set to false
             Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
                 dbName, oldDb);
             if (invalidatedDb == null) continue;
@@ -2066,17 +2066,12 @@ public class CatalogServiceCatalog extends Catalog {
       versionLock_.writeLock().unlock();
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
-        Stopwatch hmsLoadSW = new Stopwatch().start();
-        long hmsLoadTime;
         try {
           msTbl = msClient.getHiveClient().getTable(dbName, tblName);
         } catch (Exception e) {
           throw new TableLoadingException("Error loading metadata for table: " +
               dbName + "." + tblName, e);
-        } finally {
-          hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
         }
-        tbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
       tbl.setCatalogVersion(newCatalogVersion);
@@ -2781,32 +2776,31 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TGetCatalogUsageResponse getCatalogUsage() {
     TGetCatalogUsageResponse usage = new TGetCatalogUsageResponse();
+    CatalogTableMetrics catalogTableMetrics =
+        CatalogMonitor.INSTANCE.getCatalogTableMetrics();
     usage.setLarge_tables(new ArrayList<>());
     usage.setFrequently_accessed_tables(new ArrayList<>());
     usage.setHigh_file_count_tables(new ArrayList<>());
     usage.setLong_metadata_loading_tables(new ArrayList<>());
-    for (Table largeTable: CatalogUsageMonitor.INSTANCE.getLargestTables()) {
+    for (Table largeTable : catalogTableMetrics.getLargestTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(largeTable.getTableName().toThrift());
       tableUsageMetrics.setMemory_estimate_bytes(largeTable.getEstimatedMetadataSize());
       usage.addToLarge_tables(tableUsageMetrics);
     }
-    for (Table frequentTable:
-        CatalogUsageMonitor.INSTANCE.getFrequentlyAccessedTables()) {
+    for (Table frequentTable : catalogTableMetrics.getFrequentlyAccessedTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(frequentTable.getTableName().toThrift());
       tableUsageMetrics.setNum_metadata_operations(frequentTable.getMetadataOpsCount());
       usage.addToFrequently_accessed_tables(tableUsageMetrics);
     }
-    for (Table mostFilesTable:
-        CatalogUsageMonitor.INSTANCE.getHighFileCountTables()) {
+    for (Table mostFilesTable : catalogTableMetrics.getHighFileCountTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(mostFilesTable.getTableName().toThrift());
       tableUsageMetrics.setNum_files(mostFilesTable.getNumFiles());
       usage.addToHigh_file_count_tables(tableUsageMetrics);
     }
-    for (Table longestLoadingTable:
-        CatalogUsageMonitor.INSTANCE.getLongMetadataLoadingTables()) {
+    for (Table longestLoadingTable : catalogTableMetrics.getLongMetadataLoadingTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(longestLoadingTable.getTableName().toThrift());
       tableUsageMetrics.setMedian_table_loading_ns(
@@ -2824,6 +2818,14 @@ public class CatalogServiceCatalog extends Catalog {
       usage.addToLong_metadata_loading_tables(tableUsageMetrics);
     }
     return usage;
+  }
+
+  /**
+   * Retrieves information about the current catalog on-going operations.
+   */
+  public TGetOperationUsageResponse getOperationUsage() {
+    return new TGetOperationUsageResponse(
+        CatalogMonitor.INSTANCE.getCatalogOperationMetrics().getOperationMetrics());
   }
 
   /**

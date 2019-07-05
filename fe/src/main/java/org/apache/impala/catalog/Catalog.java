@@ -34,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
@@ -208,7 +209,7 @@ public abstract class Catalog implements AutoCloseable {
     if (db == null) return null;
     Table tbl = db.removeTable(tableName.getTable_name());
     if (tbl != null && !tbl.isStoredInImpaladCatalogCache()) {
-      CatalogUsageMonitor.INSTANCE.removeTable(tbl);
+      CatalogMonitor.INSTANCE.getCatalogTableMetrics().removeTable(tbl);
     }
     return tbl;
   }

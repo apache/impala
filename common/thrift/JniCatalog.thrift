@@ -747,7 +747,7 @@ struct TTableUsageMetrics {
 }
 
 // Response to a GetCatalogUsage request.
-struct TGetCatalogUsageResponse{
+struct TGetCatalogUsageResponse {
   // List of the largest (in terms of memory requirements) tables.
   1: required list<TTableUsageMetrics> large_tables
 
@@ -760,6 +760,25 @@ struct TGetCatalogUsageResponse{
 
   // List of the tables that have the longest table metadata loading time
   4: required list<TTableUsageMetrics> long_metadata_loading_tables
+}
+
+// Stores the number of in-progress operations aggregated based on the
+// catalog operation and/or table name.
+struct TOperationUsageCounter {
+  // Name of the catalog operation request
+  1: required string catalog_op_name
+
+  // Fully qualified table name
+  2: required string table_name
+
+  // Number of catalog operation requests in progress
+  3: optional i64 op_counter
+}
+
+// Response to getOperationUsage request.
+struct TGetOperationUsageResponse {
+  // List of the the number of running catalog operations
+  1: required list<TOperationUsageCounter> catalog_op_counters
 }
 
 struct TColumnName {

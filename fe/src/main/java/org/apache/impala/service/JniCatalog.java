@@ -35,6 +35,8 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.catalog.monitor.CatalogOperationMetrics;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -90,6 +92,10 @@ public class JniCatalog {
 
   // A unique identifier for this instance of the Catalog Service.
   private static final TUniqueId catalogServiceId_ = generateId();
+
+  // A singleton monitoring class that keeps track of the catalog usage metrics.
+  private final CatalogOperationMetrics catalogOperationUsage =
+      CatalogMonitor.INSTANCE.getCatalogOperationMetrics();
 
   private static TUniqueId generateId() {
     UUID uuid = UUID.randomUUID();
@@ -178,7 +184,12 @@ public class JniCatalog {
     TResetMetadataRequest req = new TResetMetadataRequest();
     JniUtil.deserializeThrift(protocolFactory_, req, thriftResetMetadataReq);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalogOpExecutor_.execResetMetadata(req));
+    catalogOperationUsage.increment(req);
+    try {
+      return serializer.serialize(catalogOpExecutor_.execResetMetadata(req));
+    } finally {
+      catalogOperationUsage.decrement(req);
+    }
   }
 
   /**
@@ -319,7 +330,12 @@ public class JniCatalog {
     TUpdateCatalogRequest request = new TUpdateCatalogRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftUpdateCatalog);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalogOpExecutor_.updateCatalog(request));
+    catalogOperationUsage.increment(request);
+    try {
+      return serializer.serialize(catalogOpExecutor_.updateCatalog(request));
+    } finally {
+      catalogOperationUsage.decrement(request);
+    }
   }
 
   /**
@@ -328,6 +344,14 @@ public class JniCatalog {
   public byte[] getCatalogUsage() throws ImpalaException, TException {
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalog_.getCatalogUsage());
+  }
+
+  /**
+   * Returns information about the current catalog operation metrics.
+   */
+  public byte[] getOperationUsage() throws ImpalaException, TException {
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(catalog_.getOperationUsage());
   }
 
   public byte[] getEventProcessorSummary() throws TException {

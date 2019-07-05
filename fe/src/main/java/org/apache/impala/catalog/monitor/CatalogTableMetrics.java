@@ -15,24 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog;
+package org.apache.impala.catalog.monitor;
+
+import com.google.common.base.Function;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.util.TopNCache;
 
 import java.util.List;
 
-import org.apache.impala.util.TopNCache;
-
-import com.google.common.base.Function;
-
 /**
- * Singleton class that monitors catalog usage. Currently, it tracks the most
- * frequently accessed tables (in terms of number of metadata operations),
- * the tables with the highest (estimated) memory requirements, and
- * the table with most number of files.
- * This class is thread-safe.
+ * Class that monitors catalog table usage. Currently, it tracks,
+ *  - the most frequently accessed tables (in terms of number of metadata operations)
+ *  - the tables with the highest (estimated) memory requirements
+ *  - the tables with the highest number of files
+ *  - the tables with the longest table metadata loading time
+ *
+ *  This class is thread-safe.
  */
-public final class CatalogUsageMonitor {
-
-  public final static CatalogUsageMonitor INSTANCE = new CatalogUsageMonitor();
+public final class CatalogTableMetrics {
+  public final static CatalogTableMetrics INSTANCE = new CatalogTableMetrics();
 
   private final TopNCache<Table, Long> frequentlyAccessedTables_;
 
@@ -42,36 +43,40 @@ public final class CatalogUsageMonitor {
 
   private final TopNCache<Table, Long> longMetadataLoadingTables_;
 
-  private CatalogUsageMonitor() {
+  private CatalogTableMetrics() {
     final int num_tables_tracked = Integer.getInteger(
         "org.apache.impala.catalog.CatalogUsageMonitor.NUM_TABLES_TRACKED", 25);
     final int num_loading_time_tables_tracked = Integer.getInteger(
         "org.apache.impala.catalog.CatalogUsageMonitor.NUM_LOADING_TIME_TABLES_TRACKED",
         100);
-    frequentlyAccessedTables_ = new TopNCache<Table, Long>(
-        new Function<Table, Long>() {
-          @Override
-          public Long apply(Table tbl) { return tbl.getMetadataOpsCount(); }
-        }, num_tables_tracked, true);
+    frequentlyAccessedTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
+      @Override
+      public Long apply(Table tbl) {
+        return tbl.getMetadataOpsCount();
+      }
+    }, num_tables_tracked, true);
 
-    largestTables_ = new TopNCache<Table, Long>(
-        new Function<Table, Long>() {
-          @Override
-          public Long apply(Table tbl) { return tbl.getEstimatedMetadataSize(); }
-        }, num_tables_tracked, false);
+    largestTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
+      @Override
+      public Long apply(Table tbl) {
+        return tbl.getEstimatedMetadataSize();
+      }
+    }, num_tables_tracked, false);
 
-    highFileCountTables_ = new TopNCache<Table, Long>(
-        new Function<Table, Long>() {
-          @Override
-          public Long apply(Table tbl) { return tbl.getNumFiles(); }
-        }, num_tables_tracked, false);
+    highFileCountTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
+      @Override
+      public Long apply(Table tbl) {
+        return tbl.getNumFiles();
+      }
+    }, num_tables_tracked, false);
 
     // sort by maximum loading time by default
-    longMetadataLoadingTables_ = new TopNCache<Table, Long>(
-        new Function<Table, Long>() {
-          @Override
-          public Long apply(Table tbl) { return tbl.getMaxTableLoadingTime(); }
-        }, num_loading_time_tables_tracked, false);
+    longMetadataLoadingTables_ = new TopNCache<Table, Long>(new Function<Table, Long>() {
+      @Override
+      public Long apply(Table tbl) {
+        return tbl.getMaxTableLoadingTime();
+      }
+    }, num_loading_time_tables_tracked, false);
   }
 
   public void updateFrequentlyAccessedTables(Table tbl) {

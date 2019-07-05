@@ -91,6 +91,8 @@ const string CATALOG_WEB_PAGE = "/catalog";
 const string CATALOG_TEMPLATE = "catalog.tmpl";
 const string CATALOG_OBJECT_WEB_PAGE = "/catalog_object";
 const string CATALOG_OBJECT_TEMPLATE = "catalog_object.tmpl";
+const string CATALOG_OPERATIONS_WEB_PAGE = "/operations";
+const string CATALOG_OPERATIONS_TEMPLATE = "catalog_operations.tmpl";
 const string TABLE_METRICS_WEB_PAGE = "/table_metrics";
 const string TABLE_METRICS_TEMPLATE = "table_metrics.tmpl";
 const string EVENT_WEB_PAGE = "/events";
@@ -296,6 +298,9 @@ void CatalogServer::RegisterWebpages(Webserver* webserver) {
   webserver->RegisterUrlCallback(EVENT_WEB_PAGE, EVENT_METRICS_TEMPLATE,
       [this](const auto& args, auto* doc) { this->EventMetricsUrlCallback(args, doc); },
       false);
+  webserver->RegisterUrlCallback(CATALOG_OPERATIONS_WEB_PAGE, CATALOG_OPERATIONS_TEMPLATE,
+      [this](const auto& args, auto* doc) { this->OperationUsageUrlCallback(args, doc); },
+      true);
   RegisterLogLevelCallbacks(webserver, true);
 }
 
@@ -634,6 +639,49 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
         document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
   }
+}
+
+void CatalogServer::OperationUsageUrlCallback(
+    const Webserver::WebRequest& req, Document* document) {
+  TGetOperationUsageResponse opeartion_usage;
+  Status status = catalog_->GetOperationUsage(&opeartion_usage);
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+
+  // Add the catalog operation counters to the document
+  Value catalog_op_list(kArrayType);
+  for (const auto& catalog_op : opeartion_usage.catalog_op_counters) {
+    Value catalog_op_obj(kObjectType);
+    Value op_name(catalog_op.catalog_op_name.c_str(), document->GetAllocator());
+    catalog_op_obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
+    Value op_counter;
+    op_counter.SetInt64(catalog_op.op_counter);
+    catalog_op_obj.AddMember("op_counter", op_counter, document->GetAllocator());
+    Value table_name(catalog_op.table_name.c_str(), document->GetAllocator());
+    catalog_op_obj.AddMember("table_name", table_name, document->GetAllocator());
+    catalog_op_list.PushBack(catalog_op_obj, document->GetAllocator());
+  }
+  document->AddMember("catalog_op_list", catalog_op_list, document->GetAllocator());
+
+  // Create a summary and add it to the document
+  map<string, int> aggregated_operations;
+  for (const auto& catalog_op : opeartion_usage.catalog_op_counters) {
+    ++aggregated_operations[catalog_op.catalog_op_name];
+  }
+  Value catalog_op_summary(kArrayType);
+  for (const auto& catalog_op : aggregated_operations) {
+    Value catalog_op_obj(kObjectType);
+    Value op_name(catalog_op.first.c_str(), document->GetAllocator());
+    catalog_op_obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
+    Value op_counter;
+    op_counter.SetInt64(catalog_op.second);
+    catalog_op_obj.AddMember("op_counter", op_counter, document->GetAllocator());
+    catalog_op_summary.PushBack(catalog_op_obj, document->GetAllocator());
+  }
+  document->AddMember("catalog_op_summary", catalog_op_summary, document->GetAllocator());
 }
 
 void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,

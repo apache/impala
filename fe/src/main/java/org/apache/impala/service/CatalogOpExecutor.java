@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -98,6 +99,8 @@ import org.apache.impala.catalog.Transaction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
+import org.apache.impala.catalog.monitor.CatalogOperationMetrics;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -147,6 +150,7 @@ import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
+import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDropDataSourceParams;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropFunctionParams;
@@ -296,6 +300,10 @@ public class CatalogOpExecutor {
   private final AuthorizationConfig authzConfig_;
   private final AuthorizationManager authzManager_;
 
+  // A singleton monitoring class that keeps track of the catalog usage metrics.
+  private final CatalogOperationMetrics catalogOpMetric_ =
+      CatalogMonitor.INSTANCE.getCatalogOperationMetrics();
+
   // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
   // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
   private final Object metastoreDdlLock_ = new Object();
@@ -321,107 +329,168 @@ public class CatalogOpExecutor {
     if (ddlRequest.isSetHeader()) {
       requestingUser = new User(ddlRequest.getHeader().getRequesting_user());
     }
+    Optional<TTableName> tTableName = Optional.empty();
+    TDdlType ddl_type = ddlRequest.ddl_type;
+    try {
+      boolean syncDdl = ddlRequest.isSync_ddl();
+      switch (ddl_type) {
+        case ALTER_DATABASE:
+          TAlterDbParams alter_db_params = ddlRequest.getAlter_db_params();
+          tTableName = Optional.of(new TTableName(alter_db_params.db, ""));
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          alterDatabase(alter_db_params, response);
+          break;
+        case ALTER_TABLE:
+          TAlterTableParams alter_table_params = ddlRequest.getAlter_table_params();
+          tTableName = Optional.of(alter_table_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          alterTable(alter_table_params, response);
+          break;
+        case ALTER_VIEW:
+          TCreateOrAlterViewParams alter_view_params = ddlRequest.getAlter_view_params();
+          tTableName = Optional.of(alter_view_params.getView_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          alterView(alter_view_params, response);
+          break;
+        case CREATE_DATABASE:
+          TCreateDbParams create_db_params = ddlRequest.getCreate_db_params();
+          tTableName = Optional.of(new TTableName(create_db_params.db, ""));
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          createDatabase(create_db_params, response);
+          break;
+        case CREATE_TABLE_AS_SELECT:
+          TCreateTableParams create_table_as_select_params =
+              ddlRequest.getCreate_table_params();
+          tTableName = Optional.of(create_table_as_select_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          response.setNew_table_created(
+              createTable(create_table_as_select_params, response, syncDdl));
+          break;
+        case CREATE_TABLE:
+          TCreateTableParams create_table_params = ddlRequest.getCreate_table_params();
+          tTableName = Optional.of((create_table_params.getTable_name()));
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          createTable(ddlRequest.getCreate_table_params(), response, syncDdl);
+          break;
+        case CREATE_TABLE_LIKE:
+          TCreateTableLikeParams create_table_like_params =
+              ddlRequest.getCreate_table_like_params();
+          tTableName = Optional.of(create_table_like_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          createTableLike(create_table_like_params, response, syncDdl);
+          break;
+        case CREATE_VIEW:
+          TCreateOrAlterViewParams create_view_params =
+              ddlRequest.getCreate_view_params();
+          tTableName = Optional.of(create_view_params.getView_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          createView(create_view_params, response);
+          break;
+        case CREATE_FUNCTION:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          createFunction(ddlRequest.getCreate_fn_params(), response);
+          break;
+        case CREATE_DATA_SOURCE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          createDataSource(ddlRequest.getCreate_data_source_params(), response);
+          break;
+        case COMPUTE_STATS:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
+          break;
+        case DROP_STATS:
+          TDropStatsParams drop_stats_params = ddlRequest.getDrop_stats_params();
+          tTableName = Optional.of(drop_stats_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          dropStats(drop_stats_params, response);
+          break;
+        case DROP_DATABASE:
+          TDropDbParams drop_db_params = ddlRequest.getDrop_db_params();
+          tTableName = Optional.of(new TTableName(drop_db_params.getDb(), ""));
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          dropDatabase(drop_db_params, response);
+          break;
+        case DROP_TABLE:
+        case DROP_VIEW:
+          TDropTableOrViewParams drop_table_or_view_params =
+              ddlRequest.getDrop_table_or_view_params();
+          tTableName = Optional.of(drop_table_or_view_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          dropTableOrView(drop_table_or_view_params, response);
+          break;
+        case TRUNCATE_TABLE:
+          TTruncateParams truncate_params = ddlRequest.getTruncate_params();
+          tTableName = Optional.of(truncate_params.getTable_name());
+          catalogOpMetric_.increment(ddl_type, tTableName);
+          truncateTable(truncate_params, response);
+          break;
+        case DROP_FUNCTION:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          dropFunction(ddlRequest.getDrop_fn_params(), response);
+          break;
+        case DROP_DATA_SOURCE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          dropDataSource(ddlRequest.getDrop_data_source_params(), response);
+          break;
+        case CREATE_ROLE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          createRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
+          break;
+        case DROP_ROLE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          dropRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
+          break;
+        case GRANT_ROLE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          grantRoleToGroup(
+              requestingUser, ddlRequest.getGrant_revoke_role_params(), response);
+          break;
+        case REVOKE_ROLE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          revokeRoleFromGroup(
+              requestingUser, ddlRequest.getGrant_revoke_role_params(), response);
+          break;
+        case GRANT_PRIVILEGE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          grantPrivilege(
+              ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(), response);
+          break;
+        case REVOKE_PRIVILEGE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          revokePrivilege(
+              ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(), response);
+          break;
+        case COMMENT_ON:
+          TCommentOnParams comment_on_params = ddlRequest.getComment_on_params();
+          tTableName = Optional.of(new TTableName("", ""));
+          alterCommentOn(comment_on_params, response, tTableName);
+          break;
+        case COPY_TESTCASE:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          copyTestCaseData(ddlRequest.getCopy_test_case_params(), response);
+          break;
+        default:
+          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          throw new IllegalStateException(
+              "Unexpected DDL exec request type: " + ddl_type);
+      }
 
-    boolean syncDdl = ddlRequest.isSync_ddl();
-    switch (ddlRequest.ddl_type) {
-      case ALTER_DATABASE:
-        alterDatabase(ddlRequest.getAlter_db_params(), response);
-        break;
-      case ALTER_TABLE:
-        alterTable(ddlRequest.getAlter_table_params(), response);
-        break;
-      case ALTER_VIEW:
-        alterView(ddlRequest.getAlter_view_params(), response);
-        break;
-      case CREATE_DATABASE:
-        createDatabase(ddlRequest.getCreate_db_params(), response);
-        break;
-      case CREATE_TABLE_AS_SELECT:
-        response.setNew_table_created(createTable(
-            ddlRequest.getCreate_table_params(), response, syncDdl));
-        break;
-      case CREATE_TABLE:
-        createTable(ddlRequest.getCreate_table_params(), response, syncDdl);
-        break;
-      case CREATE_TABLE_LIKE:
-        createTableLike(ddlRequest.getCreate_table_like_params(), response, syncDdl);
-        break;
-      case CREATE_VIEW:
-        createView(ddlRequest.getCreate_view_params(), response);
-        break;
-      case CREATE_FUNCTION:
-        createFunction(ddlRequest.getCreate_fn_params(), response);
-        break;
-      case CREATE_DATA_SOURCE:
-        createDataSource(ddlRequest.getCreate_data_source_params(), response);
-        break;
-      case COMPUTE_STATS:
-        Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
-        break;
-      case DROP_STATS:
-        dropStats(ddlRequest.getDrop_stats_params(), response);
-        break;
-      case DROP_DATABASE:
-        dropDatabase(ddlRequest.getDrop_db_params(), response);
-        break;
-      case DROP_TABLE:
-      case DROP_VIEW:
-        dropTableOrView(ddlRequest.getDrop_table_or_view_params(), response);
-        break;
-      case TRUNCATE_TABLE:
-        truncateTable(ddlRequest.getTruncate_params(), response);
-        break;
-      case DROP_FUNCTION:
-        dropFunction(ddlRequest.getDrop_fn_params(), response);
-        break;
-      case DROP_DATA_SOURCE:
-        dropDataSource(ddlRequest.getDrop_data_source_params(), response);
-        break;
-      case CREATE_ROLE:
-        createRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
-        break;
-      case DROP_ROLE:
-        dropRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
-        break;
-      case GRANT_ROLE:
-        grantRoleToGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
-            response);
-        break;
-      case REVOKE_ROLE:
-        revokeRoleFromGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
-            response);
-        break;
-      case GRANT_PRIVILEGE:
-        grantPrivilege(ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(),
-            response);
-        break;
-      case REVOKE_PRIVILEGE:
-        revokePrivilege(ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(),
-            response);
-        break;
-      case COMMENT_ON:
-        alterCommentOn(ddlRequest.getComment_on_params(), response);
-        break;
-      case COPY_TESTCASE:
-        copyTestCaseData(ddlRequest.getCopy_test_case_params(), response);
-        break;
-      default: throw new IllegalStateException("Unexpected DDL exec request type: " +
-          ddlRequest.ddl_type);
+      // If SYNC_DDL is set, set the catalog update that contains the results of this DDL
+      // operation. The version of this catalog update is returned to the requesting
+      // impalad which will wait until this catalog update has been broadcast to all the
+      // coordinators.
+      if (syncDdl) {
+        response.getResult().setVersion(
+            catalog_.waitForSyncDdlVersion(response.getResult()));
+      }
+
+      // At this point, the operation is considered successful. If any errors occurred
+      // during execution, this function will throw an exception and the CatalogServer
+      // will handle setting a bad status code.
+      response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
+    } finally {
+      catalogOpMetric_.decrement(ddl_type, tTableName);
     }
-
-    // If SYNC_DDL is set, set the catalog update that contains the results of this DDL
-    // operation. The version of this catalog update is returned to the requesting
-    // impalad which will wait until this catalog update has been broadcast to all the
-    // coordinators.
-    if (syncDdl) {
-      response.getResult().setVersion(
-          catalog_.waitForSyncDdlVersion(response.getResult()));
-    }
-
-    // At this point, the operation is considered successful. If any errors occurred
-    // during execution, this function will throw an exception and the CatalogServer
-    // will handle setting a bad status code.
-    response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return response;
   }
 
@@ -4452,19 +4521,28 @@ public class CatalogOpExecutor {
     return tbl;
   }
 
-  private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response)
+  private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response,
+      Optional<TTableName> tTableName)
       throws ImpalaRuntimeException, CatalogException, InternalException {
     if (params.getDb() != null) {
       Preconditions.checkArgument(!params.isSetTable_name() &&
           !params.isSetColumn_name());
+      tTableName.get().setDb_name(params.db);
+      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
       alterCommentOnDb(params.getDb(), params.getComment(), response);
     } else if (params.getTable_name() != null) {
       Preconditions.checkArgument(!params.isSetDb() && !params.isSetColumn_name());
+      tTableName.get().setDb_name(params.table_name.db_name);
+      tTableName.get().setTable_name(params.table_name.table_name);
+      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
       alterCommentOnTableOrView(TableName.fromThrift(params.getTable_name()),
           params.getComment(), response);
     } else if (params.getColumn_name() != null) {
       Preconditions.checkArgument(!params.isSetDb() && !params.isSetTable_name());
       TColumnName columnName = params.getColumn_name();
+      tTableName.get().setDb_name(columnName.table_name.table_name);
+      tTableName.get().setTable_name(columnName.table_name.table_name);
+      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
       alterCommentOnColumn(TableName.fromThrift(columnName.getTable_name()),
           columnName.getColumn_name(), params.getComment(), response);
     } else {

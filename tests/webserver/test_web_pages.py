@@ -788,3 +788,8 @@ class TestWebPage(ImpalaTestSuite):
     requests.get(close_session_url)
     self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
       "web interface by client at", expected_count=-1)
+
+  def test_catalog_operations_endpoint(self):
+    """Test to check that the /operations endpoint returns 200 OK."""
+    page = requests.get("http://localhost:25020/operations")
+    assert page.status_code == requests.codes.ok

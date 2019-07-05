@@ -35,6 +35,8 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.events.InFlightEvents;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
@@ -246,27 +248,29 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public void setEstimatedMetadataSize(long estimatedMetadataSize) {
     estimatedMetadataSize_.set(estimatedMetadataSize);
     if (!isStoredInImpaladCatalogCache()) {
-      CatalogUsageMonitor.INSTANCE.updateLargestTables(this);
+      CatalogMonitor.INSTANCE.getCatalogTableMetrics().updateLargestTables(this);
     }
   }
 
   public void incrementMetadataOpsCount() {
     metadataOpsCount_.incrementAndGet();
     if (!isStoredInImpaladCatalogCache()) {
-      CatalogUsageMonitor.INSTANCE.updateFrequentlyAccessedTables(this);
+      CatalogMonitor.INSTANCE.getCatalogTableMetrics().updateFrequentlyAccessedTables(
+          this);
     }
   }
 
   public void updateTableLoadingTime() {
     if (!isStoredInImpaladCatalogCache()) {
-      CatalogUsageMonitor.INSTANCE.updateLongMetadataLoadingTables(this);
+      CatalogMonitor.INSTANCE.getCatalogTableMetrics().updateLongMetadataLoadingTables(
+          this);
     }
   }
 
   public void setNumFiles(long numFiles) {
     numFiles_.set(numFiles);
     if (!isStoredInImpaladCatalogCache()) {
-      CatalogUsageMonitor.INSTANCE.updateHighFileCountTables(this);
+      CatalogMonitor.INSTANCE.getCatalogTableMetrics().updateHighFileCountTables(this);
     }
   }
 
