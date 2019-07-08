@@ -164,7 +164,7 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hs2_client = cls.create_impala_client(protocol='hs2')
     except Exception, e:
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
-      LOG.info("HS2 connection setup failed, continuing...: {0}", e)
+      LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
