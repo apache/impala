@@ -539,9 +539,17 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <b>Purpose:</b> Returns the input string with the first letter capitalized.
+          <b>Purpose:</b> Returns the input string with the first letter of each word
+          capitalized and all other letters in lowercase.
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
+          </p>
+          <p>
+            <b>Example: </b>
+          </p>
+          <p>
+            <codeph>INITCAP("i gOt mY HorSeS in tHe bacK")</codeph> returns <codeph>"I Got My
+            Horses In The Back"</codeph>.
           </p>
         </dd>
 
@@ -560,7 +568,6 @@ SELECT chr(97);
           <p>
             <b>Return type:</b> <codeph>INT</codeph>
           </p>
-
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
           <p>
@@ -812,6 +819,7 @@ select instr('foo bar bletch', 'b', 1, null);
           <p>
             <b>Example:</b>
           </p>
+
           <p>
             <codeph>LEVENSHTEIN ('welcome', 'We come')</codeph> returns 2, first change to
             replace '<codeph>w</codeph>' to '<codeph>W</codeph>', and then to replace
