@@ -544,12 +544,14 @@ SELECT chr(97);
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
+
           <p>
             <b>Example: </b>
           </p>
+
           <p>
-            <codeph>INITCAP("i gOt mY HorSeS in tHe bacK")</codeph> returns <codeph>"I Got My
-            Horses In The Back"</codeph>.
+            <codeph>INITCAP("i gOt mY ChiCkeNs in tHe yard.")</codeph> returns <codeph>" I Got
+            My Chickens In The Yard."</codeph>.
           </p>
         </dd>
 
@@ -568,6 +570,7 @@ SELECT chr(97);
           <p>
             <b>Return type:</b> <codeph>INT</codeph>
           </p>
+
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
           <p>
