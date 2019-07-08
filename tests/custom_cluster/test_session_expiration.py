@@ -128,7 +128,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
     for protocol in ['beeswax', 'hiveserver2']:
       num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
       num_connections_metrics_name = \
-          "impala.thrift-server.{}-frontend.connections-in-use".format(protocol)
+          "impala.thrift-server.{0}-frontend.connections-in-use".format(protocol)
       num_connections = impalad.service.get_metric_value(num_connections_metrics_name)
 
       # Connect to Impala using either beeswax or HS2 client and verify the number of
