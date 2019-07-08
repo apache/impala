@@ -58,8 +58,8 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackValues(int bit_width,
     return UnpackValues<OutType, i>(in, in_bytes, num_values, out);
 
   switch (bit_width) {
-    // Expand cases from 0 to 32.
-    BOOST_PP_REPEAT_FROM_TO(0, 33, UNPACK_VALUES_CASE, ignore);
+    // Expand cases from 0 to 64.
+    BOOST_PP_REPEAT_FROM_TO(0, 65, UNPACK_VALUES_CASE, ignore);
     default:
       DCHECK(false);
       return std::make_pair(nullptr, -1);
@@ -77,12 +77,14 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackValues(
   const int64_t remainder_values = values_to_read % BATCH_SIZE;
   const uint8_t* in_pos = in;
   OutType* out_pos = out;
+
   // First unpack as many full batches as possible.
   for (int64_t i = 0; i < batches_to_read; ++i) {
     in_pos = Unpack32Values<OutType, BIT_WIDTH>(in_pos, in_bytes, out_pos);
     out_pos += BATCH_SIZE;
     in_bytes -= (BATCH_SIZE * BIT_WIDTH) / CHAR_BIT;
   }
+
   // Then unpack the final partial batch.
   if (remainder_values > 0) {
     in_pos = UnpackUpTo31Values<OutType, BIT_WIDTH>(
@@ -103,15 +105,14 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(int bit_wid
         in, in_bytes, dict, dict_len, num_values, out, stride, decode_error);
 
   switch (bit_width) {
-    // Expand cases from 0 to 32.
-    BOOST_PP_REPEAT_FROM_TO(0, 33, UNPACK_VALUES_CASE, ignore);
+    // Expand cases from 0 to 64.
+    BOOST_PP_REPEAT_FROM_TO(0, 65, UNPACK_VALUES_CASE, ignore);
     default:
       DCHECK(false);
       return std::make_pair(nullptr, -1);
   }
 #pragma pop_macro("UNPACK_VALUES_CASE")
 }
-
 template <typename OutType, int BIT_WIDTH>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(
     const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
@@ -149,49 +150,68 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(
 // bpacking.c at https://github.com/lemire/FrameOfReference/, but is much more compact
 // because it uses templates rather than source-level unrolling of all combinations.
 //
-// After the template parameters is expanded and constants are propagated, all branches
+// After the template parameters are expanded and constants are propagated, all branches
 // and offset/shift calculations should be optimized out, leaving only shifts by constants
 // and bitmasks by constants. Calls to this must be stamped out manually or with
 // BOOST_PP_REPEAT_FROM_TO: experimentation revealed that the GCC 4.9.2 optimiser was
 // not able to fully propagate constants and remove branches when this was called from
 // inside a for loop with constant bounds with VALUE_IDX changed to a function argument.
-template <int BIT_WIDTH, int VALUE_IDX>
-inline uint32_t ALWAYS_INLINE UnpackValue(const uint8_t* __restrict__ in_buf) {
-  constexpr uint32_t LOAD_BIT_WIDTH = sizeof(uint32_t) * CHAR_BIT;
-  static_assert(BIT_WIDTH <= LOAD_BIT_WIDTH, "BIT_WIDTH > LOAD_BIT_WIDTH");
-  static_assert(VALUE_IDX >= 0 && VALUE_IDX < 32, "0 <= VALUE_IDX < 32");
-  // The index of the first bit of the value, relative to the start of 'in_buf'.
-  constexpr uint32_t FIRST_BIT = VALUE_IDX * BIT_WIDTH;
-  constexpr uint32_t IN_WORD_IDX = FIRST_BIT / LOAD_BIT_WIDTH;
-  constexpr uint32_t FIRST_BIT_OFFSET = FIRST_BIT % LOAD_BIT_WIDTH;
-  // Index of bit after last bit of this value, relative to start of IN_WORD_IDX.
-  constexpr uint32_t END_BIT_OFFSET = FIRST_BIT_OFFSET + BIT_WIDTH;
+//
+// We compute how many 32 bit words we have to read, which is either 1, 2 or 3. If it is
+// at least 2, the first two 32 bit words are read as one 64 bit word. Even if only one
+// word needs to be read, we try to read 64 bits if it does not lead to buffer overflow
+// because benchmarks show that it has a positive effect on performance.
+//
+// If 'FULL_BATCH' is true, this function call is part of unpacking 32 values, otherwise
+// up to 31 values. This is needed to optimise the length of the reads (32 or 64 bits) and
+// avoid buffer overflow (if we are unpacking 32 values, we can safely assume an input
+// buffer of length 32 * BIT_WIDTH).
+template <int BIT_WIDTH, int VALUE_IDX, bool FULL_BATCH>
+inline uint64_t ALWAYS_INLINE UnpackValue(const uint8_t* __restrict__ in_buf) {
+  if (BIT_WIDTH == 0) return 0;
 
-  const uint32_t* in_words = reinterpret_cast<const uint32_t*>(in_buf);
-  // The lower bits of the value come from the first word.
-  const uint32_t lower_bits =
-      BIT_WIDTH > 0 ? in_words[IN_WORD_IDX] >> FIRST_BIT_OFFSET : 0U;
-  if (END_BIT_OFFSET < LOAD_BIT_WIDTH) {
-    // All bits of the value are in the first word, but we need to mask out upper bits
-    // that belong to the next value.
-    return lower_bits % (1UL << BIT_WIDTH);
-  } if (END_BIT_OFFSET == LOAD_BIT_WIDTH) {
-    // This value was exactly the uppermost bits of the first word - no masking required.
-    return lower_bits;
-  } else {
-    DCHECK_GT(END_BIT_OFFSET, LOAD_BIT_WIDTH);
-    DCHECK_LT(VALUE_IDX, 31)
-        << "Should not go down this branch for last value with no trailing bits.";
-    // Value is split between words, so grab trailing bits from the next word.
-    // Force into [0, LOAD_BIT_WIDTH) to avoid spurious shift >= width of type warning.
-    constexpr uint32_t NUM_TRAILING_BITS =
-        END_BIT_OFFSET < LOAD_BIT_WIDTH ? 0 : END_BIT_OFFSET - LOAD_BIT_WIDTH;
-    const uint32_t trailing_bits = in_words[IN_WORD_IDX + 1] % (1UL << NUM_TRAILING_BITS);
-    // Force into [0, LOAD_BIT_WIDTH) to avoid spurious shift >= width of type warning.
-    constexpr uint32_t TRAILING_BITS_SHIFT =
-        BIT_WIDTH == 32 ? 0 : (BIT_WIDTH - NUM_TRAILING_BITS);
-    return lower_bits | (trailing_bits << TRAILING_BITS_SHIFT);
+  constexpr int FIRST_BIT_IDX = VALUE_IDX * BIT_WIDTH;
+  constexpr int FIRST_WORD_IDX = FIRST_BIT_IDX / 32;
+  constexpr int LAST_BIT_IDX = FIRST_BIT_IDX + BIT_WIDTH;
+  constexpr int LAST_WORD_IDX = BitUtil::RoundUpNumi32(LAST_BIT_IDX);
+  constexpr int WORDS_TO_READ = LAST_WORD_IDX - FIRST_WORD_IDX;
+  static_assert(WORDS_TO_READ <= 3, "At most three 32-bit words need to be loaded.");
+
+  constexpr int FIRST_BIT_OFFSET = FIRST_BIT_IDX - FIRST_WORD_IDX * 32;
+  constexpr uint64_t mask = BIT_WIDTH == 64 ? ~0L : (1UL << BIT_WIDTH) - 1;
+  const uint32_t* const in = reinterpret_cast<const uint32_t*>(in_buf);
+
+  // Avoid reading past the end of the buffer. We can safely read 64 bits if we know that
+  // this is a full batch read (so the input buffer is 32 * BIT_WIDTH long) and there is
+  // enough space in the buffer from the current reading point.
+  // We try to read 64 bits even when it is not necessary because the benchmarks show it
+  // is faster.
+  constexpr bool CAN_SAFELY_READ_64_BITS = FULL_BATCH
+      && FIRST_BIT_IDX - FIRST_BIT_OFFSET + 64 <= BIT_WIDTH * 32;
+
+  // We do not try to read 64 bits when the bit width is a power of two (unless it is
+  // necessary) because performance benchmarks show that it is better this way. This seems
+  // to be due to compiler optimisation issues, so we can revisit it when we update the
+  // compiler version.
+  constexpr bool READ_32_BITS = WORDS_TO_READ == 1
+      && (!CAN_SAFELY_READ_64_BITS || BitUtil::IsPowerOf2(BIT_WIDTH));
+
+  if (READ_32_BITS) {
+    uint32_t word = in[FIRST_WORD_IDX];
+    word >>= FIRST_BIT_OFFSET < 32 ? FIRST_BIT_OFFSET : 0;
+    return word & mask;
   }
+
+  uint64_t word = *reinterpret_cast<const uint64_t*>(in + FIRST_WORD_IDX);
+  word >>= FIRST_BIT_OFFSET;
+
+  if (WORDS_TO_READ > 2) {
+    constexpr int USEFUL_BITS = FIRST_BIT_OFFSET == 0 ? 0 : 64 - FIRST_BIT_OFFSET;
+    uint64_t extra_word = in[FIRST_WORD_IDX + 2];
+    word |= extra_word << USEFUL_BITS;
+  }
+
+  return word & mask;
 }
 
 template <typename OutType>
@@ -210,7 +230,7 @@ template <typename OutType, int BIT_WIDTH>
 const uint8_t* BitPacking::Unpack32Values(
     const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ out) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
-  static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
   DCHECK_LE(BIT_WIDTH, sizeof(OutType) * CHAR_BIT) << "BIT_WIDTH too high for output";
   constexpr int BYTES_TO_READ = BitUtil::RoundUpNumBytes(32 * BIT_WIDTH);
   DCHECK_GE(in_bytes, BYTES_TO_READ);
@@ -218,7 +238,7 @@ const uint8_t* BitPacking::Unpack32Values(
   // Call UnpackValue for 0 <= i < 32.
 #pragma push_macro("UNPACK_VALUE_CALL")
 #define UNPACK_VALUE_CALL(ignore1, i, ignore2) \
-  out[i] = static_cast<OutType>(UnpackValue<BIT_WIDTH, i>(in));
+  out[i] = static_cast<OutType>(UnpackValue<BIT_WIDTH, i, true>(in));
 
   BOOST_PP_REPEAT_FROM_TO(0, 32, UNPACK_VALUE_CALL, ignore);
   return in + BYTES_TO_READ;
@@ -233,8 +253,8 @@ const uint8_t* BitPacking::Unpack32Values(int bit_width, const uint8_t* __restri
     case i: return Unpack32Values<OutType, i>(in, in_bytes, out);
 
   switch (bit_width) {
-    // Expand cases from 0 to 32.
-    BOOST_PP_REPEAT_FROM_TO(0, 33, UNPACK_VALUES_CASE, ignore);
+    // Expand cases from 0 to 64.
+    BOOST_PP_REPEAT_FROM_TO(0, 65, UNPACK_VALUES_CASE, ignore);
     default: DCHECK(false); return in;
   }
 #pragma pop_macro("UNPACK_VALUES_CASE")
@@ -245,7 +265,7 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
     int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len,
     OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
-  static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
   constexpr int BYTES_TO_READ = BitUtil::RoundUpNumBytes(32 * BIT_WIDTH);
   DCHECK_GE(in_bytes, BYTES_TO_READ);
   // TODO: this could be optimised further by using SIMD instructions.
@@ -255,7 +275,7 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
 #pragma push_macro("DECODE_VALUE_CALL")
 #define DECODE_VALUE_CALL(ignore1, i, ignore2)               \
   {                                                          \
-    uint32_t idx = UnpackValue<BIT_WIDTH, i>(in);            \
+    uint32_t idx = UnpackValue<BIT_WIDTH, i, true>(in);            \
     uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + i * stride; \
     DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }
@@ -269,7 +289,7 @@ template <typename OutType, int BIT_WIDTH>
 const uint8_t* BitPacking::UnpackUpTo31Values(const uint8_t* __restrict__ in,
     int64_t in_bytes, int num_values, OutType* __restrict__ out) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
-  static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
   DCHECK_LE(BIT_WIDTH, sizeof(OutType) * CHAR_BIT) << "BIT_WIDTH too high for output";
   constexpr int MAX_BATCH_SIZE = 31;
   const int BYTES_TO_READ = BitUtil::RoundUpNumBytes(num_values * BIT_WIDTH);
@@ -292,7 +312,7 @@ const uint8_t* BitPacking::UnpackUpTo31Values(const uint8_t* __restrict__ in,
 #pragma push_macro("UNPACK_VALUES_CASE")
 #define UNPACK_VALUES_CASE(ignore1, i, ignore2) \
   case 31 - i: out[30 - i] = \
-      static_cast<OutType>(UnpackValue<BIT_WIDTH, 30 - i>(in_buffer));
+      static_cast<OutType>(UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer));
 
   // Use switch with fall-through cases to minimise branching.
   switch (num_values) {
@@ -310,7 +330,7 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len, int num_values,
       OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
-  static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
+  static_assert(BIT_WIDTH <= MAX_BITWIDTH, "BIT_WIDTH too high");
   constexpr int MAX_BATCH_SIZE = 31;
   const int BYTES_TO_READ = BitUtil::RoundUpNumBytes(num_values * BIT_WIDTH);
   DCHECK_GE(in_bytes, BYTES_TO_READ);
@@ -332,7 +352,7 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
 #pragma push_macro("DECODE_VALUES_CASE")
 #define DECODE_VALUES_CASE(ignore1, i, ignore2)                   \
   case 31 - i: {                                                  \
-    uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i>(in_buffer);     \
+    uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer);     \
     uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + (30 - i) * stride; \
     DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }

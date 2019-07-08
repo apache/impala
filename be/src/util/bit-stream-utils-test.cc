@@ -151,15 +151,16 @@ TEST(BitArray, TestIntSkip) {
   TestSkipping<int>(buffer, bytes_written, bit_width, 8, 56);
 }
 
-// Writes 'num_vals' values with width 'bit_width' and reads them back.
-void TestBitArrayValues(int bit_width, int num_vals) {
+// Writes 'num_vals' values with width 'bit_width' starting from 'start' and increasing
+// and reads them back.
+void TestBitArrayValues(int bit_width, uint64_t start, uint64_t num_vals) {
   const int len = BitUtil::Ceil(bit_width * num_vals, 8);
-  const int64_t mod = bit_width == 64 ? 1 : 1LL << bit_width;
+  const uint64_t mask = bit_width == 64 ? ~0UL : (1UL << bit_width) - 1;
 
   uint8_t buffer[(len > 0) ? len : 1];
   BitWriter writer(buffer, len);
-  for (int i = 0; i < num_vals; ++i) {
-    bool result = writer.PutValue(i % mod, bit_width);
+  for (uint64_t i = 0; i < num_vals; ++i) {
+    bool result = writer.PutValue((start + i) & mask, bit_width);
     EXPECT_TRUE(result);
   }
   writer.Flush();
@@ -172,19 +173,20 @@ void TestBitArrayValues(int bit_width, int num_vals) {
     // Unpack all values at once with one batched reader and in small batches with the
     // other batched reader.
     vector<int64_t> batch_vals(num_vals);
-    const int BATCH_SIZE = 32;
+    const uint64_t BATCH_SIZE = 32;
     vector<int64_t> batch_vals2(BATCH_SIZE);
     EXPECT_EQ(num_vals,
         reader.UnpackBatch(bit_width, num_vals, batch_vals.data()));
-    for (int i = 0; i < num_vals; ++i) {
+    for (uint64_t i = 0; i < num_vals; ++i) {
       if (i % BATCH_SIZE == 0) {
         int num_to_unpack = min(BATCH_SIZE, num_vals - i);
         EXPECT_EQ(num_to_unpack,
            reader2.UnpackBatch(bit_width, num_to_unpack, batch_vals2.data()));
       }
-      EXPECT_EQ(i % mod, batch_vals[i]);
-      EXPECT_EQ(i % mod, batch_vals2[i % BATCH_SIZE]);
+      EXPECT_EQ((start + i) & mask, batch_vals[i]);
+      EXPECT_EQ((start + i) & mask, batch_vals2[i % BATCH_SIZE]);
     }
+
     EXPECT_EQ(reader.bytes_left(), 0);
     EXPECT_EQ(reader2.bytes_left(), 0);
     reader.Reset(buffer, len);
@@ -194,13 +196,132 @@ void TestBitArrayValues(int bit_width, int num_vals) {
 
 TEST(BitArray, TestValues) {
   for (int width = 0; width <= MAX_WIDTH; ++width) {
-    TestBitArrayValues(width, 1);
-    TestBitArrayValues(width, 2);
+    TestBitArrayValues(width, 0, 1);
+    TestBitArrayValues(width, 0, 2);
     // Don't write too many values
-    TestBitArrayValues(width, (width < 12) ? (1 << width) : 4096);
-    TestBitArrayValues(width, 1024);
+    TestBitArrayValues(width, 0, (width < 12) ? (1 << width) : 4096);
+    TestBitArrayValues(width, 0, 1024);
+
+    // Also test values that need bitwidth > 32.
+    TestBitArrayValues(width, 1099511627775LL, 1024);
   }
 }
 
+template<typename UINT_T>
+void TestUleb128Encode(const UINT_T value, std::vector<uint8_t> expected_bytes) {
+  const int len = BatchedBitReader::max_vlq_byte_len<UINT_T>();
+
+  std::vector<uint8_t> buffer(len, 0);
+  BitWriter writer(buffer.data(), len);
+
+  const bool success = writer.PutUleb128(value);
+  EXPECT_TRUE(success);
+
+  if (expected_bytes.size() < len) {
+    // Allow the user to input fewer bytes than the maximum.
+    expected_bytes.resize(len, 0);
+  }
+
+  EXPECT_EQ(expected_bytes, buffer);
 }
 
+TEST(VLQInt, TestPutUleb128) {
+  TestUleb128Encode<uint32_t>(5, {0x05});
+  TestUleb128Encode<uint32_t>(2018, {0xe2, 0x0f});
+  TestUleb128Encode<uint32_t>(25248, {0xa0, 0xc5, 0x01});
+  TestUleb128Encode<uint32_t>(55442211, {0xa3, 0xf6, 0xb7, 0x1a});
+  TestUleb128Encode<uint32_t>(4294967295, {0xff, 0xff, 0xff, 0xff, 0x0f});
+
+  TestUleb128Encode<uint64_t>(5, {0x05});
+  TestUleb128Encode<uint64_t>(55442211, {0xa3, 0xf6, 0xb7, 0x1a});
+  TestUleb128Encode<uint64_t>(1649267441664, {0x80, 0x80, 0x80, 0x80, 0x80, 0x30});
+  TestUleb128Encode<uint64_t>(60736917191292289,
+                             {0x81, 0xeb, 0xc1, 0xaf, 0xf8, 0xfc, 0xf1, 0x6b});
+  TestUleb128Encode<uint64_t>(18446744073709551615U,
+                             {0xff, 0xff, 0xff, 0xff, 0xff,
+                              0xff, 0xff, 0xff, 0xff, 0x01});
+}
+
+template<typename UINT_T>
+void TestUleb128Decode(const UINT_T expected_value, const std::vector<uint8_t>& bytes) {
+  BatchedBitReader reader(bytes.data(), bytes.size());
+  UINT_T value;
+  const bool success = reader.GetUleb128<UINT_T>(&value);
+  EXPECT_TRUE(success);
+  EXPECT_EQ(expected_value, value);
+}
+
+TEST(VLQInt, TestGetUleb128) {
+  TestUleb128Decode<uint32_t>(5, {0x05});
+  TestUleb128Decode<uint32_t>(2018, {0xe2, 0x0f});
+  TestUleb128Decode<uint32_t>(25248, {0xa0, 0xc5, 0x01});
+  TestUleb128Decode<uint32_t>(55442211, {0xa3, 0xf6, 0xb7, 0x1a});
+  TestUleb128Decode<uint32_t>(4294967295, {0xff, 0xff, 0xff, 0xff, 0x0f});
+
+  TestUleb128Decode<uint64_t>(5, {0x05});
+  TestUleb128Decode<uint64_t>(55442211, {0xa3, 0xf6, 0xb7, 0x1a});
+  TestUleb128Decode<uint64_t>(1649267441664, {0x80, 0x80, 0x80, 0x80, 0x80, 0x30});
+  TestUleb128Decode<uint64_t>(60736917191292289,
+                             {0x81, 0xeb, 0xc1, 0xaf, 0xf8, 0xfc, 0xf1, 0x6b});
+  TestUleb128Decode<uint64_t>(18446744073709551615U,
+                             {0xff, 0xff, 0xff, 0xff, 0xff,
+                              0xff, 0xff, 0xff, 0xff, 0x01});
+}
+
+template<typename INT_T>
+void TestZigZagEncode(const INT_T value, std::vector<uint8_t> expected_bytes) {
+  const int len = BatchedBitReader::max_vlq_byte_len<INT_T>();
+
+  std::vector<uint8_t> buffer(len, 0);
+  BitWriter writer(buffer.data(), len);
+
+  const bool success = writer.PutZigZagInteger(value);
+  EXPECT_TRUE(success);
+
+  if (expected_bytes.size() < len) {
+    // Allow the user to input fewer bytes than the maximum.
+    expected_bytes.resize(len, 0);
+  }
+
+  EXPECT_EQ(expected_bytes, buffer);
+}
+
+TEST(VLQInt, TestPutZigZagInteger) {
+  TestZigZagEncode<int32_t>(-3, {0x05});
+  TestZigZagEncode<int32_t>(-2485, {0xe9, 0x26});
+  TestZigZagEncode<int32_t>(5648448, {0x80, 0xc1, 0xb1, 0x5});
+
+  TestZigZagEncode<int64_t>(1629267541664, {0xc0, 0xfa, 0xcd, 0xfe, 0xea, 0x5e});
+  TestZigZagEncode<int64_t>(-9223372036854775808U, // Most negative int64_t.
+                           {0xff, 0xff, 0xff, 0xff, 0xff,
+                            0xff, 0xff, 0xff, 0xff, 0x1});
+}
+
+template<typename INT_T>
+void TestZigZagDecode(const INT_T expected_value, std::vector<uint8_t> bytes) {
+  BatchedBitReader reader(bytes.data(), bytes.size());
+  INT_T value;
+  const bool success = reader.GetZigZagInteger<INT_T>(&value);
+  EXPECT_TRUE(success);
+  EXPECT_EQ(expected_value, value);
+}
+
+TEST(VLQInt, TestGetZigZagInteger) {
+  TestZigZagDecode<int32_t>(-3, {0x05});
+  TestZigZagDecode<int32_t>(-2485, {0xe9, 0x26});
+  TestZigZagDecode<int32_t>(5648448, {0x80, 0xc1, 0xb1, 0x5});
+
+  TestZigZagDecode<int64_t>(1629267541664, {0xc0, 0xfa, 0xcd, 0xfe, 0xea, 0x5e});
+  TestZigZagDecode<int64_t>(-9223372036854775808U, // Most negative int64_t.
+                           {0xff, 0xff, 0xff, 0xff, 0xff,
+                            0xff, 0xff, 0xff, 0xff, 0x1});
+}
+
+TEST(VLQInt, TestMaxVlqByteLen) {
+  EXPECT_EQ(2, BatchedBitReader::max_vlq_byte_len<uint8_t>());
+  EXPECT_EQ(3, BatchedBitReader::max_vlq_byte_len<uint16_t>());
+  EXPECT_EQ(5, BatchedBitReader::max_vlq_byte_len<uint32_t>());
+  EXPECT_EQ(10, BatchedBitReader::max_vlq_byte_len<uint64_t>());
+}
+
+}

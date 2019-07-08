@@ -24,237 +24,237 @@
 //   Unpack32Scalar internally.
 //
 //
-// Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+// Machine Info: Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz
 // Unpack32Values bit_width 0:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.57e+04 1.59e+04  1.6e+04         1X         1X         1X
-//                      Unpack32Scalar           1.34e+05 1.35e+05 1.36e+05      8.51X      8.49X      8.51X
-//                        UnpackScalar           2.08e+05  2.1e+05 2.12e+05      13.3X      13.2X      13.2X
+//                           BitReader           1.05e+04 1.06e+04 1.07e+04         1X         1X         1X
+//                      Unpack32Scalar           1.29e+05 1.32e+05 1.34e+05      12.3X      12.5X      12.5X
+//                        UnpackScalar           3.18e+05 3.23e+05 3.26e+05      30.3X      30.4X      30.5X
 //
 // Unpack32Values bit_width 1:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.19e+04  1.2e+04  1.2e+04         1X         1X         1X
-//                      Unpack32Scalar           8.89e+04 8.94e+04 9.04e+04      7.48X      7.46X      7.51X
-//                        UnpackScalar           9.72e+04  9.8e+04 9.86e+04      8.18X      8.18X      8.19X
+//                           BitReader           1.28e+04 1.29e+04 1.31e+04         1X         1X         1X
+//                      Unpack32Scalar           8.22e+04 8.42e+04  8.5e+04       6.4X      6.51X       6.5X
+//                        UnpackScalar           7.96e+04 8.08e+04 8.16e+04       6.2X      6.24X      6.24X
 //
 // Unpack32Values bit_width 2:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
 //                           BitReader           1.18e+04 1.19e+04  1.2e+04         1X         1X         1X
-//                      Unpack32Scalar           8.84e+04 8.91e+04 8.99e+04      7.49X      7.48X       7.5X
-//                        UnpackScalar           9.68e+04 9.76e+04 9.84e+04       8.2X      8.19X      8.21X
+//                      Unpack32Scalar           8.37e+04 8.41e+04 8.49e+04      7.06X      7.06X      7.06X
+//                        UnpackScalar            7.6e+04 7.66e+04 7.73e+04      6.42X      6.44X      6.43X
 //
 // Unpack32Values bit_width 3:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.16e+04 1.17e+04 1.18e+04         1X         1X         1X
-//                      Unpack32Scalar           8.67e+04 8.72e+04 8.79e+04      7.45X      7.42X      7.43X
-//                        UnpackScalar            9.6e+04 9.66e+04 9.74e+04      8.25X      8.22X      8.24X
+//                           BitReader           1.26e+04 1.27e+04 1.28e+04         1X         1X         1X
+//                      Unpack32Scalar           8.31e+04 8.37e+04 8.44e+04      6.61X       6.6X      6.61X
+//                        UnpackScalar           9.42e+04 9.54e+04 9.61e+04      7.49X      7.52X      7.52X
 //
 // Unpack32Values bit_width 4:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.08e+04 1.09e+04  1.1e+04         1X         1X         1X
-//                      Unpack32Scalar           9.13e+04 9.19e+04 9.25e+04      8.44X      8.43X      8.42X
-//                        UnpackScalar           9.65e+04 9.69e+04 9.78e+04      8.91X      8.89X       8.9X
+//                           BitReader           1.26e+04 1.27e+04 1.28e+04         1X         1X         1X
+//                      Unpack32Scalar            8.4e+04 8.46e+04 8.52e+04      6.68X      6.68X      6.67X
+//                        UnpackScalar           7.46e+04 7.52e+04 7.59e+04      5.93X      5.93X      5.94X
 //
 // Unpack32Values bit_width 5:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.14e+04 1.15e+04 1.16e+04         1X         1X         1X
-//                      Unpack32Scalar           8.35e+04 8.42e+04 8.49e+04       7.3X      7.31X      7.31X
-//                        UnpackScalar           9.41e+04 9.48e+04 9.56e+04      8.22X      8.22X      8.24X
+//                           BitReader           1.23e+04 1.25e+04 1.25e+04         1X         1X         1X
+//                      Unpack32Scalar           8.25e+04 8.32e+04 8.39e+04      6.68X      6.67X      6.69X
+//                        UnpackScalar           9.37e+04 9.43e+04 9.52e+04       7.6X      7.56X      7.58X
 //
 // Unpack32Values bit_width 6:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.14e+04 1.15e+04 1.16e+04         1X         1X         1X
-//                      Unpack32Scalar           8.46e+04 8.53e+04  8.6e+04       7.4X      7.41X      7.41X
-//                        UnpackScalar           9.35e+04 9.41e+04 9.51e+04      8.18X      8.16X       8.2X
+//                           BitReader           1.23e+04 1.24e+04 1.25e+04         1X         1X         1X
+//                      Unpack32Scalar           8.23e+04 8.32e+04 8.39e+04      6.69X       6.7X      6.71X
+//                        UnpackScalar           9.28e+04 9.42e+04 9.52e+04      7.54X      7.59X      7.61X
 //
 // Unpack32Values bit_width 7:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.09e+04  1.1e+04 1.11e+04         1X         1X         1X
-//                      Unpack32Scalar           8.11e+04 8.16e+04 8.25e+04      7.44X      7.44X      7.45X
-//                        UnpackScalar           9.16e+04 9.21e+04  9.3e+04       8.4X       8.4X      8.39X
+//                           BitReader            1.2e+04 1.23e+04 1.24e+04         1X         1X         1X
+//                      Unpack32Scalar           8.19e+04 8.26e+04 8.32e+04       6.8X      6.73X      6.72X
+//                        UnpackScalar           9.26e+04 9.36e+04 9.46e+04      7.69X      7.62X      7.64X
 //
 // Unpack32Values bit_width 8:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.14e+04 1.15e+04 1.16e+04         1X         1X         1X
-//                      Unpack32Scalar           9.02e+04 9.07e+04 9.14e+04       7.9X       7.9X      7.91X
-//                        UnpackScalar           9.48e+04 9.55e+04 9.63e+04      8.31X      8.33X      8.33X
+//                           BitReader           1.15e+04  1.2e+04 1.23e+04         1X         1X         1X
+//                      Unpack32Scalar           6.33e+04 8.31e+04 8.51e+04       5.5X       6.9X      6.94X
+//                        UnpackScalar           5.64e+04    7e+04 7.29e+04      4.91X      5.82X      5.95X
 //
 // Unpack32Values bit_width 9:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.11e+04 1.12e+04 1.13e+04         1X         1X         1X
-//                      Unpack32Scalar           7.94e+04 7.97e+04 8.06e+04      7.14X      7.12X      7.14X
-//                        UnpackScalar           8.78e+04 8.83e+04  8.9e+04      7.89X      7.88X      7.89X
+//                           BitReader           1.07e+04 1.14e+04 1.16e+04         1X         1X         1X
+//                      Unpack32Scalar           6.33e+04 8.16e+04 8.27e+04       5.9X      7.12X      7.14X
+//                        UnpackScalar           6.95e+04 9.22e+04 9.32e+04      6.47X      8.05X      8.05X
 //
 // Unpack32Values bit_width 10:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader            1.1e+04 1.11e+04 1.12e+04         1X         1X         1X
-//                      Unpack32Scalar           8.07e+04 8.14e+04 8.21e+04      7.31X      7.32X      7.34X
-//                        UnpackScalar           8.95e+04 9.02e+04 9.09e+04      8.11X      8.12X      8.12X
+//                           BitReader           1.18e+04 1.19e+04  1.2e+04         1X         1X         1X
+//                      Unpack32Scalar           8.13e+04 8.18e+04 8.23e+04      6.89X      6.85X      6.84X
+//                        UnpackScalar           9.17e+04 9.26e+04 9.34e+04      7.76X      7.76X      7.75X
 //
 // Unpack32Values bit_width 11:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.09e+04  1.1e+04 1.11e+04         1X         1X         1X
-//                      Unpack32Scalar           7.63e+04 7.69e+04 7.75e+04      6.99X      6.99X      6.99X
-//                        UnpackScalar           8.55e+04 8.61e+04 8.69e+04      7.83X      7.83X      7.84X
+//                           BitReader           1.17e+04 1.18e+04 1.19e+04         1X         1X         1X
+//                      Unpack32Scalar           8.07e+04 8.14e+04 8.22e+04      6.89X       6.9X      6.92X
+//                        UnpackScalar           9.13e+04 9.22e+04 9.29e+04      7.79X      7.82X      7.83X
 //
 // Unpack32Values bit_width 12:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.09e+04  1.1e+04  1.1e+04         1X         1X         1X
-//                      Unpack32Scalar           8.23e+04 8.29e+04 8.35e+04      7.55X      7.56X      7.57X
-//                        UnpackScalar           9.06e+04 9.12e+04 9.19e+04      8.31X      8.31X      8.33X
+//                           BitReader           1.17e+04 1.17e+04 1.19e+04         1X         1X         1X
+//                      Unpack32Scalar           8.07e+04 8.14e+04  8.2e+04      6.92X      6.93X      6.92X
+//                        UnpackScalar           8.94e+04 9.14e+04 9.23e+04      7.67X      7.78X      7.79X
 //
 // Unpack32Values bit_width 13:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.07e+04 1.08e+04 1.09e+04         1X         1X         1X
-//                      Unpack32Scalar           7.42e+04 7.47e+04 7.55e+04      6.92X       6.9X      6.92X
-//                        UnpackScalar           8.16e+04 8.23e+04 8.29e+04       7.6X       7.6X      7.61X
+//                           BitReader           1.13e+04 1.15e+04 1.16e+04         1X         1X         1X
+//                      Unpack32Scalar           7.85e+04 8.05e+04 8.14e+04      6.93X      6.98X      6.99X
+//                        UnpackScalar           8.77e+04 9.09e+04 9.17e+04      7.74X      7.88X      7.87X
 //
 // Unpack32Values bit_width 14:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.07e+04 1.08e+04 1.09e+04         1X         1X         1X
-//                      Unpack32Scalar           7.58e+04 7.62e+04 7.68e+04      7.08X      7.08X      7.08X
-//                        UnpackScalar           8.33e+04 8.38e+04 8.46e+04      7.78X      7.78X      7.79X
+//                           BitReader           1.14e+04 1.15e+04 1.16e+04         1X         1X         1X
+//                      Unpack32Scalar           7.81e+04    8e+04 8.06e+04      6.84X      6.95X      6.94X
+//                        UnpackScalar           8.87e+04 9.01e+04  9.1e+04      7.77X      7.83X      7.84X
 //
 // Unpack32Values bit_width 15:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.06e+04 1.06e+04 1.07e+04         1X         1X         1X
-//                      Unpack32Scalar           7.16e+04 7.22e+04 7.29e+04      6.78X      6.79X      6.79X
-//                        UnpackScalar           7.96e+04 8.05e+04 8.09e+04      7.54X      7.57X      7.54X
+//                           BitReader           1.12e+04 1.13e+04 1.14e+04         1X         1X         1X
+//                      Unpack32Scalar           7.66e+04 7.96e+04 8.06e+04      6.85X      7.01X      7.04X
+//                        UnpackScalar           8.81e+04 8.94e+04 9.04e+04      7.87X      7.88X       7.9X
 //
 // Unpack32Values bit_width 16:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.08e+04 1.08e+04 1.09e+04         1X         1X         1X
-//                      Unpack32Scalar           8.71e+04 8.76e+04 8.83e+04      8.09X      8.09X      8.08X
-//                        UnpackScalar           9.22e+04  9.3e+04 9.37e+04      8.56X      8.58X      8.57X
+//                           BitReader           1.13e+04 1.13e+04 1.14e+04         1X         1X         1X
+//                      Unpack32Scalar           8.11e+04 8.19e+04 8.27e+04       7.2X      7.22X      7.23X
+//                        UnpackScalar           8.82e+04 8.91e+04 8.97e+04      7.84X      7.85X      7.85X
 //
 // Unpack32Values bit_width 17:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.04e+04 1.04e+04 1.05e+04         1X         1X         1X
-//                      Unpack32Scalar           6.98e+04 7.04e+04 7.09e+04      6.73X      6.74X      6.74X
-//                        UnpackScalar           7.73e+04 7.78e+04 7.85e+04      7.45X      7.45X      7.47X
+//                           BitReader           1.11e+04 1.12e+04 1.13e+04         1X         1X         1X
+//                      Unpack32Scalar           7.75e+04 7.86e+04 7.91e+04         7X      7.04X      7.03X
+//                        UnpackScalar           8.75e+04 8.82e+04 8.89e+04      7.89X      7.91X       7.9X
 //
 // Unpack32Values bit_width 18:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.03e+04 1.04e+04 1.05e+04         1X         1X         1X
-//                      Unpack32Scalar            7.1e+04 7.17e+04 7.22e+04      6.86X      6.88X      6.87X
-//                        UnpackScalar           7.77e+04 7.82e+04 7.89e+04      7.51X       7.5X      7.51X
+//                           BitReader           1.09e+04 1.11e+04 1.12e+04         1X         1X         1X
+//                      Unpack32Scalar           7.71e+04 7.81e+04 7.88e+04      7.06X      7.02X      7.03X
+//                        UnpackScalar           8.68e+04 8.81e+04 8.89e+04      7.95X      7.92X      7.93X
 //
 // Unpack32Values bit_width 19:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.02e+04 1.03e+04 1.04e+04         1X         1X         1X
-//                      Unpack32Scalar           6.74e+04  6.8e+04 6.85e+04      6.59X       6.6X      6.61X
-//                        UnpackScalar           7.43e+04 7.49e+04 7.54e+04      7.26X      7.27X      7.28X
+//                           BitReader           1.09e+04  1.1e+04 1.11e+04         1X         1X         1X
+//                      Unpack32Scalar           7.69e+04 7.75e+04 7.83e+04      7.06X      7.07X      7.07X
+//                        UnpackScalar           8.62e+04 8.72e+04 8.78e+04      7.91X      7.96X      7.93X
 //
 // Unpack32Values bit_width 20:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.02e+04 1.03e+04 1.03e+04         1X         1X         1X
-//                      Unpack32Scalar           7.28e+04 7.34e+04  7.4e+04      7.15X      7.15X      7.15X
-//                        UnpackScalar           7.94e+04 8.02e+04 8.07e+04       7.8X      7.81X       7.8X
+//                           BitReader           1.07e+04  1.1e+04 1.11e+04         1X         1X         1X
+//                      Unpack32Scalar           7.58e+04 7.74e+04 7.82e+04       7.1X      7.06X      7.07X
+//                        UnpackScalar           8.43e+04 8.64e+04 8.74e+04      7.89X      7.89X       7.9X
 //
 // Unpack32Values bit_width 21:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           1.01e+04 1.01e+04 1.02e+04         1X         1X         1X
-//                      Unpack32Scalar           6.56e+04 6.62e+04 6.67e+04      6.53X      6.54X      6.54X
-//                        UnpackScalar            7.1e+04 7.15e+04 7.19e+04      7.06X      7.06X      7.06X
+//                           BitReader           1.07e+04 1.08e+04 1.09e+04         1X         1X         1X
+//                      Unpack32Scalar           7.58e+04 7.66e+04 7.76e+04      7.07X      7.09X      7.14X
+//                        UnpackScalar           8.51e+04 8.61e+04 8.69e+04      7.95X      7.97X         8X
 //
 // Unpack32Values bit_width 22:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader              1e+04 1.01e+04 1.02e+04         1X         1X         1X
-//                      Unpack32Scalar           6.68e+04 6.73e+04 6.79e+04      6.68X      6.68X      6.68X
-//                        UnpackScalar           7.35e+04 7.41e+04 7.46e+04      7.34X      7.35X      7.35X
+//                           BitReader           1.05e+04 1.08e+04 1.09e+04         1X         1X         1X
+//                      Unpack32Scalar           7.49e+04 7.62e+04 7.71e+04       7.1X      7.08X       7.1X
+//                        UnpackScalar           8.39e+04 8.59e+04 8.65e+04      7.96X      7.98X      7.97X
 //
 // Unpack32Values bit_width 23:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.87e+03 9.95e+03    1e+04         1X         1X         1X
-//                      Unpack32Scalar           6.44e+04 6.48e+04 6.53e+04      6.52X      6.52X      6.51X
-//                        UnpackScalar           6.93e+04 6.97e+04 7.04e+04      7.03X      7.01X      7.02X
+//                           BitReader           1.06e+04 1.07e+04 1.08e+04         1X         1X         1X
+//                      Unpack32Scalar           7.44e+04 7.54e+04 7.62e+04      7.03X      7.07X      7.08X
+//                        UnpackScalar           8.44e+04 8.54e+04 8.61e+04      7.97X         8X         8X
 //
 // Unpack32Values bit_width 24:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.93e+03    1e+04 1.01e+04         1X         1X         1X
-//                      Unpack32Scalar           7.44e+04 7.49e+04 7.55e+04      7.49X      7.49X      7.49X
-//                        UnpackScalar           8.12e+04 8.17e+04 8.27e+04      8.18X      8.17X       8.2X
+//                           BitReader           1.05e+04 1.06e+04 1.07e+04         1X         1X         1X
+//                      Unpack32Scalar           7.54e+04 7.62e+04 7.69e+04      7.17X      7.18X       7.2X
+//                        UnpackScalar           8.42e+04 8.51e+04 8.62e+04      8.01X      8.01X      8.07X
 //
 // Unpack32Values bit_width 25:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.71e+03 9.79e+03 9.86e+03         1X         1X         1X
-//                      Unpack32Scalar           6.12e+04 6.16e+04 6.22e+04      6.31X      6.29X      6.31X
-//                        UnpackScalar           6.44e+04 6.48e+04 6.53e+04      6.64X      6.62X      6.62X
+//                           BitReader           1.04e+04 1.05e+04 1.05e+04         1X         1X         1X
+//                      Unpack32Scalar           7.42e+04 7.49e+04 7.57e+04      7.15X      7.17X      7.18X
+//                        UnpackScalar           8.32e+04 8.43e+04 8.51e+04      8.01X      8.07X      8.07X
 //
 // Unpack32Values bit_width 26:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.67e+03 9.74e+03 9.81e+03         1X         1X         1X
-//                      Unpack32Scalar           6.21e+04 6.26e+04 6.31e+04      6.42X      6.42X      6.43X
-//                        UnpackScalar           6.53e+04 6.59e+04 6.64e+04      6.75X      6.77X      6.76X
+//                           BitReader           1.02e+04 1.04e+04 1.05e+04         1X         1X         1X
+//                      Unpack32Scalar           7.24e+04 7.46e+04 7.55e+04      7.12X      7.16X      7.19X
+//                        UnpackScalar           8.15e+04 8.43e+04 8.51e+04      8.01X      8.09X       8.1X
 //
 // Unpack32Values bit_width 27:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.56e+03 9.62e+03  9.7e+03         1X         1X         1X
-//                      Unpack32Scalar           5.99e+04 6.03e+04 6.09e+04      6.27X      6.27X      6.28X
-//                        UnpackScalar           6.32e+04 6.35e+04 6.42e+04      6.61X       6.6X      6.62X
+//                           BitReader           1.01e+04 1.03e+04 1.04e+04         1X         1X         1X
+//                      Unpack32Scalar           7.26e+04  7.4e+04 7.47e+04      7.18X      7.18X       7.2X
+//                        UnpackScalar           8.13e+04 8.35e+04 8.43e+04      8.03X      8.11X      8.12X
 //
 // Unpack32Values bit_width 28:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.53e+03 9.61e+03 9.66e+03         1X         1X         1X
-//                      Unpack32Scalar           6.37e+04 6.42e+04 6.47e+04      6.69X      6.68X       6.7X
-//                        UnpackScalar           6.68e+04 6.73e+04 6.77e+04      7.01X         7X      7.01X
+//                           BitReader              1e+04 1.03e+04 1.03e+04         1X         1X         1X
+//                      Unpack32Scalar           7.07e+04 7.41e+04 7.48e+04      7.05X      7.22X      7.23X
+//                        UnpackScalar           7.97e+04 8.34e+04 8.42e+04      7.96X      8.13X      8.14X
 //
 // Unpack32Values bit_width 29:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.41e+03 9.46e+03 9.55e+03         1X         1X         1X
-//                      Unpack32Scalar           5.79e+04 5.82e+04 5.87e+04      6.15X      6.15X      6.14X
-//                        UnpackScalar           6.08e+04 6.11e+04 6.16e+04      6.46X      6.46X      6.46X
+//                           BitReader           1.01e+04 1.01e+04 1.02e+04         1X         1X         1X
+//                      Unpack32Scalar           7.06e+04 7.27e+04 7.35e+04      7.02X      7.18X      7.19X
+//                        UnpackScalar              8e+04 8.23e+04 8.32e+04      7.96X      8.12X      8.14X
 //
 // Unpack32Values bit_width 30:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.37e+03 9.45e+03 9.52e+03         1X         1X         1X
-//                      Unpack32Scalar           5.87e+04 5.92e+04 5.96e+04      6.26X      6.27X      6.26X
-//                        UnpackScalar           6.16e+04  6.2e+04 6.26e+04      6.58X      6.56X      6.57X
+//                           BitReader           9.95e+03 1.01e+04 1.02e+04         1X         1X         1X
+//                      Unpack32Scalar              7e+04 7.23e+04 7.32e+04      7.04X      7.16X      7.18X
+//                        UnpackScalar            7.9e+04 8.18e+04 8.24e+04      7.94X      8.09X      8.08X
 //
 // Unpack32Values bit_width 31:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.26e+03 9.33e+03 9.41e+03         1X         1X         1X
-//                      Unpack32Scalar           5.59e+04 5.63e+04 5.67e+04      6.03X      6.03X      6.03X
-//                        UnpackScalar           5.85e+04 5.89e+04 5.94e+04      6.31X      6.31X      6.31X
+//                           BitReader           9.06e+03 9.33e+03 9.43e+03         1X         1X         1X
+//                      Unpack32Scalar           6.52e+04 7.17e+04 7.26e+04      7.19X      7.69X       7.7X
+//                        UnpackScalar           7.67e+04  8.1e+04 8.19e+04      8.46X      8.69X      8.69X
 //
 // Unpack32Values bit_width 32:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                           BitReader           9.89e+03 9.96e+03    1e+04         1X         1X         1X
-//                      Unpack32Scalar           9.83e+04 9.96e+04 1.01e+05      9.95X        10X        10X
-//                        UnpackScalar           8.24e+04 8.36e+04 8.44e+04      8.34X       8.4X      8.41X
+//                           BitReader           9.73e+03 9.96e+03    1e+04         1X         1X         1X
+//                      Unpack32Scalar           1.06e+05  1.1e+05 1.11e+05      10.9X        11X      11.1X
+//                        UnpackScalar           1.41e+05 1.49e+05  1.5e+05      14.5X      14.9X        15X
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>

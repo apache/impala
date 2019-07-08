@@ -244,7 +244,7 @@ class RleEncoder {
         1 + BitUtil::Ceil(MAX_VALUES_PER_LITERAL_RUN * bit_width, 8);
     /// Up to MAX_VLQ_BYTE_LEN indicator and a single 'bit_width' value.
     int max_repeated_run_size =
-        BatchedBitReader::MAX_VLQ_BYTE_LEN + BitUtil::Ceil(bit_width, 8);
+        BatchedBitReader::max_vlq_byte_len<uint32_t>() + BitUtil::Ceil(bit_width, 8);
     return std::max(max_literal_run_size, max_repeated_run_size);
   }
 
@@ -406,7 +406,7 @@ inline void RleEncoder::FlushRepeatedRun() {
   bool result = true;
   // The lsb of 0 indicates this is a repeated run
   uint32_t indicator_value = static_cast<uint32_t>(repeat_count_) << 1;
-  result &= bit_writer_.PutUleb128Int(indicator_value);
+  result &= bit_writer_.PutUleb128<uint32_t>(indicator_value);
   result &= bit_writer_.PutAligned(current_value_, BitUtil::Ceil(bit_width_, 8));
   DCHECK(result);
   num_buffered_values_ = 0;
@@ -665,7 +665,7 @@ inline void RleBatchDecoder<T>::NextCounts() {
   // Read the next run's indicator int, it could be a literal or repeated run.
   // The int is encoded as a ULEB128-encoded value.
   uint32_t indicator_value = 0;
-  if (UNLIKELY(!bit_reader_.GetUleb128Int(&indicator_value))) return;
+  if (UNLIKELY(!bit_reader_.GetUleb128<uint32_t>(&indicator_value))) return;
 
   // lsb indicates if it is a literal run or repeated run
   bool is_literal = indicator_value & 1;
