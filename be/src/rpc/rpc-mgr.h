@@ -143,9 +143,10 @@ class RpcMgr {
   bool Authorize(const string& service_name, kudu::rpc::RpcContext* context,
       MemTracker* mem_tracker) const;
 
-  /// Creates a new proxy of type P at location 'address' with hostname 'hostname' and
-  /// places it in 'proxy'. 'P' must descend from kudu::rpc::Proxy. Note that 'address'
-  /// must be a resolved IP address.
+  /// Creates a new proxy of type P to a host with IP address 'address' and hostname
+  /// 'hostname'. Please note that 'address' has to be a resolved IP address and
+  /// 'hostname' has to match the hostname used in the Kerberos principal of the
+  /// destination host if Kerberos is enabled. 'P' must descend from kudu::rpc::Proxy.
   template <typename P>
   Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
       std::unique_ptr<P>* proxy) WARN_UNUSED_RESULT;
