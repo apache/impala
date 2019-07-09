@@ -137,6 +137,7 @@ class Coordinator::BackendState {
 
   /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
+  Status exec_rpc_status() const { return exec_rpc_status_; }
 
   int64_t last_report_time_ms() {
     boost::lock_guard<boost::mutex> l(lock_);
@@ -279,6 +280,11 @@ class Coordinator::BackendState {
   /// executing impalad (which then reported the error) or cancellation has been
   /// initiated; either way, execution must not be cancelled.
   Status status_;
+
+  /// The status returned by KRPC for the ExecQueryFInstances() rpc. If this is an error,
+  /// we were unable to successfully communicate with the backend, eg. because of a
+  /// network error.
+  Status exec_rpc_status_;
 
   /// Used to distinguish between errors reported by a specific fragment instance,
   /// which would set failed_instance_id_, rather than an error independent of any

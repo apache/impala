@@ -241,15 +241,15 @@ void Coordinator::BackendState::Exec(
   int64_t start = MonotonicMillis();
 
   ExecQueryFInstancesResponsePB response;
-  Status rpc_status =
+  exec_rpc_status_ =
       FromKuduStatus(proxy->ExecQueryFInstances(request, &response, &rpc_controller),
           "Exec() rpc failed");
 
   rpc_sent_ = true;
   rpc_latency_ = MonotonicMillis() - start;
 
-  if (!rpc_status.ok()) {
-    SetExecError(rpc_status);
+  if (!exec_rpc_status_.ok()) {
+    SetExecError(exec_rpc_status_);
     return;
   }
 

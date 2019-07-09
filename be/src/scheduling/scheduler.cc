@@ -679,10 +679,10 @@ void Scheduler::ComputeBackendExecParams(
   int64_t largest_min_reservation = 0;
   for (auto& backend : per_backend_params) {
     const TNetworkAddress& host = backend.first;
-    backend.second.admit_mem_limit =
-        LookUpBackendDesc(executor_config, host).admit_mem_limit;
-    backend.second.admit_num_queries_limit =
-        LookUpBackendDesc(executor_config, host).admit_num_queries_limit;
+    const TBackendDescriptor be_desc = LookUpBackendDesc(executor_config, host);
+    backend.second.admit_mem_limit = be_desc.admit_mem_limit;
+    backend.second.admit_num_queries_limit = be_desc.admit_num_queries_limit;
+    backend.second.be_desc = be_desc;
     largest_min_reservation =
         max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
   }

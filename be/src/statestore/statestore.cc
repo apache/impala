@@ -1069,3 +1069,7 @@ void Statestore::ShutdownForTesting() {
   subscriber_priority_topic_update_threadpool_.Join();
   subscriber_heartbeat_threadpool_.Join();
 }
+
+int64_t Statestore::FailedExecutorDetectionTimeMs() {
+  return FLAGS_statestore_max_missed_heartbeats * FLAGS_statestore_heartbeat_frequency_ms;
+}

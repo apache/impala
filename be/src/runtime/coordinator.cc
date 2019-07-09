@@ -390,6 +390,14 @@ Status Coordinator::FinishBackendStartup() {
       status = backend_status;
       error_hostname = backend_state->impalad_address().hostname;
     }
+    if (!backend_state->exec_rpc_status().ok()) {
+      // The Exec() rpc failed, so blacklist the executor.
+      LOG(INFO) << "Blacklisting "
+                << TNetworkAddressToString(backend_state->impalad_address())
+                << " because an Exec() rpc to it failed.";
+      const TBackendDescriptor& be_desc = backend_state->exec_params()->be_desc;
+      ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(be_desc);
+    }
     if (backend_state->rpc_latency() > max_latency) {
       // Find the backend that takes the most time to acknowledge to
       // the ExecQueryFInstances() RPC.

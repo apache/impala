@@ -28,6 +28,7 @@
 #include "common/status.h"
 #include "gen-cpp/StatestoreService_types.h"
 #include "gutil/threading/thread_collision_warner.h"
+#include "scheduling/executor-blacklist.h"
 #include "scheduling/executor-group.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/container-util.h"
@@ -86,15 +87,19 @@ class ClusterMembershipMgr {
     Snapshot(const Snapshot&) = default;
     /// The current backend descriptor of the local backend.
     BeDescSharedPtr local_be_desc;
-    /// Map from unique backend ID to TBackendDescriptor. The
-    /// {backend ID, TBackendDescriptor} pairs represent the IMPALA_MEMBERSHIP_TOPIC
-    /// {key, value} pairs of known executors retrieved from the statestore. It's
-    /// important to track both the backend ID as well as the TBackendDescriptor so we
-    /// know what is being removed in a given update.
+    /// Map from unique backend ID to TBackendDescriptor for all known backends, including
+    /// those that are quiescing or blacklisted. The {backend ID, TBackendDescriptor}
+    /// pairs represent the IMPALA_MEMBERSHIP_TOPIC {key, value} pairs of known executors
+    /// retrieved from the statestore. It's important to track both the backend ID as well
+    /// as the TBackendDescriptor so we know what is being removed in a given update.
     BackendIdMap current_backends;
-    /// A map of executor groups by their names.
+    /// A map of executor groups by their names. Only contains executors that are
+    /// available for scheduling queries on and not executors that are quiescing or
+    /// blacklisted.
     ExecutorGroups executor_groups;
-
+    /// The local blacklist. Backends that are added to this will be present in
+    /// 'current_backends' but not in 'executor_groups'.
+    ExecutorBlacklist executor_blacklist;
     /// The version of this Snapshot. It is incremented every time the cluster membership
     /// changes.
     int64_t version = 0;
@@ -163,6 +168,10 @@ class ClusterMembershipMgr {
   void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
+  /// Adds the given backend to the local blacklist. Updates 'current_membership_' to
+  /// remove the backend from 'executor_groups' so that it will not be scheduled on.
+  void BlacklistExecutor(const TBackendDescriptor& be_desc);
+
  private:
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.
   void AddLocalBackendToStatestore(const TBackendDescriptor& local_be_desc,
@@ -189,14 +198,17 @@ class ClusterMembershipMgr {
   bool NeedsLocalBackendUpdate(const Snapshot& state,
       const BeDescSharedPtr& local_be_desc);
 
-  /// Checks that the backend ID map is consistent with 'executor_groups', i.e. all
-  /// executors in all groups are also present in the map and are non-quiescing executors.
+  /// Checks that the backend ID map is consistent with 'executor_groups' and
+  /// 'executor_blacklist', i.e. all executors in all groups are also present in the map
+  /// and are non-quiescing, non-blacklisted executors.
   /// This method should only be called in debug builds.
   bool CheckConsistency(const BackendIdMap& current_backends,
-      const ExecutorGroups& executor_groups);
+      const ExecutorGroups& executor_groups, const ExecutorBlacklist& executor_blacklist);
 
-  /// Fake mutex to DCHECK that only one thread at a time calls UpdateMembership.
-  DFAKE_MUTEX(update_membership_lock_);
+  /// Ensures that only one thread is processing a membership update at a time, either
+  /// from a statestore update or a blacklisting decision. Must be taken before any other
+  /// locks in this class.
+  boost::mutex update_membership_lock_;
 
   /// The snapshot of the current cluster membership. When receiving changes to the
   /// executors configuration from the statestore we will make a copy of the stored
@@ -204,23 +216,27 @@ class ClusterMembershipMgr {
   /// pointer.
   SnapshotPtr current_membership_;
 
-  /// Protects current_membership_
+  /// Protects current_membership_. Cannot be held at the same time as
+  /// 'callback_fn_lock_'.
   mutable boost::mutex current_membership_lock_;
 
   /// A temporary membership snapshot to hold updates while the statestore is in its
-  /// post-recovery grace period. Not exposed to clients and not protected by any locking.
+  /// post-recovery grace period. Not exposed to clients. Protected by
+  /// 'update_membership_lock_'.
   std::shared_ptr<Snapshot> recovering_membership_;
 
   /// Pointer to a subscription manager (which we do not own) which is used to register
   /// for dynamic updates to the set of available backends. May be nullptr if the set of
-  /// backends is fixed (only useful for tests).
+  /// backends is fixed (only useful for tests). Thread-safe, not protected by a lock.
   StatestoreSubscriber* statestore_subscriber_;
 
-  /// Serializes TBackendDescriptors when creating topic updates
+  /// Serializes TBackendDescriptors when creating topic updates. Not protected by a lock
+  /// - only used in statestore thread.
   ThriftSerializer thrift_serializer_;
 
   /// Unique - across the cluster - identifier for this impala backend. Used to validate
-  /// incoming backend descriptors and to register this backend with the statestore.
+  /// incoming backend descriptors and to register this backend with the statestore. Not
+  /// protected by a lock - only used in the statestore thread.
   std::string local_backend_id_;
 
   /// Callbacks that provide external dependencies.
@@ -228,7 +244,8 @@ class ClusterMembershipMgr {
   UpdateLocalServerFn update_local_server_fn_;
   UpdateFrontendFn update_frontend_fn_;
 
-  /// Protects the callbacks.
+  /// Protects the callbacks. Cannot be held at the same time as
+  /// 'current_membership_lock_'.
   mutable boost::mutex callback_fn_lock_;
 
   friend class impala::test::SchedulerWrapper;

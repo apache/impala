@@ -734,6 +734,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
       ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot();
   DCHECK(membership_snapshot.get() != nullptr);
+  string blacklist_str = membership_snapshot->executor_blacklist.BlacklistToString();
+  if (!blacklist_str.empty()) {
+    request.summary_profile->AddInfoString("Blacklisted Executors", blacklist_str);
+  }
 
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(request, admit_outcome, request.summary_profile);

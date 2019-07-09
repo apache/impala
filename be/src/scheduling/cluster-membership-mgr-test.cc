@@ -33,6 +33,9 @@ using std::uniform_real_distribution;
 using namespace impala;
 using namespace impala::test;
 
+DECLARE_int32(statestore_max_missed_heartbeats);
+DECLARE_int32(statestore_heartbeat_frequency_ms);
+
 namespace impala {
 
 /// This class and the following tests exercise the ClusterMembershipMgr core membership
@@ -335,6 +338,83 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(1, cmm2.GetSnapshot()->current_backends.size());
   ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
+}
+
+// This test verifies the interaction between the ExecutorBlacklist and
+// ClusterMembershipMgr.
+TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
+  // Set some flags to make the blacklist timeout fairly small (50ms);
+  gflags::FlagSaver saver;
+  FLAGS_statestore_max_missed_heartbeats = 5;
+  FLAGS_statestore_heartbeat_frequency_ms = 10;
+  const int BLACKLIST_TIMEOUT_SLEEP_US = 100000;
+
+  const int NUM_BACKENDS = 3;
+  for (int i = 0; i < NUM_BACKENDS; ++i) CreateBackend();
+  EXPECT_EQ(NUM_BACKENDS, backends_.size());
+  EXPECT_EQ(backends_.size(), offline_.size());
+
+  while (!offline_.empty()) CreateCMM(offline_.front());
+  EXPECT_EQ(0, offline_.size());
+  EXPECT_EQ(NUM_BACKENDS, starting_.size());
+
+  while (!starting_.empty()) StartBackend(starting_.front());
+  EXPECT_EQ(0, starting_.size());
+  EXPECT_EQ(NUM_BACKENDS, running_.size());
+
+  // Assert that all backends know about each other and are all in the default executor
+  // group.
+  for (Backend* be : running_) {
+    EXPECT_EQ(running_.size(), be->cmm->GetSnapshot()->current_backends.size());
+    EXPECT_EQ(running_.size(), GetDefaultGroupSize(*be->cmm));
+  }
+
+  // Tell a BE to blacklist itself, should have no effect.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[0]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
+
+  // Tell a BE to blacklist another BE, should remove it from executor_groups but not
+  // current_backends.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
+  // Blacklist a BE that is already blacklisted. Should have no effect.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
+
+  // Sleep and check the node has been un-blacklisted.
+  usleep(BLACKLIST_TIMEOUT_SLEEP_US);
+  EXPECT_EQ(Poll(backends_[0].get()).size(), 0);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
+
+  // Blacklist the BE and sleep again.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
+  usleep(BLACKLIST_TIMEOUT_SLEEP_US);
+  // Quiesce the blacklisted BE. The update to quiesce it will arrive in the same call to
+  // UpdateMembership() that it would have been un-blacklisted.
+  QuiesceBackend(backends_[1].get());
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
+  // Try blacklisting the quiesced BE, should have no effect.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
+
+  // Blacklist another BE and sleep.
+  backends_[0]->cmm->BlacklistExecutor(*backends_[2]->desc);
+  EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 2, GetDefaultGroupSize(*backends_[0]->cmm));
+  usleep(BLACKLIST_TIMEOUT_SLEEP_US);
+  // Delete the blacklisted BE. The update to delete it will arrive in the same call to
+  // UpdateMembership() that it would have been un-blacklisted.
+  DeleteBackend(backends_[2].get());
+  EXPECT_EQ(NUM_BACKENDS - 1, backends_[0]->cmm->GetSnapshot()->current_backends.size());
+  EXPECT_EQ(NUM_BACKENDS - 2, GetDefaultGroupSize(*backends_[0]->cmm));
 }
 
 // This test runs a group of 20 backends through their full lifecycle, validating that

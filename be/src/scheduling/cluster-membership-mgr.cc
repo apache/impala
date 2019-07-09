@@ -103,7 +103,7 @@ ClusterMembershipMgr::SnapshotPtr ClusterMembershipMgr::GetSnapshot() const {
 void ClusterMembershipMgr::UpdateMembership(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  DFAKE_SCOPED_LOCK(update_membership_lock_);
+  lock_guard<mutex> l(update_membership_lock_);
 
   // First look to see if the topic we're interested in has an update.
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
@@ -133,14 +133,21 @@ void ClusterMembershipMgr::UpdateMembership(
   // will need to send the current membership to the impala server.
   bool update_local_server = recovering_membership_.get() != nullptr && !ss_is_recovering;
 
-  // If there's no statestore update and the local backend descriptor has no changes and
-  // we don't need to update the local server, then we can skip processing altogether and
-  // avoid making a copy of the state.
-  if (no_ss_update && !needs_local_be_update && !update_local_server) return;
+  // Check if there are any executors that can be removed from the blacklist.
+  bool needs_blacklist_maintenance = base_snapshot->executor_blacklist.NeedsMaintenance();
+
+  // If there's no statestore update, the local backend descriptor has no changes, we
+  // don't need to update the local server, and the blacklist doesn't need to be updated,
+  // then we can skip processing altogether and avoid making a copy of the state.
+  if (no_ss_update && !needs_local_be_update && !update_local_server
+      && !needs_blacklist_maintenance) {
+    return;
+  }
 
   if (!no_ss_update) VLOG(1) << "Processing statestore update";
   if (needs_local_be_update) VLOG(1) << "Local backend membership needs update";
   if (update_local_server) VLOG(1) << "Local impala server needs update";
+  if (needs_blacklist_maintenance) VLOG(1) << "Removing executors from the blacklist";
   if (ss_is_recovering) {
     VLOG(1) << "Statestore subscriber is in post-recovery grace period";
   }
@@ -175,12 +182,17 @@ void ClusterMembershipMgr::UpdateMembership(
   // to the new backend map and executor groups.
   BackendIdMap* new_backend_map = &(new_state->current_backends);
   ExecutorGroups* new_executor_groups = &(new_state->executor_groups);
+  ExecutorBlacklist* new_blacklist = &(new_state->executor_blacklist);
   for (const TTopicItem& item : update.topic_entries) {
     // Deleted item
     if (item.deleted) {
       if (new_backend_map->find(item.key) != new_backend_map->end()) {
         const TBackendDescriptor& be_desc = (*new_backend_map)[item.key];
-        if (be_desc.is_executor && !be_desc.is_quiescing) {
+        bool blacklisted = new_blacklist->FindAndRemove(be_desc)
+            == ExecutorBlacklist::State::BLACKLISTED;
+        // If the backend was quiescing or was previously blacklisted, it will already
+        // have been removed from 'executor_groups'.
+        if (be_desc.is_executor && !be_desc.is_quiescing && !blacklisted) {
           for (const auto& group : be_desc.executor_groups) {
             VLOG(1) << "Removing backend " << item.key << " from group " << group
                     << " (deleted)";
@@ -236,7 +248,10 @@ void ClusterMembershipMgr::UpdateMembership(
     if (it != new_backend_map->end()) {
       // Update
       TBackendDescriptor& existing = it->second;
-      if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor) {
+      bool blacklisted =
+          new_blacklist->FindAndRemove(be_desc) == ExecutorBlacklist::State::BLACKLISTED;
+      if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor
+          && !blacklisted) {
         // Executor needs to be removed from its groups
         for (const auto& group : be_desc.executor_groups) {
           VLOG(1) << "Removing backend " << item.key << " from group " << group
@@ -254,8 +269,26 @@ void ClusterMembershipMgr::UpdateMembership(
           FindOrInsertExecutorGroup(group, new_executor_groups)->AddExecutor(be_desc);
         }
       }
+      // Since this backend is new, it cannot already be on the blacklist or probation.
+      DCHECK_EQ(new_blacklist->FindAndRemove(be_desc),
+          ExecutorBlacklist::State::NOT_BLACKLISTED);
     }
-    DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups));
+    DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
+  }
+
+  if (needs_blacklist_maintenance) {
+    // Add any backends that were removed from the blacklist and put on probation back
+    // into 'executor_groups'.
+    std::list<TBackendDescriptor> probation_list;
+    new_blacklist->Maintenance(&probation_list);
+    for (const TBackendDescriptor& be_desc : probation_list) {
+      for (const auto& group : be_desc.executor_groups) {
+        VLOG(1) << "Adding backend " << TNetworkAddressToString(be_desc.address)
+                << " to group " << group << " (passed blacklist timeout)";
+        FindOrInsertExecutorGroup(group, new_executor_groups)->AddExecutor(be_desc);
+      }
+    }
+    DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
   }
 
   // Update the local backend descriptor if required. We need to re-check new_state here
@@ -275,7 +308,7 @@ void ClusterMembershipMgr::UpdateMembership(
       }
     }
     AddLocalBackendToStatestore(*local_be_desc, subscriber_topic_updates);
-    DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups));
+    DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
   }
 
   // Don't send updates or update the current membership if the statestore is in its
@@ -292,6 +325,80 @@ void ClusterMembershipMgr::UpdateMembership(
   // Atomically update the respective membership snapshot.
   SetState(new_state);
   recovering_membership_.reset();
+}
+
+void ClusterMembershipMgr::BlacklistExecutor(const TBackendDescriptor& be_desc) {
+  if (!ExecutorBlacklist::BlacklistingEnabled()) return;
+  lock_guard<mutex> l(update_membership_lock_);
+  // Don't blacklist the local executor. Some queries may have root fragments that must be
+  // scheduled on the coordinator and will always fail if its blacklisted.
+  if (be_desc.ip_address == current_membership_->local_be_desc->ip_address
+      && be_desc.address.port == current_membership_->local_be_desc->address.port) {
+    return;
+  }
+
+  bool recovering = recovering_membership_.get() != nullptr;
+  const Snapshot* base_snapshot;
+  if (recovering) {
+    base_snapshot = recovering_membership_.get();
+  } else {
+    base_snapshot = current_membership_.get();
+  }
+  DCHECK(base_snapshot != nullptr);
+  // Check the Snapshot that we'll be updating to see if the backend is present, to avoid
+  // copying the Snapshot if it isn't.
+  bool exists = false;
+  for (const auto& group : be_desc.executor_groups) {
+    auto it = base_snapshot->executor_groups.find(group.name);
+    if (it != base_snapshot->executor_groups.end()
+        && it->second.LookUpBackendDesc(be_desc.address) != nullptr) {
+      exists = true;
+      break;
+    }
+  }
+  if (!exists) {
+    // This backend does not exist in 'executor_groups', eg. because it was removed by
+    // a statestore update before the coordinator decided to blacklist it or because
+    // it is quiescing.
+    return;
+  }
+
+  std::shared_ptr<Snapshot> new_state;
+  if (recovering) {
+    // If the statestore is currently recovering, we can apply the blacklisting to
+    // 'recovering_membership_', which doesn't need to be copied.
+    new_state = recovering_membership_;
+  } else {
+    new_state = std::make_shared<Snapshot>(*current_membership_);
+  }
+  ExecutorGroups* new_executor_groups = &(new_state->executor_groups);
+
+  for (const auto& group : be_desc.executor_groups) {
+    VLOG(1) << "Removing backend " << TNetworkAddressToString(be_desc.address)
+            << " from group " << group << " (blacklisted)";
+    FindOrInsertExecutorGroup(group, new_executor_groups)->RemoveExecutor(be_desc);
+  }
+
+  ExecutorBlacklist* new_blacklist = &(new_state->executor_blacklist);
+  new_blacklist->Blacklist(be_desc);
+
+  // We'll call SetState() with 'recovering_membership_' once the statestore is no longer
+  // in recovery.
+  if (recovering) return;
+
+  // Note that we don't call the update functions here:
+  // - The backend update function is used to cancel queries on backends that are no
+  //   longer present in 'current_backends', but we don't remove the executor from
+  //   'current_backends' here, since it always reflects the full statestore membership.
+  //   This avoids cancelling queries that may still be running successfully, eg. if the
+  //   backend is still up but got blacklisted due to a flaky network. If the backend
+  //   really is down, we'll still cancel the queries when the statestore removes it from
+  //   the membership.
+  // - The frontend update function is used to notify the planner, but the executors the
+  //   planner schedules things on is just a hint and the Scheduler will still see the
+  //   updated membership and choose non-blacklisted executors regardless of what the
+  //   planner says, so its fine to wait until the next topic update to notify the fe.
+  SetState(new_state);
 }
 
 void ClusterMembershipMgr::AddLocalBackendToStatestore(
@@ -368,7 +475,7 @@ bool ClusterMembershipMgr::NeedsLocalBackendUpdate(const Snapshot& state,
 }
 
 bool ClusterMembershipMgr::CheckConsistency(const BackendIdMap& current_backends,
-      const ExecutorGroups& executor_groups) {
+    const ExecutorGroups& executor_groups, const ExecutorBlacklist& executor_blacklist) {
   // Build a map of all backend descriptors
   std::unordered_map<TNetworkAddress, TBackendDescriptor> address_to_backend;
   for (const auto& it : current_backends) {
@@ -408,6 +515,11 @@ bool ClusterMembershipMgr::CheckConsistency(const BackendIdMap& current_backends
         LOG(WARNING) << "Backend " << group_be.address << " in group " << group_name
             << " differs from backend in current set of backends: is_executor ("
             << current_be_it->second.is_executor << " != " << group_be.is_executor << ")";
+        return false;
+      }
+      if (executor_blacklist.IsBlacklisted(group_be)) {
+        LOG(WARNING) << "Backend " << group_be.address << " in group " << group_name
+                     << " is blacklisted.";
         return false;
       }
     }

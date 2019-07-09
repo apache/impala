@@ -180,6 +180,10 @@ class Statestore : public CacheLineAligned {
 
   int32_t port() { return thrift_server_->port(); }
 
+  /// Amount of time in ms that it takes the statestore to decide that a executor is down
+  /// after it stops responding to heartbeats.
+  static int64_t FailedExecutorDetectionTimeMs();
+
  private:
   /// A TopicEntry is a single entry in a topic, and logically is a <string, byte string>
   /// pair.

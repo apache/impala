@@ -49,6 +49,8 @@ typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
 /// via QuerySchedule::set_per_backend_exec_params(). Used as an input to
 /// AdmissionController and a BackendState.
 struct BackendExecParams {
+  TBackendDescriptor be_desc;
+
   /// The fragment instance params assigned to this backend. All instances of a
   /// particular fragment are contiguous in this vector. Query lifetime;
   /// FInstanceExecParams are owned by QuerySchedule::fragment_exec_params_.
