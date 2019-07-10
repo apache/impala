@@ -43,6 +43,7 @@ import javax.json.JsonWriter;
 import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -70,6 +71,14 @@ public class TestUtils {
   private final static String NUMBER_REGEX = "\\d+(\\.\\d+)?";
   private final static String BYTE_SUFFIX_REGEX = "[KMGT]?B";
   private final static String BYTE_VALUE_REGEX = NUMBER_REGEX + BYTE_SUFFIX_REGEX;
+  // Note: The older Hive Server JDBC driver (Hive .9 and earlier) is named similarly:
+  // "org.apache.hadoop.hive.jdbc.HiveDriver". However, Impala currently only supports
+  // the Hive Server 2 JDBC driver (Hive .10 and later).
+  final static String HIVE_SERVER2_DRIVER_NAME =
+      "org.apache.hive.jdbc.HiveDriver";
+  // The default connection string template to connect to localhost on a given port
+  // number.
+  final static String HS2_CONNECTION_TEMPLATE = "jdbc:hive2://localhost:%d/default";
 
   public interface ResultFilter {
     public boolean matches(String input);
@@ -428,5 +437,12 @@ public class TestUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Returns a random alphanumeric string of given length
+   */
+  public static String getRandomString(int size) {
+    return RandomStringUtils.randomAlphanumeric(size);
   }
 }
