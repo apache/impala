@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.InternalException;
@@ -57,7 +58,7 @@ public class StmtMetadataLoader {
 
   // Results of the loading process. See StmtTableCache.
   private final Set<String> dbs_ = new HashSet<>();
-  private final Map<TableName, FeTable> loadedTbls_ = new HashMap<>();
+  private final Map<TableName, FeTable> loadedOrFailedTbls_ = new HashMap<>();
 
   // Metrics for the metadata load.
   // Number of prioritizedLoad() RPCs issued to the catalogd.
@@ -126,16 +127,16 @@ public class StmtMetadataLoader {
    * a statestore topic update.
    * This function succeeds even across catalog restarts for the following reasons:
    * - The loading process is strictly additive, i.e., a new loaded table may be added
-   *   to the 'loadedTbls_' map, but an existing entry is never removed, even if the
-   *   equivalent table in the impalad catalog is different.
+   *   to the 'loadedOrFailedTbls_' map, but an existing entry is never removed, even if
+   *   the equivalent table in the impalad catalog is different.
    * - Tables on the impalad side are not modified in place. This means that an entry in
-   *   the 'loadedTbls_' will always remain in the loaded state.
+   *   the 'loadedOrFailedTbls_' will always remain in the loaded state.
    * Tables/views that are already loaded are simply included in the result.
    * Marks the start and end of metadata loading in 'timeline_' if it is non-NULL.
    * Must only be called once for a single statement.
    */
   public StmtTableCache loadTables(Set<TableName> tbls) throws InternalException {
-    Preconditions.checkState(dbs_.isEmpty() && loadedTbls_.isEmpty());
+    Preconditions.checkState(dbs_.isEmpty() && loadedOrFailedTbls_.isEmpty());
     Preconditions.checkState(numLoadRequestsSent_ == 0);
     Preconditions.checkState(numCatalogUpdatesReceived_ == 0);
     FeCatalog catalog = fe_.getCatalog();
@@ -144,11 +145,11 @@ public class StmtMetadataLoader {
     // and adding events to the timeline.
     if (missingTbls.isEmpty()) {
       if (timeline_ != null) {
-        timeline_.markEvent(
-            String.format("Metadata of all %d tables cached", loadedTbls_.size()));
+        timeline_.markEvent(String.format("Metadata of all %d tables cached",
+            loadedOrFailedTbls_.size()));
       }
-      fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
-      return new StmtTableCache(catalog, dbs_, loadedTbls_);
+      fe_.getImpaladTableUsageTracker().recordTableUsage(loadedOrFailedTbls_.keySet());
+      return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_);
     }
 
     if (timeline_ != null) timeline_.markEvent("Metadata load started");
@@ -228,14 +229,15 @@ public class StmtMetadataLoader {
     if (timeline_ != null) {
       timeline_.markEvent(String.format("Metadata load finished. " +
           "loaded-tables=%d/%d load-requests=%d catalog-updates=%d",
-          requestedTbls.size(), loadedTbls_.size(), numLoadRequestsSent_,
+          requestedTbls.size(), loadedOrFailedTbls_.size(), numLoadRequestsSent_,
           numCatalogUpdatesReceived_));
 
       if (MetastoreShim.getMajorVersion() > 2) {
         StringBuilder validIdsBuf = new StringBuilder("Loaded ValidWriteIdLists");
         validIdsBuf.append(" for transactional tables: ");
         boolean hasAcidTbls = false;
-        for (FeTable iTbl : loadedTbls_.values()) {
+        for (FeTable iTbl : loadedOrFailedTbls_.values()) {
+          if (iTbl instanceof FeIncompleteTable) continue;
           if (AcidUtils.isTransactionalTable(iTbl.getMetaStoreTable().getParameters())) {
             validIdsBuf.append("\n");
             validIdsBuf.append("           ");
@@ -248,23 +250,24 @@ public class StmtMetadataLoader {
         if (hasAcidTbls) timeline_.markEvent(validIdsBuf.toString());
       }
     }
-    fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
-    return new StmtTableCache(catalog, dbs_, loadedTbls_);
+    fe_.getImpaladTableUsageTracker().recordTableUsage(loadedOrFailedTbls_.keySet());
+    return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_);
   }
 
   /**
    * Determines whether the 'tbls' are loaded in the given catalog or not. Adds the names
-   * of referenced databases that exist to 'dbs_', and loaded tables to 'loadedTbls_'.
+   * of referenced databases that exist to 'dbs_', and loaded tables to
+   * 'loadedOrFailedTbls_'.
    * Returns the set of tables that are not loaded. Recursively collects loaded/missing
    * tables from views. Uses 'sessionDb_' to construct table candidates from views with
    * Path.getCandidateTables(). Non-existent tables are ignored and not returned or
-   * added to 'loadedTbls_'.
+   * added to 'loadedOrFailedTbls_'.
    */
   private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls) {
     Set<TableName> missingTbls = new HashSet<>();
     Set<TableName> viewTbls = new HashSet<>();
     for (TableName tblName: tbls) {
-      if (loadedTbls_.containsKey(tblName)) continue;
+      if (loadedOrFailedTbls_.containsKey(tblName)) continue;
       FeDb db = catalog.getDb(tblName.getDb());
       if (db == null) continue;
       dbs_.add(tblName.getDb());
@@ -274,7 +277,7 @@ public class StmtMetadataLoader {
         missingTbls.add(tblName);
         continue;
       }
-      loadedTbls_.put(tblName, tbl);
+      loadedOrFailedTbls_.put(tblName, tbl);
       if (tbl instanceof FeView) {
         viewTbls.addAll(collectTableCandidates(((FeView) tbl).getQueryStmt()));
       }
