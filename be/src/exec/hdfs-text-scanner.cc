@@ -90,10 +90,11 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
       case THdfsCompression::SNAPPY:
       case THdfsCompression::SNAPPY_BLOCKED:
       case THdfsCompression::BZIP2:
+      case THdfsCompression::DEFLATE:
         for (int j = 0; j < files[i]->splits.size(); ++j) {
-          // In order to decompress gzip-, snappy- and bzip2-compressed text files, we
-          // need to read entire files. Only read a file if we're assigned the first split
-          // to avoid reading multi-block files with multiple scanners.
+          // In order to decompress gzip-, snappy-, bzip2- and deflate-compressed text
+          // files, we need to read entire files. Only read a file if we're assigned the
+          // first split to avoid reading multi-block files with multiple scanners.
           ScanRange* split = files[i]->splits[j];
 
           // We only process the split that starts at offset 0.
@@ -192,10 +193,20 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
 
 Status HdfsTextScanner::InitNewRange() {
   DCHECK_EQ(scan_state_, CONSTRUCTED);
+
+  auto compression_type = stream_ ->file_desc()->file_compression;
   // Update the decompressor based on the compression type of the file in the context.
-  DCHECK(stream_->file_desc()->file_compression != THdfsCompression::SNAPPY)
+  DCHECK(compression_type != THdfsCompression::SNAPPY)
       << "FE should have generated SNAPPY_BLOCKED instead.";
-  RETURN_IF_ERROR(UpdateDecompressor(stream_->file_desc()->file_compression));
+  // In Hadoop, text files compressed into .DEFLATE files contain
+  // deflate with zlib wrappings as opposed to raw deflate, which
+  // is what THdfsCompression::DEFLATE implies. Since deflate is
+  // the default compression algorithm used in Hadoop, it makes
+  // sense to map it to type DEFAULT in Impala instead
+  if (compression_type == THdfsCompression::DEFLATE) {
+    compression_type = THdfsCompression::DEFAULT;
+  }
+  RETURN_IF_ERROR(UpdateDecompressor(compression_type));
 
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   char field_delim = hdfs_partition->field_delim();

@@ -235,11 +235,13 @@ table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/snap/block
+table_name:date_tbl, constraint:restrict_to, table_format:text/def/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/none/none
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/lzo/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/snap/block
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/def/block
 table_name:insert_date_tbl, constraint:restrict_to, table_format:hbase/none/none
 
 # Full transactional table is only supported for ORC

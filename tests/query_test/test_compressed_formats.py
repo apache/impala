@@ -71,22 +71,13 @@ class TestCompressedFormats(ImpalaTestSuite):
   def test_compressed_formats(self, vector):
     file_format = vector.get_value('file_format')
     extension, suffix = vector.get_value('compression_format')
-    if file_format in ['rc', 'seq']:
-      # Test that compressed RC/sequence files are supported.
+    if file_format in ['rc', 'seq', 'text']:
+      # TODO: How about LZO?
+      # Test that {gzip,snappy,bzip,deflate}-compressed
+      # {RC,sequence,text} files are supported.
       db_suffix = '_%s_%s' % (file_format, suffix)
       self._copy_and_query_compressed_file(
-       'tinytable', db_suffix, suffix, '000000_0', extension)
-    elif file_format is 'text':
-      # TODO: How about LZO?
-      if suffix in ['gzip', 'snap', 'bzip']:
-        # Test that {gzip,snappy,bzip}-compressed text files are supported.
-        db_suffix = '_%s_%s' % (file_format, suffix)
-        self._copy_and_query_compressed_file(
-          'tinytable', db_suffix, suffix, '000000_0', extension)
-      else:
-        # Deflate-compressed (['def']) text files (or at least text files with a
-        # compressed extension) have not been tested yet.
-        pytest.skip("Skipping the text/def tests")
+        'tinytable', db_suffix, suffix, '000000_0', extension)
     else:
       assert False, "Unknown file_format: %s" % file_format
 

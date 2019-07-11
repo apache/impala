@@ -74,6 +74,7 @@ class HdfsTextScanner : public HdfsScanner {
       case THdfsCompression::SNAPPY:
       case THdfsCompression::SNAPPY_BLOCKED:
       case THdfsCompression::BZIP2:
+      case THdfsCompression::DEFLATE:
         return true;
       default:
         return false;
