@@ -210,6 +210,8 @@ class SkipIfDockerizedCluster:
 class SkipIfHive3:
   sentry_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
+  kudu_hms_notifications_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
+      reason="Kudu is not tested with Hive 3 notifications yet, see IMPALA-8751.")
 
 
 class SkipIfHive2:

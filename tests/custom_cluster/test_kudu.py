@@ -22,7 +22,7 @@ from kudu.schema import INT32
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfKudu
+from tests.common.skip import SkipIfKudu, SkipIfHive3
 from tests.common.test_dimensions import add_exec_option_dimension
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -194,6 +194,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
         in table_desc
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_drop_non_empty_db(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database will fail if Kudu tables are present
        and that the tables remain.
@@ -217,6 +218,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
       assert not kudu_client.table_exists(kudu_table.name)
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_drop_db_cascade(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database cascade will succeed even if Kudu
        tables are present. Make sure the corresponding managed tables are removed
@@ -239,6 +241,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
       assert not kudu_client.table_exists(kudu_table.name)
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_drop_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table should fail if the underlying
        Kudu table has been dropped externally.
@@ -258,6 +261,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
       assert "Table %s no longer exists in the Hive MetaStore." % kudu_tbl_name in str(e)
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_drop_external_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that Impala can recover from the case where the underlying Kudu table of
        an external table is dropped using the Kudu client.
@@ -287,5 +291,6 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
       assert (external_table_name,) not in cursor.fetchall()
 
   @SkipIfKudu.no_hybrid_clock
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
