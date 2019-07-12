@@ -232,13 +232,6 @@ class SkipIfCatalogV2:
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="Test is specific to old implementation of catalog.")
 
-  # TODO: IMPALA-8486: fix invalidation or update tests to reflect expected behaviour.
-  @classmethod
-  def lib_cache_invalidation_broken(self):
-    return pytest.mark.skipif(
-      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
-      reason="IMPALA-8486: LibCache isn't invalidated by function DDL.")
-
   # TODO: IMPALA-7131: add support or update tests to reflect expected behaviour.
   @classmethod
   def data_sources_unsupported(self):

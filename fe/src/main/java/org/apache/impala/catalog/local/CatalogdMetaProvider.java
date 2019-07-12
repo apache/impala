@@ -260,8 +260,6 @@ public class CatalogdMetaProvider implements MetaProvider {
    *
    * For details of the usage of Futures within the cache, see
    * {@link #loadWithCaching(String, String, Object, Callable).
-   *
-
    */
   final Cache<Object,Object> cache_;
 
@@ -1213,6 +1211,13 @@ public class CatalogdMetaProvider implements MetaProvider {
           invalidated);
       invalidateCacheForFunction(obj.fn.name.db_name, obj.fn.name.function_name,
           invalidated);
+      if (obj.fn.hdfs_location != null) {
+        // After the coordinator creates a function, it will also receive an invalidation
+        // update for this function from the statestored's broadcast. We shouldn't remove
+        // the libcache entry for this case, just mark it as needs refresh. LibCache will
+        // refresh the cached file if its mtime changes in HDFS.
+        FeSupport.NativeLibCacheSetNeedsRefresh(obj.fn.hdfs_location);
+      }
       break;
     case DATABASE:
       if (cache_.asMap().remove(DB_LIST_CACHE_KEY) != null) {

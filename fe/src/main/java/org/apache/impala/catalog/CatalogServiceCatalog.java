@@ -642,7 +642,11 @@ public class CatalogServiceCatalog extends Catalog {
         // the full information rather than doing fetch-on-demand.
         return obj;
       case FUNCTION:
-        min.setFn(new TFunction(obj.fn.getName()));
+        TFunction fnObject = new TFunction(obj.fn.getName());
+        // IMPALA-8486: add the hdfs location so coordinators can mark their libCache
+        // entry for this function to be stale.
+        if (obj.fn.hdfs_location != null) fnObject.setHdfs_location(obj.fn.hdfs_location);
+        min.setFn(fnObject);
         break;
       case DATA_SOURCE:
       case HDFS_CACHE_POOL:
