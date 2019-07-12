@@ -183,8 +183,30 @@ under the License.
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <!--
+      The impala.cdp.repo above can reference versions that are not in that
+      repository. For example, artifact A at version 280 may have a dependency
+      on artifact B at version 279, but the maven repository may only have
+      artifact B at version 280. This repository contains all the versions, so
+      it satisfies the dangling dependencies. This was necessary for IMPALA-8766.
+      -->
+      <id>hwx.public.repo</id>
+      <url>https://nexus-private.hortonworks.com/nexus/content/groups/public</url>
+      <name>Hortonworks public repository</name>
+      <!--
+      Snapshots are specifically disabled, because the snapshots in this repository
+      would conflict with the versions in impala.cdh.repo and should be unnecessary.
+      -->
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <!-- The Hortonworks public repository is only needed for USE_CDP_HIVE=true -->
+        <enabled>${env.USE_CDP_HIVE}</enabled>
+      </releases>
+    </repository>
   </repositories>
-
   <pluginRepositories>
     <pluginRepository>
       <id>cloudera.thirdparty.repo</id>
