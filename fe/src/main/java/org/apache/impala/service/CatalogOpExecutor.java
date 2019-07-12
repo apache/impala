@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -3872,22 +3873,28 @@ public class CatalogOpExecutor {
       List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
     if (!catalog_.isExternalEventProcessingEnabled() ||
         affectedExistingPartitions.size() == 0) return;
-    // Map of partition ids to file names of all existing partitions touched by the
+
+    // Map of partition names to file names of all existing partitions touched by the
     // insert.
-    Map<Long, Set<String>> partitionFilesMap = new HashMap<>();
+    Map<String, Set<String>> partitionFilesMapBeforeInsert = new HashMap<>();
     if (!isInsertOverwrite) {
-      for (FeFsPartition partition : affectedExistingPartitions) {
-        partitionFilesMap.put(partition.getId(),
-            ((HdfsPartition) partition).getFileNames());
-      }
+      partitionFilesMapBeforeInsert =
+          getPartitionNameFilesMap(affectedExistingPartitions);
     }
     // If table is partitioned, we add all existing partitions touched by this insert
-    // to the insert event. If it is not an insert overwrite operation, we find new
-    // files added by this insert.
+    // to the insert event.
     Collection<? extends FeFsPartition> partsPostInsert;
-    partsPostInsert = table.getNumClusteringCols() > 0 ?
-        ((FeFsTable)table).loadPartitions(partitionFilesMap.keySet()) :
-            FeCatalogUtils.loadAllPartitions((HdfsTable) table);
+    partsPostInsert =
+        ((HdfsTable) table).getPartitionsForNames(
+            partitionFilesMapBeforeInsert.keySet());
+
+    // If it is not an insert overwrite operation, we find new files added by this insert.
+    Map<String, Set<String>> partitionFilesMapPostInsert = new HashMap<>();
+    if (!isInsertOverwrite) {
+      partitionFilesMapPostInsert =
+          getPartitionNameFilesMap(partsPostInsert);
+    }
+
     for (FeFsPartition part : partsPostInsert) {
       // Find the delta of the files added by the insert if it is not an overwrite
       // operation. HMS fireListenerEvent() expects an empty list if no new files are
@@ -3895,14 +3902,17 @@ public class CatalogOpExecutor {
       Set<String> deltaFiles = new HashSet<>();
       List<String> partVals = null;
       if (!isInsertOverwrite) {
-        Set<String> filesPostInsert = ((HdfsPartition) part).getFileNames();
+        String partitionName = part.getPartitionName() + "/";
+        Set<String> filesPostInsert =
+            partitionFilesMapPostInsert.get(partitionName);
         if (table.getNumClusteringCols() > 0) {
-          Set<String> filesBeforeInsert = partitionFilesMap.get(part.getId());
+          Set<String> filesBeforeInsert =
+              partitionFilesMapBeforeInsert.get(partitionName);
           deltaFiles = Sets.difference(filesBeforeInsert, filesPostInsert);
           partVals = part.getPartitionValuesAsStrings(true);
         } else {
-          Map.Entry<Long, Set<String>> entry =
-              partitionFilesMap.entrySet().iterator().next();
+          Map.Entry<String, Set<String>> entry =
+              partitionFilesMapBeforeInsert.entrySet().iterator().next();
           deltaFiles = Sets.difference(entry.getValue(), filesPostInsert);
         }
         LOG.info("{} new files detected for table {} partition {}.",
@@ -3923,6 +3933,16 @@ public class CatalogOpExecutor {
             + "generating INSERT event.");
       }
     }
+  }
+
+  /**
+   * Util method to return a map of partition names to list of files for that partition.
+   */
+  private static Map<String, Set<String>> getPartitionNameFilesMap(Collection<?
+      extends FeFsPartition> partitions) {
+        return partitions.stream().collect(
+            Collectors.toMap(p -> p.getPartitionName() + "/",
+                p -> ((HdfsPartition) p).getFileNames()));
   }
 
   /**

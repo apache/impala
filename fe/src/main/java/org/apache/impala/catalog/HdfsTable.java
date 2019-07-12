@@ -1110,7 +1110,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * Given a set of partition names, returns the corresponding HdfsPartition
    * objects.
    */
-  private List<HdfsPartition> getPartitionsForNames(Collection<String> partitionNames) {
+  public List<HdfsPartition> getPartitionsForNames(Collection<String> partitionNames) {
     List<HdfsPartition> parts = Lists.newArrayListWithCapacity(partitionNames.size());
     for (String partitionName: partitionNames) {
       String partName = DEFAULT_PARTITION_NAME;
