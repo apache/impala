@@ -279,18 +279,60 @@ class TestObservability(ImpalaTestSuite):
     assert results.runtime_profile.count("AGGREGATION_NODE") == 2
     assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
 
-  def test_query_profile_contains_query_compilation_events(self):
-    """Test that the expected events show up in a query profile.
-       If the table metadata is not cached this test will fail, as the metadata load
-       creates lines dynamically."""
-    event_regexes = [r'Query Compilation:',
-        r'Metadata of all .* tables cached:',
+  def test_query_profile_contains_query_compilation_static_events(self):
+    """Test that the expected events show up in a query profile. These lines are static
+    and should appear in this exact order."""
+    event_regexes = [
         r'Analysis finished:',
         r'Authorization finished (.*):',
         r'Value transfer graph computed:',
         r'Single node plan created:',
         r'Runtime filters computed:',
+        r'Distributed plan created:']
+    query = "select * from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_query_compilation_metadata_load_events(self):
+    """Test that the Metadata load started and finished events appear in the query
+    profile when Catalog cache is evicted."""
+    invalidate_query = "invalidate metadata functional.alltypes"
+    select_query = "select * from functional.alltypes"
+    self.execute_query(invalidate_query).runtime_profile
+    runtime_profile = self.execute_query(select_query).runtime_profile
+    event_regexes = [r'Query Compilation:',
+        r'Metadata load started:',
+        r'Metadata load finished. loaded-tables=.*/.* load-requests=.* '
+            r'catalog-updates=.*:',
+        r'Analysis finished:']
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_query_compilation_metadata_cached_event(self):
+    """Test that the Metadata cache available event appears in the query profile when
+    the table is cached."""
+    refresh_query = "refresh functional.alltypes"
+    select_query = "select * from functional.alltypes"
+    self.execute_query(refresh_query).runtime_profile
+    runtime_profile = self.execute_query(select_query).runtime_profile
+    event_regexes = [r'Query Compilation:',
+        r'Metadata of all .* tables cached:',
+        r'Analysis finished:']
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_query_compilation_lineage_event(self):
+    """Test that the lineage information appears in the profile in the right place. This
+    event depends on whether the lineage_event_log_dir is configured."""
+    impalad = self.impalad_test_service
+    lineage_event_log_dir_value = impalad.get_flag_current_value("lineage_event_log_dir")
+    assert lineage_event_log_dir_value is not None
+    if lineage_event_log_dir_value == "":
+      event_regexes = [
         r'Distributed plan created:',
+        r'Planning finished:']
+    else:
+      event_regexes = [
+        r'Distributed plan created:',
+        r'Lineage info computed:',
         r'Planning finished:']
     query = "select * from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile

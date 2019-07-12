@@ -84,6 +84,15 @@ class BaseImpalaService(object):
     return [metrics.get(metric_name, default_value)
             for metric_name, default_value in zip(metric_names, default_values)]
 
+  def get_flag_current_value(self, flag):
+    """Returns the value of the the given flag name from the Impala /varz debug webpage.
+    If the flag does not exist it returns None."""
+    varz = json.loads(self.read_debug_webpage("varz?json"))
+    for var in varz.get("flags"):
+      if var["name"] == flag:
+        return var["current"]
+    return None
+
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
     start_time = time()
     while (time() - start_time < timeout):
