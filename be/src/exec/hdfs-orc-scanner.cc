@@ -106,11 +106,12 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
 
   // Set expected_local to false to avoid cache on stale data (IMPALA-6830)
   bool expected_local = false;
+  int cache_options = split_range->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* range = scanner_->scan_node_->AllocateScanRange(
       metadata_range->fs(), scanner_->filename(), length, offset, partition_id,
       split_range->disk_id(), expected_local, split_range->is_erasure_coded(),
       split_range->mtime(),
-      BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length));
+      BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length, cache_options));
 
   unique_ptr<BufferDescriptor> io_buffer;
   Status status;

@@ -379,6 +379,9 @@ struct TQueryOptions {
   // the cost of parsing and analyzing the statement, which is required to enforce the
   // statement expression limit.
   89: optional i32 max_statement_length_bytes = 16777216
+
+  // If true, skip using the data cache for this query session.
+  90: optional bool disable_data_cache = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -575,7 +578,7 @@ struct TPlanFragmentCtx {
 struct TScanRangeParams {
   1: required PlanNodes.TScanRange scan_range
   2: optional i32 volume_id = -1
-  3: optional bool is_cached = false
+  3: optional bool try_hdfs_cache = false
   4: optional bool is_remote
 }
 

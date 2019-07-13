@@ -841,6 +841,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_statement_length_bytes(max_statement_length_bytes);
         break;
       }
+      case TImpalaQueryOptions::DISABLE_DATA_CACHE: {
+        query_options->__set_disable_data_cache(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

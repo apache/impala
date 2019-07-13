@@ -429,6 +429,9 @@ enum TImpalaQueryOptions {
   // likely to violate the statement expression limit. Rejecting them early avoids
   // the cost of parsing/analysis.
   MAX_STATEMENT_LENGTH_BYTES = 88
+
+  // Disable the data cache.
+  DISABLE_DATA_CACHE = 89
 }
 
 // The summary of a DML statement.

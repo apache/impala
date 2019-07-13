@@ -154,10 +154,13 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
       return Status::OK();
     }
     int64_t partition_id = parent_->partition_descriptor()->id();
+    bool expected_local = false;
+    // Disable HDFS caching as we are reading past the end.
+    int cache_options = scan_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
     ScanRange* range = parent_->scan_node_->AllocateScanRange(
         scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
-        scan_range_->disk_id(), false, scan_range_->is_erasure_coded(),
-        scan_range_->mtime(), BufferOpts::Uncached());
+        scan_range_->disk_id(), expected_local, scan_range_->is_erasure_coded(),
+        scan_range_->mtime(), BufferOpts(cache_options));
     bool needs_buffers;
     RETURN_IF_ERROR(
         parent_->scan_node_->reader_context()->StartScanRange(range, &needs_buffers));

@@ -254,7 +254,7 @@ class HdfsScanNodeBase : public ScanNode {
       int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
       bool is_erasure_coded, int64_t mtime,
       const io::BufferOpts& buffer_opts,
-      const io::ScanRange* original_split = NULL);
+      const io::ScanRange* original_split = nullptr);
 
   /// Same as above, but it takes a pointer to a ScanRangeMetadata object which contains
   /// the partition_id, original_splits, and other information about the scan range.
@@ -266,8 +266,8 @@ class HdfsScanNodeBase : public ScanNode {
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, std::vector<io::ScanRange::SubRange>&& sub_ranges,
       int64_t partition_id, int disk_id, bool expected_local, bool is_erasure_coded,
-      int64_t mtime,
-      const io::BufferOpts& buffer_opts, const io::ScanRange* original_split = NULL);
+      int64_t mtime, const io::BufferOpts& buffer_opts,
+      const io::ScanRange* original_split = nullptr);
 
   /// Same as above, but it takes both sub-ranges and metadata.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
@@ -277,10 +277,9 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Old API for compatibility with text scanners (e.g. LZO text scanner).
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
-      int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
-      bool expected_local, int64_t mtime,
-      bool is_erasure_coded = false,
-      const io::ScanRange* original_split = NULL);
+      int64_t offset, int64_t partition_id, int disk_id, int cache_options,
+      bool expected_local, int64_t mtime, bool is_erasure_coded = false,
+      const io::ScanRange* original_split = nullptr);
 
   /// Adds ranges to the io mgr queue. Can be overridden to add scan-node specific
   /// actions like starting scanner threads. Must not be called once

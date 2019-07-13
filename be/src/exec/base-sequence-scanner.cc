@@ -62,9 +62,12 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     // it is not cached.
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
+    bool expected_local = false;
+    int cache_options = !scan_node->IsDataCacheDisabled() ? BufferOpts::USE_DATA_CACHE :
+        BufferOpts::NO_CACHING;
     ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
-        files[i]->filename.c_str(), header_size, 0, header_metadata, -1, false,
-        files[i]->is_erasure_coded, files[i]->mtime, BufferOpts::Uncached());
+        files[i]->filename.c_str(), header_size, 0, header_metadata, -1, expected_local,
+        files[i]->is_erasure_coded, files[i]->mtime, BufferOpts(cache_options));
     header_ranges.push_back(header_range);
   }
   // When the header is parsed, we will issue more AddDiskIoRanges in

@@ -34,6 +34,12 @@ class TestDataCache(CustomClusterTestSuite):
   def get_workload(self):
     return 'functional-query'
 
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestDataCache, cls).setup_class()
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--always_use_data_cache=true --data_cache_write_concurrency=64"
@@ -70,3 +76,26 @@ class TestDataCache(CustomClusterTestSuite):
       # Do a second run. Expect some hits.
       self.execute_query(QUERY)
       assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') > 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--always_use_data_cache=true --data_cache_write_concurrency=64"
+      " --cache_force_single_shard=true",
+      start_args="--data_cache_dir=/tmp --data_cache_size=500MB", cluster_size=1)
+  def test_data_cache_disablement(self, vector):
+    # Verifies that the cache metrics are all zero.
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0
+
+    # Runs a query with the cache disabled and then enabled against multiple file formats.
+    # Verifies that the metrics stay at zero when the cache is disabled.
+    for disable_cache in [True, False]:
+      vector.get_value('exec_option')['disable_data_cache'] = int(disable_cache)
+      for file_format in ['text_gzip', 'parquet', 'avro', 'seq', 'rc']:
+        QUERY = "select * from functional_{0}.alltypes".format(file_format)
+        self.execute_query(QUERY, vector.get_value('exec_option'))
+        assert disable_cache ==\
+            (self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0)
+        assert disable_cache ==\
+            (self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0)

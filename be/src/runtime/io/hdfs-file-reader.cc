@@ -34,9 +34,6 @@
 DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
     "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
     "(assuming the HDFS client is configured to do so).");
-DEFINE_bool(always_use_data_cache, false, "(Advanced) Always uses the IO data cache "
-    "for all reads, regardless of whether the read is local or remote. By default, the "
-    "IO data cache is only used if the data is expected to be remote. Used by tests.");
 
 #ifndef NDEBUG
 DECLARE_int32(stress_disk_read_delay_ms);
@@ -119,12 +116,11 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
     ScopedTimer<MonotonicStopWatch> req_context_read_timer(
         scan_range_->reader_->read_timer_);
 
-    // If it's a remote scan range, try reading from the remote data cache.
+    // Try reading from the remote data cache if it's enabled for the scan range.
     DataCache* remote_data_cache = io_mgr->remote_data_cache();
-    bool try_cache = (!expected_local_ || FLAGS_always_use_data_cache) &&
-        remote_data_cache != nullptr;
+    bool try_data_cache = scan_range_->UseDataCache() && remote_data_cache != nullptr;
     int64_t cached_read = 0;
-    if (try_cache) {
+    if (try_data_cache) {
       cached_read = ReadDataCache(remote_data_cache, file_offset, buffer, bytes_to_read);
       DCHECK_GE(cached_read, 0);
       *bytes_read = cached_read;
@@ -179,7 +175,7 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
     }
 
     int64_t cached_bytes_missed = *bytes_read - cached_read;
-    if (try_cache && status.ok() && cached_bytes_missed > 0) {
+    if (try_data_cache && status.ok() && cached_bytes_missed > 0) {
       DCHECK_LE(*bytes_read, bytes_to_read);
       WriteDataCache(remote_data_cache, file_offset, buffer, *bytes_read,
           cached_bytes_missed);

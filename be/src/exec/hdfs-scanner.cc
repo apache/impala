@@ -812,18 +812,19 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
           footer_range = scan_node->AllocateScanRange(files[i]->fs,
               files[i]->filename.c_str(), footer_size, footer_start,
               split_metadata->partition_id, footer_split->disk_id(),
-              footer_split->expected_local(), files[i]->is_erasure_coded,
-              files[i]->mtime, BufferOpts(footer_split->try_cache()),
-              split);
+              footer_split->expected_local(), files[i]->is_erasure_coded, files[i]->mtime,
+              BufferOpts(footer_split->cache_options()), split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
+          bool expected_local = false;
+          int cache_options = !scan_node->IsDataCacheDisabled() ?
+              BufferOpts::USE_DATA_CACHE : BufferOpts::NO_CACHING;
           footer_range =
               scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
-                   footer_size, footer_start, split_metadata->partition_id, -1, false,
-                   files[i]->is_erasure_coded, files[i]->mtime, BufferOpts::Uncached(),
-                   split);
+                   footer_size, footer_start, split_metadata->partition_id, -1,
+                   expected_local, files[i]->is_erasure_coded, files[i]->mtime,
+                   BufferOpts(cache_options), split);
         }
-
         footer_ranges.push_back(footer_range);
       } else {
         scan_node->RangeComplete(file_type, THdfsCompression::NONE);

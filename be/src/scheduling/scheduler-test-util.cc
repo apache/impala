@@ -560,11 +560,11 @@ void Result::ProcessAssignments(const AssignmentCallback& cb) const {
           const TScanRange& scan_range = scan_range_params.scan_range;
           DCHECK(scan_range.__isset.hdfs_file_split);
           const THdfsFileSplit& hdfs_file_split = scan_range.hdfs_file_split;
-          bool is_cached =
-              scan_range_params.__isset.is_cached ? scan_range_params.is_cached : false;
+          bool try_hdfs_cache = scan_range_params.__isset.try_hdfs_cache ?
+              scan_range_params.try_hdfs_cache : false;
           bool is_remote =
               scan_range_params.__isset.is_remote ? scan_range_params.is_remote : false;
-          cb({addr, hdfs_file_split, is_cached, is_remote});
+          cb({addr, hdfs_file_split, try_hdfs_cache, is_remote});
         }
       }
     }

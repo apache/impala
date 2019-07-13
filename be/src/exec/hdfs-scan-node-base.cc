@@ -57,6 +57,10 @@
 DECLARE_bool(skip_file_runtime_filtering);
 #endif
 
+DEFINE_bool(always_use_data_cache, false, "(Advanced) Always uses the IO data cache "
+    "for all reads, regardless of whether the read is local or remote. By default, the "
+    "IO data cache is only used if the data is expected to be remote. Used by tests.");
+
 namespace filesystem = boost::filesystem;
 using namespace impala;
 using namespace impala::io;
@@ -235,11 +239,17 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     bool expected_local = params.__isset.is_remote && !params.is_remote;
     if (expected_local && params.volume_id == -1) ++num_ranges_missing_volume_id;
 
-    bool try_cache = params.is_cached;
+    int cache_options = BufferOpts::NO_CACHING;
+    if (params.__isset.try_hdfs_cache && params.try_hdfs_cache) {
+      cache_options |= BufferOpts::USE_HDFS_CACHE;
+    }
+    if ((!expected_local || FLAGS_always_use_data_cache) && !IsDataCacheDisabled()) {
+      cache_options |= BufferOpts::USE_DATA_CACHE;
+    }
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
             split.offset, split.partition_id, params.volume_id, expected_local,
-            file_desc->is_erasure_coded, file_desc->mtime, BufferOpts(try_cache)));
+            file_desc->is_erasure_coded, file_desc->mtime, BufferOpts(cache_options)));
   }
 
   // Update server wide metrics for number of scan ranges and ranges that have
@@ -633,11 +643,11 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
 }
 
 ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
-    bool expected_local, int64_t mtime, bool is_erasure_coded,
-    const ScanRange* original_split) {
+    int64_t len, int64_t offset, int64_t partition_id, int disk_id,
+    int cache_options, bool expected_local, int64_t mtime,
+    bool is_erasure_coded, const ScanRange* original_split) {
   return AllocateScanRange(fs, file, len, offset, partition_id, disk_id, expected_local,
-      is_erasure_coded, mtime, BufferOpts(try_cache), original_split);
+      is_erasure_coded, mtime, BufferOpts(cache_options), original_split);
 }
 
 Status HdfsScanNodeBase::AddDiskIoRanges(const vector<ScanRange*>& ranges,

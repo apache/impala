@@ -78,6 +78,10 @@ const string ScanNode::AVERAGE_HDFS_READ_THREAD_CONCURRENCY =
 const string ScanNode::NUM_SCANNER_THREADS_STARTED =
     "NumScannerThreadsStarted";
 
+bool ScanNode::IsDataCacheDisabled() const {
+  return runtime_state()->query_options().disable_data_cache;
+}
+
 Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   const TQueryOptions& query_options = state->query_options();

@@ -113,6 +113,9 @@ class ScanNode : public ExecNode {
 
   virtual bool IsScanNode() const { return true; }
 
+  /// Returns true iff the data cache in IoMgr is disabled by query options.
+  bool IsDataCacheDisabled() const;
+
   RuntimeState* runtime_state() const { return runtime_state_; }
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }

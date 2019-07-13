@@ -1433,12 +1433,13 @@ Status HdfsParquetScanner::ProcessFooter() {
     }
     metadata_ptr = metadata_buffer.buffer();
 
-    // Read the footer into the metadata buffer.
+    // Read the footer into the metadata buffer. Skip HDFS caching in this case.
+    int cache_options = metadata_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
     ScanRange* metadata_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), filename(), metadata_size, metadata_start, partition_id,
         metadata_range_->disk_id(), metadata_range_->expected_local(),
         metadata_range_->is_erasure_coded(), metadata_range_->mtime(),
-        BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
+        BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size, cache_options));
 
     unique_ptr<BufferDescriptor> io_buffer;
     bool needs_buffers;

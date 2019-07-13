@@ -451,7 +451,7 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
   handle->read_range_->Reset(nullptr, handle->write_range_->file(),
       handle->write_range_->len(), handle->write_range_->offset(),
       handle->write_range_->disk_id(), false, false, ScanRange::INVALID_MTIME,
-      BufferOpts::ReadInto(buffer.data(), buffer.len()));
+      BufferOpts::ReadInto(buffer.data(), buffer.len(), BufferOpts::NO_CACHING));
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
   bool needs_buffers;

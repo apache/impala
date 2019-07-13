@@ -475,7 +475,8 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   bytes_to_read_ = len;
   offset_ = offset;
   disk_id_ = disk_id;
-  try_cache_ = buffer_opts.try_cache_;
+  cache_options_ = buffer_opts.cache_options_;
+
   // HDFS ranges must have an mtime > 0. Local ranges do not use mtime.
   if (fs_) DCHECK_GT(mtime, 0);
   mtime_ = mtime;
@@ -593,7 +594,7 @@ int64_t ScanRange::MaxReadChunkSize() const {
 Status ScanRange::ReadFromCache(
     const unique_lock<mutex>& reader_lock, bool* read_succeeded) {
   DCHECK(reader_lock.mutex() == &reader_->lock_ && reader_lock.owns_lock());
-  DCHECK(try_cache_);
+  DCHECK(UseHdfsCache());
   DCHECK_EQ(bytes_read_, 0);
   *read_succeeded = false;
   Status status = file_reader_->Open(false);

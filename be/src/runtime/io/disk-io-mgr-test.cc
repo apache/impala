@@ -239,11 +239,13 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   ScanRange* InitRange(ObjectPool* pool, const char* file_path, int offset, int len,
-      int disk_id, int64_t mtime, void* meta_data = nullptr, bool is_cached = false,
+      int disk_id, int64_t mtime, void* meta_data = nullptr, bool is_hdfs_cached = false,
       std::vector<ScanRange::SubRange> sub_ranges = {}) {
     ScanRange* range = pool->Add(new ScanRange);
+    int cache_options =
+        is_hdfs_cached ? BufferOpts::USE_HDFS_CACHE : BufferOpts::NO_CACHING;
     range->Reset(nullptr, file_path, len, offset, disk_id, true, false, mtime,
-        BufferOpts(is_cached), move(sub_ranges), meta_data);
+        BufferOpts(cache_options), move(sub_ranges), meta_data);
     EXPECT_EQ(mtime, range->mtime());
     return range;
   }
@@ -1447,7 +1449,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     int scan_len = min(len, buffer_len);
     ScanRange* range = pool_.Add(new ScanRange);
     range->Reset(nullptr, tmp_file, scan_len, 0, 0, true, false, ScanRange::INVALID_MTIME,
-        BufferOpts::ReadInto(client_buffer.data(), buffer_len));
+        BufferOpts::ReadInto(client_buffer.data(), buffer_len, BufferOpts::NO_CACHING));
     bool needs_buffers;
     ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     ASSERT_FALSE(needs_buffers);
@@ -1492,8 +1494,9 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferSubRanges) {
     int result_len = strlen(expected_result);
     vector<uint8_t> client_buffer(result_len);
     ScanRange* range = pool_.Add(new ScanRange);
+    int cache_options = fake_cache ? BufferOpts::USE_HDFS_CACHE : BufferOpts::NO_CACHING;
     range->Reset(nullptr, tmp_file, data_len, 0, 0, true, false, stat_val.st_mtime,
-        BufferOpts::ReadInto(fake_cache, client_buffer.data(), result_len),
+        BufferOpts::ReadInto(cache_options, client_buffer.data(), result_len),
         move(sub_ranges));
     if (fake_cache) {
       SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cache, data_len));
@@ -1543,7 +1546,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
     unique_ptr<RequestContext> reader = io_mgr->RegisterContext();
     ScanRange* range = pool_.Add(new ScanRange);
     range->Reset(nullptr, tmp_file, SCAN_LEN, 0, 0, true, false, ScanRange::INVALID_MTIME,
-        BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN));
+        BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN, BufferOpts::NO_CACHING));
     bool needs_buffers;
     ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     ASSERT_FALSE(needs_buffers);

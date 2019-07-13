@@ -914,10 +914,10 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
   // See if the read will be remote. This is not the case if the impalad runs on one of
   // the replica's datanodes.
   bool remote_read = true;
-  // For local reads we can set volume_id and is_cached. For remote reads HDFS will
+  // For local reads we can set volume_id and try_hdfs_cache. For remote reads HDFS will
   // decide which replica to use so we keep those at default values.
   int volume_id = -1;
-  bool is_cached = false;
+  bool try_hdfs_cache = false;
   for (const TScanRangeLocation& location : scan_range_locations.locations) {
     const TNetworkAddress& replica_host = host_list[location.host_idx];
     IpAddr replica_ip;
@@ -925,7 +925,7 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
         && executor_ip == replica_ip) {
       remote_read = false;
       volume_id = location.volume_id;
-      is_cached = location.is_cached;
+      try_hdfs_cache = location.is_cached;
       break;
     }
   }
@@ -934,7 +934,7 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     assignment_byte_counters_.remote_bytes += scan_range_length;
   } else {
     assignment_byte_counters_.local_bytes += scan_range_length;
-    if (is_cached) assignment_byte_counters_.cached_bytes += scan_range_length;
+    if (try_hdfs_cache) assignment_byte_counters_.cached_bytes += scan_range_length;
   }
 
   if (total_assignments_ != nullptr) {
@@ -951,7 +951,7 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
   TScanRangeParams scan_range_params;
   scan_range_params.scan_range = scan_range_locations.scan_range;
   scan_range_params.__set_volume_id(volume_id);
-  scan_range_params.__set_is_cached(is_cached);
+  scan_range_params.__set_try_hdfs_cache(try_hdfs_cache);
   scan_range_params.__set_is_remote(remote_read);
   scan_range_params_list->push_back(scan_range_params);
 
