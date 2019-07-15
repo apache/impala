@@ -622,11 +622,6 @@ def validate_options():
     LOG.error("Please specify a valid number of coordinators > 0")
     sys.exit(1)
 
-  if (options.use_exclusive_coordinators and
-      options.num_coordinators >= options.cluster_size):
-    LOG.error("Cannot start an Impala cluster with no executors")
-    sys.exit(1)
-
   if not os.path.isdir(options.log_dir):
     LOG.error("Log dir does not exist or is not a directory: {log_dir}".format(
         log_dir=options.log_dir))

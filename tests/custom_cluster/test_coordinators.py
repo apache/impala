@@ -287,3 +287,9 @@ class TestCoordinators(CustomClusterTestSuite):
     finally:
       assert client is not None
       self._stop_impala_cluster()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1, num_exclusive_coordinators=1)
+  def test_dedicated_coordinator_without_executors(self):
+    result = self.execute_query_expect_failure(self.client, "select 2")
+    assert "No executors registered in group: default" in str(result)

@@ -255,6 +255,10 @@ void ClusterMembershipMgr::UpdateMembership(
       } else if (local_be_desc->is_executor) {
         VLOG(1) << "Adding local backend to group " << group;
         (*new_executor_groups)[group].AddExecutor(*local_be_desc);
+      } else {
+        //TODO(IMPALA-8484): Remove this when it's no longer needed
+        VLOG(1) << "Creating empty default executor group";
+        new_executor_groups->emplace(group, ExecutorGroup());
       }
     }
     AddLocalBackendToStatestore(*local_be_desc, subscriber_topic_updates);

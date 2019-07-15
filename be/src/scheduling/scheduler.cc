@@ -666,7 +666,12 @@ Status Scheduler::Schedule(QuerySchedule* schedule) {
   if (it == membership_snapshot->executor_groups.end()) {
     return Status(Substitute("Unknown executor group: $0", group_name));
   }
+
   const ExecutorGroup& executor_group = it->second;
+  if (executor_group.NumExecutors() == 0) {
+    return Status(Substitute("No executors registered in group: $0", group_name));
+  }
+
   ExecutorConfig executor_config =
       {executor_group, *membership_snapshot->local_be_desc};
   RETURN_IF_ERROR(ComputeScanRangeAssignment(executor_config, schedule));
