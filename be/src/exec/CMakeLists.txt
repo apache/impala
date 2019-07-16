@@ -32,6 +32,8 @@ add_library(Exec
   analytic-eval-node.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
+  blocking-plan-root-sink.cc
+  buffered-plan-root-sink.cc
   cardinality-check-node.cc
   catalog-op-executor.cc
   data-sink.cc

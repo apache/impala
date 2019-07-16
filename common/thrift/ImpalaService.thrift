@@ -404,6 +404,13 @@ enum TImpalaQueryOptions {
   // Default hints for insert statement. Will be overridden by hints in the INSERT
   // statement, if any.
   DEFAULT_HINTS_INSERT_STATEMENT = 84
+
+  // Enable spooling of query results. If true, query results will be spooled in
+  // memory up to a specified memory limit. If the memory limit is hit, the
+  // coordinator fragment will block until the client has consumed enough rows to free
+  // up more memory. If false, client consumption driven backpressure controls the rate
+  // at which rows are materialized by the execution tree.
+  SPOOL_QUERY_RESULTS = 85
 }
 
 // The summary of a DML statement.

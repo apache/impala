@@ -26,6 +26,8 @@
 #include "exec/hdfs-table-sink.h"
 #include "exec/kudu-table-sink.h"
 #include "exec/kudu-util.h"
+#include "exec/blocking-plan-root-sink.h"
+#include "exec/buffered-plan-root-sink.h"
 #include "exec/plan-root-sink.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
@@ -106,7 +108,11 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
       }
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
-      *sink = pool->Add(new PlanRootSink(sink_id, row_desc, state));
+      if (state->query_options().spool_query_results) {
+        *sink = pool->Add(new BufferedPlanRootSink(sink_id, row_desc, state));
+      } else {
+        *sink = pool->Add(new BlockingPlanRootSink(sink_id, row_desc, state));
+      }
       break;
     case TDataSinkType::JOIN_BUILD_SINK:
       // IMPALA-4224 - join build sink not supported in backend execution.

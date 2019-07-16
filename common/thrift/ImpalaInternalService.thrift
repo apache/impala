@@ -355,6 +355,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   85: optional string default_hints_insert_statement;
+
+  // See comment in ImpalaService.thrift
+  86: optional bool spool_query_results = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
