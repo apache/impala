@@ -29,6 +29,7 @@
 #include "common/compiler-util.h"
 #include "util/aligned-new.h"
 #include "util/condition-variable.h"
+#include "util/runtime-profile.h"
 #include "util/stopwatch.h"
 #include "util/time.h"
 
@@ -59,15 +60,21 @@ struct ByteLimitDisabledFn {
 /// held before 'put_lock_'. When the 'get_list_' is empty, the caller of BlockingGet()
 /// will atomically swap the 'put_list_' with 'get_list_'. The swapping happens with both
 /// the 'get_lock_' and 'put_lock_' held.
+///
+/// The queue supports two optional RuntimeProfile::Counters. One to track the amount
+/// of time spent blocking in BlockingGet() and the other to track the amount of time
+/// spent in BlockingPut().
 template <typename T, typename ElemBytesFn = ByteLimitDisabledFn<T>>
 class BlockingQueue : public CacheLineAligned {
  public:
-  BlockingQueue(size_t max_elements, int64_t max_bytes = -1)
+  BlockingQueue(size_t max_elements, int64_t max_bytes = -1,
+      RuntimeProfile::Counter* get_wait_timer = nullptr,
+      RuntimeProfile::Counter* put_wait_timer = nullptr)
     : shutdown_(false),
       max_elements_(max_elements),
-      total_put_wait_time_(0),
+      put_wait_timer_(put_wait_timer),
       get_list_size_(0),
-      total_get_wait_time_(0),
+      get_wait_timer_(get_wait_timer),
       max_bytes_(max_bytes) {
     DCHECK(max_bytes == -1 || max_bytes > 0) << max_bytes;
     DCHECK_GT(max_elements_, 0);
@@ -98,15 +105,15 @@ class BlockingQueue : public CacheLineAligned {
         put_cv_.NotifyOne();
         // Sleep with 'get_lock_' held to block off other readers which cannot
         // make progress anyway.
-        timer.Start();
+        if (get_wait_timer_ != nullptr) timer.Start();
         get_cv_.Wait(write_lock);
-        timer.Stop();
+        if (get_wait_timer_ != nullptr) timer.Stop();
       }
       DCHECK(!put_list_.empty());
       put_list_.swap(get_list_);
       get_list_size_.Store(get_list_.size());
       write_lock.unlock();
-      total_get_wait_time_ += timer.ElapsedTime();
+      if (get_wait_timer_ != nullptr) get_wait_timer_->Add(timer.ElapsedTime());
     }
 
     DCHECK(!get_list_.empty());
@@ -143,11 +150,11 @@ class BlockingQueue : public CacheLineAligned {
     DCHECK_GE(val_bytes, 0);
     boost::unique_lock<boost::mutex> write_lock(put_lock_);
     while (!HasCapacityInternal(write_lock, val_bytes) && !shutdown_) {
-      timer.Start();
+      if (put_wait_timer_ != nullptr) timer.Start();
       put_cv_.Wait(write_lock);
-      timer.Stop();
+      if (put_wait_timer_ != nullptr) timer.Stop();
     }
-    total_put_wait_time_ += timer.ElapsedTime();
+    if (put_wait_timer_ != nullptr) put_wait_timer_->Add(timer.ElapsedTime());
     if (UNLIKELY(shutdown_)) return false;
 
     DCHECK_LT(put_list_.size(), max_elements_);
@@ -173,12 +180,12 @@ class BlockingQueue : public CacheLineAligned {
     TimeFromNowMicros(timeout_micros, &abs_time);
     bool notified = true;
     while (!HasCapacityInternal(write_lock, val_bytes) && !shutdown_ && notified) {
-      timer.Start();
+      if (put_wait_timer_ != nullptr) timer.Start();
       // Wait until we're notified or until the timeout expires.
       notified = put_cv_.WaitUntil(write_lock, abs_time);
-      timer.Stop();
+      if (put_wait_timer_ != nullptr) timer.Stop();
     }
-    total_put_wait_time_ += timer.ElapsedTime();
+    if (put_wait_timer_ != nullptr) put_wait_timer_->Add(timer.ElapsedTime());
     // If the list is still full or if the the queue has been shut down, return false.
     // NOTE: We don't check 'notified' here as it appears that pthread condition variables
     // have a weird behavior in which they can return ETIMEDOUT from timed_wait even if
@@ -213,18 +220,6 @@ class BlockingQueue : public CacheLineAligned {
   bool AtCapacity() const {
     boost::unique_lock<boost::mutex> write_lock(put_lock_);
     return SizeLocked(write_lock) >= max_elements_;
-  }
-
-  int64_t total_get_wait_time() const {
-    // Hold lock to make sure the value read is consistent (i.e. no torn read).
-    boost::lock_guard<boost::mutex> read_lock(get_lock_);
-    return total_get_wait_time_;
-  }
-
-  int64_t total_put_wait_time() const {
-    // Hold lock to make sure the value read is consistent (i.e. no torn read).
-    boost::lock_guard<boost::mutex> write_lock(put_lock_);
-    return total_put_wait_time_;
   }
 
  private:
@@ -277,7 +272,7 @@ class BlockingQueue : public CacheLineAligned {
   ConditionVariable put_cv_;
 
   /// Total amount of time threads blocked in BlockingPut(). Guarded by 'put_lock_'.
-  int64_t total_put_wait_time_;
+  RuntimeProfile::Counter* put_wait_timer_ = nullptr;
 
   /// Running counter for bytes enqueued, incremented through the producer thread.
   /// Decremented by transferring value from 'get_bytes_dequeued_'.
@@ -300,7 +295,7 @@ class BlockingQueue : public CacheLineAligned {
   /// Total amount of time a thread blocked in BlockingGet(). Guarded by 'get_lock_'.
   /// Note that a caller of BlockingGet() may sleep with 'get_lock_' held and this
   /// variable doesn't include the time which other threads block waiting for 'get_lock_'.
-  int64_t total_get_wait_time_;
+  RuntimeProfile::Counter* get_wait_timer_ = nullptr;
 
   /// Running count of bytes dequeued. Decremented from 'put_bytes_enqueued_' when it
   /// exceeds the queue capacity. Kept separate from 'put_bytes_enqueued_' so that

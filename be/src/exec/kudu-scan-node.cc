@@ -24,10 +24,10 @@
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
 #include "gutil/gscoped_ptr.h"
+#include "runtime/blocking-row-batch-queue.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/query-state.h"
-#include "runtime/row-batch-queue.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
@@ -149,7 +149,7 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
     // * Don't start up a thread if there is not enough memory available for the
     //    estimated memory consumption (include reservation and non-reserved memory).
     if (!first_thread) {
-      if (thread_state_.batch_queue()->AtCapacity()) break;
+      if (thread_state_.batch_queue()->IsFull()) break;
       if (!mem_limiter->ClaimMemoryForScannerThread(
               this, EstimateScannerThreadMemConsumption())) {
         COUNTER_ADD(thread_state_.scanner_thread_mem_unavailable_counter(), 1);

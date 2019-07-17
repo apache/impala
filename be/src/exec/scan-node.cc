@@ -21,9 +21,9 @@
 #include <boost/bind.hpp>
 
 #include "exprs/scalar-expr.h"
+#include "runtime/blocking-row-batch-queue.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/query-state.h"
-#include "runtime/row-batch-queue.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
@@ -259,8 +259,8 @@ void ScanNode::ScannerThreadState::Open(
   VLOG(2) << "Max row batch queue size for scan node '" << parent->id()
           << "' in fragment instance '" << PrintId(state->fragment_instance_id())
           << "': " << max_row_batches;
-  batch_queue_.reset(
-      new RowBatchQueue(max_row_batches, FLAGS_max_queued_row_batch_bytes));
+  batch_queue_.reset(new BlockingRowBatchQueue(max_row_batches,
+      FLAGS_max_queued_row_batch_bytes, row_batches_get_timer_, row_batches_put_timer_));
 
   // Start measuring the scanner thread concurrency only once the node is opened.
   average_concurrency_ = parent->runtime_profile()->AddSamplingCounter(
@@ -303,7 +303,7 @@ bool ScanNode::ScannerThreadState::EnqueueBatchWithTimeout(
   // Transfer memory ownership before enqueueing. If the caller retries, this transfer
   // is idempotent.
   (*row_batch)->SetMemTracker(row_batches_mem_tracker_);
-  if (!batch_queue_->BlockingPutWithTimeout(move(*row_batch), timeout_micros)) {
+  if (!batch_queue_->AddBatchWithTimeout(move(*row_batch), timeout_micros)) {
     return false;
   }
   COUNTER_ADD(row_batches_enqueued_, 1);
@@ -319,8 +319,6 @@ void ScanNode::ScannerThreadState::Close(ScanNode* parent) {
   scanner_threads_.JoinAll();
   DCHECK_EQ(num_active_.Load(), 0) << "There should be no active threads";
   if (batch_queue_ != nullptr) {
-    row_batches_put_timer_->Set(batch_queue_->total_put_wait_time());
-    row_batches_get_timer_->Set(batch_queue_->total_get_wait_time());
     row_batches_peak_mem_consumption_->Set(row_batches_mem_tracker_->peak_consumption());
     batch_queue_->Cleanup();
   }

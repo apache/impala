@@ -25,12 +25,12 @@
 #include "exec/exec-node-util.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
+#include "runtime/blocking-row-batch-queue.h"
 #include "runtime/descriptors.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/io/request-context.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
-#include "runtime/row-batch-queue.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
@@ -305,7 +305,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
 
     if (!first_thread) {
       // Cases 5, 6 and 7.
-      if (thread_state_.batch_queue()->AtCapacity()) break;
+      if (thread_state_.batch_queue()->IsFull()) break;
       if (!scanner_mem_limiter->ClaimMemoryForScannerThread(this, est_mem)) {
         COUNTER_ADD(thread_state_.scanner_thread_mem_unavailable_counter(), 1);
         break;

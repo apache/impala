@@ -38,20 +38,9 @@ BlockingPlanRootSink::BlockingPlanRootSink(
 
 Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  ValidateCollectionSlots(*row_desc_, batch);
+  PlanRootSink::ValidateCollectionSlots(*row_desc_, batch);
+  RETURN_IF_ERROR(PlanRootSink::UpdateAndCheckRowsProducedLimit(state, batch));
   int current_batch_row = 0;
-
-  // Check to ensure that the number of rows produced by query execution does not exceed
-  // rows_returned_limit_. Since the BlockingPlanRootSink has a single producer, the
-  // num_rows_returned_ value can be verified without acquiring the lock_.
-  num_rows_produced_ += batch->num_rows();
-  if (num_rows_produced_limit_ > 0 && num_rows_produced_ > num_rows_produced_limit_) {
-    Status err = Status::Expected(TErrorCode::ROWS_PRODUCED_LIMIT_EXCEEDED,
-        PrintId(state->query_id()),
-        PrettyPrinter::Print(num_rows_produced_limit_, TUnit::NONE));
-    VLOG_QUERY << err.msg().msg();
-    return err;
-  }
 
   // Don't enter the loop if batch->num_rows() == 0; no point triggering the consumer with
   // 0 rows to return. Be wary of ever returning 0-row batches to the client; some poorly

@@ -26,7 +26,7 @@
 
 namespace impala {
 
-class RowBatchQueue;
+class BlockingRowBatchQueue;
 class TScanRange;
 
 /// Abstract base class of all scan nodes. Subclasses support different storage layers
@@ -253,7 +253,7 @@ class ScanNode : public ExecNode {
     bool EnqueueBatchWithTimeout(std::unique_ptr<RowBatch>* row_batch,
         int64_t timeout_micros);
 
-    RowBatchQueue* batch_queue() { return batch_queue_.get(); }
+    BlockingRowBatchQueue* batch_queue() { return batch_queue_.get(); }
     RuntimeProfile::ThreadCounters* thread_counters() const { return thread_counters_; }
     int max_num_scanner_threads() const { return max_num_scanner_threads_; }
     int64_t estimated_per_thread_mem() const { return estimated_per_thread_mem_; }
@@ -282,7 +282,7 @@ class ScanNode : public ExecNode {
     /// Outgoing row batches queue. Row batches are produced asynchronously by the scanner
     /// threads and consumed by the main fragment thread that calls GetNext() on the scan
     /// node.
-    boost::scoped_ptr<RowBatchQueue> batch_queue_;
+    boost::scoped_ptr<BlockingRowBatchQueue> batch_queue_;
 
     /// The number of scanner threads currently running.
     AtomicInt32 num_active_{0};

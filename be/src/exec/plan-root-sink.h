@@ -88,6 +88,11 @@ class PlanRootSink : public DataSink {
   /// SubplanNode with respect to setting collection-slots to NULL.
   void ValidateCollectionSlots(const RowDescriptor& row_desc, RowBatch* batch);
 
+  /// Check to ensure that the number of rows produced by query execution does not exceed
+  /// the NUM_ROWS_PRODUCED_LIMIT query option. Returns an error Status if the given
+  /// batch causes the limit to be exceeded. Updates the value of num_rows_produced_.
+  Status UpdateAndCheckRowsProducedLimit(RuntimeState* state, RowBatch* batch);
+
   /// State of the sender:
   /// - ROWS_PENDING: the sender is still producing rows; the only non-terminal state
   /// - EOS: the sender has passed all rows to Send()
@@ -96,8 +101,13 @@ class PlanRootSink : public DataSink {
   enum class SenderState { ROWS_PENDING, EOS, CLOSED_NOT_EOS };
   SenderState sender_state_ = SenderState::ROWS_PENDING;
 
+ private:
   /// Limit on the number of rows produced by this query, initialized by the constructor.
   const int64_t num_rows_produced_limit_;
+
+  /// Updated by CheckRowsProducedLimit() to indicate the total number of rows produced
+  /// by query execution.
+  int64_t num_rows_produced_ = 0;
 };
 }
 

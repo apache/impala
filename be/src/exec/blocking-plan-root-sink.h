@@ -90,8 +90,5 @@ class BlockingPlanRootSink : public PlanRootSink {
 
   /// Set by GetNext() to indicate to Send() how many rows it should write to results_.
   int num_rows_requested_ = 0;
-
-  /// Updated by Send() to indicate the total number of rows produced by query execution.
-  int64_t num_rows_produced_ = 0;
 };
 }

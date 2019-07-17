@@ -15,35 +15,54 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/row-batch-queue.h"
-
+#include "runtime/blocking-row-batch-queue.h"
 #include "runtime/row-batch.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
+using namespace std;
+
 namespace impala {
 
-RowBatchQueue::RowBatchQueue(int max_batches, int64_t max_bytes)
-  : BlockingQueue<unique_ptr<RowBatch>,RowBatchBytesFn>(max_batches, max_bytes) {}
+BlockingRowBatchQueue::BlockingRowBatchQueue(int max_batches, int64_t max_bytes,
+    RuntimeProfile::Counter* get_batch_wait_timer,
+    RuntimeProfile::Counter* add_batch_wait_timer)
+  : batch_queue_(new BlockingQueue<std::unique_ptr<RowBatch>, RowBatchBytesFn>(
+        max_batches, max_bytes, get_batch_wait_timer, add_batch_wait_timer)) {}
 
-RowBatchQueue::~RowBatchQueue() {
+BlockingRowBatchQueue::~BlockingRowBatchQueue() {
   DCHECK(cleanup_queue_.empty());
 }
 
-void RowBatchQueue::AddBatch(unique_ptr<RowBatch> batch) {
-  if (!BlockingPut(move(batch))) {
+void BlockingRowBatchQueue::AddBatch(unique_ptr<RowBatch> batch) {
+  if (!batch_queue_->BlockingPut(move(batch))) {
     lock_guard<SpinLock> l(lock_);
     cleanup_queue_.push_back(move(batch));
   }
 }
 
-unique_ptr<RowBatch> RowBatchQueue::GetBatch() {
+bool BlockingRowBatchQueue::AddBatchWithTimeout(
+    unique_ptr<RowBatch>&& batch, int64_t timeout_micros) {
+  return batch_queue_->BlockingPutWithTimeout(
+      forward<unique_ptr<RowBatch>>(batch), timeout_micros);
+}
+
+unique_ptr<RowBatch> BlockingRowBatchQueue::GetBatch() {
   unique_ptr<RowBatch> result;
-  if (BlockingGet(&result)) return result;
+  if (batch_queue_->BlockingGet(&result)) return result;
   return unique_ptr<RowBatch>();
 }
 
-void RowBatchQueue::Cleanup() {
+bool BlockingRowBatchQueue::IsFull() const {
+  return batch_queue_->AtCapacity();
+}
+
+void BlockingRowBatchQueue::Shutdown() {
+  batch_queue_->Shutdown();
+}
+
+void BlockingRowBatchQueue::Cleanup() {
   unique_ptr<RowBatch> batch = nullptr;
   while ((batch = GetBatch()) != nullptr) {
     batch.reset();

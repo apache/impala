@@ -28,6 +28,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 set_source_files_properties(${ROW_BATCH_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(Runtime
+  blocking-row-batch-queue.cc
   buffered-tuple-stream.cc
   client-cache.cc
   collection-value.cc
@@ -38,6 +39,7 @@ add_library(Runtime
   date-value.cc
   debug-options.cc
   descriptors.cc
+  deque-row-batch-queue.cc
   dml-exec-state.cc
   exec-env.cc
   fragment-instance-state.cc
@@ -62,7 +64,6 @@ add_library(Runtime
   reservation-manager.cc
   row-batch.cc
   ${ROW_BATCH_PROTO_SRCS}
-  row-batch-queue.cc
   runtime-filter.cc
   runtime-filter-bank.cc
   runtime-filter-ir.cc

@@ -24,10 +24,9 @@ class TestResultSpooling(ImpalaTestSuite):
     return 'functional-query'
 
   def test_result_spooling(self):
-    """Test that setting SPOOL_QUERY_RESULTS does not crash Impala. The implementation
-    of query result spooling has not been completed yet, so queries that run when
-    SPOOL_QUERY_RESULTS = true, will return no results."""
+    """Tests that setting SPOOL_QUERY_RESULTS = true for simple queries returns the
+    correct number of results."""
     query_opts = {"spool_query_results": "true"}
     query = "select * from functional.alltypes limit 10"
     result = self.execute_query_expect_success(self.client, query, query_opts)
-    assert(len(result.data) == 0)
+    assert(len(result.data) == 10)
