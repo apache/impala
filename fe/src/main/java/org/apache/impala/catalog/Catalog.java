@@ -163,6 +163,24 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
+   * Returns the table with the given name if it's completely loaded in the cache.
+   * Otherwise, return an IncompleteTable for it.
+   */
+  public Table getTableIfCachedNoThrow(String dbName, String tableName) {
+    // In legacy catalog implementation, this is the same behavior as getTableNoThrow.
+    return getTableNoThrow(dbName, tableName);
+  }
+
+  /**
+   * The same as getTableIfCachedNoThrow except that we'll throw an exception if database
+   * not exists.
+   */
+  public Table getTableIfCached(String dbName, String tableName)
+      throws DatabaseNotFoundException {
+    return getTable(dbName, tableName);
+  }
+
+  /**
    * Removes a table from the catalog and returns the table that was removed, or null
    * if the table/database does not exist.
    */

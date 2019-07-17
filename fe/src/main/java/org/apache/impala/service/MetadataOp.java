@@ -303,7 +303,13 @@ public class MetadataOp {
         List<String> tableComments = Lists.newArrayList();
         List<String> tableTypes = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
-          FeTable table = catalog.getTableNoThrow(db.getName(), tabName);
+          FeTable table;
+          if (columnPatternMatcher == PatternMatcher.MATCHER_MATCH_NONE) {
+            // Don't need to completely load the table meta if columns are not required.
+            table = catalog.getTableIfCachedNoThrow(db.getName(), tabName);
+          } else {
+            table = catalog.getTableNoThrow(db.getName(), tabName);
+          }
           if (table == null) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
             continue;

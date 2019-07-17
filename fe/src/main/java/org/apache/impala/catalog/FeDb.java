@@ -62,6 +62,12 @@ public interface FeDb extends HasName {
   FeTable getTable(String tbl);
 
   /**
+   * @return the table with the given name if it's completely loaded in the cache.
+   * Otherwise, return an IncompleteTable for it.
+   */
+  FeTable getTableIfCached(String tbl);
+
+  /**
    * @return the names of the tables within this database
    */
   List<String> getAllTableNames();

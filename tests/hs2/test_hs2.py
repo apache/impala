@@ -473,9 +473,7 @@ class TestHS2(HS2TestSuite):
         assert table_schema == "default"
         assert table_name == table
         assert table_type == "TABLE"
-        if (i == 0 and
-              not ImpalaTestClusterProperties.get_instance().is_catalog_v2_cluster()):
-          # IMPALA-7587: comments not returned for non-loaded tables with legacy catalog.
+        if i == 0:
           assert table_remarks == ""
         else:
           assert table_remarks == "table comment"

@@ -183,6 +183,14 @@ public class Db extends CatalogObjectImpl implements FeDb {
   public Table getTable(String tblName) { return tableCache_.get(tblName); }
 
   /**
+   * Returns the Table with the given name if present in the table cache or null if the
+   * table does not exist in the cache. If the table is unloaded, the result is an
+   * IncompleteTable.
+   */
+  @Override
+  public Table getTableIfCached(String tblName) { return getTable(tblName); }
+
+  /**
    * Removes the table name and any cached metadata from the Table cache.
    */
   public Table removeTable(String tableName) {

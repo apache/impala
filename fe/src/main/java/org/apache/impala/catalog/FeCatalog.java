@@ -40,11 +40,18 @@ public interface FeCatalog {
       throws DatabaseNotFoundException;
 
   /** @see Catalog#getTable(String, String) */
-  FeTable getTable(String db_name, String table_name)
+  FeTable getTable(String dbName, String tableName)
       throws DatabaseNotFoundException;
 
   /** @see Catalog#getTableNoThrow(String, String) */
-  FeTable getTableNoThrow(String db_name, String table_name);
+  FeTable getTableNoThrow(String dbName, String tableName);
+
+  /** @see Catalog#getTableIfCached(String, String) */
+  FeTable getTableIfCached(String dbName, String tableName)
+      throws DatabaseNotFoundException;
+
+  /** @see Catalog#getTableIfCachedNoThrow(String, String) */
+  FeTable getTableIfCachedNoThrow(String dbName, String tableName);
 
   /** @see Catalog#getTCatalogObject(TCatalogObject) */
   TCatalogObject getTCatalogObject(TCatalogObject objectDesc)
@@ -55,7 +62,7 @@ public interface FeCatalog {
 
   /** @see Catalog#getHdfsPartition(String, String, List) */
   FeFsPartition getHdfsPartition(String db, String tbl,
-      List<TPartitionKeyValue> partition_spec) throws CatalogException;
+      List<TPartitionKeyValue> partitionSpec) throws CatalogException;
 
   /** @see Catalog#getDataSources(PatternMatcher) */
   List<? extends FeDataSource> getDataSources(PatternMatcher createHivePatternMatcher);

@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.Expr;
@@ -40,6 +41,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
@@ -373,5 +375,34 @@ public class LocalCatalogTest {
     assertEquals(1, resp.rows.size());
     assertEquals(resp.rows.get(0).colVals.get(1).string_val, "functional");
     assertEquals(resp.rows.get(0).colVals.get(2).string_val, "bad_serde");
+  }
+
+  /**
+   * Test GET_TABLES request won't trigger metadata loading for targeted tables.
+   */
+  @Test
+  public void testGetTableIfCached() throws Exception {
+    FeTable tbl = catalog_.getTableIfCachedNoThrow("functional", "alltypes");
+    assertTrue(tbl instanceof LocalIncompleteTable);
+
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    fe_.execHiveServer2MetadataOp(req);
+
+    // It's still a LocalIncompleteTable since GET_TABLES don't trigger metadata loading.
+    tbl = catalog_.getDb("functional").getTableIfCached("alltypes");
+    assertTrue(tbl instanceof LocalIncompleteTable);
+
+    // GET_COLUMNS request should trigger metadata loading for the targeted table.
+    req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_COLUMNS;
+    req.get_columns_req = new TGetColumnsReq();
+    req.get_columns_req.setSchemaName("functional");
+    req.get_columns_req.setTableName("alltypes");
+    fe_.execHiveServer2MetadataOp(req);
+    // Table should be loaded
+    tbl = catalog_.getDb("functional").getTableIfCached("alltypes");
+    assertTrue(tbl instanceof LocalFsTable);
   }
 }

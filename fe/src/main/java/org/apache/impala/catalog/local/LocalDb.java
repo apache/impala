@@ -103,7 +103,7 @@ class LocalDb implements FeDb {
   }
 
   @Override
-  public FeTable getTable(String tblName) {
+  public FeTable getTableIfCached(String tblName) {
     Preconditions.checkNotNull(tblName);
     tblName = tblName.toLowerCase();
     loadTableNames();
@@ -111,8 +111,13 @@ class LocalDb implements FeDb {
       // Table doesn't exist.
       return null;
     }
-    FeTable tbl = tables_.get(tblName);
-    if (tbl == null) {
+    return tables_.get(tblName);
+  }
+
+  @Override
+  public FeTable getTable(String tblName) {
+    FeTable tbl = getTableIfCached(tblName);
+    if (tbl instanceof LocalIncompleteTable) {
       // The table exists but hasn't been loaded yet.
       try{
         tbl = LocalTable.load(this, tblName);
@@ -159,7 +164,7 @@ class LocalDb implements FeDb {
     try {
       List<String> names = catalog_.getMetaProvider().loadTableNames(name_);
       for (String tableName : names) {
-        newMap.put(tableName.toLowerCase(), null);
+        newMap.put(tableName.toLowerCase(), new LocalIncompleteTable(this, tableName));
       }
     } catch (TException e) {
       throw new LocalCatalogException(String.format(

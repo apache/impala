@@ -398,10 +398,9 @@ public class JdbcTest extends JdbcTestBase {
         rs.getString("TABLE_NAME"));
 
     String remarks = rs.getString("REMARKS");
-    // IMPALA-7587: with catalog V2, if a table is not yet loaded before
-    // getTables(), then the 'remarks' field is left empty. getColumns()
-    // loads the table metadata, so later getTables() calls will return
-    // 'remarks' correctly.
+    // getTables() won't trigger full meta loading for tables. So for unloaded tables,
+    // the 'remarks' field is left empty. getColumns() loads the table metadata, so later
+    // getTables() calls will return 'remarks' correctly.
     assertTrue("Incorrect table comment: " + remarks,
         remarks.equals("") || remarks.equals("table comment"));
 
