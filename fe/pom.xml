@@ -91,6 +91,31 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-aws</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-azure</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-azure-datalake</artifactId>
+      <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>
@@ -925,34 +950,6 @@ under the License.
             </exclusion>
           </exclusions>
         </dependency>
-
-        <!-- CDH profile manually specifies cloud storage dependencies rather
-             than using hadoop-cloud-storage. This is to minimize any disruption
-             to older configurations. -->
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-aws</artifactId>
-          <version>${hadoop.version}</version>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-azure</artifactId>
-          <version>${hadoop.version}</version>
-        </dependency>
-
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-azure-datalake</artifactId>
-          <version>${hadoop.version}</version>
-          <exclusions>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
       </dependencies>
     </profile>
 
@@ -1057,18 +1054,12 @@ under the License.
           <version>3.2.0-m3</version>
           <scope>test</scope>
         </dependency>
-        <!-- The hadoop-cloud-storage artifact gets AWS, Azure, and other cloud
-             storage dependencies. It also incorporates Knox runtime dependencies. -->
+        <!-- IMPALA-8766: Include Knox jars on the classpath -->
         <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-cloud-storage</artifactId>
-          <version>${hadoop.version}</version>
+          <groupId>org.apache.knox</groupId>
+          <artifactId>gateway-cloud-bindings</artifactId>
+          <version>${knox.version}</version>
           <exclusions>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
             <!-- Impala currently doesn't support GCS, so exclude those jars -->
             <exclusion>
               <groupId>com.google.cloud.bigdataoss</groupId>

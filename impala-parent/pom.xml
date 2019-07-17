@@ -40,6 +40,7 @@ under the License.
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
     <kite.version>${env.IMPALA_KITE_VERSION}</kite.version>
+    <knox.version>${env.IMPALA_KNOX_VERSION}</knox.version>
     <thrift.version>0.9.3</thrift.version>
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
     <impala.query.event.hook.api.version>1.0-SNAPSHOT</impala.query.event.hook.api.version>
@@ -185,25 +186,31 @@ under the License.
     </repository>
     <repository>
       <!--
-      The impala.cdp.repo above can reference versions that are not in that
-      repository. For example, artifact A at version 280 may have a dependency
-      on artifact B at version 279, but the maven repository may only have
-      artifact B at version 280. This repository contains all the versions, so
-      it satisfies the dangling dependencies. This was necessary for IMPALA-8766.
+      HWX Nexus is disabled. This is a tombstone to list out why:
+      1. Snapshots are disabled because HWX Nexus contains snapshots of CDH artifacts
+      that can conflict with the artifacts in the maven repository associated with
+      the CDH_BUILD_NUMBER. Maven can end up downloading a mix of artifacts that are
+      mutually incompatible. Snapshots are not necessary at this time.
+      2.  In a previous change, we depended on the hadoop-cloud-storage artifact from
+      the impala.cdp.repo. This had the odd property that it referenced versions of
+      artifacts that were not in the impala.cdp.repo. For example, artifact A at
+      version 280 may have a dependency on artifact B at version 279, but the maven
+      repository may only have artifact B at version 280. Nexus was meant to handle
+      these dangling dependencies (see IMPALA-8766). However, HWX Nexus ages out jars
+      from old build numbers. When the artifact B at version 279 ages out, it breaks
+      the build. Just as seriously, if Impala uses the impala.cdp.repo in a way that
+      requires an external maven repository, old commits may become unbuildable if that
+      external maven repository removes any of the jars we need.
+      So, HWX Nexus is disabled and should face strong scrutiny before being reenabled.
       -->
       <id>hwx.public.repo</id>
       <url>https://nexus-private.hortonworks.com/nexus/content/groups/public</url>
       <name>Hortonworks public repository</name>
-      <!--
-      Snapshots are specifically disabled, because the snapshots in this repository
-      would conflict with the versions in impala.cdh.repo and should be unnecessary.
-      -->
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
       <releases>
-        <!-- The Hortonworks public repository is only needed for USE_CDP_HIVE=true -->
-        <enabled>${env.USE_CDP_HIVE}</enabled>
+        <enabled>false</enabled>
       </releases>
     </repository>
   </repositories>
