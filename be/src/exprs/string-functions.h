@@ -158,6 +158,32 @@ class StringFunctions {
   static IntVal Levenshtein(
       FunctionContext* context, const StringVal& s1, const StringVal& s2);
 
+  static DoubleVal JaroDistance(
+      FunctionContext* ctx, const StringVal& s1, const StringVal& s2);
+
+  static DoubleVal JaroSimilarity(
+      FunctionContext* ctx, const StringVal& s1, const StringVal& s2);
+
+  static DoubleVal JaroWinklerDistance(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2);
+
+  static DoubleVal JaroWinklerDistance(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2, const DoubleVal& scaling_factor);
+
+  static DoubleVal JaroWinklerDistance(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2, const DoubleVal& scaling_factor,
+      const DoubleVal& boost_threshold);
+
+  static DoubleVal JaroWinklerSimilarity(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2);
+
+  static DoubleVal JaroWinklerSimilarity(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2, const DoubleVal& scaling_factor);
+
+  static DoubleVal JaroWinklerSimilarity(FunctionContext* ctx, const StringVal& s1,
+      const StringVal& s2, const DoubleVal& scaling_factor,
+      const DoubleVal& boost_threshold);
+
  private:
   /// Templatized implementation of the actual string trimming function.
   /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.

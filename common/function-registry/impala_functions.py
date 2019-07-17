@@ -586,6 +586,22 @@ visible_functions = [
    'impala::StringFunctions::GetJsonObject'],
   [['levenshtein', 'le_dst'], 'INT', ['STRING', 'STRING'],
    '_ZN6impala15StringFunctions11LevenshteinEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['jaro_distance', 'jaro_dst'], 'DOUBLE', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions12JaroDistanceEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['jaro_similarity', 'jaro_sim'], 'DOUBLE', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions14JaroSimilarityEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['jaro_winkler_distance', 'jw_dst'], 'DOUBLE', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions19JaroWinklerDistanceEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['jaro_winkler_distance', 'jw_dst'], 'DOUBLE', ['STRING', 'STRING', 'DOUBLE'],
+   '_ZN6impala15StringFunctions19JaroWinklerDistanceEPN10impala_udf15FunctionContextERKNS1_9StringValES6_RKNS1_9DoubleValE'],
+  [['jaro_winkler_distance', 'jw_dst'], 'DOUBLE', ['STRING', 'STRING', 'DOUBLE', 'DOUBLE'],
+   '_ZN6impala15StringFunctions19JaroWinklerDistanceEPN10impala_udf15FunctionContextERKNS1_9StringValES6_RKNS1_9DoubleValES9_'],
+  [['jaro_winkler_similarity', 'jw_sim'], 'DOUBLE', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions21JaroWinklerSimilarityEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['jaro_winkler_similarity', 'jw_sim'], 'DOUBLE', ['STRING', 'STRING', 'DOUBLE'],
+   '_ZN6impala15StringFunctions21JaroWinklerSimilarityEPN10impala_udf15FunctionContextERKNS1_9StringValES6_RKNS1_9DoubleValE'],
+  [['jaro_winkler_similarity', 'jw_sim'], 'DOUBLE', ['STRING', 'STRING', 'DOUBLE', 'DOUBLE'],
+   '_ZN6impala15StringFunctions21JaroWinklerSimilarityEPN10impala_udf15FunctionContextERKNS1_9StringValES6_RKNS1_9DoubleValES9_'],
 
   # Conditional Functions
   # Some of these have empty symbols because the BE special-cases them based on the

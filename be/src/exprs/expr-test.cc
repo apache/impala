@@ -4013,6 +4013,114 @@ TEST_P(ExprTest, StringFunctions) {
   TestErrorString("le_dst(repeat('x', 256), 'z')",
       "levenshtein argument exceeds maximum length of 255 characters\n");
 
+  for (const string fn_name: { "jaro_dst", "jaro_distance" }) {
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_DOUBLE);
+    TestValue(fn_name + "('foo', 'foo')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('foo', 'bar')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('', '')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('', 'jaro')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('jaro', '')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('crate', 'trace')", TYPE_DOUBLE, 0.2666666666666666);
+    TestValue(fn_name + "('dwayne', 'duane')", TYPE_DOUBLE, 0.1777777777777778);
+    TestValue(fn_name + "('martha', 'marhta')", TYPE_DOUBLE, 0.05555555555555558);
+    TestValue(fn_name + "('frog', 'fog')", TYPE_DOUBLE, 0.08333333333333337);
+    TestValue(fn_name + "('hello', 'haloa')", TYPE_DOUBLE, 0.2666666666666666);
+    TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.1666666666666667);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "jaro argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "jaro argument exceeds maximum length of 255 characters\n");
+  }
+
+  for (const string fn_name: { "jaro_sim", "jaro_similarity" }) {
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_DOUBLE);
+    TestValue(fn_name + "('foo', 'foo')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('foo', 'bar')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('', '')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('', 'jaro')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('jaro', '')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('crate', 'trace')", TYPE_DOUBLE, 0.7333333333333334);
+    TestValue(fn_name + "('dwayne', 'duane')", TYPE_DOUBLE, 0.82222222222222222);
+    TestValue(fn_name + "('martha', 'marhta')", TYPE_DOUBLE, 0.944444444444444444);
+    TestValue(fn_name + "('frog', 'fog')", TYPE_DOUBLE, 0.9166666666666666);
+    TestValue(fn_name + "('hello', 'haloa')", TYPE_DOUBLE, 0.73333333333333334);
+    TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.8333333333333333);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "jaro argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "jaro argument exceeds maximum length of 255 characters\n");
+  }
+
+  for (const string fn_name: { "jaro_winkler_distance", "jw_dst" }) {
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_DOUBLE);
+    TestValue(fn_name + "('foo', 'foo')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('foo', 'bar')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('', '')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('', 'jaro')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('jaro', '')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('crate', 'trace')", TYPE_DOUBLE, 0.2666666666666666);
+    TestValue(fn_name + "('crate', 'trace', 0.2)", TYPE_DOUBLE, 0.2666666666666666);
+    TestValue(fn_name + "('dwayne', 'duane')", TYPE_DOUBLE, 0.16);
+    TestValue(fn_name + "('martha', 'marhta', 0.0)", TYPE_DOUBLE, 0.05555555555555558);
+    TestValue(fn_name + "('martha', 'marhta')", TYPE_DOUBLE, 0.03888888888888886);
+    TestValue(fn_name + "('martha', 'marhta', 0.2)", TYPE_DOUBLE, 0.02222222222222225);
+    TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.1666666666666667);
+    TestValue(fn_name + "('martha', 'marhta', 0.1, 0.99)", TYPE_DOUBLE,
+        0.05555555555555558);
+    TestValue(fn_name + "('dwayne', 'duane', 0.1, 0.9)", TYPE_DOUBLE, 0.1777777777777778);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "jaro-winkler argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "jaro-winkler argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.26)",
+        "jaro-winkler scaling factor values can range between 0.0 and 0.25\n");
+    TestErrorString(fn_name + "('foo', 'bar', -0.01)",
+        "jaro-winkler scaling factor values can range between 0.0 and 0.25\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.1, -0.01)",
+        "jaro-winkler boost threshold values can range between 0.0 and 1.0\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.1, 1.01)",
+        "jaro-winkler boost threshold values can range between 0.0 and 1.0\n");
+  }
+  for (const string fn_name: { "jaro_winkler_similarity", "jw_sim"}) {
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_DOUBLE);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_DOUBLE);
+    TestValue(fn_name + "('foo', 'foo')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('foo', 'bar')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('', '')", TYPE_DOUBLE, 1.0);
+    TestValue(fn_name + "('', 'jaro')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('jaro', '')", TYPE_DOUBLE, 0.0);
+    TestValue(fn_name + "('crate', 'trace')", TYPE_DOUBLE, 0.7333333333333334);
+    TestValue(fn_name + "('crate', 'trace', 0.2)", TYPE_DOUBLE, 0.7333333333333334);
+    TestValue(fn_name + "('dwayne', 'duane')", TYPE_DOUBLE, 0.84);
+    TestValue(fn_name + "('martha', 'marhta', 0.0)", TYPE_DOUBLE, 0.94444444444444442);
+    TestValue(fn_name + "('martha', 'marhta', 0.1)", TYPE_DOUBLE, 0.96111111111111111);
+    TestValue(fn_name + "('martha', 'marhta', 0.2)", TYPE_DOUBLE, 0.97777777777777777);
+    TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.8333333333333333);;
+    TestValue(fn_name + "('martha', 'marhta', 0.1, 0.99)", TYPE_DOUBLE,
+        0.94444444444444442);
+    TestValue(fn_name + "('dwayne', 'duane', 0.1, 0.9)", TYPE_DOUBLE,
+        0.82222222222222222);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "jaro-winkler argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "jaro-winkler argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.26)",
+        "jaro-winkler scaling factor values can range between 0.0 and 0.25\n");
+    TestErrorString(fn_name + "('foo', 'bar', -0.01)",
+        "jaro-winkler scaling factor values can range between 0.0 and 0.25\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.1, -0.01)",
+        "jaro-winkler boost threshold values can range between 0.0 and 1.0\n");
+    TestErrorString(fn_name + "('foo', 'bar', 0.1, 1.01)",
+        "jaro-winkler boost threshold values can range between 0.0 and 1.0\n");
+  }
+
   TestStringValue("substring('Hello', 1)", "Hello");
   TestStringValue("substring('Hello', -2)", "lo");
   TestStringValue("substring('Hello', cast(0 as bigint))", "");

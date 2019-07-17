@@ -1167,4 +1167,177 @@ IntVal StringFunctions::Levenshtein(
 
   return IntVal(result);
 }
+
+// Based on https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance
+// Implements Jaro similarity
+DoubleVal StringFunctions::JaroSimilarity(
+    FunctionContext* ctx, const StringVal& s1, const StringVal& s2) {
+
+  int s1len = s1.len;
+  int s2len = s2.len;
+
+  // error if either input exceeds 255 characters
+  if (s1len > 255 || s2len > 255) {
+    ctx->SetError("jaro argument exceeds maximum length of 255 characters");
+    return DoubleVal(-1.0);
+  }
+
+  // short cut cases:
+  // - null strings
+  // - zero length strings
+  // - identical length and value strings
+  if (s1.is_null || s2.is_null) return DoubleVal::null();
+  if (s1len == 0 && s2len == 0) return DoubleVal(1.0);
+  if (s1len == 0 || s2len == 0) return DoubleVal(0.0);
+  if (s1len == s2len && memcmp(s1.ptr, s2.ptr, s1len) == 0) return DoubleVal(1.0);
+
+  // the window size to search for matches in the other string
+  int max_range = std::max(0, std::max(s1len, s2len) / 2 - 1);
+
+  int s1_matching[s1len];
+  int s2_matching[s2len];
+  std::fill_n(s1_matching, s1len, -1);
+  std::fill_n(s2_matching, s2len, -1);
+
+  // calculate matching characters
+  int matching_characters = 0;
+  for (int i = 0; i < s1len; i++) {
+    // matching window
+    int min_index = std::max(i - max_range, 0);
+    int max_index = std::min(i + max_range + 1, s2len);
+    if (min_index >= max_index) break;
+
+    for (int j = min_index; j < max_index; j++) {
+      if (s2_matching[j] == -1 && s1.ptr[i] == s2.ptr[j]) {
+        s1_matching[i] = i;
+        s2_matching[j] = j;
+        matching_characters++;
+        break;
+      }
+    }
+  }
+
+  if (matching_characters == 0) return DoubleVal(0.0);
+
+  // transpositions (one-way only)
+  double transpositions = 0.0;
+  for (int i = 0, s1i = 0, s2i = 0; i < matching_characters; i++) {
+    while (s1_matching[s1i] == -1) {
+      s1i++;
+    }
+    while (s2_matching[s2i] == -1) {
+      s2i++;
+    }
+    if (s1.ptr[s1i] != s2.ptr[s2i]) {
+      transpositions += 0.5;
+    }
+    s1i++;
+    s2i++;
+  }
+  double m = static_cast<double>(matching_characters);
+  double jaro_similarity = 1.0 / 3.0  * ( m / static_cast<double>(s1len)
+                                        + m / static_cast<double>(s2len)
+                                        + (m - transpositions) / m );
+
+  return DoubleVal(jaro_similarity);
+}
+
+DoubleVal StringFunctions::JaroDistance(
+    FunctionContext* ctx, const StringVal& s1, const StringVal& s2) {
+
+  DoubleVal jaro_similarity = StringFunctions::JaroSimilarity(ctx, s1, s2);
+  if (jaro_similarity.is_null) return DoubleVal::null();
+  if (jaro_similarity.val == -1.0) return DoubleVal(-1.0);
+  return DoubleVal(1.0 - jaro_similarity.val);
+}
+
+DoubleVal StringFunctions::JaroWinklerDistance(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2) {
+  return StringFunctions::JaroWinklerDistance(ctx, s1, s2,
+    DoubleVal(0.1), DoubleVal(0.7));
+}
+
+DoubleVal StringFunctions::JaroWinklerDistance(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2,
+      const DoubleVal& scaling_factor) {
+  return StringFunctions::JaroWinklerDistance(ctx, s1, s2,
+    scaling_factor, DoubleVal(0.7));
+}
+
+// Based on https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance
+// Implements Jaro-Winkler distance
+// Extended with boost_theshold: Winkler's modification only applies if Jaro exceeds it
+DoubleVal StringFunctions::JaroWinklerDistance(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2,
+      const DoubleVal& scaling_factor, const DoubleVal& boost_threshold) {
+
+  DoubleVal jaro_winkler_similarity = StringFunctions::JaroWinklerSimilarity(
+    ctx, s1, s2, scaling_factor, boost_threshold);
+
+  if (jaro_winkler_similarity.is_null) return DoubleVal::null();
+  if (jaro_winkler_similarity.val == -1.0) return DoubleVal(-1.0);
+  return DoubleVal(1.0 - jaro_winkler_similarity.val);
+}
+
+DoubleVal StringFunctions::JaroWinklerSimilarity(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2) {
+  return StringFunctions::JaroWinklerSimilarity(ctx, s1, s2,
+    DoubleVal(0.1), DoubleVal(0.7));
+}
+
+DoubleVal StringFunctions::JaroWinklerSimilarity(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2,
+      const DoubleVal& scaling_factor) {
+  return StringFunctions::JaroWinklerSimilarity(ctx, s1, s2,
+    scaling_factor, DoubleVal(0.7));
+}
+
+// Based on https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance
+// Implements Jaro-Winkler similarity
+// Extended with boost_theshold: Winkler's modification only applies if Jaro exceeds it
+DoubleVal StringFunctions::JaroWinklerSimilarity(FunctionContext* ctx,
+      const StringVal& s1, const StringVal& s2,
+      const DoubleVal& scaling_factor, const DoubleVal& boost_threshold) {
+
+  constexpr int MAX_PREFIX_LENGTH = 4;
+  int s1len = s1.len;
+  int s2len = s2.len;
+
+  // error if either input exceeds 255 characters
+  if (s1len > 255 || s2len > 255) {
+    ctx->SetError("jaro-winkler argument exceeds maximum length of 255 characters");
+    return DoubleVal(-1.0);
+  }
+  // scaling factor has to be between 0.0 and 0.25
+  if (scaling_factor.val < 0.0 || scaling_factor.val > 0.25) {
+    ctx->SetError("jaro-winkler scaling factor values can range between 0.0 and 0.25");
+    return DoubleVal(-1.0);
+  }
+  // error if boost threshold is out of range 0.0..1.0
+  if (boost_threshold.val < 0.0 || boost_threshold.val > 1.0) {
+    ctx->SetError("jaro-winkler boost threshold values can range between 0.0 and 1.0");
+    return DoubleVal(-1.0);
+  }
+
+  if (s1.is_null || s2.is_null) return DoubleVal::null();
+
+  DoubleVal jaro_similarity = StringFunctions::JaroSimilarity(ctx, s1, s2);
+  if (jaro_similarity.is_null) return DoubleVal::null();
+  if (jaro_similarity.val == -1.0) return DoubleVal(-1.0);
+
+  double jaro_winkler_similarity = jaro_similarity.val;
+
+  if (jaro_similarity.val > boost_threshold.val) {
+    int common_length = std::min(MAX_PREFIX_LENGTH, std::min(s1len, s2len));
+    int common_prefix = 0;
+    while (common_prefix < common_length &&
+           s1.ptr[common_prefix] == s2.ptr[common_prefix]) {
+      common_prefix++;
+    }
+
+    jaro_winkler_similarity += common_prefix * scaling_factor.val *
+      (1.0 - jaro_similarity.val);
+  }
+  return DoubleVal(jaro_winkler_similarity);
+}
 }
