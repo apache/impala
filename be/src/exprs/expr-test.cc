@@ -4152,18 +4152,25 @@ TEST_P(ExprTest, StringFunctions) {
   TestIsNull("chr(NULL)", TYPE_STRING);
 
   TestStringValue("split_part('abc~!def~!ghi', '~!', 1)", "abc");
+  TestStringValue("split_part('abc~!def~!ghi', '~!', -1)", "ghi");
   TestStringValue("split_part('abc~!~def~!~ghi', '~!', 2)", "~def");
+  TestStringValue("split_part('abc~!~def~!~ghi', '~!', -2)", "~def");
   TestStringValue("split_part('abc@@def@@ghi', '@@', 3)", "ghi");
+  TestStringValue("split_part('abc@@def@@ghi', '@@', -3)", "abc");
   TestStringValue("split_part('abc@@def@@@@ghi', '@@', 4)", "ghi");
+  TestStringValue("split_part('abc@@def@@@@ghi', '@@', -4)", "abc");
   TestStringValue("split_part('abc@@def@@ghi', '@@', 4)", "");
+  TestStringValue("split_part('abc@@def@@ghi', '@@', -4)", "");
   TestStringValue("split_part('', '@@', 1)", "");
+  TestStringValue("split_part('', '@@', -1)", "");
   TestStringValue("split_part('abcdef', '', 1)", "abcdef");
+  TestStringValue("split_part('abcdef', '', -1)", "abcdef");
   TestStringValue("split_part('', '', 1)", "");
+  TestStringValue("split_part('', '', -1)", "");
   TestIsNull("split_part(NULL, NULL, 1)", TYPE_STRING);
   TestIsNull("split_part('abcdefabc', NULL, 1)", TYPE_STRING);
   TestIsNull("split_part(NULL, 'xyz', 1)", TYPE_STRING);
   TestError("split_part('abc@@def@@ghi', '@@', 0)");
-  TestError("split_part('abc@@def@@ghi', '@@', -1)");
 
   TestStringValue("lower('')", "");
   TestStringValue("lower('HELLO')", "hello");

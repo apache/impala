@@ -1018,22 +1018,28 @@ StringVal StringFunctions::Chr(FunctionContext* ctx, const IntVal& val) {
 }
 
 // Similar to strstr() except that the strings are not null-terminated
-static char* LocateSubstring(char* haystack, int hay_len, const char* needle, int needle_len) {
+// Parameter 'direction' controls the direction of searching, can be either 1 or -1
+static char* LocateSubstring(char* haystack, const int hay_len, const char* needle,
+    const int needle_len, const int direction = 1) {
   DCHECK_GT(needle_len, 0);
   DCHECK(needle != NULL);
   DCHECK(hay_len == 0 || haystack != NULL);
+  DCHECK(direction == 1 || direction == -1);
+  if (hay_len < needle_len) return nullptr;
+  char* start = haystack;
+  if (direction == -1) start += hay_len - needle_len;
   for (int i = 0; i < hay_len - needle_len + 1; ++i) {
-    char* possible_needle = haystack + i;
+    char* possible_needle = start + direction * i;
     if (strncmp(possible_needle, needle, needle_len) == 0) return possible_needle;
   }
-  return NULL;
+  return nullptr;
 }
 
 StringVal StringFunctions::SplitPart(FunctionContext* context,
     const StringVal& str, const StringVal& delim, const BigIntVal& field) {
   if (str.is_null || delim.is_null || field.is_null) return StringVal::null();
   int field_pos = field.val;
-  if (field_pos <= 0) {
+  if (field_pos == 0) {
     stringstream ss;
     ss << "Invalid field position: " << field.val;
     context->SetError(ss.str().c_str());
@@ -1041,23 +1047,36 @@ StringVal StringFunctions::SplitPart(FunctionContext* context,
   }
   if (delim.len == 0) return str;
   char* str_start = reinterpret_cast<char*>(str.ptr);
-  char* str_part = str_start;
   char* delimiter = reinterpret_cast<char*>(delim.ptr);
-  for (int cur_pos = 1; ; ++cur_pos) {
-    int remaining_len = str.len - (str_part - str_start);
-    char* delim_ref = LocateSubstring(str_part, remaining_len, delimiter, delim.len);
-    if (delim_ref == NULL) {
+  const int DIRECTION = field_pos > 0 ? 1 : -1;
+  char* window_start = str_start;
+  char* window_end = str_start + str.len;
+  for (int cur_pos = DIRECTION; ; cur_pos += DIRECTION) {
+    int remaining_len = window_end - window_start;
+    char* delim_ref = LocateSubstring(window_start, remaining_len, delimiter, delim.len,
+        DIRECTION);
+    if (delim_ref == nullptr) {
       if (cur_pos == field_pos) {
-        return StringVal(reinterpret_cast<uint8_t*>(str_part), remaining_len);
+        return StringVal(reinterpret_cast<uint8_t*>(window_start), remaining_len);
       }
       // Return empty string if required field position is not found.
       return StringVal();
     }
     if (cur_pos == field_pos) {
-      return StringVal(reinterpret_cast<uint8_t*>(str_part),
-          delim_ref - str_part);
+      if (DIRECTION < 0) {
+        window_start = delim_ref + delim.len;
+      }
+      else {
+        window_end = delim_ref;
+      }
+      return StringVal(reinterpret_cast<uint8_t*>(window_start),
+          window_end - window_start);
     }
-    str_part = delim_ref + delim.len;
+    if (DIRECTION < 0) {
+      window_end = delim_ref;
+    } else {
+      window_start = delim_ref + delim.len;
+    }
   }
   return StringVal();
 }
