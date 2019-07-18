@@ -428,6 +428,25 @@ $ ps ax | grep [i]mpalad
       </conbody>
 
     </concept>
+    <concept id="impala-7800">
+      <title>Change in Client Connection Timeout</title>
+      <conbody>
+        <p>The default behavior of client connection timeout changed.</p>
+        <p>In Impala 3.2 and lower, client waited indefinitely to open the new
+          session if the maximum number of threads specified by
+            <codeph>--fe_service_threads</codeph> has been allocated.</p>
+        <p>In Impala 3.3 and higher, a new startup flag,
+            <codeph>--accepted_client_cnxn_timeout</codeph>, was added to
+          control how the server should treat new connection requests if we have
+          run out of the configured number of server threads.</p>
+        <p>If <codeph>--accepted_client_cnxn_timeout > 0</codeph>, new
+          connection requests are rejected after the specified timeout.</p>
+        <p>If <codeph>--accepted_client_cnxn_timeout=0</codeph>, clients waits
+          indefinitely to connect to Impala. You can use this setting to restore
+          the pre-Impala 3.3 behavior.</p>
+        <p>The default timeout is 5 minutes. </p>
+      </conbody>
+    </concept>
 
     <concept id="concept_mkn_ygr_jdb">
 
