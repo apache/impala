@@ -83,9 +83,7 @@ under the License.
           The <codeph>DATE</codeph> data type.
         </li>
 
-        <li>
-          XML and JSON functions.
-        </li>
+        <li> XML functions. </li>
 
         <li>
           Certain aggregate functions from HiveQL: <codeph>covar_pop</codeph>, <codeph>covar_samp</codeph>,

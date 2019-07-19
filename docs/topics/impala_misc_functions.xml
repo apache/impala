@@ -56,6 +56,11 @@ under the License.
       </li>
 
       <li>
+        <xref href="#misc_functions/get_json_object"
+        >GET_JSON_OBJECT</xref>
+      </li>
+
+      <li>
         <xref href="#misc_functions/logged_in_user">LOGGED_IN_USER</xref>
       </li>
 
@@ -118,6 +123,96 @@ under the License.
 
           <p>
             <b>Added in:</b> <keyword keyref="impala225"/>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="get_json_object">
+
+        <dt>
+          GET_JSON_OBJECT(STRING json_str, STRING selector)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Extracts JSON object from the <varname>json_str</varname> based on the
+          <varname>selector</varname> JSON path and returns the string of the extracted JSON
+          object.
+          <p>
+            The function returns <codeph>NULL</codeph> if the input <varname>json_str</varname>
+            is invalid or if nothing is selected based on the <varname>selector</varname> JSON
+            path.
+          </p>
+
+          <p>
+            The following characters are supported in the <varname>selector</varname> JSON path:
+            <ul>
+              <li>
+                $ : Denotes the root object
+              </li>
+
+              <li>
+                . : Denotes the child operator
+              </li>
+
+              <li>
+                [] : Denotes the subscript operator for array
+              </li>
+
+              <li>
+                * : Denotes the wildcard for [] or .
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            <b>Return type:</b> <codeph>STRING</codeph>
+          </p>
+
+          <p>
+            <b>Examples:</b>
+          </p>
+<codeblock>---- QUERY
+SELECT GET_JSON_OBJECT ('{"a":true, "b":false, "c":true}', '$.*');
+---- RESULTS
+[true,false,true]</codeblock>
+<codeblock>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$.a.b.c') FROM (VALUES (
+ ('{"a": {"b": {"c": 1}}}' AS json),
+ ('{"a": {"b": {"c": 2}}}'),
+ ('{"a": {"b": {"c": 3}}}')
+)) t
+---- RESULTS
+'1'
+'2'
+'3'</codeblock>
+<codeblock>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$.a'),
+ GET_JSON_OBJECT(t.json, '$.b'),
+ GET_JSON_OBJECT(t.json, '$.c')
+FROM (VALUES (
+ ('{"a":1, "b":2, "c":3}' AS json),
+ ('{"b":2, "c":3}'),
+ ('{"c":3}')
+)) t
+---- RESULTS
+'1','2','3'
+'NULL','2','3'
+'NULL','NULL','3'</codeblock>
+<codeblock>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$[1]'),
+ GET_JSON_OBJECT(t.json, '$[*]')
+FROM (VALUES (
+ ('["a", "b", "c"]' AS json),
+ ('["a", "b"]'),
+ ('["a"]')
+)) t
+---- RESULTS
+'b','["a","b","c"]'
+'b','["a","b"]'
+'NULL','a'</codeblock>
+          <p>
+            <b>Added in:</b> <keyword keyref="impala31"/>
           </p>
         </dd>
 
@@ -230,6 +325,15 @@ under the License.
           unique identifier</xref>, a 128-bit value encoded as a string with groups of
           hexadecimal digits separated by dashes.
           <p>
+            Each call to <codeph>UUID()</codeph> produces a new arbitrary value.
+          </p>
+
+          <p>
+            If you get a UUID for each row of a result set, you can use it as a unique
+            identifier within a table, or even a unique ID across tables.
+          </p>
+
+          <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
 
@@ -245,29 +349,6 @@ under the License.
             quickly construct new unique identifiers during a data import job, or to combine
             data from different tables without the likelihood of ID collisions.
           </p>
-
-          <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>
--- Each call to uuid() produces a new arbitrary value.
-select uuid();
-+--------------------------------------+
-| uuid()                               |
-+--------------------------------------+
-| c7013e25-1455-457f-bf74-a2046e58caea |
-+--------------------------------------+
-
--- If you get a UUID for each row of a result set, you can use it as a
--- unique identifier within a table, or even a unique ID across tables.
-select uuid() from four_row_table;
-+--------------------------------------+
-| uuid()                               |
-+--------------------------------------+
-| 51d3c540-85e5-4cb9-9110-604e53999e2e |
-| 0bb40071-92f6-4a59-a6a4-60d46e9703e2 |
-| 5e9d7c36-9842-4a96-862d-c13cd0457c02 |
-| cae29095-0cc0-4053-a5ea-7fcd3c780861 |
-+--------------------------------------+
-</codeblock>
         </dd>
 
       </dlentry>

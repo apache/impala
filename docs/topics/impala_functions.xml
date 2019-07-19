@@ -514,6 +514,13 @@ under the License.
           </row>
           <row>
             <entry>
+              <xref
+                href="impala_misc_functions.xml#misc_functions/get_json_object"
+                >GET_JSON_OBJECT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
               <xref href="impala_bit_functions.xml#bit_functions/getbit"
                 >GETBIT</xref>
             </entry>
