@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="default_hints_insert_statement">
+
+  <title>DEFAULT_HINTS_INSERT_STATEMENT Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DEFAULT_HINTS_INSERT_STATEMENT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>DEFAULT_HINTS_INSERT_STATEMENT</codeph> query option sets the default hints
+      for the <codeph>INSERT</codeph> statements with no optimizer hint specified.
+    </p>
+
+    <p>
+      When there are hints specified in an <codeph>INSERT</codeph> statement, these default
+      hints are ignored.
+    </p>
+
+    <p>
+      You can specify multiple hints separated by '<codeph>:</codeph>'.
+    </p>
+
+    <p>
+      For example:
+    </p>
+
+<codeblock>SET DEFAULT_HINTS_INSERT_STATEMENT=CLUSTERED;
+SET DEFAULT_HINTS_INSERT_STATEMENT=SHUFFLE;
+SET DEFAULT_HINTS_INSERT_STATEMENT=NOCLUSTERED:NOSHUFFLE; </codeblock>
+
+    <p>
+      The default hints apply to the HDFS and Kudu table formats and are ignored for the HBase
+      table format.
+    </p>
+
+    <p>
+      <b>Type:</b> <codeph>STRING</codeph>
+    </p>
+
+    <p>
+      <b>Default:</b> none
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala33"/>
+    </p>
+
+  </conbody>
+
+</concept>
