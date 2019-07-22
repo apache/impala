@@ -23,6 +23,7 @@ FROM ubuntu:16.04
 RUN apt-get update && \
   apt-get install -y openjdk-8-jre-headless \
   libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
+  sudo netcat-openbsd less curl iproute2 vim iputils-ping \
   tzdata liblzo2-2 krb5-user && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
