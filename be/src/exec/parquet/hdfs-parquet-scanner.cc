@@ -1402,11 +1402,16 @@ Status HdfsParquetScanner::ProcessFooter() {
   // the magic number
   uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
   uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
-  uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
   // The start of the metadata is:
   // file_len - 4-byte footer length field - 4-byte version number field - metadata size
   int64_t metadata_start = file_len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) -
       metadata_size;
+  if (UNLIKELY(metadata_start < 0)) {
+    return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
+                             "footer: $1 bytes. File size: $2 bytes.",
+        filename(), metadata_size, file_len));
+  }
+  uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
 
   // If the metadata was too big, we need to read it into a contiguous buffer before
   // deserializing it.
@@ -1420,10 +1425,6 @@ Status HdfsParquetScanner::ProcessFooter() {
     int64_t partition_id = context_->partition_descriptor()->id();
     const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
     DCHECK_EQ(file_desc, stream_->file_desc());
-    if (metadata_start < 0) {
-      return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
-          "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size, file_len));
-    }
 
     if (!metadata_buffer.TryAllocate(metadata_size)) {
       string details = Substitute("Could not allocate buffer of $0 bytes for Parquet "
