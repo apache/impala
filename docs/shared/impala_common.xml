@@ -4570,8 +4570,7 @@ sudo pip-python install ssl</codeblock>
 CREATE EXTERNAL TABLE impala_name STORED AS KUDU
   TBLPROPERTIES('kudu.table_name' = 'original_kudu_name');
 </codeblock>
-      </p>
-      <p> External Kudu tables differ in one important way from other external
+        External Kudu tables differ in one important way from other external
         tables: adding or dropping a column or range partition changes the data
         in the underlying Kudu table, in contrast to an HDFS-backed external
         table where existing data files are left untouched.</p>

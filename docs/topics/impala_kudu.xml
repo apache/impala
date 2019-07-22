@@ -1141,7 +1141,7 @@ kudu.table_name  | impala::some_database.table_name_demo
     </concept>
 
   </concept>
-  <concept id="concept_y4k_x1m_j3b">
+  <concept id="kudu_hms">
     <title>Working with Kudu Integrated with Hive Metastore</title>
     <conbody>
       <p>Starting from Kudu 1.10 and Impala 3.3, Impala supports Kudu services
