@@ -133,6 +133,38 @@ under the License.
           </dd>
 
         </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --idle_client_poll_time_s
+          </dt>
+
+          <dd>
+            The value of this setting specifies how frequently Impala polls to check if a client
+            connection is idle and closes it if the connection is idle. A client connection is
+            idle if all sessions associated with the client connection are idle.
+            <p>
+              By default, <codeph>--idle_client_poll_time_s</codeph> is set to 30 seconds.
+            </p>
+
+            <p>
+              If <codeph>--idle_client_poll_time_s</codeph> is set to 0, idle client connections
+              stay open until explicitly closed by the clients.
+            </p>
+
+            <p>
+              The connection will only be closed if all the associated sessions are idle or
+              closed. Sessions cannot be idle unless either the flag
+              <codeph>--idle_session_timeout</codeph> or the
+              <codeph>IDLE_SESSION_TIMEOUT</codeph> query option is set to greater than 0. If
+              idle session timeout is not configured, a session cannot become idle by
+              definition, and therefore its connection stays open until the client explicitly
+              closes it.
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
     </section>
