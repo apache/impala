@@ -1,0 +1,113 @@
+====
+---- QUERY
+# Validate reading all types from a table when result spooling is enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select * from alltypes order by id limit 10
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000,2009,1
+3,false,3,3,3,30,3.299999952316284,30.3,'01/01/09','3',2009-01-01 00:03:00.300000000,2009,1
+4,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4',2009-01-01 00:04:00.600000000,2009,1
+5,false,5,5,5,50,5.5,50.5,'01/01/09','5',2009-01-01 00:05:00.100000000,2009,1
+6,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/09','6',2009-01-01 00:06:00.150000000,2009,1
+7,false,7,7,7,70,7.699999809265137,70.7,'01/01/09','7',2009-01-01 00:07:00.210000000,2009,1
+8,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8',2009-01-01 00:08:00.280000000,2009,1
+9,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/09','9',2009-01-01 00:09:00.360000000,2009,1
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Validates that column ordering is preserved when result spooling is enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select month, year, timestamp_col, string_col, date_string_col, double_col, float_col,
+bigint_col, int_col, smallint_col, tinyint_col, bool_col, id from alltypes
+order by id limit 10
+---- RESULTS
+1,2009,2009-01-01 00:00:00,'0','01/01/09',0,0,0,0,0,0,true,0
+1,2009,2009-01-01 00:01:00,'1','01/01/09',10.1,1.100000023841858,10,1,1,1,false,1
+1,2009,2009-01-01 00:02:00.100000000,'2','01/01/09',20.2,2.200000047683716,20,2,2,2,true,2
+1,2009,2009-01-01 00:03:00.300000000,'3','01/01/09',30.3,3.299999952316284,30,3,3,3,false,3
+1,2009,2009-01-01 00:04:00.600000000,'4','01/01/09',40.4,4.400000095367432,40,4,4,4,true,4
+1,2009,2009-01-01 00:05:00.100000000,'5','01/01/09',50.5,5.5,50,5,5,5,false,5
+1,2009,2009-01-01 00:06:00.150000000,'6','01/01/09',60.59999999999999,6.599999904632568,60,6,6,6,true,6
+1,2009,2009-01-01 00:07:00.210000000,'7','01/01/09',70.7,7.699999809265137,70,7,7,7,false,7
+1,2009,2009-01-01 00:08:00.280000000,'8','01/01/09',80.8,8.800000190734863,80,8,8,8,true,8
+1,2009,2009-01-01 00:09:00.360000000,'9','01/01/09',90.89999999999999,9.899999618530273,90,9,9,9,false,9
+---- TYPES
+INT,INT,TIMESTAMP,STRING,STRING,DOUBLE,FLOAT,BIGINT,INT,SMALLINT,TINYINT,BOOLEAN,INT
+====
+---- QUERY
+# Validates that UDFs are properly evaluated when result spooling is enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select abs(id), abs(int_col) + abs(int_col) from alltypes order by id limit 10
+---- RESULTS
+0,0
+1,2
+2,4
+3,6
+4,8
+5,10
+6,12
+7,14
+8,16
+9,18
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Validates that queries with Agg nodes return correct results when result spooling is
+# enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select avg(int_col) + avg(bigint_col) from alltypes
+---- RESULTS
+49.5
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Validates that queries with Join nodes return correct results when result spooling is
+# enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select j.test_name, d.name from jointbl j inner join dimtbl d on
+(j.test_id = d.id)
+---- RESULTS
+'Name1','Name1'
+'Name2','Name2'
+'Name3','Name3'
+'Name4','Name4'
+'Name5','Name5'
+'Name16','Name6'
+'Name6','Name6'
+'Name16','Name6'
+'Name16','Name6'
+'Name6','Name6'
+'Name16','Name6'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# Validates that NULLs are properly handled when result spooling is enabled.
+SET SPOOL_QUERY_RESULTS=true;
+select * from nullrows order by id limit 10
+---- RESULTS
+'a','','NULL',NULL,NULL,'a','a',true
+'b','','NULL',NULL,NULL,'a','NULL',false
+'c','','NULL',NULL,NULL,'a','NULL',NULL
+'d','','NULL',NULL,NULL,'a','NULL',NULL
+'e','','NULL',NULL,NULL,'a','NULL',NULL
+'f','','NULL',NULL,NULL,'f','f',true
+'g','','NULL',NULL,NULL,'f','NULL',false
+'h','','NULL',NULL,NULL,'f','NULL',NULL
+'i','','NULL',NULL,NULL,'f','NULL',NULL
+'j','','NULL',NULL,NULL,'f','NULL',NULL
+---- TYPES
+STRING,STRING,STRING,INT,DOUBLE,STRING,STRING,BOOLEAN
+====
+---- QUERY
+SET SPOOL_QUERY_RESULTS=true;
+select * from emptytable;
+---- RESULTS
+---- TYPES
+STRING,INT
+====

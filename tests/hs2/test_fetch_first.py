@@ -104,14 +104,26 @@ class TestFetchFirst(HS2TestSuite):
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_query_stmts_v6(self):
-    self.run_query_stmts_test();
+    self.run_query_stmts_test()
 
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_query_stmts_v1(self):
-    self.run_query_stmts_test();
+    self.run_query_stmts_test()
 
-  def run_query_stmts_test(self):
+  @pytest.mark.xfail(reason="Unsupported until IMPALA-8819 is completed")
+  @pytest.mark.execute_serially
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
+  def test_query_stmts_v6_with_result_spooling(self):
+    self.run_query_stmts_test({'spool_query_results': 'true'})
+
+  @pytest.mark.xfail(reason="Unsupported until IMPALA-8819 is completed")
+  @pytest.mark.execute_serially
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
+  def test_query_stmts_v1_with_result_spooling(self):
+    self.run_query_stmts_test({'spool_query_results': 'true'})
+
+  def run_query_stmts_test(self, conf_overlay=dict()):
     """Tests Impala's limited support for the FETCH_FIRST fetch orientation for queries.
     Impala permits FETCH_FIRST for a particular query iff result caching is enabled
     via the 'impala.resultset.cache.size' confOverlay option. FETCH_FIRST will succeed as
@@ -125,6 +137,7 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.confOverlay = dict()
+    execute_statement_req.confOverlay.update(conf_overlay)
     execute_statement_req.statement =\
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)

@@ -25,6 +25,7 @@ from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.cancel_util import cancel_query_and_validate_state
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # PRIMARY KEY for lineitem
@@ -135,7 +136,6 @@ class TestCancellation(ImpalaTestSuite):
         query = "create table ctas_cancel stored as %sfile as %s" %\
             (file_format, query)
 
-    join_before_close = vector.get_value('join_before_close')
     wait_action = vector.get_value('wait_action')
     fail_rpc_action = vector.get_value('fail_rpc_action')
 
@@ -148,62 +148,12 @@ class TestCancellation(ImpalaTestSuite):
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):
-      handle = self.execute_query_async(query, vector.get_value('exec_option'),
-                                        table_format=vector.get_value('table_format'))
-
-      def fetch_results():
-        threading.current_thread().fetch_results_error = None
-        threading.current_thread().query_profile = None
-        try:
-          new_client = self.create_impala_client()
-          new_client.fetch(query, handle)
-        except ImpalaBeeswaxException as e:
-          threading.current_thread().fetch_results_error = e
-
-      thread = threading.Thread(target=fetch_results)
-      thread.start()
-
-      sleep(vector.get_value('cancel_delay'))
-      assert self.client.get_state(handle) != self.client.QUERY_STATES['EXCEPTION']
-      cancel_result = self.client.cancel(handle)
-      assert cancel_result.status_code == 0,\
-          'Unexpected status code from cancel request: %s' % cancel_result
-
-      if join_before_close:
-        thread.join()
-
-      close_error = None
-      try:
-        self.client.close_query(handle)
-      except ImpalaBeeswaxException as e:
-        close_error = e
-
-      # Before accessing fetch_results_error we need to join the fetch thread
-      thread.join()
-
-      if thread.fetch_results_error is None:
-        # If the fetch rpc didn't result in CANCELLED (and auto-close the query) then
-        # the close rpc should have succeeded.
-        assert close_error is None
-      elif close_error is None:
-        # If the close rpc succeeded, then the fetch rpc should have either succeeded,
-        # failed with 'Cancelled' or failed with 'Invalid query handle' (if the close
-        # rpc occured before the fetch rpc).
-        if thread.fetch_results_error is not None:
-          assert 'Cancelled' in str(thread.fetch_results_error) or \
-            ('Invalid query handle' in str(thread.fetch_results_error) \
-             and not join_before_close)
-      else:
-        # If the close rpc encountered an exception, then it must be due to fetch
-        # noticing the cancellation and doing the auto-close.
-        assert 'Invalid or unknown query handle' in str(close_error)
-        assert 'Cancelled' in str(thread.fetch_results_error)
+      cancel_query_and_validate_state(self.client, query,
+          vector.get_value('exec_option'), vector.get_value('table_format'),
+          vector.get_value('cancel_delay'), vector.get_value('join_before_close'))
 
       if query_type == "CTAS":
         self.cleanup_test_table(vector.get_value('table_format'))
-
-      # TODO: Add some additional verification to check to make sure the query was
-      # actually canceled
 
     # Executing the same query without canceling should work fine. Only do this if the
     # query has a limit or aggregation
