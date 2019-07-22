@@ -445,42 +445,46 @@ public class CatalogOpExecutor {
     // the state in-memory and do not flush it to HMS, the older state can be recovered
     // by loading everything back from HMS. For ex: INVALIDATE METADATA.
     int numDbsAdded = 0;
-    for (TDatabase thriftDb: testCaseData.getDbs()) {
-      Db db = Db.fromTDatabase(thriftDb);
-      // Set a new version to force an overwrite if a Db already exists with the same
-      // name.
-      db.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
-      Db ret = catalog_.addDb(db.getName(), db.getMetaStoreDb());
-      if (ret != null) {
-        ++numDbsAdded;
-        response.result.addToUpdated_catalog_objects(db.toTCatalogObject());
+    if (testCaseData.getDbs() != null) {
+      for (TDatabase thriftDb : testCaseData.getDbs()) {
+        Db db = Db.fromTDatabase(thriftDb);
+        // Set a new version to force an overwrite if a Db already exists with the same
+        // name.
+        db.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+        Db ret = catalog_.addDb(db.getName(), db.getMetaStoreDb());
+        if (ret != null) {
+          ++numDbsAdded;
+          response.result.addToUpdated_catalog_objects(db.toTCatalogObject());
+        }
       }
     }
 
     int numTblsAdded = 0;
     int numViewsAdded = 0;
-    for(TTable tTable: testCaseData.tables_and_views) {
-      Db db = catalog_.getDb(tTable.db_name);
-      // Db should have been created by now.
-      Preconditions.checkNotNull(db, String.format("Missing db %s", tTable.db_name));
-      Table t = Table.fromThrift(db, tTable);
-      // Set a new version to force an overwrite if a table already exists with the same
-      // name.
-      t.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
-      catalog_.addTable(db, t);
-      if (t instanceof View) {
-        ++numViewsAdded;
-      } else {
-        ++numTblsAdded;
-      }
-      // The table lock is needed here since toTCatalogObject() calls Table#toThrift()
-      // which expects the current thread to hold this lock. For more details refer
-      // to IMPALA-4092.
-      t.getLock().lock();
-      try {
-        response.result.addToUpdated_catalog_objects(t.toTCatalogObject());
-      } finally {
-        t.getLock().unlock();
+    if (testCaseData.getTables_and_views() != null) {
+      for (TTable tTable : testCaseData.tables_and_views) {
+        Db db = catalog_.getDb(tTable.db_name);
+        // Db should have been created by now.
+        Preconditions.checkNotNull(db, String.format("Missing db %s", tTable.db_name));
+        Table t = Table.fromThrift(db, tTable);
+        // Set a new version to force an overwrite if a table already exists with the same
+        // name.
+        t.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+        catalog_.addTable(db, t);
+        if (t instanceof View) {
+          ++numViewsAdded;
+        } else {
+          ++numTblsAdded;
+        }
+        // The table lock is needed here since toTCatalogObject() calls Table#toThrift()
+        // which expects the current thread to hold this lock. For more details refer
+        // to IMPALA-4092.
+        t.getLock().lock();
+        try {
+          response.result.addToUpdated_catalog_objects(t.toTCatalogObject());
+        } finally {
+          t.getLock().unlock();
+        }
       }
     }
     StringBuilder responseStr = new StringBuilder();
