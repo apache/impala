@@ -26,6 +26,7 @@
 #include <boost/filesystem.hpp>
 #include <gutil/casts.h>
 #include <gutil/strings/escaping.h>
+#include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
 #include <random>
 #include <string>
@@ -39,6 +40,7 @@
 
 #include "exec/kudu-util.h"
 #include "kudu/rpc/sasl_common.h"
+#include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
@@ -496,18 +498,24 @@ static int SaslGetPath(void* context, const char** path) {
   return SASL_OK;
 }
 
-bool BasicAuth(ThriftServer::ConnectionContext* connection_context, const char* base64) {
-  int64_t in_len = strlen(base64);
+bool BasicAuth(
+    ThriftServer::ConnectionContext* connection_context, const std::string& base64) {
+  if (base64.empty()) {
+    connection_context->return_headers.push_back("WWW-Authenticate: Basic");
+    return false;
+  }
   string decoded;
-  if (!Base64Unescape(base64, in_len, &decoded)) {
+  if (!Base64Unescape(base64, &decoded)) {
     LOG(ERROR) << "Failed to decode base64 auth string from: "
                << TNetworkAddressToString(connection_context->network_address);
+    connection_context->return_headers.push_back("WWW-Authenticate: Basic");
     return false;
   }
   std::size_t colon = decoded.find(':');
   if (colon == std::string::npos) {
     LOG(ERROR) << "Auth string must be in the form '<username>:<password>' from: "
                << TNetworkAddressToString(connection_context->network_address);
+    connection_context->return_headers.push_back("WWW-Authenticate: Basic");
     return false;
   }
   string username = decoded.substr(0, colon);
@@ -516,8 +524,57 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context, const char* 
   if (ret) {
     // Authenication was successful, so set the username on the connection.
     connection_context->username = username;
+    return true;
   }
-  return ret;
+  connection_context->return_headers.push_back("WWW-Authenticate: Basic");
+  return false;
+}
+
+// Performs a step of SPNEGO auth for the HTTP transport and sets the username on
+// 'connection_context' if auth is successful. 'header_token' is the value from an
+// 'Authorization: Negotiate" header. Returns true if the step was successful and sets
+// 'is_complete' to indicate if more steps are needed. Returns false if an error was
+// encountered and the connection should be closed.
+bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
+    const std::string& header_token, bool* is_complete) {
+  std::string token;
+  // Note: according to RFC 2616, the correct format for the header is:
+  // 'Authorization: Negotiate <token>'. However, beeline incorrectly adds an additional
+  // ':', i.e. 'Authorization: Negotiate: <token>'. We handle that here.
+  TryStripPrefixString(header_token, ": ", &token);
+  string resp_token;
+  string username;
+  kudu::Status spnego_status =
+      kudu::gssapi::SpnegoStep(token, &resp_token, is_complete, &username);
+  if (spnego_status.ok()) {
+    if (!resp_token.empty()) {
+      string resp_header = Substitute("WWW-Authenticate: Negotiate $0", resp_token);
+      connection_context->return_headers.push_back(resp_header);
+    }
+    if (*is_complete) {
+      if (username.empty()) {
+        spnego_status = kudu::Status::RuntimeError(
+            "SPNEGO indicated complete, but got empty principal");
+        // Crash in debug builds, but fall through to treating as an error in release.
+        LOG(DFATAL) << "Got no authenticated principal for SPNEGO-authenticated "
+                    << " connection from "
+                    << TNetworkAddressToString(connection_context->network_address)
+                    << ": " << spnego_status.ToString();
+      } else {
+        // Authentication was successful, so set the username on the connection.
+        connection_context->username = username;
+      }
+    }
+  } else {
+    LOG(WARNING) << "Failed to authenticate request from "
+                 << TNetworkAddressToString(connection_context->network_address)
+                 << " via SPNEGO: " << spnego_status.ToString();
+  }
+  return spnego_status.ok();
+}
+
+vector<string> ReturnHeaders(ThriftServer::ConnectionContext* connection_context) {
+  return std::move(connection_context->return_headers);
 }
 
 namespace {
@@ -869,17 +926,10 @@ Status SecureAuthProvider::GetServerTransportFactory(
   DCHECK(!principal_.empty() || has_ldap_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
-    // TODO: add support for SPNEGO style of HTTP auth
-    if (!principal_.empty() && !has_ldap_) {
-      const string err = "Kerberos not yet supported with HTTP transport.";
-      LOG(ERROR) << err;
-      return Status(err);
-    }
-
+    bool has_kerberos = !principal_.empty();
     factory->reset(new ThriftServer::BufferedTransportFactory(
         ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
-        new THttpServerTransportFactory(
-            server_name, metrics, /* requireBasicAuth */ true)));
+        new THttpServerTransportFactory(server_name, metrics, has_ldap_, has_kerberos)));
     return Status::OK();
   }
 
@@ -951,20 +1001,31 @@ Status SecureAuthProvider::WrapClientTransport(const string& hostname,
 void SecureAuthProvider::SetupConnectionContext(
     const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
     ThriftServer::TransportType underlying_transport_type,
-    TTransport* underlying_transport) {
+    TTransport* underlying_input_transport, TTransport* underlying_output_transport) {
   switch (underlying_transport_type) {
     case ThriftServer::BINARY: {
       TSaslServerTransport* sasl_transport =
-          down_cast<TSaslServerTransport*>(underlying_transport);
+          down_cast<TSaslServerTransport*>(underlying_input_transport);
 
       // Get the username from the transport.
       connection_ptr->username = sasl_transport->getUsername();
       break;
     }
     case ThriftServer::HTTP: {
-      THttpServer* http_transport = down_cast<THttpServer*>(underlying_transport);
-      http_transport->setAuthFn(
-          std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1));
+      THttpServer* http_input_transport =
+          down_cast<THttpServer*>(underlying_input_transport);
+      if (has_ldap_) {
+        http_input_transport->setBasicAuthFn(
+            std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1));
+      }
+      if (!principal_.empty()) {
+        http_input_transport->setNegotiateAuthFn(std::bind(NegotiateAuth,
+            connection_ptr.get(), std::placeholders::_1, std::placeholders::_2));
+        THttpServer* http_output_transport =
+            down_cast<THttpServer*>(underlying_input_transport);
+        http_output_transport->setReturnHeadersFn(
+            std::bind(ReturnHeaders, connection_ptr.get()));
+      }
       break;
     }
     default:

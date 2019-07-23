@@ -97,9 +97,6 @@ class TAcceptQueueServer::Task : public Runnable {
     } catch (...) {
       GlobalOutput("TAcceptQueueServer uncaught exception.");
     }
-    if (eventHandler != nullptr) {
-      eventHandler->deleteContext(connectionContext, input_, output_);
-    }
 
     try {
       input_->getTransport()->close();
@@ -112,6 +109,11 @@ class TAcceptQueueServer::Task : public Runnable {
     } catch (const TTransportException& ttx) {
       string errStr = string("TAcceptQueueServer output close failed: ") + ttx.what();
       GlobalOutput(errStr.c_str());
+    }
+
+    // Delete the context after closing the transports in case they have references to it.
+    if (eventHandler != nullptr) {
+      eventHandler->deleteContext(connectionContext, input_, output_);
     }
 
     // Remove this task from parent bookkeeping

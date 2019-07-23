@@ -2588,10 +2588,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
       hs2_server_->SetConnectionHandler(this);
     }
 
-    // We can't currently secure the http server with Kerberos, only with LDAP, so if
-    // Kerberos is enabled and LDAP isn't we automatically disable the http server.
-    if ((hs2_http_port > 0 && (!IsKerberosEnabled() || FLAGS_enable_ldap_auth))
-        || (TestInfo::is_test() && hs2_http_port == 0)) {
+    if (hs2_http_port > 0 || (TestInfo::is_test() && hs2_http_port == 0)) {
       boost::shared_ptr<TProcessor> hs2_http_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
       boost::shared_ptr<TProcessorEventHandler> event_handler(

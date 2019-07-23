@@ -60,11 +60,12 @@ class AuthProvider {
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
       WARN_UNUSED_RESULT = 0;
 
-  /// Setup 'connection_ptr' to get its username from 'underlying_transport'.
+  /// Setup 'connection_ptr' to get its username with the given transports.
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_transport) = 0;
+      apache::thrift::transport::TTransport* underlying_input_transport,
+      apache::thrift::transport::TTransport* underlying_output_transport) = 0;
 
   /// Returns true if this provider uses Sasl at the transport layer.
   virtual bool is_secure() = 0;
@@ -73,9 +74,10 @@ class AuthProvider {
 };
 
 /// Used if either (or both) Kerberos and LDAP auth are desired. For BINARY connections we
-/// use Sasl for the communication, and for HTTP connections we use BASIC auth.  This
-/// "wraps" the underlying communication, in thrift-speak. This is used for both client
-/// and server contexts; there is one for internal and one for external communication.
+/// use Sasl for the communication, and for HTTP connections we use Basic or SPNEGO auth.
+/// This "wraps" the underlying communication, in thrift-speak. This is used for both
+/// client and server contexts; there is one for internal and one for external
+/// communication.
 class SecureAuthProvider : public AuthProvider {
  public:
   SecureAuthProvider(bool is_internal)
@@ -105,13 +107,14 @@ class SecureAuthProvider : public AuthProvider {
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   /// IF sasl was used, the username will be available from the handshake, and we set it
-  /// here. If HTTP BASIC auth was used, the username won't be available until the first
-  /// packet is received, so w register a callback with the transport that will set the
-  /// username then.
+  /// here. If HTTP Basic or SPNEGO auth was used, the username won't be available until
+  /// one or more packets are received, so we register a callback with the transport that
+  /// will set the username when it's available.
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_transport);
+      apache::thrift::transport::TTransport* underlying_input_transport,
+      apache::thrift::transport::TTransport* underlying_output_transport);
 
   virtual bool is_secure() { return true; }
 
@@ -190,7 +193,8 @@ class NoAuthProvider : public AuthProvider {
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_transport) {
+      apache::thrift::transport::TTransport* underlying_input_transport,
+      apache::thrift::transport::TTransport* underlying_output_transport) {
     connection_ptr->username = "";
   }
 
