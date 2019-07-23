@@ -355,6 +355,9 @@ under the License.
         tables produces Parquet data files with relatively narrow ranges of column values within
         each file.
       </p>
+      <p>To disable Impala from writing the Parquet page index when creating
+        Parquet files, set the <codeph>PARQUET_WRITE_PAGE_INDEX</codeph> query
+        option to <codeph>FALSE</codeph>.</p>
 
     </conbody>
 

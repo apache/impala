@@ -216,7 +216,10 @@ under the License.
           <topicref href="topics/impala_parquet_dictionary_filtering.xml"/>
           <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
           <topicref href="topics/impala_parquet_file_size.xml"/>
+          <topicref href="topics/impala_parquet_page_row_count_limit.xml"/>
           <topicref href="topics/impala_parquet_read_statistics.xml"/>
+          <topicref href="topics/impala_parquet_read_page_index.xml"/>
+          <topicref href="topics/impala_parquet_write_page_index.xml"/>
           <topicref rev="2.6.0 IMPALA-3286" href="topics/impala_prefetch_mode.xml"/>
           <topicref href="topics/impala_query_timeout_s.xml"/>
           <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_read_page_index">
+
+  <title>PARQUET_READ_PAGE_INDEX Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>PARQUET_READ_PAGE_INDEX</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Use the <codeph>PARQUET_READ_PAGE_INDEX</codeph> query option to disable or enable using
+      the Parquet page index during scans. The page index contains min/max statistics at the
+      page-level granularity. It can be used to skip pages and rows that do not match the
+      conditions in the <codeph>WHERE</codeph> clause.
+    </p>
+
+    <p>
+      This option enables the same optimization as the <codeph>PARQUET_READ_STATISTICS</codeph>
+      at the finer grained page level.
+    </p>
+
+    <p>
+      Impala supports filtering based on Parquet statistics:
+    </p>
+
+    <ul>
+      <li>
+        Of the types: Boolean, Integer, Decimal, String, Timestamp
+      </li>
+
+      <li>
+        For simple predicates of the forms: <codeph>&lt;slot> &lt;op> &lt;constant></codeph> or
+        <codeph>&lt;constant> &lt;op> &lt;slot></codeph>, where <codeph>&lt;op></codeph> is LT,
+        LE, GE, GT, and EQ
+      </li>
+    </ul>
+
+    <p>
+      The supported values for the query option are:
+      <ul>
+        <li>
+          <codeph>true</codeph> (<codeph>1</codeph>): Read the page-level statistics from the
+          Parquet page index during query processing and filter out pages based on the
+          statistics.
+        </li>
+
+        <li>
+          <codeph>false</codeph> (<codeph>0</codeph>): Do not use the Parquet page index.
+        </li>
+
+        <li>
+          Any other values are treated as <codeph>false</codeph>.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Type:</b> Boolean
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>TRUE</codeph>
+    </p>
+
+  </conbody>
+
+</concept>
