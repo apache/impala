@@ -225,8 +225,8 @@ ColumnType KuduDataTypeToColumnType(
     case DataType::DECIMAL:
       return ColumnType::CreateDecimalType(
           type_attributes.precision(), type_attributes.scale());
+    default: return ColumnType(PrimitiveType::INVALID_TYPE);
   }
-  return ColumnType(PrimitiveType::INVALID_TYPE);
 }
 
 Status CreateKuduValue(const ColumnType& col_type, void* value, KuduValue** out) {
