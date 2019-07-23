@@ -84,28 +84,6 @@ under the License.
         <dlentry>
 
           <dt>
-            --fe_service_threads
-          </dt>
-
-          <dd>
-            Specifies the maximum number of concurrent client connections allowed. The default
-            value is 64 with which 64 queries can run simultaneously.
-            <p>
-              If you have more clients trying to connect to Impala than the value of this
-              setting, the later arriving clients have to wait for the duration specified by
-              <codeph>--accepted_client_cnxn_timeout</codeph>. You can increase this value to
-              allow more client connections. However, a large value means more threads to be
-              maintained even if most of the connections are idle, and it could negatively
-              impact query latency. Client applications should use the connection pool to avoid
-              need for large number of sessions.
-            </p>
-          </dd>
-
-        </dlentry>
-
-        <dlentry>
-
-          <dt>
             --accepted_client_cnxn_timeout
           </dt>
 
@@ -130,6 +108,53 @@ under the License.
             <p>
               The timeout applies only to client facing thrift servers, i.e., HS2 and Beeswax
               servers.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --disconnected_session_timeout
+          </dt>
+
+          <dd>
+            When a HiveServer2 session has had no open connections for longer than this value,
+            the session will be closed, and any associated queries will be unregistered.
+            <p>
+              Specify the value in hours.
+            </p>
+
+            <p>
+              The default value is 1 hour.
+            </p>
+
+            <p>
+              This flag does not apply to Beeswax clients. When a Beeswax client connection is
+              closed, Impala closes the session associated with that connection.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --fe_service_threads
+          </dt>
+
+          <dd>
+            Specifies the maximum number of concurrent client connections allowed. The default
+            value is 64 with which 64 queries can run simultaneously.
+            <p>
+              If you have more clients trying to connect to Impala than the value of this
+              setting, the later arriving clients have to wait for the duration specified by
+              <codeph>--accepted_client_cnxn_timeout</codeph>. You can increase this value to
+              allow more client connections. However, a large value means more threads to be
+              maintained even if most of the connections are idle, and it could negatively
+              impact query latency. Client applications should use the connection pool to avoid
+              need for large number of sessions.
             </p>
           </dd>
 
