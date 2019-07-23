@@ -72,7 +72,7 @@ start-impala-cluster.py --kill
 
 # Build the docker images required to start the cluster.
 # parquet-reader is needed for e2e tests but not built for non-test build.
-make -j ${IMPALA_BUILD_THREADS} docker_images parquet-reader
+make -j ${IMPALA_BUILD_THREADS} docker_debug_images parquet-reader
 
 source_impala_config
 

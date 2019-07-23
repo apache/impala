@@ -575,7 +575,12 @@ class DockerMiniClusterOperations(object):
                 "-e", "JAVA_TOOL_OPTIONS={0}".format(
                     build_java_tool_options(DEFAULT_IMPALAD_JVM_DEBUG_PORT))]
     # The container build processes tags the generated image with the daemon name.
-    image_tag = daemon
+    debug_build = options.build_type == "debug" or (options.build_type == "latest" and
+        os.path.basename(os.path.dirname(os.readlink("be/build/latest"))) == "debug")
+    if debug_build:
+      image_tag = daemon + "_debug"
+    else:
+      image_tag = daemon
     host_name = self.__gen_host_name__(daemon, instance)
     container_name = self.__gen_container_name__(daemon, instance)
     # Mount configuration into container so that we don't need to rebuild container

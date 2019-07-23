@@ -20,13 +20,23 @@
 # Most artifacts are symlinked so need to be dereferenced (e.g. with tar -h) before
 # being used as a build context.
 
+import argparse
 import glob
 import os
 import shutil
 from subprocess import check_call
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--debug-build", help="Setup build context for debug build",
+                    action="store_true")
+args = parser.parse_args()
+
 IMPALA_HOME = os.environ["IMPALA_HOME"]
-OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context")
+if args.debug_build:
+  BUILD_TYPE = "debug"
+else:
+  BUILD_TYPE = "release"
+OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context", BUILD_TYPE)
 DOCKERFILE = os.path.join(IMPALA_HOME, "docker/impala_base/Dockerfile")
 
 IMPALA_TOOLCHAIN = os.environ["IMPALA_TOOLCHAIN"]
@@ -59,9 +69,15 @@ def symlink_file_into_dir(src_file, dst_dir):
 
 
 # Impala binaries and native dependencies.
-check_call([STRIP, "--strip-debug",
-            os.path.join(IMPALA_HOME, "be/build/latest/service/impalad"),
-            "-o", os.path.join(BIN_DIR, "impalad")])
+
+# Strip debug symbols from release build to reduce image size. Keep them for
+# debug build.
+IMPALAD_BINARY = os.path.join(IMPALA_HOME, "be/build", BUILD_TYPE, "service/impalad")
+if args.debug_build:
+  symlink_file_into_dir(IMPALAD_BINARY, BIN_DIR)
+else:
+  check_call([STRIP, "--strip-debug", IMPALAD_BINARY,
+              "-o", os.path.join(BIN_DIR, "impalad")])
 for lib in ["libstdc++", "libgcc"]:
   for so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format(lib))):
     symlink_file_into_dir(so, LIB_DIR)

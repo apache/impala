@@ -15,7 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-FROM impala_base
+ARG BASE_IMAGE=impala_base
+FROM ${BASE_IMAGE}
 
 # Externally-facing ports
 # Debug webserver
