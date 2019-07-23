@@ -41,8 +41,9 @@ rules.ninja
 # Build timestamp files
 .*timestamp
 
-# Docker build files
+# Docker generated files
 docker/build_context
+docker/docker-images.txt
 
 Testing/
 llvm-ir/

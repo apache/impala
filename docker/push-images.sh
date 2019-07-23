@@ -19,6 +19,8 @@
 
 set -euo pipefail
 
+DIR=$(dirname "$0")
+
 usage() {
   echo "push_to_registry.sh [options]"
   echo
@@ -64,10 +66,10 @@ if [[ -z "$PREFIX" ]]; then
 fi
 
 # The image tags that are updated by the impala build process.
-# TODO(IMPALA-8622): get this list from a generated file.
-IMAGES=(statestored catalogd impalad_coordinator impalad_executor impalad_coord_exec)
+IMAGES=$(cat ${DIR}/docker-images.txt)
+echo "Images to push: ${IMAGES}"
 
-for IMAGE in "${IMAGES[@]}"; do
+for IMAGE in ${IMAGES}; do
   if [[ -z "$REGISTRY" ]]; then
     # Docker Hub does not require a prefix.
     DEST=
