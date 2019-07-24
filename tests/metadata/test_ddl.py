@@ -237,6 +237,20 @@ class TestDdlStatements(TestDdlBase):
     assert len(properties) == 1
     assert {'foo_role': 'ROLE'} == properties
 
+  def test_metadata_after_alter_database(self, vector, unique_database):
+    self.client.execute("create table {0}.tbl (i int)".format(unique_database))
+    self.client.execute("create function {0}.f() returns int "
+                        "location '{1}/libTestUdfs.so' symbol='NoArgs'"
+                        .format(unique_database, WAREHOUSE))
+    self.client.execute("alter database {0} set owner user foo_user".format(
+      unique_database))
+    table_names = self.client.execute("show tables in {0}".format(
+      unique_database)).get_data()
+    assert "tbl" == table_names
+    func_names = self.client.execute("show functions in {0}".format(
+      unique_database)).get_data()
+    assert "INT\tf()\tNATIVE\ttrue" == func_names
+
   def test_alter_table_set_owner(self, vector, unique_database):
     table_name = "{0}.test_owner_tbl".format(unique_database)
     self.client.execute("create table {0}(i int)".format(table_name))

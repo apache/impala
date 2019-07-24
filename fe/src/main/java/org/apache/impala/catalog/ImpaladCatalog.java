@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -388,16 +389,29 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         existingDb.getCatalogVersion() < catalogVersion) {
       Db newDb = Db.fromTDatabase(thriftDb);
       newDb.setCatalogVersion(catalogVersion);
-      addDb(newDb);
       if (existingDb != null) {
         CatalogObjectVersionSet.INSTANCE.updateVersions(
             existingDb.getCatalogVersion(), catalogVersion);
         CatalogObjectVersionSet.INSTANCE.removeAll(existingDb.getTables());
         CatalogObjectVersionSet.INSTANCE.removeAll(
             existingDb.getFunctions(null, new PatternMatcher()));
+        // IMPALA-8434: add back the existing tables/functions. Note that their version
+        // counters in CatalogObjectVersionSet have been decreased by the above removeAll
+        // statements, meaning their references from the old db are deleted since the old
+        // db object has been replaced by newDb. addTable and addFunction will add their
+        // versions back.
+        for (Table tbl: existingDb.getTables()) {
+          newDb.addTable(tbl);
+        }
+        for (List<Function> functionList: existingDb.getAllFunctions().values()) {
+          for (Function func: functionList) {
+            newDb.addFunction(func);
+          }
+        }
       } else {
         CatalogObjectVersionSet.INSTANCE.addVersion(catalogVersion);
       }
+      addDb(newDb);
     }
   }
 
