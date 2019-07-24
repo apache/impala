@@ -33,6 +33,9 @@ usage() {
   echo "     Append this image prefix to all images pushed to the registry. Required."
   echo "  -r <registry>"
   echo "     Push to this registry. Optional, if not specified pushes to docker hub."
+  echo "  -t <tag>"
+  echo "     Append this tag to all images before pushing them, Optional, defaults to"
+  echo "     empty."
   echo
   echo "Examples:"
   echo "To push to some user's repository on Docker Hub, with names like "
@@ -42,7 +45,8 @@ usage() {
 
 PREFIX=
 REGISTRY=
-while getopts "p:r:" OPTION
+TAG=
+while getopts "p:r:t:" OPTION
 do
   case "$OPTION" in
     p)
@@ -50,6 +54,9 @@ do
       ;;
     r)
       REGISTRY="$OPTARG"
+      ;;
+    t)
+      TAG="$OPTARG"
       ;;
     ?)
       echo "Unknown option."
@@ -77,6 +84,9 @@ for IMAGE in ${IMAGES}; do
     DEST=$REGISTRY/
   fi
   DEST+="$PREFIX-$IMAGE"
+  if [[ -n "$TAG" ]]; then
+    DEST+=":$TAG"
+  fi
   docker image tag "$IMAGE" "$DEST"
   docker push "$DEST"
 done
