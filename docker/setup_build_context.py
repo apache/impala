@@ -83,3 +83,5 @@ for jar in glob.glob(os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar"
 os.symlink(os.path.join(IMPALA_HOME, "www"), os.path.join(OUTPUT_DIR, "www"))
 # Scripts
 symlink_file_into_dir(os.path.join(IMPALA_HOME, "docker/daemon_entrypoint.sh"), BIN_DIR)
+symlink_file_into_dir(os.path.join(IMPALA_HOME, "bin/graceful_shutdown_backends.sh"),
+                      BIN_DIR)

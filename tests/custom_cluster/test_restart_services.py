@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+import os
 import pytest
 import psutil
 import re
@@ -23,6 +24,7 @@ import signal
 import socket
 import time
 
+from subprocess import check_call
 from tests.common.environ import build_flavor_timeout
 from time import sleep
 
@@ -544,3 +546,19 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     self.assert_impalad_log_contains('INFO', "Shutdown signal received.",
                                      NUM_SIGNALS_TO_SEND)
     assert impalad.is_running(), "Impalad process should still be running."
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
+            hostname=socket.gethostname()), cluster_size=1)
+  def test_graceful_shutdown_script(self):
+    impalad = psutil.Process(self.cluster.impalads[0].get_pid())
+    script = os.path.join(os.environ['IMPALA_HOME'], 'bin',
+                          'graceful_shutdown_backends.sh')
+    start_time = time.time()
+    check_call([script, str(self.IDLE_SHUTDOWN_GRACE_PERIOD_S)])
+    LOG.info("Waiting for impalad to exit {0}".format(start_time))
+    impalad.wait()
+    shutdown_duration = time.time() - start_time
+    assert shutdown_duration <= self.IDLE_SHUTDOWN_GRACE_PERIOD_S + 10

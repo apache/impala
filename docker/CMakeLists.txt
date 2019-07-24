@@ -37,6 +37,7 @@ add_custom_target(impala_base_image
   COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR} && tar cvh . | docker build -t impala_base -
   DEPENDS impala_base_build_context ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
   DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
+  DEPENDS ${CMAKE_SOURCE_DIR}/bin/graceful_shutdown_backends.sh
   COMMENT "Building Impala base docker image."
   VERBATIM
 )
