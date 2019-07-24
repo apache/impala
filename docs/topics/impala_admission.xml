@@ -102,19 +102,39 @@ under the License.
               still use <uicontrol>Max Running Queries</uicontrol> as a
               safeguard. If queries exceed either the total estimated memory or
               the maximum number of concurrent queries, they are added to the
-              queue. </p>
+              queue. </p><p>If <uicontrol>Max Running Queries
+                Multiple</uicontrol> is set, the <uicontrol>Max Running
+                Queries</uicontrol> setting is ignored.</p>
           </dd>
         </dlentry>
-      </dl>
-      <dl>
+        <dlentry>
+          <dt>Max Running Queries Multiple</dt>
+          <dd>This floating point number is multiplied by the current total
+            number of executors at runtime to give the maximum number of
+            concurrently running queries allowed in the pool. The effect of this
+            setting scales with the number of executors in the resource
+              pool.<p>This calculation is rounded up to the nearest integer, so
+              the result will always be at least one. </p><p>If set to zero or a
+              negative number, the setting is ignored.</p></dd>
+        </dlentry>
         <dlentry>
           <dt> Max Queued Queries </dt>
           <dd> Maximum number of queries that can be queued in this pool. The
             default value is 200 for Impala 2.1 or higher and 50 for previous
-            versions of Impala. (optional)</dd>
+            versions of Impala. (optional)<p>If <uicontrol>Max Queued Queries
+                Multiple</uicontrol> is set, the <uicontrol>Max Queued
+                Queries</uicontrol> setting is ignored.</p></dd>
         </dlentry>
-      </dl>
-      <dl>
+        <dlentry>
+          <dt>Max Queued Queries Multiple</dt>
+          <dd>This floating point number is multiplied by the current total
+            number of executors at runtime to give the maximum number of queries
+            that can be queued in the pool. The effect of this setting scales
+            with the number of executors in the resource pool.<p>This
+              calculation is rounded up to the nearest integer, so the result
+              will always be at least one. </p><p>If set to zero or a negative
+              number, the setting is ignored.</p></dd>
+        </dlentry>
         <dlentry>
           <dt> Queue Timeout </dt>
           <dd> The amount of time, in milliseconds, that a query waits in the
@@ -216,7 +236,17 @@ under the License.
                   query.</li>
               </ul>
             </p>
+            <p>If <uicontrol>Max Memory Multiple</uicontrol> is set, the
+                <uicontrol>Max Memory</uicontrol> setting is ignored.</p>
           </dd>
+        </dlentry>
+        <dlentry>
+          <dt>Max Memory Multiple</dt>
+          <dd> This number of bytes is multiplied by the current total number of
+            executors at runtime to give the maximum memory available across the
+            cluster for the pool. The effect of this setting scales with the
+            number of executors in the resource pool.<p>If set to zero or a
+              negative number, the setting is ignored.</p></dd>
         </dlentry>
         <dlentry>
           <dt>Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
