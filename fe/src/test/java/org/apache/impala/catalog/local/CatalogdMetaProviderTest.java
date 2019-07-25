@@ -39,6 +39,7 @@ import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -47,6 +48,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
+import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -251,11 +253,21 @@ public class CatalogdMetaProviderTest {
 
   @Test
   public void testPiggybackSuccess() throws Exception {
+    // TODO: investigate the cause of flakiness (IMPALA-8794)
+    Assume.assumeTrue(
+        "Skipping this test because it is flaky with Hive3",
+        TestUtils.getHiveMajorVersion() == 2);
+
     doTestPiggyback(/*success=*/true);
   }
 
   @Test
   public void testPiggybackFailure() throws Exception {
+    // TODO: investigate the cause of flakiness (IMPALA-8794)
+    Assume.assumeTrue(
+        "Skipping this test because it is flaky with Hive3",
+        TestUtils.getHiveMajorVersion() == 2);
+
     doTestPiggyback(/*success=*/false);
   }
 
