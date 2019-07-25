@@ -17,7 +17,8 @@
 
 # Functional tests for ACID integration with Hive.
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2)
+from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
+                               SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
@@ -36,10 +37,20 @@ class TestAcid(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['text'])
 
   @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid(self, vector, unique_database):
     self.run_test_case('QueryTest/acid', vector, use_db=unique_database)
 
   @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid_compaction(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-compaction', vector, use_db=unique_database)
 
@@ -48,6 +59,11 @@ class TestAcid(ImpalaTestSuite):
     self.run_test_case('QueryTest/acid-negative', vector, use_db=unique_database)
 
   @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid_partitioned(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-partitioned', vector, use_db=unique_database)
 
@@ -57,6 +73,11 @@ class TestAcid(ImpalaTestSuite):
   # it can not be shown in the query profile.  Skip CatalogV2 to avoid flaky tests.
   @SkipIfHive2.acid
   @SkipIfCatalogV2.hms_event_polling_enabled()
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid_profile(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-profile', vector, use_db=unique_database)
 # TODO(todd): further tests to write:
