@@ -76,7 +76,8 @@ under the License.
       <title>Impala Startup Options for Client Connections</title>
 
       <p>
-        The following options control client connections to Impala.
+        Use the following flags when starting Impala Daemon coordinator to control client
+        connections to Impala.
       </p>
 
       <dl>
