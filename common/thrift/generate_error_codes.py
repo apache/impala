@@ -430,6 +430,9 @@ error_codes = (
   ("LZ4_DECOMPRESS_SAFE_FAILED", 141, "LZ4: LZ4_decompress_safe failed"),
 
   ("LZ4_COMPRESS_DEFAULT_FAILED", 142, "LZ4: LZ4_compress_default failed"),
+
+  ("MAX_STATEMENT_LENGTH_EXCEEDED", 143, "Statement length of $0 bytes exceeds the "
+   "maximum statement length ($1 bytes)"),
 )
 
 import sys

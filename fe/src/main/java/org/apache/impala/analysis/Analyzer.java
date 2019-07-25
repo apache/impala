@@ -455,6 +455,12 @@ public class Analyzer {
     // Expr rewriter for normalizing and rewriting expressions.
     private final ExprRewriter exprRewriter_;
 
+    // Total number of expressions across the statement (including all subqueries). This
+    // is used to enforce a limit on the total number of expressions. Incremented by
+    // incrementNumStmtExprs(). Note that this does not include expressions that do not
+    // require analysis (e.g. some literal expressions).
+    private int numStmtExprs_ = 0;
+
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory) {
       this.stmtTableCache = stmtTableCache;
@@ -2846,6 +2852,17 @@ public class Analyzer {
   public int incrementCallDepth() { return ++callDepth_; }
   public int decrementCallDepth() { return --callDepth_; }
   public int getCallDepth() { return callDepth_; }
+
+  public int incrementNumStmtExprs() { return globalState_.numStmtExprs_++; }
+  public int getNumStmtExprs() { return globalState_.numStmtExprs_; }
+  public void checkStmtExprLimit() throws AnalysisException {
+    int statementExpressionLimit = getQueryOptions().getStatement_expression_limit();
+    if (getNumStmtExprs() > statementExpressionLimit) {
+      String errorStr = String.format("Exceeded the statement expression limit (%d)\n" +
+          "Statement has %d expressions.", statementExpressionLimit, getNumStmtExprs());
+      throw new AnalysisException(errorStr);
+    }
+  }
 
   public boolean hasMutualValueTransfer(SlotId a, SlotId b) {
     return hasValueTransfer(a, b) && hasValueTransfer(b, a);

@@ -367,6 +367,18 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   87: optional TTransactionalType default_transactional_type = TTransactionalType.NONE;
+
+  // See comment in ImpalaService.thrift.
+  // The default of 250,000 is set to a high value to avoid impacting existing users, but
+  // testing indicates a statement with this number of expressions can run.
+  88: optional i32 statement_expression_limit = 250000
+
+  // See comment in ImpalaService.thrift
+  // The default is set to 16MB. It is likely that a statement of this size would exceed
+  // the statement expression limit. Setting a limit on the total statement size avoids
+  // the cost of parsing and analyzing the statement, which is required to enforce the
+  // statement expression limit.
+  89: optional i32 max_statement_length_bytes = 16777216
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

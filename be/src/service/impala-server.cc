@@ -1106,6 +1106,14 @@ Status ImpalaServer::ExecuteInternal(
     }
 #endif
 
+    size_t statement_length = query_ctx.client_request.stmt.length();
+    int32_t max_statement_length =
+        query_ctx.client_request.query_options.max_statement_length_bytes;
+    if (max_statement_length > 0 && statement_length > max_statement_length) {
+      return Status(ErrorMsg(TErrorCode::MAX_STATEMENT_LENGTH_EXCEEDED,
+          statement_length, max_statement_length));
+    }
+
     RETURN_IF_ERROR((*request_state)->UpdateQueryStatus(
         exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
 

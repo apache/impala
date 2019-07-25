@@ -815,6 +815,32 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_default_transactional_type(enum_type);
         break;
       }
+      case TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT: {
+        StringParser::ParseResult result;
+        const int32_t statement_expression_limit =
+          StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS ||
+            statement_expression_limit < MIN_STATEMENT_EXPRESSION_LIMIT) {
+          return Status(Substitute("Invalid statement expression limit: $0 "
+              "Valid values are in [$1, $2]", value, MIN_STATEMENT_EXPRESSION_LIMIT,
+              std::numeric_limits<int32_t>::max()));
+        }
+        query_options->__set_statement_expression_limit(statement_expression_limit);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES: {
+        int64_t max_statement_length_bytes;
+        RETURN_IF_ERROR(ParseMemValue(value, "max statement length bytes",
+            &max_statement_length_bytes));
+        if (max_statement_length_bytes < MIN_MAX_STATEMENT_LENGTH_BYTES ||
+            max_statement_length_bytes > std::numeric_limits<int32_t>::max()) {
+          return Status(Substitute("Invalid maximum statement length: $0 "
+              "Valid values are in [$1, $2]", max_statement_length_bytes,
+              MIN_MAX_STATEMENT_LENGTH_BYTES, std::numeric_limits<int32_t>::max()));
+        }
+        query_options->__set_max_statement_length_bytes(max_statement_length_bytes);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

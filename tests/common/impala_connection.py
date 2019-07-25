@@ -41,6 +41,26 @@ LOG.propagate = False
 PROGRESS_LOG_RE = re.compile(
     r'^Query [a-z0-9:]+ [0-9]+% Complete \([0-9]+ out of [0-9]+\)$')
 
+MAX_SQL_LOGGING_LENGTH = 128 * 1024
+
+
+# test_exprs.py's TestExprLimits executes extremely large SQLs (multiple MBs). It is the
+# only test that runs SQL larger than 128KB. Logging these SQLs in execute() increases
+# the size of the JUnitXML files, causing problems for users of JUnitXML like Jenkins.
+# This function limits the size of the SQL logged if it is larger than 128KB.
+def log_sql_stmt(sql_stmt):
+  """If the 'sql_stmt' is shorter than MAX_SQL_LOGGING_LENGTH, log it unchanged. If
+     it is larger than MAX_SQL_LOGGING_LENGTH, truncate it and comment it out."""
+  if (len(sql_stmt) <= MAX_SQL_LOGGING_LENGTH):
+    LOG.info("{0};\n".format(sql_stmt))
+  else:
+    # The logging output should be valid SQL, so the truncated SQL is commented out.
+    LOG.info("-- Skip logging full SQL statement of length {0}".format(len(sql_stmt)))
+    LOG.info("-- Logging a truncated version, commented out:")
+    for line in sql_stmt[0:MAX_SQL_LOGGING_LENGTH].split("\n"):
+      LOG.info("-- {0}".format(line))
+    LOG.info("-- [...]")
+
 # Common wrapper around the internal types of HS2/Beeswax operation/query handles.
 class OperationHandle(object):
   def __init__(self, handle, sql_stmt):
@@ -180,11 +200,13 @@ class BeeswaxConnection(ImpalaConnection):
     self.__beeswax_client.close_dml(operation_handle.get_handle())
 
   def execute(self, sql_stmt, user=None):
-    LOG.info("-- executing against %s\n%s;\n" % (self.__host_port, sql_stmt))
+    LOG.info("-- executing against %s\n" % (self.__host_port))
+    log_sql_stmt(sql_stmt)
     return self.__beeswax_client.execute(sql_stmt, user=user)
 
   def execute_async(self, sql_stmt, user=None):
-    LOG.info("-- executing async: %s\n%s;\n" % (self.__host_port, sql_stmt))
+    LOG.info("-- executing async: %s\n" % (self.__host_port))
+    log_sql_stmt(sql_stmt)
     beeswax_handle = self.__beeswax_client.execute_query_async(sql_stmt, user=user)
     return OperationHandle(beeswax_handle, sql_stmt)
 
@@ -312,8 +334,9 @@ class ImpylaHS2Connection(ImpalaConnection):
         return r
 
   def execute_async(self, sql_stmt, user=None):
-    LOG.info("-- executing against {0} at {1}\n{2};\n".format(
-        self._is_hive and 'Hive' or 'Impala', self.__host_port, sql_stmt))
+    LOG.info("-- executing against {0} at {1}\n".format(
+        self._is_hive and 'Hive' or 'Impala', self.__host_port))
+    log_sql_stmt(sql_stmt)
     if user is not None:
       raise NotImplementedError("Not yet implemented for HS2 - authentication")
     try:

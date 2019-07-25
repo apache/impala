@@ -347,6 +347,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // analysisDone().
   private boolean isAnalyzed_ = false;
 
+  // True if this has already been counted towards the number of statement expressions
+  private boolean isCountedForNumStmtExprs_ = false;
+
   protected Expr() {
     type_ = Type.INVALID;
     selectivity_ = -1.0;
@@ -369,6 +372,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     numDistinctValues_ = other.numDistinctValues_;
     isConstant_ = other.isConstant_;
     fn_ = other.fn_;
+    isCountedForNumStmtExprs_ = other.isCountedForNumStmtExprs_;
     children_ = Expr.cloneList(other.children_);
   }
 
@@ -420,6 +424,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         throw new AnalysisException(String.format("Exceeded the maximum depth of an " +
             "expression tree (%s).", EXPR_DEPTH_LIMIT));
       }
+      incrementNumStmtExprs(analyzer);
     }
     for (Expr child: children_) {
       child.analyze(analyzer);
@@ -450,6 +455,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     } catch (AnalysisException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  /**
+   * Helper function to properly count the number of statement expressions.
+   * If this expression has not been counted already and this is not a WITH clause,
+   * increment the number of statement expressions. This function guarantees that an
+   * expression will be counted at most once.
+   */
+  private void incrementNumStmtExprs(Analyzer analyzer) {
+    // WITH clauses use a separate Analyzer with its own GlobalState. Skip counting
+    // this expression towards that GlobalState. If the view defined by the WITH
+    // clause is referenced, it will be counted during that analysis.
+    if (analyzer.hasWithClause()) return;
+    // If the expression is already counted, do not count it again. This is important
+    // for expressions that can be cloned (e.g. when doing Expr::trySubstitute()).
+    if (isCountedForNumStmtExprs_) return;
+    analyzer.incrementNumStmtExprs();
+    isCountedForNumStmtExprs_ = true;
   }
 
   /**

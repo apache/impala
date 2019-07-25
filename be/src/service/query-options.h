@@ -47,7 +47,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::DEFAULT_TRANSACTIONAL_TYPE + 1);\
+      TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES + 1);\
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)\
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -174,12 +174,21 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(spool_query_results, SPOOL_QUERY_RESULTS,\
       TQueryOptionLevel::DEVELOPMENT)\
   QUERY_OPT_FN(default_transactional_type, DEFAULT_TRANSACTIONAL_TYPE,\
-      TQueryOptionLevel::ADVANCED)
+      TQueryOptionLevel::ADVANCED)\
+  QUERY_OPT_FN(statement_expression_limit, STATEMENT_EXPRESSION_LIMIT,\
+      TQueryOptionLevel::REGULAR)\
+  QUERY_OPT_FN(max_statement_length_bytes, MAX_STATEMENT_LENGTH_BYTES,\
+      TQueryOptionLevel::REGULAR)
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.
-  static const int64_t SPILLABLE_BUFFER_LIMIT = 1LL << 40; // 1 TB
-  static const int64_t ROW_SIZE_LIMIT = 1LL << 40; // 1 TB
+static const int64_t SPILLABLE_BUFFER_LIMIT = 1LL << 40; // 1 TB
+static const int64_t ROW_SIZE_LIMIT = 1LL << 40; // 1 TB
+
+/// Limits on the query size are intended to be large. Prevent them from being set
+/// to small values (which can prevent clients from executing anything).
+static const int32_t MIN_STATEMENT_EXPRESSION_LIMIT = 1 << 10; // 1024
+static const int32_t MIN_MAX_STATEMENT_LENGTH_BYTES = 1 << 10; // 1 KB
 
 /// Converts a TQueryOptions struct into a map of key, value pairs.  Options that
 /// aren't set and lack defaults in common/thrift/ImpalaInternalService.thrift are

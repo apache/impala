@@ -454,6 +454,14 @@ public class AnalysisContext {
     Preconditions.checkNotNull(analysisResult_.stmt_);
     analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
     analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+    // Enforce the statement expression limit at the end of analysis so that there is an
+    // accurate count of the total number of expressions. The first analyze() call is not
+    // very expensive (~seconds) even for large statements. The limit on the total length
+    // of the SQL statement (max_statement_length_bytes) provides an upper bound.
+    // It is important to enforce this before expression rewrites, because rewrites are
+    // expensive with large expression trees. For example, a SQL that takes a few seconds
+    // to analyze the first time may take 10 minutes for rewrites.
+    analysisResult_.analyzer_.checkStmtExprLimit();
     boolean isExplain = analysisResult_.isExplainStmt();
 
     // Apply expr and subquery rewrites.

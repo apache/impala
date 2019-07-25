@@ -161,7 +161,10 @@ TEST(QueryOptions, SetByteOptions) {
           {8 * 1024, RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}},
       {MAKE_OPTIONDEF(runtime_bloom_filter_size),
           {RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
-              RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}}};
+              RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}},
+      {MAKE_OPTIONDEF(max_statement_length_bytes),
+          {MIN_MAX_STATEMENT_LENGTH_BYTES, I32_MAX}},
+  };
   TestByteCaseSet(options, case_set_i64);
   TestByteCaseSet(options, case_set_i32);
 }
@@ -239,6 +242,8 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(exec_time_limit_s),              {0, I32_MAX}},
       {MAKE_OPTIONDEF(thread_reservation_limit),       {-1, I32_MAX}},
       {MAKE_OPTIONDEF(thread_reservation_aggregate_limit), {-1, I32_MAX}},
+      {MAKE_OPTIONDEF(statement_expression_limit),
+          {MIN_STATEMENT_EXPRESSION_LIMIT, I32_MAX}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

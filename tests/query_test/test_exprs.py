@@ -16,6 +16,8 @@
 # under the License.
 
 import pytest
+import re
+from random import randint
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -131,6 +133,67 @@ class TestExprLimits(ImpalaTestSuite):
     cast_query = "select " + self.__gen_deep_func_expr("cast(", "1", " as int)")
     self.__exec_query(cast_query)
 
+  def test_under_statement_expression_limit(self):
+    """Generate a huge case statement that barely fits within the statement expression
+       limit and verify that it runs."""
+    # This takes 20+ minutes, so only run it on exhaustive.
+    # TODO: Determine whether this needs to run serially. It use >5 GB of memory.
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("Only test limit of codegen on exhaustive")
+    case = self.__gen_huge_case("int_col", 32, 2, "  ")
+    query = "select {0} as huge_case from functional_parquet.alltypes".format(case)
+    self.__exec_query(query)
+
+  def test_max_statement_size(self):
+    """Generate a huge case statement that exceeds the default 16MB limit and verify
+       that it gets rejected."""
+
+    expected_err_tmpl = ("Statement length of {0} bytes exceeds the maximum "
+        "statement length \({1} bytes\)")
+    size_16mb = 16 * 1024 * 1024
+
+    # Case 1: a valid SQL that would parse correctly
+    case = self.__gen_huge_case("int_col", 75, 2, "  ")
+    query = "select {0} as huge_case from functional.alltypes".format(case)
+    err = self.execute_query_expect_failure(self.client, query)
+    assert re.search(expected_err_tmpl.format(len(query), size_16mb), str(err))
+
+    # Case 2: a string of 'a' characters that does not parse. This will still fail
+    # with the same message, because the check is before parsing.
+    invalid_sql = 'a' * (size_16mb + 1)
+    err = self.execute_query_expect_failure(self.client, invalid_sql)
+    assert re.search(expected_err_tmpl.format(len(invalid_sql), size_16mb), str(err))
+
+  def test_statement_expression_limit(self):
+    """Generate a huge case statement that barely fits within the 16MB limit but exceeds
+       the statement expression limit. Verify that it fails."""
+    case = self.__gen_huge_case("int_col", 66, 2, "  ")
+    query = "select {0} as huge_case from functional.alltypes".format(case)
+    assert len(query) < 16 * 1024 * 1024
+    expected_err_re = ("Exceeded the statement expression limit \({0}\)\n"
+        "Statement has .* expressions.").format(250000)
+    err = self.execute_query_expect_failure(self.client, query)
+    assert re.search(expected_err_re, str(err))
+
+  def __gen_huge_case(self, col_name, fanout, depth, indent):
+    toks = ["case\n"]
+    for i in xrange(fanout):
+      add = randint(1, 1000000)
+      divisor = randint(1, 10000000)
+      mod = randint(0, divisor)
+      # Generate a mathematical expr that can't be easily optimised out.
+      when_expr = "{0} + {1} % {2} = {3}".format(col_name, add, divisor, mod)
+      if depth == 0:
+        then_expr = "{0}".format(i)
+      else:
+        then_expr = "({0})".format(
+            self.__gen_huge_case(col_name, fanout, depth - 1, indent + "  "))
+      toks.append(indent)
+      toks.append("when {0} then {1}\n".format(when_expr, then_expr))
+    toks.append(indent)
+    toks.append("end")
+    return ''.join(toks)
+
   def __gen_deep_infix_expr(self, prefix, repeat_suffix):
     expr = prefix
     for i in xrange(self.EXPR_DEPTH_LIMIT - 1):
@@ -150,8 +213,8 @@ class TestExprLimits(ImpalaTestSuite):
     try:
       impala_ret = self.execute_query(sql_str)
       assert impala_ret.success, "Failed to execute query %s" % (sql_str)
-    except: # consider any exception a failure
-      assert False, "Failed to execute query %s" % (sql_str)
+    except Exception as e:  # consider any exception a failure
+      assert False, "Failed to execute query %s: %s" % (sql_str, e)
 
 class TestUtcTimestampFunctions(ImpalaTestSuite):
   """Tests for UTC timestamp functions, i.e. functions that do not depend on the behavior

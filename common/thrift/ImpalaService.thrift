@@ -415,6 +415,20 @@ enum TImpalaQueryOptions {
   // Speficies the default transactional type for new HDFS tables.
   // Valid values: none, insert_only
   DEFAULT_TRANSACTIONAL_TYPE = 86
+
+  // Limit on the total number of expressions in the statement. Statements that exceed
+  // the limit will get an error during analysis. This is intended to set an upper
+  // bound on the complexity of statements to avoid resource impacts such as excessive
+  // time in analysis or codegen. This is enforced only for the first pass of analysis
+  // before any rewrites are applied.
+  STATEMENT_EXPRESSION_LIMIT = 87
+
+  // Limit on the total length of a SQL statement. Statements that exceed the maximum
+  // length will get an error before parsing/analysis. This is complementary to the
+  // statement expression limit, because statements of a certain size are highly
+  // likely to violate the statement expression limit. Rejecting them early avoids
+  // the cost of parsing/analysis.
+  MAX_STATEMENT_LENGTH_BYTES = 88
 }
 
 // The summary of a DML statement.

@@ -2399,6 +2399,165 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("cast(", "1", " as int)");
   }
 
+  /** Generates a specific number of expressions by repeating a column reference.
+   * It generates a string containing 'num_copies' expressions. If 'use_alias' is true,
+   * each column reference has a distinct alias. This allows the repeated columns to be
+   * used in places that require distinct names (e.g. the definition of a view).
+   */
+  String getRepeatedColumnReference(String col_name, int num_copies, boolean use_alias) {
+    StringBuilder repColRef = new StringBuilder();
+
+    for (int i = 0; i < num_copies; ++i) {
+      if (i != 0) repColRef.append(", ");
+      repColRef.append(col_name);
+      if (use_alias) repColRef.append(String.format(" alias%d", i));
+    }
+    return repColRef.toString();
+  }
+
+  /** Get the error message for a statement with 'actual_num_expressions' that exceeds
+   * the statment_expression_limit 'limit'.
+   */
+  String getExpressionLimitErrorStr(int actual_num_expressions, int limit) {
+    return String.format("Exceeded the statement expression limit (%d)\n" +
+        "Statement has %d expressions", limit, actual_num_expressions);
+  }
+
+  @Test
+  public void TestStatementExprLimit() {
+    // To keep it simple and fast, we use a low value for statement_expression_limit.
+    // Since the statement_expression_limit is evaluated before rewrites, turn off
+    // expression rewrites.
+    TQueryOptions queryOpts = new TQueryOptions();
+    queryOpts.setStatement_expression_limit(20);
+    queryOpts.setEnable_expr_rewrites(false);
+    AnalysisContext ctx = createAnalysisCtx(queryOpts);
+
+    // Known SQL patterns (repeated reference to column) that generate 20 and 21
+    // expressions, respectively.
+    String repCols20 = getRepeatedColumnReference("int_col", 20, true);
+    String repCols21 = getRepeatedColumnReference("int_col", 21, true);
+
+    // Select from table
+    AnalyzesOk(String.format("select %s from functional.alltypes", repCols20), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    AnalysisError(String.format("select %s from functional.alltypes", repCols21),
+        ctx, getExpressionLimitErrorStr(21, 20));
+
+    // WHERE clause
+    // This statement has 20 expressions without the WHERE clause, as tested above.
+    // So, this will only be an error if the bool_col in the WHERE clause counts.
+    AnalysisError(String.format("select %s from functional.alltypes where bool_col",
+        repCols20), ctx, getExpressionLimitErrorStr(21, 20));
+
+    // Create table as select
+    AnalyzesOk(String.format("create table exprlimit1 as " +
+        "select %s from functional.alltypes", repCols20), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    AnalysisError(String.format("create table exprlimit1 as " +
+        "select %s from functional.alltypes", repCols21), ctx,
+        getExpressionLimitErrorStr(21, 20));
+
+    // Create view
+    AnalyzesOk(String.format("create view exprlimit1 as " +
+        "select %s from functional.alltypes", repCols20), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    AnalysisError(String.format("create view exprlimit1 as " +
+        "select %s from functional.alltypes", repCols21), ctx,
+        getExpressionLimitErrorStr(21, 20));
+
+    // Subquery
+    AnalyzesOk(String.format("select * from (select %s from functional.alltypes) x",
+        repCols20), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    AnalysisError(String.format("select * from (select %s from functional.alltypes) x",
+        repCols21), ctx, getExpressionLimitErrorStr(21, 20));
+
+    // WITH clause
+    AnalyzesOk(String.format("with v as (select %s from functional.alltypes) " +
+        "select * from v", repCols20), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    AnalysisError(String.format("with v as (select %s from functional.alltypes) " +
+        "select * from v", repCols21), ctx, getExpressionLimitErrorStr(21, 20));
+
+    // View is counted (functional.alltypes_parens has a few expressions)
+    AnalysisError(String.format("select %s from functional.alltypes_parens", repCols20),
+        ctx, getExpressionLimitErrorStr(32, 20));
+
+    // If a view is referenced multiple times, it counts multiple times.
+    AnalysisError(String.format("with v as (select %s from functional.alltypes) " +
+        "select * from v v1,v v2", repCols20), ctx, getExpressionLimitErrorStr(40, 20));
+
+    // If a view is not referenced, it doesn't count.
+    AnalyzesOk(String.format("with v as (select %s from functional.alltypes) select 1",
+        repCols21), ctx);
+    // This is zero because literals do not count.
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 0);
+
+    // EXPLAIN is not exempted from the limit
+    AnalysisError(String.format("explain select %s from functional.alltypes", repCols21),
+        ctx, getExpressionLimitErrorStr(21, 20));
+
+    // Wide table doesn't impact *
+    AnalyzesOk("select * from functional.widetable_1000_cols", ctx);
+
+    // Literal expressions don't count towards the limit, so build a list of literals
+    // to use to test various cases.
+    StringBuilder literalList = new StringBuilder();
+    for (int i = 0; i < 200; ++i) {
+      if (i != 0) literalList.append(", ");
+      literalList.append(i);
+    }
+
+    // Literals in the select list do not count
+    AnalyzesOk(String.format("select %s", literalList.toString()), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 0);
+
+    // Literals in an IN list do not count
+    AnalyzesOk(String.format("select int_col IN (%s) from functional.alltypes",
+        literalList.toString()), ctx);
+
+    // Literals in a VALUES clause do not count
+    StringBuilder valuesList = new StringBuilder();
+    for (int i = 0; i < 200; ++i) {
+      if (i != 0) valuesList.append(", ");
+      valuesList.append("(" + i + ")");
+    }
+    AnalyzesOk("insert into functional.insert_overwrite_nopart (col1) VALUES " +
+        valuesList.toString(), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 0);
+
+    // Expressions that are operators applied to constants still count
+    StringBuilder constantExpr = new StringBuilder();
+    for (int i = 0; i < 21; ++i) {
+      if (i != 0) constantExpr.append(" * ");
+      constantExpr.append(i);
+    }
+    // 21 literals with 20 multiplications requires 20 ArithmeticExprs
+    AnalyzesOk(String.format("select %s", constantExpr.toString()), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    constantExpr.append(" * 100");
+    // 22 literals with 21 multiplications requires 21 ArithmeticExprs
+    AnalysisError(String.format("select %s", constantExpr.toString()),
+        ctx, getExpressionLimitErrorStr(21, 20));
+
+    // Put a non-literal in an IN list to verify it still counts appropriately.
+    StringBuilder inListExpr = new StringBuilder();
+    for (int i = 0; i < 19; i++) {
+      if (i != 0) inListExpr.append(" * ");
+      inListExpr.append(i);
+    }
+    // 19 literals with 18 multiplications = 18 expressions. int_col and IN are another
+    // two expressions. This has 20 expressions total.
+    AnalyzesOk(String.format("select int_col IN (%s) from functional.alltypes",
+        inListExpr.toString()), ctx);
+    assertEquals(ctx.getAnalyzer().getNumStmtExprs(), 20);
+    // Adding one more expression pushes us over the limit.
+    inListExpr.append(" * 100");
+    AnalysisError(String.format("select int_col IN (%s) from functional.alltypes",
+        inListExpr.toString()), ctx, getExpressionLimitErrorStr(21, 20));
+  }
+
   // Verifies the resulting expr decimal type is expectedType under decimal v1 or
   // decimal v2.
   private void testDecimalExpr(String expr, Type decimalExpectedType, boolean isV2) {
