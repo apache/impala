@@ -106,9 +106,7 @@ under the License.
             <entry>
               Structured
             </entry>
-            <entry>
-              Snappy, gzip; currently Snappy by default
-            </entry>
+            <entry> Snappy, gzip, zstd; currently Snappy by default </entry>
             <entry>
               Yes.
             </entry>
@@ -314,6 +312,10 @@ under the License.
           </p>
         </dd>
 
+      </dlentry>
+      <dlentry>
+        <dt>Zstd</dt>
+        <dd>For Parquet files only.</dd>
       </dlentry>
     </dl>
 

@@ -432,7 +432,7 @@ under the License.
 
   <concept id="parquet_compression">
 
-    <title>Snappy and GZip Compression for Parquet Data Files</title>
+    <title>Compressions for Parquet Data Files</title>
 
     <prolog>
       <metadata>
