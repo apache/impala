@@ -333,8 +333,7 @@ class ImpalaTestClusterProperties(object):
     return self._runtime_flags
 
   def is_catalog_v2_cluster(self):
-    """Whether we use CATALOG_V2 options, including local catalog and HMS notifications.
-    For now, assume that --use_local_catalog=true implies that the others are enabled."""
+    """Checks whether we use local catalog."""
     try:
       key = "use_local_catalog"
       # --use_local_catalog is hidden so does not appear in JSON if disabled.
@@ -346,6 +345,18 @@ class ImpalaTestClusterProperties(object):
         return False
       raise
 
+  def is_event_polling_enabled(self):
+    """Whether we use HMS notifications to automatically refresh catalog service.
+    Checks if --hms_event_polling_interval_s is set to non-zero value"""
+    try:
+      key = "hms_event_polling_interval_s"
+      # --use_local_catalog is hidden so does not appear in JSON if disabled.
+      return key in self.runtime_flags and int(self.runtime_flags[key]["current"]) > 0
+    except Exception:
+      if self.is_remote_cluster():
+        # IMPALA-8553: be more tolerant of failures on remote cluster builds.
+        LOG.exception("Failed to get flags from web UI, assuming catalog V1")
+        return False
 
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,
         asan_build_timeout=None, code_coverage_build_timeout=None):

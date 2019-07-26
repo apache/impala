@@ -32,7 +32,7 @@ from subprocess import call
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfHive2,
-    SkipIfIsilon, SkipIfLocal)
+    SkipIfIsilon, SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -57,7 +57,10 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
+  # Skip this test if catalogv2 is enabled since global invalidate is not
+  # supported. #TODO This can be re-enabled when event polling is turned on
   @pytest.mark.execute_serially
+  @SkipIfCatalogV2.impala_7506()
   def test_sanity(self, vector, cluster_properties):
     """Verifies that creating a catalog entity (database, table) in Impala using
     'IF NOT EXISTS' while the entity exists in HMS, does not throw an error."""

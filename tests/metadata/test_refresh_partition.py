@@ -134,7 +134,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     # Make sure its still shows the same result before refreshing
     result = self.client.execute("select count(*) from %s" % table_name)
     valid_counts = [0]
-    if cluster_properties.is_catalog_v2_cluster():
+    if cluster_properties.is_event_polling_enabled():
       # HMS notifications may pick up added partition racily.
       valid_counts.append(1)
     assert int(result.data[0]) in valid_counts

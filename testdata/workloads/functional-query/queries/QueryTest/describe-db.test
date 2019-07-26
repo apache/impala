@@ -8,27 +8,6 @@ describe database default
 string, string, string
 ====
 ---- QUERY
-# Test printing of hive_test_desc_db database.
-describe database hive_test_desc_db
----- RESULTS
-'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
----- TYPES
-string, string, string
-====
----- QUERY
-# Test printing of hive_test_desc_db database with extended information.
-describe database extended hive_test_desc_db
----- RESULTS
-'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
-'Parameter: ','',''
-'','$USER','USER'
-'Owner: ','',''
-'','e','2.82'
-'','pi','3.14'
----- TYPES
-string, string, string
-====
----- QUERY
 describe database extended impala_test_desc_db1
 ---- RESULTS
 '','$USER','USER'

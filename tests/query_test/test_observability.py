@@ -293,19 +293,51 @@ class TestObservability(ImpalaTestSuite):
     runtime_profile = self.execute_query(query).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
 
-  def test_query_profile_contains_query_compilation_metadata_load_events(self):
+  def test_query_profile_contains_query_compilation_metadata_load_events(self,
+        cluster_properties):
     """Test that the Metadata load started and finished events appear in the query
     profile when Catalog cache is evicted."""
     invalidate_query = "invalidate metadata functional.alltypes"
     select_query = "select * from functional.alltypes"
     self.execute_query(invalidate_query).runtime_profile
     runtime_profile = self.execute_query(select_query).runtime_profile
-    event_regexes = [r'Query Compilation:',
-        r'Metadata load started:',
-        r'Metadata load finished. loaded-tables=.*/.* load-requests=.* '
+    # Depending on whether this is a catalog-v2 cluster or not some of the metadata
+    # loading events are different
+    if not cluster_properties.is_catalog_v2_cluster():
+      load_event_regexes = [r'Query Compilation:', r'Metadata load started:',
+          r'Metadata load finished. loaded-tables=.*/.* load-requests=.* '
             r'catalog-updates=.*:',
-        r'Analysis finished:']
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+          r'Analysis finished:']
+    else:
+      load_event_regexes = [
+        r'Frontend:',
+        r'CatalogFetch.ColumnStats.Misses',
+        r'CatalogFetch.ColumnStats.Requests',
+        r'CatalogFetch.ColumnStats.Time',
+        # The value of this counter may or not be present if it has a value of zero
+        r'CatalogFetch.Config.Misses|CatalogFetch.Config.Hits',
+        r'CatalogFetch.Config.Requests',
+        r'CatalogFetch.Config.Time',
+        r'CatalogFetch.DatabaseList.Hits',
+        r'CatalogFetch.DatabaseList.Requests',
+        r'CatalogFetch.DatabaseList.Time',
+        r'CatalogFetch.PartitionLists.Misses',
+        r'CatalogFetch.PartitionLists.Requests',
+        r'CatalogFetch.PartitionLists.Time',
+        r'CatalogFetch.Partitions.Hits',
+        r'CatalogFetch.Partitions.Misses',
+        r'CatalogFetch.Partitions.Requests',
+        r'CatalogFetch.Partitions.Time',
+        r'CatalogFetch.RPCs.Bytes',
+        r'CatalogFetch.RPCs.Requests',
+        r'CatalogFetch.RPCs.Time',
+        r'CatalogFetch.TableNames.Hits',
+        r'CatalogFetch.TableNames.Requests',
+        r'CatalogFetch.TableNames.Time',
+        r'CatalogFetch.Tables.Misses',
+        r'CatalogFetch.Tables.Requests',
+        r'CatalogFetch.Tables.Time']
+    self.__verify_profile_event_sequence(load_event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_compilation_metadata_cached_event(self):
     """Test that the Metadata cache available event appears in the query profile when

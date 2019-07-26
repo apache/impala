@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.testutil.ImpalaJdbcClient;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.util.Metrics;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -414,7 +415,11 @@ public class JdbcTest extends JdbcTestBase {
     assertTrue(rs.next());
     assertEquals("Incorrect table name", "jdbc_column_comments_test",
         rs.getString("TABLE_NAME"));
-    assertEquals("Incorrect table comment", "table comment", rs.getString("REMARKS"));
+    // if this is a catalog-v2 cluster the getTables call does not load the localTable
+    // since it does not request columns. See IMPALA-8606 for more details
+    if (!TestUtils.isCatalogV2Enabled("localhost", 25020)) {
+      assertEquals("Incorrect table comment", "table comment", rs.getString("REMARKS"));
+    }
   }
 
   @Test

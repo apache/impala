@@ -115,7 +115,10 @@ class LocalDb implements FeDb {
   }
 
   @Override
-  public FeTable getTable(String tblName) {
+  public FeTable getTable(String tableName) {
+    // the underlying layers of the cache expect all the table name to be in lowercase
+    String tblName = Preconditions.checkNotNull(tableName,
+        "Received a null table name").toLowerCase();
     FeTable tbl = getTableIfCached(tblName);
     if (tbl instanceof LocalIncompleteTable) {
       // The table exists but hasn't been loaded yet.

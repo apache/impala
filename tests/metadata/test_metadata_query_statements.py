@@ -169,13 +169,20 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                           "location \"" + get_fs_path("/test2.db") + "\"")
       self.run_stmt_in_hive("create database hive_test_desc_db comment 'test comment' "
                            "with dbproperties('pi' = '3.14', 'e' = '2.82')")
-      if cluster_properties.is_catalog_v2_cluster():
-        # Using local catalog + HMS event processor - wait until the database shows up.
+      if cluster_properties.is_event_polling_enabled():
+        # Using HMS event processor - wait until the database shows up.
         self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
-      else:
+      elif not cluster_properties.is_catalog_v2_cluster():
+        # Hive created database is visible
         # Using traditional catalog - need to invalidate to pick up hive-created db.
         self.client.execute("invalidate metadata")
+      else:
+        # In local catalog mode global invalidate metadata is not supported.
+        # TODO Once IMPALA-7506 is fixed, re-enable global invalidate for catalog-v2
+        pass
       self.run_test_case('QueryTest/describe-db', vector)
+      if not cluster_properties.is_catalog_v2_cluster():
+        self.run_test_case('QueryTest/describe-hive-db', vector)
     finally:
       self.__test_describe_db_cleanup()
 

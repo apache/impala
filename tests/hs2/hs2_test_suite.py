@@ -26,7 +26,52 @@ from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from time import sleep, time
 
+
+def add_session_helper(self, protocol_version, conf_overlay, close_session, fn):
+  """Helper function used in the various needs_session decorators before to set up
+  a session, call fn(), then optionally tear down the session."""
+  open_session_req = TCLIService.TOpenSessionReq()
+  open_session_req.username = getuser()
+  open_session_req.configuration = dict()
+  if conf_overlay is not None:
+    open_session_req.configuration = conf_overlay
+  open_session_req.client_protocol = protocol_version
+  resp = self.hs2_client.OpenSession(open_session_req)
+  HS2TestSuite.check_response(resp)
+  self.session_handle = resp.sessionHandle
+  assert protocol_version <= resp.serverProtocolVersion
+  try:
+    fn()
+  finally:
+    if close_session:
+      close_session_req = TCLIService.TCloseSessionReq()
+      close_session_req.sessionHandle = resp.sessionHandle
+      HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
+    self.session_handle = None
+
 def needs_session(protocol_version=
+                  TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
+                  conf_overlay=None,
+                  close_session=True,
+                  cluster_properties=None):
+  def session_decorator(fn):
+    """Decorator that establishes a session and sets self.session_handle. When the test is
+    finished, the session is closed.
+    """
+    def add_session(self):
+      add_session_helper(self, protocol_version, conf_overlay, close_session,
+          lambda: fn(self))
+    return add_session
+
+  return session_decorator
+
+
+# same as needs_session but takes in a cluster_properties as a argument
+# cluster_properties is defined as a fixture in conftest.py which allows us
+# to pass it as an argument to a test. However, it does not work well with
+# decorators without installing new modules.
+# Ref: https://stackoverflow.com/questions/19614658
+def needs_session_cluster_properties(protocol_version=
                   TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
                   conf_overlay=None,
                   close_session=True):
@@ -34,25 +79,9 @@ def needs_session(protocol_version=
     """Decorator that establishes a session and sets self.session_handle. When the test is
     finished, the session is closed.
     """
-    def add_session(self):
-      open_session_req = TCLIService.TOpenSessionReq()
-      open_session_req.username = getuser()
-      open_session_req.configuration = dict()
-      if conf_overlay is not None:
-        open_session_req.configuration = conf_overlay
-      open_session_req.client_protocol = protocol_version
-      resp = self.hs2_client.OpenSession(open_session_req)
-      HS2TestSuite.check_response(resp)
-      self.session_handle = resp.sessionHandle
-      assert protocol_version <= resp.serverProtocolVersion
-      try:
-        fn(self)
-      finally:
-        if close_session:
-          close_session_req = TCLIService.TCloseSessionReq()
-          close_session_req.sessionHandle = resp.sessionHandle
-          HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
-        self.session_handle = None
+    def add_session(self, cluster_properties, unique_database):
+      add_session_helper(self, protocol_version, conf_overlay, close_session,
+          lambda: fn(self, cluster_properties, unique_database))
     return add_session
 
   return session_decorator

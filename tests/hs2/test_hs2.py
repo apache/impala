@@ -30,7 +30,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
     operation_id_to_query_id, create_session_handle_without_secret,
-    create_op_handle_without_secret)
+    create_op_handle_without_secret, needs_session_cluster_properties)
 from TCLIService import TCLIService
 
 LOG = logging.getLogger('test_hs2')
@@ -436,15 +436,13 @@ class TestHS2(HS2TestSuite):
         self.session_handle)
     TestHS2.check_invalid_session(self.hs2_client.GetSchemas(get_schemas_req))
 
-  @pytest.mark.execute_serially
-  @needs_session()
-  def test_get_tables(self):
+  @needs_session_cluster_properties()
+  def test_get_tables(self, cluster_properties, unique_database):
     """Basic test for the GetTables() HS2 method. Needs to execute serially because
     the test depends on controlling whether a table is loaded or not and other
     concurrent tests loading or invalidating tables could interfere with it."""
-    # TODO: unique_database would be better, but it doesn't work with @needs_session
-    # at the moment.
     table = "__hs2_column_comments_test"
+    self.execute_query("use {0}".format(unique_database))
     self.execute_query("drop table if exists {0}".format(table))
     self.execute_query("""
         create table {0} (a int comment 'column comment')
@@ -452,7 +450,7 @@ class TestHS2(HS2TestSuite):
     try:
       req = TCLIService.TGetTablesReq()
       req.sessionHandle = self.session_handle
-      req.schemaName = "default"
+      req.schemaName = unique_database
       req.tableName = table
 
       # Execute the request twice, the first time with the table unloaded and the second
@@ -470,13 +468,14 @@ class TestHS2(HS2TestSuite):
         table_type = results.columns[3].stringVal.values[0]
         table_remarks = results.columns[4].stringVal.values[0]
         assert table_cat == ''
-        assert table_schema == "default"
+        assert table_schema == unique_database
         assert table_name == table
         assert table_type == "TABLE"
         if i == 0:
           assert table_remarks == ""
         else:
-          assert table_remarks == "table comment"
+          if not cluster_properties.is_catalog_v2_cluster():
+            assert table_remarks == "table comment"
         # Ensure the table is loaded for the second iteration.
         self.execute_query("describe {0}".format(table))
 
@@ -484,7 +483,7 @@ class TestHS2(HS2TestSuite):
       invalid_req = TCLIService.TGetTablesReq()
       invalid_req.sessionHandle = create_session_handle_without_secret(
           self.session_handle)
-      invalid_req.schemaName = "default"
+      invalid_req.schemaName = unique_database
       invalid_req.tableName = table
       TestHS2.check_invalid_session(self.hs2_client.GetTables(invalid_req))
     finally:

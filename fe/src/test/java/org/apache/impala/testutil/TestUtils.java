@@ -17,15 +17,19 @@
 
 package org.apache.impala.testutil;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -392,5 +396,37 @@ public class TestUtils {
     String hiveMajorVersion = Preconditions.checkNotNull(System.getenv(
         "IMPALA_HIVE_MAJOR_VERSION"));
     return Integer.parseInt(hiveMajorVersion);
+  }
+
+  /**
+   * Gets checks if the catalog server running on the given host and port has
+   * catalog-v2 enabled
+   * @return
+   * @throws IOException
+   */
+  public static boolean isCatalogV2Enabled(String host, int port) throws IOException {
+    Preconditions.checkNotNull(host);
+    Preconditions.checkState(port >= 0);
+    String topicMode = getConfigValue(new URL(String.format("http://%s:%s"
+            + "/varz?json", host, port)), "catalog_topic_mode");
+    Preconditions.checkNotNull(topicMode);
+    return topicMode.equals("minimal");
+  }
+
+  /**
+   * Gets a flag value from the given URL. Useful to scrubbing the catalog/coordinator
+   * varz json output to look for interesting configurations
+   */
+  private static String getConfigValue(URL url, String key) throws IOException {
+    Map<Object, Object> map = new ObjectMapper().readValue(url, Map.class);
+    if (map.containsKey("flags")) {
+      Preconditions.checkState(map.containsKey("flags"));
+      ArrayList<LinkedHashMap<String, String>> flags =
+          (ArrayList<LinkedHashMap<String, String>>) map.get("flags");
+      for (LinkedHashMap<String, String> flag : flags) {
+        if (flag.getOrDefault("name", "").equals(key)) return flag.get("current");
+      }
+    }
+    return null;
   }
 }
