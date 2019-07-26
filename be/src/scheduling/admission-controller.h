@@ -30,6 +30,7 @@
 #include "common/status.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
+#include "scheduling/query-schedule.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
@@ -38,7 +39,6 @@
 
 namespace impala {
 
-class QuerySchedule;
 class ExecEnv;
 
 /// Represents the admission outcome of a query. It is stored in the 'admit_outcome'
@@ -152,6 +152,16 @@ enum class AdmissionOutcome {
 /// making admission decisions, which works well when either relatively few coordinators
 /// are used or, if there is a wide distribution of requests across impalads, the rate of
 /// submission is low enough that new state is able to be updated by the statestore.
+///
+/// Releasing Queries:
+/// When queries complete they must be explicitly released from the admission controller
+/// using the methods 'ReleaseQuery' and 'ReleaseQueryBackends'. These methods release
+/// the admitted memory and decrement the number of admitted queries for the resource
+/// pool. All Backends for a query must be released via 'ReleaseQueryBackends' before the
+/// query is released using 'ReleaseQuery'. Releasing Backends releases the admitted
+/// memory used by that Backend and decrements the number of running queries on the host
+/// running that Backend. Releasing a query does not release any admitted memory, it only
+/// decrements the number of running queries in the resource pool.
 ///
 /// Executor Groups:
 /// Executors in a cluster can be assigned to executor groups. Each executor can only be
@@ -332,9 +342,19 @@ class AdmissionController {
 
   /// Updates the pool statistics when a query completes (either successfully,
   /// is cancelled or failed). This should be called for all requests that have
-  /// been submitted via AdmitQuery().
+  /// been submitted via AdmitQuery(). 'schedule' is the QuerySchedule of the completed
+  /// query and 'peak_mem_consumption' is the peak memory consumption of the query.
   /// This does not block.
   void ReleaseQuery(const QuerySchedule& schedule, int64_t peak_mem_consumption);
+
+  /// Updates the pool statistics when a Backend running a query completes (either
+  /// successfully, is cancelled or failed). This should be called for all Backends part
+  /// of a query for all queries that have been submitted via AdmitQuery().
+  /// 'schedule' is the QuerySchedule of the associated query and the vector of
+  /// TNetworkAddresses identify the completed Backends.
+  /// This does not block.
+  void ReleaseQueryBackends(
+      const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addr);
 
   /// Registers the request queue topic with the statestore.
   Status Init();
@@ -482,7 +502,9 @@ class AdmissionController {
     /// Updates the pool stats when the request represented by 'schedule' is admitted.
     void Admit(const QuerySchedule& schedule);
     /// Updates the pool stats when the request represented by 'schedule' is released.
-    void Release(const QuerySchedule& schedule, int64_t peak_mem_consumption);
+    void ReleaseQuery(const QuerySchedule& schedule, int64_t peak_mem_consumption);
+    /// Releases the specified memory from the pool stats.
+    void ReleaseMem(int64_t mem_to_release);
     /// Updates the pool stats when the request represented by 'schedule' is queued.
     void Queue();
     /// Updates the pool stats when the request represented by 'schedule' is dequeued.
@@ -709,6 +731,12 @@ class AdmissionController {
   /// If true, tear down the dequeuing thread. This only happens in unit tests.
   bool done_;
 
+  /// Tracks the number of released Backends for each active query. Used purely for
+  /// internal state validation. Used to ensure that all Backends are released before
+  /// the query is released.
+  typedef boost::unordered_map<TUniqueId, int> NumReleasedBackends;
+  NumReleasedBackends num_released_backends_;
+
   /// Resolves the resource pool name in 'query_ctx.request_pool' and stores the resulting
   /// name in 'pool_name' and the resulting config in 'pool_config'.
   Status ResolvePoolAndGetConfig(const TQueryCtx& query_ctx, std::string* pool_name,
@@ -805,8 +833,24 @@ class AdmissionController {
 
   /// Updates the memory admitted and the num of queries running for each host in
   /// 'schedule'. If 'is_admitting' is true, the memory admitted and the num of queries is
-  /// increased, otherwise it is decreased.
+  /// increased, otherwise it is decreased. This method updates the host stats for every
+  /// Backend running the query.
   void UpdateHostStats(const QuerySchedule& schedule, bool is_admitting);
+
+  /// Updates the memory admitted and the num of queries running for each host in
+  /// 'schedule' based on the completed Backends. 'host_addrs' is a vector of completed
+  /// Backends each represented by a TNetworkAddress. Unlike UpdateHostStats, this method
+  /// only updates the host stats for the Backends specified in the 'host_addrs' vector.
+  /// Moreover, it is only used to release queries, and thus always decrements the amount
+  /// of memory admitted and the number of queries running per host. Returns the total
+  /// amount of memory to release for all the Backends.
+  int64_t UpdateHostStatsForQueryBackends(
+      const QuerySchedule& schedule, const std::vector<TNetworkAddress>& host_addrs);
+
+  /// Updates the memory admitted and the num of queries running on the specified host by
+  /// adding the specified mem and num_queries to the host stats.
+  void UpdateHostStats(
+      const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit);
 
   /// Rejection happens in several stages
   /// 1) Based on static pool configuration
@@ -933,6 +977,12 @@ class AdmissionController {
   /// Returns the size of executor group 'group_name' in 'membership_snapshot'.
   int64_t GetExecutorGroupSize(const ClusterMembershipMgr::Snapshot& membership_snapshot,
       const std::string& group_name);
+
+  /// Get the amount of memory to admit for the Backend with the given BackendExecParams.
+  /// This method may return different values depending on if the Backend is an Executor
+  /// or a Coordinator.
+  static int64_t GetMemToAdmit(
+      const QuerySchedule& schedule, const BackendExecParams& backend_exec_params);
 
   FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, PoolStats);

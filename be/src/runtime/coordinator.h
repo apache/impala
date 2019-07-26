@@ -25,6 +25,8 @@
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
 
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
+
 #include "common/global-types.h"
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
@@ -222,6 +224,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
  private:
   class BackendState;
+  class BackendResourceState;
   struct FilterTarget;
   class FilterState;
   class FragmentStats;
@@ -268,6 +271,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   bool has_called_wait_ = false;  // if true, Wait() was called; protected by wait_lock_
 
+  BackendResourceState* backend_resource_state_ = nullptr;
+
   /// Keeps track of number of completed ranges and total scan ranges. Initialized by
   /// Exec().
   ProgressUpdater progress_;
@@ -287,6 +292,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Total number of filter updates received (always 0 if filter mode is not
   /// GLOBAL). Excludes repeated broadcast filter updates. Set in Exec().
   RuntimeProfile::Counter* filter_updates_received_ = nullptr;
+
+  /// A RuntimeProfile Counter of the number of completed backends. Updated for each
+  /// Backend in 'UpdateBackendExecStatus' when 'ApplyExecStatusReport' returns true.
+  /// Only valid after InitBackendStates() is called. Does not count the number of
+  /// CANCELLED Backends.
+  RuntimeProfile::Counter* num_completed_backends_ = nullptr;
 
   /// The filtering mode for this query. Set in constructor.
   TRuntimeFilterMode::type filter_mode_;
@@ -340,6 +351,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// or when all backends are cancelled due to an execution error or client requested
   /// cancellation. Initialized in StartBackendExec().
   boost::scoped_ptr<CountingBarrier> backend_exec_complete_barrier_;
+
+  /// Barrier that is released when all Backends have released their admission control
+  /// resources.
+  CountingBarrier backend_released_barrier_;
 
   // Protects exec_state_ and exec_status_. exec_state_ can be read independently via
   // the atomic, but the lock is held when writing either field and when reading both
@@ -499,7 +514,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// use by other queries. This should only be called if one of following
   /// preconditions is satisfied for each backend on which the query is executing:
   ///
-  /// * The backend finished execution.  Rationale: the backend isn't consuming
+  /// * The backend finished execution. Rationale: the backend isn't consuming
   ///   resources.
   /// * A cancellation RPC was delivered to the backend.
   ///   Rationale: the backend will be cancelled and release resources soon. By the
@@ -521,10 +536,26 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// after that completes to avoid over-admitting queries.
   ///
   /// The ExecState state-machine ensures this is called exactly once.
-  void ReleaseAdmissionControlResources();
+  void ReleaseQueryAdmissionControlResources();
+
+  /// Helper method to release admission control resource for the given vector of
+  /// BackendStates. Resources are released using
+  /// AdmissionController::ReleaseQueryBackends which releases the admitted memory used
+  /// by each BackendState and decrements the number of running queries on the host
+  /// running the BackendState.
+  void ReleaseBackendAdmissionControlResources(
+      const std::vector<BackendState*>& backend_states);
 
   /// Checks the exec_state_ of the query and returns true if the query is executing.
   bool IsExecuting();
+
+  /// BackendState and BackendResourceState are private to the Coordinator class, so mark
+  /// all tests in CoordinatorBackendStateTest as friends.
+  friend class CoordinatorBackendStateTest;
+  FRIEND_TEST(CoordinatorBackendStateTest, StateMachine);
+  FRIEND_TEST(CoordinatorBackendStateTest, CoordinatorOnly);
+  FRIEND_TEST(CoordinatorBackendStateTest, TimedRelease);
+  FRIEND_TEST(CoordinatorBackendStateTest, BatchedRelease);
 };
 
 }

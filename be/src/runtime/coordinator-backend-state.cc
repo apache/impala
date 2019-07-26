@@ -58,17 +58,18 @@ const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
-Coordinator::BackendState::BackendState(
-    const Coordinator& coord, int state_idx, TRuntimeFilterMode::type filter_mode)
-  : coord_(coord),
+Coordinator::BackendState::BackendState(const QuerySchedule& schedule,
+    const TQueryCtx& query_ctx, int state_idx,
+    TRuntimeFilterMode::type filter_mode, const BackendExecParams& exec_params)
+  : schedule_(schedule),
     state_idx_(state_idx),
-    filter_mode_(filter_mode) {
-}
+    filter_mode_(filter_mode),
+    backend_exec_params_(&exec_params),
+    query_ctx_(query_ctx),
+    query_id_(schedule.query_id()) {}
 
-void Coordinator::BackendState::Init(
-    const BackendExecParams& exec_params, const vector<FragmentStats*>& fragment_stats,
+void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
-  backend_exec_params_ = &exec_params;
   host_ = backend_exec_params_->be_desc.address;
   krpc_host_ = backend_exec_params_->be_desc.krpc_address;
   num_remaining_instances_ = backend_exec_params_->instance_params.size();
@@ -105,7 +106,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   request->set_min_mem_reservation_bytes(backend_exec_params_->min_mem_reservation_bytes);
   request->set_initial_mem_reservation_total_claims(
       backend_exec_params_->initial_mem_reservation_total_claims);
-  request->set_per_backend_mem_limit(coord_.schedule_.per_backend_mem_limit());
+  request->set_per_backend_mem_limit(schedule_.per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
   sidecar->__isset.fragment_ctxs = true;
@@ -173,7 +174,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
 void Coordinator::BackendState::SetExecError(const Status& status) {
   const string ERR_TEMPLATE = "ExecQueryFInstances rpc query_id=$0 failed: $1";
   const string& err_msg =
-      Substitute(ERR_TEMPLATE, PrintId(query_id()), status.msg().GetFullMessageDetails());
+      Substitute(ERR_TEMPLATE, PrintId(query_id_), status.msg().GetFullMessageDetails());
   LOG(ERROR) << err_msg;
   status_ = Status::Expected(err_msg);
 }
@@ -204,7 +205,7 @@ void Coordinator::BackendState::Exec(
 
   ExecQueryFInstancesRequestPB request;
   TExecQueryFInstancesSidecar sidecar;
-  sidecar.__set_query_ctx(query_ctx());
+  sidecar.__set_query_ctx(query_ctx_);
   SetRpcParams(debug_options, filter_routing_table, &request, &sidecar);
 
   RpcController rpc_controller;
@@ -242,7 +243,7 @@ void Coordinator::BackendState::Exec(
 
   VLOG_FILE << "making rpc: ExecQueryFInstances"
       << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="
-      << PrintId(query_id());
+      << PrintId(query_id_);
 
   // guard against concurrent UpdateBackendExecStatus() that may arrive after RPC returns
   lock_guard<mutex> l(lock_);
@@ -268,7 +269,7 @@ void Coordinator::BackendState::Exec(
   }
 
   for (const auto& entry: instance_stats_map_) entry.second->stopwatch_.Start();
-  VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id());
+  VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
 }
 
 Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
@@ -334,7 +335,7 @@ void Coordinator::BackendState::LogFirstInProgress(
     std::vector<Coordinator::BackendState*> backend_states) {
   for (Coordinator::BackendState* backend_state : backend_states) {
     if (!backend_state->IsDone()) {
-      VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id())
+      VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id_)
                  << ": first in-progress backend: "
                  << TNetworkAddressToString(backend_state->impalad_address());
       break;
@@ -500,21 +501,21 @@ bool Coordinator::BackendState::Cancel() {
   // set an error status to make sure we only cancel this once
   if (status_.ok()) status_ = Status::CANCELLED;
 
-  VLOG_QUERY << "Sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id())
+  VLOG_QUERY << "Sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id_)
              << " backend=" << TNetworkAddressToString(krpc_host_);
 
   std::unique_ptr<ControlServiceProxy> proxy;
   Status get_proxy_status = ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
   if (!get_proxy_status.ok()) {
     status_.MergeStatus(get_proxy_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id()) << " could not get proxy to "
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_) << " could not get proxy to "
                << TNetworkAddressToString(krpc_host_)
                << " failure: " << get_proxy_status.msg().msg();
     return true;
   }
 
   CancelQueryFInstancesRequestPB request;
-  TUniqueIdToUniqueIdPB(query_id(), request.mutable_query_id());
+  TUniqueIdToUniqueIdPB(query_id_, request.mutable_query_id());
   CancelQueryFInstancesResponsePB response;
 
   const int num_retries = 3;
@@ -522,12 +523,12 @@ bool Coordinator::BackendState::Cancel() {
   const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
   Status rpc_status =
       RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::CancelQueryFInstances, request,
-          &response, query_ctx(), "Cancel() RPC failed", num_retries, timeout_ms,
+          &response, query_ctx_, "Cancel() RPC failed", num_retries, timeout_ms,
           backoff_time_ms, "COORD_CANCEL_QUERY_FINSTANCES_RPC");
 
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id()) << " could not do rpc to "
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_) << " could not do rpc to "
                << TNetworkAddressToString(krpc_host_)
                << " failure: " << rpc_status.msg().msg();
     return true;
@@ -535,7 +536,7 @@ bool Coordinator::BackendState::Cancel() {
   Status cancel_status = Status(response.status());
   if (!cancel_status.ok()) {
     status_.MergeStatus(cancel_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id())
+    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_)
                << " got failure after rpc to " << TNetworkAddressToString(krpc_host_)
                << " failure: " << cancel_status.msg().msg();
     return true;
@@ -544,7 +545,7 @@ bool Coordinator::BackendState::Cancel() {
 }
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
-  DCHECK(rpc_params.dst_query_id == query_id());
+  DCHECK(rpc_params.dst_query_id == query_id_);
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
   if (IsDone()) return;

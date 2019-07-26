@@ -48,6 +48,9 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from tests.util.web_pages_util import (
+    get_num_completed_backends,
+    get_mem_admitted_backends_debug_page)
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
@@ -571,7 +574,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.wait_for_finished_timeout(handle, 1000)
     expected_mem_limits = self.__get_mem_limits_admission_debug_page()
     actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
-    mem_admitted = self.__get_mem_admitted_backends_debug_page()
+    mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
     debug_string = " expected_mem_limits:" + str(
       expected_mem_limits) + " actual_mem_limits:" + str(
       actual_mem_limits) + " mem_admitted:" + str(mem_admitted)
@@ -587,7 +590,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     assert abs(mem_admitted['coordinator'] - expected_mem_limits[
       'coordinator']) < 5 * MB, debug_string
     assert abs(
-      mem_admitted['executor'] - expected_mem_limits['executor']) < 5 * MB, debug_string
+      mem_admitted['executor'][0] - expected_mem_limits['executor']) < 5 * MB, \
+        debug_string
 
   def __get_mem_limits_admission_debug_page(self):
     """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
@@ -618,25 +622,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
                     self.cluster.impalads]
     return {'coordinator': float(mem_trackers[0]['limit']),
             'executor': float(mem_trackers[1]['limit'])}
-
-  def __get_mem_admitted_backends_debug_page(self):
-    """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
-    mem admitted to the backends extracted from the backends debug page of the coordinator
-    impala daemon. Returns a dictionary with the keys 'coordinator' and 'executor' and
-    their respective mem values in bytes."""
-    # Based on how the cluster is setup, the first impalad in the cluster is the
-    # coordinator.
-    response_json = self.cluster.impalads[0].service.get_debug_webpage_json("backends")
-    assert 'backends' in response_json
-    assert len(response_json['backends']) == 2
-    ret = dict()
-    from tests.verifiers.mem_usage_verifier import parse_mem_value
-    for backend in response_json['backends']:
-      if backend['is_coordinator']:
-        ret['coordinator'] = parse_mem_value(backend['mem_admitted'])
-      else:
-        ret['executor'] = parse_mem_value(backend['mem_admitted'])
-    return ret
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -1299,6 +1284,56 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     reasons = self.__extract_init_queue_reasons([profile])
     assert len(reasons) == 1
     assert "Local backend has not started up yet." in reasons[0]
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1)
+  def test_release_backends(self, vector):
+    """Test that executor backends are shutdown when they complete, that completed
+    executor backends release their admitted memory, and that
+    NumCompletedBackends is updated each time an executor backend completes."""
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+
+    # Craft a query where part of the executor backends completes, while the rest remain
+    # running indefinitely. The query forces the 'lineitem' table to be treated as the
+    # small table even though it is bigger than the 'customer' table. This forces the
+    # small table scan ('lineitem' scan) to run on two nodes and the big table scan
+    # ('customers' scan) to run on a single node. By using debug actions to force the
+    # big table scan to hang indefinitely, the small table scan should finish quickly.
+    # This causes one executor backend to complete quickly, and causes the other one to
+    # hang.
+    vector.get_value('exec_option')['debug_action'] = '0:GETNEXT:WAIT'
+    query = "select STRAIGHT_JOIN * from tpch.customer JOIN /* +BROADCAST */ " \
+            "tpch.lineitem where customer.c_custkey = lineitem.l_orderkey limit 100"
+
+    # Amount of time to wait for the query to reach the running state before throwing a
+    # Timeout exception.
+    timeout = 10
+
+    handle = self.execute_query_async(query, vector.get_value('exec_option'))
+    try:
+      # Wait for the query to reach the running state (it should never reach the finished
+      # state because of the 'WAIT' debug action), wait for the 'lineitem' scan to
+      # complete, and then validate that one of the executor backends shutdowns and
+      # releases its admitted memory.
+      self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], timeout)
+      sleep(10)  # Wait for the 'lineitem' scan to complete
+      assert "NumCompletedBackends: 1 (1)" in self.client.get_runtime_profile(handle)
+      get_num_completed_backends(self.cluster.impalads[0].service,
+        handle.get_handle().id) == 1
+      mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
+      num_executor_zero_admitted = 0
+      for executor_mem_admitted in mem_admitted['executor']:
+        if executor_mem_admitted == 0:
+          num_executor_zero_admitted += 1
+      assert num_executor_zero_admitted == 1
+    finally:
+      # Once the query is closed, validate that all backends have shutdown.
+      self.client.close_query(handle)
+      mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
+      assert mem_admitted['coordinator'] == 0
+      for executor_mem_admitted in mem_admitted['executor']:
+        assert executor_mem_admitted == 0
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):

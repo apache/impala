@@ -140,7 +140,7 @@ class TestAutoScaling(CustomClusterTestSuite):
     GROUP_SIZE = 2
     EXECUTOR_SLOTS = 3
     auto_scaler = AutoScaler(executor_slots=EXECUTOR_SLOTS, group_size=GROUP_SIZE,
-                             max_groups=1)
+                             max_groups=1, coordinator_slots=EXECUTOR_SLOTS)
     workload = None
     try:
       auto_scaler.start()

@@ -58,16 +58,15 @@ struct FInstanceExecParams;
 /// Thread-safe unless pointed out otherwise.
 class Coordinator::BackendState {
  public:
-  BackendState(const Coordinator& coord, int state_idx,
-      TRuntimeFilterMode::type filter_mode);
+  BackendState(const QuerySchedule& schedule, const TQueryCtx& query_ctx, int state_idx,
+      TRuntimeFilterMode::type filter_mode, const BackendExecParams& exec_params);
 
   /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
   /// and installs the instance profiles as children of the corresponding FragmentStats'
   /// root profile. Also creates a child profile below 'host_profile_parent' that contains
   /// counters for the backend.
   /// Separated from c'tor to simplify future handling of out-of-mem errors.
-  void Init(const BackendExecParams& backend_exec_params,
-      const std::vector<FragmentStats*>& fragment_stats,
+  void Init(const std::vector<FragmentStats*>& fragment_stats,
       RuntimeProfile* host_profile_parent, ObjectPool* obj_pool);
 
   /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc and
@@ -250,7 +249,8 @@ class Coordinator::BackendState {
     void InitCounters();
   };
 
-  const Coordinator& coord_; /// Coordinator object that owns this BackendState
+  /// QuerySchedule associated with the Coordinator that owns this BackendState.
+  const QuerySchedule& schedule_;
 
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
@@ -315,8 +315,11 @@ class Coordinator::BackendState {
   /// Uses GenerateReportTimeout().
   int64_t last_report_time_ms_ = 0;
 
-  const TQueryCtx& query_ctx() const { return coord_.query_ctx(); }
-  const TUniqueId& query_id() const { return coord_.query_id(); }
+  /// The query context of the Coordinator that owns this BackendState.
+  const TQueryCtx& query_ctx_;
+
+  /// The query id of the Coordinator that owns this BackendState.
+  const TUniqueId& query_id_;
 
   /// Fill in 'request' and 'sidecar' based on state. Uses filter_routing_table to remove
   /// filters that weren't selected during its construction.
@@ -388,6 +391,143 @@ class Coordinator::FragmentStats {
   SummaryStats rates_;
 };
 
+/// Tracks the state of the resources of all BackendStates for a Coordinator. Implements
+/// throttling logic to limit the rate at which BackendStates release their admission
+/// controller resources. The class is initialized with all the BackendStates running for
+/// a query. 'MarkBackendFinished' and 'BackendsReleased' should be called when a Backend
+/// finishes and is released, respectively. MarkBackendFinished returns a vector of
+/// BackendStates that should be released.
+///
+/// Each BackendState has an associated ResourceState that can take on the values:
+///     * IN_USE:     All BackendStates start out in this state as their resources are
+///                   being used and have not been released yet.
+///     * PENDING:    The BackendState has completed, but should not be released yet.
+///     * RELEASABLE: The BackendState has completed, and should be released.
+///     * RELEASED:   The BackendState has been completed and released.
+///
+/// Each BackendState starts as IN_USE, and can either transition to PENDING or
+/// RELEASED. Any PENDING states must transition to RELEASABLE and then to RELEASED.
+/// All BackendStates must eventually transition to RELEASED.
+///
+/// BackendStates passed into the MarkBackendFinished method transition to the PENDING
+/// state. BackendStates returned by MarkBackendFinished are in the RELEASABLE state
+/// until they are released by BackendsReleased, after which they transition to the
+/// RELEASED state.
+///
+/// Throttling is necessary because the AdmissionController is currently protected by a
+/// single global lock, so releasing resources per-Backend per-query can overwhelm the
+/// AdmissionController on large clusters. Throttling is done using the following
+/// heuristics to limit the rate at which the Coordinator releases admission control
+/// resources:
+///     * Coordinator-Only Release: If the only running Backend is the Coordinator,
+///     release all PENDING backends. This is particularly useful when combined with
+///     result spooling because the Coordinator backend may be long lived. When result
+///     spooling is enabled, and clients don't immediately fetch query results, the
+///     coordinator fragment stays alive until the results are fetched or the query is
+///     closed.
+///     * Timed Release: If more than 'FLAGS_release_backend_states_delay_ms' milliseconds
+///     have elapsed since the last time a Backend completed, release all PENDING
+///     backends. This is useful for queries that are long running, and whose Backends
+///     complete incrementally (perhaps because of skew or fan-in). It also helps decrease
+///     the rate at which Backends are released, especially for short lived queries.
+///     * Batched Release: If more than half the remaining Backends have been released
+///     since the last time Backends were released, release all PENDING backends. This
+///     bounds the number of times resources are released to O(log(n)) where n is the
+///     number of backends. The base value of the logarithm is controlled by
+///     FLAGS_batched_release_decay_factor.
+///
+/// This class has a 'CloseAndGetUnreleasedBackends' method that must be called before the
+/// object is destroyed. The 'CloseAndGetUnreleasedBackends' method returns any remaining
+/// unreleased Backends (e.g. Backends in either the IN_USE or PENDING state). Backends in
+/// the RELEASABLE state are assumed to be released by the client, and any RELEASABLE
+/// Backends must be marked as RELEASED by a call to 'BackendsReleased' before the
+/// destructor is called. It is valid to call 'MarkBackendFinished' or 'BackendsReleased'
+/// after the BackendResourceState is closed. Once a BackendResourceState is closed,
+/// BackendStates can no longer transition to the PENDING or RELEASABLE state.
+///
+/// This class is thread-safe unless pointed out otherwise.
+class Coordinator::BackendResourceState {
+ public:
+  /// Create the BackendResourceState with the given vector of BackendStates. All
+  /// BackendStates are initially in the IN_USE state.
+  BackendResourceState(
+      const std::vector<BackendState*>& backend_states, const QuerySchedule& schedule);
+  ~BackendResourceState();
+
+  /// Mark a BackendState as finished and transition it to the PENDING state. Applies
+  /// above mentioned heuristics to determine if all PENDING BackendStates should
+  /// transition to the RELEASABLE state. If the transition to RELEASABLE occurs, this
+  /// method returns a list of RELEASABLE states that should be released by the caller
+  /// and then passed to BackendsReleased. Returns an empty list if no PENDING Backends
+  /// should be released. A no-op if the BackendResourceState is closed already.
+  void MarkBackendFinished(
+      BackendState* backend_state, std::vector<BackendState*>* releasable_backend_states);
+
+  /// Marks the BackendStates as RELEASED. Must be called after the resources for the
+  /// BackendStates have been released. This can be called after
+  /// CloseAndGetUnreleasedBackends() has been called. If CloseAndGetUnreleasedBackends()
+  /// returns any BackendStates, they must be passed to this method so they can be marked
+  /// as RELEASED.
+  void BackendsReleased(const std::vector<BackendState*>& released_backend_states);
+
+  /// Closes the state machine and returns a vector of IN_USE or PENDING BackendStates.
+  /// This method is idempotent. The caller is expected to mark all returned
+  /// BackendStates as released using BackendReleased().
+  std::vector<BackendState*> CloseAndGetUnreleasedBackends();
+
+ private:
+  /// Represents the state of the admission control resources associated with a
+  /// BackendState. Each BackendState starts off as IN_USE and eventually transitions
+  /// to RELEASED.
+  enum ResourceState { IN_USE, PENDING, RELEASABLE, RELEASED };
+
+  /// Protects all member variables below.
+  SpinLock lock_;
+
+  /// A timer used to track how frequently calls to MarkBackendFinished transition
+  /// Backends to the RELEASABLE state. Used by the 'Timed Release' heuristic.
+  MonotonicStopWatch released_timer_;
+
+  /// Counts the number of Backends in the IN_USE state.
+  int num_in_use_;
+
+  /// Counts the number of Backends in the PENDING state.
+  int num_pending_ = 0;
+
+  /// Counts the number of Backends in the RELEASED state.
+  int num_released_ = 0;
+
+  /// True if the Backend running the Coordinator fragment has been released, false
+  /// otherwise.
+  bool released_coordinator_ = false;
+
+  /// Tracks all BackendStates for a given query along with the state of their admission
+  /// control resources.
+  std::unordered_map<BackendState*, ResourceState> backend_resource_states_;
+
+  /// The BackendStates for a given query. Owned by the Coordinator.
+  const std::vector<BackendState*>& backend_states_;
+
+  /// The total number of BackendStates for a given query.
+  const int num_backends_;
+
+  // True if the BackendResourceState is closed, false otherwise.
+  bool closed_ = false;
+
+  /// QuerySchedule associated with the Coordinator that owns this BackendResourceState.
+  const QuerySchedule& schedule_;
+
+  /// Configured value of FLAGS_release_backend_states_delay_ms in nanoseconds.
+  const int64_t release_backend_states_delay_ns_;
+
+  /// The initial value of the decay factor for the 'Batched Release'. Increases by
+  /// *FLAGS_batched_released_decay_factor on each batched release.
+  int64_t batched_release_decay_value_;
+
+  // Requires access to RELEASE_BACKEND_STATES_DELAY_NS and backend_resource_states_.
+  friend class CoordinatorBackendStateTest;
+  FRIEND_TEST(CoordinatorBackendStateTest, StateMachine);
+};
 }
 
 #endif

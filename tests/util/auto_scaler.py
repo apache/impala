@@ -43,10 +43,10 @@ class AutoScaler(object):
   DEFAULT_POOL_NAME = "default-pool"
 
   def __init__(self, executor_slots, group_size, start_batch_size=0, max_groups=0,
-               wait_up_s=0, wait_down_s=0):
+               wait_up_s=0, wait_down_s=0, coordinator_slots=128):
     # Number of queries that can run concurrently on each executor
     self.executor_slots = executor_slots
-    self.coordinator_slots = 128
+    self.coordinator_slots = coordinator_slots
     # Number of executors per executor group
     self.group_size = group_size
     # New executor groups will be started in increments of this size

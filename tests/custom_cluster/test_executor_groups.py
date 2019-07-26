@@ -233,7 +233,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.cancel(q2)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="-max_concurrent_queries=16")
+  @CustomClusterTestSuite.with_args(impalad_args="-max_concurrent_queries=3")
   def test_executor_concurrency(self):
     """Tests that the command line flag to limit query concurrency on executors works as
     expected."""

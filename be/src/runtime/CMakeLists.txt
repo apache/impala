@@ -34,6 +34,7 @@ add_library(Runtime
   collection-value.cc
   coordinator.cc
   coordinator-backend-state.cc
+  coordinator-backend-resource-state.cc
   datetime-parse-util.cc
   date-parse-util.cc
   date-value.cc
@@ -84,6 +85,7 @@ add_library(Runtime
 add_dependencies(Runtime gen-deps)
 
 add_library(RuntimeTests STATIC
+  coordinator-backend-state-test.cc
   date-test.cc
   decimal-test.cc
   free-pool-test.cc
@@ -103,6 +105,7 @@ add_library(RuntimeTests STATIC
 )
 add_dependencies(RuntimeTests gen-deps)
 
+ADD_UNIFIED_BE_LSAN_TEST(coordinator-backend-state-test CoordinatorBackendStateTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(mem-pool-test MemPoolTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(free-pool-test FreePoolTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(string-buffer-test StringBufferTest.*)

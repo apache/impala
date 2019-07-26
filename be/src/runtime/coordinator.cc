@@ -77,7 +77,8 @@ Coordinator::Coordinator(ClientRequestState* parent, const QuerySchedule& schedu
     filter_mode_(schedule.query_options().runtime_filter_mode),
     obj_pool_(new ObjectPool()),
     query_events_(events),
-    exec_rpcs_complete_barrier_(schedule_.per_backend_exec_params().size()) {}
+    exec_rpcs_complete_barrier_(schedule_.per_backend_exec_params().size()),
+    backend_released_barrier_(schedule_.per_backend_exec_params().size()) {}
 
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
@@ -206,12 +207,16 @@ void Coordinator::InitBackendStates() {
 
   // create BackendStates
   int backend_idx = 0;
-  for (const auto& entry: schedule_.per_backend_exec_params()) {
-    BackendState* backend_state = obj_pool()->Add(
-        new BackendState(*this, backend_idx, filter_mode_));
-    backend_state->Init(entry.second, fragment_stats_, host_profiles_, obj_pool());
+  for (const auto& entry : schedule_.per_backend_exec_params()) {
+    BackendState* backend_state = obj_pool()->Add(new BackendState(
+        schedule_, query_ctx(), backend_idx, filter_mode_, entry.second));
+    backend_state->Init(fragment_stats_, host_profiles_, obj_pool());
     backend_states_[backend_idx++] = backend_state;
   }
+  backend_resource_state_ =
+      obj_pool()->Add(new BackendResourceState(backend_states_, schedule_));
+  num_completed_backends_ =
+      ADD_COUNTER(query_profile_, "NumCompletedBackends", TUnit::UNIT);
 }
 
 void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
@@ -408,6 +413,7 @@ Status Coordinator::FinishBackendStartup() {
     // Mark backend complete if no fragment instances were assigned to it.
     if (backend_state->IsEmptyBackend()) {
       backend_exec_complete_barrier_->Notify();
+      num_completed_backends_->Add(1);
     }
   }
   query_profile_->AddInfoString(
@@ -571,7 +577,7 @@ void Coordinator::HandleExecStateTransition(
   } else {
     CancelBackends();
   }
-  ReleaseAdmissionControlResources();
+  ReleaseQueryAdmissionControlResources();
   // Once the query has released its admission control resources, update its end time.
   parent_request_state_->UpdateEndTime();
   // Can compute summary only after we stop accepting reports from the backends. Both
@@ -755,6 +761,19 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     }
     // We've applied all changes from the final status report - notify waiting threads.
     discard_result(backend_exec_complete_barrier_->Notify());
+
+    // Mark backend_state as closed and release the backend_state's resources if
+    // necessary.
+    vector<BackendState*> releasable_backends;
+    backend_resource_state_->MarkBackendFinished(backend_state, &releasable_backends);
+    if (!releasable_backends.empty()) {
+      ReleaseBackendAdmissionControlResources(releasable_backends);
+      backend_resource_state_->BackendsReleased(releasable_backends);
+      for (int i = 0; i < releasable_backends.size(); ++i) {
+        backend_released_barrier_.Notify();
+      }
+    }
+    num_completed_backends_->Add(1);
   }
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
@@ -898,7 +917,19 @@ void Coordinator::ReleaseExecResources() {
   // caching. The query MemTracker will be cleaned up later.
 }
 
-void Coordinator::ReleaseAdmissionControlResources() {
+void Coordinator::ReleaseQueryAdmissionControlResources() {
+  vector<BackendState*> unreleased_backends =
+      backend_resource_state_->CloseAndGetUnreleasedBackends();
+  if (!unreleased_backends.empty()) {
+    ReleaseBackendAdmissionControlResources(unreleased_backends);
+    backend_resource_state_->BackendsReleased(unreleased_backends);
+    for (int i = 0; i < unreleased_backends.size(); ++i) {
+      backend_released_barrier_.Notify();
+    }
+  }
+  // Wait for all backends to be released before calling
+  // AdmissionController::ReleaseQuery.
+  backend_released_barrier_.Wait();
   LOG(INFO) << "Release admission control resources for query_id=" << PrintId(query_id());
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
@@ -906,6 +937,18 @@ void Coordinator::ReleaseAdmissionControlResources() {
   admission_controller->ReleaseQuery(
       schedule_, ComputeQueryResourceUtilization().peak_per_host_mem_consumption);
   query_events_->MarkEvent("Released admission control resources");
+}
+
+void Coordinator::ReleaseBackendAdmissionControlResources(
+    const vector<BackendState*>& backend_states) {
+  AdmissionController* admission_controller =
+      ExecEnv::GetInstance()->admission_controller();
+  DCHECK(admission_controller != nullptr);
+  vector<TNetworkAddress> host_addrs;
+  for (auto backend_state : backend_states) {
+    host_addrs.push_back(backend_state->impalad_address());
+  }
+  admission_controller->ReleaseQueryBackends(schedule_, host_addrs);
 }
 
 Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() {

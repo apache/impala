@@ -689,7 +689,15 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   pool_stats->Admit(*query_schedule);
   ASSERT_EQ(1, pool_stats->agg_num_running());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_running->GetValue());
-  pool_stats->Release(*query_schedule, false);
+  int64_t mem_to_release = 0;
+  vector<TNetworkAddress> host_addrs;
+  for (auto backend_state : query_schedule->per_backend_exec_params()) {
+    host_addrs.push_back(backend_state.first);
+    mem_to_release +=
+        admission_controller->GetMemToAdmit(*query_schedule, backend_state.second);
+  }
+  pool_stats->ReleaseMem(mem_to_release);
+  pool_stats->ReleaseQuery(*query_schedule, 0);
   CheckPoolStatsEmpty(pool_stats);
 }
 
