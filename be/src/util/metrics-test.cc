@@ -463,13 +463,38 @@ TEST_F(MetricsTest, MetricGroupJson) {
   EXPECT_EQ(val2["name"].GetString(), string("child1"));
 }
 
+// Test the mapping of Impala's metric names into prometheus names.
+TEST_F(MetricsTest, PrometheusMetricNames) {
+  // Test that metrics get prefixed with impala_ if needed and don't get
+  // prefixed if they already start with impala.
+  EXPECT_EQ("impala_metric", MetricGroup::ImpalaToPrometheusName("impala_metric"));
+  EXPECT_EQ(
+      "impala_an_impala_metric", MetricGroup::ImpalaToPrometheusName("an_impala_metric"));
+  EXPECT_EQ("impala_IMPALA_METRIC", MetricGroup::ImpalaToPrometheusName("IMPALA_METRIC"));
+  EXPECT_EQ("impala_random_metric", MetricGroup::ImpalaToPrometheusName("random_metric"));
+  EXPECT_EQ("impala_impal_random_metric",
+      MetricGroup::ImpalaToPrometheusName("impal_random_metric"));
+  EXPECT_EQ(
+      "impala_impalas_metric", MetricGroup::ImpalaToPrometheusName("impalas_metric"));
+  EXPECT_EQ("impala_impalametric", MetricGroup::ImpalaToPrometheusName("impalametric"));
+  EXPECT_EQ("impala_server_metric",
+      MetricGroup::ImpalaToPrometheusName("impala-server-metric"));
+
+  // Test that . and - get transformed to _.
+  EXPECT_EQ("impala_metric_name_with_punctuation_",
+      MetricGroup::ImpalaToPrometheusName("metric-name.with-punctuation_"));
+
+  // Other special characters are unmodified
+  EXPECT_EQ("impala_!@#$%*", MetricGroup::ImpalaToPrometheusName("!@#$%*"));
+}
+
 void AssertPrometheus(const std::stringstream& val, const string& name,
     const string& value, const string& desc, const string& kind = "") {
   std::stringstream exp_val;
   // convert to all values to expected format
   exp_val << "# HELP " << name << " " << desc << "\n"
           << "# TYPE " << name << " " << kind << "\n";
-  if (name == "stats_metric" || name == "histogram_metric") {
+  if (name == "impala_stats_metric" || name == "impala_histogram_metric") {
     exp_val << value + "\n";
   } else {
     exp_val << name << " " << value + "\n";
@@ -483,7 +508,7 @@ TEST_F(MetricsTest, CountersPrometheus) {
   metrics.AddCounter("counter", 0);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "0", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "0", "description", "counter");
 }
 
 TEST_F(MetricsTest, CountersBytesPrometheus) {
@@ -492,7 +517,7 @@ TEST_F(MetricsTest, CountersBytesPrometheus) {
   metrics.AddCounter("counter", 555);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "555", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "555", "description", "counter");
 }
 
 TEST_F(MetricsTest, CountersNonePrometheus) {
@@ -501,7 +526,7 @@ TEST_F(MetricsTest, CountersNonePrometheus) {
   metrics.AddCounter("counter", 0);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "0", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "0", "description", "counter");
 }
 
 TEST_F(MetricsTest, CountersTimeMSPrometheus) {
@@ -510,7 +535,7 @@ TEST_F(MetricsTest, CountersTimeMSPrometheus) {
   metrics.AddCounter("counter", 4354364);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "4354.36", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "4354.36", "description", "counter");
 }
 
 TEST_F(MetricsTest, CountersTimeNSPrometheus) {
@@ -519,7 +544,7 @@ TEST_F(MetricsTest, CountersTimeNSPrometheus) {
   metrics.AddCounter("counter", 4354364234);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "4.35436", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "4.35436", "description", "counter");
 }
 
 TEST_F(MetricsTest, CountersTimeSPrometheus) {
@@ -528,7 +553,7 @@ TEST_F(MetricsTest, CountersTimeSPrometheus) {
   metrics.AddCounter("counter", 120);
   std::stringstream counter_val;
   metrics.ToPrometheus(true, &counter_val);
-  AssertPrometheus(counter_val, "counter", "120", "description", "counter");
+  AssertPrometheus(counter_val, "impala_counter", "120", "description", "counter");
 }
 
 TEST_F(MetricsTest, GaugesPrometheus) {
@@ -537,7 +562,7 @@ TEST_F(MetricsTest, GaugesPrometheus) {
   metrics.AddGauge("gauge", 10);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "10", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "10", "", "gauge");
 }
 
 TEST_F(MetricsTest, GaugesBytesPrometheus) {
@@ -546,7 +571,7 @@ TEST_F(MetricsTest, GaugesBytesPrometheus) {
   metrics.AddGauge("gauge", 150000);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "150000", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "150000", "", "gauge");
 }
 
 TEST_F(MetricsTest, GaugesTimeMSPrometheus) {
@@ -555,7 +580,7 @@ TEST_F(MetricsTest, GaugesTimeMSPrometheus) {
   metrics.AddGauge("gauge", 10000);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "10", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "10", "", "gauge");
 }
 
 TEST_F(MetricsTest, GaugesTimeNSPrometheus) {
@@ -564,7 +589,7 @@ TEST_F(MetricsTest, GaugesTimeNSPrometheus) {
   metrics.AddGauge("gauge", 2334123456);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "2.33412", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "2.33412", "", "gauge");
 }
 
 TEST_F(MetricsTest, GaugesTimeSPrometheus) {
@@ -573,7 +598,7 @@ TEST_F(MetricsTest, GaugesTimeSPrometheus) {
   metrics.AddGauge("gauge", 1500);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "1500", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "1500", "", "gauge");
 }
 
 TEST_F(MetricsTest, GaugesUnitPrometheus) {
@@ -582,7 +607,7 @@ TEST_F(MetricsTest, GaugesUnitPrometheus) {
   metrics.AddGauge("gauge", 111);
   std::stringstream gauge_val;
   metrics.ToPrometheus(true, &gauge_val);
-  AssertPrometheus(gauge_val, "gauge", "111", "", "gauge");
+  AssertPrometheus(gauge_val, "impala_gauge", "111", "", "gauge");
 }
 
 TEST_F(MetricsTest, StatsMetricsPrometheus) {
@@ -594,13 +619,13 @@ TEST_F(MetricsTest, StatsMetricsPrometheus) {
   metric->Update(20.0);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 20\n"
-      "stats_metric_min 10\n"
-      "stats_metric_max 20\n"
-      "stats_metric_mean 15\n"
-      "stats_metric_stddev 5\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 20\n"
+      "impala_stats_metric_min 10\n"
+      "impala_stats_metric_max 20\n"
+      "impala_stats_metric_mean 15\n"
+      "impala_stats_metric_stddev 5\n",
       "", "counter");
 }
 
@@ -613,13 +638,13 @@ TEST_F(MetricsTest, StatsMetricsBytesPrometheus) {
   metric->Update(2230.1234567);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 2230.12\n"
-      "stats_metric_min 10\n"
-      "stats_metric_max 2230.12\n"
-      "stats_metric_mean 1120.06\n"
-      "stats_metric_stddev 1110.06\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 2230.12\n"
+      "impala_stats_metric_min 10\n"
+      "impala_stats_metric_max 2230.12\n"
+      "impala_stats_metric_mean 1120.06\n"
+      "impala_stats_metric_stddev 1110.06\n",
       "", "counter");
 }
 
@@ -632,13 +657,13 @@ TEST_F(MetricsTest, StatsMetricsNonePrometheus) {
   metric->Update(20.0);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 20\n"
-      "stats_metric_min 10\n"
-      "stats_metric_max 20\n"
-      "stats_metric_mean 15\n"
-      "stats_metric_stddev 5\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 20\n"
+      "impala_stats_metric_min 10\n"
+      "impala_stats_metric_max 20\n"
+      "impala_stats_metric_mean 15\n"
+      "impala_stats_metric_stddev 5\n",
       "", "counter");
 }
 
@@ -651,13 +676,13 @@ TEST_F(MetricsTest, StatsMetricsTimeMSPrometheus) {
   metric->Update(20.0);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 0.02\n"
-      "stats_metric_min 0.01\n"
-      "stats_metric_max 0.02\n"
-      "stats_metric_mean 0.015\n"
-      "stats_metric_stddev 0.005\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 0.02\n"
+      "impala_stats_metric_min 0.01\n"
+      "impala_stats_metric_max 0.02\n"
+      "impala_stats_metric_mean 0.015\n"
+      "impala_stats_metric_stddev 0.005\n",
       "", "counter");
 }
 
@@ -670,13 +695,13 @@ TEST_F(MetricsTest, StatsMetricsTimeNSPrometheus) {
   metric->Update(20.567);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 2.0567e-08\n"
-      "stats_metric_min 1.01235e-08\n"
-      "stats_metric_max 2.0567e-08\n"
-      "stats_metric_mean 1.53452e-08\n"
-      "stats_metric_stddev 5.22178e-09\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 2.0567e-08\n"
+      "impala_stats_metric_min 1.01235e-08\n"
+      "impala_stats_metric_max 2.0567e-08\n"
+      "impala_stats_metric_mean 1.53452e-08\n"
+      "impala_stats_metric_stddev 5.22178e-09\n",
       "", "counter");
 }
 
@@ -689,13 +714,13 @@ TEST_F(MetricsTest, StatsMetricsTimeSPrometheus) {
   metric->Update(20.22);
   std::stringstream stats_val;
   metrics.ToPrometheus(true, &stats_val);
-  AssertPrometheus(stats_val, "stats_metric",
-      "stats_metric_total 2\n"
-      "stats_metric_last 20.22\n"
-      "stats_metric_min 10.22\n"
-      "stats_metric_max 20.22\n"
-      "stats_metric_mean 15.22\n"
-      "stats_metric_stddev 5\n",
+  AssertPrometheus(stats_val, "impala_stats_metric",
+      "impala_stats_metric_total 2\n"
+      "impala_stats_metric_last 20.22\n"
+      "impala_stats_metric_min 10.22\n"
+      "impala_stats_metric_max 20.22\n"
+      "impala_stats_metric_mean 15.22\n"
+      "impala_stats_metric_stddev 5\n",
       "", "counter");
 }
 
@@ -712,16 +737,16 @@ TEST_F(MetricsTest, HistogramPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  AssertPrometheus(val, "histogram_metric",
-      "histogram_metric{le=\"0.2\"} 2.5\n"
-      "histogram_metric{le=\"0.5\"} 5\n"
-      "histogram_metric{le=\"0.7\"} 7.5\n"
-      "histogram_metric{le=\"0.9\"} 9\n"
-      "histogram_metric{le=\"0.95\"} 9.496\n"
-      "histogram_metric{le=\"0.999\"} 9.984\n"
-      "histogram_metric_max 10.001\n"
-      "histogram_metric_min 0\n"
-      "histogram_metric_count 10002",
+  AssertPrometheus(val, "impala_histogram_metric",
+      "impala_histogram_metric{le=\"0.2\"} 2.5\n"
+      "impala_histogram_metric{le=\"0.5\"} 5\n"
+      "impala_histogram_metric{le=\"0.7\"} 7.5\n"
+      "impala_histogram_metric{le=\"0.9\"} 9\n"
+      "impala_histogram_metric{le=\"0.95\"} 9.496\n"
+      "impala_histogram_metric{le=\"0.999\"} 9.984\n"
+      "impala_histogram_metric_max 10.001\n"
+      "impala_histogram_metric_min 0\n"
+      "impala_histogram_metric_count 10002",
       "", "histogram");
 }
 
@@ -738,16 +763,16 @@ TEST_F(MetricsTest, HistogramTimeNSPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  AssertPrometheus(val, "histogram_metric",
-      "histogram_metric{le=\"0.2\"} 2.5e-06\n"
-      "histogram_metric{le=\"0.5\"} 5e-06\n"
-      "histogram_metric{le=\"0.7\"} 7.5e-06\n"
-      "histogram_metric{le=\"0.9\"} 9e-06\n"
-      "histogram_metric{le=\"0.95\"} 9.496e-06\n"
-      "histogram_metric{le=\"0.999\"} 9.984e-06\n"
-      "histogram_metric_max 1.0001e-05\n"
-      "histogram_metric_min 0\n"
-      "histogram_metric_count 10002",
+  AssertPrometheus(val, "impala_histogram_metric",
+      "impala_histogram_metric{le=\"0.2\"} 2.5e-06\n"
+      "impala_histogram_metric{le=\"0.5\"} 5e-06\n"
+      "impala_histogram_metric{le=\"0.7\"} 7.5e-06\n"
+      "impala_histogram_metric{le=\"0.9\"} 9e-06\n"
+      "impala_histogram_metric{le=\"0.95\"} 9.496e-06\n"
+      "impala_histogram_metric{le=\"0.999\"} 9.984e-06\n"
+      "impala_histogram_metric_max 1.0001e-05\n"
+      "impala_histogram_metric_min 0\n"
+      "impala_histogram_metric_count 10002",
       "", "histogram");
 }
 
@@ -764,16 +789,16 @@ TEST_F(MetricsTest, HistogramTimeSPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  AssertPrometheus(val, "histogram_metric",
-      "histogram_metric{le=\"0.2\"} 2500\n"
-      "histogram_metric{le=\"0.5\"} 5000\n"
-      "histogram_metric{le=\"0.7\"} 7500\n"
-      "histogram_metric{le=\"0.9\"} 9000\n"
-      "histogram_metric{le=\"0.95\"} 9496\n"
-      "histogram_metric{le=\"0.999\"} 9984\n"
-      "histogram_metric_max 10001\n"
-      "histogram_metric_min 0\n"
-      "histogram_metric_count 10002",
+  AssertPrometheus(val, "impala_histogram_metric",
+      "impala_histogram_metric{le=\"0.2\"} 2500\n"
+      "impala_histogram_metric{le=\"0.5\"} 5000\n"
+      "impala_histogram_metric{le=\"0.7\"} 7500\n"
+      "impala_histogram_metric{le=\"0.9\"} 9000\n"
+      "impala_histogram_metric{le=\"0.95\"} 9496\n"
+      "impala_histogram_metric{le=\"0.999\"} 9984\n"
+      "impala_histogram_metric_max 10001\n"
+      "impala_histogram_metric_min 0\n"
+      "impala_histogram_metric_count 10002",
       "", "histogram");
 }
 
@@ -790,16 +815,16 @@ TEST_F(MetricsTest, HistogramBytesPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  AssertPrometheus(val, "histogram_metric",
-      "histogram_metric{le=\"0.2\"} 2500\n"
-      "histogram_metric{le=\"0.5\"} 5000\n"
-      "histogram_metric{le=\"0.7\"} 7500\n"
-      "histogram_metric{le=\"0.9\"} 9000\n"
-      "histogram_metric{le=\"0.95\"} 9496\n"
-      "histogram_metric{le=\"0.999\"} 9984\n"
-      "histogram_metric_max 10001\n"
-      "histogram_metric_min 0\n"
-      "histogram_metric_count 10002",
+  AssertPrometheus(val, "impala_histogram_metric",
+      "impala_histogram_metric{le=\"0.2\"} 2500\n"
+      "impala_histogram_metric{le=\"0.5\"} 5000\n"
+      "impala_histogram_metric{le=\"0.7\"} 7500\n"
+      "impala_histogram_metric{le=\"0.9\"} 9000\n"
+      "impala_histogram_metric{le=\"0.95\"} 9496\n"
+      "impala_histogram_metric{le=\"0.999\"} 9984\n"
+      "impala_histogram_metric_max 10001\n"
+      "impala_histogram_metric_min 0\n"
+      "impala_histogram_metric_count 10002",
       "", "histogram");
 }
 
@@ -816,30 +841,30 @@ TEST_F(MetricsTest, HistogramUnitPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  AssertPrometheus(val, "histogram_metric",
-      "histogram_metric{le=\"0.2\"} 2500\n"
-      "histogram_metric{le=\"0.5\"} 5000\n"
-      "histogram_metric{le=\"0.7\"} 7500\n"
-      "histogram_metric{le=\"0.9\"} 9000\n"
-      "histogram_metric{le=\"0.95\"} 9496\n"
-      "histogram_metric{le=\"0.999\"} 9984\n"
-      "histogram_metric_max 10001\n"
-      "histogram_metric_min 0\n"
-      "histogram_metric_count 10002",
+  AssertPrometheus(val, "impala_histogram_metric",
+      "impala_histogram_metric{le=\"0.2\"} 2500\n"
+      "impala_histogram_metric{le=\"0.5\"} 5000\n"
+      "impala_histogram_metric{le=\"0.7\"} 7500\n"
+      "impala_histogram_metric{le=\"0.9\"} 9000\n"
+      "impala_histogram_metric{le=\"0.95\"} 9496\n"
+      "impala_histogram_metric{le=\"0.999\"} 9984\n"
+      "impala_histogram_metric_max 10001\n"
+      "impala_histogram_metric_min 0\n"
+      "impala_histogram_metric_count 10002",
       "", "histogram");
 }
 
 TEST_F(MetricsTest, MetricGroupPrometheus) {
   std::stringstream exp_val;
-  exp_val << "# HELP counter1 description\n"
-             "# TYPE counter1 counter\n"
-             "counter1 2048\n"
-             "# HELP counter2 description\n"
-             "# TYPE counter2 counter\n"
-             "counter2 2048\n"
-             "# HELP child_counter description\n"
-             "# TYPE child_counter counter\n"
-             "child_counter 0\n";
+  exp_val << "# HELP impala_counter1 description\n"
+             "# TYPE impala_counter1 counter\n"
+             "impala_counter1 2048\n"
+             "# HELP impala_counter2 description\n"
+             "# TYPE impala_counter2 counter\n"
+             "impala_counter2 2048\n"
+             "# HELP impala_child_counter description\n"
+             "# TYPE impala_child_counter counter\n"
+             "impala_child_counter 0\n";
   MetricGroup metrics("PrometheusTest");
   AddMetricDef("counter1", TMetricKind::COUNTER, TUnit::BYTES, "description");
   AddMetricDef("counter2", TMetricKind::COUNTER, TUnit::BYTES, "description");

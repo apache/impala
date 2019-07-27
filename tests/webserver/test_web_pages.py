@@ -580,4 +580,4 @@ class TestWebPage(ImpalaTestSuite):
     resp = self.get_and_check_status(self.PROMETHEUS_METRICS_URL)
     assert len(resp) == 3
     # check if metric shows up
-    assert 'statestore_subscriber_heartbeat_interval_time_min' in resp[0].text
+    assert 'impala_statestore_subscriber_heartbeat_interval_time_min' in resp[0].text

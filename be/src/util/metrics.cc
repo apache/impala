@@ -36,7 +36,6 @@
 
 #include "common/names.h"
 
-using boost::algorithm::replace_all_copy;
 using namespace impala;
 using namespace rapidjson;
 using namespace strings;
@@ -277,9 +276,7 @@ void MetricGroup::ToPrometheus(bool include_children, stringstream* out_val) {
     stringstream metric_value;
     stringstream metric_kind;
 
-    // replace all occurrence of '.' and '-'
-    string name = replace_all_copy(m.first, ".", "_");
-    name = replace_all_copy(name, "-", "_");
+    const string& name = ImpalaToPrometheusName(m.first);
     TMetricKind::type metric_type =
         m.second->ToPrometheus(name, &metric_value, &metric_kind);
     if (metric_type == TMetricKind::SET || metric_type == TMetricKind::PROPERTY) {
@@ -306,6 +303,19 @@ void MetricGroup::ToPrometheus(bool include_children, stringstream* out_val) {
       child.second->ToPrometheus(true, out_val);
     }
   }
+}
+
+string MetricGroup::ImpalaToPrometheusName(const string& impala_metric_name) {
+  string result = impala_metric_name;
+  // Substitute characters as needed to match prometheus conventions. The string is
+  // already the right size so we can do this in place.
+  for (size_t i = 0; i < result.size(); ++i) {
+    if (result[i] == '.' || result[i] == '-') result[i] = '_';
+  }
+  if (result.compare(0, 7, "impala_") != 0) {
+    result.insert(0, "impala_");
+  }
+  return result;
 }
 
 MetricGroup* MetricGroup::GetOrCreateChildGroup(const string& name) {

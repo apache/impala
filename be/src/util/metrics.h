@@ -428,6 +428,7 @@ class MetricGroup {
   const std::string& name() const { return name_; }
 
  private:
+  FRIEND_TEST(MetricsTest, PrometheusMetricNames);
   /// Pool containing all metric objects
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
@@ -466,6 +467,16 @@ class MetricGroup {
 
   /// Non-templated implementation for FindMetricForTesting() that does not cast.
   Metric* FindMetricForTestingInternal(const std::string& key);
+
+  /// Convert an Impala metric name into its equivalent name for Prometheus.
+  /// All metrics that do not already have "impala_" as a prefix are prefixed with
+  /// "impala_" and have their names transformed to fit the standard Prometheus
+  /// metric naming conventions.
+  /// E.g.
+  /// * "impala-server.num-fragments" becomes "impala_server_num_fragments"
+  /// * "catalog.num-databases" becomes "impala_catalog_num_databases"
+  /// * "memory.rss" becomes "impala_memory_rss"
+  static std::string ImpalaToPrometheusName(const std::string& impala_metric_name);
 };
 
 
