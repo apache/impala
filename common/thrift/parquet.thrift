@@ -38,6 +38,28 @@ enum Type {
   DOUBLE = 5;
   BYTE_ARRAY = 6;
   FIXED_LEN_BYTE_ARRAY = 7;
+
+  /**
+   * UBSAN_FORCE_WIDTH forces the values of the C++ enum Type to include (1u << 31) - 1.
+   * That prevents the undefined behavior in the [expr] and [dcl.enum] sections of the
+   * C++14 standard:
+   *
+   *     If during the evaluation of an expression, the result is not mathematically
+   *     defined or not in the range of representable values for its type, the behavior is
+   *     undefined.
+   *
+   * and
+   *
+   *     [F]or an enumeration where emin is the smallest enumerator and emax is the
+   *     largest, the values of the enumeration are the values in the range bmin to bmax,
+   *     defined as follows: Let K be 1 for a two's complement representation and 0 for a
+   *     one's complement or sign-magnitude representation. bmax is the smallest value
+   *     greater than or equal to max(|emin| - K, |emax|) and equal to 2^M-1, where M is
+   *     a non-negative integer. bmin is zero if emin is non-negative and -(bmax+K)
+   *     otherwise.
+   */
+
+  UBSAN_FORCE_WIDTH = 0x7ffffff;
 }
 
 /**
