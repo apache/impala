@@ -55,6 +55,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.ClassUtil;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
@@ -602,6 +603,21 @@ public class MetastoreEvents {
       String partString = FileUtils.makePartName(partitionCols, partitionVals);
       return partString;
     }
+
+    /*
+     * Helper function to initiate a table reload on Catalog. Re-throws the exception if
+     * the catalog operation throws.
+     */
+    protected void reloadTableFromCatalog(String operation) throws CatalogException {
+      if (!catalog_.reloadTableIfExists(dbName_, tblName_,
+              "Processing " + operation + " event from HMS")) {
+        debugLog("Automatic refresh on table {} failed as the table is not "
+            + "present either in catalog or metastore.", getFullyQualifiedTblName());
+      } else {
+        infoLog("Table {} has been refreshed after " + operation +".",
+            getFullyQualifiedTblName());
+      }
+    }
   }
 
   /**
@@ -729,7 +745,7 @@ public class MetastoreEvents {
   public static class InsertEvent extends MetastoreTableEvent {
 
     // Represents the partition for this insert. Null if the table is unpartitioned.
-    private final org.apache.hadoop.hive.metastore.api.Partition insertPartition_;
+    private Partition insertPartition_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -760,9 +776,14 @@ public class MetastoreEvents {
      */
     @Override
     public void process() throws MetastoreNotificationException {
-      if (insertPartition_ != null)
+      // Reload the whole table if it's a transactional table.
+      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+        insertPartition_ = null;
+      }
+
+      if (insertPartition_ != null) {
         processPartitionInserts();
-      else {
+      } else {
         processTableInserts();
       }
     }
@@ -812,14 +833,7 @@ public class MetastoreEvents {
       try {
         // Ignore event if table or database is not in the catalog. Throw exception if
         // refresh fails.
-        if (!catalog_.reloadTableIfExists(dbName_, tblName_,
-              "processing table-level INSERT event from HMS")) {
-          debugLog("Automatic refresh table {} failed as the table is not "
-              + "present either catalog or metastore.", getFullyQualifiedTblName());
-        } else {
-          infoLog("Table {} has been refreshed after insert.",
-              getFullyQualifiedTblName());
-        }
+        reloadTableFromCatalog("table-level INSERT");
       } catch (DatabaseNotFoundException e) {
         debugLog("Automatic refresh of table {} insert failed as the "
             + "database is not present in the catalog.", getFullyQualifiedTblName());
@@ -1357,28 +1371,33 @@ public class MetastoreEvents {
       // Notification is created for newly created partitions only. We need not worry
       // about "IF NOT EXISTS".
       try {
-        boolean success = true;
-        // HMS adds partitions in a transactional way. This means there may be multiple
-        // HMS partition objects in an add_partition event. We try to do the same here by
-        // refreshing all those partitions in a loop. If any partition refresh fails, we
-        // throw MetastoreNotificationNeedsInvalidateException exception. We skip
-        // refresh of the partitions if the table is not present in the catalog.
-        infoLog("Trying to refresh {} partitions added to table {} in the event",
-            addedPartitions_.size(), getFullyQualifiedTblName());
-        for (Partition partition : addedPartitions_) {
-          List<TPartitionKeyValue> tPartSpec =
-              getTPartitionSpecFromHmsPartition(msTbl_, partition);
-          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-              "processing ADD_PARTITION event from HMS")) {
-            debugLog("Refresh partitions on table {} failed "
-                + "as table was not present in the catalog.", getFullyQualifiedTblName());
-            success = false;
-            break;
+        // Reload the whole table if it's a transactional table.
+        if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+          reloadTableFromCatalog("ADD_PARTITION");
+        } else {
+          boolean success = true;
+          // HMS adds partitions in a transactional way. This means there may be multiple
+          // HMS partition objects in an add_partition event. We try to do the same here
+          // by refreshing all those partitions in a loop. If any partition refresh fails,
+          // we throw MetastoreNotificationNeedsInvalidateException exception. We skip
+          // refresh of the partitions if the table is not present in the catalog.
+          infoLog("Trying to refresh {} partitions added to table {} in the event",
+              addedPartitions_.size(), getFullyQualifiedTblName());
+          for (Partition partition : addedPartitions_) {
+            List<TPartitionKeyValue> tPartSpec =
+                getTPartitionSpecFromHmsPartition(msTbl_, partition);
+            if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+                "processing ADD_PARTITION event from HMS")) {
+              debugLog("Refresh partitions on table {} failed as table was not present " +
+                  "in the catalog.", getFullyQualifiedTblName());
+              success = false;
+              break;
+            }
           }
-        }
-        if (success) {
-          infoLog("Refreshed {} partitions of table {}", addedPartitions_.size(),
-              getFullyQualifiedTblName());
+          if (success) {
+            infoLog("Refreshed {} partitions of table {}", addedPartitions_.size(),
+                getFullyQualifiedTblName());
+          }
         }
       } catch (DatabaseNotFoundException e) {
         debugLog("Refresh partitions on table {} after add_partitions event failed as "
@@ -1448,34 +1467,39 @@ public class MetastoreEvents {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
-      // Refresh the partition that was altered.
-      Preconditions.checkNotNull(partitionAfter_);
-      List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
-          partitionAfter_);
-      try {
-        // Ignore event if table or database is not in catalog. Throw exception if
-        // refresh fails.
-
-        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-            "processing ALTER_PARTITION event from HMS")) {
-          debugLog("Refresh of table {} partition {} failed as the table "
-                  + "is not present in the catalog.", getFullyQualifiedTblName(),
+      // Reload the whole table if it's a transactional table.
+      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+        reloadTableFromCatalog("ALTER_PARTITION");
+      } else {
+        // Refresh the partition that was altered.
+        Preconditions.checkNotNull(partitionAfter_);
+        List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
+            partitionAfter_);
+        try {
+          // Ignore event if table or database is not in catalog. Throw exception if
+          // refresh fails.
+          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+              "processing ALTER_PARTITION event from HMS")) {
+            debugLog("Refresh of table {} partition {} failed as the table "
+                    + "is not present in the catalog.", getFullyQualifiedTblName(),
+                constructPartitionStringFromTPartitionSpec(tPartSpec));
+          } else {
+            infoLog("Table {} partition {} has been refreshed",
+                getFullyQualifiedTblName(),
+                constructPartitionStringFromTPartitionSpec(tPartSpec));
+          }
+        } catch (DatabaseNotFoundException e) {
+          debugLog("Refresh of table {} partition {} "
+                  + "event failed as the database is not present in the catalog.",
+              getFullyQualifiedTblName(),
               constructPartitionStringFromTPartitionSpec(tPartSpec));
-        } else {
-          infoLog("Table {} partition {} has been refreshed", getFullyQualifiedTblName(),
-              constructPartitionStringFromTPartitionSpec(tPartSpec));
+        } catch (CatalogException e) {
+          throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
+                  + "partition on table {} partition {} failed. Event processing cannot "
+                  + "continue. Issue and invalidate command to reset the event processor "
+                  + "state.", getFullyQualifiedTblName(),
+              constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
         }
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Refresh of table {} partition {} "
-                + "event failed as the database is not present in the catalog.",
-            getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec));
-      } catch (CatalogException e) {
-        throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
-                + "partition on table {} partition {} failed. Event processing cannot "
-                + "continue. Issue and invalidate command to reset the event processor "
-                + "state.", getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
       }
     }
 
@@ -1532,28 +1556,33 @@ public class MetastoreEvents {
       // We do not need self event as dropPartition() call is a no-op if the directory
       // doesn't exist.
       try {
-        boolean success = true;
-        // We refresh all the partitions that were dropped from HMS. If a refresh
-        // fails, we throw a MetastoreNotificationNeedsInvalidateException
-        infoLog("{} partitions dropped from table {}. Trying "
-            + "to refresh.", droppedPartitions_.size(), getFullyQualifiedTblName());
-        for (Map<String, String> partSpec : droppedPartitions_) {
-          List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
-          for (Map.Entry<String, String> entry : partSpec.entrySet()) {
-            tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
+        // Reload the whole table if it's a transactional table.
+        if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+          reloadTableFromCatalog("DROP_PARTITION");
+        } else {
+          boolean success = true;
+          // We refresh all the partitions that were dropped from HMS. If a refresh
+          // fails, we throw a MetastoreNotificationNeedsInvalidateException
+          infoLog("{} partitions dropped from table {}. Trying "
+              + "to refresh.", droppedPartitions_.size(), getFullyQualifiedTblName());
+          for (Map<String, String> partSpec : droppedPartitions_) {
+            List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
+            for (Map.Entry<String, String> entry : partSpec.entrySet()) {
+              tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
+            }
+            if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
+                "processing DROP_PARTITION event from HMS")) {
+              debugLog("Could not refresh partition {} of table {} as table "
+                      + "was not present in the catalog.",
+                      getFullyQualifiedTblName());
+              success = false;
+              break;
+            }
           }
-          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-              "processing DROP_PARTITION event from HMS")) {
-            debugLog("Could not refresh partition {} of table {} as table "
-                    + "was not present in the catalog.",
-                    getFullyQualifiedTblName());
-            success = false;
-            break;
+          if (success) {
+            infoLog("Refreshed {} partitions of table {}", droppedPartitions_.size(),
+                getFullyQualifiedTblName());
           }
-        }
-        if (success) {
-          infoLog("Refreshed {} partitions of table {}", droppedPartitions_.size(),
-              getFullyQualifiedTblName());
         }
       } catch (DatabaseNotFoundException e) {
         debugLog("Could not refresh partitions of table {}"

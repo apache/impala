@@ -22,12 +22,15 @@ import java.util.List;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.AcidUtils;
 
 import com.google.common.base.Preconditions;
 
@@ -150,6 +153,17 @@ public class ResetMetadataStmt extends StatementBase {
                 tableName_);
           }
           if (partitionSpec_ != null) {
+            try {
+              // Get local table info without reaching out to HMS
+              FeTable table = analyzer.getTable(dbName, tableName_.getTbl());
+              if (AcidUtils.isTransactionalTable(
+                      table.getMetaStoreTable().getParameters())) {
+                throw new AnalysisException("Refreshing a partition is not allowed on " +
+                    "transactional tables. Try to refresh the whole table instead.");
+              }
+            } catch (TableLoadingException e) {
+              throw new AnalysisException(e);
+            }
             partitionSpec_.setPrivilegeRequirement(Privilege.ANY);
             partitionSpec_.analyze(analyzer);
           }

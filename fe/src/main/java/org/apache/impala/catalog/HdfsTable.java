@@ -1897,4 +1897,11 @@ public class HdfsTable extends Table implements FeFsTable {
     tmpTable.setTableStats(msTbl);
     return tmpTable;
   }
+
+  /**
+   * Returns true if the table is partitioned, false otherwise.
+   */
+  public boolean isPartitioned() {
+    return getMetaStoreTable().getPartitionKeysSize() > 0;
+  }
 }

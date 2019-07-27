@@ -83,6 +83,7 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
@@ -91,7 +92,6 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -3524,6 +3524,22 @@ public class CatalogOpExecutor {
     return msTbl;
   }
 
+  /**
+   * Returns the metastore.api.Table object from the Hive Metastore for an existing
+   * fully loaded table. Gets the MetaStore object from 'catalog_'.
+   */
+  private org.apache.hadoop.hive.metastore.api.Table getTableFromMetaStore(
+      TableName tblName) throws CatalogException {
+    Preconditions.checkNotNull(tblName);
+    org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      msTbl = msClient.getHiveClient().getTable(tblName.getDb(),tblName.getTbl());
+    } catch (TException e) {
+      LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
+    }
+    return msTbl;
+  }
+
   private static List<FieldSchema> buildFieldSchemaList(List<TColumn> columns) {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
@@ -3591,15 +3607,45 @@ public class CatalogOpExecutor {
         if (tbl != null) {
           // If the table is not loaded, no need to perform refresh after the initial
           // metadata load.
-          boolean needsRefresh = tbl.isLoaded();
+          boolean isTableLoadedInCatalog = tbl.isLoaded();
           tbl = getExistingTable(tblName.getDb(), tblName.getTbl(),
               "Load triggered by " + cmdString);
           if (tbl != null) {
-            if (needsRefresh) {
+            if (isTableLoadedInCatalog) {
+              boolean isTransactional = AcidUtils.isTransactionalTable(
+                  tbl.getMetaStoreTable().getParameters());
               if (req.isSetPartition_spec()) {
+                Preconditions.checkArgument(!isTransactional);
                 updatedThriftTable = catalog_.reloadPartition(tbl,
                     req.getPartition_spec(), cmdString);
               } else {
+                if (isTransactional) {
+                  org.apache.hadoop.hive.metastore.api.Table hmsTbl =
+                      getTableFromMetaStore(tblName);
+                  if (hmsTbl == null) {
+                      throw new TableNotFoundException("Table not found: " +
+                          tblName.toString());
+                  }
+                  HdfsTable hdfsTable = (HdfsTable)tbl;
+                  if (!hdfsTable.isPartitioned() &&
+                      MetastoreShim.getWriteIdFromMSTable(tbl.getMetaStoreTable()) ==
+                      MetastoreShim.getWriteIdFromMSTable(hmsTbl)) {
+                    // No need to refresh the table if the local writeId equals to the
+                    // latest writeId from HMS and the table is not partitioned.
+                    LOG.debug("Skip reloading table " + tblName.toString() +
+                        " because it has the latest writeId locally");
+                    resp.getResult().setStatus(new TStatus(TErrorCode.OK,
+                        new ArrayList<String>()));
+                    return resp;
+                  }
+                  // TODO IMPALA-8809: Optimisation for partitioned tables:
+                  //   1: Reload the whole table if schema change happened. Identify
+                  //     such scenario by checking Table.TBL_PROP_LAST_DDL_TIME property.
+                  //     Note, table level writeId is not updated by HMS for partitioned
+                  //     ACID tables, there is a Jira to cover this: HIVE-22062.
+                  //   2: If no need for a full table reload then fetch partition level
+                  //     writeIds and reload only the ones that changed.
+                }
                 updatedThriftTable = catalog_.reloadTable(tbl, cmdString);
               }
             } else {

@@ -21,6 +21,8 @@ import time
 import requests
 
 from tests.common.environ import build_flavor_timeout
+from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, \
+    SkipIfLocal, SkipIfHive2
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.hive_utils import HiveDbWrapper
@@ -39,7 +41,20 @@ class TestEventProcessing(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=2")
+  @SkipIfHive2.acid
+  def test_insert_events_transactional(self):
+    """Executes 'run_test_insert_events' for transactional tables.
+    """
+    self.run_test_insert_events(is_transactional=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=2")
   def test_insert_events(self):
+    """Executes 'run_test_insert_events' for non-transactional tables.
+    """
+    self.run_test_insert_events()
+
+  def run_test_insert_events(self, is_transactional=False):
     """Test for insert event processing. Events are created in Hive and processed in
     Impala. The following cases are tested :
     Insert into table --> for partitioned and non-partitioned table
@@ -50,9 +65,14 @@ class TestEventProcessing(CustomClusterTestSuite):
     with HiveDbWrapper(self, db_name):
      # Test table with no partitions.
      TBL_INSERT_NOPART = 'tbl_insert_nopart'
+     self.run_stmt_in_hive("drop table if exists %s.%s" % (db_name, TBL_INSERT_NOPART))
      last_synced_event_id = self.get_last_synced_event_id()
-     self.run_stmt_in_hive("create table %s.%s (id int, val int)"
-         % (db_name, TBL_INSERT_NOPART))
+     TBLPROPERTIES = ""
+     if is_transactional:
+       TBLPROPERTIES = "TBLPROPERTIES ('transactional'='true'," \
+           "'transactional_properties'='insert_only')"
+     self.run_stmt_in_hive("create table %s.%s (id int, val int) %s"
+         % (db_name, TBL_INSERT_NOPART, TBLPROPERTIES))
      # Test insert into table, this will fire an insert event.
      self.run_stmt_in_hive("insert into %s.%s values(101, 200)"
          % (db_name, TBL_INSERT_NOPART))
@@ -76,8 +96,10 @@ class TestEventProcessing(CustomClusterTestSuite):
      # Test partitioned table.
      last_synced_event_id = self.get_last_synced_event_id()
      TBL_INSERT_PART = 'tbl_insert_part'
+     self.run_stmt_in_hive("drop table if exists %s.%s" % (db_name, TBL_INSERT_PART))
      self.run_stmt_in_hive("create table %s.%s (id int, name string) "
-         "partitioned by(day int, month int, year int)" % (db_name, TBL_INSERT_PART))
+         "partitioned by(day int, month int, year int) %s"
+         % (db_name, TBL_INSERT_PART, TBLPROPERTIES))
      # Insert data into partitions.
      self.run_stmt_in_hive("insert into %s.%s partition(day=28, month=03, year=2019)"
          "values(101, 'x')" % (db_name, TBL_INSERT_PART))

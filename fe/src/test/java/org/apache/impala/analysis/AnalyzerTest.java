@@ -611,6 +611,15 @@ public class AnalyzerTest extends FrontendTestBase {
 
     AnalyzesOk("show column stats functional_orc_def.full_transactional_table");
     AnalyzesOk("show column stats functional.insert_only_transactional_table");
+
+    AnalyzesOk("refresh functional.insert_only_transactional_table");
+    AnalyzesOk("refresh functional_orc_def.full_transactional_table");
+    AnalysisError("refresh functional.insert_only_transactional_table partition (j=1)",
+        "Refresh a partition is not allowed on transactional tables. Try to refresh " +
+        "the whole table instead.");
+    AnalysisError("refresh functional_orc_def.full_transactional_table partition (j=1)",
+        "Refresh a partition is not allowed on transactional tables. Try to refresh " +
+        "the whole table instead.");
   }
 
   @Test

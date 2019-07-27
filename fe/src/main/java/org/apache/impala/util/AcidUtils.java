@@ -43,7 +43,7 @@ import javax.annotation.Nullable;
  * Contains utility functions for working with Acid tables.
  * <p>
  * The code is mostly copy pasted from Hive. Ideally we should use the
- * the code directly from Hive.
+ * code directly from Hive.
  * </p>
  */
 public class AcidUtils {

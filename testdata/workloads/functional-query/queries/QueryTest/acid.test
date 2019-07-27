@@ -24,6 +24,14 @@ select * from tt order by x;
 1
 2
 ====
+---- QUERY
+# Do a second refresh on an already refreshed ACID table.
+refresh tt;
+select * from tt order by x;
+---- RESULTS
+1
+2
+====
 ---- HIVE_QUERY
 use $DATABASE;
 insert overwrite table tt values (3);
