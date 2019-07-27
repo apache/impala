@@ -77,6 +77,7 @@ make -j ${IMPALA_BUILD_THREADS} docker_images parquet-reader
 source_impala_config
 
 export TEST_START_CLUSTER_ARGS="--docker_network=${DOCKER_NETWORK}"
+TEST_START_CLUSTER_ARGS+=" --data_cache_dir=/tmp --data_cache_size=500m"
 export MAX_PYTEST_FAILURES=0
 export NUM_CONCURRENT_TESTS=$(nproc)
 # Frontend tests fail because of localhost hardcoded everywhere

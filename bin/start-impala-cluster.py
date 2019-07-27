@@ -138,6 +138,8 @@ IMPALA_HOME = os.environ["IMPALA_HOME"]
 CORE_SITE_PATH = os.path.join(IMPALA_HOME, "fe/src/test/resources/core-site.xml")
 KNOWN_BUILD_TYPES = ["debug", "release", "latest"]
 IMPALA_LZO = os.environ["IMPALA_LZO"]
+# The location in the container where the cache is always mounted.
+DATA_CACHE_CONTAINER_PATH = "/opt/impala/cache"
 
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
@@ -348,8 +350,15 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       # Try creating the directory if it doesn't exist already. May raise exception.
       if not os.path.exists(data_cache_path):
         os.mkdir(data_cache_path)
+      if options.docker_network is None:
+        data_cache_path_arg = data_cache_path
+      else:
+        # The data cache directory will always be mounted at the same path inside the
+        # container.
+        data_cache_path_arg = DATA_CACHE_CONTAINER_PATH
+
       args = "-data_cache={dir}:{quota} {args}".format(
-          dir=data_cache_path, quota=options.data_cache_size, args=args)
+          dir=data_cache_path_arg, quota=options.data_cache_size, args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
@@ -526,7 +535,7 @@ class DockerMiniClusterOperations(object):
                   DEFAULT_HS2_HTTP_PORT: chosen_ports['hs2_http_port'],
                   DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
       self.__run_container__("impalad_coord_exec", impalad_arg_lists[i], port_map, i,
-          mem_limit=mem_limit)
+          mem_limit=mem_limit, supports_data_cache=True)
 
   def __gen_container_name__(self, daemon, instance=None):
     """Generate the name for the container, which should be unique among containers
@@ -541,7 +550,8 @@ class DockerMiniClusterOperations(object):
       return daemon
     return "{0}-{1}".format(daemon, instance)
 
-  def __run_container__(self, daemon, args, port_map, instance=None, mem_limit=None):
+  def __run_container__(self, daemon, args, port_map, instance=None, mem_limit=None,
+      supports_data_cache=False):
     """Launch a container with the daemon - impalad, catalogd, or statestored. If there
     are multiple impalads in the cluster, a unique instance number must be specified.
     'args' are command-line arguments to be appended to the end of the daemon command
@@ -549,7 +559,9 @@ class DockerMiniClusterOperations(object):
     --docker_auto_ports was set on the command line, 'port_map' is ignored and Docker
     will automatically choose the mapping. If there is an existing running or stopped
     container with the same name, it will be destroyed. If provided, mem_limit is
-    passed to "docker run" as a string to set the memory limit for the container."""
+    passed to "docker run" as a string to set the memory limit for the container.
+    If 'supports_data_cache' is true and the data cache is enabled via --data_cache_dir,
+    mount the data cache inside the container."""
     self.__destroy_container__(daemon, instance)
     if options.docker_auto_ports:
       port_args = ["-P"]
@@ -577,6 +589,15 @@ class DockerMiniClusterOperations(object):
     if not os.path.isdir(log_dir):
       os.makedirs(log_dir)
     mount_args += ["--mount", "type=bind,src={0},dst=/opt/impala/logs".format(log_dir)]
+
+    # Create a data cache subdirectory for each daemon and mount at /opt/impala/cache
+    # in the container.
+    if options.data_cache_dir and supports_data_cache:
+      data_cache_dir = os.path.join(options.data_cache_dir, host_name + "_cache")
+      if not os.path.isdir(data_cache_dir):
+        os.makedirs(data_cache_dir)
+      mount_args += ["--mount", "type=bind,src={0},dst={1}".format(
+                     data_cache_dir, DATA_CACHE_CONTAINER_PATH)]
 
     # Run the container as the current user.
     user_args = ["--user", "{0}:{1}".format(os.getuid(), os.getgid())]
