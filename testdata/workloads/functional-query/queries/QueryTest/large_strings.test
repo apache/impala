@@ -1,5 +1,6 @@
 ====
 ---- QUERY
+set mem_limit=4gb;
 # IMPALA-1619 group_concat() error
 select length(group_concat(l_comment, "!")) from (
 select l_comment from tpch_parquet.lineitem union all
@@ -114,6 +115,7 @@ Memory limit exceeded
 ====
 ---- QUERY
 #IMPALA-3350: Results of string functions can exceed 1GB.
+set mem_limit=4gb;
 select length(concat_ws(',', s, s, s, s)) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -123,6 +125,7 @@ select length(concat_ws(',', s, s, s, s)) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(repeat(s, 10)) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -132,6 +135,7 @@ select length(repeat(s, 10)) from (
 repeat() result is larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(lpad(s, 1073741830, '!')) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -141,6 +145,7 @@ select length(lpad(s, 1073741830, '!')) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(rpad(s, 1073741830, '~')) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -150,11 +155,14 @@ select length(rpad(s, 1073741830, '~')) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
+set mem_limit=4gb;
 select space(1073741830);
 ---- CATCH
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(regexp_replace(s, '.', '++++++++')) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -164,6 +172,7 @@ select length(regexp_replace(s, '.', '++++++++')) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(replace(s, ' ', '++++++++')) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -173,6 +182,7 @@ select length(replace(s, ' ', '++++++++')) from (
 625718301
 =====
 ---- QUERY
+set mem_limit=5gb;
 select replace(x, '+', '000') from (select (replace(s, ' ', '++++++++')) x from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -182,16 +192,19 @@ select replace(x, '+', '000') from (select (replace(s, ' ', '++++++++')) x from 
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select trunc(timestamp_col, space(1073741830)) from functional.alltypes
 ---- CATCH
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select extract(timestamp_col, space(1073741830)) from functional.alltypes
 ---- CATCH
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(madlib_encode_vector(concat_ws(',', s, s, s, s))) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -201,6 +214,7 @@ select length(madlib_encode_vector(concat_ws(',', s, s, s, s))) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 select length(madlib_decode_vector(concat_ws(',', s, s, s, s))) from (
   select group_concat(l_comment, "!") s from (
     select l_comment from tpch.lineitem union all
@@ -210,6 +224,7 @@ select length(madlib_decode_vector(concat_ws(',', s, s, s, s))) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+set mem_limit=4gb;
 # IMPALA-4874: Generate a large row made up of multiple large strings to test RPC
 #              transmission. This uses hashing to make this difficult to compress,
 #              which results in a larger row batch.
@@ -226,6 +241,7 @@ INT,INT
 489174530,489174530
 =====
 ---- QUERY
+set mem_limit=4gb;
 select repeat('the quick brown fox', 1024 * 1024 * 100)
 ---- CATCH
 repeat() result is larger than allowed limit of 1 GB character data

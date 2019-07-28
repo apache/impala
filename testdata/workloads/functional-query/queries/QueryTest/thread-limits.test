@@ -5,7 +5,7 @@
 set thread_reservation_limit=2;
 select count(*) from alltypes
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+row_regex:.*Rejected query from pool .*: thread reservation on backend '.*'
  is greater than the THREAD_RESERVATION_LIMIT query option value: 3 > 2\.
 ====
 ---- QUERY
@@ -41,7 +41,7 @@ set thread_reservation_limit=3;
 set mt_dop=4;
 select count(*) from alltypes
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+row_regex:.*Rejected query from pool .*: thread reservation on backend '.*'
  is greater than the THREAD_RESERVATION_LIMIT query option value: 5 > 3\.
 ====
 ---- QUERY
@@ -50,7 +50,7 @@ row_regex:.*Rejected query from pool default-pool: thread reservation on backend
 set thread_reservation_aggregate_limit=3;
 select count(*) from alltypes
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: sum of thread reservations across
+row_regex:.*Rejected query from pool .*: sum of thread reservations across
  all [0-9]+ backends is greater than the THREAD_RESERVATION_AGGREGATE_LIMIT query option
  value: [0-9]+ > 3\.
 ====
@@ -70,7 +70,7 @@ BIGINT
 set thread_reservation_aggregate_limit=3;
 select count(*) from tpch_parquet.orders
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: sum of thread reservations across
+row_regex:.*Rejected query from pool .*: sum of thread reservations across
  all [0-9]+ backends is greater than the THREAD_RESERVATION_AGGREGATE_LIMIT query option
  value: [0-9]+ > 3\.
 ====
@@ -119,6 +119,6 @@ with
  c512 as (select * from c256 union select * from c256)
 select * from c512 union select * from c512;
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+row_regex:.*Rejected query from pool .*: thread reservation on backend '.*'
  is greater than the THREAD_RESERVATION_LIMIT query option value: [0-9]* > 3000\.
 ====

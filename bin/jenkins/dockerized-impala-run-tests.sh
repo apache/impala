@@ -76,8 +76,12 @@ make -j ${IMPALA_BUILD_THREADS} docker_debug_images parquet-reader
 
 source_impala_config
 
+FAIR_SCHED_CONF=/opt/impala/conf/minicluster-fair-scheduler.xml
+LLAMA_CONF=/opt/impala/conf/minicluster-llama-site.xml
 export TEST_START_CLUSTER_ARGS="--docker_network=${DOCKER_NETWORK}"
 TEST_START_CLUSTER_ARGS+=" --data_cache_dir=/tmp --data_cache_size=500m"
+TEST_START_CLUSTER_ARGS+=" --impalad_args=-fair_scheduler_allocation_path=${FAIR_SCHED_CONF}"
+TEST_START_CLUSTER_ARGS+=" --impalad_args=-llama_site_path=${LLAMA_CONF}"
 export MAX_PYTEST_FAILURES=0
 export NUM_CONCURRENT_TESTS=$(nproc)
 # Frontend tests fail because of localhost hardcoded everywhere

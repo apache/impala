@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<allocations>
+  <queue name="root">
+    <weight>1.0</weight>
+    <schedulingPolicy>fair</schedulingPolicy>
+    <aclSubmitApps>*</aclSubmitApps>
+    <aclAdministerApps>*</aclAdministerApps>
+    <queue name="default">
+      <weight>1.0</weight>
+      <schedulingPolicy>fair</schedulingPolicy>
+      <!-- Set memory absurdly high, to force memory based AC to be enabled
+           but so that only the per-host memory limits are actually taken
+           into account for admission control. -->
+      <maxResources>30000 mb, 0 vcores</maxResources>
+    </queue>
+    <!-- A pool with no per-query limits at all. Used for tests where we want to run
+       without memory limits, etc. Only one query can be executed at a time in this
+       pool, to make things more predictable.-->
+    <queue name="no-limits">
+      <weight>1.0</weight>
+      <schedulingPolicy>fair</schedulingPolicy>
+    </queue>
+  </queue>
+  <defaultQueueSchedulingPolicy>fair</defaultQueueSchedulingPolicy>
+  <queuePlacementPolicy>
+    <rule name="specified" create="false"/>
+    <rule name="default"/>
+  </queuePlacementPolicy>
+</allocations>

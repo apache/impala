@@ -1826,5 +1826,5 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 set mem_limit=1m;
 compute stats tpch_parquet.customer;
 ---- CATCH
-Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query for buffer reservations
+row_regex: .*Rejected query from pool .*: minimum memory reservation is greater than memory available to the query for buffer reservations.*
 ====

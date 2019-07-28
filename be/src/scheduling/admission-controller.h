@@ -478,6 +478,7 @@ class AdmissionController {
       IntGauge* pool_max_mem_resources;
       IntGauge* pool_max_requests;
       IntGauge* pool_max_queued;
+      IntGauge* pool_queue_timeout;
       IntGauge* max_query_mem_limit;
       IntGauge* min_query_mem_limit;
       BooleanProperty* clamp_mem_limit_query_option;
@@ -939,6 +940,9 @@ class AdmissionController {
   /// is configured.
   static std::string GetMaxRequestsForPoolDescription(
       const TPoolConfig& pool_config, int64_t cluster_size);
+
+  /// Returns the effective queue timeout for the pool in milliseconds.
+  static int64_t GetQueueTimeoutForPoolMs(const TPoolConfig& pool_config);
 
   /// Returns a maximum number of queries that should be dequeued locally from 'queue'
   /// before DequeueLoop waits on dequeue_cv_ at the top of its loop.

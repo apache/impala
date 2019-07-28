@@ -120,6 +120,8 @@ const string POOL_MAX_REQUESTS_METRIC_KEY_FORMAT =
   "admission-controller.pool-max-requests.$0";
 const string POOL_MAX_QUEUED_METRIC_KEY_FORMAT =
   "admission-controller.pool-max-queued.$0";
+const string POOL_QUEUE_TIMEOUT_METRIC_KEY_FORMAT =
+  "admission-controller.pool-queue-timeout.$0";
 const string POOL_MAX_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT =
   "admission-controller.pool-max-query-mem-limit.$0";
 const string POOL_MIN_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT =
@@ -777,6 +779,7 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(
   metrics_.pool_max_mem_resources->SetValue(pool_cfg.max_mem_resources);
   metrics_.pool_max_requests->SetValue(pool_cfg.max_requests);
   metrics_.pool_max_queued->SetValue(pool_cfg.max_queued);
+  metrics_.pool_queue_timeout->SetValue(GetQueueTimeoutForPoolMs(pool_cfg));
   metrics_.max_query_mem_limit->SetValue(pool_cfg.max_query_mem_limit);
   metrics_.min_query_mem_limit->SetValue(pool_cfg.min_query_mem_limit);
   metrics_.clamp_mem_limit_query_option->SetValue(pool_cfg.clamp_mem_limit_query_option);
@@ -891,11 +894,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       PROFILE_INFO_KEY_LAST_QUEUED_REASON, queue_node.not_admitted_reason);
   request.query_events->MarkEvent(QUERY_EVENT_QUEUED);
 
-  int64_t queue_wait_timeout_ms = FLAGS_queue_wait_timeout_ms;
-  if (pool_cfg.__isset.queue_timeout_ms) {
-    queue_wait_timeout_ms = pool_cfg.queue_timeout_ms;
-  }
-  queue_wait_timeout_ms = max<int64_t>(0, queue_wait_timeout_ms);
+  int64_t queue_wait_timeout_ms = GetQueueTimeoutForPoolMs(pool_cfg);
   int64_t wait_start_ms = MonotonicMillis();
 
   // Block in Get() up to the time out, waiting for the promise to be set when the query
@@ -1446,6 +1445,13 @@ void AdmissionController::DequeueLoop() {
   }
 }
 
+int64_t AdmissionController::GetQueueTimeoutForPoolMs(const TPoolConfig& pool_config) {
+  int64_t queue_wait_timeout_ms = pool_config.__isset.queue_timeout_ms ?
+      pool_config.queue_timeout_ms :
+      FLAGS_queue_wait_timeout_ms;
+  return max<int64_t>(0, queue_wait_timeout_ms);
+}
+
 int64_t AdmissionController::GetMaxToDequeue(RequestQueue& queue, PoolStats* stats,
     const TPoolConfig& pool_config, int64_t cluster_size) {
   if (PoolLimitsRunningQueriesCount(pool_config)) {
@@ -1672,6 +1678,8 @@ void AdmissionController::PoolStats::ToJson(
       document->GetAllocator());
   pool->AddMember(
       "pool_max_queued", metrics_.pool_max_queued->GetValue(), document->GetAllocator());
+  pool->AddMember("pool_queue_timeout", metrics_.pool_queue_timeout->GetValue(),
+      document->GetAllocator());
   pool->AddMember("max_query_mem_limit", metrics_.max_query_mem_limit->GetValue(),
       document->GetAllocator());
   pool->AddMember("min_query_mem_limit", metrics_.min_query_mem_limit->GetValue(),
@@ -1766,6 +1774,8 @@ void AdmissionController::PoolStats::InitMetrics() {
       POOL_MAX_REQUESTS_METRIC_KEY_FORMAT, 0, name_);
   metrics_.pool_max_queued = parent_->metrics_group_->AddGauge(
       POOL_MAX_QUEUED_METRIC_KEY_FORMAT, 0, name_);
+  metrics_.pool_queue_timeout = parent_->metrics_group_->AddGauge(
+      POOL_QUEUE_TIMEOUT_METRIC_KEY_FORMAT, 0, name_);
   metrics_.max_query_mem_limit = parent_->metrics_group_->AddGauge(
       POOL_MAX_QUERY_MEM_LIMIT_METRIC_KEY_FORMAT, 0, name_);
   metrics_.min_query_mem_limit = parent_->metrics_group_->AddGauge(

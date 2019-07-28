@@ -533,33 +533,43 @@ class TestWebPage(ImpalaTestSuite):
     # without the pool_name search string.
     self.client.execute("select 1")
     response_json = self.__fetch_resource_pools_json()
-    assert response_json[0]['pool_name'] == "default-pool"
 
-    response_json = self.__fetch_resource_pools_json("default-pool")
-    assert response_json[0]['pool_name'] == "default-pool"
+    # Find the default pool. It is either "root.default" if a fair-scheduler.xml file
+    # is provided or "default-pool" otherwise.
+    default_pool = None
+    for pool_json in response_json:
+      pool_name = pool_json['pool_name']
+      if pool_name in ['default-pool', 'root.default']:
+        default_pool = pool_name
+        break
+    assert default_pool is not None, \
+        "Expected a default pool to be present in {0}".format(response_json)
+
+    response_json = self.__fetch_resource_pools_json(default_pool)
+    assert response_json[0]['pool_name'] == default_pool
 
     # Make sure the reset informational stats endpoint works, both with and without the
     # pool_name search string.
     assert response_json[0]['total_admitted'] > 0
     self.get_and_check_status(
-      self.RESET_RESOURCE_POOL_STATS_URL + "?pool_name=default-pool",
+      self.RESET_RESOURCE_POOL_STATS_URL + "?pool_name={0}".format(default_pool),
       ports_to_test=[25000])
-    response_json = self.__fetch_resource_pools_json("default-pool")
+    response_json = self.__fetch_resource_pools_json(default_pool)
     assert response_json[0]['total_admitted'] == 0
 
     self.client.execute("select 1")
-    response_json = self.__fetch_resource_pools_json("default-pool")
+    response_json = self.__fetch_resource_pools_json(default_pool)
     assert response_json[0]['total_admitted'] > 0
     self.get_and_check_status(self.RESET_RESOURCE_POOL_STATS_URL, ports_to_test=[25000])
-    response_json = self.__fetch_resource_pools_json("default-pool")
+    response_json = self.__fetch_resource_pools_json(default_pool)
     pool_config = response_json[0]
     assert pool_config['total_admitted'] == 0
 
     # check that metrics exist
-    assert pool_config['max_query_mem_limit'] == 0
-    assert pool_config['min_query_mem_limit'] == 0
-    assert pool_config['max_running_queries_multiple'] == 0
-    assert pool_config['max_memory_multiple'] == 0
+    assert 'max_query_mem_limit' in pool_config
+    assert 'min_query_mem_limit' in pool_config
+    assert 'max_running_queries_multiple' in pool_config
+    assert 'max_memory_multiple' in pool_config
     assert 'clamp_mem_limit_query_option' in pool_config
     assert 'max_running_queries_derived' in pool_config
     assert 'max_queued_queries_derived' in pool_config
@@ -577,7 +587,6 @@ class TestWebPage(ImpalaTestSuite):
     assert len(responses) == 1
     response_json = json.loads(responses[0].text)
     assert 'resource_pools' in response_json
-    assert len(response_json['resource_pools']) == 1
     return response_json['resource_pools']
 
   @SkipIfBuildType.remote

@@ -1,6 +1,8 @@
 ====
 ---- QUERY
 # Create a temporary table with 10MB strings for the following tests.
+# Need to bump memory estimate to prevent running out of memory.
+set mem_limit="1.2gb";
 create table bigstrs stored as parquet as
 select *, repeat(string_col, 10000000) as bigstr
 from functional.alltypes
@@ -55,6 +57,7 @@ int,bigint
 ====
 ---- QUERY
 # Row is too big to process in right side of hash join.
+set mem_limit="1gb";
 select straight_join atp.id, bs.id, atp.string_col
 from functional.alltypes atp
   join bigstrs bs on repeat(atp.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and atp.id = bs.id
@@ -64,6 +67,7 @@ Row of size 9.54 MB could not be materialized by HASH_JOIN_NODE (id=2). Increase
 ====
 ---- QUERY
 # Row is too big to process in right side of hash join.
+set mem_limit="1gb";
 set max_row_size=18m;
 select straight_join atp.id, bs.id, atp.string_col
 from functional.alltypes atp
@@ -148,6 +152,7 @@ Row of size 9.54 MB could not be materialized by SORT_NODE (id=1). Increase the 
 ---- QUERY
 # Sort and analytic should be able to process the large strings if we increase the row
 # size.
+set mem_limit="1gb";
 set max_row_size=10m;
 SELECT id, int_col, substring(bigstr, 1, 10), substring(bigstr, 9999999, 1), rank
 FROM (

@@ -203,6 +203,7 @@ class ImpalaHttpHandler {
   ///    "pool_max_mem_resources": 10485760,
   ///    "pool_max_requests": 10,
   ///    "pool_max_queued": 10,
+  ///    "pool_queue_timeout": 60000,
   ///    "max_query_mem_limit": 0,
   ///    "min_query_mem_limit": 0,
   ///    "clamp_mem_limit_query_option": true,

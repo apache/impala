@@ -86,6 +86,7 @@ class TestInsertQueries(ImpalaTestSuite):
       pytest.skip("Test unreasonably slow with JNI checking.")
     table_name = unique_database + ".insert_largestring"
 
+    self.client.set_configuration_option("mem_limit", "4gb")
     file_format = vector.get_value('table_format').file_format
     if file_format == "parquet":
       stored_as = file_format

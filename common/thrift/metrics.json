@@ -50,6 +50,16 @@
     "key": "admission-controller.pool-max-queued.$0"
   },
   {
+    "description": "Resource Pool $0 Queue Timeout",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Queue Timeout",
+    "units": "TIME_MS",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-queue-timeout.$0"
+  },
+  {
     "description": "Resource Pool $0 Max Query Memory Limit",
     "contexts": [
       "RESOURCE_POOL"

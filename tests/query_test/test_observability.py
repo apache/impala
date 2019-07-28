@@ -385,7 +385,10 @@ class TestObservability(ImpalaTestSuite):
         r'Last row fetched:',
         r'Released admission control resources:']
     query = "select * from functional.alltypes"
-    runtime_profile = self.execute_query(query).runtime_profile
+    # Use no-limits pool so that it cannot get queued in admission control (which would
+    # add an extra event to the above timeline).
+    query_opts = {'request_pool': 'root.no-limits'}
+    runtime_profile = self.execute_query(query, query_opts).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_instance_events(self):

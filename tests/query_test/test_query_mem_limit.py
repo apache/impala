@@ -94,6 +94,8 @@ class TestQueryMemLimit(ImpalaTestSuite):
     mem_limit = copy(vector.get_value('mem_limit'))
     exec_options = copy(vector.get_value('exec_option'))
     exec_options['mem_limit'] = mem_limit
+    # Send to the no-limits pool so that no memory limits apply.
+    exec_options['request_pool'] = "root.no-limits"
     query = vector.get_value('query')
     table_format = vector.get_value('table_format')
     if mem_limit in["0", "-1"] or self.PASS_REGEX.match(mem_limit):
