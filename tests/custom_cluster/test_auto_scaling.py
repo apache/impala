@@ -42,8 +42,8 @@ class TestAutoScaling(CustomClusterTestSuite):
   def _get_total_admitted_queries(self):
     return self.impalad_test_service.get_total_admitted_queries("default-pool")
 
-  def _get_num_executors(self):
-    return self.impalad_test_service.get_num_known_live_backends(only_executors=True)
+  def _get_num_backends(self):
+    return self.impalad_test_service.get_metric_value("cluster-membership.backends.total")
 
   def _get_num_running_queries(self):
     return self.impalad_test_service.get_num_running_queries("default-pool")
@@ -67,9 +67,12 @@ class TestAutoScaling(CustomClusterTestSuite):
       workload.start()
 
       # Wait for workers to spin up
-      assert any(self._get_num_executors() >= GROUP_SIZE or sleep(1)
+      cluster_size = GROUP_SIZE + 1  # +1 to include coordinator.
+      assert any(self._get_num_backends() >= cluster_size or sleep(1)
                  for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
           "Number of backends did not increase within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total-healthy") >= 1
 
       # Wait until we admitted at least 10 queries
       assert any(self._get_total_admitted_queries() >= 10 or sleep(1)
@@ -77,26 +80,30 @@ class TestAutoScaling(CustomClusterTestSuite):
           "Did not admit enough queries within %s s" % self.STATE_CHANGE_TIMEOUT_S
 
       # Wait for second executor group to start
-      num_expected = 2 * GROUP_SIZE
-      assert any(self._get_num_executors() == num_expected or sleep(1)
+      cluster_size = (2 * GROUP_SIZE) + 1
+      assert any(self._get_num_backends() >= cluster_size or sleep(1)
                  for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
                      "Number of backends did not reach %s within %s s" % (
-                     num_expected, self.STATE_CHANGE_TIMEOUT_S)
+                     cluster_size, self.STATE_CHANGE_TIMEOUT_S)
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total-healthy") >= 2
 
       # Wait for query rate to surpass the maximum for a single executor group plus 20%
       min_query_rate = 1.2 * EXECUTOR_SLOTS
       assert any(workload.get_query_rate() > min_query_rate or sleep(1)
                  for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
                      "Query rate did not surpass %s within %s s" % (
-                     num_expected, self.STATE_CHANGE_TIMEOUT_S)
+                     cluster_size, self.STATE_CHANGE_TIMEOUT_S)
 
       LOG.info("Stopping workload")
       workload.stop()
 
       # Wait for workers to spin down
-      assert any(self._get_num_executors() == 0 or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-          "Backends did not shut down within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", 1,
+        timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total") == 0
 
     finally:
       if workload:
@@ -122,9 +129,10 @@ class TestAutoScaling(CustomClusterTestSuite):
       workload.start()
 
       # Wait for workers to spin up
-      assert any(self._get_num_executors() >= GROUP_SIZE or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-          "Number of backends did not increase within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      cluster_size = GROUP_SIZE + 1  # +1 to include coordinator.
+      self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", cluster_size,
+        timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
 
       # Wait until we admitted at least 10 queries
       assert any(self._get_total_admitted_queries() >= 10 or sleep(1)
@@ -144,15 +152,18 @@ class TestAutoScaling(CustomClusterTestSuite):
           "Unexpected number of running queries: %s" % num_running
 
       # Check that only a single group started
-      assert self._get_num_executors() == GROUP_SIZE
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total-healthy") == 1
 
       LOG.info("Stopping workload")
       workload.stop()
 
       # Wait for workers to spin down
-      assert any(self._get_num_executors() == 0 or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-          "Backends did not shut down within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", 1,
+        timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total") == 0
 
     finally:
       if workload:
@@ -179,22 +190,23 @@ class TestAutoScaling(CustomClusterTestSuite):
       workload.start()
 
       # Wait for first executor to start up
-      assert any(self._get_num_executors() >= 1 or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-          "Number of backends did not increase within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.executor-groups.total", 1,
+        timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
 
       # Wait for remaining executors to start up and make sure that no queries are
       # admitted during startup
       end_time = time() + self.STATE_CHANGE_TIMEOUT_S
       startup_complete = False
+      cluster_size = GROUP_SIZE + 1  # +1 to include coordinator.
       while time() < end_time:
         num_admitted = self._get_total_admitted_queries()
-        num_backends = self._get_num_executors()
-        if num_backends < GROUP_SIZE:
+        num_backends = self._get_num_backends()
+        if num_backends < cluster_size:
           assert num_admitted == 0, "%s/%s backends started but %s queries have " \
-              "already been admitted." % (num_backends, GROUP_SIZE, num_admitted)
+              "already been admitted." % (num_backends, cluster_size, num_admitted)
         if num_admitted > 0:
-          assert num_backends == GROUP_SIZE
+          assert num_backends == cluster_size
           startup_complete = True
           break
         sleep(1)
@@ -205,9 +217,11 @@ class TestAutoScaling(CustomClusterTestSuite):
       workload.stop()
 
       # Wait for workers to spin down
-      assert any(self._get_num_executors() == 0 or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-          "Backends did not shut down within %s s" % self.STATE_CHANGE_TIMEOUT_S
+      self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", 1,
+        timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
+      assert self.impalad_test_service.get_metric_value(
+        "cluster-membership.executor-groups.total") == 0
 
     finally:
       if workload:

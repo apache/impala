@@ -32,6 +32,7 @@
 #include "scheduling/executor-group.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/container-util.h"
+#include "util/metrics-fwd.h"
 
 namespace impala {
 
@@ -127,7 +128,8 @@ class ClusterMembershipMgr {
   /// locks are held when calling this callback.
   typedef std::function<Status(const TUpdateExecutorMembershipRequest&)> UpdateFrontendFn;
 
-  ClusterMembershipMgr(std::string local_backend_id, StatestoreSubscriber* subscriber);
+  ClusterMembershipMgr(std::string local_backend_id, StatestoreSubscriber* subscriber,
+      MetricGroup* metrics);
 
   /// Initializes instances of this class. This only sets up the statestore subscription.
   /// Callbacks to the local ImpalaServer and Frontend must be registered in separate
@@ -205,10 +207,19 @@ class ClusterMembershipMgr {
   bool CheckConsistency(const BackendIdMap& current_backends,
       const ExecutorGroups& executor_groups, const ExecutorBlacklist& executor_blacklist);
 
+  /// Updates the membership metrics.
+  void UpdateMetrics(const BackendIdMap& current_backends,
+      const ExecutorGroups& executor_groups);
+
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
   /// locks in this class.
   boost::mutex update_membership_lock_;
+
+  /// Membership metrics
+  IntCounter* total_live_executor_groups_ = nullptr;
+  IntCounter* total_healthy_executor_groups_ = nullptr;
+  IntCounter* total_backends_ = nullptr;
 
   /// The snapshot of the current cluster membership. When receiving changes to the
   /// executors configuration from the statestore we will make a copy of the stored

@@ -2441,5 +2441,34 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "events-processor.events-received-15min-rate"
+  },
+  {
+    "description": "Total number of executor groups that have at least one executor",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of executor groups that have at least one executor",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.executor-groups.total"
+  },
+  {
+    "description": "Total number of executor groups that are in a healthy state, that is, have at least the configured minimum number of executors to be considered for admission",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of executor groups that are in a healthy state",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.executor-groups.total-healthy"
+  },{
+    "description": "Total number of backends registered with the statestore",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Total number of backends registered with the statestore",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "cluster-membership.backends.total"
   }
 ]

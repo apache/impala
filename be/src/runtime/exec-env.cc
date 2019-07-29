@@ -217,7 +217,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   }
 
   cluster_membership_mgr_.reset(new ClusterMembershipMgr(
-      statestore_subscriber_->id(), statestore_subscriber_.get()));
+      statestore_subscriber_->id(), statestore_subscriber_.get(), metrics_.get()));
 
   admission_controller_.reset(
       new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),

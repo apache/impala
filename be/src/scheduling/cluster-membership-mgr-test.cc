@@ -26,6 +26,7 @@
 #include "service/impala-server.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
+#include "util/metrics.h"
 
 using std::mt19937;
 using std::uniform_int_distribution;
@@ -69,6 +70,7 @@ class ClusterMembershipMgrTest : public testing::Test {
   /// A struct to hold information related to a simulated backend during the test.
   struct Backend {
     string backend_id;
+    std::unique_ptr<MetricGroup> metric_group;
     std::unique_ptr<ClusterMembershipMgr> cmm;
     std::shared_ptr<TBackendDescriptor> desc;
   };
@@ -175,7 +177,9 @@ class ClusterMembershipMgrTest : public testing::Test {
   /// this method.
   void CreateCMM(Backend* be) {
     ASSERT_TRUE(IsInVector(be, offline_));
-    be->cmm = make_unique<ClusterMembershipMgr>(be->backend_id, nullptr);
+    be->metric_group = make_unique<MetricGroup>("test");
+    be->cmm = make_unique<ClusterMembershipMgr>(
+        be->backend_id, nullptr, be->metric_group.get());
     RemoveFromVector(be, &offline_);
     starting_.push_back(be);
   }
@@ -268,8 +272,10 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   auto b1 = make_shared<TBackendDescriptor>(MakeBackendDescriptor(1));
   auto b2 = make_shared<TBackendDescriptor>(MakeBackendDescriptor(2));
 
-  ClusterMembershipMgr cmm1(b1->address.hostname, nullptr);
-  ClusterMembershipMgr cmm2(b2->address.hostname, nullptr);
+  MetricGroup tmp_metrics1("test-metrics1");
+  MetricGroup tmp_metrics2("test-metrics2");
+  ClusterMembershipMgr cmm1(b1->address.hostname, nullptr, &tmp_metrics1);
+  ClusterMembershipMgr cmm2(b2->address.hostname, nullptr, &tmp_metrics2);
 
   const Statestore::TopicId topic_id = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   StatestoreSubscriber::TopicDeltaMap topic_delta_map = {{topic_id, TTopicDelta()}};

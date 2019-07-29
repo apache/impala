@@ -694,10 +694,10 @@ void SchedulerWrapper::InitializeScheduler() {
                                            << "hosts.";
   const Host& scheduler_host = plan_.cluster().hosts()[0];
   string scheduler_backend_id = scheduler_host.ip;
-  cluster_membership_mgr_.reset(new ClusterMembershipMgr(scheduler_backend_id, nullptr));
-  cluster_membership_mgr_->SetLocalBeDescFn([scheduler_host]() {
-      return BuildBackendDescriptor(scheduler_host);
-  });
+  cluster_membership_mgr_.reset(
+      new ClusterMembershipMgr(scheduler_backend_id, nullptr, &metrics_));
+  cluster_membership_mgr_->SetLocalBeDescFn(
+      [scheduler_host]() { return BuildBackendDescriptor(scheduler_host); });
   Status status = cluster_membership_mgr_->Init();
   DCHECK(status.ok()) << "Cluster membership manager init failed in test";
   scheduler_.reset(new Scheduler(&metrics_, nullptr));

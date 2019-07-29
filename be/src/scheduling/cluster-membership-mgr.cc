@@ -19,6 +19,7 @@
 
 #include "common/logging.h"
 #include "common/names.h"
+#include "util/metrics.h"
 #include "util/test-info.h"
 
 namespace {
@@ -44,12 +45,22 @@ ExecutorGroup* FindOrInsertExecutorGroup(const TExecutorGroupDesc& group,
 
 namespace impala {
 
-ClusterMembershipMgr::ClusterMembershipMgr(string local_backend_id,
-    StatestoreSubscriber* subscriber) :
-    current_membership_(std::make_shared<const Snapshot>()),
+static const string LIVE_EXEC_GROUP_KEY("cluster-membership.executor-groups.total");
+static const string HEALTHY_EXEC_GROUP_KEY(
+    "cluster-membership.executor-groups.total-healthy");
+static const string TOTAL_BACKENDS_KEY("cluster-membership.backends.total");
+
+ClusterMembershipMgr::ClusterMembershipMgr(
+    string local_backend_id, StatestoreSubscriber* subscriber, MetricGroup* metrics)
+  : current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
     thrift_serializer_(/* compact= */ false),
     local_backend_id_(move(local_backend_id)) {
+  DCHECK(metrics != nullptr);
+  MetricGroup* metric_grp = metrics->GetOrCreateChildGroup("cluster-membership");
+  total_live_executor_groups_ = metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY, 0);
+  total_healthy_executor_groups_ = metric_grp->AddCounter(HEALTHY_EXEC_GROUP_KEY, 0);
+  total_backends_ = metric_grp->AddCounter(TOTAL_BACKENDS_KEY, 0);
 }
 
 Status ClusterMembershipMgr::Init() {
@@ -311,6 +322,8 @@ void ClusterMembershipMgr::UpdateMembership(
     DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
   }
 
+  UpdateMetrics(*new_backend_map, *new_executor_groups);
+
   // Don't send updates or update the current membership if the statestore is in its
   // post-recovery grace period.
   if (ss_is_recovering) {
@@ -525,6 +538,25 @@ bool ClusterMembershipMgr::CheckConsistency(const BackendIdMap& current_backends
     }
   }
   return true;
+}
+
+void ClusterMembershipMgr::UpdateMetrics(
+    const BackendIdMap& current_backends, const ExecutorGroups& executor_groups) {
+  int total_live_executor_groups = 0;
+  int total_healthy_executor_groups = 0;
+  for (const auto& group_it : executor_groups) {
+    const ExecutorGroup& group = group_it.second;
+    if (group.IsHealthy()) {
+      total_live_executor_groups++;
+      total_healthy_executor_groups++;
+    } else if (group.NumHosts() > 0) {
+      total_live_executor_groups++;
+    }
+  }
+  DCHECK_GE(total_live_executor_groups, total_healthy_executor_groups);
+  total_live_executor_groups_->SetValue(total_live_executor_groups);
+  total_healthy_executor_groups_->SetValue(total_healthy_executor_groups);
+  total_backends_->SetValue(current_backends.size());
 }
 
 } // end namespace impala

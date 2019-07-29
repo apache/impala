@@ -242,8 +242,12 @@ DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and co
     "queries from clients. If false, it will refuse client connections.");
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
     "fragments.");
-DEFINE_string(executor_groups, "", "List of executor groups, separated by comma. "
-    "Currently only a single group may be specified.");
+DEFINE_string(executor_groups, "",
+    "List of executor groups, separated by comma. Each executor group specification can "
+    "optionally contain a minimum size, separated by a ':', e.g. --executor_groups "
+    "default-pool-1:3. Default minimum size is 1. Only when the cluster membership "
+    "contains at least that number of executors for the group will it be considered "
+    "healthy for admission. Currently only a single group may be specified.");
 
 // TODO: can we automatically choose a startup grace period based on the max admission
 // control queue timeout + some margin for error?
