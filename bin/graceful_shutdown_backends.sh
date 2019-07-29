@@ -38,14 +38,14 @@ if [[ $# -ge 1 ]]; then
 fi
 
 LOG "Initiating graceful shutdown."
-for pid in $(pidof impalad); do
+for pid in $(pgrep impalad); do
   LOG "Sending signal to daemon with pid $pid"
   kill -SIGRTMIN $pid
 done
 
 LOG "Waiting for daemons to exit, up to $GRACE_TIMEOUT s."
 for ((i=0; i<$GRACE_TIMEOUT; ++i)); do
-  pids=$(pidof impalad || true)
+  pids=$(pgrep impalad || true)
   if [[ -z "$pids" ]]; then
     LOG "All daemons have exited after $i s."
     break
