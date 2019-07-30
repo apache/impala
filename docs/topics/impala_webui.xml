@@ -113,6 +113,68 @@ under the License.
 
   </conbody>
 
+  <concept id="concept_xfx_r1t_43b">
+
+    <title>Configuring Debug Web UIs</title>
+
+    <conbody>
+
+      <p/>
+
+    </conbody>
+
+    <concept id="webui_impalad_disabling">
+
+      <title>Turning off the Web UI</title>
+
+      <conbody>
+
+        <p>
+          To disable Web UI for the <codeph>impalad</codeph>, <codeph>statestored</codeph>, or
+          <codeph>catalogd</codeph>:
+        </p>
+
+        <ol>
+          <li>
+            Stop the Impala role you want to turn off the Web UI for, <codeph>impalad</codeph>,
+            <codeph>statestored</codeph>, or <codeph>catalogd</codeph>.
+          </li>
+
+          <li>
+            Restart the role with the <codeph>&#8209;&#8209;enable_webserver=false</codeph>
+            startup flag.
+          </li>
+        </ol>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="concept_g5j_ydt_43b">
+
+      <title>Using Kerberos HTTP SPNEGO Authentication for Web UI</title>
+
+      <conbody>
+
+        <p>
+          To provide security through Kerberos, Impala Web UIs support SPNEGO, a protocol for
+          securing HTTP requests with Kerberos by passing negotiation tokens through HTTP
+          headers.
+        </p>
+
+        <p>
+          To enable authorization using SPNEGO, set the
+          <codeph>--webserver_require_spnego=true</codeph> startup flag and restart the Impala
+          roles, <codeph>impalad</codeph>, <codeph>statestored</codeph>, or
+          <codeph>catalogd</codeph>.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
   <concept id="webui_impalad">
 
     <title>Debug Web UI for impalad</title>
@@ -133,31 +195,6 @@ under the License.
       </p>
 
     </conbody>
-
-    <concept id="webui_impalad_disabling">
-
-      <title>Turning off the Web UI for impalad</title>
-
-      <conbody>
-
-        <p>
-          To disable Web UI for an <codeph>impalad</codeph>:
-        </p>
-
-        <ol>
-          <li>
-            Stop the <codeph>impalad</codeph>.
-          </li>
-
-          <li>
-            Restart the <codeph>impalad</codeph> with the
-            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
-          </li>
-        </ol>
-
-      </conbody>
-
-    </concept>
 
     <concept id="webui_impalad_main">
 
@@ -689,31 +726,6 @@ under the License.
 
     </conbody>
 
-    <concept id="webui_statestored_disabling">
-
-      <title>Turning off the Web UI for statestored</title>
-
-      <conbody>
-
-        <p>
-          To disable Web UI for the <codeph>statestored</codeph>:
-        </p>
-
-        <ol>
-          <li>
-            Stop the <codeph>statestored</codeph>.
-          </li>
-
-          <li>
-            Restart the <codeph>statestored</codeph> with the
-            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
-          </li>
-        </ol>
-
-      </conbody>
-
-    </concept>
-
     <concept id="webui_statestored_main">
 
       <title>Main Page</title>
@@ -948,31 +960,6 @@ under the License.
       </p>
 
     </conbody>
-
-    <concept id="webui_catalogd_disabling">
-
-      <title>Turning off the Web UI for catalogd</title>
-
-      <conbody>
-
-        <p>
-          To disable Web UI for the <codeph>catalogd</codeph>:
-        </p>
-
-        <ol>
-          <li>
-            Stop the <codeph>catalogd</codeph>.
-          </li>
-
-          <li>
-            Restart the <codeph>catalogd</codeph> with the
-            <codeph>&#8209;&#8209;enable_webserver=false</codeph> startup flag.
-          </li>
-        </ol>
-
-      </conbody>
-
-    </concept>
 
     <concept id="webui_catalogd_main">
 
