@@ -26,5 +26,10 @@ if [[ ! -d "${RANGER_LOG_DIR}" ]]; then
     mkdir -p "${RANGER_LOG_DIR}"
 fi
 
+# IMPALA-8815: don't allow additional potentially incompatible jars to get onto
+# the ranger classpath. We should only need the test cluster configs on the classpath.
+unset CLASSPATH
+. $IMPALA_HOME/bin/impala-config.sh
+
 JAVA_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30130" \
     "${RANGER_HOME}"/ews/ranger-admin-services.sh restart
