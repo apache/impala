@@ -145,6 +145,11 @@ set default_file_format=bar
 Invalid default file format: 'bar'. Valid values are TEXT(0), RC_FILE(1), SEQUENCE_FILE(2), AVRO(3), PARQUET(4), KUDU(5), ORC(6).
 ====
 ---- QUERY
+set default_transactional_type=bar
+---- CATCH
+Invalid default transactional type: 'bar'. Valid values are NONE(0), INSERT_ONLY(1).
+====
+---- QUERY
 # Test that SET actually does change the mem_limit.
 # First, show mem_limit is not hit.
 select 1

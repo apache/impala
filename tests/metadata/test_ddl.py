@@ -780,6 +780,57 @@ class TestDdlStatements(TestDdlBase):
       self.client, "show create table {0}".format(orc_table))
     assert any("ORC" in x for x in result.data)
 
+  @SkipIfHive2.acid
+  def test_create_table_transactional_type(self, vector, unique_database):
+    # When default_transactional_type query option is not specified, the transaction
+    # related table properties are not set.
+    non_acid_table = "{0}.non_acid_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client, "create table {0}(i int)".format(non_acid_table),
+        {"default_transactional_type": "none"})
+    props = self._get_properties("Table Parameters", non_acid_table)
+    assert "transactional" not in props
+    assert "transactional_properties" not in props
+
+    # Create table as "insert_only" transactional.
+    insert_only_acid_table = "{0}.insert_only_acid_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client, "create table {0}(i int)".format(insert_only_acid_table),
+        {"default_transactional_type": "insert_only"})
+    props = self._get_properties("Table Parameters", insert_only_acid_table)
+    assert props["transactional"] == "true"
+    assert props["transactional_properties"] == "insert_only"
+
+    # default_transactional_type query option should not affect external tables
+    external_table = "{0}.external_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client, "create external table {0}(i int)".format(external_table),
+        {"default_transactional_type": "insert_only"})
+    props = self._get_properties("Table Parameters", external_table)
+    assert "transactional" not in props
+    assert "transactional_properties" not in props
+
+    # default_transactional_type query option should not affect Kudu tables.
+    kudu_table = "{0}.kudu_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client,
+        "create table {0}(i int primary key) stored as kudu".format(kudu_table),
+        {"default_transactional_type": "insert_only"})
+    props = self._get_properties("Table Parameters", kudu_table)
+    assert "transactional" not in props
+    assert "transactional_properties" not in props
+
+    # default_transactional_type query option should have no effect when transactional
+    # table properties are set manually.
+    manual_acid_table = "{0}.manual_acid_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client, "create table {0}(i int) TBLPROPERTIES ('transactional'='false')"
+            .format(manual_acid_table),
+        {"default_transactional_type": "insert_only"})
+    props = self._get_properties("Table Parameters", manual_acid_table)
+    assert "transactional" not in props
+    assert "transactional_properties" not in props
+
   def test_kudu_column_comment(self, vector, unique_database):
     table = "{0}.kudu_table0".format(unique_database)
     self.client.execute("create table {0}(x int comment 'x' primary key) \

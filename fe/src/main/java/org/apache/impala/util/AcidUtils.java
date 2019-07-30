@@ -26,6 +26,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TTransactionalType;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -99,6 +101,26 @@ public class AcidUtils {
 
   public static boolean isFullAcidTable(Map<String, String> props) {
     return isTransactionalTable(props) && !isInsertOnlyTable(props);
+  }
+
+  // Sets transaction related table properties for new tables based on manually
+  // set table properties and default transactional type.
+  public static void setTransactionalProperties(Map<String, String> props,
+      TTransactionalType defaultTransactionalType) {
+    Preconditions.checkNotNull(props);
+    if (props.get(TABLE_IS_TRANSACTIONAL) != null
+        || props.get(TABLE_TRANSACTIONAL_PROPERTIES) != null) {
+      // Table properties are set manually, ignore default.
+      return;
+    }
+
+    switch (defaultTransactionalType) {
+      case NONE: break;
+      case INSERT_ONLY:
+        props.put(TABLE_IS_TRANSACTIONAL, "true");
+        props.put(TABLE_TRANSACTIONAL_PROPERTIES, INSERTONLY_TRANSACTIONAL_PROPERTY);
+        break;
+    }
   }
 
   /**

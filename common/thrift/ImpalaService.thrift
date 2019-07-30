@@ -411,6 +411,10 @@ enum TImpalaQueryOptions {
   // up more memory. If false, client consumption driven backpressure controls the rate
   // at which rows are materialized by the execution tree.
   SPOOL_QUERY_RESULTS = 85
+
+  // Speficies the default transactional type for new HDFS tables.
+  // Valid values: none, insert_only
+  DEFAULT_TRANSACTIONAL_TYPE = 86
 }
 
 // The summary of a DML statement.

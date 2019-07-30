@@ -808,6 +808,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_spool_query_results(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::DEFAULT_TRANSACTIONAL_TYPE: {
+        TTransactionalType::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "default transactional type",
+            _TTransactionalType_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_default_transactional_type(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

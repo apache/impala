@@ -75,6 +75,12 @@ enum TParquetTimestampType {
   INT64_NANOS
 }
 
+// A table's Hive ACID type.
+enum TTransactionalType {
+  NONE,
+  INSERT_ONLY
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -358,6 +364,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   86: optional bool spool_query_results = false;
+
+  // See comment in ImpalaService.thrift
+  87: optional TTransactionalType default_transactional_type = TTransactionalType.NONE;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -86,6 +86,7 @@ PRINT_THRIFT_ENUM_IMPL(TSessionType)
 PRINT_THRIFT_ENUM_IMPL(TStmtType)
 PRINT_THRIFT_ENUM_IMPL(TUnit)
 PRINT_THRIFT_ENUM_IMPL(TParquetTimestampType)
+PRINT_THRIFT_ENUM_IMPL(TTransactionalType)
 
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;

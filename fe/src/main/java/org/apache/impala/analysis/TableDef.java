@@ -38,6 +38,7 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
@@ -222,8 +223,7 @@ class TableDef {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     fqTableName_ = analyzer.getFqTableName(getTblName());
     fqTableName_.analyze();
-    // Disallow creation of full ACID table.
-    analyzer.ensureTableNotFullAcid(options_.tblProperties, fqTableName_.toString());
+    analyzeAcidProperties(analyzer);
     analyzeColumnDefs(analyzer);
     analyzePrimaryKeys();
 
@@ -440,5 +440,30 @@ class TableDef {
           "value in the range [-128:127]: " + value);
     }
     return byteVal;
+  }
+
+  /**
+   * Analyzes Hive ACID related properties.
+   * Can change table properties based on query options.
+   */
+  private void analyzeAcidProperties(Analyzer analyzer) throws AnalysisException {
+    if (isExternal_) {
+      if (AcidUtils.isTransactionalTable(options_.tblProperties)) {
+        throw new AnalysisException("EXTERNAL tables cannot be transactional");
+      }
+      return;
+    }
+
+    if (options_.fileFormat == THdfsFileFormat.KUDU) {
+      if (AcidUtils.isTransactionalTable(options_.tblProperties)) {
+        throw new AnalysisException("Kudu tables cannot be transactional");
+      }
+      return;
+    }
+
+    AcidUtils.setTransactionalProperties(options_.tblProperties,
+          analyzer.getQueryOptions().getDefault_transactional_type());
+    // Disallow creation of full ACID table.
+    analyzer.ensureTableNotFullAcid(options_.tblProperties, fqTableName_.toString());
   }
 }
