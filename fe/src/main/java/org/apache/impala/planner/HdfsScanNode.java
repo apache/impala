@@ -470,7 +470,7 @@ public class HdfsScanNode extends ScanNode {
 
     if (!BackendConfig.INSTANCE.isOrcScannerEnabled()) {
       for (FeFsPartition part: partitions_) {
-        if (part.getInputFormatDescriptor().getFileFormat() == HdfsFileFormat.ORC) {
+        if (part.getFileFormat() == HdfsFileFormat.ORC) {
           throw new NotImplementedException(
               "ORC scans are disabled by --enable_orc_scanner flag");
         }
@@ -496,7 +496,7 @@ public class HdfsScanNode extends ScanNode {
     }
 
     for (FeFsPartition part: partitions_) {
-      HdfsFileFormat format = part.getInputFormatDescriptor().getFileFormat();
+      HdfsFileFormat format = part.getFileFormat();
       if (format.isComplexTypesSupported()) continue;
       // If the file format allows querying just scalar typed columns and the query
       // doesn't materialize any complex typed columns, it is allowed.

@@ -1273,7 +1273,7 @@ public class SingleNodePlanner {
     FeFsPartition part = findUnsupportedDateFsPartition(partitions);
     if (part != null) {
       FeFsTable table = (FeFsTable)hdfsTblRef.getTable();
-      HdfsFileFormat ff = part.getInputFormatDescriptor().getFileFormat();
+      HdfsFileFormat ff = part.getFileFormat();
       // Throw an exception if tupleDesc contains a non-clustering, materialized
       // DATE slot.
       for (SlotDescriptor slotDesc: tupleDesc.getMaterializedSlots()) {
@@ -1343,7 +1343,7 @@ public class SingleNodePlanner {
   private FeFsPartition findUnsupportedDateFsPartition(
       List<? extends FeFsPartition> partitions) {
     for (FeFsPartition part: partitions) {
-      HdfsFileFormat ff = part.getInputFormatDescriptor().getFileFormat();
+      HdfsFileFormat ff = part.getFileFormat();
       if (!ff.isDateTypeSupported()) return part;
     }
     return null;

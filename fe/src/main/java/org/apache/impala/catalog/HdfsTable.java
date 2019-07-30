@@ -1776,7 +1776,7 @@ public class HdfsTable extends Table implements FeFsTable {
             p.getParameters());
         rowBuilder.add(rep.toString());
       }
-      rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());
+      rowBuilder.add(p.getFileFormat().toString());
       rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
       rowBuilder.add(p.getLocation());
       result.addToRows(rowBuilder.get());
