@@ -52,15 +52,31 @@ under the License.
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
-      This optimization speeds up common <q>introspection</q> operations when using queries
-      to calculate the cardinality and range for partition key columns.
+      This optimization speeds up common <q>introspection</q> operations
+      over partition key columns, for example determining the distinct values
+      of partition keys.
     </p>
 
     <p>
-      This optimization does not apply if the queries contain any <codeph>WHERE</codeph>,
-      <codeph>GROUP BY</codeph>, or <codeph>HAVING</codeph> clause. The relevant queries
-      should only compute the minimum, maximum, or number of distinct values for the
-      partition key columns across the whole table.
+      This optimization does not apply to <codeph>SELECT</codeph> statements
+      that reference columns that are not partition keys. It also only applies
+      when all the partition key columns in the <codeph>SELECT</codeph> statement
+      are referenced in one of the following contexts:
+      <ul>
+        <li>
+          <p>
+            Within a <codeph>MAX()</codeph> or <codeph>MAX()</codeph>
+            aggregate function or as the argument of any aggregate function with
+            the <codeph>DISTINCT</codeph> keyword applied.
+          </p>
+        </li>
+        <li>
+          <p>
+            Within a <codeph>WHERE</codeph>, <codeph>GROUP BY</codeph>
+            or <codeph>HAVING</codeph> clause.
+          </p>
+        </li>
+      </ul>
     </p>
 
     <p>
