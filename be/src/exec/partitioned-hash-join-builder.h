@@ -72,10 +72,10 @@ class PhjBuilder : public DataSink {
  public:
   class Partition;
 
-  PhjBuilder(int join_node_id, TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
-      const RowDescriptor* build_row_desc, RuntimeState* state,
-      BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
-      int64_t max_row_buffer_size);
+  PhjBuilder(int join_node_id, const std::string& join_node_label, TJoinOp::type join_op,
+      const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
+      RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
+      int64_t spillable_buffer_size, int64_t max_row_buffer_size);
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -370,10 +370,13 @@ class PhjBuilder : public DataSink {
 
   RuntimeState* const runtime_state_;
 
-  // The ID of the plan join node this is associated with.
-  // TODO: we may want to replace this with a sink ID once we progress further with
-  // multithreading.
+  /// The ID of the plan join node this is associated with.
+  /// TODO: we may want to replace this with a sink ID once we progress further with
+  /// multithreading.
   const int join_node_id_;
+
+  /// The label of the plan join node this is associated with.
+  const std::string join_node_label_;
 
   /// The join operation this is building for.
   const TJoinOp::type join_op_;

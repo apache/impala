@@ -209,9 +209,9 @@ string BufferedTupleStream::Page::DebugString() const {
       handle.DebugString(), num_rows, retrieved_buffer, attached_to_output_batch);
 }
 
-Status BufferedTupleStream::Init(int node_id, bool pinned) {
+Status BufferedTupleStream::Init(const string& caller_label, bool pinned) {
   if (!pinned) UnpinStream(UNPIN_ALL_EXCEPT_CURRENT);
-  node_id_ = node_id;
+  caller_label_ = caller_label;
   return Status::OK();
 }
 
@@ -267,6 +267,7 @@ void BufferedTupleStream::Close(RowBatch* batch, FlushMode flush) {
   pages_.clear();
   num_pages_ = 0;
   bytes_pinned_ = 0;
+  bytes_unpinned_ = 0;
   closed_ = true;
 }
 
@@ -281,6 +282,8 @@ int64_t BufferedTupleStream::CalcBytesPinned() const {
 Status BufferedTupleStream::PinPage(Page* page) {
   RETURN_IF_ERROR(buffer_pool_->Pin(buffer_pool_client_, &page->handle));
   bytes_pinned_ += page->len();
+  bytes_unpinned_ -= page->len();
+  DCHECK_GE(bytes_unpinned_, 0);
   return Status::OK();
 }
 
@@ -304,6 +307,8 @@ void BufferedTupleStream::UnpinPageIfNeeded(Page* page, bool stream_pinned) {
     DCHECK_EQ(new_pin_count, page->pin_count() - 1);
     buffer_pool_->Unpin(buffer_pool_client_, &page->handle);
     bytes_pinned_ -= page->len();
+    DCHECK_GE(bytes_pinned_, 0);
+    bytes_unpinned_ += page->len();
     if (page->pin_count() == 0) page->retrieved_buffer = false;
   }
 }
@@ -386,7 +391,7 @@ Status BufferedTupleStream::NewWritePage(int64_t page_len) noexcept {
 Status BufferedTupleStream::CalcPageLenForRow(int64_t row_size, int64_t* page_len) {
   if (UNLIKELY(row_size > max_page_len_)) {
     return Status(TErrorCode::MAX_ROW_SIZE,
-        PrettyPrinter::Print(row_size, TUnit::BYTES), node_id_,
+        PrettyPrinter::Print(row_size, TUnit::BYTES), caller_label_,
         PrettyPrinter::Print(state_->query_options().max_row_size, TUnit::BYTES));
   }
   *page_len = max(default_page_len_, BitUtil::RoundUpToPowerOfTwo(row_size));

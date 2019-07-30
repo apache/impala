@@ -204,7 +204,7 @@ Status GroupingAggregator::Open(RuntimeState* state) {
       serialize_stream_.reset(new BufferedTupleStream(state, &intermediate_row_desc_,
           buffer_pool_client(), resource_profile_.spillable_buffer_size,
           resource_profile_.max_row_buffer_size));
-      RETURN_IF_ERROR(serialize_stream_->Init(id_, false));
+      RETURN_IF_ERROR(serialize_stream_->Init(exec_node_->label(), false));
       bool got_buffer;
       // Reserve the memory for 'serialize_stream_' so we don't need to scrounge up
       // another buffer during spilling.

@@ -228,6 +228,7 @@ set (SRC_FILES
   Planner.thrift
   Partitions.thrift
   parquet.thrift
+  ResourceProfile.thrift
   Results.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift

@@ -197,7 +197,7 @@ Status Sorter::Run::AddBatchInternal(
         if (total_var_len > sorter_->page_len_) {
           int64_t max_row_size = sorter_->state_->query_options().max_row_size;
           return Status(TErrorCode::MAX_ROW_SIZE,
-              PrettyPrinter::Print(total_var_len, TUnit::BYTES), sorter_->node_id_,
+              PrettyPrinter::Print(total_var_len, TUnit::BYTES), sorter_->node_label_,
               PrettyPrinter::Print(max_row_size, TUnit::BYTES));
         }
       } else {
@@ -761,9 +761,9 @@ Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
       const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
-    int64_t page_len, RuntimeProfile* profile, RuntimeState* state, int node_id,
-    bool enable_spilling)
-  : node_id_(node_id),
+    int64_t page_len, RuntimeProfile* profile, RuntimeState* state,
+    const string& node_label, bool enable_spilling)
+  : node_label_(node_label),
     state_(state),
     expr_perm_pool_(mem_tracker),
     expr_results_pool_(mem_tracker),
@@ -806,7 +806,7 @@ Status Sorter::Prepare(ObjectPool* obj_pool) {
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
   if (sort_tuple_desc->byte_size() > page_len_) {
     return Status(TErrorCode::MAX_ROW_SIZE,
-        PrettyPrinter::Print(sort_tuple_desc->byte_size(), TUnit::BYTES), node_id_,
+        PrettyPrinter::Print(sort_tuple_desc->byte_size(), TUnit::BYTES), node_label_,
         PrettyPrinter::Print(state_->query_options().max_row_size, TUnit::BYTES));
   }
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();

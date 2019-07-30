@@ -75,7 +75,7 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
   // TODO: allow PhjBuilder to be the sink of a separate fragment. For now, PhjBuilder is
   // owned by this node, but duplicates some state (exprs, etc) in anticipation of it
   // being separated out further.
-  builder_.reset(new PhjBuilder(id(), join_op_, child(0)->row_desc(),
+  builder_.reset(new PhjBuilder(id(), label(), join_op_, child(0)->row_desc(),
       child(1)->row_desc(), state, buffer_pool_client(),
       resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size));
   RETURN_IF_ERROR(
@@ -837,7 +837,7 @@ Status PartitionedHashJoinNode::InitNullAwareProbePartition() {
   unique_ptr<BufferedTupleStream> probe_rows =
       make_unique<BufferedTupleStream>(state, child(0)->row_desc(), buffer_pool_client(),
           resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size);
-  Status status = probe_rows->Init(id(), true);
+  Status status = probe_rows->Init(label(), true);
   if (!status.ok()) goto error;
   bool got_buffer;
   status = probe_rows->PrepareForWrite(&got_buffer);
@@ -861,7 +861,7 @@ Status PartitionedHashJoinNode::InitNullProbeRows() {
       make_unique<BufferedTupleStream>(state, child(0)->row_desc(), buffer_pool_client(),
           resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size);
   // Start with stream pinned, unpin later if needed.
-  RETURN_IF_ERROR(null_probe_rows_->Init(id(), true));
+  RETURN_IF_ERROR(null_probe_rows_->Init(label(), true));
   bool got_buffer;
   RETURN_IF_ERROR(null_probe_rows_->PrepareForWrite(&got_buffer));
   DCHECK(got_buffer) << "Accounted in min reservation"

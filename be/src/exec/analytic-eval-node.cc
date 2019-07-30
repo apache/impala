@@ -190,7 +190,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
       buffer_pool_client(), resource_profile_.spillable_buffer_size,
       resource_profile_.spillable_buffer_size));
-  RETURN_IF_ERROR(input_stream_->Init(id(), true));
+  RETURN_IF_ERROR(input_stream_->Init(label(), true));
   bool success;
   RETURN_IF_ERROR(input_stream_->PrepareForReadWrite(true, &success));
   DCHECK(success) << "Had reservation: " << buffer_pool_client()->DebugString();

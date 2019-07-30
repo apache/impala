@@ -50,6 +50,13 @@ class BlockingPlanRootSink : public PlanRootSink {
   BlockingPlanRootSink(
       TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state);
 
+  /// TODO: Currently, this does nothing, it just calls DataSink::Prepare. However, adding
+  /// it is necessary because BufferedPlanRootSink needs to use PlanRootSink::Prepare.
+  /// Once IMPALA-8825 (add counters to track how long the producer and consumer threads
+  /// block, and the rate at which rows are read / sent) is done, this should do the work
+  /// to initialize the necessary counters.
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
+
   /// Blocks until the consumer has consumed 'batch' by calling GetNext().
   virtual Status Send(RuntimeState* state, RowBatch* batch) override;
 

@@ -499,6 +499,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       RETURN_IF_ERROR(ParseQueryOptions(option, &overlay, &overlay_mask));
     }
     OverlayQueryOptions(overlay, overlay_mask, &query_ctx->client_request.query_options);
+    RETURN_IF_ERROR(ValidateQueryOptions(&overlay));
     set_query_options_mask |= overlay_mask;
   }
 

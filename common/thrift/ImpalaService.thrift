@@ -408,7 +408,7 @@ enum TImpalaQueryOptions {
   // Enable spooling of query results. If true, query results will be spooled in
   // memory up to a specified memory limit. If the memory limit is hit, the
   // coordinator fragment will block until the client has consumed enough rows to free
-  // up more memory. If false, client consumption driven backpressure controls the rate
+  // up more memory. If false, client consumption driven back-pressure controls the rate
   // at which rows are materialized by the execution tree.
   SPOOL_QUERY_RESULTS = 85
 
@@ -432,6 +432,22 @@ enum TImpalaQueryOptions {
 
   // Disable the data cache.
   DISABLE_DATA_CACHE = 89
+
+  // The maximum amount of memory used when spooling query results. If this value is
+  // exceeded when spooling results, all memory will be unpinned and most likely spilled
+  // to disk. Set to 100 MB by default. Only applicable if SPOOL_QUERY_RESULTS
+  // is true. Setting this to 0 or -1 means the memory is unbounded. Cannot be set to
+  // values below -1.
+  MAX_RESULT_SPOOLING_MEM = 90
+
+  // The maximum amount of memory that can be spilled when spooling query results. Must be
+  // greater than or equal to MAX_RESULT_SPOOLING_MEM to allow unpinning all pinned memory
+  // if the amount of spooled results exceeds MAX_RESULT_SPOOLING_MEM. If this value is
+  // exceeded, the coordinator fragment will block until the client has consumed enough
+  // rows to free up more memory. Set to 1 GB by default. Only applicable if
+  // SPOOL_QUERY_RESULTS is true. Setting this to 0 or -1 means the memory is unbounded.
+  // Cannot be set to values below -1.
+  MAX_SPILLED_RESULT_SPOOLING_MEM = 91
 }
 
 // The summary of a DML statement.

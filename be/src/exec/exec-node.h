@@ -191,6 +191,10 @@ class ExecNode {
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
 
+  /// Returns a unique label for this ExecNode of the form "PLAN_NODE_TYPE(id=[int])",
+  /// for example, EXCHANGE_NODE (id=2).
+  std::string label() const;
+
   /// Returns the row descriptor for rows produced by this node. The RowDescriptor is
   /// constant for the lifetime of the fragment instance, and so is shared by reference
   /// across the plan tree, including in RowBatches. The lifetime of the descriptor is the

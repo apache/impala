@@ -320,7 +320,7 @@ class SimpleTupleStreamTest : public testing::Test {
 
     BufferedTupleStream stream(
         runtime_state_, desc, &client_, default_page_len, max_page_len);
-    ASSERT_OK(stream.Init(-1, true));
+    ASSERT_OK(stream.Init("SimpleTupleStreamTest", true));
     bool got_write_reservation;
     ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
     ASSERT_TRUE(got_write_reservation);
@@ -364,7 +364,7 @@ class SimpleTupleStreamTest : public testing::Test {
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read,
       bool unpin_stream, int64_t page_len = PAGE_LEN) {
     BufferedTupleStream stream(runtime_state_, int_desc_, &client_, page_len, page_len);
-    ASSERT_OK(stream.Init(-1, true));
+    ASSERT_OK(stream.Init("SimpleTupleStreamTest", true));
     bool got_reservation;
     ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
     ASSERT_TRUE(got_reservation);
@@ -622,7 +622,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
 
   BufferedTupleStream stream(
       runtime_state_, row_desc, &client_, buffer_size, buffer_size);
-  ASSERT_OK(stream.Init(-1, true));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::TestUnpinPin", true));
   if (read_write) {
     bool got_reservation = false;
     ASSERT_OK(stream.PrepareForReadWrite(false, &got_reservation));
@@ -715,7 +715,7 @@ void SimpleTupleStreamTest::TestTransferMemory(bool pin_stream, bool read_write)
 
   BufferedTupleStream stream(
       runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
-  ASSERT_OK(stream.Init(-1, pin_stream));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::TestTransferMemory", pin_stream));
   if (read_write) {
     bool got_reservation;
     ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
@@ -788,7 +788,7 @@ void SimpleTupleStreamTest::TestAttachMemory(bool pin_stream, bool attach_on_rea
 
   BufferedTupleStream stream(
       runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
-  ASSERT_OK(stream.Init(-1, pin_stream));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::TestAttachMemory", pin_stream));
   bool got_write_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
   ASSERT_TRUE(got_write_reservation);
@@ -882,7 +882,8 @@ void SimpleTupleStreamTest::TestFlushResourcesReadWrite(
 
   BufferedTupleStream stream(
       runtime_state_, int_desc_, &client_, BUFFER_SIZE, BUFFER_SIZE);
-  ASSERT_OK(stream.Init(-1, pin_stream));
+  ASSERT_OK(
+      stream.Init("SimpleTupleStreamTest::TestFlushResourcesReadWrite", pin_stream));
   bool got_reservation;
   ASSERT_OK(stream.PrepareForReadWrite(attach_on_read, &got_reservation));
   ASSERT_TRUE(got_reservation);
@@ -997,7 +998,7 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
 
   BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, buffer_size, buffer_size, external_slots);
-  ASSERT_OK(stream.Init(0, false));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::StringsOutsideStream", false));
   bool got_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_reservation));
   ASSERT_TRUE(got_reservation);
@@ -1071,7 +1072,7 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
   ASSERT_TRUE(nullable_big_row_desc_->IsAnyTupleNullable());
   BufferedTupleStream nullable_stream(
       runtime_state_, nullable_big_row_desc_, &client_, BIG_ROW_BYTES, BIG_ROW_BYTES);
-  ASSERT_OK(nullable_stream.Init(-1, true));
+  ASSERT_OK(nullable_stream.Init("SimpleTupleStreamTest::BigRow", true));
   bool got_reservation;
   ASSERT_OK(nullable_stream.PrepareForWrite(&got_reservation));
 
@@ -1095,7 +1096,7 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
   Status status;
   BufferedTupleStream stream(
       runtime_state_, big_row_desc_, &client_, DEFAULT_PAGE_LEN, BIG_ROW_BYTES * 2);
-  ASSERT_OK(stream.Init(-1, true));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::BigRowMemoryUse", true));
   RowBatch* batch;
   bool got_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_reservation));
@@ -1136,7 +1137,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   Status status;
   BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, DEFAULT_PAGE_LEN, BIG_ROW_BYTES * 2);
-  ASSERT_OK(stream.Init(-1, true));
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::BigStringReadWrite", true));
   RowBatch write_batch(string_desc_, 1024, &tracker_);
   RowBatch read_batch(string_desc_, 1024, &tracker_);
   bool got_reservation;
@@ -1302,7 +1303,7 @@ TEST_F(MultiTupleStreamTest, MultiTupleAddRowCustom) {
   int rows_added = 0;
   BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, buffer_size, buffer_size);
-  ASSERT_OK(stream.Init(-1, false));
+  ASSERT_OK(stream.Init("MultiTupleStreamTest::MultiTupleAddRowCustom", false));
   bool got_write_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
   ASSERT_TRUE(got_write_reservation);
@@ -1477,7 +1478,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   int array_lens[] = {0, 1, 5, 10, 1000, 2, 49, 20};
   int num_array_lens = sizeof(array_lens) / sizeof(array_lens[0]);
   int array_len_index = 0;
-  ASSERT_OK(stream.Init(-1, false));
+  ASSERT_OK(stream.Init("ArrayTupleStreamTest::TestArrayDeepCopy", false));
   bool got_write_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
   ASSERT_TRUE(got_write_reservation);

@@ -33,10 +33,8 @@ public class ResourceProfile {
   private final boolean isValid_;
 
   // Estimated memory consumption in bytes. Guaranteed to be >= minReservationBytes_ if
-  // both are set (the constructor ensures this).
-  // TODO: IMPALA-5013: currently we are inconsistent about how these estimates are
-  // derived or what they mean. Re-evaluate what they mean and either deprecate or
-  // fix them.
+  // both are set and guaranteed to be <= maxMemReservationBytes_ if both are set (the
+  // constructor ensures both of these conditions).
   private final long memEstimateBytes_;
 
   // Minimum memory reservation required to execute in bytes.
@@ -71,6 +69,7 @@ public class ResourceProfile {
     Preconditions.checkArgument(maxRowBufferBytes == -1
         || LongMath.isPowerOfTwo(maxRowBufferBytes));
     Preconditions.checkArgument(!isValid || threadReservation >= 0, threadReservation);
+    Preconditions.checkArgument(maxMemReservationBytes >= minMemReservationBytes);
     isValid_ = isValid;
     memEstimateBytes_ = (minMemReservationBytes != -1) ?
         Math.max(memEstimateBytes, minMemReservationBytes) : memEstimateBytes;

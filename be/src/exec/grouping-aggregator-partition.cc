@@ -57,7 +57,7 @@ Status GroupingAggregator::Partition::InitStreams() {
       new BufferedTupleStream(parent->state_, &parent->intermediate_row_desc_,
           parent->buffer_pool_client(), parent->resource_profile_.spillable_buffer_size,
           parent->resource_profile_.max_row_buffer_size, external_varlen_slots));
-  RETURN_IF_ERROR(aggregated_row_stream->Init(parent->id_, true));
+  RETURN_IF_ERROR(aggregated_row_stream->Init(parent->exec_node_->label(), true));
   bool got_buffer;
   RETURN_IF_ERROR(aggregated_row_stream->PrepareForWrite(&got_buffer));
   DCHECK(got_buffer) << "Buffer included in reservation " << parent->id_ << "\n"
@@ -69,7 +69,7 @@ Status GroupingAggregator::Partition::InitStreams() {
             parent->buffer_pool_client(), parent->resource_profile_.spillable_buffer_size,
             parent->resource_profile_.max_row_buffer_size));
     // This stream is only used to spill, no need to ever have this pinned.
-    RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id_, false));
+    RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->exec_node_->label(), false));
     // Save memory by waiting until we spill to allocate the write buffer for the
     // unaggregated row stream.
     DCHECK(!unaggregated_row_stream->has_write_iterator());
@@ -144,7 +144,7 @@ Status GroupingAggregator::Partition::SerializeStreamForSpilling() {
         new BufferedTupleStream(parent->state_, &parent->intermediate_row_desc_,
             parent->buffer_pool_client(), parent->resource_profile_.spillable_buffer_size,
             parent->resource_profile_.max_row_buffer_size));
-    status = parent->serialize_stream_->Init(parent->id_, false);
+    status = parent->serialize_stream_->Init(parent->exec_node_->label(), false);
     if (status.ok()) {
       bool got_buffer;
       status = parent->serialize_stream_->PrepareForWrite(&got_buffer);

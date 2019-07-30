@@ -516,3 +516,46 @@ TEST(QueryOptions, CompressionCodec) {
 #undef ENTRIES
 #undef ENTRY
 }
+
+// Tests for setting of MAX_RESULT_SPOOLING_MEM and
+// MAX_SPILLED_RESULT_SPOOLING_MEM. Setting of these options must maintain the
+// condition 'MAX_RESULT_SPOOLING_MEM <= MAX_SPILLED_RESULT_SPOOLING_MEM'.
+// A value of 0 for each of these parameters means the memory is unbounded.
+TEST(QueryOptions, ResultSpooling) {
+  {
+    TQueryOptions options;
+    // Setting the memory to 0 (unbounded) should fail with the default spilled value.
+    options.__set_max_result_spooling_mem(0);
+    EXPECT_FALSE(ValidateQueryOptions(&options).ok());
+    // Setting the spilled memory to 0 (unbounded) should always work.
+    options.__set_max_spilled_result_spooling_mem(0);
+    EXPECT_TRUE(ValidateQueryOptions(&options).ok());
+    // Setting the memory to 0 (unbounded) should work if the spilled memory is unbounded
+    // as well.
+    options.__set_max_result_spooling_mem(0);
+    EXPECT_TRUE(ValidateQueryOptions(&options).ok());
+    // Setting the spilled memory to a bounded value should fail if the memory is bounded.
+    options.__set_max_spilled_result_spooling_mem(1);
+    EXPECT_FALSE(ValidateQueryOptions(&options).ok());
+  }
+
+  {
+    TQueryOptions options;
+    // Setting the spilled memory to a value lower than the memory should fail.
+    options.__set_max_result_spooling_mem(2);
+    EXPECT_TRUE(ValidateQueryOptions(&options).ok());
+    options.__set_max_spilled_result_spooling_mem(1);
+    EXPECT_FALSE(ValidateQueryOptions(&options).ok());
+  }
+
+  {
+    TQueryOptions options;
+    // Setting the memory to a value higher than the spilled memory should fail.
+    options.__set_max_result_spooling_mem(1);
+    EXPECT_TRUE(ValidateQueryOptions(&options).ok());
+    options.__set_max_spilled_result_spooling_mem(2);
+    EXPECT_TRUE(ValidateQueryOptions(&options).ok());
+    options.__set_max_result_spooling_mem(3);
+    EXPECT_FALSE(ValidateQueryOptions(&options).ok());
+  }
+}

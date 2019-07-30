@@ -36,6 +36,11 @@ BlockingPlanRootSink::BlockingPlanRootSink(
     TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state)
   : PlanRootSink(sink_id, row_desc, state) {}
 
+Status BlockingPlanRootSink::Prepare(
+    RuntimeState* state, MemTracker* parent_mem_tracker) {
+  return DataSink::Prepare(state, parent_mem_tracker);
+}
+
 Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
   PlanRootSink::ValidateCollectionSlots(*row_desc_, batch);

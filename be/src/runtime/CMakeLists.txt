@@ -39,7 +39,6 @@ add_library(Runtime
   date-value.cc
   debug-options.cc
   descriptors.cc
-  deque-row-batch-queue.cc
   dml-exec-state.cc
   exec-env.cc
   fragment-instance-state.cc
@@ -72,6 +71,7 @@ add_library(Runtime
   sorted-run-merger.cc
   sorter.cc
   sorter-ir.cc
+  spillable-row-batch-queue.cc
   string-value.cc
   thread-resource-mgr.cc
   timestamp-parse-util.cc

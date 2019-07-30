@@ -18,6 +18,7 @@
 #pragma once
 
 #include "exec/plan-root-sink.h"
+#include "runtime/spillable-row-batch-queue.h"
 #include "util/condition-variable.h"
 
 namespace impala {
@@ -25,7 +26,9 @@ namespace impala {
 class DequeRowBatchQueue;
 
 /// PlanRootSink that buffers RowBatches from the 'sender' (fragment) thread. RowBatches
-/// are buffered in memory until a max number of RowBatches are queued. Any subsequent
+/// are buffered in memory until the queue is full (the definition of 'full' depends on
+/// the queue being used, in the current implementation the SpillableRowBatchQueue is
+/// 'full' when the amount of spilled data exceeds the configured limit). Any subsequent
 /// calls to Send will block until the 'consumer' (coordinator) thread has read enough
 /// RowBatches to free up sufficient space in the queue. The blocking behavior follows
 /// the same semantics as BlockingPlanRootSink.
@@ -40,7 +43,17 @@ class DequeRowBatchQueue;
 class BufferedPlanRootSink : public PlanRootSink {
  public:
   BufferedPlanRootSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-      RuntimeState* state);
+      RuntimeState* state, const TBackendResourceProfile& resource_profile,
+      const TDebugOptions& debug_options);
+
+  /// Initializes the row_batches_get_wait_timer_ and row_batches_send_wait_timer_
+  /// counters.
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
+
+  /// Creates and opens the SpillableRowBatchQueue, returns an error Status if the queue
+  /// could not be opened. Failure to open the queue could occur if the initial
+  /// reservation for the BufferedTupleStream could not be acquired.
+  virtual Status Open(RuntimeState* state) override;
 
   /// Creates a copy of the given RowBatch and adds it to the queue. The copy is
   /// necessary as the ownership of 'batch' remains with the sender.
@@ -50,10 +63,10 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// batches from the queue, or until the sink is either closed or cancelled.
   virtual Status FlushFinal(RuntimeState* state) override;
 
-  /// Release resources and unblocks consumer.
+  /// Releases resources and unblocks the consumer thread.
   virtual void Close(RuntimeState* state) override;
 
-  /// Blocks until rows are available for consumption
+  /// Blocks until rows are available for consumption.
   virtual Status GetNext(
       RuntimeState* state, QueryResultSet* result_set, int num_rows, bool* eos) override;
 
@@ -80,8 +93,31 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// to unblock the producer.
   ConditionVariable batch_queue_has_capacity_;
 
-  /// A DequeRowBatchQueue that buffers RowBatches from the sender for consumption by
+  /// A SpillableRowBatchQueue that buffers RowBatches from the sender for consumption by
   /// the consumer. The queue is not thread safe and access is protected by 'lock_'.
-  std::unique_ptr<DequeRowBatchQueue> batch_queue_;
+  std::unique_ptr<SpillableRowBatchQueue> batch_queue_;
+
+  /// The TBackendResourceProfile created by the fe/ for the PlanRootSink. Passed to the
+  /// SpillableRowBatchQueue to impose the necessary memory limits.
+  const TBackendResourceProfile& resource_profile_;
+
+  /// Required by the SpillableRowBatchQueue's ReservationManager when claiming the
+  /// initial reservation.
+  const TDebugOptions& debug_options_;
+
+  /// Measures the amount of time spent by Impala waiting for the result spooling queue
+  /// to have more space. The queue may become full if Impala has produced enough rows to
+  /// fill up the queue, and the client hasn't not consumed any rows, or is consuming
+  /// rows in at a slower rate than Impala is producing them. Specifically, this counter
+  /// measures the amount of time spent waiting on 'batch_queue_has_capacity_' in the
+  /// 'Send'  method.
+  RuntimeProfile::Counter* row_batches_send_wait_timer_ = nullptr;
+
+  /// Measures the amount of time spend by the client waiting for the result spooling
+  /// queue to have rows. The queue may be empty if the query has not produced any rows
+  /// yet or if the client is consuming rows at a faster rate than Impala is producing
+  /// them. Specifically, this counter measures the amount of time spent waiting on
+  /// 'rows_available_' in the 'GetNext' method.
+  RuntimeProfile::Counter* row_batches_get_wait_timer_ = nullptr;
 };
 }

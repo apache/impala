@@ -50,7 +50,12 @@ public class ResourceProfileBuilder {
    */
   public ResourceProfileBuilder setMinMemReservationBytes(long minMemReservationBytes) {
     minMemReservationBytes_ = minMemReservationBytes;
-    maxMemReservationBytes_ = Long.MAX_VALUE;
+    if (maxMemReservationBytes_ == 0) maxMemReservationBytes_ = Long.MAX_VALUE;
+    return this;
+  }
+
+  public ResourceProfileBuilder setMaxMemReservationBytes(long maxMemReservationBytes) {
+    maxMemReservationBytes_ = maxMemReservationBytes;
     return this;
   }
 

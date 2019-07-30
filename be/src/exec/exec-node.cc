@@ -364,6 +364,15 @@ void ExecNode::DebugString(int indentation_level, stringstream* out) const {
   }
 }
 
+string ExecNode::label() const {
+  map<int, const char*>::const_iterator i = _TPlanNodeType_VALUES_TO_NAMES.find(type_);
+  string node_type_name = "UNKNOWN";
+  if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
+    node_type_name = i->second;
+  }
+  return Substitute("$0 (id=$1)", node_type_name, std::to_string(id_));
+}
+
 void ExecNode::CollectNodes(TPlanNodeType::type node_type, vector<ExecNode*>* nodes) {
   if (type_ == node_type) nodes->push_back(this);
   for (int i = 0; i < children_.size(); ++i) {

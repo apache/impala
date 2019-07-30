@@ -1050,6 +1050,12 @@ void ImpalaServer::AddPoolConfiguration(TQueryCtx* ctx,
            << " set_pool_mask=" << set_pool_options_mask.to_string()
            << " overlay_mask=" << overlay_mask.to_string();
   OverlayQueryOptions(pool_options, overlay_mask, &ctx->client_request.query_options);
+
+  status = ValidateQueryOptions(&pool_options);
+  if (!status.ok()) {
+    VLOG_QUERY << "Ignoring errors while validating default query options for pool="
+               << resolved_pool << ", message: " << status.GetDetail();
+  }
 }
 
 Status ImpalaServer::Execute(TQueryCtx* query_ctx,
@@ -1515,6 +1521,7 @@ void ImpalaServer::InitializeConfigVariables() {
   QueryOptionsMask set_query_options; // unused
   Status status = ParseQueryOptions(FLAGS_default_query_options,
       &default_query_options_, &set_query_options);
+  status.MergeStatus(ValidateQueryOptions(&default_query_options_));
   if (!status.ok()) {
     // Log error and exit if the default query options are invalid.
     CLEAN_EXIT_WITH_ERROR(Substitute("Invalid default query options. Please check "

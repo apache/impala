@@ -808,6 +808,22 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_spool_query_results(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::MAX_RESULT_SPOOLING_MEM: {
+        int64_t max_result_spooling_mem;
+        RETURN_IF_ERROR(ParseMemValue(value, "max result spooling memory",
+            &max_result_spooling_mem));
+        query_options->__set_max_result_spooling_mem(
+            max_result_spooling_mem);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_SPILLED_RESULT_SPOOLING_MEM: {
+        int64_t max_spilled_result_spooling_mem;
+        RETURN_IF_ERROR(ParseMemValue(value, "max spilled result spooling memory",
+            &max_spilled_result_spooling_mem));
+        query_options->__set_max_spilled_result_spooling_mem(
+            max_spilled_result_spooling_mem);
+        break;
+      }
       case TImpalaQueryOptions::DEFAULT_TRANSACTIONAL_TYPE: {
         TTransactionalType::type enum_type;
         RETURN_IF_ERROR(GetThriftEnum(value, "default transactional type",
@@ -886,6 +902,24 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
         set_query_options_mask));
   }
   if (errorStatus.msg().details().size() > 0) return errorStatus;
+  return Status::OK();
+}
+
+Status impala::ValidateQueryOptions(TQueryOptions* query_options) {
+  // Validate that max_result_spooling_mem <=
+  // max_spilled_result_spooling_mem (a value of 0 means memory is unbounded).
+  int64_t max_mem = query_options->max_result_spooling_mem;
+  int64_t max_spilled_mem = query_options->max_spilled_result_spooling_mem;
+  if (max_mem == 0 && max_spilled_mem != 0) {
+    return Status("If max_result_spooling_mem is set to 0 (unbounded) "
+                  "max_spilled_result_spooling_mem must be set to 0 (unbounded) as "
+                  "well.");
+  }
+  if (max_spilled_mem != 0 && max_spilled_mem < max_mem) {
+    return Status(Substitute("max_spilled_result_spooling_mem '$0' must be greater than "
+                             "max_result_spooling_mem '$1'",
+        max_spilled_mem, max_mem));
+  }
   return Status::OK();
 }
 

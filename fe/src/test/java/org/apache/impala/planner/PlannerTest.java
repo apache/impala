@@ -937,4 +937,20 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile(
         "scan-node-fs-scheme", ImmutableSet.of(PlannerTestOption.VALIDATE_SCAN_FS));
   }
+
+  /**
+   * Validate the resource requirements of the PLAN-ROOT SINK when result spooling is
+   * enabled.
+   */
+  @Test
+  public void testResultSpooling() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setSpool_query_results(true);
+    options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    runPlannerTestFile(
+        "result-spooling", options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+                                        PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+                                        PlannerTestOption.VALIDATE_RESOURCES));
+  }
 }

@@ -95,7 +95,7 @@ class Sorter {
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
   /// sorted. 'ordering_exprs', 'is_asc_order' and 'nulls_first' are parameters
   /// for the comparator for the sort tuples.
-  /// 'node_id' is the ID of the exec node using the sorter for error reporting.
+  /// 'node_label' is the label of the exec node using the sorter for error reporting.
   /// 'enable_spilling' should be set to false to reduce the number of requested buffers
   /// if the caller will use AddBatchNoSpill().
   ///
@@ -107,7 +107,7 @@ class Sorter {
       const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
-      RuntimeProfile* profile, RuntimeState* state, int node_id,
+      RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
       bool enable_spilling);
   ~Sorter();
 
@@ -207,8 +207,8 @@ class Sorter {
   /// since the Sorter has started working on it's initial runs.
   void TryToIncreaseMemAllocationForMerge();
 
-  /// ID of the ExecNode that owns the sorter, used for error reporting.
-  const int node_id_;
+  /// Label of the ExecNode that owns the sorter, used for error reporting.
+  const std::string node_label_;
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;

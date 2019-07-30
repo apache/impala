@@ -320,8 +320,8 @@ error_codes = (
    "Kudu table '$0' column '$1' contains an out of range timestamp. "
    "The valid date range is 1400-01-01..9999-12-31."),
 
-  ("MAX_ROW_SIZE", 104, "Row of size $0 could not be materialized in plan node with "
-    "id $1. Increase the max_row_size query option (currently $2) to process larger rows."),
+  ("MAX_ROW_SIZE", 104, "Row of size $0 could not be materialized by $1. Increase the "
+   "max_row_size query option (currently $2) to process larger rows."),
 
   ("IR_VERIFY_FAILED", 105,
    "Failed to verify generated IR function $0, see log for more details."),

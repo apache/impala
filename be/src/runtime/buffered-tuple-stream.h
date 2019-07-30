@@ -216,11 +216,11 @@ class BufferedTupleStream {
 
   ~BufferedTupleStream() { DCHECK(closed_); }
 
-  /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
-  /// once before any of the other APIs.
+  /// Initializes the tuple stream object on behalf of a caller uniquely identified by a
+  /// 'caller_label'. Must be called once before any of the other APIs.
   /// If 'pinned' is true, the tuple stream starts off pinned, otherwise it is unpinned.
-  /// 'node_id' is only used for error reporting.
-  Status Init(int node_id, bool pinned) WARN_UNUSED_RESULT;
+  /// 'caller_label' is only used for error reporting.
+  Status Init(const std::string& caller_label, bool pinned) WARN_UNUSED_RESULT;
 
   /// Prepares the stream for writing by saving enough reservation for a default-size
   /// write page. Tries to increase reservation if there is not enough unused reservation
@@ -366,6 +366,11 @@ class BufferedTupleStream {
     return bytes_pinned_;
   }
 
+  /// Returns the number of bytes currently unpinned by the stream.
+  int64_t bytes_unpinned() const {
+    return bytes_unpinned_;
+  }
+
   bool is_closed() const { return closed_; }
   bool is_pinned() const { return pinned_; }
   bool has_read_iterator() const { return has_read_iterator_; }
@@ -418,8 +423,10 @@ class BufferedTupleStream {
   /// Description of rows stored in the stream.
   const RowDescriptor* desc_;
 
-  /// Plan node ID, used for error reporting.
-  int node_id_ = -1;
+  /// Caller ID, used for error reporting. A unique id identifying the class using the
+  /// BufferedTupleStream. For ExecNodes this is the TPlanNodeId, however, it could be
+  /// any unique string.
+  std::string caller_label_;
 
   /// The size of the fixed length portion for each tuple in the row.
   std::vector<int> fixed_tuple_sizes_;
@@ -504,6 +511,10 @@ class BufferedTupleStream {
   /// Total bytes of pinned pages in pages_, stored to avoid iterating over the list
   /// to compute it.
   int64_t bytes_pinned_ = 0;
+
+  /// Total bytes of pinned pages in pages_, stored to avoid iterating over the list
+  /// to compute it.
+  int64_t bytes_unpinned_ = 0;
 
   /// Number of rows stored in the stream. Includes rows that were already deleted during
   /// a destructive 'attach_on_read' pass over the stream.

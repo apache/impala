@@ -51,14 +51,16 @@ using strings::Substitute;
 
 const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
 
-PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
-    const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
-    RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
-    int64_t spillable_buffer_size, int64_t max_row_buffer_size)
+PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
+    TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
+    const RowDescriptor* build_row_desc, RuntimeState* state,
+    BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
+    int64_t max_row_buffer_size)
   : DataSink(-1, build_row_desc,
         Substitute("Hash Join Builder (join_node_id=$0)", join_node_id), state),
     runtime_state_(state),
     join_node_id_(join_node_id),
+    join_node_label_(join_node_label),
     join_op_(join_op),
     probe_row_desc_(probe_row_desc),
     buffer_pool_client_(buffer_pool_client),
@@ -259,7 +261,7 @@ void PhjBuilder::Reset(RowBatch* row_batch) {
 Status PhjBuilder::CreateAndPreparePartition(int level, Partition** partition) {
   all_partitions_.emplace_back(new Partition(runtime_state_, this, level));
   *partition = all_partitions_.back().get();
-  RETURN_IF_ERROR((*partition)->build_rows()->Init(join_node_id_, true));
+  RETURN_IF_ERROR((*partition)->build_rows()->Init(join_node_label_, true));
   bool got_buffer;
   RETURN_IF_ERROR((*partition)->build_rows()->PrepareForWrite(&got_buffer));
   DCHECK(got_buffer)
@@ -418,7 +420,7 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
         make_unique<BufferedTupleStream>(runtime_state_, probe_row_desc_,
             buffer_pool_client_, spillable_buffer_size_, max_row_buffer_size_));
     BufferedTupleStream* probe_stream = spilled_partition_probe_streams_.back().get();
-    RETURN_IF_ERROR(probe_stream->Init(join_node_id_, false));
+    RETURN_IF_ERROR(probe_stream->Init(join_node_label_, false));
 
     // Loop until either the stream gets a buffer or all partitions are spilled (in which
     // case SpillPartition() returns an error).

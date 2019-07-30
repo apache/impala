@@ -33,7 +33,6 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
-#include "runtime/deque-row-batch-queue.h"
 #include "runtime/krpc-data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "util/container-util.h"
@@ -110,7 +109,9 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
       if (state->query_options().spool_query_results) {
-        *sink = pool->Add(new BufferedPlanRootSink(sink_id, row_desc, state));
+        *sink = pool->Add(new BufferedPlanRootSink(sink_id, row_desc, state,
+            fragment_ctx.fragment.output_sink.plan_root_sink.resource_profile,
+            fragment_instance_ctx.debug_options));
       } else {
         *sink = pool->Add(new BlockingPlanRootSink(sink_id, row_desc, state));
       }

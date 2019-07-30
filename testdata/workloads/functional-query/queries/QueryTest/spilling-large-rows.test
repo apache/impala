@@ -15,7 +15,7 @@ select id, count(distinct bigstr)
 from bigstrs
 group by id
 ---- CATCH
-Row of size 9.54 MB could not be materialized in plan node
+Row of size 9.54 MB could not be materialized by AGGREGATION_NODE
 ====
 ---- QUERY
 # Agg should be able to process the large strings if we increase the row size.
@@ -60,7 +60,7 @@ from functional.alltypes atp
   join bigstrs bs on repeat(atp.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and atp.id = bs.id
 where atp.id < 100
 ---- CATCH
-Row of size 9.54 MB could not be materialized in plan node with id 2. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+Row of size 9.54 MB could not be materialized by HASH_JOIN_NODE (id=2). Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
 ====
 ---- QUERY
 # Row is too big to process in right side of hash join.
@@ -104,7 +104,7 @@ select id, substr(bigstr, 1, 5)
 from bigstrs
 order by bigstr, id
 ---- CATCH
-Row of size 9.54 MB could not be materialized in plan node with id 1. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+Row of size 9.54 MB could not be materialized by SORT_NODE (id=1). Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
 ====
 ---- QUERY
 # Sort should be able to process the large strings if we increase the row size.
@@ -143,7 +143,7 @@ FROM (
   ) a
 ORDER BY id
 ---- CATCH
-Row of size 9.54 MB could not be materialized in plan node with id 1. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+Row of size 9.54 MB could not be materialized by SORT_NODE (id=1). Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
 ====
 ---- QUERY
 # Sort and analytic should be able to process the large strings if we increase the row

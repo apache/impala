@@ -382,6 +382,12 @@ struct TQueryOptions {
 
   // If true, skip using the data cache for this query session.
   90: optional bool disable_data_cache = false;
+
+  // See comment in ImpalaService.thrift
+  91: optional i64 max_result_spooling_mem = 104857600;
+
+  // See comment in ImpalaService.thrift
+  92: optional i64 max_spilled_result_spooling_mem = 1073741824;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
