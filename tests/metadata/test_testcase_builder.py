@@ -19,6 +19,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
   create_single_exec_option_dimension,
   create_uncompressed_text_dimension)
+from tests.util.filesystem_utils import get_fs_path
 
 
 class TestTestcaseBuilder(ImpalaTestSuite):
@@ -36,8 +37,9 @@ class TestTestcaseBuilder(ImpalaTestSuite):
       create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_query_without_from(self):
+    tmp_path = get_fs_path("/tmp")
     # Generate Testcase Data for query without table reference
-    testcase_generate_query = """COPY TESTCASE TO 'hdfs:///tmp' SELECT 5 * 20"""
+    testcase_generate_query = """COPY TESTCASE TO '%s' SELECT 5 * 20""" % tmp_path
     result = self.execute_query_expect_success(self.client, testcase_generate_query)
     assert len(result.data) == 1, "Testcase builder wrong result: {0}".format(result.data)
 
@@ -45,7 +47,8 @@ class TestTestcaseBuilder(ImpalaTestSuite):
     testcase_path = str(result.data)[1: -1]
     index = testcase_path.index('/tmp')
     hdfs_path = testcase_path[index:-1]
-    assert self.hdfs_client.exists(hdfs_path), "File not generated {0}".format(hdfs_path)
+    assert self.filesystem_client.exists(hdfs_path), \
+        "File not generated {0}".format(hdfs_path)
 
     try:
       # Test load testcase works
@@ -53,5 +56,5 @@ class TestTestcaseBuilder(ImpalaTestSuite):
       self.execute_query_expect_success(self.client, testcase_load_query)
     finally:
       # Delete testcase file from tmp
-      status = self.hdfs_client.delete_file_dir(hdfs_path)
+      status = self.filesystem_client.delete_file_dir(hdfs_path)
       assert status, "Delete generated testcase file failed with {0}".format(status)
