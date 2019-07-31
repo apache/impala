@@ -21,6 +21,7 @@ under the License.
 <concept id="ports">
 
   <title>Ports Used by Impala</title>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -36,8 +37,8 @@ under the License.
 
     <p>
       <indexterm audience="hidden">ports</indexterm>
-      Impala uses the TCP ports listed in the following table. Before deploying Impala, ensure these ports are open
-      on each system.
+      Impala uses the TCP ports listed in the following table. Before deploying Impala, ensure
+      these ports are open on each system.
     </p>
 
     <table>
@@ -90,8 +91,8 @@ under the License.
             </entry>
             <entry>
               <p>
-                Used to transmit commands and receive results by <codeph>impala-shell</codeph> and
-                some ODBC drivers.
+                Used to transmit commands and receive results by <codeph>impala-shell</codeph>
+                and some ODBC drivers via the Beeswax protocol.
               </p>
             </entry>
           </row>
@@ -118,8 +119,9 @@ under the License.
             </entry>
             <entry>
               <p>
-                Used to transmit commands and receive results by applications, such as Business Intelligence tools,
-                using JDBC, the Beeswax query editor in Hue, and some ODBC drivers.
+                Used to transmit commands and receive results by client applications over
+                binary, such as Business Intelligence tools, using JDBC, the Beeswax query
+                editor in Hue, and some ODBC drivers.
               </p>
             </entry>
           </row>
@@ -145,8 +147,10 @@ under the License.
               </p>
             </entry>
             <entry>
-              <p> Internal use only. Impala daemons use this port for Thrift
-                based communication with each other. </p>
+              <p>
+                Internal use only. Impala daemons use this port for Thrift based communication
+                with each other.
+              </p>
             </entry>
           </row>
           <row>
@@ -172,7 +176,8 @@ under the License.
             </entry>
             <entry>
               <p>
-                Internal use only. Impala daemons listen on this port for updates from the statestore daemon.
+                Internal use only. Impala daemons listen on this port for updates from the
+                statestore daemon.
               </p>
             </entry>
           </row>
@@ -199,7 +204,8 @@ under the License.
             </entry>
             <entry>
               <p>
-                Internal use only. The catalog daemon listens on this port for updates from the statestore daemon.
+                Internal use only. The catalog daemon listens on this port for updates from the
+                statestore daemon.
               </p>
             </entry>
           </row>
@@ -280,8 +286,8 @@ under the License.
             </entry>
             <entry>
               <p>
-                Catalog service web interface for administrators to monitor and troubleshoot. New in Impala 1.2 and
-                higher.
+                Catalog service web interface for administrators to monitor and troubleshoot.
+                New in Impala 1.2 and higher.
               </p>
             </entry>
           </row>
@@ -308,8 +314,8 @@ under the License.
             </entry>
             <entry>
               <p>
-                Internal use only. The statestore daemon listens on this port for registration/unregistration
-                requests.
+                Internal use only. The statestore daemon listens on this port for
+                registration/unregistration requests.
               </p>
             </entry>
           </row>
@@ -336,27 +342,37 @@ under the License.
             </entry>
             <entry>
               <p>
-                Internal use only. The catalog service uses this port to communicate with the Impala daemons. New
-                in Impala 1.2 and higher.
+                Internal use only. The catalog service uses this port to communicate with the
+                Impala daemons. New in Impala 1.2 and higher.
               </p>
             </entry>
           </row>
           <row>
             <entry>
-              <p> Impala Daemon </p>
+              <p>
+                Impala Daemon
+              </p>
             </entry>
             <entry>
-              <p>KRPC Port</p>
+              <p>
+                KRPC Port
+              </p>
             </entry>
             <entry>
-              <p>27000</p>
+              <p>
+                27000
+              </p>
             </entry>
             <entry>
-              <p>Internal</p>
+              <p>
+                Internal
+              </p>
             </entry>
             <entry>
-              <p>Internal use only. Impala daemons use this port for KRPC based
-                communication with each other.</p>
+              <p>
+                Internal use only. Impala daemons use this port for KRPC based communication
+                with each other.
+              </p>
             </entry>
           </row>
           <row rev="1.3.0">
@@ -367,7 +383,7 @@ under the License.
             </entry>
             <entry>
               <p>
-                Llama Callback Port
+                HiveServer2 HTTP Port
               </p>
             </entry>
             <entry>
@@ -377,13 +393,12 @@ under the License.
             </entry>
             <entry>
               <p>
-                Internal
+                External
               </p>
             </entry>
             <entry>
-              <p>
-                Internal use only. Impala daemons use to communicate with Llama. New in <keyword keyref="impala13"/> and higher.
-              </p>
+              <p> Used to transmit commands and receive results by client
+                applications over HTTP via the HiveServer2 protocol. </p>
             </entry>
           </row>
           <row rev="1.3.0">
@@ -463,13 +478,15 @@ under the License.
             </entry>
             <entry>
               <p>
-                Llama service web interface for administrators to monitor and troubleshoot.
-                New in <keyword keyref="impala13"/> and higher.
+                Llama service web interface for administrators to monitor and troubleshoot. New
+                in <keyword keyref="impala13"/> and higher.
               </p>
             </entry>
           </row>
         </tbody>
       </tgroup>
     </table>
+
   </conbody>
+
 </concept>

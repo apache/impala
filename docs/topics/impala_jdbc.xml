@@ -76,16 +76,61 @@ under the License.
     <conbody>
 
       <p>
-        The default port used by JDBC 2.0 and later (as well as ODBC 2.x) is 21050. Impala
-        server accepts JDBC connections through this same port 21050 by default. Make sure this
-        port is available for communication with other hosts on your network, for example, that
-        it is not blocked by firewall software. If your JDBC client software connects to a
-        different port, specify that alternative port number with the
-        <codeph>&#8209;&#8209;hs2_port</codeph> option when starting <codeph>impalad</codeph>.
-        See <xref
-          href="impala_processes.xml#processes"/> for details about Impala
-        startup options. See <xref href="impala_ports.xml#ports"/> for information about all
-        ports used for communication between Impala and clients or between Impala components.
+        The following are the default ports that Impala server accepts JDBC connections through:
+        <simpletable frame="all"
+          relcolwidth="1.0* 1.03* 2.38*" id="simpletable_tr2_gnt_43b">
+
+          <strow>
+
+            <stentry><b>Protocol</b>
+
+            </stentry>
+
+            <stentry><b>Default Port</b>
+
+            </stentry>
+
+            <stentry><b>Flag to Specify an Alternate Port</b>
+
+            </stentry>
+
+          </strow>
+
+          <strow>
+
+            <stentry>HTTP</stentry>
+
+            <stentry>28000</stentry>
+
+            <stentry><codeph>&#8209;&#8209;hs2_http_port</codeph>
+
+            </stentry>
+
+          </strow>
+
+          <strow>
+
+            <stentry>Binary TCP</stentry>
+
+            <stentry>21050</stentry>
+
+            <stentry><codeph>&#8209;&#8209;hs2_port</codeph>
+
+            </stentry>
+
+          </strow>
+
+        </simpletable>
+      </p>
+
+      <p>
+        Make sure the port for the protocol you are using is available for communication with
+        clients, for example, that it is not blocked by firewall software.
+      </p>
+
+      <p>
+        If your JDBC client software connects to a different port, specify that alternative port
+        number with the flag in the above table when starting the <codeph>impalad</codeph>.
       </p>
 
     </conbody>
@@ -292,6 +337,13 @@ under the License.
         </p>
 
 <codeblock>jdbc:hive2://myhost.example.com:21050/test_db;user=fred;password=xyz123</codeblock>
+
+        <p>
+          To connect to an instance of Impala over HTTP, specify the HTTP port, 28000 by
+          default, and <codeph>transportMode=http</codeph> in the connection string. For
+          example:
+<codeblock>jdbc:hive2://myhost.example.com:28000/;transportMode=http</codeblock>
+        </p>
 
         <note>
           <p conref="../shared/impala_common.xml#common/hive_jdbc_ssl_kerberos_caveat"/>
