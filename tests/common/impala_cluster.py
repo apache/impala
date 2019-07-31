@@ -209,7 +209,7 @@ class ImpalaCluster(object):
     impalads = list()
     statestored = list()
     catalogd = None
-    for process in find_user_processes(['impalad', 'catalogd', 'statestored']):
+    for binary, process in find_user_processes(['impalad', 'catalogd', 'statestored']):
       # IMPALA-6889: When a process shuts down and becomes a zombie its cmdline becomes
       # empty for a brief moment, before it gets reaped by its parent (see man proc). We
       # copy the cmdline to prevent it from changing between the following checks and
@@ -223,11 +223,11 @@ class ImpalaCluster(object):
         continue
       if len(cmdline) == 0:
         continue
-      if process.name == 'impalad':
+      if binary == 'impalad':
         impalads.append(ImpaladProcess(cmdline))
-      elif process.name == 'statestored':
+      elif binary == 'statestored':
         statestored.append(StateStoreProcess(cmdline))
-      elif process.name == 'catalogd':
+      elif binary == 'catalogd':
         catalogd = CatalogdProcess(cmdline)
 
     self.__sort_impalads(impalads)
@@ -532,11 +532,20 @@ class CatalogdProcess(BaseImpalaProcess):
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching
-  binary name from the provided list."""
+  binary name from the provided list. Return a iterable of tuples, with each tuple
+  containing the binary name and the psutil.Process object."""
   for pid in psutil.get_pid_list():
     try:
       process = psutil.Process(pid)
-      if process.username == getuser() and process.name in binaries: yield process
+      cmdline = process.cmdline
+      if process.username != getuser() or len(cmdline) == 0:
+        continue
+      # IMPALA-8820 - sometimes the process name does not reflect the executed binary
+      # because the process can change its own name at runtime. Checking the command
+      # line is more robust.
+      binary_name = os.path.basename(cmdline[0])
+      if binary_name in binaries:
+        yield binary_name, process
     except KeyError, e:
       if "uid not found" not in str(e):
         raise

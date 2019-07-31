@@ -154,7 +154,7 @@ def check_process_exists(binary, attempts=1):
   otherwise.
   """
   for _ in range(attempts):
-    for proc in find_user_processes([binary]):
+    for _ in find_user_processes([binary]):
       return True
     sleep(1)
   return False
@@ -181,7 +181,7 @@ def build_java_tool_options(jvm_debug_port=None):
 def kill_matching_processes(binary_names, force=False):
   """Kills all processes with the given binary name, waiting for them to exit"""
   # Send all the signals before waiting so that processes can clean up in parallel.
-  processes = list(find_user_processes(binary_names))
+  processes = [proc for _, proc in find_user_processes(binary_names)]
   for process in processes:
     try:
       if force:
