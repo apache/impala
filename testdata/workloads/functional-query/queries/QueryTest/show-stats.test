@@ -148,7 +148,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
-# Column column stats for a table with complex types.
+# Column stats for a table with complex types.
+# TODO: when complex type stats are supported revisit: compute-stats-complextype-warning.test
 show column stats functional.allcomplextypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE

@@ -180,9 +180,15 @@ abstract public class ScanNode extends PlanNode {
     return false;
   }
 
+  /**
+   * Returns true if the column does not have stats, complex type columns are skipped.
+   */
   public boolean isTableMissingColumnStats() {
     for (SlotDescriptor slot: desc_.getSlots()) {
-      if (slot.getColumn() != null && !slot.getStats().hasStats()) return true;
+      if (slot.getColumn() != null && !slot.getStats().hasStats() &&
+          !slot.getColumn().getType().isComplexType()) {
+        return true;
+      }
     }
     return false;
   }

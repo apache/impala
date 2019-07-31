@@ -554,8 +554,6 @@ from tpch_nested_parquet.customer c, c.c_orders
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=32.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT c_custkey, o_orderkey, o_orderstatus, o_totalprice,
 o_orderdate, o_orderpriority, o_clerk FROM tpch_nested_parquet.customer c,
 c.c_orders
@@ -605,8 +603,6 @@ from tpch_nested_parquet.customer c, c.c_orders
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT c_custkey, o_orderkey, pos FROM
 tpch_nested_parquet.customer c, c.c_orders
 
@@ -656,8 +652,6 @@ from tpch_nested_parquet.customer c, c.c_orders
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT c_custkey, pos FROM tpch_nested_parquet.customer c,
 c.c_orders
 
@@ -707,8 +701,6 @@ from tpch_nested_parquet.customer c, c.c_orders
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT c_custkey FROM tpch_nested_parquet.customer c, c.c_orders
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -756,8 +748,6 @@ from tpch_nested_parquet.customer c, c.c_orders
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT o_orderkey FROM tpch_nested_parquet.customer c,
 c.c_orders
 
@@ -806,8 +796,6 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=16.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT c_custkey, o_orderkey, l_comment FROM
 tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 
@@ -4521,8 +4509,6 @@ from tpch_nested_parquet.customer c,
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=85.94MB Threads=2
 Per-Host Resource Estimates: Memory=346MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT DISTINCT c_name, v.o_orderkey, v.o_orderstatus FROM
 tpch_nested_parquet.customer c, (SELECT DISTINCT o1.o_orderkey, o2.o_orderstatus
 FROM c.c_orders o1 INNER JOIN c.c_orders o2 ON o1.o_orderkey = o2.o_orderkey
@@ -4598,8 +4584,6 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=119.94MB Threads=4
 Per-Host Resource Estimates: Memory=494MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT DISTINCT c_name, v.o_orderkey, v.o_orderstatus FROM
 tpch_nested_parquet.customer c, (SELECT DISTINCT o1.o_orderkey, o2.o_orderstatus
 FROM c.c_orders o1 INNER JOIN c.c_orders o2 ON o1.o_orderkey = o2.o_orderkey
@@ -4695,8 +4679,6 @@ Per-Host Resources: mem-estimate=345.94MB mem-reservation=85.94MB thread-reserva
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=239.88MB Threads=5
 Per-Host Resource Estimates: Memory=979MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT DISTINCT c_name, v.o_orderkey, v.o_orderstatus FROM
 tpch_nested_parquet.customer c, (SELECT DISTINCT o1.o_orderkey, o2.o_orderstatus
 FROM c.c_orders o1 INNER JOIN c.c_orders o2 ON o1.o_orderkey = o2.o_orderkey
@@ -4801,8 +4783,6 @@ from tpch_nested_parquet.customer c,
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=104.00MB Threads=2
 Per-Host Resource Estimates: Memory=136MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT * FROM tpch_nested_parquet.customer c, (SELECT *,
 row_number() OVER (ORDER BY o_totalprice ASC) rnum_price, row_number() OVER
 (ORDER BY o_orderdate ASC) rnum_date, row_number() OVER (ORDER BY
@@ -4889,8 +4869,6 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=104.00MB Threads=3
 Per-Host Resource Estimates: Memory=147MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT * FROM tpch_nested_parquet.customer c, (SELECT *,
 row_number() OVER (ORDER BY o_totalprice ASC) rnum_price, row_number() OVER
 (ORDER BY o_orderdate ASC) rnum_date, row_number() OVER (ORDER BY
@@ -4984,8 +4962,6 @@ Per-Host Resources: mem-estimate=136.00MB mem-reservation=104.00MB thread-reserv
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=208.00MB Threads=3
 Per-Host Resource Estimates: Memory=284MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_nested_parquet.customer
 Analyzed query: SELECT * FROM tpch_nested_parquet.customer c, (SELECT *,
 row_number() OVER (ORDER BY o_totalprice ASC) rnum_price, row_number() OVER
 (ORDER BY o_orderdate ASC) rnum_date, row_number() OVER (ORDER BY

@@ -81,6 +81,11 @@ class TestComputeStats(ImpalaTestSuite):
   def test_compute_stats_incremental(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-incremental', vector, unique_database)
 
+  @SkipIfS3.eventually_consistent
+  def test_compute_stats_complextype_warning(self, vector, unique_database):
+    self.run_test_case('QueryTest/compute-stats-complextype-warning', vector,
+        unique_database)
+
   @pytest.mark.execute_serially
   @SkipIfS3.eventually_consistent
   def test_compute_stats_many_partitions(self, vector):

@@ -1,0 +1,17 @@
+====
+---- QUERY
+# The missing stats warning should appear when the stats are not available,
+# in this case it is due to missing table stats.
+create table if not exists complex_collection (list ARRAY < STRING >);
+explain select count(*) from complex_collection c, c.list;
+---- RESULTS: VERIFY_IS_SUBSET
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+====
+---- QUERY
+# Although stats are not available for complex types the missing stats warning
+# should not appear when stats are available.
+compute stats complex_collection;
+explain select count(*) from complex_collection c, c.list;
+---- RESULTS: VERIFY_IS_NOT_IN
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+====
