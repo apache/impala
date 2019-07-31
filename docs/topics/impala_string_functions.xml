@@ -1396,94 +1396,57 @@ select replace('hello world','xyz','abc');
       <dlentry rev="2.3.0 IMPALA-2084" id="split_part">
 
         <dt>
-          SPLIT_PART(STRING source, STRING delimiter, BIGINT n)
+          SPLIT_PART(STRING source, STRING delimiter, BIGINT index)
         </dt>
 
         <dd>
-          <b>Purpose:</b> Returns the nth field within a delimited string. The fields are
-          numbered starting from 1. The delimiter can consist of multiple characters, not just a
-          single character. All matching of the delimiter is done exactly, not using any regular
-          expression patterns.
+          <b>Purpose:</b> Returns the requested <codeph>index</codeph>th part of the input
+          <varname>source</varname> string split by the <varname>delimiter</varname>.
+          <ul>
+            <li>
+              If <varname>index</varname> is a positive number, returns the
+              <varname>index</varname>th part from the left within the <varname>source</varname>
+              string.
+            </li>
+
+            <li>
+              If <varname>index</varname> is a negative number, returns the
+              <varname>index</varname>th part from the right within the
+              <varname>source</varname> string.
+            </li>
+
+            <li>
+              If <varname>index</varname> is 0, returns an error.
+            </li>
+          </ul>
+          <p>
+            The <varname>delimiter</varname> can consist of multiple characters, not just a
+            single character.
+          </p>
+          <p>
+            All matching of the delimiter is done exactly, not using any regular expression
+            patterns.
+          </p>
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
-
-          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
-
-          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
-
-          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
-
-          <p conref="../shared/impala_common.xml#common/example_blurb"/>
-
+          <p conref="../shared/impala_common.xml#common/example_blurb"
+              />
           <p>
-            These examples show how to retrieve the nth field from a delimited string:
+            <codeph>SPLIT_PART('x,y,z',',',2)</codeph> returns <codeph>'y'</codeph>.
           </p>
-<codeblock><![CDATA[
-select split_part('x,y,z',',',1);
-+-----------------------------+
-| split_part('x,y,z', ',', 1) |
-+-----------------------------+
-| x                           |
-+-----------------------------+
-
-select split_part('x,y,z',',',2);
-+-----------------------------+
-| split_part('x,y,z', ',', 2) |
-+-----------------------------+
-| y                           |
-+-----------------------------+
-
-select split_part('x,y,z',',',3);
-+-----------------------------+
-| split_part('x,y,z', ',', 3) |
-+-----------------------------+
-| z                           |
-+-----------------------------+
-]]>
-</codeblock>
           <p>
-            These examples show what happens for out-of-range field positions. Specifying a
-            value less than 1 produces an error. Specifying a value greater than the number of
-            fields returns a zero-length string (which is not the same as
-            <codeph>NULL</codeph>).
+            <codeph>SPLIT_PART('one***two***three','***',2)</codeph> returns
+            <codeph>'two'</codeph>.
           </p>
-<codeblock><![CDATA[
-select split_part('x,y,z',',',0);
-ERROR: Invalid field position: 0
-
-with t1 as (select split_part('x,y,z',',',4) nonexistent_field)
-  select
-      nonexistent_field
-    , concat('[',nonexistent_field,']')
-    , length(nonexistent_field);
-from t1
-+-------------------+-------------------------------------+---------------------------+
-| nonexistent_field | concat('[', nonexistent_field, ']') | length(nonexistent_field) |
-+-------------------+-------------------------------------+---------------------------+
-|                   | []                                  | 0                         |
-+-------------------+-------------------------------------+---------------------------+
-]]>
-</codeblock>
           <p>
-            These examples show how the delimiter can be a multi-character value:
+            <codeph>SPLIT_PART('abc@@def@@ghi', '@@', 3)</codeph> returns
+            <codeph>'ghi'</codeph>.
           </p>
-<codeblock><![CDATA[
-select split_part('one***two***three','***',2);
-+-------------------------------------------+
-| split_part('one***two***three', '***', 2) |
-+-------------------------------------------+
-| two                                       |
-+-------------------------------------------+
-
-select split_part('one\|/two\|/three','\|/',3);
-+-------------------------------------------+
-| split_part('one\|/two\|/three', '\|/', 3) |
-+-------------------------------------------+
-| three                                     |
-+-------------------------------------------+
-]]>
-</codeblock>
+          <p>
+            <codeph>SPLIT_PART('abc@@def@@ghi', '@@', -3)</codeph> returns
+            <codeph>'abc'</codeph>.
+          </p>
         </dd>
 
       </dlentry>
