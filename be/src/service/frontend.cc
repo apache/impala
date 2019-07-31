@@ -111,6 +111,7 @@ Frontend::Frontend() {
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
     {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_},
     {"abortTransaction", "(J)V", &abort_txn_},
+    {"unregisterTransaction", "(J)V", &unregister_txn_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -268,6 +269,10 @@ Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) 
 
 Status Frontend::AbortTransaction(int64_t transaction_id) {
   return JniUtil::CallJniMethod(fe_, abort_txn_, transaction_id);
+}
+
+Status Frontend::UnregisterTransaction(int64_t transaction_id) {
+  return JniUtil::CallJniMethod(fe_, unregister_txn_, transaction_id);
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {

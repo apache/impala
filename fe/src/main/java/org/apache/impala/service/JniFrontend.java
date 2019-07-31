@@ -639,11 +639,19 @@ public class JniFrontend {
 
   /**
    * Aborts a transaction.
-   * @param transactionId the id of the transaction to commit.
+   * @param transactionId the id of the transaction to abort.
    * @throws TransactionException
    */
   public void abortTransaction(long transactionId) throws TransactionException {
     this.frontend_.abortTransaction(transactionId);
+  }
+
+  /**
+   * Unregister an already committed transaction.
+   * @param transactionId the id of the transaction to clear.
+   */
+  public void unregisterTransaction(long transactionId) {
+    this.frontend_.unregisterTransaction(transactionId);
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.impala.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -36,6 +37,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.LockComponent;
+import org.apache.hadoop.hive.metastore.api.LockLevel;
+import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -183,6 +188,12 @@ public class Frontend {
   private static final int INCONSISTENT_METADATA_NUM_RETRIES =
       BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries();
 
+  // Number of retries to acquire an HMS ACID lock.
+  private static final int LOCK_RETRIES = 10;
+
+  // Time interval between retries of acquiring an HMS ACID lock
+  private static final int LOCK_RETRY_WAIT_SECONDS = 3;
+
   /**
    * Plan-time context that allows capturing various artifacts created
    * during the process.
@@ -257,6 +268,8 @@ public class Frontend {
   // Stores metastore clients for direct accesses to HMS.
   private final MetaStoreClientPool metaStoreClientPool_;
 
+  private final TransactionKeepalive transactionKeepalive_;
+
   public Frontend(AuthorizationFactory authzFactory) throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig());
   }
@@ -290,6 +303,11 @@ public class Frontend {
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
     metaStoreClientPool_ = new MetaStoreClientPool(1, 0);
+    if (MetastoreShim.getMajorVersion() > 2) {
+      transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
+    } else {
+      transactionKeepalive_ = null;
+    }
   }
 
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
@@ -1292,11 +1310,15 @@ public class Frontend {
         if (AcidUtils.isTransactionalTable(
             targetTable.getMetaStoreTable().getParameters())) {
           // TODO (IMPALA-8788): should load table write ids in transaction context.
-          long txnId = openTransaction();
+          long txnId = openTransaction(queryCtx);
           queryCtx.setTransaction_id(txnId);
-          timeline.markEvent("Transaction opened");
+          timeline.markEvent("Transaction opened (" + String.valueOf(txnId) + ")");
           Long writeId = allocateWriteIdIfNeeded(queryCtx, targetTable);
-          if (writeId != null) insertStmt.setWriteId(writeId);
+          if (writeId != null) {
+            Collection<FeTable> tables = stmtTableCache.tables.values();
+            createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite());
+            insertStmt.setWriteId(writeId);
+          }
         }
       } else if (analysisResult.isLoadDataStmt()) {
         result.stmt_type = TStmtType.LOAD;
@@ -1644,26 +1666,42 @@ public class Frontend {
   }
 
   /**
-   * Opens a new transaction.
+   * Opens a new transaction and registers it to the keepalive object.
+   * @param queryCtx context of the query that requires the transaction.
    * @return the transaction id.
    * @throws TransactionException
    */
-  private long openTransaction() throws TransactionException {
-    IMetaStoreClient hmsClient = metaStoreClientPool_.getClient().getHiveClient();
-    return MetastoreShim.openTransaction(hmsClient, "Impala");
+  private long openTransaction(TQueryCtx queryCtx) throws TransactionException {
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      IMetaStoreClient hmsClient = client.getHiveClient();
+      long transactionId = MetastoreShim.openTransaction(hmsClient, "Impala");
+      transactionKeepalive_.addTransaction(transactionId, queryCtx);
+      return transactionId;
+    }
   }
 
   /**
    * Aborts a transaction.
-   * @param transactionId is the id of the transaction to abort.
+   * @param txnId is the id of the transaction to abort.
    * @throws TransactionException
    * TODO: maybe we should make it async.
    */
-  public void abortTransaction(long transactionId) throws TransactionException {
-    Long txnId = transactionId;
-    LOG.error("Aborting transaction: " + txnId.toString());
-    IMetaStoreClient hmsClient = metaStoreClientPool_.getClient().getHiveClient();
-    MetastoreShim.abortTransaction(hmsClient, transactionId);
+  public void abortTransaction(long txnId) throws TransactionException {
+    LOG.error("Aborting transaction: " + Long.toString(txnId));
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      IMetaStoreClient hmsClient = client.getHiveClient();
+      transactionKeepalive_.deleteTransaction(txnId);
+      MetastoreShim.abortTransaction(hmsClient, txnId);
+    }
+  }
+
+  /**
+   * Unregisters an already committed transaction.
+   * @param txnId is the id of the transaction to clear.
+   */
+  public void unregisterTransaction(long txnId) {
+    LOG.info("Unregistering already committed transaction: " + Long.toString(txnId));
+    transactionKeepalive_.deleteTransaction(txnId);
   }
 
   /**
@@ -1681,10 +1719,52 @@ public class Frontend {
     if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
       return null;
     }
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      IMetaStoreClient hmsClient = client.getHiveClient();
+      long txnId = queryCtx.getTransaction_id();
+      return MetastoreShim.allocateTableWriteId(hmsClient, txnId, table.getDb().getName(),
+          table.getName());
+    }
+  }
 
-    IMetaStoreClient hmsClient = this.metaStoreClientPool_.getClient().getHiveClient();
-    long txnId = queryCtx.getTransaction_id();
-    return MetastoreShim.allocateTableWriteId(hmsClient, txnId, table.getDb().getName(),
-        table.getName());
+  /**
+   * Creates Lock object for the insert statement.
+   * @param txnId the transaction id to be used.
+   * @param tables the tables in the query.
+   * @param targetTable the target table of INSERT. Must be transactional.
+   * @param isOverwrite
+   * @throws TransactionException
+   */
+  private void createLockForInsert(Long txnId, Collection<FeTable> tables,
+      FeTable targetTable, boolean isOverwrite) throws TransactionException {
+    Preconditions.checkState(
+        AcidUtils.isTransactionalTable(targetTable.getMetaStoreTable().getParameters()));
+    List<LockComponent> lockComponents = new ArrayList<>(tables.size());
+    for (FeTable table : tables) {
+      if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+        continue;
+      }
+      LockComponent lockComponent = new LockComponent();
+      lockComponent.setDbname(table.getDb().getName());
+      lockComponent.setTablename(table.getName());
+      lockComponent.setLevel(LockLevel.TABLE);
+      if (table == targetTable) {
+        if (isOverwrite) {
+          lockComponent.setType(LockType.EXCLUSIVE);
+        } else {
+          lockComponent.setType(LockType.SHARED_READ);
+        }
+        lockComponent.setOperationType(DataOperationType.INSERT);
+      } else {
+        lockComponent.setType(LockType.SHARED_READ);
+        lockComponent.setOperationType(DataOperationType.SELECT);
+      }
+      lockComponents.add(lockComponent);
+    }
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      IMetaStoreClient hmsClient = client.getHiveClient();
+      MetastoreShim.acquireLock(hmsClient, txnId, lockComponents, LOCK_RETRIES,
+          LOCK_RETRY_WAIT_SECONDS);
+    }
   }
 }

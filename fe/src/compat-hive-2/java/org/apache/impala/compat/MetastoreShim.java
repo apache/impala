@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.metastore.api.LockComponent;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -323,6 +324,23 @@ public class MetastoreShim {
   public static void abortTransaction(IMetaStoreClient client, long txnId)
       throws TransactionException {
     throw new UnsupportedOperationException("abortTransaction is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static boolean heartbeat(IMetaStoreClient client,
+      long txnId, long lockId) throws TransactionException {
+    throw new UnsupportedOperationException("heartbeat is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static long acquireLock(IMetaStoreClient client, long txnId,
+      List<LockComponent> lockComponents, int lockRetries, int retryWaitSeconds)
+      throws TransactionException {
+    throw new UnsupportedOperationException("acquireLock is not supported.");
   }
 
   /**

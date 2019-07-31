@@ -1126,6 +1126,10 @@ Status ClientRequestState::UpdateCatalog() {
       }
       if (InTransaction()) {
         // UpdateCatalog() succeeded and already committed the transaction for us.
+        int64_t txn_id = GetTransactionId();
+        if (!frontend_->UnregisterTransaction(txn_id).ok()) {
+          LOG(ERROR) << Substitute("Failed to unregister transaction $0", txn_id);
+        }
         ClearTransactionState();
         query_events_->MarkEvent("Transaction committed");
       }

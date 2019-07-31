@@ -16,6 +16,10 @@
 # under the License.
 
 # Functional tests for ACID integration with Hive.
+
+import pytest
+import time
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
                                SkipIfADLS, SkipIfIsilon, SkipIfLocal)
@@ -84,3 +88,66 @@ class TestAcid(ImpalaTestSuite):
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.
 #  Negative test for LOAD DATA INPATH and all other SQL that we don't support.
+
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @pytest.mark.execute_serially
+  def test_acid_heartbeats(self, vector, unique_database):
+    """Tests heartbeating of transactions. Creates a long-running query via
+    some jitting and in the meanwhile it periodically checks whether there is
+    a transaction that has sent a heartbeat since its start.
+    """
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    last_open_txn_start_time = self._latest_open_transaction()
+    dummy_tbl = "{}.{}".format(unique_database, "dummy")
+    self.execute_query("create table {} (i int) tblproperties"
+                       "('transactional'='true',"
+                       "'transactional_properties'='insert_only')".format(dummy_tbl))
+    try:
+      handle = self.execute_query_async(
+          "insert into {} values (sleep(200000))".format(dummy_tbl))
+      MAX_ATTEMPTS = 10
+      attempt = 0
+      success = False
+      while attempt < MAX_ATTEMPTS:
+        if self._any_open_heartbeated_transaction_since(last_open_txn_start_time):
+          success = True
+          break
+        attempt += 1
+        time.sleep(20)
+      assert success
+    finally:
+      self.client.cancel(handle)
+
+  def _latest_open_transaction(self):
+    max_start = 0
+    for txn in self._get_impala_transactions():
+      start = txn['start_time']
+      if start > max_start:
+        max_start = start
+    return max_start
+
+  def _any_open_heartbeated_transaction_since(self, since_start_time):
+    for txn in self._get_impala_transactions():
+      if txn['state'] == 'OPEN':
+        start = txn['start_time']
+        if start > since_start_time and start != txn['last_heartbeat']:
+          return True
+    return False
+
+  def _get_impala_transactions(self):
+    transactions = self.run_stmt_in_hive("SHOW TRANSACTIONS")
+    for transaction_line in transactions.split('\n')[2:-1]:
+      transaction_columns = transaction_line.split(',')
+      txn_dict = dict()
+      txn_dict['state'] = transaction_columns[1]
+      txn_dict['start_time'] = int(transaction_columns[2])
+      txn_dict['last_heartbeat'] = int(transaction_columns[3])
+      txn_dict['user'] = transaction_columns[4]
+      if txn_dict['user'] != 'Impala':
+        continue
+      yield txn_dict

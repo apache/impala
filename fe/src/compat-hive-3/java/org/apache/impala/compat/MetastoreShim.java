@@ -26,9 +26,9 @@ import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -38,13 +38,21 @@ import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.metastore.api.LockComponent;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
+import org.apache.hadoop.hive.metastore.api.LockState;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
+import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
@@ -68,8 +76,10 @@ import org.apache.impala.compat.HiveMetadataFormatUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
+import org.apache.impala.service.TransactionKeepalive;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
@@ -79,6 +89,7 @@ import com.google.common.base.Preconditions;
  * between major versions of Hive. This implements the shimmed methods for Hive 3.
  */
 public class MetastoreShim {
+  public static final Logger LOG = Logger.getLogger(MetastoreShim.class);
   private static final String EXTWRITE = "EXTWRITE";
   private static final String EXTREAD = "EXTREAD";
   private static final String HIVEBUCKET2 = "HIVEBUCKET2";
@@ -489,6 +500,80 @@ public class MetastoreShim {
     try {
       client.abortTxns(Arrays.asList(txnId));
     } catch (Exception e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Heartbeats a transaction and/or lock to keep them alive.
+   * @param client is the HMS client to be used.
+   * @param txnId is the transaction id.
+   * @param lockId is the lock id.
+   * @return True on success, false if the transaction or lock is non-existent
+   * anymore.
+   * @throws In case of any other failures.
+   */
+  public static boolean heartbeat(IMetaStoreClient client,
+      long txnId, long lockId) throws TransactionException {
+    String errorMsg = "Caught exception during heartbeating transaction " +
+        String.valueOf(txnId) + " lock " + String.valueOf(lockId);
+    LOG.info("Sending heartbeat");
+    try {
+      client.heartbeat(txnId, lockId);
+    } catch (NoSuchLockException e) {
+      LOG.info(errorMsg, e);
+      return false;
+    } catch (NoSuchTxnException e) {
+      LOG.info(errorMsg, e);
+      return false;
+    } catch (TxnAbortedException e) {
+      LOG.info(errorMsg, e);
+      return false;
+    } catch (TException e) {
+      throw new TransactionException(e.getMessage());
+    }
+    return true;
+  }
+
+  /**
+   * Creates a lock for the given lock components. Returns the acquired lock, this
+   * might involve some waiting.
+   * @param client is the HMS client to be used.
+   * @param lockComponents the lock components to include in this lock.
+   * @param lockRetries the number of retries to acquire the lock.
+   * @param retryWaitSeconds wait interval between retries.
+   * @return the lock id
+   * @throws TransactionException in case of failure
+   */
+  public static long acquireLock(IMetaStoreClient client, long txnId,
+      List<LockComponent> lockComponents, int lockRetries, int retryWaitSeconds)
+          throws TransactionException {
+    LockRequestBuilder lockRequestBuilder = new LockRequestBuilder();
+    lockRequestBuilder.setUser("Impala");
+    lockRequestBuilder.setTransactionId(txnId);
+    for (LockComponent lockComponent : lockComponents) {
+      lockRequestBuilder.addLockComponent(lockComponent);
+    }
+    LockRequest lockRequest = lockRequestBuilder.build();
+    try {
+      LockResponse lockResponse = client.lock(lockRequest);
+      long lockId = lockResponse.getLockid();
+      int retries = 0;
+      while (lockResponse.getState() == LockState.WAITING && retries < lockRetries) {
+        try {
+          Thread.sleep(retryWaitSeconds * 1000);
+          ++retries;
+          lockResponse = client.checkLock(lockId);
+        } catch (InterruptedException e) {
+          // Since wait time and number of retries is configurable it wouldn't add
+          // much value to make acquireLock() interruptible so we just swallow the
+          // exception here.
+        }
+      }
+      if (lockResponse.getState() == LockState.ACQUIRED) return lockId;
+      throw new TransactionException("Failed to acquire lock for transaction " +
+          String.valueOf(txnId));
+    } catch (TException e) {
       throw new TransactionException(e.getMessage());
     }
   }
