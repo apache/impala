@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="connecting">
 
-  <title>Connecting to impalad through impala-shell</title>
+  <title>Connecting to Impala Daemon from impala-shell</title>
   <titlealts audience="PDF"><navtitle>Connecting to impalad</navtitle></titlealts>
   <prolog>
     <metadata>
@@ -35,27 +35,20 @@ under the License.
 
   <conbody>
 
-<!--
-TK: This would be a good theme for a tutorial topic.
-Lots of nuances to illustrate through sample code.
--->
-
-    <p>
-      Within an <cmdname>impala-shell</cmdname> session, you can only issue queries while connected to an instance
-      of the <cmdname>impalad</cmdname> daemon. You can specify the connection information:
-      <ul>
-        <li>
-          Through command-line options when you run the <cmdname>impala-shell</cmdname> command.
-        </li>
-        <li>
-          Through a configuration file that is read when you run the <cmdname>impala-shell</cmdname> command.
-        </li>
-        <li>
-          During an <cmdname>impala-shell</cmdname> session, by issuing a <codeph>CONNECT</codeph> command.
-        </li>
-      </ul>
-      See <xref href="impala_shell_options.xml"/> for the command-line and configuration file options you can use.
-    </p>
+    <p> Within an <cmdname>impala-shell</cmdname> session, you can only issue
+      queries while connected to an instance of the <cmdname>impalad</cmdname>
+      daemon. You can specify the connection information: <ul>
+        <li> Through command-line options when you run the
+            <cmdname>impala-shell</cmdname> command. </li>
+        <li> Through a configuration file that is read when you run the
+            <cmdname>impala-shell</cmdname> command. </li>
+        <li> During an <cmdname>impala-shell</cmdname> session, by issuing a
+            <codeph>CONNECT</codeph> command. </li>
+      </ul><note>You cannot connect to the 3.2 or earlier versions of Impala
+        using the <codeph>'hs2'</codeph> or <codeph>'hs2-http'</codeph> protocol
+          (<codeph>--protocol</codeph> option).</note> See <xref
+        href="impala_shell_options.xml"/> for the command-line and configuration
+      file options you can use. </p>
 
     <p> You can connect to any Impala daemon (<cmdname>impalad</cmdname>), and
       that daemon coordinates the execution of all queries sent to it. </p>
@@ -72,7 +65,7 @@ Lots of nuances to illustrate through sample code.
         href="impala_proxy.xml"/> for details. </p>
 
     <p>
-      <b>To connect the Impala shell during shell startup:</b>
+      <b>To connect to an Impala during shell startup:</b>
     </p>
 
     <ol>
@@ -82,46 +75,31 @@ Lots of nuances to illustrate through sample code.
           <cmdname>impala-shell</cmdname> connections, find out the port number
         also. </li>
 
-      <li>
-        Use the <codeph>-i</codeph> option to the
-        <cmdname>impala-shell</cmdname> interpreter to specify the connection information for
-        that instance of <cmdname>impalad</cmdname>:
-<codeblock># When you are logged into the same machine running impalad.
+      <li> Use the <codeph>-i</codeph> option to the
+          <cmdname>impala-shell</cmdname> interpreter to specify the connection
+        information for that instance of <cmdname>impalad</cmdname>:
+        <codeblock># When you are connecting to an impalad running on the same machine.
 # The prompt will reflect the current hostname.
 $ impala-shell
 
-# When you are logged into the same machine running impalad.
-# The host will reflect the hostname 'localhost'.
-$ impala-shell -i localhost
-
-# When you are logged onto a different host, perhaps a client machine
-# outside the Hadoop cluster.
-$ impala-shell -i <varname>some.other.hostname</varname>
-
-# When you are logged onto a different host, and impalad is listening
-# on a non-default port. Perhaps a load balancer is forwarding requests
-# to a different host/port combination behind the scenes.
+# When you are connecting to an impalad running on a remote machine, and impalad is listening
+# on a non-default port over the HTTP HiveServer2 protocol.
+$ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</varname> --protocol='hs2-http'
+# When you are connecting to an impalad running on a remote machine, and impalad is listening
+# on a non-default port.
 $ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</varname>
 </codeblock>
       </li>
     </ol>
 
     <p>
-      <b>To connect the Impala shell after shell startup:</b>
+      <b>To connect to an Impala in the<cmdname>impala-shell</cmdname>
+        session:</b>
     </p>
 
     <ol>
-      <li>
-        Start the Impala shell with no connection:
-<codeblock>$ impala-shell</codeblock>
-        <p>
-          You should see a prompt like the following:
-        </p>
-<codeblock>Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-...
-<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
-[Not connected] &gt; </codeblock>
-      </li>
+      <li> Start the Impala shell with no connection:
+        <codeblock>$ impala-shell</codeblock></li>
 
       <li> Locate the hostname that is running the <cmdname>impalad</cmdname>
         daemon. If that <cmdname>impalad</cmdname> uses a non-default port
@@ -129,10 +107,10 @@ $ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</v
         connections, find out the port number also. </li>
 
       <li> Use the <codeph>connect</codeph> command to connect to an Impala
-        instance. Enter a command of the form: <codeblock>[Not connected] &gt; connect <varname>impalad-host</varname>
-[<varname>impalad-host</varname>:21000] &gt;</codeblock>
-        <note> Replace <varname>impalad-host</varname> with the hostname you
-          have configured to run Impala in your environment. The changed prompt
+        instance. Enter a command of the form:
+          <codeblock>[Not connected] &gt; connect <varname>impalad-host</varname></codeblock><note>
+          Replace <varname>impalad-host</varname> with the hostname you have
+          configured to run Impala in your environment. The changed prompt
           indicates a successful connection. </note>
       </li>
     </ol>

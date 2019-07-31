@@ -83,9 +83,8 @@ under the License.
           <tbody>
             <row>
               <entry>
-                <p>
-                  -B or --delimited
-                </p>
+                <p> -B or </p>
+                <p>--delimited </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -149,8 +148,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -o <varname>filename</varname> or --output_file <varname>filename</varname>
+                <p> -o <varname>filename</varname> or </p>
+                <p>--output_file <varname>filename</varname>
                 </p>
               </entry>
               <entry rev="2.0.0">
@@ -191,9 +190,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -p or --show_profiles
-                </p>
+                <p> -p or </p>
+                <p>--show_profiles </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -209,9 +207,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -h or --help
-                </p>
+                <p> -h or </p>
+                <p>--help </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -243,10 +240,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -i <varname>hostname</varname> or
-                  --impalad=<varname>hostname</varname>[:<varname>portnum</varname>]
-                </p>
+                <p> -i <varname>hostname</varname> or </p>
+                <p>--impalad=<varname>hostname</varname>[:<varname>portnum</varname>] </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -265,8 +260,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -q <varname>query</varname> or --query=<varname>query</varname>
+                <p> -q <varname>query</varname> or </p>
+                <p>--query=<varname>query</varname>
                 </p>
               </entry>
               <entry rev="2.0.0">
@@ -289,8 +284,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -f <varname>query_file</varname> or --query_file=<varname>query_file</varname>
+                <p> -f <varname>query_file</varname> or</p>
+                <p> --query_file=<varname>query_file</varname>
                 </p>
               </entry>
               <entry rev="2.0.0">
@@ -309,10 +304,11 @@ under the License.
             </row>
             <row rev="2.11.0 IMPALA-5736">
               <entry>
-                <p>
-                  --query_option="<varname>option</varname>=<varname>value</varname>"
-                  -Q "<varname>option</varname>=<varname>value</varname>"
-                </p>
+                <p> --query_option=</p>
+                <p>"<varname>option</varname>=</p>
+                <p><varname>value</varname>" </p>
+                <p>-Q "<varname>option</varname>=</p>
+                <p><varname>value</varname>" </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -330,9 +326,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -k or --kerberos
-                </p>
+                <p> -k or </p>
+                <p>--kerberos </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -353,8 +348,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -s <varname>kerberos_service_name</varname> or --kerberos_service_name=<varname>name</varname>
+                <p> -s <varname>kerberos_service_name</varname> or </p>
+                <p>--kerberos_service_name=<varname>name</varname>
                 </p>
               </entry>
               <entry rev="2.0.0">
@@ -373,9 +368,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -V or --verbose
-                </p>
+                <p> -V or </p>
+                <p>--verbose </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -408,9 +402,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -v or --version
-                </p>
+                <p> -v or </p>
+                <p>--version </p>
               </entry>
               <entry rev="2.0.0">
                 <p>
@@ -442,8 +435,8 @@ under the License.
             </row>
             <row>
               <entry>
-                <p>
-                  -d <varname>default_db</varname> or --database=<varname>default_db</varname>
+                <p> -d <varname>default_db</varname> or </p>
+                <p>--database=<varname>default_db</varname>
                 </p>
               </entry>
               <entry rev="2.0.0">
@@ -569,6 +562,25 @@ under the License.
                 WARNING: This will allow authentication credentials to be sent unencrypted,
                 and hence may be vulnerable to an attack.
               </entry>
+            </row>
+            <row>
+              <entry>--protocol=<varname>protocol</varname></entry>
+              <entry>N/A</entry>
+              <entry>Protocol to use for the connection to Impala. <p>Valid
+                    <varname>protocol</varname> values are:<ul>
+                    <li><codeph>'hs2'</codeph>: Impala-shell uses the binary TCP
+                      based transport to speak to the Impala Daemon via the
+                      HiveServer2 protocol.</li>
+                    <li><codeph>'hs2-http'</codeph>: Impala-shell uses HTTP
+                      transport to speak to the Impala Daemon via the
+                      HiveServer2 protocol.</li>
+                    <li><codeph>'beeswax'</codeph>: Impala-shell uses the binary
+                      TCP based transport to speak to the Impala Daemon via
+                      Beeswax. This is the current default setting.</li>
+                  </ul></p><p>You cannot connect to the 3.2 or earlier versions
+                  of Impala using the <codeph>'hs2'</codeph> or
+                    <codeph>'hs2-http'</codeph> option.</p><p>Beeswax support is
+                  deprecated and will be removed in the future.</p></entry>
             </row>
           </tbody>
         </tgroup>
