@@ -169,9 +169,21 @@ class ImpalaCluster(object):
     if expected_num_ready_impalads is None:
       expected_num_ready_impalads = len(self.impalads)
 
+    def check_processes_still_running():
+      """Check that the processes we waited for above (i.e. impalads, statestored,
+      catalogd) are still running. Throw an exception otherwise."""
+      self.refresh()
+      # The number of impalad processes may temporarily increase if breakpad forked a
+      # process to write a minidump.
+      assert len(self.impalads) >= expected_num_impalads
+      assert self.statestored is not None
+      assert self.catalogd is not None
+
+
     for impalad in self.impalads:
       impalad.service.wait_for_num_known_live_backends(expected_num_ready_impalads,
-          timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
+          timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2,
+          early_abort_fn=check_processes_still_running)
       if (impalad._get_arg_value("is_coordinator", default="true") == "true" and
          impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) == 0):
         impalad.wait_for_catalog()

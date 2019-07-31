@@ -39,6 +39,12 @@ class TestMetadataReplicas(CustomClusterTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestMetadataReplicas, cls).setup_class()
+
   @pytest.mark.execute_serially
   def test_start(self):
     """ Baseline to verify that the initial state is identical. No DDL/DML

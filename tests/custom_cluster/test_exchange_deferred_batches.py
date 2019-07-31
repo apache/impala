@@ -25,7 +25,13 @@ class TestExchangeDeferredBatches(CustomClusterTestSuite):
 
     @classmethod
     def get_workload(cls):
-      return 'tpch'
+      return 'functional-query'
+
+    @classmethod
+    def setup_class(cls):
+      if cls.exploration_strategy() != 'exhaustive':
+        pytest.skip('runs only in exhaustive')
+      super(TestExchangeDeferredBatches, cls).setup_class()
 
     @pytest.mark.execute_serially
     @CustomClusterTestSuite.with_args(

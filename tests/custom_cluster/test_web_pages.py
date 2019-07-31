@@ -23,6 +23,16 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
 class TestWebPage(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestWebPage, cls).setup_class()
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--enable_extended_memory_metrics=true"

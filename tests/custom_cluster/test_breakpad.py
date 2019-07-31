@@ -60,8 +60,6 @@ class TestBreakpadBase(CustomClusterTestSuite):
   def teardown_class(cls):
     # Re-enable core dumps
     setrlimit(RLIMIT_CORE, (RLIM_INFINITY, RLIM_INFINITY))
-    # Start default cluster for subsequent tests (verify_metrics).
-    cls._start_impala_cluster([])
 
   def start_cluster_with_args(self, **kwargs):
     cluster_options = []
@@ -163,6 +161,9 @@ class TestBreakpadCore(TestBreakpadBase):
     except CalledProcessError:
       failed_to_start = True
     assert failed_to_start
+    # Don't check for minidumps until all processes have gone away so that
+    # the state of the cluster is not in flux.
+    self.wait_for_num_processes('impalad', 0)
     assert self.count_minidumps('impalad') > 0
 
 

@@ -396,6 +396,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_trivial_coord_query_limits(self):
     """Tests that trivial coordinator only queries have negligible resource requirements.
     """
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     # Queries with only constant exprs or limit 0 should be admitted.
     self.execute_query_expect_success(self.client, "select 1")
     self.execute_query_expect_success(self.client,
@@ -856,6 +858,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_query_locations_correctness(self, vector):
     """Regression test for IMPALA-7516: Test to make sure query locations and in-flight
     queries are correct for different admission results that can affect it."""
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     # Choose a query that runs on all 3 backends.
     query = "select * from functional.alltypesagg A, (select sleep(10000)) B limit 1"
     # Case 1: When a query runs succesfully.
@@ -1282,15 +1286,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     reasons = self.__extract_init_queue_reasons([profile])
     assert len(reasons) == 1
     assert "Local backend has not started up yet." in reasons[0]
-
-  @pytest.mark.execute_serially
-  def test_scheduler_error(self):
-    """This test verifies that the admission controller handles scheduler errors
-    correctly."""
-    client = self.create_impala_client()
-    client.set_configuration_option("debug_action", "SCHEDULER_SCHEDULE:FAIL")
-    result = self.execute_query_expect_failure(client, "select 1")
-    assert "Error during scheduling" in str(result)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
@@ -1795,6 +1790,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1, queue_wait_timeout_ms=600000),
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_flags(self, vector):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     self.pool_name = 'default-pool'
     # The pool has no mem resources set, so submitting queries with huge mem_limits
     # should be fine. This exercises the code that does the per-pool memory

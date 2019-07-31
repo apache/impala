@@ -111,11 +111,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     def decorate(func):
       if impalad_args is not None:
         func.func_dict[IMPALAD_ARGS] = impalad_args
-      if statestored_args is None:
-        func.func_dict[STATESTORED_ARGS] = DEFAULT_STATESTORE_ARGS
-      else:
-        func.func_dict[STATESTORED_ARGS] = \
-            DEFAULT_STATESTORE_ARGS + " " + statestored_args
+      func.func_dict[STATESTORED_ARGS] = statestored_args
       if catalogd_args is not None:
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
@@ -246,6 +242,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # certain custom startup arguments work and we want to keep them independent of dev
     # environments.
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
+           '--state_store_args=%s' % DEFAULT_STATESTORE_ARGS,
            '--cluster_size=%d' % cluster_size,
            '--num_coordinators=%d' % num_coordinators,
            '--log_dir=%s' % impala_log_dir,

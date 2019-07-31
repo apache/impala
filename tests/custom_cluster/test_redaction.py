@@ -170,6 +170,8 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
   @pytest.mark.execute_serially
   def test_bad_rules(self):
     '''Check that the server fails to start if the redaction rules are bad.'''
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     startup_options = dict()
     self.assert_server_fails_to_start('{ "version": 100 }', startup_options,
         'Error parsing redaction rules; only version 1 is supported')
@@ -182,6 +184,8 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
        could dump table data. Row logging would be enabled with "-v=3" or could be
        enabled  with the -vmodule option. In either case the server should not start.
     '''
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     rules = r"""
         {
           "version": 1,
@@ -213,6 +217,8 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
        rules are set. The expectation is the full query text will show up in the logs
        and the web ui.
     '''
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     self.start_cluster_using_rules('')
     email = 'foo@bar.com'
     self.execute_query_expect_success(self.client,

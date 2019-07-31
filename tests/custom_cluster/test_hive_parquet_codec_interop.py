@@ -35,6 +35,12 @@ class TestParquetInterop(CustomClusterTestSuite):
     return 'functional-query'
 
   @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestParquetInterop, cls).setup_class()
+
+  @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value.

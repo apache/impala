@@ -146,10 +146,16 @@ class TestFailpoints(ImpalaTestSuite):
     or hangs"""
     query = "select * from tpch.lineitem limit 10000"
 
+    # Test that the admission controller handles scheduler errors correctly.
+    debug_action = "SCHEDULER_SCHEDULE:FAIL"
+    result = self.execute_query_expect_failure(self.client, query,
+        query_options={'debug_action': debug_action})
+    assert "Error during scheduling" in str(result)
+
     # Fail the Prepare() phase of all fragment instances.
     debug_action = 'FIS_IN_PREPARE:FAIL@1.0'
     self.execute_query_expect_failure(self.client, query,
-        query_options={'debug_action':debug_action})
+        query_options={'debug_action': debug_action})
 
     # Fail the Open() phase of all fragment instances.
     debug_action = 'FIS_IN_OPEN:FAIL@1.0'

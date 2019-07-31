@@ -18,6 +18,7 @@
 # under the License.
 
 import logging
+import pytest
 from time import sleep, time
 
 from tests.util.auto_scaler import AutoScaler
@@ -29,6 +30,16 @@ LOG = logging.getLogger("test_auto_scaling")
 
 
 class TestAutoScaling(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestAutoScaling, cls).setup_class()
+
   """This class contains tests that exercise the logic related to scaling clusters up and
   down by adding and removing groups of executors."""
   INITIAL_STARTUP_TIME_S = 10

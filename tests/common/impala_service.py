@@ -251,12 +251,16 @@ class ImpaladService(BaseImpalaService):
     return False
 
   def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1,
-      include_shutting_down=True):
+      include_shutting_down=True, early_abort_fn=lambda: False):
+    """Poll the debug web server until the number of backends known by this service
+    reaches 'expected_value'. 'early_abort_fn' is called periodically and can
+    throw an exception if polling should be aborted early."""
     start_time = time()
     while (time() - start_time < timeout):
+      early_abort_fn()
       value = None
       try:
-        value = self.get_num_known_live_backends(timeout=timeout, interval=interval,
+        value = self.get_num_known_live_backends(timeout=1, interval=interval,
             include_shutting_down=include_shutting_down)
       except Exception, e:
         LOG.error(e)

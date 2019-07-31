@@ -45,6 +45,12 @@ class TestUdfPersistence(CustomClusterTestSuite):
     return 'functional-query'
 
   @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestUdfPersistence, cls).setup_class()
+
+  @classmethod
   def add_test_dimensions(cls):
     super(TestUdfPersistence, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

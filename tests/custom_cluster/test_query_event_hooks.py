@@ -56,6 +56,16 @@ class TestHooksStartupFail(CustomClusterTestSuite):
   All test cases in this testsuite are expected to fail cluster startup and will
   swallow exceptions thrown during setup_method().
   """
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestHooksStartupFail, cls).setup_class()
+
   FAILING_HOOK = "org.apache.impala.testutil.AlwaysErrorQueryEventHook"
   NONEXIST_HOOK = "captain.hook"
   LOG_DIR1 = tempfile.mkdtemp(prefix="test_hooks_startup_fail_", dir=os.getenv("LOG_DIR"))

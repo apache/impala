@@ -32,6 +32,16 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
   adjust --max_page_header_size, which is the maximum bytes of header data that the
   scanner reads before it bails out.
   '''
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestParquetMaxPageHeader, cls).setup_class()
+
 
   TEXT_TABLE_NAME = "parquet_test_data_text"
   PARQUET_TABLE_NAME = "large_page_header"

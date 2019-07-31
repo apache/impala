@@ -26,6 +26,15 @@ import tempfile
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 class TestScratchDir(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestScratchDir, cls).setup_class()
 
   # Query with order by requires spill to disk if intermediate results don't fit in mem
   spill_query = """

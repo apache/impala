@@ -26,6 +26,12 @@ class TestAlwaysFalseFilter(CustomClusterTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestAlwaysFalseFilter, cls).setup_class()
+
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--skip_file_runtime_filtering=true")
