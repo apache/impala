@@ -155,11 +155,13 @@ class TestInsertQueries(ImpalaTestSuite):
     self.hive_client.setMetaConf("metastore.client.capability.check", capability_check)
 
   @SkipIfHive2.acid
+  @UniqueDatabase.parametrize(sync_ddl=True)
   def test_acid_nonacid_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-nonacid-insert', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @SkipIfHive2.acid
+  @UniqueDatabase.parametrize(sync_ddl=True)
   def test_acid_insert_fail(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-insert-fail', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
