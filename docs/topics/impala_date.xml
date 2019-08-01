@@ -18,9 +18,16 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept audience="hidden" id="date" rev="2.0.0">
+<concept id="date" rev="2.0.0">
 
-  <title>DATE Data Type (<keyword keyref="impala21"/> or higher only)</title>
+  <title>DATE Data Type</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DATE</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -35,88 +42,169 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">DATE data type</indexterm>
-      A type representing the date (year, month, and day) as a single numeric value. Used to represent a broader
-      date range than possible with the <codeph>TIMESTAMP</codeph> type, with fewer distinct values than
-      <codeph>TIMESTAMP</codeph>, and in a more compact and efficient form than using a <codeph>STRING</codeph>
-      such as <codeph>'2014-12-31'</codeph>.
+      Use the <codeph>DATE</codeph> data type to store date values. The <codeph>DATE</codeph>
+      type is supported for HBase, Text, and Parquet.
     </p>
-
-    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
-
-<codeblock><varname>column_name</varname> DATE</codeblock>
 
     <p>
-      <b>Range:</b> January 1, -4712 BC .. December 31, 9999 AD.
+      <b>Range:</b>
     </p>
 
-    <p conref="../shared/impala_common.xml#common/hbase_ok"/>
+    <p>
+      0000-01-01 to 9999-12-31
+    </p>
 
-    <p conref="../shared/impala_common.xml#common/parquet_blurb"/>
+    <p>
+      <b>Literals and expressions:</b>
+    </p>
+
+    <p>
+      The <codeph>DATE</codeph> literals are in the form of <codeph>DATE'YYYY-MM-DD'</codeph>.
+      For example, <codeph>DATE '2013-01-01'</codeph>
+    </p>
+
+    <p>
+      <b>Parquet considerations:</b>
+    </p>
+
+    <p>
+      Parquet uses <codeph>DATE</codeph> logical type for dates. The <codeph>DATE</codeph>
+      logical type annotates an <codeph>INT32</codeph> that stores the number of days from the
+      Unix epoch, January 1, 1970. This representation introduces a parquet interoperability
+      issue between Impala and older versions of Hive:
+    </p>
+
+    <p>
+      If Hive versions lower than 3.1 wrote dates earlier than 1582-10-15 to a parquet table,
+      those dates will be read back incorrectly by Impala and vice versa. In Hive 3.1 and
+      higher, this is no longer an issue.
+    </p>
+
+    <p>
+      <b>Explicit casting between DATE and other data types:</b>
+    </p>
+
+    <p>
+      <codeph>DATE</codeph> type can only be converted to/from <codeph>DATE</codeph>,
+      <codeph>TIMESTAMP</codeph>, or <codeph>STRING</codeph> types as described below.
+    </p>
+
+    <table id="table_ovw_zt1_p3b">
+      <tgroup cols="3">
+        <colspec colnum="1" colname="col1" colwidth="1*"/>
+        <colspec colname="newCol2" colnum="2" colwidth="1.09*"/>
+        <colspec colnum="3" colname="col2" colwidth="3.46*"/>
+        <thead>
+          <row>
+            <entry>
+              Cast from
+            </entry>
+            <entry>
+              Cast to
+            </entry>
+            <entry>
+              Result
+            </entry>
+          </row>
+        </thead>
+        <tbody>
+          <row>
+            <entry>
+              <codeph>TIMESTAMP</codeph>
+            </entry>
+            <entry>
+              <codeph>DATE</codeph>
+            </entry>
+            <entry>
+              The date component of the <codeph>TIMESTAMP</codeph> is returned, and the time of
+              the day component of the <codeph>TIMESTAMP</codeph> is ignored.
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <codeph>STRING</codeph>
+            </entry>
+            <entry>
+              <codeph>DATE</codeph>
+            </entry>
+            <entry>
+              The <codeph>DATE</codeph> value of <codeph>yyyy-MM-dd</codeph> is returned.
+
+              <p>
+                The <codeph>STRING</codeph> value must be in the <codeph>yyyy-MM-dd</codeph> or
+                <codeph>yyyy-MM-dd HH:mm:ss.SSSSSSSSS</codeph> pattern.
+              </p>
+
+
+
+              <p>
+                If the time component is present in <codeph>STRING</codeph>, it is silently
+                ignored.
+              </p>
+
+
+
+              <p>
+                If the <codeph>STRING</codeph> value does not match the above formats, an error
+                is returned.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <codeph>DATE</codeph>
+            </entry>
+            <entry>
+              <codeph>TIMESTAMP</codeph>
+            </entry>
+            <entry>
+              The year, month, and day of the <codeph>DATE</codeph> is returned along with the
+              time of day component set to <codeph>00:00:00</codeph>.
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <codeph>DATE</codeph>
+            </entry>
+            <entry>
+              <codeph>STRING</codeph>
+            </entry>
+            <entry>
+              The <codeph>STRING</codeph> value, <codeph>'yyyy-MM-dd'</codeph>, is returned.
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <p>
+      <b>Implicit casting between DATE and other types: </b>
+    </p>
+
+    <p>
+      Implicit casting is supported:
+    </p>
 
     <ul>
       <li>
-        This type can be read from and written to Parquet files.
+        From <codeph>STRING</codeph> to <codeph>DATE</codeph> if the source
+        <codeph>STRING</codeph> value is in the <codeph>yyyy-MM-dd</codeph> or
+        <codeph>yyyy-MM-dd HH:mm:ss.SSSSSSSSS</codeph> pattern.
       </li>
 
       <li>
-        There is no requirement for a particular level of Parquet.
-      </li>
-
-      <li>
-        Parquet files generated by Impala and containing this type can be freely interchanged with other components
-        such as Hive and MapReduce.
+        From <codeph>DATE</codeph> to <codeph>TIMESTAMP</codeph>.
       </li>
     </ul>
 
-    <p conref="../shared/impala_common.xml#common/hive_blurb"/>
-
     <p>
-      TK.
+      <b>Added in:</b>
     </p>
 
-    <p conref="../shared/impala_common.xml#common/conversion_blurb"/>
-
     <p>
-      TK.
+      The <codeph>DATE</codeph> type is available in Impala 3.3 and higher.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/partitioning_blurb"/>
-
-    <p>
-      This type can be used for partition key columns. Because it has less granularity (and thus fewer distinct
-      values) than an equivalent <codeph>TIMESTAMP</codeph> column, and numeric columns are more efficient as
-      partition keys than strings, prefer to partition by a <codeph>DATE</codeph> column rather than a
-      <codeph>TIMESTAMP</codeph> column or a <codeph>STRING</codeph> representation of a date.
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
-
-    <p>
-      This type is available on <keyword keyref="impala20_full"/> or higher.
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/internals_2_bytes"/>
-
-    <p conref="../shared/impala_common.xml#common/added_in_20"/>
-
-    <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
-
-    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
-
-    <p>
-      Things happen when converting <codeph>TIMESTAMP</codeph> to <codeph>DATE</codeph> or <codeph>DATE</codeph> to
-      <codeph>TIMESTAMP</codeph>. TK.
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/example_blurb"/>
-
-    <p conref="../shared/impala_common.xml#common/related_info"/>
-
-    <p>
-      The <xref href="impala_timestamp.xml#timestamp">TIMESTAMP</xref> data type is closely related. Some functions
-      from <xref href="impala_datetime_functions.xml#datetime_functions"/> accept and return <codeph>DATE</codeph>
-      values.
-    </p>
   </conbody>
+
 </concept>
