@@ -78,6 +78,7 @@ uint32_t THttpTransport::readEnd() {
       readChunked();
     }
   }
+  readHeaders_ = true;
   return 0;
 }
 
@@ -93,6 +94,8 @@ uint32_t THttpTransport::readMoreData() {
 
   if (chunked_) {
     size = readChunked();
+    // If we read to the end of the chunked data, we should read headers again.
+    if (size == 0) readHeaders_ = true;
   } else {
     size = readContent(contentLength_);
     readHeaders_ = true;

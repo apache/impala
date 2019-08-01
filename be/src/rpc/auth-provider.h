@@ -40,10 +40,9 @@ class AuthProvider {
   virtual Status Start() WARN_UNUSED_RESULT = 0;
 
   /// Creates a new Thrift transport factory in the out parameter that performs
-  /// authorisation per this provider's protocol. The top-level transport returned by
-  /// 'factory' must always be a TBufferedTransport, but depending on the AuthProvider
-  /// implementation and the value of 'underlying_transport_type', that may be wrapped
-  /// around another transport type, eg. a TSaslServerTransport.
+  /// authorisation per this provider's protocol. The type of the transport returned is
+  /// determined by 'underlying_transport_type' and there may be multiple levels of
+  /// wrapped transports, eg. a TBufferedTransport around a TSaslServerTransport.
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
       const std::string& server_name, MetricGroup* metrics,
@@ -60,12 +59,15 @@ class AuthProvider {
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
       WARN_UNUSED_RESULT = 0;
 
-  /// Setup 'connection_ptr' to get its username with the given transports.
+  /// Setup 'connection_ptr' to get its username with the given transports and sets
+  /// 'network_address' based on the underlying socket. The transports should be generated
+  /// by the factory returned by GetServerTransportFactory() when called with the same
+  /// 'underlying_transport_type'.
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_input_transport,
-      apache::thrift::transport::TTransport* underlying_output_transport) = 0;
+      apache::thrift::transport::TTransport* input_transport,
+      apache::thrift::transport::TTransport* output_transport) = 0;
 
   /// Returns true if this provider uses Sasl at the transport layer.
   virtual bool is_secure() = 0;
@@ -113,8 +115,8 @@ class SecureAuthProvider : public AuthProvider {
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_input_transport,
-      apache::thrift::transport::TTransport* underlying_output_transport);
+      apache::thrift::transport::TTransport* input_transport,
+      apache::thrift::transport::TTransport* output_transport);
 
   virtual bool is_secure() { return true; }
 
@@ -193,8 +195,8 @@ class NoAuthProvider : public AuthProvider {
   virtual void SetupConnectionContext(
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
-      apache::thrift::transport::TTransport* underlying_input_transport,
-      apache::thrift::transport::TTransport* underlying_output_transport);
+      apache::thrift::transport::TTransport* input_transport,
+      apache::thrift::transport::TTransport* output_transport);
 
   virtual bool is_secure() { return false; }
 };

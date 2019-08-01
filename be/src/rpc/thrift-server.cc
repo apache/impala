@@ -201,36 +201,14 @@ const ThriftServer::ConnectionContext* ThriftServer::GetThreadConnectionContext(
 
 void* ThriftServer::ThriftServerEventProcessor::createContext(
     boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
-  TSocket* socket = NULL;
-  TTransport* transport = input->getTransport().get();
   boost::shared_ptr<ConnectionContext> connection_ptr =
       boost::shared_ptr<ConnectionContext>(new ConnectionContext);
-  TTransport* underlying_input_transport =
-      (static_cast<TBufferedTransport*>(transport))->getUnderlyingTransport().get();
-  TTransport* underlying_output_transport =
-      (static_cast<TBufferedTransport*>(output->getTransport().get()))
-          ->getUnderlyingTransport()
-          .get();
-
   thrift_server_->auth_provider_->SetupConnectionContext(connection_ptr,
-      thrift_server_->transport_type_, underlying_input_transport,
-      underlying_output_transport);
-  if (thrift_server_->auth_provider_->is_secure()
-      && thrift_server_->transport_type_ == ThriftServer::BINARY) {
-    TSaslServerTransport* sasl_transport =
-        static_cast<TSaslServerTransport*>(underlying_input_transport);
-    socket = static_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
-  } else if (thrift_server_->transport_type_ == ThriftServer::HTTP) {
-    THttpServer* http_transport = static_cast<THttpServer*>(underlying_input_transport);
-    socket = static_cast<TSocket*>(http_transport->getUnderlyingTransport().get());
-  } else {
-    socket = static_cast<TSocket*>(underlying_input_transport);
-  }
+      thrift_server_->transport_type_, input->getTransport().get(),
+      output->getTransport().get());
 
   {
     connection_ptr->server_name = thrift_server_->name_;
-    connection_ptr->network_address =
-        MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 
     lock_guard<mutex> l(thrift_server_->connection_contexts_lock_);
     uuid connection_uuid = thrift_server_->uuid_generator_();

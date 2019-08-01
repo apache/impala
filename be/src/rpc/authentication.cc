@@ -954,9 +954,8 @@ Status SecureAuthProvider::GetServerTransportFactory(
 
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
-    factory->reset(new ThriftServer::BufferedTransportFactory(
-        ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
-        new THttpServerTransportFactory(server_name, metrics, has_ldap_, has_kerberos)));
+    factory->reset(
+        new THttpServerTransportFactory(server_name, metrics, has_ldap_, has_kerberos));
     return Status::OK();
   }
 
@@ -1027,22 +1026,23 @@ Status SecureAuthProvider::WrapClientTransport(const string& hostname,
 
 void SecureAuthProvider::SetupConnectionContext(
     const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
-    ThriftServer::TransportType underlying_transport_type,
-    TTransport* underlying_input_transport, TTransport* underlying_output_transport) {
+    ThriftServer::TransportType underlying_transport_type, TTransport* input_transport,
+    TTransport* output_transport) {
+  TSocket* socket = nullptr;
   switch (underlying_transport_type) {
     case ThriftServer::BINARY: {
-      TSaslServerTransport* sasl_transport =
-          down_cast<TSaslServerTransport*>(underlying_input_transport);
-
+      TBufferedTransport* buffered_transport =
+          down_cast<TBufferedTransport*>(input_transport);
+      TSaslServerTransport* sasl_transport = down_cast<TSaslServerTransport*>(
+          buffered_transport->getUnderlyingTransport().get());
+      socket = down_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
       // Get the username from the transport.
       connection_ptr->username = sasl_transport->getUsername();
       break;
     }
     case ThriftServer::HTTP: {
-      THttpServer* http_input_transport =
-          down_cast<THttpServer*>(underlying_input_transport);
-      THttpServer* http_output_transport =
-          down_cast<THttpServer*>(underlying_output_transport);
+      THttpServer* http_input_transport = down_cast<THttpServer*>(input_transport);
+      THttpServer* http_output_transport = down_cast<THttpServer*>(output_transport);
       THttpServer::HttpCallbacks callbacks;
       callbacks.path_fn = std::bind(
           HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
@@ -1057,11 +1057,14 @@ void SecureAuthProvider::SetupConnectionContext(
       }
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
+      socket = down_cast<TSocket*>(http_input_transport->getUnderlyingTransport().get());
       break;
     }
     default:
       LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
   }
+  connection_ptr->network_address =
+      MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 }
 
 Status NoAuthProvider::GetServerTransportFactory(
@@ -1073,9 +1076,7 @@ Status NoAuthProvider::GetServerTransportFactory(
       factory->reset(new ThriftServer::BufferedTransportFactory());
       break;
     case ThriftServer::HTTP:
-      factory->reset(new ThriftServer::BufferedTransportFactory(
-          ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
-          new THttpServerTransportFactory()));
+      factory->reset(new THttpServerTransportFactory());
       break;
     default:
       LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
@@ -1093,18 +1094,20 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
 
 void NoAuthProvider::SetupConnectionContext(
     const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
-    ThriftServer::TransportType underlying_transport_type,
-    TTransport* underlying_input_transport, TTransport* underlying_output_transport) {
+    ThriftServer::TransportType underlying_transport_type, TTransport* input_transport,
+    TTransport* output_transport) {
   connection_ptr->username = "";
+  TSocket* socket = nullptr;
   switch (underlying_transport_type) {
-    case ThriftServer::BINARY:
-      // Intentionally blank - since there's no security, there's nothing to set up here.
+    case ThriftServer::BINARY: {
+      TBufferedTransport* buffered_transport =
+          down_cast<TBufferedTransport*>(input_transport);
+      socket = down_cast<TSocket*>(buffered_transport->getUnderlyingTransport().get());
       break;
+    }
     case ThriftServer::HTTP: {
-      THttpServer* http_input_transport =
-          down_cast<THttpServer*>(underlying_input_transport);
-      THttpServer* http_output_transport =
-          down_cast<THttpServer*>(underlying_input_transport);
+      THttpServer* http_input_transport = down_cast<THttpServer*>(input_transport);
+      THttpServer* http_output_transport = down_cast<THttpServer*>(input_transport);
       THttpServer::HttpCallbacks callbacks;
       // Even though there's no security, we set up some callbacks, eg. to allow
       // impersonation over unsecured connections for testing purposes.
@@ -1113,11 +1116,14 @@ void NoAuthProvider::SetupConnectionContext(
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
+      socket = down_cast<TSocket*>(http_input_transport->getUnderlyingTransport().get());
       break;
     }
     default:
       LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
   }
+  connection_ptr->network_address =
+      MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 }
 
 Status AuthManager::Init() {
