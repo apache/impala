@@ -309,10 +309,15 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->kudu_latest_observed_ts = 0;
 
   // If the username was set by a lower-level transport, use it.
-  const ThriftServer::Username& username =
-      ThriftServer::GetThreadConnectionContext()->username;
-  if (!username.empty()) {
-    state->connected_user = username;
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  if (!connection_context->username.empty()) {
+    state->connected_user = connection_context->username;
+    if (!connection_context->do_as_user.empty()) {
+      state->do_as_user = connection_context->do_as_user;
+      Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
+      HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+    }
   } else {
     state->connected_user = request.username;
   }

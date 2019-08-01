@@ -53,14 +53,22 @@ public class LdapImpalaShellTest {
   // These correspond to the values in fe/src/test/resources/users.ldif
   private static final String testUser_ = "Test1Ldap";
   private static final String testPassword_ = "12345";
+  private static final String testUser2_ = "Test2Ldap";
+  private static final String testPassword2_ = "abcde";
+
+  // The cluster will be set up to allow testUser_ to act as a proxy for delegateUser_.
+  // Includes a special character to test HTTP path encoding.
+  private static final String delegateUser_ = "proxyUser$";
 
   @Before
   public void setUp() throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
-    String ldapArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
-        + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok", uri, dn);
+    String ldapArgs = String.format(
+        "--enable_ldap_auth --ldap_uri='%s' --ldap_bind_pattern='%s' " +
+        "--ldap_passwords_in_clear_ok --authorized_proxy_user_config=%s=%s",
+        uri, dn, testUser_, delegateUser_);
     int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
   }
@@ -74,32 +82,34 @@ public class LdapImpalaShellTest {
    * Helper to run a shell command 'cmd'. If 'shouldSucceed' is true, the command
    * is expected to succeed, failure otherwise.
    */
-  private void runShellCommand(String[] cmd, boolean shouldSucceed) throws Exception {
+  private void runShellCommand(String[] cmd, boolean shouldSucceed, String expectedOut,
+      String expectedErr) throws Exception {
     Runtime rt = Runtime.getRuntime();
     Process process = rt.exec(cmd);
     // Collect the stderr.
     BufferedReader input = new BufferedReader(
         new InputStreamReader(process.getErrorStream()));
-    StringBuffer stderr = new StringBuffer();
+    StringBuffer stderrBuf = new StringBuffer();
     String line;
     while ((line = input.readLine()) != null) {
-      stderr.append(line);
-      stderr.append('\n');
+      stderrBuf.append(line);
+      stderrBuf.append('\n');
     }
+    String stderr = stderrBuf.toString();
+    assertTrue(stderr, stderr.contains(expectedErr));
     // Collect the stdout (which has the resultsets).
     input = new BufferedReader(new InputStreamReader(process.getInputStream()));
-    StringBuffer stdout = new StringBuffer();
+    StringBuffer stdoutBuf = new StringBuffer();
     while ((line = input.readLine()) != null) {
-      stdout.append(line);
-      stdout.append('\n');
+      stdoutBuf.append(line);
+      stdoutBuf.append('\n');
     }
     int expectedReturn = shouldSucceed ? 0 : 1;
     assertEquals(stderr.toString(), expectedReturn, process.waitFor());
-    // If the query succeeds, assert that the output contains the correct
-    // username.
+    // If the query succeeds, assert that the output is correct.
     if (shouldSucceed) {
-      String temp = stdout.toString();
-      assertTrue(temp, temp.contains(testUser_));
+      String stdout = stdoutBuf.toString();
+      assertTrue(stdout, stdout.contains(expectedOut));
     }
   }
 
@@ -127,11 +137,56 @@ public class LdapImpalaShellTest {
     for (String protocol: protocolsToTest) {
       protocol = String.format(protocolTemplate, protocol);
       validCommand[1] = protocol;
-      runShellCommand(validCommand, /*shouldSucceed*/ true);
+      runShellCommand(validCommand, /*shouldSucceed*/ true, testUser_,
+          "Starting Impala Shell using LDAP-based authentication");
       invalidCommand[1] = protocol;
-      runShellCommand(invalidCommand, /*shouldSucceed*/ false);
+      runShellCommand(
+          invalidCommand, /*shouldSucceed*/ false, "", "Not connected to Impala");
       commandWithoutAuth[1] = protocol;
-      runShellCommand(commandWithoutAuth, /*shouldSucceed*/ false);
+      runShellCommand(
+          commandWithoutAuth, /*shouldSucceed*/ false, "", "Not connected to Impala");
     }
+  }
+
+  private String[] buildCommand(
+      String query, String protocol, String user, String password, String httpPath) {
+    String[] command = {"impala-shell.sh", "--protocol=" + protocol, "--ldap",
+        "--auth_creds_ok_in_clear", "--user=" + user,
+        "--ldap_password_cmd=printf " + password, "--query=" + query,
+        "--http_path=" + httpPath};
+    return command;
+  }
+
+  /**
+   * Tests user impersonation over the HTTP protocol by using the HTTP path to specify the
+   * 'doAs' parameter.
+   */
+  @Test
+  public void testHttpImpersonation() throws Exception {
+    String invalidDelegateUser = "invalid-delegate-user";
+    String query = "select logged_in_user()";
+    String errTemplate = "User '%s' is not authorized to delegate to '%s'";
+
+    // Run with an invalid proxy user.
+    String[] command = buildCommand(
+        query, "hs2-http", testUser2_, testPassword2_, "/?doAs=" + delegateUser_);
+    runShellCommand(command, /* shouldSucceed */ false, "",
+        String.format(errTemplate, testUser2_, delegateUser_));
+
+    // Run with a valid proxy user but invalid delegate user.
+    command = buildCommand(
+        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + invalidDelegateUser);
+    runShellCommand(command, /* shouldSucceed */ false, "",
+        String.format(errTemplate, testUser_, invalidDelegateUser));
+
+    // 'doAs' parameter that cannot be decoded.
+    command = buildCommand(
+        query, "hs2-http", testUser_, testPassword_, "/?doAs=%");
+    runShellCommand(command, /* shouldSucceed */ false, "", "Not connected to Impala");
+
+    // Successfully delegate.
+    command = buildCommand(
+        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + delegateUser_);
+    runShellCommand(command, /* shouldSucceed */ true, delegateUser_, "");
   }
 }

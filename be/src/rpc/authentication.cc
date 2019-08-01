@@ -26,6 +26,7 @@
 #include <boost/filesystem.hpp>
 #include <gutil/casts.h>
 #include <gutil/strings/escaping.h>
+#include <gutil/strings/split.h>
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
 #include <random>
@@ -47,6 +48,7 @@
 #include "transport/THttpServer.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/auth-util.h"
+#include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/network-util.h"
@@ -577,6 +579,31 @@ vector<string> ReturnHeaders(ThriftServer::ConnectionContext* connection_context
   return std::move(connection_context->return_headers);
 }
 
+// Takes the path component of an HTTP request and parses it. For now, we only care about
+// the 'doAs' parameter.
+bool HttpPathFn(ThriftServer::ConnectionContext* connection_context, const string& path,
+    string* err_msg) {
+  // 'path' should be of the form '/.*[?<key=value>[&<key=value>...]]'
+  vector<string> split = Split(path, delimiter::Limit("?", 1));
+  if (split.size() == 2) {
+    for (auto pair : Split(split[1], "&")) {
+      vector<string> key_value = Split(pair, delimiter::Limit("=", 1));
+      if (key_value.size() == 2 && key_value[0] == "doAs") {
+        string decoded;
+        if (!UrlDecode(key_value[1], &decoded)) {
+          *err_msg = Substitute(
+              "Could not decode 'doAs' parameter from HTTP request with path: $0", path);
+          return false;
+        } else {
+          connection_context->do_as_user = decoded;
+        }
+        break;
+      }
+    }
+  }
+  return true;
+}
+
 namespace {
 
 // SASL requires mutexes for thread safety, but doesn't implement
@@ -1014,18 +1041,22 @@ void SecureAuthProvider::SetupConnectionContext(
     case ThriftServer::HTTP: {
       THttpServer* http_input_transport =
           down_cast<THttpServer*>(underlying_input_transport);
+      THttpServer* http_output_transport =
+          down_cast<THttpServer*>(underlying_output_transport);
+      THttpServer::HttpCallbacks callbacks;
+      callbacks.path_fn = std::bind(
+          HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
+      callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       if (has_ldap_) {
-        http_input_transport->setBasicAuthFn(
-            std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1));
+        callbacks.basic_auth_fn =
+            std::bind(BasicAuth, connection_ptr.get(), std::placeholders::_1);
       }
       if (!principal_.empty()) {
-        http_input_transport->setNegotiateAuthFn(std::bind(NegotiateAuth,
-            connection_ptr.get(), std::placeholders::_1, std::placeholders::_2));
-        THttpServer* http_output_transport =
-            down_cast<THttpServer*>(underlying_input_transport);
-        http_output_transport->setReturnHeadersFn(
-            std::bind(ReturnHeaders, connection_ptr.get()));
+        callbacks.negotiate_auth_fn = std::bind(NegotiateAuth, connection_ptr.get(),
+            std::placeholders::_1, std::placeholders::_2);
       }
+      http_input_transport->setCallbacks(callbacks);
+      http_output_transport->setCallbacks(callbacks);
       break;
     }
     default:
@@ -1058,6 +1089,35 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
   // No Sasl - yawn.  Don't do any transport wrapping for clients.
   *wrapped_transport = raw_transport;
   return Status::OK();
+}
+
+void NoAuthProvider::SetupConnectionContext(
+    const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+    ThriftServer::TransportType underlying_transport_type,
+    TTransport* underlying_input_transport, TTransport* underlying_output_transport) {
+  connection_ptr->username = "";
+  switch (underlying_transport_type) {
+    case ThriftServer::BINARY:
+      // Intentionally blank - since there's no security, there's nothing to set up here.
+      break;
+    case ThriftServer::HTTP: {
+      THttpServer* http_input_transport =
+          down_cast<THttpServer*>(underlying_input_transport);
+      THttpServer* http_output_transport =
+          down_cast<THttpServer*>(underlying_input_transport);
+      THttpServer::HttpCallbacks callbacks;
+      // Even though there's no security, we set up some callbacks, eg. to allow
+      // impersonation over unsecured connections for testing purposes.
+      callbacks.path_fn = std::bind(
+          HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
+      callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
+      http_input_transport->setCallbacks(callbacks);
+      http_output_transport->setCallbacks(callbacks);
+      break;
+    }
+    default:
+      LOG(FATAL) << Substitute("Bad transport type: $0", underlying_transport_type);
+  }
 }
 
 Status AuthManager::Init() {

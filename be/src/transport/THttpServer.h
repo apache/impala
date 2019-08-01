@@ -33,16 +33,28 @@ namespace transport {
 class THttpServer : public THttpTransport {
 public:
 
-  // Function that takes a base64 encoded string of the form 'username:password' and
-  // returns true if authentication is successful.
-  typedef std::function<bool(const std::string&)> BasicAuthFn;
+  struct HttpCallbacks {
+   public:
+    // Function that takes the value from a 'Authorization: Basic' header. Returns true
+    // if authentication is successful. Must be set if 'has_ldap_' is true.
+    std::function<bool(const std::string&)> basic_auth_fn =
+        [&](const std::string&) { DCHECK(false); return false; };
 
-  // Function that takes the value from a 'Authorization: Negotiate' header. Returns true
-  // if successful and sets 'is_complete' to true if negoation is done.
-  typedef std::function<bool(const std::string&, bool* is_complete)> NegotiateAuthFn;
+    // Function that takes the value from a 'Authorization: Negotiate' header. Returns
+    // true if successful and sets 'is_complete' to true if negoation is done. Must be set
+    // if 'has_kerberos_' is true.
+    std::function<bool(const std::string&, bool* is_complete)> negotiate_auth_fn =
+        [&](const std::string&, bool*) { DCHECK(false); return false; };
 
-  // Function that returns a list of headers to return to the client.
-  typedef std::function<std::vector<std::string>()> ReturnHeadersFn;
+    // Function that returns a list of headers to return to the client.
+    std::function<std::vector<std::string>()> return_headers_fn =
+        [&]() { return std::vector<std::string>(); };
+
+    // Function that takes the path component of an HTTP request. Returns false and sets
+    // 'err_msg' if an error is encountered.
+    std::function<bool(const std::string& path, std::string* err_msg)> path_fn =
+        [&](const std::string&, std::string*) { return true; };
+  };
 
   THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
       bool metrics_enabled, impala::IntCounter* total_basic_auth_success,
@@ -54,9 +66,7 @@ public:
 
   virtual void flush();
 
-  void setBasicAuthFn(const BasicAuthFn& fn) { basic_auth_fn_ = fn; }
-  void setNegotiateAuthFn(const NegotiateAuthFn& fn) { negotiate_auth_fn_ = fn; }
-  void setReturnHeadersFn(const ReturnHeadersFn& fn) { return_headers_fn_ = fn; }
+  void setCallbacks(const HttpCallbacks& callbacks) { callbacks_ = callbacks; }
 
 protected:
   void readHeaders();
@@ -68,12 +78,6 @@ protected:
   void returnUnauthorized();
 
  private:
-  static bool dummyBasicAuthFn(const std::string&) { return false; }
-  static bool dummyNegotiateAuthFn(const std::string&, bool*) { return false; }
-  static std::vector<std::string> dummyReturnHeadersFn() {
-    return std::vector<std::string>();
-  }
-
   // If either of the following is true, a '401 - Unauthorized' will be returned to the
   // client on requests that do not contain a valid 'Authorization' header. If 'has_ldap_'
   // is true, 'Basic' auth headers will be processed, and if 'has_kerberos_' is true
@@ -81,12 +85,7 @@ protected:
   bool has_ldap_ = false;
   bool has_kerberos_ = false;
 
-  // Called with the base64 encoded authorization from a 'Authorization: Basic' header.
-  BasicAuthFn basic_auth_fn_ = &dummyBasicAuthFn;
-  // Called with the value from a 'Authorization: Negotiate' header.
-  NegotiateAuthFn negotiate_auth_fn_ = &dummyNegotiateAuthFn;
-  // Called during flush() to get additional headers to return.
-  ReturnHeadersFn return_headers_fn_ = &dummyReturnHeadersFn;
+  HttpCallbacks callbacks_;
 
   // The value from the 'Authorization' header.
   std::string auth_value_ = "";

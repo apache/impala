@@ -128,6 +128,10 @@ bool THttpServer::parseStatusLine(char* status) {
   *http = '\0';
 
   if (strcmp(method, "POST") == 0) {
+    string err_msg;
+    if (!callbacks_.path_fn(string(path), &err_msg)) {
+      throw TTransportException(err_msg);
+    }
     // POST method ok, looking for content.
     return true;
   } else if (strcmp(method, "OPTIONS") == 0) {
@@ -182,7 +186,7 @@ void THttpServer::headersDone() {
   // all supported auth types.
   bool authorized = false;
   if (has_ldap_ && (!got_negotiate_auth || !has_kerberos_)) {
-    if (basic_auth_fn_(basic_auth_token)) {
+    if (callbacks_.basic_auth_fn(basic_auth_token)) {
       authorized = true;
       if (metrics_enabled_) total_basic_auth_success_->Increment(1);
     } else {
@@ -190,7 +194,7 @@ void THttpServer::headersDone() {
     }
   } else if (has_kerberos_ && (!got_basic_auth || !has_ldap_)) {
     bool is_complete;
-    if (negotiate_auth_fn_(negotiate_auth_token, &is_complete)) {
+    if (callbacks_.negotiate_auth_fn(negotiate_auth_token, &is_complete)) {
       // If 'is_complete' is false we want to return a 401.
       authorized = is_complete;
       if (is_complete && metrics_enabled_) total_negotiate_auth_success_->Increment(1);
@@ -220,7 +224,7 @@ void THttpServer::flush() {
     << "Server: Thrift/" << VERSION << CRLF << "Access-Control-Allow-Origin: *" << CRLF
     << "Content-Type: application/x-thrift" << CRLF << "Content-Length: " << len << CRLF
     << "Connection: Keep-Alive" << CRLF;
-  vector<string> return_headers = return_headers_fn_();
+  vector<string> return_headers = callbacks_.return_headers_fn();
   for (const string& header : return_headers) {
     h << header << CRLF;
   }
@@ -261,7 +265,7 @@ std::string THttpServer::getTimeRFC1123() {
 void THttpServer::returnUnauthorized() {
   std::ostringstream h;
   h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << getTimeRFC1123() << CRLF;
-  vector<string> return_headers = return_headers_fn_();
+  vector<string> return_headers = callbacks_.return_headers_fn();
   for (const string& header : return_headers) {
     h << header << CRLF;
   }

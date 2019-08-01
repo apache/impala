@@ -194,9 +194,7 @@ class NoAuthProvider : public AuthProvider {
       const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
       apache::thrift::transport::TTransport* underlying_input_transport,
-      apache::thrift::transport::TTransport* underlying_output_transport) {
-    connection_ptr->username = "";
-  }
+      apache::thrift::transport::TTransport* underlying_output_transport);
 
   virtual bool is_secure() { return false; }
 };
