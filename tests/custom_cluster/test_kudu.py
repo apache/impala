@@ -147,6 +147,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_implicit_external_table_props(self, cursor, kudu_client):
     """Check that table properties added internally for external table during
        table creation are as expected.
@@ -172,6 +173,7 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
             in table_desc
 
   @pytest.mark.execute_serially
+  @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_implicit_managed_table_props(self, cursor, kudu_client, unique_database):
     """Check that table properties added internally for managed table during table
        creation are as expected.
