@@ -69,8 +69,8 @@ void Coordinator::BackendState::Init(
     const BackendExecParams& exec_params, const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
   backend_exec_params_ = &exec_params;
-  host_ = backend_exec_params_->instance_params[0]->host;
-  krpc_host_ = backend_exec_params_->instance_params[0]->krpc_host;
+  host_ = backend_exec_params_->be_desc.address;
+  krpc_host_ = backend_exec_params_->be_desc.krpc_address;
   num_remaining_instances_ = backend_exec_params_->instance_params.size();
 
   host_profile_ = RuntimeProfile::Create(obj_pool, TNetworkAddressToString(host_));
@@ -187,6 +187,14 @@ void Coordinator::BackendState::Exec(
     last_report_time_ms_ = GenerateReportTimestamp();
     exec_complete_barrier->Notify();
   });
+
+  // Don not issue an ExecQueryFInstances RPC if there are no fragment instances
+  // scheduled to run on this backend.
+  if (IsEmptyBackend()) {
+    DCHECK(backend_exec_params_->is_coord_backend);
+    return;
+  }
+
   std::unique_ptr<ControlServiceProxy> proxy;
   Status get_proxy_status = ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
   if (!get_proxy_status.ok()) {
@@ -349,6 +357,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     const ReportExecStatusRequestPB& backend_exec_status,
     const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
     ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state) {
+  DCHECK(!IsEmptyBackend());
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
   lock_guard<SpinLock> l1(exec_summary->lock);
@@ -453,6 +462,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
 
 void Coordinator::BackendState::UpdateHostProfile(
     const TRuntimeProfileTree& thrift_profile) {
+  DCHECK(!IsEmptyBackend());
   host_profile_->Update(thrift_profile);
 }
 
@@ -534,6 +544,7 @@ bool Coordinator::BackendState::Cancel() {
 }
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
+  DCHECK(!IsEmptyBackend());
   DCHECK(rpc_params.dst_query_id == query_id());
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.

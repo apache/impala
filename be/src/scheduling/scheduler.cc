@@ -673,21 +673,22 @@ void Scheduler::ComputeBackendExecParams(
       be_params.initial_mem_reservation_total_claims +=
           f.fragment.initial_mem_reservation_total_claims;
       be_params.thread_reservation += f.fragment.thread_reservation;
-      if (f.is_coord_fragment) be_params.contains_coord_fragment = true;
     }
   }
 
-  int64_t largest_min_reservation = 0;
+  // This also ensures an entry always exists for the coordinator backend.
   int64_t coord_min_reservation = 0;
+  const TNetworkAddress& coord_addr = executor_config.local_be_desc.address;
+  BackendExecParams& coord_be_params = per_backend_params[coord_addr];
+  coord_be_params.is_coord_backend = true;
+  coord_min_reservation = coord_be_params.min_mem_reservation_bytes;
+
+  int64_t largest_min_reservation = 0;
   for (auto& backend : per_backend_params) {
     const TNetworkAddress& host = backend.first;
     const TBackendDescriptor be_desc = LookUpBackendDesc(executor_config, host);
-    backend.second.admit_mem_limit = be_desc.admit_mem_limit;
-    backend.second.admit_num_queries_limit = be_desc.admit_num_queries_limit;
     backend.second.be_desc = be_desc;
-    if (backend.second.contains_coord_fragment) {
-      coord_min_reservation = backend.second.min_mem_reservation_bytes;
-    } else {
+    if (!backend.second.is_coord_backend) {
       largest_min_reservation =
           max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
     }

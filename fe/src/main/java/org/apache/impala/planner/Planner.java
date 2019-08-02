@@ -441,12 +441,16 @@ public class Planner {
         maxPerHostPeakResources.getMinMemReservationBytes());
     request.setMax_per_host_thread_reservation(
         maxPerHostPeakResources.getThreadReservation());
-    // Assuming the root fragment will always run on the coordinator backend, which
-    // might not be true for queries that don't have a coordinator fragment
-    // (request.getStmt_type() != TStmtType.QUERY). TODO: Fix in IMPALA-8791.
-    request.setDedicated_coord_mem_estimate(MathUtil.saturatingAdd(rootFragment
-        .getResourceProfile().getMemEstimateBytes(), totalRuntimeFilterMemBytes +
-        DEDICATED_COORD_SAFETY_BUFFER_BYTES));
+    if (getAnalysisResult().isQueryStmt()) {
+      request.setDedicated_coord_mem_estimate(MathUtil.saturatingAdd(rootFragment
+          .getResourceProfile().getMemEstimateBytes(), totalRuntimeFilterMemBytes +
+          DEDICATED_COORD_SAFETY_BUFFER_BYTES));
+    } else {
+      // For queries that don't have a coordinator fragment, estimate a small
+      // amount of memory that the query state spwaned on the coordinator can use.
+      request.setDedicated_coord_mem_estimate(totalRuntimeFilterMemBytes +
+          DEDICATED_COORD_SAFETY_BUFFER_BYTES);
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Max per-host min reservation: " +
           maxPerHostPeakResources.getMinMemReservationBytes());

@@ -43,29 +43,26 @@ DEFINE_bool_hidden(use_dedicated_coordinator_estimates, true,
 namespace impala {
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-    const TQueryOptions& query_options, bool is_dedicated_coord,
-    RuntimeProfile* summary_profile, RuntimeProfile::EventSequence* query_events)
+    const TQueryOptions& query_options, RuntimeProfile* summary_profile,
+    RuntimeProfile::EventSequence* query_events)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_scan_ranges_(0),
-    next_instance_id_(query_id),
-    is_dedicated_coord_(is_dedicated_coord) {
+    next_instance_id_(query_id) {
   Init();
 }
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-    const TQueryOptions& query_options, bool is_dedicated_coord,
-    RuntimeProfile* summary_profile)
+    const TQueryOptions& query_options, RuntimeProfile* summary_profile)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
     summary_profile_(summary_profile),
     num_scan_ranges_(0),
-    next_instance_id_(query_id),
-    is_dedicated_coord_(is_dedicated_coord) {
+    next_instance_id_(query_id) {
   // Init() is not called, this constructor is for white box testing only.
   DCHECK(TestInfo::is_test());
 }
@@ -89,7 +86,7 @@ void QuerySchedule::Init() {
 
   // mark coordinator fragment
   const TPlanFragment& root_fragment = request_.plan_exec_info[0].fragments[0];
-  if (requiresCoordinatorFragment()) {
+  if (RequiresCoordinatorFragment()) {
     fragment_exec_params_[root_fragment.idx].is_coord_fragment = true;
     // the coordinator instance gets index 0, generated instance ids start at 1
     next_instance_id_ = CreateInstanceId(next_instance_id_, 1);
@@ -182,7 +179,11 @@ void QuerySchedule::Validate() const {
       }
     }
   }
-  // TODO: add validation for BackendExecParams
+
+  for (const auto& elem: per_backend_exec_params_) {
+    const BackendExecParams& bp = elem.second;
+    DCHECK(!bp.instance_params.empty() || bp.is_coord_backend);
+  }
 }
 
 int64_t QuerySchedule::GetPerExecutorMemoryEstimate() const {
@@ -223,7 +224,7 @@ void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) c
 }
 
 const FInstanceExecParams& QuerySchedule::GetCoordInstanceExecParams() const {
-  DCHECK(requiresCoordinatorFragment());
+  DCHECK(RequiresCoordinatorFragment());
   const TPlanFragment& coord_fragment =  request_.plan_exec_info[0].fragments[0];
   const FragmentExecParams& fragment_params = fragment_exec_params_[coord_fragment.idx];
   DCHECK_EQ(fragment_params.instance_exec_params.size(), 1);
@@ -247,20 +248,25 @@ int QuerySchedule::GetNumFragmentInstances() const {
 }
 
 int64_t QuerySchedule::GetClusterMemoryToAdmit() const {
-  if (!requiresCoordinatorFragment()) {
-    // For this case, there will be no coordinator fragment so only use the per
-    // executor mem to admit while accounting for admitted memory. This will also ensure
-    // the per backend mem admitted accounting is consistent with the cluster-wide mem
-    // admitted.
-    return per_backend_mem_to_admit() * per_backend_exec_params_.size();
-  } else {
-    return per_backend_mem_to_admit() * (per_backend_exec_params_.size() - 1)
-        + coord_backend_mem_to_admit();
-  }
+  // There will always be an entry for the coordinator in per_backend_exec_params_.
+  return per_backend_mem_to_admit() * (per_backend_exec_params_.size() - 1)
+      + coord_backend_mem_to_admit();
 }
 
 bool QuerySchedule::UseDedicatedCoordEstimates() const {
-  return is_dedicated_coord_ && FLAGS_use_dedicated_coordinator_estimates;
+  for (auto& itr : per_backend_exec_params_) {
+    if (!itr.second.is_coord_backend) continue;
+    auto& coord = itr.second;
+    bool is_dedicated_coord = !coord.be_desc.is_executor;
+    bool only_coord_fragment_scheduled =
+        RequiresCoordinatorFragment() && coord.instance_params.size() == 1;
+    bool no_fragment_scheduled = coord.instance_params.size() == 0;
+    return FLAGS_use_dedicated_coordinator_estimates && is_dedicated_coord
+        && (only_coord_fragment_scheduled || no_fragment_scheduled);
+  }
+  DCHECK(false)
+      << "Coordinator backend should always have a entry in per_backend_exec_params_";
+  return false;
 }
 
 void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
@@ -269,6 +275,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   // mem_limit if it is set in the query options, else sets it to -1 (no limit).
   bool mimic_old_behaviour =
       pool_cfg.min_query_mem_limit == 0 && pool_cfg.max_query_mem_limit == 0;
+  bool use_dedicated_coord_estimates = UseDedicatedCoordEstimates();
 
   per_backend_mem_to_admit_ = 0;
   coord_backend_mem_to_admit_ = 0;
@@ -281,7 +288,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
 
   if (!has_query_option) {
     per_backend_mem_to_admit_ = GetPerExecutorMemoryEstimate();
-    coord_backend_mem_to_admit_ = UseDedicatedCoordEstimates() ?
+    coord_backend_mem_to_admit_ = use_dedicated_coord_estimates ?
         GetDedicatedCoordMemoryEstimate() :
         GetPerExecutorMemoryEstimate();
     if (!mimic_old_behaviour) {
@@ -299,7 +306,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     if (pool_cfg.min_query_mem_limit > 0) {
       per_backend_mem_to_admit_ =
           max(per_backend_mem_to_admit_, pool_cfg.min_query_mem_limit);
-      if (!UseDedicatedCoordEstimates() || has_query_option) {
+      if (!use_dedicated_coord_estimates || has_query_option) {
         // The minimum mem limit option does not apply to dedicated coordinators -
         // this would result in over-reserving of memory. Treat coordinator and
         // executor mem limits the same if the query option was explicitly set.
@@ -321,7 +328,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   coord_backend_mem_to_admit_ = min(coord_backend_mem_to_admit_, MemInfo::physical_mem());
 
   // If the query is only scheduled to run on the coordinator.
-  if (per_backend_exec_params_.size() == 1 && requiresCoordinatorFragment()) {
+  if (per_backend_exec_params_.size() == 1 && RequiresCoordinatorFragment()) {
     per_backend_mem_to_admit_ = 0;
   }
 
