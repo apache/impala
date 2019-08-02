@@ -82,7 +82,8 @@ auto MakeTestOkFn(TQueryOptions& options, OptionDef<T> option_def) {
 template<typename T>
 auto MakeTestErrFn(TQueryOptions& options, OptionDef<T> option_def) {
   return [&options, option_def](const char* str) {
-    EXPECT_FALSE(SetQueryOption(option_def.option_name, str, &options, nullptr).ok());
+    EXPECT_FALSE(SetQueryOption(option_def.option_name, str, &options, nullptr).ok())
+      << option_def.option_name << " " << str;
   };
 }
 
@@ -110,7 +111,7 @@ void TestByteCaseSet(TQueryOptions& options,
     }
     TestError(to_string(range.lower_bound - 1).c_str());
     TestError(to_string(static_cast<uint64_t>(range.upper_bound) + 1).c_str());
-    TestError("1tb");
+    TestError("1pb");
     TestError("1%");
     TestError("1%B");
     TestError("1B%");
@@ -120,6 +121,7 @@ void TestByteCaseSet(TQueryOptions& options,
         {"1 B", 1},
         {"0Kb", 0},
         {"4G",  4ll * 1024 * 1024 * 1024},
+        {"4tb",  4ll * 1024 * 1024 * 1024 * 1024},
         {"-1M", -1024 * 1024}
     };
     for (const auto& value_def : common_values) {
@@ -307,7 +309,7 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestOk("0", 0);
     TestOk("4GB", 4ll * 1024 * 1024 * 1024);
     TestError("-1MB");
-    TestError("1tb");
+    TestError("1pb");
     TestError("1%");
     TestError("1%B");
     TestError("1B%");

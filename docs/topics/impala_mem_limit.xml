@@ -167,10 +167,10 @@ MEM_LIMIT set to 3mb
     </p>
 
 <codeblock rev="">
-[localhost:21000] > set mem_limit=3tb;
-MEM_LIMIT set to 3tb
+[localhost:21000] > set mem_limit=3pb;
+MEM_LIMIT set to 3pb
 [localhost:21000] > select 5;
-ERROR: Failed to parse query memory limit from '3tb'.
+ERROR: Failed to parse query memory limit from '3pb'.
 
 [localhost:21000] > set mem_limit=xyz;
 MEM_LIMIT set to xyz

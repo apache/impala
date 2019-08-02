@@ -92,6 +92,22 @@ class TmpFileMgr {
   /// Same typedef as io::WriteRange::WriteDoneCallback.
   typedef std::function<void(const Status&)> WriteDoneCallback;
 
+  /// A configured temporary directory that TmpFileMgr allocates files in.
+  struct TmpDir {
+    TmpDir(const std::string& path, int64_t bytes_limit, IntGauge* bytes_used_metric)
+      : path(path), bytes_limit(bytes_limit), bytes_used_metric(bytes_used_metric) {}
+
+    /// Path to the temporary directory.
+    const std::string path;
+
+    /// Limit on bytes that should be written to this path. Set to maximum value
+    /// of int64_t if there is no limit.
+    int64_t const bytes_limit;
+
+    /// The current bytes of scratch used for this temporary directory.
+    IntGauge* const bytes_used_metric;
+  };
+
   /// Represents a group of temporary files - one per disk with a scratch directory. The
   /// total allocated bytes of the group can be bound by setting the space allocation
   /// limit. The owner of the FileGroup object is responsible for calling the Close()
@@ -202,8 +218,11 @@ class TmpFileMgr {
 
     /// Return a SCRATCH_ALLOCATION_FAILED error with the appropriate information,
     /// including scratch directories, the amount of scratch allocated and previous
-    /// errors that caused this failure. 'lock_' must be held by caller.
-    Status ScratchAllocationFailedStatus();
+    /// errors that caused this failure. If some directories were at capacity,
+    /// but had not encountered an error, the indices of these directories in
+    /// tmp_file_mgr_->tmp_dir_ should be included in 'at_capacity_dirs'.
+    /// 'lock_' must be held by caller.
+    Status ScratchAllocationFailedStatus(const std::vector<int>& at_capacity_dirs);
 
     /// The TmpFileMgr it is associated with.
     TmpFileMgr* const tmp_file_mgr_;
@@ -390,9 +409,13 @@ class TmpFileMgr {
 
   /// Custom initialization - initializes with the provided list of directories.
   /// If one_dir_per_device is true, only use one temporary directory per device.
-  /// This interface is intended for testing purposes.
-  Status InitCustom(const std::vector<std::string>& tmp_dirs, bool one_dir_per_device,
+  /// This interface is intended for testing purposes. 'tmp_dir_specifiers'
+  /// use the command-line syntax, i.e. <path>[:<limit>]. The first variant takes
+  /// a comma-separated list, the second takes a vector.
+  Status InitCustom(const std::string& tmp_dirs_spec, bool one_dir_per_device,
       MetricGroup* metrics) WARN_UNUSED_RESULT;
+  Status InitCustom(const std::vector<std::string>& tmp_dir_specifiers,
+      bool one_dir_per_device, MetricGroup* metrics) WARN_UNUSED_RESULT;
 
   /// Return the scratch directory path for the device.
   std::string GetTmpDirPath(DeviceId device_id) const;
@@ -419,7 +442,7 @@ class TmpFileMgr {
   bool initialized_;
 
   /// The paths of the created tmp directories.
-  std::vector<std::string> tmp_dirs_;
+  std::vector<TmpDir> tmp_dirs_;
 
   /// Metrics to track active scratch directories.
   IntGauge* num_active_scratch_dirs_metric_;

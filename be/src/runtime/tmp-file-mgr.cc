@@ -17,6 +17,8 @@
 
 #include "runtime/tmp-file-mgr.h"
 
+#include <limits>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
@@ -35,6 +37,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
@@ -43,7 +46,14 @@
 DEFINE_bool(disk_spill_encryption, true,
     "Set this to encrypt and perform an integrity "
     "check on all data spilled to disk during a query");
-DEFINE_string(scratch_dirs, "/tmp", "Writable scratch directories");
+DEFINE_string(scratch_dirs, "/tmp",
+    "Writable scratch directories. "
+    "This is a comma-separated list of directories. Each directory is "
+    "specified as the directory path and an optional limit on the bytes that will "
+    "be allocated in that directory. If the optional limit is provided, the path and "
+    "the limit are separated by a colon. E.g. '/dir1:10G,/dir2:5GB,/dir3' will allow "
+    "allocating up to 10GB of scratch in /dir1, 5GB of scratch in /dir2 and an "
+    "unlimited amount in /dir3.");
 DEFINE_bool(allow_multiple_scratch_dirs_per_device, true,
     "If false and --scratch_dirs contains multiple directories on the same device, "
     "then only the first writable directory is used");
@@ -71,6 +81,8 @@ const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK =
     "tmp-file-mgr.scratch-space-bytes-used-high-water-mark";
 const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED =
     "tmp-file-mgr.scratch-space-bytes-used";
+const string SCRATCH_DIR_BYTES_USED_FORMAT =
+    "tmp-file-mgr.scratch-space-bytes-used.dir-$0";
 
 TmpFileMgr::TmpFileMgr()
   : initialized_(false),
@@ -79,27 +91,61 @@ TmpFileMgr::TmpFileMgr()
     scratch_bytes_used_metric_(nullptr) {}
 
 Status TmpFileMgr::Init(MetricGroup* metrics) {
-  string tmp_dirs_spec = FLAGS_scratch_dirs;
+  return InitCustom(
+      FLAGS_scratch_dirs, !FLAGS_allow_multiple_scratch_dirs_per_device, metrics);
+}
+
+Status TmpFileMgr::InitCustom(
+    const string& tmp_dirs_spec, bool one_dir_per_device, MetricGroup* metrics) {
   vector<string> all_tmp_dirs;
   // Empty string should be interpreted as no scratch
   if (!tmp_dirs_spec.empty()) {
     split(all_tmp_dirs, tmp_dirs_spec, is_any_of(","), token_compress_on);
   }
-  return InitCustom(all_tmp_dirs, !FLAGS_allow_multiple_scratch_dirs_per_device, metrics);
+  return InitCustom(all_tmp_dirs, one_dir_per_device, metrics);
 }
 
-Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_device,
-      MetricGroup* metrics) {
+Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
+    bool one_dir_per_device, MetricGroup* metrics) {
   DCHECK(!initialized_);
-  if (tmp_dirs.empty()) {
+  if (tmp_dir_specifiers.empty()) {
     LOG(WARNING) << "Running without spill to disk: no scratch directories provided.";
+  }
+  vector<TmpDir> tmp_dirs;
+  // Parse the directory specifiers. Don't return an error on parse errors, just log a
+  // warning - we don't want to abort process startup because of misconfigured scratch,
+  // since queries will generally still be runnable.
+  for (const string& tmp_dir_spec : tmp_dir_specifiers) {
+    vector<string> toks;
+    split(toks, tmp_dir_spec, is_any_of(":"), token_compress_on);
+    if (toks.size() > 2) {
+      LOG(ERROR) << "Could not parse temporary dir specifier, too many colons: '"
+                 << tmp_dir_spec << "'";
+      continue;
+    }
+    int64_t bytes_limit = numeric_limits<int64_t>::max();
+    if (toks.size() == 2) {
+      bool is_percent;
+      bytes_limit = ParseUtil::ParseMemSpec(toks[1], &is_percent, 0);
+      if (bytes_limit < 0 || is_percent) {
+        LOG(ERROR) << "Malformed data cache capacity configuration '" << tmp_dir_spec
+                   << "'";
+        continue;
+      } else if (bytes_limit == 0) {
+        // Interpret -1, 0 or empty string as no limit.
+        bytes_limit = numeric_limits<int64_t>::max();
+      }
+    }
+    IntGauge* bytes_used_metric = metrics->AddGauge(
+        SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_dirs.size()));
+    tmp_dirs.emplace_back(toks[0], bytes_limit, bytes_used_metric);
   }
 
   vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
   // For each tmp directory, find the disk it is on,
   // so additional tmp directories on the same disk can be skipped.
   for (int i = 0; i < tmp_dirs.size(); ++i) {
-    path tmp_path(trim_right_copy_if(tmp_dirs[i], is_any_of("/")));
+    path tmp_path(trim_right_copy_if(tmp_dirs[i].path, is_any_of("/")));
     tmp_path = absolute(tmp_path);
     path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
     // tmp_path must be a writable directory.
@@ -127,8 +173,10 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
       if (status.ok()) {
         if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
         LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on "
-                  << "disk " << disk_id;
-        tmp_dirs_.push_back(scratch_subdir_path.string());
+                  << "disk " << disk_id
+                  << " limit: " << PrettyPrinter::PrintBytes(tmp_dirs[i].bytes_limit);
+        tmp_dirs_.emplace_back(scratch_subdir_path.string(), tmp_dirs[i].bytes_limit,
+            tmp_dirs[i].bytes_used_metric);
       } else {
         LOG(WARNING) << "Could not remove and recreate directory "
                      << scratch_subdir_path.string() << ": cannot use it for scratch. "
@@ -144,7 +192,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
       metrics, TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
   num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size());
   for (int i = 0; i < tmp_dirs_.size(); ++i) {
-    active_scratch_dirs_metric_->Add(tmp_dirs_[i]);
+    active_scratch_dirs_metric_->Add(tmp_dirs_[i].path);
   }
   scratch_bytes_used_metric_ =
       metrics->AddHWMGauge(TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK,
@@ -154,7 +202,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
 
   if (tmp_dirs_.empty() && !tmp_dirs.empty()) {
     LOG(ERROR) << "Running without spill to disk: could not use any scratch "
-               << "directories in list: " << join(tmp_dirs, ",")
+               << "directories in list: " << join(tmp_dir_specifiers, ",")
                << ". See previous warnings for information on causes.";
   }
   return Status::OK();
@@ -170,7 +218,7 @@ void TmpFileMgr::NewFile(
   string unique_name = lexical_cast<string>(random_generator()());
   stringstream file_name;
   file_name << PrintId(file_group->unique_id()) << "_" << unique_name;
-  path new_file_path(tmp_dirs_[device_id]);
+  path new_file_path(tmp_dirs_[device_id].path);
   new_file_path /= file_name.str();
 
   new_file->reset(new File(file_group, device_id, new_file_path.string()));
@@ -180,7 +228,7 @@ string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
-  return tmp_dirs_[device_id];
+  return tmp_dirs_[device_id].path;
 }
 
 int TmpFileMgr::NumActiveTmpDevices() {
@@ -206,10 +254,17 @@ TmpFileMgr::File::File(FileGroup* file_group, DeviceId device_id, const string& 
   DCHECK(file_group != nullptr);
 }
 
-void TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+bool TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
   DCHECK_GT(num_bytes, 0);
+  TmpDir* dir = GetDir();
+  // Increment optimistically and roll back if the limit is exceeded.
+  if (dir->bytes_used_metric->Increment(num_bytes) > dir->bytes_limit) {
+    dir->bytes_used_metric->Increment(-num_bytes);
+    return false;
+  }
   *offset = bytes_allocated_;
   bytes_allocated_ += num_bytes;
+  return true;
 }
 
 int TmpFileMgr::File::AssignDiskQueue() const {
@@ -223,7 +278,13 @@ void TmpFileMgr::File::Blacklist(const ErrorMsg& msg) {
 
 Status TmpFileMgr::File::Remove() {
   // Remove the file if present (it may not be present if no writes completed).
-  return FileSystemUtil::RemovePaths({path_});
+  Status status = FileSystemUtil::RemovePaths({path_});
+  GetDir()->bytes_used_metric->Increment(-bytes_allocated_);
+  return status;
+}
+
+TmpFileMgr::TmpDir* TmpFileMgr::File::GetDir() {
+  return &file_group_->tmp_file_mgr_->tmp_dirs_[device_id_];
 }
 
 string TmpFileMgr::File::DebugString() {
@@ -272,7 +333,7 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
     ++files_allocated;
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
-  if (tmp_files_.size() == 0) return ScratchAllocationFailedStatus();
+  if (tmp_files_.size() == 0) return ScratchAllocationFailedStatus({});
   // Start allocating on a random device to avoid overloading the first device.
   next_allocation_index_ = rand() % tmp_files_.size();
   return Status::OK();
@@ -315,18 +376,27 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
   // Lazily create the files on the first write.
   if (tmp_files_.empty()) RETURN_IF_ERROR(CreateFiles());
 
+  // Track the indices of any directories where we failed due to capacity. This is
+  // required for error reporting if we are totally out of capacity so that it's clear
+  // that some disks were at capacity.
+  vector<int> at_capacity_dirs;
+
   // Find the next physical file in round-robin order and allocate a range from it.
   for (int attempt = 0; attempt < tmp_files_.size(); ++attempt) {
-    *tmp_file = tmp_files_[next_allocation_index_].get();
+    int idx = next_allocation_index_;
     next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
+    *tmp_file = tmp_files_[idx].get();
     if ((*tmp_file)->is_blacklisted()) continue;
-    (*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset);
+    if (!(*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset)) {
+      at_capacity_dirs.push_back(idx);
+      continue;
+    }
     scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
     tmp_file_mgr_->scratch_bytes_used_metric_->Increment(scratch_range_bytes);
     current_bytes_allocated_ += num_bytes;
     return Status::OK();
   }
-  return ScratchAllocationFailedStatus();
+  return ScratchAllocationFailedStatus(at_capacity_dirs);
 }
 
 void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
@@ -484,11 +554,21 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   return handle->RetryWrite(io_ctx_.get(), tmp_file, file_offset);
 }
 
-Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus() {
-  Status status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
-        join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString(),
-        PrettyPrinter::PrintBytes(scratch_space_bytes_used_counter_->value()),
-        PrettyPrinter::PrintBytes(current_bytes_allocated_));
+Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus(
+    const vector<int>& at_capacity_dirs) {
+  vector<string> tmp_dir_paths;
+  for (TmpDir& tmp_dir : tmp_file_mgr_->tmp_dirs_) {
+    tmp_dir_paths.push_back(tmp_dir.path);
+  }
+  vector<string> at_capacity_dir_paths;
+  for (int dir_idx : at_capacity_dirs) {
+    at_capacity_dir_paths.push_back(tmp_file_mgr_->tmp_dirs_[dir_idx].path);
+  }
+  Status status(TErrorCode::SCRATCH_ALLOCATION_FAILED, join(tmp_dir_paths, ","),
+      GetBackendString(),
+      PrettyPrinter::PrintBytes(scratch_space_bytes_used_counter_->value()),
+      PrettyPrinter::PrintBytes(current_bytes_allocated_),
+      join(at_capacity_dir_paths, ","));
   // Include all previous errors that may have caused the failure.
   for (Status& err : scratch_errors_) status.MergeStatus(err);
   return status;

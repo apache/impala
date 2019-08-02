@@ -36,11 +36,13 @@ class TmpFileMgr::File {
  public:
   File(FileGroup* file_group, DeviceId device_id, const std::string& path);
 
-  /// Allocates 'num_bytes' bytes in this file for a new block of data.
-  /// The file size is increased by a call to truncate() if necessary.
-  /// Sets 'offset' to the file offset of the first byte in the allocated
+  /// Allocates 'num_bytes' bytes in this file for a new block of data if there is
+  /// free capacity in this temporary directory. If there is insufficient capacity,
+  /// return false. Otherwise, update state and return true.
+  /// This function does not actually perform any file operations.
+  /// On success, sets 'offset' to the file offset of the first byte in the allocated
   /// range on success.
-  void AllocateSpace(int64_t num_bytes, int64_t* offset);
+  bool AllocateSpace(int64_t num_bytes, int64_t* offset);
 
   /// Called when an IO error is encountered for this file. Logs the error and blacklists
   /// the file.
@@ -85,7 +87,10 @@ class TmpFileMgr::File {
 
   /// Set to true to indicate that we shouldn't allocate any more space in this file.
   bool blacklisted_;
+
+  /// Helper to get the TmpDir that this file is associated with.
+  TmpDir* GetDir();
 };
-}
+} // namespace impala
 
 #endif

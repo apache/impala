@@ -2151,6 +2151,16 @@
     "key": "tmp-file-mgr.scratch-space-bytes-used-high-water-mark"
   },
   {
+    "description": "The current total spilled bytes for a single scratch directory.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Per-directory scratch space bytes used",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.scratch-space-bytes-used.dir-$0"
+  },
+  {
     "description": "Number of senders waiting for receiving fragment to initialize",
     "contexts": [
       "IMPALAD"

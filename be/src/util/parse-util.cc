@@ -40,6 +40,12 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent,
     number_str_len--;
   }
   switch (*suffix_char) {
+    case 't':
+    case 'T':
+      // Terabytes.
+      number_str_len--;
+      multiplier = 1024L * 1024L * 1024L * 1024L;
+      break;
     case 'g':
     case 'G':
       // Gigabytes.

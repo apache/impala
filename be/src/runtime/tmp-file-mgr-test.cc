@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <numeric>
 
 #include <boost/filesystem.hpp>
@@ -52,6 +53,11 @@ namespace impala {
 
 using namespace io;
 
+static const int64_t KILOBYTE = 1024L;
+static const int64_t MEGABYTE = 1024L * KILOBYTE;
+static const int64_t GIGABYTE = 1024L * MEGABYTE;
+static const int64_t TERABYTE = 1024L * GIGABYTE;
+
 class TmpFileMgrTest : public ::testing::Test {
  public:
   virtual void SetUp() {
@@ -75,6 +81,18 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   DiskIoMgr* io_mgr() { return test_env_->exec_env()->disk_io_mgr(); }
+
+  /// Helper to create a TmpFileMgr and initialise it with InitCustom(). Adds the mgr to
+  /// 'obj_pool_' for automatic cleanup at the end of each test. Fails the test if
+  /// InitCustom() fails.
+  TmpFileMgr* CreateTmpFileMgr(const string& tmp_dirs_spec) {
+    // Allocate a new metrics group for each TmpFileMgr so they don't get confused by
+    // the pre-existing metrics (TmpFileMgr assumes it's a singleton in product code).
+    MetricGroup* metrics = obj_pool_.Add(new MetricGroup(""));
+    TmpFileMgr* mgr = obj_pool_.Add(new TmpFileMgr());
+    EXPECT_OK(mgr->InitCustom(tmp_dirs_spec, false, metrics));
+    return mgr;
+  }
 
   /// Check that metric values are consistent with TmpFileMgr state.
   void CheckMetrics(TmpFileMgr* tmp_file_mgr) {
@@ -120,6 +138,11 @@ class TmpFileMgrTest : public ::testing::Test {
       files->push_back(file.get());
     }
     return Status::OK();
+  }
+
+  /// Helper to get the private tmp_dirs_ member.
+  static const vector<TmpFileMgr::TmpDir>& GetTmpDirs(TmpFileMgr* mgr) {
+    return mgr->tmp_dirs_;
   }
 
   /// Helper to call the private TmpFileMgr::NewFile() method.
@@ -644,4 +667,184 @@ TEST_F(TmpFileMgrTest, TestHWMMetric) {
   file_group_2.Close();
   checkHWMMetrics(0, 2 * LIMIT);
 }
+
+// Test that usage per directory is tracked correctly and per-directory limits are
+// enforced. Sets up several scratch directories, some with limits, and checks
+// that the allocations occur in the right directories.
+TEST_F(TmpFileMgrTest, TestDirectoryLimits) {
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2",
+      "/tmp/tmp-file-mgr-test.3"});
+  vector<string> tmp_dir_specs({"/tmp/tmp-file-mgr-test.1:512",
+      "/tmp/tmp-file-mgr-test.2:1k", "/tmp/tmp-file-mgr-test.3"});
+  RemoveAndCreateDirs(tmp_dirs);
+  TmpFileMgr tmp_file_mgr;
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
+
+  TmpFileMgr::FileGroup file_group_1(
+      &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
+  TmpFileMgr::FileGroup file_group_2(
+      &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p2"), TUniqueId());
+
+  vector<TmpFileMgr::File*> files;
+  ASSERT_OK(CreateFiles(&file_group_1, &files));
+  ASSERT_OK(CreateFiles(&file_group_2, &files));
+
+  IntGauge* dir1_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  IntGauge* dir2_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-1");
+  IntGauge* dir3_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-2");
+
+  // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
+  const int64_t ALLOC_SIZE = 512;
+  int64_t offset;
+  TmpFileMgr::File* alloc_file;
+
+  // Allocate three times - once per directory. We expect these allocations to go through
+  // so we should have one allocation in each directory.
+  SetNextAllocationIndex(&file_group_1, 0);
+  for (int i = 0; i < tmp_dir_specs.size(); ++i) {
+    ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
+  }
+  EXPECT_EQ(ALLOC_SIZE, dir1_usage->GetValue());
+  EXPECT_EQ(ALLOC_SIZE, dir2_usage->GetValue());
+  EXPECT_EQ(ALLOC_SIZE, dir3_usage->GetValue());
+
+  // This time we should hit the limit on the first directory. Do this from a
+  // different file group to show that limits are enforced across file groups.
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_OK(GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset));
+  }
+  EXPECT_EQ(ALLOC_SIZE, dir1_usage->GetValue());
+  EXPECT_EQ(2 * ALLOC_SIZE, dir2_usage->GetValue());
+  EXPECT_EQ(2 * ALLOC_SIZE, dir3_usage->GetValue());
+
+  // Now we're at the limits on two directories, all allocations should got to the
+  // last directory without a limit.
+  for (int i = 0; i < 100; ++i) {
+    ASSERT_OK(GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset));
+  }
+  EXPECT_EQ(ALLOC_SIZE, dir1_usage->GetValue());
+  EXPECT_EQ(2 * ALLOC_SIZE, dir2_usage->GetValue());
+  EXPECT_EQ(102 * ALLOC_SIZE, dir3_usage->GetValue());
+
+  file_group_2.Close();
+  // Metrics should be decremented when the file groups delete the underlying files.
+  EXPECT_EQ(ALLOC_SIZE, dir1_usage->GetValue());
+  EXPECT_EQ(ALLOC_SIZE, dir2_usage->GetValue());
+  EXPECT_EQ(ALLOC_SIZE, dir3_usage->GetValue());
+
+  // We should be able to reuse the space freed up.
+  ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
+
+  EXPECT_EQ(2 * ALLOC_SIZE, dir2_usage->GetValue());
+  file_group_1.Close();
+  EXPECT_EQ(0, dir1_usage->GetValue());
+  EXPECT_EQ(0, dir2_usage->GetValue());
+  EXPECT_EQ(0, dir3_usage->GetValue());
 }
+
+// Test the case when all per-directory limits are hit. We expect to return a status
+// and fail gracefully.
+TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
+  vector<string> tmp_dir_specs(
+      {"/tmp/tmp-file-mgr-test.1:256kb", "/tmp/tmp-file-mgr-test.2:1mb"});
+  const int64_t DIR1_LIMIT = 256L * 1024L;
+  const int64_t DIR2_LIMIT = 1024L * 1024L;
+  RemoveAndCreateDirs(tmp_dirs);
+  TmpFileMgr tmp_file_mgr;
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
+
+  TmpFileMgr::FileGroup file_group_1(
+      &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
+  TmpFileMgr::FileGroup file_group_2(
+      &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p2"), TUniqueId());
+
+  vector<TmpFileMgr::File*> files;
+  ASSERT_OK(CreateFiles(&file_group_1, &files));
+  ASSERT_OK(CreateFiles(&file_group_2, &files));
+
+  IntGauge* dir1_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  IntGauge* dir2_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-1");
+
+  // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
+  const int64_t ALLOC_SIZE = 512;
+  const int64_t MAX_ALLOCATIONS = (DIR1_LIMIT + DIR2_LIMIT) / ALLOC_SIZE;
+  int64_t offset;
+  TmpFileMgr::File* alloc_file;
+
+  // Allocate exactly the maximum total capacity of the directories.
+  SetNextAllocationIndex(&file_group_1, 0);
+  for (int i = 0; i < MAX_ALLOCATIONS; ++i) {
+    ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
+  }
+  EXPECT_EQ(DIR1_LIMIT, dir1_usage->GetValue());
+  EXPECT_EQ(DIR2_LIMIT, dir2_usage->GetValue());
+  // The directories are at capacity, so allocations should fail.
+  Status err1 = GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset);
+  ASSERT_EQ(err1.code(), TErrorCode::SCRATCH_ALLOCATION_FAILED);
+  Status err2 = GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset);
+  ASSERT_EQ(err2.code(), TErrorCode::SCRATCH_ALLOCATION_FAILED);
+
+  // A FileGroup should recover once allocations are released, i.e. it does not
+  // permanently block allocating files from the group.
+  file_group_1.Close();
+  ASSERT_OK(GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset));
+  file_group_2.Close();
+}
+
+// Test the directory parsing logic, including the various error cases.
+TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
+  RemoveAndCreateDirs({"/tmp/tmp-file-mgr-test1", "/tmp/tmp-file-mgr-test2",
+      "/tmp/tmp-file-mgr-test3", "/tmp/tmp-file-mgr-test4", "/tmp/tmp-file-mgr-test5",
+      "/tmp/tmp-file-mgr-test6", "/tmp/tmp-file-mgr-test7"});
+  // Configure various directories with valid formats.
+  auto& dirs = GetTmpDirs(
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:5g,/tmp/tmp-file-mgr-test2,"
+                       "/tmp/tmp-file-mgr-test3:1234,/tmp/tmp-file-mgr-test4:99999999,"
+                       "/tmp/tmp-file-mgr-test5:200tb,/tmp/tmp-file-mgr-test6:100MB"));
+  EXPECT_EQ(6, dirs.size());
+  EXPECT_EQ(5 * GIGABYTE, dirs[0].bytes_limit);
+  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1].bytes_limit);
+  EXPECT_EQ(1234, dirs[2].bytes_limit);
+  EXPECT_EQ(99999999, dirs[3].bytes_limit);
+  EXPECT_EQ(200 * TERABYTE, dirs[4].bytes_limit);
+  EXPECT_EQ(100 * MEGABYTE, dirs[5].bytes_limit);
+
+  // Various invalid limit formats result in the directory getting skipped.
+  // Include a valid dir on the end to ensure that we don't short-circuit all
+  // directories.
+  auto& dirs2 = GetTmpDirs(
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:foo,/tmp/tmp-file-mgr-test2:?,"
+                       "/tmp/tmp-file-mgr-test3:1.2.3.4,/tmp/tmp-file-mgr-test4: ,"
+                       "/tmp/tmp-file-mgr-test5:5pb,/tmp/tmp-file-mgr-test6:10%,"
+                       "/tmp/tmp-file-mgr-test1:100"));
+  EXPECT_EQ(1, dirs2.size());
+  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0].path);
+  EXPECT_EQ(100, dirs2[0].bytes_limit);
+
+  // Various valid ways of specifying "unlimited".
+  auto& dirs3 =
+      GetTmpDirs(CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:,/tmp/tmp-file-mgr-test2:-1,"
+                                  "/tmp/tmp-file-mgr-test3,/tmp/tmp-file-mgr-test4:0"));
+  EXPECT_EQ(4, dirs3.size());
+  for (const auto& dir : dirs3) {
+    EXPECT_EQ(numeric_limits<int64_t>::max(), dir.bytes_limit);
+  }
+
+  // Extra colons
+  auto& dirs4 = GetTmpDirs(
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:1:,/tmp/tmp-file-mgr-test2:10mb::"));
+  EXPECT_EQ(0, dirs4.size());
+
+  // Empty strings.
+  auto& nodirs = GetTmpDirs(CreateTmpFileMgr(""));
+  EXPECT_EQ(0, nodirs.size());
+  auto& empty_paths = GetTmpDirs(CreateTmpFileMgr(","));
+  EXPECT_EQ(2, empty_paths.size());
+}
+} // namespace impala

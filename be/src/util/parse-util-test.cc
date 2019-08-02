@@ -35,6 +35,7 @@ TEST(ParseMemSpecs, Basic) {
   int64_t kilobytes = 1024;
   int64_t megabytes = 1024 * kilobytes;
   int64_t gigabytes = 1024 * megabytes;
+  int64_t terabytes = 1024 * gigabytes;
 
   bytes = ParseUtil::ParseMemSpec("1", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(1, bytes);
@@ -72,6 +73,14 @@ TEST(ParseMemSpecs, Basic) {
   ASSERT_EQ(12 * gigabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  bytes = ParseUtil::ParseMemSpec("8T", &is_percent, MemInfo::physical_mem());
+  ASSERT_EQ(8 * terabytes, bytes);
+  ASSERT_FALSE(is_percent);
+
+  bytes = ParseUtil::ParseMemSpec("12tb", &is_percent, MemInfo::physical_mem());
+  ASSERT_EQ(12 * terabytes, bytes);
+  ASSERT_FALSE(is_percent);
+
   bytes = ParseUtil::ParseMemSpec("13%", &is_percent, MemInfo::physical_mem());
   ASSERT_GT(bytes, 0);
   ASSERT_TRUE(is_percent);
@@ -91,6 +100,8 @@ TEST(ParseMemSpecs, Basic) {
   bad_values.push_back("1Bb");
   bad_values.push_back("1%%");
   bad_values.push_back("1.1");
+  bad_values.push_back("1pb");
+  bad_values.push_back("1eb");
   stringstream ss;
   ss << UINT64_MAX;
   bad_values.push_back(ss.str());
