@@ -515,8 +515,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       fs_allocation_file="mem-limit-test-fair-scheduler.xml",
       llama_site_file="mem-limit-test-llama-site.xml"), num_exclusive_coordinators=1,
     cluster_size=2)
-  def test_sanity_checks_dedicated_coordinator(self, vector):
-    """Test for verifying targeted dedicated coordinator memory estimation behavior."""
+  def test_sanity_checks_dedicated_coordinator(self, vector, unique_database):
+    """Sanity tests for verifying targeted dedicated coordinator memory estimations and
+    behavior."""
     self.client.set_configuration_option('request_pool', "root.regularPool")
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     exec_options = vector.get_value('exec_option')
@@ -546,6 +547,17 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     assert abs(mem_to_admit['executor'] - 0) < 0.0001, \
       "mem_to_admit:" + str(mem_to_admit)
     self.client.close_query(handle)
+
+    # Make sure query execution works perfectly for a query that does not have any
+    # fragments schdeuled on the coordinator, but has runtime-filters that need to be
+    # aggregated at the coordinator.
+    exec_options = vector.get_value('exec_option')
+    exec_options['RUNTIME_FILTER_WAIT_TIME_MS'] = 30000
+    query = """CREATE TABLE {0}.temp_tbl AS SELECT STRAIGHT_JOIN o_orderkey
+    FROM tpch_parquet.lineitem INNER JOIN [SHUFFLE] tpch_parquet.orders
+    ON o_orderkey = l_orderkey GROUP BY 1""".format(unique_database)
+    result = self.execute_query_expect_success(self.client, query, exec_options)
+    assert "Runtime filters: All filters arrived" in result.runtime_profile
 
   def __verify_mem_accounting(self, vector, using_dedicated_coord_estimates):
     """Helper method used by test_dedicated_coordinator_*_mem_accounting that verifies

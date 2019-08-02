@@ -52,7 +52,9 @@ class ExecSummary;
 struct FInstanceExecParams;
 
 /// This class manages all aspects of the execution of all fragment instances of a
-/// single query on a particular backend.
+/// single query on a particular backend. For the coordinator backend its possible to have
+/// no fragment instances scheduled on it. In that case, no RPCs are issued and the
+/// Backend state transitions to 'done' state right after Exec() is called on it.
 /// Thread-safe unless pointed out otherwise.
 class Coordinator::BackendState {
  public:
@@ -72,6 +74,7 @@ class Coordinator::BackendState {
   /// notifies on rpc_complete_barrier when the rpc completes. Success/failure is
   /// communicated through GetStatus(). Uses filter_routing_table to remove filters
   /// that weren't selected during its construction.
+  /// No RPC is issued if there are no fragment instances scheduled on this backend.
   /// The debug_options are applied to the appropriate TPlanFragmentInstanceCtxs, based
   /// on their node_id/instance_idx.
   void Exec(const DebugOptions& debug_options,
@@ -158,6 +161,9 @@ class Coordinator::BackendState {
 
   /// Returns a timestamp using monotonic time for tracking arrival of status reports.
   static int64_t GenerateReportTimestamp() { return MonotonicMillis(); }
+
+  /// Returns True if there are no fragment instances scheduled on this backend.
+  bool IsEmptyBackend() { return backend_exec_params_->instance_params.empty(); }
 
  private:
   /// Execution stats for a single fragment instance.

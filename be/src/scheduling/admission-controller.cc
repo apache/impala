@@ -56,8 +56,6 @@ DEFINE_int64_hidden(admission_control_stale_topic_threshold_ms, 5 * 1000,
     "capture most cases where the Impala daemon is disconnected from the statestore "
     "or topic updates are seriously delayed.");
 
-DECLARE_bool(is_executor);
-
 namespace impala {
 
 const int64_t AdmissionController::PoolStats::HISTOGRAM_NUM_OF_BINS = 128;
@@ -398,7 +396,7 @@ void AdmissionController::UpdateHostStats(
   int64_t per_backend_mem_to_admit = schedule.per_backend_mem_to_admit();
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host_addr = entry.first;
-    int64_t mem_to_admit = entry.second.contains_coord_fragment ?
+    int64_t mem_to_admit = entry.second.is_coord_backend ?
         schedule.coord_backend_mem_to_admit() : per_backend_mem_to_admit;
     if (!is_admitting) mem_to_admit *= -1;
     const string host = TNetworkAddressToString(host_addr);
@@ -441,9 +439,8 @@ bool AdmissionController::CanAccommodateMaxInitialReservation(
   const int64_t coord_min_reservation = schedule.coord_min_reservation();
   return CanMemLimitAccommodateReservation(
              executor_mem_limit, executor_min_reservation, mem_unavailable_reason)
-      && (!schedule.requiresCoordinatorFragment()
-             || CanMemLimitAccommodateReservation(
-                    coord_mem_limit, coord_min_reservation, mem_unavailable_reason));
+      && CanMemLimitAccommodateReservation(
+             coord_mem_limit, coord_min_reservation, mem_unavailable_reason);
 }
 
 bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule,
@@ -483,11 +480,11 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t admit_mem_limit = entry.second.admit_mem_limit;
+    int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit;
     const HostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
     int64_t mem_admitted = host_stats.mem_admitted;
-    int64_t mem_to_admit = entry.second.contains_coord_fragment ?
+    int64_t mem_to_admit = entry.second.is_coord_backend ?
         coord_mem_to_admit : executor_mem_to_admit;
     VLOG_ROW << "Checking memory on host=" << host_id
              << " mem_reserved=" << PrintBytes(mem_reserved)
@@ -519,7 +516,7 @@ bool AdmissionController::HasAvailableSlot(const QuerySchedule& schedule,
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t admit_num_queries_limit = entry.second.admit_num_queries_limit;
+    int64_t admit_num_queries_limit = entry.second.be_desc.admit_num_queries_limit;
     int64_t num_admitted = host_stats_[host_id].num_admitted;
     VLOG_ROW << "Checking available slot on host=" << host_id
              << " num_admitted=" << num_admitted << " needs=" << num_admitted + 1
@@ -640,21 +637,21 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
       nullptr, std::numeric_limits<int64_t>::max());
   int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
-    cluster_min_mem_reservation_bytes += e.second.min_mem_reservation_bytes;
-    if (e.second.min_mem_reservation_bytes > largest_min_mem_reservation.second) {
-      largest_min_mem_reservation =
-          make_pair(&e.first, e.second.min_mem_reservation_bytes);
+    const BackendExecParams& bp = e.second;
+    cluster_min_mem_reservation_bytes += bp.min_mem_reservation_bytes;
+    if (bp.min_mem_reservation_bytes > largest_min_mem_reservation.second) {
+      largest_min_mem_reservation = make_pair(&e.first, bp.min_mem_reservation_bytes);
     }
-    cluster_thread_reservation += e.second.thread_reservation;
-    if (e.second.thread_reservation > max_thread_reservation.second) {
-      max_thread_reservation = make_pair(&e.first, e.second.thread_reservation);
+    cluster_thread_reservation += bp.thread_reservation;
+    if (bp.thread_reservation > max_thread_reservation.second) {
+      max_thread_reservation = make_pair(&e.first, bp.thread_reservation);
     }
-    if (e.second.contains_coord_fragment) {
+    if (bp.is_coord_backend) {
       coord_admit_mem_limit.first = &e.first;
-      coord_admit_mem_limit.second = e.second.admit_mem_limit;
-    } else if (e.second.admit_mem_limit < min_executor_admit_mem_limit.second) {
+      coord_admit_mem_limit.second = bp.be_desc.admit_mem_limit;
+    } else if (bp.be_desc.admit_mem_limit < min_executor_admit_mem_limit.second) {
       min_executor_admit_mem_limit.first = &e.first;
-      min_executor_admit_mem_limit.second = e.second.admit_mem_limit;
+      min_executor_admit_mem_limit.second = bp.be_desc.admit_mem_limit;
     }
   }
 
@@ -724,17 +721,15 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
               TNetworkAddressToString(*min_executor_admit_mem_limit.first));
       return true;
     }
-    if (schedule.requiresCoordinatorFragment()) {
-      int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
-      VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
-               << coord_mem_to_admit
-               << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
-      if (coord_mem_to_admit > coord_admit_mem_limit.second) {
-        *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
-            PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
-            TNetworkAddressToString(*coord_admit_mem_limit.first));
-        return true;
-      }
+    int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
+    VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
+             << coord_mem_to_admit
+             << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
+    if (coord_mem_to_admit > coord_admit_mem_limit.second) {
+      *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
+          PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
+          TNetworkAddressToString(*coord_admit_mem_limit.first));
+      return true;
     }
   }
   return false;
@@ -1148,11 +1143,9 @@ Status AdmissionController::ComputeGroupSchedules(
   for (const ExecutorGroup* executor_group : executor_groups) {
     DCHECK(executor_group->IsHealthy());
     DCHECK_GT(executor_group->NumExecutors(), 0);
-    bool is_dedicated_coord = !FLAGS_is_executor;
     unique_ptr<QuerySchedule> group_schedule =
         make_unique<QuerySchedule>(request.query_id, request.request,
-            request.query_options, is_dedicated_coord, request.summary_profile,
-            request.query_events);
+            request.query_options, request.summary_profile, request.query_events);
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";

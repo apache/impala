@@ -97,11 +97,10 @@ class AdmissionControllerTest : public testing::Test {
     TQueryOptions* query_options = pool_.Add(new TQueryOptions());
     query_options->__set_mem_limit(mem_limit);
     QuerySchedule* query_schedule = pool_.Add(new QuerySchedule(
-        *query_id, *request, *query_options, is_dedicated_coord, profile));
+        *query_id, *request, *query_options, profile));
     query_schedule->set_executor_group(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
+    SetHostsInQuerySchedule(*query_schedule, num_hosts, is_dedicated_coord);
     query_schedule->UpdateMemoryRequirements(config);
-
-    SetHostsInQuerySchedule(*query_schedule, num_hosts);
     return query_schedule;
   }
 
@@ -113,14 +112,24 @@ class AdmissionControllerTest : public testing::Test {
   }
 
   /// Replace the per-backend hosts in the schedule with one having 'count' hosts.
+  /// Note: no FInstanceExecParams are added so
+  /// QuerySchedule::UseDedicatedCoordEstimates() would consider this schedule as not
+  /// having anything scheduled on the backend which would result in always returning true
+  /// if a dedicated coordinator backend exists.
   void SetHostsInQuerySchedule(QuerySchedule& query_schedule, const int count,
-      int64_t min_mem_reservation_bytes = 0, int64_t admit_mem_limit = 200L * MEGABYTE) {
+      bool is_dedicated_coord, int64_t min_mem_reservation_bytes = 0,
+      int64_t admit_mem_limit = 200L * MEGABYTE) {
     PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
     for (int i = 0; i < count; ++i) {
       BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
-      backend_exec_params->admit_mem_limit = admit_mem_limit;
       backend_exec_params->min_mem_reservation_bytes = min_mem_reservation_bytes;
-      if (i == 0) backend_exec_params->contains_coord_fragment = true;
+      backend_exec_params->be_desc.__set_admit_mem_limit(admit_mem_limit);
+      backend_exec_params->be_desc.__set_is_executor(true);
+      if (i == 0) {
+        // Add first element as the coordinator.
+        backend_exec_params->is_coord_backend = true;
+        backend_exec_params->be_desc.__set_is_executor(!is_dedicated_coord);
+      }
       const string host_name = Substitute("host$0", i);
       per_backend_exec_params->emplace(
           MakeNetworkAddress(host_name, 25000), *backend_exec_params);
@@ -479,7 +488,7 @@ TEST_F(AdmissionControllerTest, QueryRejection) {
 
   // Adjust the QuerySchedule to have minimum memory reservation of 45MB.
   // This will be rejected immediately as minimum memory reservation is too high.
-  SetHostsInQuerySchedule(*query_schedule, host_count, 45L * MEGABYTE);
+  SetHostsInQuerySchedule(*query_schedule, host_count, false, 45L * MEGABYTE);
   string rejected_reserved_reason;
   ASSERT_TRUE(admission_controller->RejectForSchedule(
       *query_schedule, config_d, host_count, host_count, &rejected_reserved_reason));
@@ -799,17 +808,19 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
   // Add coordinator backend.
   BackendExecParams* coord_exec_params = pool_.Add(new BackendExecParams());
-  coord_exec_params->admit_mem_limit = 512 * MEGABYTE;
-  coord_exec_params->contains_coord_fragment = true;
+  coord_exec_params->is_coord_backend = true;
   coord_exec_params->thread_reservation = 1;
+  coord_exec_params->be_desc.__set_admit_mem_limit(512 * MEGABYTE);
+  coord_exec_params->be_desc.__set_is_executor(false);
   const string coord_host_name = Substitute("host$0", 1);
   TNetworkAddress coord_addr = MakeNetworkAddress(coord_host_name, 25000);
   const string coord_host = TNetworkAddressToString(coord_addr);
   per_backend_exec_params->emplace(coord_addr, *coord_exec_params);
   // Add executor backend.
   BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
-  backend_exec_params->admit_mem_limit = GIGABYTE;
   backend_exec_params->thread_reservation = 1;
+  backend_exec_params->be_desc.__set_admit_mem_limit(GIGABYTE);
+  backend_exec_params->be_desc.__set_is_executor(true);
   const string exec_host_name = Substitute("host$0", 2);
   TNetworkAddress exec_addr = MakeNetworkAddress(exec_host_name, 25000);
   const string exec_host = TNetworkAddressToString(exec_addr);
@@ -853,7 +864,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Test 2: coord's admit_mem_limit < executor's admit_mem_limit. Query rejected because
   // coord's admit_mem_limit is less than mem_to_admit on the coord.
   // Re-using previous QuerySchedule object.
-  coord_exec_params->admit_mem_limit = 100 * MEGABYTE;
+  coord_exec_params->be_desc.__set_admit_mem_limit(100 * MEGABYTE);
   (*per_backend_exec_params)[coord_addr] = *coord_exec_params;
   query_schedule->set_per_backend_exec_params(*per_backend_exec_params);
   ASSERT_TRUE(admission_controller->RejectForSchedule(

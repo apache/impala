@@ -45,7 +45,9 @@ typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
     FragmentScanRangeAssignment;
 
-/// Execution parameters for a single backend. Computed by Scheduler::Schedule(), set
+/// Execution parameters for a single backend. This gets created for every backend that
+/// participates in query execution, which includes, every backend that has fragments
+/// scheduled on it and the coordinator backend. Computed by Scheduler::Schedule(), set
 /// via QuerySchedule::set_per_backend_exec_params(). Used as an input to
 /// AdmissionController and a BackendState.
 struct BackendExecParams {
@@ -54,6 +56,8 @@ struct BackendExecParams {
   /// The fragment instance params assigned to this backend. All instances of a
   /// particular fragment are contiguous in this vector. Query lifetime;
   /// FInstanceExecParams are owned by QuerySchedule::fragment_exec_params_.
+  /// This can be empty only for the coordinator backend, that is, if 'is_coord_backend'
+  /// is true.
   std::vector<const FInstanceExecParams*> instance_params;
 
   // The minimum query-wide buffer reservation size (in bytes) required for this backend.
@@ -74,16 +78,8 @@ struct BackendExecParams {
   // concurrently-executing fragment instances at any point in query execution.
   int64_t thread_reservation = 0;
 
-  // The maximum bytes of memory that can be admitted to this backend by the
-  // admission controller. Obtained from the scheduler's executors configuration
-  // which is updated by membership updates from the statestore.
-  int64_t admit_mem_limit = 0;
-
-  // The maximum number of queries that this backend can execute concurrently.
-  int64_t admit_num_queries_limit = 0;
-
-  // Indicates whether this backend will run the coordinator fragment.
-  bool contains_coord_fragment = false;
+  // Indicates whether this backend is the coordinator.
+  bool is_coord_backend = false;
 };
 
 /// Map from an impalad host address to the list of assigned fragment instance params.
@@ -162,18 +158,17 @@ struct FragmentExecParams {
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, bool is_dedicated_coord,
-      RuntimeProfile* summary_profile,
+      const TQueryOptions& query_options, RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
 
   /// For testing only: build a QuerySchedule object but do not run Init().
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, bool is_dedicated_coord,
-      RuntimeProfile* summary_profile);
+      const TQueryOptions& query_options, RuntimeProfile* summary_profile);
 
   /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
   /// - all fragments have a FragmentExecParams
   /// - all scan ranges are assigned
+  /// - all BackendExecParams have instances assigned except for coordinator.
   void Validate() const;
 
   const TUniqueId& query_id() const { return query_id_; }
@@ -287,6 +282,11 @@ class QuerySchedule {
 
   /// Returns true if coordinator estimates calculated by the planner and specialized for
   /// dedicated a coordinator are to be used for estimating memory requirements.
+  /// This happens when the following conditions are true:
+  /// 1. Coordinator fragment is scheduled on a dedicated coordinator
+  /// 2. Either only the coordinator fragment or no fragments are scheduled on the
+  /// coordinator backend. This essentially means that no executor fragments are scheduled
+  /// on the coordinator backend.
   bool UseDedicatedCoordEstimates() const;
 
   /// Populates or updates the per host query memory limit and the amount of memory to be
@@ -298,11 +298,6 @@ class QuerySchedule {
   const string& executor_group() const { return executor_group_; }
 
   void set_executor_group(string executor_group);
-
-  /// Returns true if a coordinator fragment is required based on the query stmt type.
-  bool requiresCoordinatorFragment() const {
-    return request_.stmt_type == TStmtType::QUERY;
-  }
 
  private:
   /// These references are valid for the lifetime of this query schedule because they
@@ -366,9 +361,6 @@ class QuerySchedule {
   /// The coordinator's backend memory reservation. Set in Scheduler::Schedule().
   int64_t coord_min_reservation_ = 0;
 
-  /// Indicates whether coordinator fragment will be running on a dedicated coordinator.
-  bool is_dedicated_coord_ = false;
-
   /// The name of the executor group that this schedule was computed for. Set by the
   /// Scheduler and only valid after scheduling completes successfully.
   string executor_group_;
@@ -377,6 +369,11 @@ class QuerySchedule {
   /// Sets is_coord_fragment and input_fragments.
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
   void Init();
+
+  /// Returns true if a coordinator fragment is required based on the query stmt type.
+  bool RequiresCoordinatorFragment() const {
+    return request_.stmt_type == TStmtType::QUERY;
+  }
 };
 }
 
