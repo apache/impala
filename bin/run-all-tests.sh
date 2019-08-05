@@ -142,6 +142,11 @@ COMMON_PYTEST_ARGS="--maxfail=${MAX_PYTEST_FAILURES} --exploration_strategy=core
     `" --workload_exploration_strategy="`
         `"functional-query:${EXPLORATION_STRATEGY},"`
         `"targeted-stress:${EXPLORATION_STRATEGY}"
+if [[ "${EXPLORATION_STRATEGY}" == "core" ]]; then
+  # Skip the stress test in core - all stress tests are in exhaustive and
+  # pytest startup takes a significant amount of time.
+  RUN_TESTS_ARGS+=" --skip-stress"
+fi
 
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # Only one impalad is supported when running against local filesystem.
