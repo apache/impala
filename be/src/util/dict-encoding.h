@@ -253,7 +253,8 @@ class DictDecoderBase {
     DCHECK_GE(buffer_len, 0);
     if (UNLIKELY(buffer_len == 0)) return Status("Dictionary cannot be 0 bytes");
     uint8_t bit_width = *buffer;
-    if (UNLIKELY(bit_width < 0 || bit_width > BatchedBitReader::MAX_BITWIDTH)) {
+    if (UNLIKELY(bit_width < 0 || bit_width > sizeof(IndexType) * 8
+          || bit_width > BatchedBitReader::MAX_BITWIDTH)) {
       return Status(strings::Substitute("Dictionary has invalid or unsupported bit "
           "width: $0", bit_width));
     }
@@ -283,7 +284,8 @@ class DictDecoderBase {
   }
 
  protected:
-  RleBatchDecoder<uint32_t> data_decoder_;
+  using IndexType = uint32_t;
+  RleBatchDecoder<IndexType> data_decoder_;
 
   /// Greater than zero if we've started decoding a repeated run.
   int64_t num_repeats_ = 0;
@@ -501,7 +503,7 @@ ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValues(
     if (num_repeats > 0) {
       // Decode repeats directly to the output.
       uint32_t num_repeats_to_consume = std::min<uint32_t>(num_repeats, count);
-      uint32_t idx = data_decoder_.GetRepeatedValue(num_repeats_to_consume);
+      const IndexType idx = data_decoder_.GetRepeatedValue(num_repeats_to_consume);
       if (UNLIKELY(idx >= dict_.size())) return false;
       T repeated_val = dict_[idx];
       out.SetNext(repeated_val, num_repeats_to_consume);
@@ -574,7 +576,7 @@ bool DictDecoder<T>::DecodeNextValue(T* value) {
   int32_t num_repeats = data_decoder_.NextNumRepeats();
   DCHECK_GE(num_repeats, 0);
   if (num_repeats > 0) {
-    uint32_t idx = data_decoder_.GetRepeatedValue(num_repeats);
+    const IndexType idx = data_decoder_.GetRepeatedValue(num_repeats);
     if (UNLIKELY(idx >= dict_.size())) return false;
     memcpy(&decoded_values_[0], &dict_[idx], sizeof(T));
     memcpy(value, &decoded_values_[0], sizeof(T));

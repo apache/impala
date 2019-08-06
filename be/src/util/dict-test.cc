@@ -270,6 +270,31 @@ TEST(DictTest, SetDataAfterPartialRead) {
   EXPECT_EQ(track_decoder.consumption(), bytes_alloc);
 }
 
+// Make sure the decoder detects if the bit width is too high.
+TEST(DictTest, SetDataInvalidBitwidthFails) {
+  // The maximum bit width that bit packing can handle is higher but DictDecoder uses 32
+  // bit integers to store the indices.
+  const int high_bit_width = 33;
+  uint8_t buffer[5] = {}; // Initialise the buffer.
+
+  MemTracker tracker;
+  DictDecoder<int> decoder(&tracker);
+
+  // Accept valid bit widths.
+  for (int i = 0; i < high_bit_width; i++) {
+    buffer[0] = i;
+    Status status = decoder.SetData(buffer, 5);
+    EXPECT_TRUE(status.ok());
+  }
+
+  // Reject too high bit widths.
+  for (int i = high_bit_width; i < BatchedBitReader::MAX_BITWIDTH; i++) {
+    buffer[0] = i;
+    Status status = decoder.SetData(buffer, 5);
+    EXPECT_FALSE(status.ok());
+  }
+}
+
 // Test handling of decode errors from out-of-range values.
 TEST(DictTest, DecodeErrors) {
   int bytes_alloc = 0;
