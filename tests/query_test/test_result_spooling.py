@@ -48,8 +48,8 @@ class TestResultSpooling(ImpalaTestSuite):
     """Validates that reading multiple row batches works when result spooling is
     enabled."""
     vector.get_value('exec_option')['batch_size'] = 10
-    self.validate_query("select id from alltypes order by id limit 1000",
-        vector.get_value('exec_option'))
+    self.validate_query("select id from functional_parquet.alltypes order by id "
+                        "limit 1000", vector.get_value('exec_option'))
 
   def validate_query(self, query, exec_options):
     """Compares the results of the given query with and without result spooling
