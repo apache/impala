@@ -278,7 +278,8 @@ class DirectMetaProvider implements MetaProvider {
       List<String> colNames) throws TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     try (MetaStoreClient c = msClientPool_.getClient()) {
-      return c.getHiveClient().getTableColumnStatistics(
+      return MetastoreShim.getTableColumnStatistics(
+          c.getHiveClient(),
           ((TableMetaRefImpl)table).dbName_,
           ((TableMetaRefImpl)table).tableName_,
           colNames);

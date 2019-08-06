@@ -54,6 +54,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TFunctionBinaryType;
@@ -560,9 +561,9 @@ public class CatalogTest {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       // Load some string stats data and use it to update the stats of different
       // typed columns.
-      ColumnStatisticsData stringColStatsData = client.getHiveClient()
-          .getTableColumnStatistics("functional", "alltypesagg",
-           Lists.newArrayList("string_col")).get(0).getStatsData();
+      ColumnStatisticsData stringColStatsData = MetastoreShim.getTableColumnStatistics(
+          client.getHiveClient(), "functional", "alltypesagg",
+          Lists.newArrayList("string_col")).get(0).getStatsData();
 
       assertTrue(!table.getColumn("int_col").updateStats(stringColStatsData));
       assertStatsUnknown(table.getColumn("int_col"));
@@ -574,8 +575,8 @@ public class CatalogTest {
       assertStatsUnknown(table.getColumn("bool_col"));
 
       // Do the same thing, but apply bigint stats to a string column.
-      ColumnStatisticsData bigIntCol = client.getHiveClient()
-          .getTableColumnStatistics("functional", "alltypes",
+      ColumnStatisticsData bigIntCol = MetastoreShim.getTableColumnStatistics(
+          client.getHiveClient(), "functional", "alltypes",
           Lists.newArrayList("bigint_col")).get(0).getStatsData();
       assertTrue(!table.getColumn("string_col").updateStats(bigIntCol));
       assertStatsUnknown(table.getColumn("string_col"));

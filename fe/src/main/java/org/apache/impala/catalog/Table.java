@@ -272,7 +272,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     List<String> colNames = getColumnNamesWithHmsStats();
 
     try {
-      colStats = client.getTableColumnStatistics(db_.getName(), name_, colNames);
+      colStats = MetastoreShim.getTableColumnStatistics(client, db_.getName(), name_,
+          colNames);
     } catch (Exception e) {
       LOG.warn("Could not load column statistics for: " + getFullName(), e);
       return;

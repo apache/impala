@@ -941,10 +941,9 @@ public class CatalogOpExecutor {
     }
 
     // Update column stats.
-    ColumnStatistics colStats = null;
     numUpdatedColumns.setRef(0L);
     if (params.isSetColumn_stats()) {
-      colStats = createHiveColStats(params, table);
+      ColumnStatistics colStats = createHiveColStats(params, table);
       if (colStats.getStatsObjSize() > 0) {
         try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msClient.getHiveClient().updateTableColumnStatistics(colStats);
@@ -1071,7 +1070,7 @@ public class CatalogOpExecutor {
       TAlterTableUpdateStatsParams params, Table table) {
     Preconditions.checkState(params.isSetColumn_stats());
     // Collection of column statistics objects to be returned.
-    ColumnStatistics colStats = new ColumnStatistics();
+    ColumnStatistics colStats = MetastoreShim.createNewHiveColStats();
     colStats.setStatsDesc(
         new ColumnStatisticsDesc(true, table.getDb().getName(), table.getName()));
     // Generate Hive column stats objects from the update stats params.
@@ -1364,7 +1363,7 @@ public class CatalogOpExecutor {
         if (!col.getStats().hasStats()) continue;
 
         try {
-          msClient.getHiveClient().deleteTableColumnStatistics(
+          MetastoreShim.deleteTableColumnStatistics(msClient.getHiveClient(),
               table.getDb().getName(), table.getName(), col.getName());
           ++numColsUpdated;
         } catch (NoSuchObjectException e) {

@@ -44,7 +44,11 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
+import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.InvalidInputException;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.LockComponent;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
@@ -52,6 +56,7 @@ import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.LockState;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -116,6 +121,12 @@ public class MetastoreShim {
   private static final int LOCK_RETRY_WAIT_SECONDS = 3;
 
   /**
+   * Constant variable that stores engine value needed to store / access
+   * Impala column statistics.
+   */
+  protected static final String IMPALA_ENGINE = "impala";
+
+  /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
    */
   public static boolean validateName(String name) {
@@ -170,6 +181,39 @@ public class MetastoreShim {
     client.alter_partitions(dbName, tblName, partitions, null,
          validWriteIds, tblWriteId);
   }
+
+  /**
+   * Wrapper around IMetaStoreClient.getTableColumnStatistics() to deal with added
+   * arguments.
+   */
+  public static List<ColumnStatisticsObj> getTableColumnStatistics(
+      IMetaStoreClient client, String dbName, String tableName, List<String> colNames)
+      throws NoSuchObjectException, MetaException, TException {
+    return client.getTableColumnStatisticsV2(dbName, tableName, colNames,
+        /*engine*/IMPALA_ENGINE);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.deleteTableColumnStatistics() to deal with added
+   * arguments.
+   */
+  public static boolean deleteTableColumnStatistics(IMetaStoreClient client,
+      String dbName, String tableName, String colName)
+      throws NoSuchObjectException, MetaException, InvalidObjectException, TException,
+             InvalidInputException {
+    return client.deleteTableColumnStatisticsV2(dbName, tableName, colName,
+        /*engine*/IMPALA_ENGINE);
+  }
+
+  /**
+   * Wrapper around ColumnStatistics c'tor to deal with the added engine property.
+   */
+  public static ColumnStatistics createNewHiveColStats() {
+    ColumnStatistics colStats = new ColumnStatistics();
+    colStats.setEngine(IMPALA_ENGINE);
+    return colStats;
+  }
+
   /**
    * Wrapper around MetaStoreUtils.updatePartitionStatsFast() to deal with added
    * arguments.

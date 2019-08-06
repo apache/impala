@@ -35,9 +35,14 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
+import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.InvalidInputException;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.LockComponent;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -109,6 +114,34 @@ public class MetastoreShim {
       String dbName, String tblName, List<Partition> partitions,
       long tblWriteId, long txnId) {
     throw new UnsupportedOperationException("alterTableWithTransaction");
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.getTableColumnStatistics() to deal with added
+   * arguments.
+   */
+  public static List<ColumnStatisticsObj> getTableColumnStatistics(
+      IMetaStoreClient client, String dbName, String tableName, List<String> colNames)
+      throws NoSuchObjectException, MetaException, TException {
+    return client.getTableColumnStatistics(dbName, tableName, colNames);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.deleteTableColumnStatistics() to deal with added
+   * arguments.
+   */
+  public static boolean deleteTableColumnStatistics(IMetaStoreClient client,
+      String dbName, String tableName, String colName)
+      throws NoSuchObjectException, MetaException, InvalidObjectException, TException,
+             InvalidInputException {
+    return client.deleteTableColumnStatistics(dbName, tableName, colName);
+  }
+
+  /**
+   * Wrapper around ColumnStatistics c'tor to deal with the added engine property.
+   */
+  public static ColumnStatistics createNewHiveColStats() {
+    return new ColumnStatistics();
   }
 
   /**
