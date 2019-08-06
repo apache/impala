@@ -121,6 +121,7 @@ under the License.
       <topicref href="topics/impala_tables.xml"/>
       <topicref href="topics/impala_views.xml"/>
     </topicref>
+    <topicref href="topics/impala_transactions.xml"/>
     <topicref href="topics/impala_langref_sql.xml">
       <topicref href="topics/impala_ddl.xml"/>
       <topicref href="topics/impala_dml.xml"/>
@@ -182,6 +183,7 @@ under the License.
           <topicref rev="3.3.0" href="topics/impala_default_hints_insert_statement.xml"/>
           <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml"/>
+          <topicref rev="3.3.0" href="topics/impala_default_transactional_type.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
           <topicref rev="2.10.0 IMPALA-5483" href="topics/impala_disable_codegen_rows_threshold.xml"/>
           <topicref audience="hidden" href="topics/impala_disable_outermost_topn.xml"/>

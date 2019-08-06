@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="default_transactional_type">
+
+  <title>DEFAULT_TRANSACTIONAL_TYPE Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DEFAULT_TRANSACTIONAL_TYPE</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Use the <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option to create insert-only
+      transactional tables by default.
+    </p>
+
+    <note>
+      The <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option applies only when integrated
+      with Hive 3.
+    </note>
+
+    <p>
+      The supported values are:
+      <ul>
+        <li>
+          <codeph>NONE</codeph>: The table will not be created as transactional.
+        </li>
+
+        <li>
+          <codeph>INSERT_ONLY</codeph>: The table will be created as transactional. See
+          <xref href="impala_transactions.xml#transactions"/> for details.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      If either table properties, <codeph>transactional</codeph> or
+      <codeph>transactional_properties</codeph>, are set, this query option is ignored.
+    </p>
+
+    <note>
+      The <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option does not affect external, Kudu,
+      or HBase tables as these cannot be transactional.
+    </note>
+
+    <p>
+      <b>Type:</b> Enum as specified above
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>NONE</codeph>
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala33"/>
+    </p>
+
+  </conbody>
+
+</concept>

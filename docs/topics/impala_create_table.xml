@@ -47,7 +47,6 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">CREATE TABLE statement</indexterm>
       Creates a new table and specifies its characteristics. While creating a table, you
       optionally specify aspects such as:
     </p>
@@ -211,7 +210,7 @@ data_type:
 
     <p rev="kudu IMPALA-3719">
       <b>kudu_partition_clause:</b>
-      <codeblock rev="kudu">
+<codeblock rev="kudu">
 kudu_partition_clause ::= [ <varname>hash_clause</varname> [, ...]] [, <varname>range_clause</varname> ]
 
 hash_clause ::=
@@ -322,7 +321,8 @@ AS
       <q>external</q> table, where the data files are typically produced outside Impala and
       queried from their original locations in HDFS, and Impala leaves the data files in place
       when you drop the table. For details about internal and external tables, see
-      <xref href="impala_tables.xml#tables"/>.
+      <xref
+        href="impala_tables.xml#tables"/>.
     </p>
 
     <p>
@@ -343,7 +343,8 @@ AS
       whether Impala <q>takes control</q> of the underlying data files and moves them when you
       rename the table, or deletes them when you drop the table. For more about internal and
       external tables and how they interact with the <codeph>LOCATION</codeph> attribute, see
-      <xref href="impala_tables.xml#tables"/>.
+      <xref
+        href="impala_tables.xml#tables"/>.
     </p>
 
     <p>
@@ -355,7 +356,8 @@ AS
       one or more specified columns. Impala queries can use the partition metadata to minimize
       the amount of data that is read from disk or transmitted across the network, particularly
       during join queries. For details about partitioning, see
-      <xref href="impala_partitioning.xml#partitioning"/>.
+      <xref
+        href="impala_partitioning.xml#partitioning"/>.
     </p>
 
     <note rev="IMPALA-3719">
@@ -364,20 +366,22 @@ AS
         tables. See the <codeph>PARTITION BY</codeph> clause, rather than <codeph>PARTITIONED
         BY</codeph>, for Kudu tables.
       </p>
+
       <p rev="IMPALA-5546">
         In <keyword keyref="impala210_full"/> and higher, the <codeph>PARTITION BY</codeph>
         clause is optional for Kudu tables. If the clause is omitted, Impala automatically
-        constructs a single partition that is not connected to any column. Because such a
-        table cannot take advantage of Kudu features for parallelized queries and
-        query optimizations, omitting the <codeph>PARTITION BY</codeph> clause is only
-        appropriate for small lookup tables.
+        constructs a single partition that is not connected to any column. Because such a table
+        cannot take advantage of Kudu features for parallelized queries and query optimizations,
+        omitting the <codeph>PARTITION BY</codeph> clause is only appropriate for small lookup
+        tables.
       </p>
     </note>
 
     <p rev="2.5.0">
       Prior to <keyword keyref="impala25_full"/>, you could use a partitioned table as the
       source and copy data from it, but could not specify any partitioning clauses for the new
-      table. In <keyword keyref="impala25_full"/> and higher, you can now use the
+      table. In <keyword
+        keyref="impala25_full"/> and higher, you can now use the
       <codeph>PARTITIONED BY</codeph> clause with a <codeph>CREATE TABLE AS SELECT</codeph>
       statement. See the examples under the following discussion of the <codeph>CREATE TABLE AS
       SELECT</codeph> syntax variation.
@@ -388,50 +392,50 @@ AS
     </p>
 
     <p rev="2.9.0 IMPALA-4166">
-      The optional <codeph>SORT BY</codeph> clause lets you specify zero or more columns
-      that are sorted in the data files created by each Impala <codeph>INSERT</codeph> or
-      <codeph>CREATE TABLE AS SELECT</codeph> operation. Creating data files that are
-      sorted is most useful for Parquet tables, where the metadata stored inside each file includes
-      the minimum and maximum values for each column in the file. (The statistics apply to each row group
-      within the file; for simplicity, Impala writes a single row group in each file.) Grouping
-      data values together in relatively narrow ranges within each data file makes it possible
-      for Impala to quickly skip over data files that do not contain value ranges indicated in
-      the <codeph>WHERE</codeph> clause of a query, and can improve the effectiveness
-      of Parquet encoding and compression.
+      The optional <codeph>SORT BY</codeph> clause lets you specify zero or more columns that
+      are sorted in the data files created by each Impala <codeph>INSERT</codeph> or
+      <codeph>CREATE TABLE AS SELECT</codeph> operation. Creating data files that are sorted is
+      most useful for Parquet tables, where the metadata stored inside each file includes the
+      minimum and maximum values for each column in the file. (The statistics apply to each row
+      group within the file; for simplicity, Impala writes a single row group in each file.)
+      Grouping data values together in relatively narrow ranges within each data file makes it
+      possible for Impala to quickly skip over data files that do not contain value ranges
+      indicated in the <codeph>WHERE</codeph> clause of a query, and can improve the
+      effectiveness of Parquet encoding and compression.
     </p>
 
     <p rev="2.9.0 IMPALA-4166">
-      This clause is not applicable for Kudu tables or HBase tables. Although it works
-      for other HDFS file formats besides Parquet, the more efficient layout is most
-      evident with Parquet tables, because each Parquet data file includes statistics
-      about the data values in that file.
+      This clause is not applicable for Kudu tables or HBase tables. Although it works for other
+      HDFS file formats besides Parquet, the more efficient layout is most evident with Parquet
+      tables, because each Parquet data file includes statistics about the data values in that
+      file.
     </p>
 
     <p rev="2.9.0 IMPALA-4166">
-      The <codeph>SORT BY</codeph> columns cannot include any partition key columns
-      for a partitioned table, because those column values are not represented in
-      the underlying data files.
+      The <codeph>SORT BY</codeph> columns cannot include any partition key columns for a
+      partitioned table, because those column values are not represented in the underlying data
+      files.
     </p>
 
     <p rev="2.9.0 IMPALA-4166">
-      Because data files can arrive in Impala tables by mechanisms that do not respect
-      the <codeph>SORT BY</codeph> clause, such as <codeph>LOAD DATA</codeph> or ETL
-      tools that create HDFS files, Impala does not guarantee or rely on the data being
-      sorted. The sorting aspect is only used to create a more efficient layout for
-      Parquet files generated by Impala, which helps to optimize the processing of
-      those Parquet files during Impala queries. During an <codeph>INSERT</codeph>
-      or <codeph>CREATE TABLE AS SELECT</codeph> operation, the sorting occurs
-      when the <codeph>SORT BY</codeph> clause applies to the destination table
-      for the data, regardless of whether the source table has a <codeph>SORT BY</codeph>
-      clause.
+      Because data files can arrive in Impala tables by mechanisms that do not respect the
+      <codeph>SORT BY</codeph> clause, such as <codeph>LOAD DATA</codeph> or ETL tools that
+      create HDFS files, Impala does not guarantee or rely on the data being sorted. The sorting
+      aspect is only used to create a more efficient layout for Parquet files generated by
+      Impala, which helps to optimize the processing of those Parquet files during Impala
+      queries. During an <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph>
+      operation, the sorting occurs when the <codeph>SORT BY</codeph> clause applies to the
+      destination table for the data, regardless of whether the source table has a <codeph>SORT
+      BY</codeph> clause.
     </p>
 
     <p rev="2.9.0 IMPALA-4166">
-      For example, when creating a table intended to contain census data, you might define
-      sort columns such as last name and state. If a data file in this table contains a
-      narrow range of last names, for example from <codeph>Smith</codeph> to <codeph>Smythe</codeph>,
-      Impala can quickly detect that this data file contains no matches for a <codeph>WHERE</codeph>
-      clause such as <codeph>WHERE last_name = 'Jones'</codeph> and avoid reading the entire file.
+      For example, when creating a table intended to contain census data, you might define sort
+      columns such as last name and state. If a data file in this table contains a narrow range
+      of last names, for example from <codeph>Smith</codeph> to <codeph>Smythe</codeph>, Impala
+      can quickly detect that this data file contains no matches for a <codeph>WHERE</codeph>
+      clause such as <codeph>WHERE last_name = 'Jones'</codeph> and avoid reading the entire
+      file.
     </p>
 
 <codeblock rev="2.9.0 IMPALA-4166">CREATE TABLE census_data (last_name STRING, first_name STRING, state STRING, address STRING)
@@ -441,9 +445,9 @@ AS
 
     <p rev="2.9.0 IMPALA-4166">
       Likewise, if an existing table contains data without any sort order, you can reorganize
-      the data in a more efficient way by using <codeph>INSERT</codeph> or
-      <codeph>CREATE TABLE AS SELECT</codeph> to copy that data into a new table with a
-      <codeph>SORT BY</codeph> clause:
+      the data in a more efficient way by using <codeph>INSERT</codeph> or <codeph>CREATE TABLE
+      AS SELECT</codeph> to copy that data into a new table with a <codeph>SORT BY</codeph>
+      clause:
     </p>
 
 <codeblock rev="2.9.0 IMPALA-4166">CREATE TABLE sorted_census_data
@@ -454,10 +458,37 @@ AS
 </codeblock>
 
     <p rev="2.9.0 IMPALA-4166">
-      The metadata for the <codeph>SORT BY</codeph> clause is stored in the <codeph>TBLPROPERTIES</codeph>
-      fields for the table. Other SQL engines that can interoperate with Impala tables, such as Hive
-      and Spark SQL, do not recognize this property when inserting into a table that has a <codeph>SORT BY</codeph>
-      clause.
+      The metadata for the <codeph>SORT BY</codeph> clause is stored in the
+      <codeph>TBLPROPERTIES</codeph> fields for the table. Other SQL engines that can
+      interoperate with Impala tables, such as Hive and Spark SQL, do not recognize this
+      property when inserting into a table that has a <codeph>SORT BY</codeph> clause.
+    </p>
+
+    <p>
+      <b>Transactional tables:</b>
+    </p>
+
+    <p>
+      In the version 3.3 and higher, when integrated with Hive 3, Impala can create, read, and
+      insert into transactional tables.
+    </p>
+
+    <p>
+      To create a table that supports transactions, use the <codeph>TBLPROPERTIES</codeph>
+      clause and set the <codeph>'transactional'</codeph> and
+      <codeph>'transactional_properties'</codeph> as below. Currently, Impala only supports
+      insert-only transactional tables.
+<codeblock>TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')</codeblock>
+    </p>
+
+    <p>
+      When integrated with Hive3 and the <codeph>DEFAULT_TRANSACTIONAL_TYPE</codeph> query
+      option is set to <codeph>INSERT_ONLY</codeph>, tables are created as insert-only
+      transactional table by default.
+    </p>
+
+    <p>
+      Transactional tables are not supported for Kudu and HBase.
     </p>
 
     <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
@@ -467,9 +498,10 @@ AS
       partitioning mechanisms, the syntax associated with the <codeph>STORED AS KUDU</codeph>
       clause is shown separately in the above syntax descriptions. Kudu tables have their own
       syntax for <codeph>CREATE TABLE</codeph>, <codeph>CREATE EXTERNAL TABLE</codeph>, and
-      <codeph>CREATE TABLE AS SELECT</codeph>. <ph rev="IMPALA-2256">Prior to <keyword keyref="impala210_full"/>,
-      all internal Kudu tables require a <codeph>PARTITION BY</codeph> clause, different than
-      the <codeph>PARTITIONED BY</codeph> clause for HDFS-backed tables.</ph>
+      <codeph>CREATE TABLE AS SELECT</codeph>. <ph rev="IMPALA-2256">Prior to
+      <keyword keyref="impala210_full"/>, all internal Kudu tables require a <codeph>PARTITION
+      BY</codeph> clause, different than the <codeph>PARTITIONED BY</codeph> clause for
+      HDFS-backed tables.</ph>
     </p>
 
     <p>
@@ -562,17 +594,19 @@ CREATE TABLE ctas_t1
     <p rev="IMPALA-3719">
       For more on the <codeph>PRIMARY KEY</codeph> clause, see
       <xref href="impala_kudu.xml#kudu_primary_key"/> and
-      <xref href="impala_kudu.xml#kudu_primary_key_attribute"/>.
+      <xref
+        href="impala_kudu.xml#kudu_primary_key_attribute"/>.
     </p>
 
     <p>
       For more on creating a Kudu table with a specific replication factor, see
-        <xref href="impala_kudu.xml#kudu_replication_factor"/>.
+      <xref href="impala_kudu.xml#kudu_replication_factor"/>.
     </p>
 
     <p rev="IMPALA-3719">
       For more on the <codeph>NULL</codeph> and <codeph>NOT NULL</codeph> attributes, see
-      <xref href="impala_kudu.xml#kudu_not_null_attribute"/>.
+      <xref
+        href="impala_kudu.xml#kudu_not_null_attribute"/>.
     </p>
 
     <p rev="IMPALA-3719">
@@ -835,7 +869,8 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
       to a new file format. (For some file formats, Impala can do a <codeph>CREATE TABLE ...
       LIKE</codeph> to create the table, but Impala cannot insert data in that file format; in
       these cases, you must load the data in Hive. See
-      <xref href="impala_file_formats.xml#file_formats"/> for details.)
+      <xref
+        href="impala_file_formats.xml#file_formats"/> for details.)
     </p>
 
     <p rev="1.2" id="ctas">
@@ -940,16 +975,17 @@ CREATE TABLE synthesized_columns AS SELECT upper(c1) AS all_caps, c2+c3 AS total
     <p rev="2.5.0">
       Prior to <keyword keyref="impala25_full"/> you could use a partitioned table as the source
       and copy data from it, but could not specify any partitioning clauses for the new table.
-      In <keyword keyref="impala25_full"/> and higher, you can now use the <codeph>PARTITIONED
-      BY</codeph> clause with a <codeph>CREATE TABLE AS SELECT</codeph> statement. The following
-      example demonstrates how you can copy data from an unpartitioned table in a <codeph>CREATE
-      TABLE AS SELECT</codeph> operation, creating a new partitioned table in the process. The
-      main syntax consideration is the column order in the <codeph>PARTITIONED BY</codeph>
-      clause and the select list: the partition key columns must be listed last in the select
-      list, in the same order as in the <codeph>PARTITIONED BY</codeph> clause. Therefore, in
-      this case, the column order in the destination table is different from the source table.
-      You also only specify the column names in the <codeph>PARTITIONED BY</codeph> clause, not
-      the data types or column comments.
+      In <keyword
+        keyref="impala25_full"/> and higher, you can now use the
+      <codeph>PARTITIONED BY</codeph> clause with a <codeph>CREATE TABLE AS SELECT</codeph>
+      statement. The following example demonstrates how you can copy data from an unpartitioned
+      table in a <codeph>CREATE TABLE AS SELECT</codeph> operation, creating a new partitioned
+      table in the process. The main syntax consideration is the column order in the
+      <codeph>PARTITIONED BY</codeph> clause and the select list: the partition key columns must
+      be listed last in the select list, in the same order as in the <codeph>PARTITIONED
+      BY</codeph> clause. Therefore, in this case, the column order in the destination table is
+      different from the source table. You also only specify the column names in the
+      <codeph>PARTITIONED BY</codeph> clause, not the data types or column comments.
     </p>
 
 <codeblock rev="2.5.0">
@@ -1101,7 +1137,8 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
     <p>
       For more details about creating Parquet tables, and examples of the <codeph>CREATE TABLE
-      LIKE PARQUET</codeph> syntax, see <xref href="impala_parquet.xml#parquet"/>.
+      LIKE PARQUET</codeph> syntax, see <xref
+        href="impala_parquet.xml#parquet"/>.
     </p>
 
     <p>
@@ -1168,11 +1205,13 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       If you specify the <codeph>CACHED IN</codeph> clause, any existing or future data files in
       the table directory or the partition subdirectories are designated to be loaded into
       memory with the HDFS caching mechanism. See
-      <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details about using the HDFS
-      caching feature.
+      <xref
+        href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details about using
+      the HDFS caching feature.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/impala_cache_replication_factor"/>
+    <p
+      conref="../shared/impala_common.xml#common/impala_cache_replication_factor"/>
 
 <!-- Say something in here about the SHOW statement, e.g. SHOW TABLES, SHOW TABLE/COLUMN STATS, SHOW PARTITIONS. -->
 
@@ -1300,15 +1339,26 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
     <p>
       <xref href="impala_tables.xml#tables"/>,
-      <xref href="impala_alter_table.xml#alter_table"/>,
-      <xref href="impala_drop_table.xml#drop_table"/>,
-      <xref href="impala_partitioning.xml#partitioning"/>,
-      <xref href="impala_tables.xml#internal_tables"/>,
-      <xref href="impala_tables.xml#external_tables"/>,
-      <xref href="impala_compute_stats.xml#compute_stats"/>,
-      <xref href="impala_sync_ddl.xml#sync_ddl"/>, <xref href="impala_show.xml#show_tables"/>,
-      <xref href="impala_show.xml#show_create_table"/>,
-      <xref href="impala_describe.xml#describe"/>
+      <xref
+        href="impala_alter_table.xml#alter_table"/>,
+      <xref
+        href="impala_drop_table.xml#drop_table"/>,
+      <xref
+        href="impala_partitioning.xml#partitioning"/>,
+      <xref
+        href="impala_tables.xml#internal_tables"/>,
+      <xref
+        href="impala_tables.xml#external_tables"/>,
+      <xref
+        href="impala_compute_stats.xml#compute_stats"/>,
+      <xref
+        href="impala_sync_ddl.xml#sync_ddl"/>,
+      <xref
+        href="impala_show.xml#show_tables"/>,
+      <xref
+        href="impala_show.xml#show_create_table"/>,
+      <xref
+        href="impala_describe.xml#describe"/>
     </p>
 
   </conbody>
