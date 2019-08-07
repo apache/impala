@@ -622,6 +622,9 @@ under the License.
         Any options you specify on the <cmdname>impala-shell</cmdname> command line override any corresponding
         options within the configuration file.
       </p>
+      <p>You can specify key-value pair options using <codeph>keyval</codeph>,
+        similar to the <codeph>--var</codeph> command-line option. For example,
+          <codeph>keyval=</codeph><varname>variable1</varname>=<varname>value1</varname>.</p>
 
       <p>
         The following example shows a configuration file that you might use during benchmarking tests. It sets
@@ -646,7 +649,7 @@ write_delimited=true
 output_delimiter=,
 output_file=/home/tester1/benchmark_results.csv
 show_profiles=true
-</codeblock>
+keyval=msg1=hello,keyval=msg2=world</codeblock>
 
       <p rev="2.11.0 IMPALA-5736">
         The following example shows a configuration file that connects to a specific remote Impala node, runs a
