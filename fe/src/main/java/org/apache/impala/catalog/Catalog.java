@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -25,9 +26,18 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.api.LockComponent;
+import org.apache.hadoop.hive.metastore.api.LockLevel;
+import org.apache.hadoop.hive.metastore.api.LockType;
+
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.TransactionException;
+import org.apache.impala.common.TransactionKeepalive;
+import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -88,12 +98,20 @@ public abstract class Catalog implements AutoCloseable {
   protected final CatalogObjectCache<AuthzCacheInvalidation> authzCacheInvalidation_ =
       new CatalogObjectCache<>();
 
+  // This member is responsible for heartbeating HMS locks and transactions.
+  private TransactionKeepalive transactionKeepalive_;
+
   /**
    * Creates a new instance of Catalog backed by a given MetaStoreClientPool.
    */
   public Catalog(MetaStoreClientPool metaStoreClientPool) {
     dataSources_ = new CatalogObjectCache<DataSource>();
     metaStoreClientPool_ = Preconditions.checkNotNull(metaStoreClientPool);
+    if (MetastoreShim.getMajorVersion() > 2) {
+      transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
+    } else {
+      transactionKeepalive_ = null;
+    }
   }
 
   /**
@@ -646,5 +664,41 @@ public abstract class Catalog implements AutoCloseable {
    */
   public static boolean keyEquals(TCatalogObject first, TCatalogObject second) {
     return toCatalogObjectKey(first).equals(toCatalogObjectKey(second));
+  }
+
+  /**
+   * Creates an exclusive lock for a particular table and acquires it in the HMS. Starts
+   * heartbeating the lock. This function is for locks that doesn't belong to a
+   * transaction.
+   * @param dbName Name of the DB where the particular table is.
+   * @param tableName Name of the table where the lock is acquired.
+   * @throws TransactionException
+   */
+  public long lockTable(String dbName, String tableName, HeartbeatContext ctx)
+      throws TransactionException {
+    LockComponent lockComponent = new LockComponent();
+    lockComponent.setDbname(dbName);
+    lockComponent.setTablename(tableName);
+    lockComponent.setLevel(LockLevel.TABLE);
+    lockComponent.setType(LockType.EXCLUSIVE);
+    lockComponent.setOperationType(DataOperationType.NO_TXN);
+    List<LockComponent> lockComponents = Arrays.asList(lockComponent);
+    long lockId = -1L;
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      lockId = MetastoreShim.acquireLock(client.getHiveClient(), 0L, lockComponents);
+      transactionKeepalive_.addLock(lockId, ctx);
+    }
+    return lockId;
+  }
+
+  /**
+   * Releases a lock based on its ID from HMS and stops heartbeating it.
+   * @param lockId is the ID of the lock to clear.
+   */
+  public void releaseTableLock(long lockId) throws TransactionException {
+    try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
+      transactionKeepalive_.deleteLock(lockId);
+      MetastoreShim.releaseLock(client.getHiveClient(), lockId);
+    }
   }
 }

@@ -1,5 +1,6 @@
 ====
 ---- HIVE_QUERY
+# Create a table with Hive and run insert, select, and drop from Impala on it.
 use $DATABASE;
 create table tt (x int) tblproperties (
   'transactional'='true',
@@ -14,6 +15,7 @@ select * from tt
 1
 ====
 ---- HIVE_QUERY
+# Insert from Hive to test refresh table from Impala in the below test.
 use $DATABASE;
 insert into tt values (2);
 ====
@@ -32,8 +34,7 @@ select * from tt order by x;
 1
 2
 ====
----- HIVE_QUERY
-use $DATABASE;
+---- QUERY
 insert overwrite table tt values (3);
 insert into tt values (4);
 ====
@@ -44,8 +45,7 @@ select * from tt order by x;
 3
 4
 ====
----- HIVE_QUERY
-use $DATABASE;
+---- QUERY
 create table upgraded_table (x int);
 insert into upgraded_table values (1);
 # Upgrade to the table to insert only acid when there are already values in it.
@@ -55,10 +55,34 @@ insert into upgraded_table values (2);
 insert into upgraded_table values (3);
 ====
 ---- QUERY
-invalidate metadata upgraded_table;
 select * from upgraded_table;
 ---- RESULTS
 1
 2
 3
+====
+---- QUERY
+drop table tt;
+show tables;
+---- RESULTS
+'upgraded_table'
+====
+---- QUERY
+# After dropping the table I re-create and drop it again to check that all the locks
+# are released properly from HMS.
+create table tt (x int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+====
+---- QUERY
+show tables;
+---- RESULTS
+'upgraded_table'
+'tt'
+====
+---- QUERY
+drop table tt;
+show tables;
+---- RESULTS
+'upgraded_table'
 ====

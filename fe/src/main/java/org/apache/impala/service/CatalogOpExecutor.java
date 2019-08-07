@@ -100,6 +100,7 @@ import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.TransactionException;
+import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
@@ -1546,6 +1547,8 @@ public class CatalogOpExecutor {
    * Also drops all associated caching requests on the table and/or table's partitions,
    * uncaching all table data. If params.purge is true, table data is permanently
    * deleted.
+   * In case of transactional tables acquires an exclusive HMS table lock before
+   * executing the drop operation.
    */
   private void dropTableOrView(TDropTableOrViewParams params, TDdlExecResponse resp)
       throws ImpalaException {
@@ -1571,6 +1574,28 @@ public class CatalogOpExecutor {
       // or non-existence of the database will be handled down below.
     }
 
+    Table tbl = catalog_.getTableIfCachedNoThrow(tableName.getDb(), tableName.getTbl());
+    long lockId = -1;
+    if (tbl != null && !(tbl instanceof IncompleteTable) &&
+        AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+      HeartbeatContext ctx = new HeartbeatContext(
+          String.format("Drop table/view %s.%s", tableName.getDb(), tableName.getTbl()),
+          System.nanoTime());
+      lockId = catalog_.lockTable(tableName.getDb(), tableName.getTbl(), ctx);
+    }
+
+    try {
+      dropTableOrViewInternal(params, tableName, resp);
+    } finally {
+      if (lockId > 0) catalog_.releaseTableLock(lockId);
+    }
+  }
+
+  /**
+   * Helper function for dropTableOrView().
+   */
+  private void dropTableOrViewInternal(TDropTableOrViewParams params,
+      TableName tableName, TDdlExecResponse resp) throws ImpalaException {
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
       Db db = catalog_.getDb(params.getTable_name().db_name);

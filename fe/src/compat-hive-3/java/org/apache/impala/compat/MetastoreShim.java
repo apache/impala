@@ -72,11 +72,11 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
+import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.compat.HiveMetadataFormatUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
-import org.apache.impala.service.TransactionKeepalive;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.log4j.Logger;
@@ -104,6 +104,13 @@ public class MetastoreShim {
   private static final String HIVESQL = "HIVESQL";
   private static final long MAJOR_VERSION = 3;
   private static boolean capabilitiestSet_ = false;
+
+  // Number of retries to acquire an HMS ACID lock.
+  private static final int LOCK_RETRIES = 10;
+
+  // Time interval between retries of acquiring an HMS ACID lock
+  private static final int LOCK_RETRY_WAIT_SECONDS = 3;
+
   /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
    */
@@ -539,18 +546,18 @@ public class MetastoreShim {
    * Creates a lock for the given lock components. Returns the acquired lock, this
    * might involve some waiting.
    * @param client is the HMS client to be used.
+   * @param txnId The transaction ID associated with the lock. Zero if the lock doesn't
+   * belong to a transaction.
    * @param lockComponents the lock components to include in this lock.
-   * @param lockRetries the number of retries to acquire the lock.
-   * @param retryWaitSeconds wait interval between retries.
    * @return the lock id
    * @throws TransactionException in case of failure
    */
   public static long acquireLock(IMetaStoreClient client, long txnId,
-      List<LockComponent> lockComponents, int lockRetries, int retryWaitSeconds)
+      List<LockComponent> lockComponents)
           throws TransactionException {
     LockRequestBuilder lockRequestBuilder = new LockRequestBuilder();
     lockRequestBuilder.setUser("Impala");
-    lockRequestBuilder.setTransactionId(txnId);
+    if (txnId > 0) lockRequestBuilder.setTransactionId(txnId);
     for (LockComponent lockComponent : lockComponents) {
       lockRequestBuilder.addLockComponent(lockComponent);
     }
@@ -559,9 +566,9 @@ public class MetastoreShim {
       LockResponse lockResponse = client.lock(lockRequest);
       long lockId = lockResponse.getLockid();
       int retries = 0;
-      while (lockResponse.getState() == LockState.WAITING && retries < lockRetries) {
+      while (lockResponse.getState() == LockState.WAITING && retries < LOCK_RETRIES) {
         try {
-          Thread.sleep(retryWaitSeconds * 1000);
+          Thread.sleep(LOCK_RETRY_WAIT_SECONDS * 1000);
           ++retries;
           lockResponse = client.checkLock(lockId);
         } catch (InterruptedException e) {
@@ -571,9 +578,32 @@ public class MetastoreShim {
         }
       }
       if (lockResponse.getState() == LockState.ACQUIRED) return lockId;
+      if (lockId > 0) {
+        try {
+          releaseLock(client, lockId);
+        } catch (TransactionException te) {
+          LOG.error("Failed to release lock as a cleanup step after acquiring a lock " +
+              "has failed: " + lockId + " " + te.getMessage());
+        }
+      }
       throw new TransactionException("Failed to acquire lock for transaction " +
           String.valueOf(txnId));
     } catch (TException e) {
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Releases a lock in HMS.
+   * @param client is the HMS client to be used.
+   * @param lockId is the lock ID to be released.
+   * @throws TransactionException
+   */
+  public static void releaseLock(IMetaStoreClient client, long lockId)
+      throws TransactionException {
+    try {
+      client.unlock(lockId);
+    } catch (Exception e) {
       throw new TransactionException(e.getMessage());
     }
   }

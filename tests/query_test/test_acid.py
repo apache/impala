@@ -46,7 +46,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
-  def test_acid(self, vector, unique_database):
+  def test_acid_basic(self, vector, unique_database):
     self.run_test_case('QueryTest/acid', vector, use_db=unique_database)
 
   @SkipIfHive2.acid

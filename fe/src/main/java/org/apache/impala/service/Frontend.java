@@ -103,6 +103,8 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.TransactionException;
+import org.apache.impala.common.TransactionKeepalive;
+import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hooks.QueryCompleteContext;
 import org.apache.impala.hooks.QueryEventHook;
@@ -187,12 +189,6 @@ public class Frontend {
   // Maximum number of times to retry a query if it fails due to inconsistent metadata.
   private static final int INCONSISTENT_METADATA_NUM_RETRIES =
       BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries();
-
-  // Number of retries to acquire an HMS ACID lock.
-  private static final int LOCK_RETRIES = 10;
-
-  // Time interval between retries of acquiring an HMS ACID lock
-  private static final int LOCK_RETRY_WAIT_SECONDS = 3;
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -1675,7 +1671,8 @@ public class Frontend {
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
       long transactionId = MetastoreShim.openTransaction(hmsClient, "Impala");
-      transactionKeepalive_.addTransaction(transactionId, queryCtx);
+      HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
+      transactionKeepalive_.addTransaction(transactionId, ctx);
       return transactionId;
     }
   }
@@ -1763,8 +1760,7 @@ public class Frontend {
     }
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
-      MetastoreShim.acquireLock(hmsClient, txnId, lockComponents, LOCK_RETRIES,
-          LOCK_RETRY_WAIT_SECONDS);
+      MetastoreShim.acquireLock(hmsClient, txnId, lockComponents);
     }
   }
 }

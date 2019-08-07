@@ -726,6 +726,24 @@ class TestHmsIntegration(ImpalaTestSuite):
     assert '3,30' == hive_result[3]
     assert '4,41' == hive_result[4]
 
+  @SkipIfHive2.acid
+  def test_drop_acid_table(self, vector, unique_database):
+    """
+    Tests that a transactional table dropped by Impala is also dropped if we check from
+    Hive.
+    """
+    table_name = "%s.acid_insert" % unique_database
+    self.client.execute(
+      "create table %s (i int) "
+      "TBLPROPERTIES('transactional'='true', "
+      "'transactional_properties'='insert_only')" % table_name)
+    show_tables_result = self.run_stmt_in_hive("show tables in %s" % unique_database)
+    assert "acid_insert" in show_tables_result
+    self.client.execute("drop table %s" % table_name)
+    show_tables_result_after_drop = self.run_stmt_in_hive(
+        "show tables in %s" % unique_database)
+    assert "acid_insert" not in show_tables_result_after_drop
+
   @pytest.mark.execute_serially
   def test_change_table_name(self, vector):
     """

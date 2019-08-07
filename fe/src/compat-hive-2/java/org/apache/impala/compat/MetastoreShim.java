@@ -329,6 +329,14 @@ public class MetastoreShim {
   /**
    * Hive-3 only function
    */
+  public static void releaseLock(IMetaStoreClient client, long lockId)
+      throws TransactionException {
+    throw new UnsupportedOperationException("releaseLock is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
   public static boolean heartbeat(IMetaStoreClient client,
       long txnId, long lockId) throws TransactionException {
     throw new UnsupportedOperationException("heartbeat is not supported.");
@@ -338,7 +346,7 @@ public class MetastoreShim {
    * Hive-3 only function
    */
   public static long acquireLock(IMetaStoreClient client, long txnId,
-      List<LockComponent> lockComponents, int lockRetries, int retryWaitSeconds)
+      List<LockComponent> lockComponents)
       throws TransactionException {
     throw new UnsupportedOperationException("acquireLock is not supported.");
   }

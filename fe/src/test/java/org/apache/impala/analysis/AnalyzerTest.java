@@ -583,8 +583,7 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(
         "drop table functional_orc_def.full_transactional_table",
         insertOnlyErrorForFullMsg);
-    AnalysisError("drop table functional.insert_only_transactional_table",
-        insertOnlyErrorMsg);
+    AnalyzesOk("drop table functional.insert_only_transactional_table");
 
     AnalysisError(
         "truncate table functional_orc_def.full_transactional_table",

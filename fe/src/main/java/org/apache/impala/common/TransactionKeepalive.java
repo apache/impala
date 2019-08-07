@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.service;
+package org.apache.impala.common;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,13 +54,28 @@ public class TransactionKeepalive {
 
   private final MetaStoreClientPool metaStoreClientPool_;
 
+  // Stores information for logging purposes. Stores either a TQueryCtx or a cause
+  // string. toString() returns the stored TQueryCtx if it is set or the string cause
+  // otherwise.
   public static class HeartbeatContext {
-    public TQueryCtx queryCtx;
-    public long creationTime;
+    private TQueryCtx queryCtx;
+    private String cause;
+    private long creationTime;
 
     public HeartbeatContext(TQueryCtx queryCtx, long creationTime) {
       this.queryCtx = queryCtx;
       this.creationTime = creationTime;
+    }
+
+    public HeartbeatContext(String cause, long creationTime) {
+      this.queryCtx = null;
+      this.cause = "'" + cause + "'";
+      this.creationTime = creationTime;
+    }
+
+    public String toString() {
+      if (queryCtx != null) return queryCtx.query_id.toString();
+      return cause;
     }
   }
 
@@ -170,21 +185,19 @@ public class TransactionKeepalive {
           // Transaction or lock doesn't exist anymore, let's remove them.
           if (transactionId != 0) {
             LOG.warn("Transaction " + String.valueOf(transactionId) + " of query " +
-                context.queryCtx.query_id.toString() + " doesn't exist anymore. Stop " +
-                "heartbeating it.");
+                context.toString() + " doesn't exist anymore. Stop heartbeating it.");
             TransactionKeepalive.this.deleteTransaction(transactionId);
           }
           if (lockId != 0) {
             LOG.warn("Lock " + String.valueOf(lockId) + " of query " +
-                context.queryCtx.query_id.toString() + " doesn't exist anymore. Stop " +
-                "heartbeating it.");
+                context.toString() + " doesn't exist anymore. Stop heartbeating it.");
             TransactionKeepalive.this.deleteLock(lockId);
           }
         }
       } catch (TransactionException e) {
         LOG.warn("Caught exception during heartbeating transaction " +
             String.valueOf(transactionId) + " lock " + String.valueOf(lockId) +
-            " for query " + context.queryCtx.query_id.toString(), e);
+            " for query " + context.toString(), e);
       }
     }
   }
@@ -204,22 +217,20 @@ public class TransactionKeepalive {
   /**
    * Add transaction to heartbeat. Associated locks shouldn't be added.
    */
-  synchronized public void addTransaction(Long transactionId, TQueryCtx queryCtx) {
+  synchronized public void addTransaction(Long transactionId, HeartbeatContext ctx) {
     Preconditions.checkNotNull(transactionId);
-    Preconditions.checkNotNull(queryCtx);
+    Preconditions.checkNotNull(ctx);
     Preconditions.checkState(!transactions_.containsKey(transactionId));
-    HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
     transactions_.put(transactionId, ctx);
   }
 
   /**
    * Add lock to heartbeat. This should be a lock without a transaction context.
    */
-  synchronized public void addLock(Long lockId, TQueryCtx queryCtx) {
+  synchronized public void addLock(Long lockId, HeartbeatContext ctx) {
     Preconditions.checkNotNull(lockId);
-    Preconditions.checkNotNull(queryCtx);
+    Preconditions.checkNotNull(ctx);
     Preconditions.checkState(!locks_.containsKey(lockId));
-    HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
     locks_.put(lockId, ctx);
   }
 
