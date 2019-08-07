@@ -227,31 +227,43 @@ TEST_F(SchedulerTest, RemoteExecutorCandidates) {
   // of 5, 6, and 7.
   schema.AddSingleBlockTable("T1", {5, 6, 7});
 
-  // Test a range of number of remote executor candidates, including cases where the
-  // number of remote executor candidates exceeds the number of Impala nodes.
-  for (int num_candidates = 1; num_candidates <= num_impala_nodes + 1; ++num_candidates) {
-    Plan plan(schema);
-    plan.AddTableScan("T1");
-    plan.SetRandomReplica(true);
-    plan.SetNumRemoteExecutorCandidates(num_candidates);
+  // Test a range of number of remote executor candidates with both true and false for
+  // schedule_random replica. This includes cases where the number of remote executor
+  // candidates exceeds the number of Impala nodes.
+  for (bool schedule_random_replica : {true, false}) {
+    for (int num_candidates = 1; num_candidates <= num_impala_nodes + 2;
+         ++num_candidates) {
+      Plan plan(schema);
+      plan.AddTableScan("T1");
+      plan.SetRandomReplica(schedule_random_replica);
+      plan.SetNumRemoteExecutorCandidates(num_candidates);
 
-    Result result(plan);
-    SchedulerWrapper scheduler(plan);
-    for (int i = 0; i < 100; ++i) ASSERT_OK(scheduler.Compute(&result));
+      Result result(plan);
+      SchedulerWrapper scheduler(plan);
+      for (int i = 0; i < 100; ++i) ASSERT_OK(scheduler.Compute(&result));
 
-    ASSERT_EQ(100, result.NumAssignments());
-    EXPECT_EQ(100, result.NumTotalAssignments());
-    EXPECT_EQ(100 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
-    if (num_candidates < num_impala_nodes) {
-      EXPECT_EQ(num_candidates, result.NumDistinctBackends());
-    } else {
-      EXPECT_EQ(num_impala_nodes, result.NumDistinctBackends());
-    }
-    EXPECT_GE(result.MinNumAssignedBytesPerHost(), Block::DEFAULT_BLOCK_SIZE);
-    // If there is only one remote executor candidate, then all scan ranges will be
-    // assigned to one backend.
-    if (num_candidates == 1) {
-      EXPECT_EQ(result.MinNumAssignedBytesPerHost(), 100 * Block::DEFAULT_BLOCK_SIZE);
+      ASSERT_EQ(100, result.NumAssignments());
+      EXPECT_EQ(100, result.NumTotalAssignments());
+      EXPECT_EQ(100 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
+
+      if (schedule_random_replica && num_candidates > 1) {
+        if (num_candidates < num_impala_nodes) {
+          EXPECT_EQ(num_candidates, result.NumDistinctBackends());
+        } else {
+          // Since this scenario still uses the consistent placement algorithm, there is
+          // no guarantee that the scan range will be placed on all the nodes. But
+          // it should be placed on almost all of the nodes.
+          EXPECT_GE(result.NumDistinctBackends(), num_impala_nodes - 1);
+        }
+        EXPECT_GE(result.MinNumAssignedBytesPerHost(), Block::DEFAULT_BLOCK_SIZE);
+      } else {
+        // If schedule_random_replica is false, then the scheduler will pick the first
+        // candidate (as none of the backends have any assignments). This means that all
+        // the iterations will assign work to the same backend. This is also true when
+        // the number of remote executor candidates is one.
+        EXPECT_EQ(result.NumDistinctBackends(), 1);
+        EXPECT_EQ(result.MinNumAssignedBytesPerHost(), 100 * Block::DEFAULT_BLOCK_SIZE);
+      }
     }
   }
 }
@@ -375,9 +387,7 @@ TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
   Plan plan(schema);
   plan.AddTableScan("T1");
   plan.SetRandomReplica(false);
-  // TODO: Consistent scheduling is only completely consistent to removing an unused
-  // node when the number of executor candidates is 1. See IMPALA-8677.
-  plan.SetNumRemoteExecutorCandidates(1);
+  plan.SetNumRemoteExecutorCandidates(3);
 
   Result result_base(plan);
   SchedulerWrapper scheduler(plan);

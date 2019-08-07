@@ -56,6 +56,16 @@ static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.to
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 
+// Consistent scheduling requires picking up to k distinct candidates out of n nodes.
+// Since each iteration can pick a node that it already picked (i.e. it is sampling with
+// replacement), it may need more than k iterations to pick k distinct candidates.
+// There is also no guaranteed bound on the number of iterations. To protect against
+// bugs and large numbers of iterations, we limit the number of iterations. This constant
+// determines the number of iterations per distinct candidate allowed. Eight iterations
+// per distinct candidate provides a very high probability of actually getting k distinct
+// candidates. See GetRemoteExecutorCandidates() for a deeper description.
+static const int MAX_ITERATIONS_PER_EXECUTOR_CANDIDATE = 8;
+
 Scheduler::Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_service)
   : metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     request_pool_service_(request_pool_service) {
@@ -542,7 +552,8 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   } // End of for loop over scan ranges.
 
   // Assign remote scans to executors.
-  int num_remote_executor_candidates = query_options.num_remote_executor_candidates;
+  int num_remote_executor_candidates =
+      min(query_options.num_remote_executor_candidates, executor_group.NumExecutors());
   for (const TScanRangeLocationList* scan_range_locations : remote_scan_range_locations) {
     DCHECK(!exec_at_coord);
     const IpAddr* executor_ip;
@@ -551,13 +562,10 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     // 1. When enabled by setting 'num_remote_executor_candidates' > 0
     // AND
     // 2. This is an HDFS file split
-    // AND
-    // 3. The number of remote executor candidates is less than the number of backends.
     // Otherwise, fall back to the normal method of selecting executors for remote
     // ranges, which allows for execution on any backend.
     if (scan_range_locations->scan_range.__isset.hdfs_file_split &&
-        num_remote_executor_candidates > 0 &&
-        num_remote_executor_candidates < executor_group.NumExecutors()) {
+        num_remote_executor_candidates > 0) {
       assignment_ctx.GetRemoteExecutorCandidates(
           &scan_range_locations->scan_range.hdfs_file_split,
           num_remote_executor_candidates, &remote_executor_candidates);
@@ -765,13 +773,14 @@ void Scheduler::AssignmentCtx::GetRemoteExecutorCandidates(
     vector<IpAddr>* remote_executor_candidates) {
   // This should be given an empty vector
   DCHECK_EQ(remote_executor_candidates->size(), 0);
-  // This function should not be used when 'num_candidates' exceeds the number
-  // of executors.
-  DCHECK_LT(num_candidates, executor_group_.NumExecutors());
+  // This function should not be called with 'num_candidates' exceeding the number of
+  // executors.
+  DCHECK_LE(num_candidates, executor_group_.NumExecutors());
   // Two different hashes of the filename can result in the same executor.
   // The function should return distinct executors, so it may need to do more hashes
   // than 'num_candidates'.
-  set<IpAddr> distinct_backends;
+  unordered_set<IpAddr> distinct_backends;
+  distinct_backends.reserve(num_candidates);
   // Generate multiple hashes of the file split by using the hash as a seed to a PRNG.
   // Note: The hash includes the partition path hash, the filename (relative to the
   // partition directory), and the offset. The offset is used to allow very large files
@@ -781,18 +790,42 @@ void Scheduler::AssignmentCtx::GetRemoteExecutorCandidates(
       hdfs_file_split->relative_path.length(), hash);
   hash = HashUtil::Hash(&hdfs_file_split->offset, sizeof(hdfs_file_split->offset), hash);
   pcg32 prng(hash);
-  // To avoid any problem scenarios, limit the total number of iterations
-  int max_iterations = num_candidates * 3;
+  // The function should return distinct executors, so it may need to do more hashes
+  // than 'num_candidates'. To avoid any problem scenarios, limit the total number of
+  // iterations. The number of iterations is set to a reasonably high level, because
+  // on average the loop short circuits considerably earlier. Using a higher number of
+  // iterations is useful for smaller clusters where we are using this function to get
+  // all the backends in a consistent order rather than picking a consistent subset.
+  // Suppose there are three nodes and the number of remote executor candidates is three.
+  // One can calculate the probability of picking three distinct executors in at most
+  // n iterations. For n=3, the second pick must not overlap the first (probability 2/3),
+  // and the third pick must not be either the first or second (probability 1/3). So:
+  // P(3) = 1*(2/3)*(1/3)=2/9
+  // The probability that it is done in at most n+1 steps is the probability that
+  // it completed in n steps combined with the probability that it completes in the n+1st
+  // step. In order to complete in the n+1st step, the previous n steps must not have
+  // all landed on a single backend (probability (1/3)^(n-1)) and this step must not land
+  // on the two backends already chosen (probability 1/3). So, the recursive step is:
+  // P(n+1) = P(n) + (1 - P(n))*(1-(1/3)^(n-1))*(1/3)
+  // Here are some example probabilities:
+  // Probability of completing in at most 5 iterations: 0.6284
+  // Probability of completing in at most 10 iterations: 0.9506
+  // Probability of completing in at most 15 iterations: 0.9935
+  // Probability of completing in at most 20 iterations: 0.9991
+  int max_iterations = num_candidates * MAX_ITERATIONS_PER_EXECUTOR_CANDIDATE;
   for (int i = 0; i < max_iterations; ++i) {
     // Look up nearest IpAddr
     const IpAddr* executor_addr = executor_group_.GetHashRing()->GetNode(prng());
     DCHECK(executor_addr != nullptr);
-    distinct_backends.insert(*executor_addr);
+    auto insert_ret = distinct_backends.insert(*executor_addr);
+    // The return type of unordered_set.insert() is a pair<iterator, bool> where the
+    // second element is whether this was a new element. If this is a new element,
+    // add this element to the return vector.
+    if (insert_ret.second) {
+      remote_executor_candidates->push_back(*executor_addr);
+    }
     // Short-circuit if we reach the appropriate number of replicas
-    if (distinct_backends.size() == num_candidates) break;
-  }
-  for (const IpAddr& addr : distinct_backends) {
-    remote_executor_candidates->push_back(addr);
+    if (remote_executor_candidates->size() == num_candidates) break;
   }
 }
 
