@@ -105,8 +105,8 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(int bit_wid
         in, in_bytes, dict, dict_len, num_values, out, stride, decode_error);
 
   switch (bit_width) {
-    // Expand cases from 0 to 64.
-    BOOST_PP_REPEAT_FROM_TO(0, 65, UNPACK_VALUES_CASE, ignore);
+    // Expand cases from 0 to MAX_DICT_BITWIDTH.
+    BOOST_PP_REPEAT_FROM_TO(0, 33, UNPACK_VALUES_CASE, ignore);
     default:
       DCHECK(false);
       return std::make_pair(nullptr, -1);
@@ -270,6 +270,9 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
   DCHECK_GE(in_bytes, BYTES_TO_READ);
   // TODO: this could be optimised further by using SIMD instructions.
   // https://lemire.me/blog/2016/08/25/faster-dictionary-decoding-with-simd-instructions/
+
+  static_assert(BIT_WIDTH <= MAX_DICT_BITWIDTH,
+      "Too high bit width for dictionary index.");
 
   // Call UnpackValue() and DecodeValue() for 0 <= i < 32.
 #pragma push_macro("DECODE_VALUE_CALL")

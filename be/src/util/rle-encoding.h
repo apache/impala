@@ -82,10 +82,11 @@ namespace impala {
 
 /// RLE decoder with a batch-oriented interface that enables fast decoding.
 /// Users of this class must first initialize the class to point to a buffer of
-/// RLE-encoded data, passed into the constructor or Reset(). Then they can
-/// decode data by checking NextNumRepeats()/NextNumLiterals() to see if the
-/// next run is a repeated or literal run, then calling GetRepeatedValue()
-/// or GetLiteralValues() respectively to read the values.
+/// RLE-encoded data, passed into the constructor or Reset(). The provided
+/// bit_width must be at most min(sizeof(T) * 8, BatchedBitReader::MAX_BITWIDTH).
+/// Then they can decode data by checking NextNumRepeats()/NextNumLiterals() to
+/// see if the next run is a repeated or literal run, then calling
+/// GetRepeatedValue() or GetLiteralValues() respectively to read the values.
 ///
 /// End-of-input is signalled by NextNumRepeats() == NextNumLiterals() == 0.
 /// Other decoding errors are signalled by functions returning false. If an
@@ -495,6 +496,7 @@ inline void RleBatchDecoder<T>::Reset(uint8_t* buffer, int buffer_len, int bit_w
   DCHECK(buffer != nullptr);
   DCHECK_GE(buffer_len, 0);
   DCHECK_GE(bit_width, 0);
+  DCHECK_LE(bit_width, sizeof(T) * 8);
   DCHECK_LE(bit_width, BatchedBitReader::MAX_BITWIDTH);
   bit_reader_.Reset(buffer, buffer_len);
   bit_width_ = bit_width;

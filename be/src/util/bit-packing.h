@@ -47,6 +47,7 @@ namespace impala {
 class BitPacking {
  public:
   static constexpr int MAX_BITWIDTH = sizeof(uint64_t) * 8;
+  static constexpr int MAX_DICT_BITWIDTH = sizeof(uint32_t) * 8;
 
   /// Unpack bit-packed values with 'bit_width' from 'in' to 'out'. Keeps unpacking until
   /// either all 'in_bytes' are read or 'num_values' values are unpacked. 'out' must have

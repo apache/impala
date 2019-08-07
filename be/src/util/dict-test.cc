@@ -284,7 +284,7 @@ TEST(DictTest, SetDataInvalidBitwidthFails) {
   for (int i = 0; i < high_bit_width; i++) {
     buffer[0] = i;
     Status status = decoder.SetData(buffer, 5);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
   }
 
   // Reject too high bit widths.
