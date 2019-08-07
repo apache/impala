@@ -26,19 +26,21 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.PartitionDropOptions;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -89,6 +92,7 @@ import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.Transaction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
@@ -173,6 +177,7 @@ import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.KuduUtil;
@@ -949,7 +954,7 @@ public class CatalogOpExecutor {
     //       see other ways to get a new write id (which is needed to update
     //       transactional tables). Hive seems to use internal API for this.
     //       See IMPALA-8865 about plans to improve this.
-    MetastoreShim.TblTransaction tblTxn = null;
+    TblTransaction tblTxn = null;
     try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       try {
         if (AcidUtils.isTransactionalTable(msTbl.getParameters())) {
@@ -974,7 +979,7 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       TAlterTableUpdateStatsParams params,
       Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns,
-      MetaStoreClient msClient, MetastoreShim.TblTransaction tblTxn)
+      MetaStoreClient msClient, TblTransaction tblTxn)
       throws ImpalaException {
     // Update column stats.
     numUpdatedColumns.setRef(0L);
@@ -1624,7 +1629,7 @@ public class CatalogOpExecutor {
       HeartbeatContext ctx = new HeartbeatContext(
           String.format("Drop table/view %s.%s", tableName.getDb(), tableName.getTbl()),
           System.nanoTime());
-      lockId = catalog_.lockTable(tableName.getDb(), tableName.getTbl(), ctx);
+      lockId = catalog_.lockTableStandalone(tableName.getDb(), tableName.getTbl(), ctx);
     }
 
     try {
@@ -1803,15 +1808,19 @@ public class CatalogOpExecutor {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
       try {
-        HdfsTable hdfsTable = (HdfsTable)table;
-        Collection<? extends FeFsPartition> parts =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
-        for (FeFsPartition part: parts) {
-          FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
+        if (MetastoreShim.getMajorVersion() > 2 && AcidUtils.isTransactionalTable(
+            table.getMetaStoreTable().getParameters())) {
+          truncateTransactionalTable(params, table);
+        } else {
+          HdfsTable hdfsTable = (HdfsTable)table;
+          Collection<? extends FeFsPartition> parts =
+              FeCatalogUtils.loadAllPartitions(hdfsTable);
+          for (FeFsPartition part: parts) {
+            FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
+          }
+          dropColumnStats(table);
+          dropTableStats(table);
         }
-
-        dropColumnStats(table);
-        dropTableStats(table);
       } catch (Exception e) {
         String fqName = tblName.db_name + "." + tblName.table_name;
         throw new CatalogException(String.format("Failed to truncate table: %s.\n" +
@@ -1824,6 +1833,84 @@ public class CatalogOpExecutor {
     } finally {
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
       table.getLock().unlock();
+    }
+  }
+
+  /**
+   * Truncates a transactional table. It creates new empty base directories in all
+   * partitions of the table. That way queries started earlier can still read a
+   * valid snapshot version of the data. HMS's cleaner should remove obsolete
+   * directories later.
+   * After that empty directory creation it removes stats-related parameters of
+   * the table and its partitions.
+   */
+  private void truncateTransactionalTable(TTruncateParams params, Table table)
+      throws ImpalaException {
+    TableName tblName = TableName.fromThrift(params.getTable_name());
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      IMetaStoreClient hmsClient = msClient.getHiveClient();
+      HeartbeatContext ctx = new HeartbeatContext(
+          String.format("Truncate table %s.%s", tblName.getDb(), tblName.getTbl()),
+          System.nanoTime());
+      try (Transaction txn = catalog_.openTransaction(hmsClient, ctx)) {
+        Preconditions.checkState(txn.getId() > 0);
+        catalog_.lockTableInTransaction(tblName.getDb(), tblName.getTbl(), txn,
+            DataOperationType.DELETE, ctx);
+        TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
+            table.getMetaStoreTable(), txn.getId());
+        HdfsTable hdfsTable = (HdfsTable)table;
+        Collection<? extends FeFsPartition> parts =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        createEmptyBaseDirectories(parts, tblTxn.writeId);
+        // Currently Impala cannot update the statistics properly. So instead of
+        // writing correct stats, let's just remove COLUMN_STATS_ACCURATE parameter from
+        // each partition.
+        // TODO(IMPALA-8883): properly update statistics
+        List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
+            Lists.newArrayListWithCapacity(parts.size());
+        if (table.getNumClusteringCols() > 0) {
+          for (FeFsPartition part: parts) {
+            org.apache.hadoop.hive.metastore.api.Partition hmsPart =
+                ((HdfsPartition)part).toHmsPartition();
+            Preconditions.checkNotNull(hmsPart);
+            if (hmsPart.getParameters() != null) {
+              hmsPart.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+              hmsPartitions.add(hmsPart);
+            }
+          }
+        }
+        // For partitioned tables we need to alter all the partitions in HMS.
+        if (!hmsPartitions.isEmpty()) {
+          unsetPartitionsColStats(table.getMetaStoreTable(), hmsPartitions, tblTxn);
+        }
+        // Remove COLUMN_STATS_ACCURATE property from the table.
+        unsetTableColStats(table.getMetaStoreTable(), tblTxn);
+        txn.commit();
+      }
+    } catch (Exception e) {
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "truncateTable"), e);
+    }
+  }
+
+  /**
+   * Creates new empty base directories for an ACID table. The directories won't be
+   * really empty, they will contain the hidden "_empty" file. It's needed because
+   * FileSystemUtil.listFiles() doesn't see empty directories. See IMPALA-8739.
+   * @param partitions the partitions in which we create new directories.
+   * @param writeId the write id of the new base directory.
+   * @throws IOException
+   */
+  private void createEmptyBaseDirectories(
+      Collection<? extends FeFsPartition> partitions, long writeId) throws IOException {
+    for (FeFsPartition part: partitions) {
+      Path partPath = new Path(part.getLocation());
+      FileSystem fs = FileSystemUtil.getFileSystemForPath(partPath);
+      String baseDirStr =
+          part.getLocation() + Path.SEPARATOR + "base_" + String.valueOf(writeId);
+      fs.mkdirs(new Path(baseDirStr));
+      String emptyFile = baseDirStr + Path.SEPARATOR + "_empty";
+      fs.create(new Path(emptyFile));
     }
   }
 
@@ -3375,7 +3462,7 @@ public class CatalogOpExecutor {
    * call.
    */
   private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean overwriteLastDdlTime, MetastoreShim.TblTransaction tblTxn)
+      boolean overwriteLastDdlTime, TblTransaction tblTxn)
       throws ImpalaRuntimeException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       if (overwriteLastDdlTime) {
@@ -3550,8 +3637,7 @@ public class CatalogOpExecutor {
    * timeouts.
    */
   private void bulkAlterPartitions(Table tbl, List<HdfsPartition> modifiedParts,
-      MetastoreShim.TblTransaction tblTxn)
-      throws ImpalaException {
+      TblTransaction tblTxn) throws ImpalaException {
     List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
         Lists.newArrayList();
     for (HdfsPartition p: modifiedParts) {
@@ -3808,7 +3894,7 @@ public class CatalogOpExecutor {
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
 
     long transactionId = -1;
-    MetastoreShim.TblTransaction tblTxn = null;
+    TblTransaction tblTxn = null;
     if (update.isSetTransaction_id()) {
       transactionId = update.getTransaction_id();
       Preconditions.checkState(transactionId > 0);
@@ -4370,7 +4456,7 @@ public class CatalogOpExecutor {
    * Update table properties to remove the COLUMN_STATS_ACCURATE entry if it exists.
    */
   private void unsetTableColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
-      MetastoreShim.TblTransaction tblTxn) throws ImpalaRuntimeException{
+      TblTransaction tblTxn) throws ImpalaRuntimeException{
     Map<String, String> params = msTable.getParameters();
     if (params != null && params.containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
       params.remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
@@ -4385,7 +4471,7 @@ public class CatalogOpExecutor {
    */
   private void unsetPartitionsColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
       List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset,
-      MetastoreShim.TblTransaction tblTxn) throws ImpalaRuntimeException{
+      TblTransaction tblTxn) throws ImpalaRuntimeException{
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       try {
         if (tblTxn != null) {

@@ -581,8 +581,7 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(
         "truncate table functional_orc_def.full_transactional_table",
         errorMsg);
-    AnalysisError("truncate table functional.insert_only_transactional_table",
-        String.format(insertOnlyErrorMsg, "TRUNCATE TABLE"));
+    AnalyzesOk("truncate table functional.insert_only_transactional_table");
 
     AnalysisError(
         "alter table functional_orc_def.full_transactional_table " +

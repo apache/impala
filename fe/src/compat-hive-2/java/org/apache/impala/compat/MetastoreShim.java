@@ -65,6 +65,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.thrift.TException;
 
 /**
@@ -72,15 +73,6 @@ import org.apache.thrift.TException;
  * between major versions of Hive. This implements the shimmed methods for Hive 2.
  */
 public class MetastoreShim {
-
-  /**
-   * Empty class, should not be instantiated.
-   */
-  public static class TblTransaction {
-    public TblTransaction() {
-      throw new UnsupportedOperationException("new TblTransaction");
-    }
-  }
 
   public static TblTransaction createTblTransaction(
      IMetaStoreClient client, Table tbl, long txnId) {

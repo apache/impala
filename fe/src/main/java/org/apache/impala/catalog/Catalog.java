@@ -26,11 +26,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.LockComponent;
 import org.apache.hadoop.hive.metastore.api.LockLevel;
 import org.apache.hadoop.hive.metastore.api.LockType;
-
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -667,26 +667,70 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
+   * Opens a transaction and returns a Transaction object that can be used in a
+   * try-with-resources statement. That way transactions won't leak.
+   * @param hmsClient the client towards HMS.
+   * @param ctx Context for heartbeating.
+   * @return an AutoCloseable transaction object.
+   * @throws TransactionException
+   */
+  public Transaction openTransaction(IMetaStoreClient hmsClient, HeartbeatContext ctx)
+      throws TransactionException {
+    return new Transaction(hmsClient, transactionKeepalive_, "Impala Catalog", ctx);
+  }
+
+  /**
    * Creates an exclusive lock for a particular table and acquires it in the HMS. Starts
    * heartbeating the lock. This function is for locks that doesn't belong to a
-   * transaction.
+   * transaction. The client of this function is responsible for calling
+   * 'releaseTableLock()'.
    * @param dbName Name of the DB where the particular table is.
    * @param tableName Name of the table where the lock is acquired.
    * @throws TransactionException
    */
-  public long lockTable(String dbName, String tableName, HeartbeatContext ctx)
+  public long lockTableStandalone(String dbName, String tableName, HeartbeatContext ctx)
       throws TransactionException {
+    return lockTableInternal(dbName, tableName, 0L, DataOperationType.NO_TXN, ctx);
+  }
+
+  /**
+   * Creates an exclusive lock for a particular table and acquires it in the HMS.
+   * This function can only be invoked in a transaction context, i.e. 'txnId'
+   * cannot be 0.
+   * @param dbName Name of the DB where the particular table is.
+   * @param tableName Name of the table where the lock is acquired.
+   * @param transaction the transaction that needs to lock the table.
+   * @throws TransactionException
+   */
+  public void lockTableInTransaction(String dbName, String tableName,
+      Transaction transaction, DataOperationType opType, HeartbeatContext ctx)
+      throws TransactionException {
+    Preconditions.checkState(transaction.getId() > 0);
+    lockTableInternal(dbName, tableName, transaction.getId(), opType, ctx);
+  }
+
+  /**
+   * Creates an exclusive lock for a particular table and acquires it in the HMS. Starts
+   * heartbeating the lock if it doesn't have a transaction context.
+   * @param dbName Name of the DB where the particular table is.
+   * @param tableName Name of the table where the lock is acquired.
+   * @param txnId id of the transaction, 0 for standalone locks.
+   * @throws TransactionException
+   */
+  private long lockTableInternal(String dbName, String tableName, long txnId,
+      DataOperationType opType, HeartbeatContext ctx) throws TransactionException {
+    Preconditions.checkState(txnId >= 0);
     LockComponent lockComponent = new LockComponent();
     lockComponent.setDbname(dbName);
     lockComponent.setTablename(tableName);
     lockComponent.setLevel(LockLevel.TABLE);
     lockComponent.setType(LockType.EXCLUSIVE);
-    lockComponent.setOperationType(DataOperationType.NO_TXN);
+    lockComponent.setOperationType(opType);
     List<LockComponent> lockComponents = Arrays.asList(lockComponent);
     long lockId = -1L;
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
-      lockId = MetastoreShim.acquireLock(client.getHiveClient(), 0L, lockComponents);
-      transactionKeepalive_.addLock(lockId, ctx);
+      lockId = MetastoreShim.acquireLock(client.getHiveClient(), txnId, lockComponents);
+      if (txnId == 0L) transactionKeepalive_.addLock(lockId, ctx);
     }
     return lockId;
   }

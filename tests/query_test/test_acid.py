@@ -66,6 +66,17 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
+  def test_acid_truncate(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-truncate', vector, use_db=unique_database)
+    assert "0" == self.run_stmt_in_hive("select count(*) from {0}.{1}".format(
+        unique_database, "pt")).split("\n")[1]
+
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid_partitioned(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-partitioned', vector, use_db=unique_database)
 

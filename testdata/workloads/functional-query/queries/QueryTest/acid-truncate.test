@@ -1,0 +1,97 @@
+====
+---- QUERY
+create table tt (x int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+truncate table tt;
+select * from tt;
+---- RESULTS
+====
+---- QUERY
+insert into tt values (1);
+insert into tt values (2);
+insert into tt values (3);
+====
+---- QUERY
+select * from tt;
+---- RESULTS
+1
+2
+3
+====
+---- HIVE_QUERY
+use $DATABASE;
+analyze table tt compute statistics for columns;
+====
+---- QUERY
+invalidate metadata tt;
+show create table tt;
+---- RESULTS
+row_regex: .*COLUMN_STATS_ACCURATE.*
+====
+---- QUERY
+truncate table tt;
+select * from tt;
+---- RESULTS
+====
+---- QUERY
+show files in tt;
+---- RESULTS
+====
+---- QUERY
+show create table tt;
+---- RESULTS
+row_regex: (?!.*COLUMN_STATS_ACCURATE)
+====
+---- QUERY
+truncate table tt;
+insert into tt values (4);
+select * from tt;
+---- RESULTS
+4
+====
+---- QUERY
+# Create partitioned ACID table and use dynamic partitioning during insert.
+create table pt (i int)
+partitioned by (sp int, dp int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+insert into table pt partition(sp=1, dp) select 10, 1 union select 20, 2;
+insert into table pt partition(sp=3, dp) select 30, 3;
+====
+---- QUERY
+select sp, dp, i from pt order by sp, dp, i;
+---- RESULTS
+1,1,10
+1,2,20
+3,3,30
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+truncate table pt;
+select * from pt;
+---- RESULTS
+====
+---- QUERY
+show files in pt;
+---- RESULTS
+====
+---- QUERY
+insert into table pt partition(sp=1, dp) select 11, 1 union select 21, 2;
+insert into table pt partition(sp=4, dp) select 40, 4;
+select sp, dp, i from pt order by sp, dp, i;
+---- RESULTS
+1,1,11
+1,2,21
+4,4,40
+---- TYPES
+INT,INT,INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+analyze table pt compute statistics for columns;
+====
+---- QUERY
+truncate table pt;
+====

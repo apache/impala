@@ -91,6 +91,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -130,16 +131,6 @@ public class MetastoreShim {
   // Id used to register transactions / locks.
   // Not final, as it makes sense to set it based on role + instance, see IMPALA-8853.
   public static String TRANSACTION_USER_ID = "Impala";
-
-  /**
-   * Transaction parameters needed for single table operations.
-   */
-  public static class TblTransaction {
-    public long txnId;
-    public boolean ownsTxn;
-    public long writeId;
-    public String validWriteIds;
-  }
 
   /**
    * Initializes and returns a TblTransaction object for table 'tbl'.

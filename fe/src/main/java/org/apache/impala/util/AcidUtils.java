@@ -18,7 +18,6 @@ package org.apache.impala.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
 import com.google.errorprone.annotations.Immutable;
 
 import org.apache.hadoop.fs.FileStatus;
@@ -52,6 +51,16 @@ public class AcidUtils {
   // Constant also defined in hive_metastoreConstants
   public static final String TABLE_IS_TRANSACTIONAL = "transactional";
   public static final String TABLE_TRANSACTIONAL_PROPERTIES = "transactional_properties";
+
+  /**
+   * Transaction parameters needed for single table operations.
+   */
+  public static class TblTransaction {
+    public long txnId;
+    public boolean ownsTxn;
+    public long writeId;
+    public String validWriteIds;
+  }
 
   // Regex pattern for files in base directories. The pattern matches strings like
   // "base_0000005/abc.txt",

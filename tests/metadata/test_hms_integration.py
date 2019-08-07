@@ -751,6 +751,26 @@ class TestHmsIntegration(ImpalaTestSuite):
         "show tables in %s" % unique_database)
     assert "acid_insert" not in show_tables_result_after_drop
 
+  @SkipIfHive2.acid
+  def test_truncate_acid_table(self, vector, unique_database):
+    """
+    Tests that a transactional table truncated by Impala shows no rows when
+    queried by Hive.
+    """
+    table_name = "%s.acid_truncate" % unique_database
+    self.client.execute(
+      "create table %s (i int) "
+      "TBLPROPERTIES('transactional'='true', "
+      "'transactional_properties'='insert_only')" % table_name)
+    self.client.execute("insert into %s values (1), (2)" % table_name)
+    query_result = self.run_stmt_in_hive("select * from %s" % table_name)
+    assert "1" in query_result
+    assert "2" in query_result
+    self.client.execute("truncate table %s" % table_name)
+    query_result_after_truncate = self.run_stmt_in_hive("select count(*) from %s" %
+                                                        table_name)
+    assert "0" == query_result_after_truncate.split('\n')[1]
+
   @pytest.mark.execute_serially
   def test_change_table_name(self, vector):
     """
