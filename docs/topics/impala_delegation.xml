@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="1.2" id="delegation">
 
-  <title>Configuring Impala Delegation for Hue and BI Tools</title>
+  <title>Configuring Impala Delegation for Clients</title>
 
   <prolog>
     <metadata>
@@ -38,10 +38,10 @@ under the License.
   <conbody>
 
     <p>
-      When users submit Impala queries through a separate application, such as Hue or a business
-      intelligence tool, typically all requests are treated as coming from the same user. In
-      Impala 1.2 and higher, Impala supports <q>delegation</q> where users whose names you
-      specify can delegate the execution of a query to another user. The query runs with the
+      When users submit Impala queries through a separate client application, such as Hue or a
+      business intelligence tool, typically all requests are treated as coming from the same
+      user. In Impala 1.2 and higher, Impala supports <q>delegation</q> where users whose names
+      you specify can delegate the execution of a query to another user. The query runs with the
       privileges of the delegated user, not the original authenticated user.
     </p>
 
@@ -147,6 +147,11 @@ under the License.
         When opening a client connection, the client must provide a delegated username via the
         HiveServer2 protocol property,<codeph>impala.doas.user</codeph> or
         <codeph>DelegationUID</codeph>.
+        <p>
+          When the client connects over HTTP, the <codeph>doAs</codeph> parameter can be
+          specified in the HTTP path, e.g.
+          <codeph>/?doAs=</codeph><varname>delegated_user</varname>.
+        </p>
       </li>
 
       <li>
@@ -183,7 +188,7 @@ under the License.
       The user or group delegation process works as follows:
       <ol>
         <li>
-          The Impalad daemon starts with one of the following options:
+          The <codeph>impalad</codeph> daemon starts with one of the following options:
           <ul>
             <li>
               <codeph>&#8209;&#8209;authorized_proxy_user_config=<varname>authenticated_user</varname>=<varname>delegated_user</varname></codeph>

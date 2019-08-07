@@ -43,6 +43,9 @@ under the License.
     <p>
       Impala supports authentication using either Kerberos or LDAP.
     </p>
+    <p>
+      You can also make proxy connections to Impala through Apache Knox.
+    </p>
 
     <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
 
