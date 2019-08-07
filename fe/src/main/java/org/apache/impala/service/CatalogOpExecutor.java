@@ -3612,40 +3612,20 @@ public class CatalogOpExecutor {
               "Load triggered by " + cmdString);
           if (tbl != null) {
             if (isTableLoadedInCatalog) {
-              boolean isTransactional = AcidUtils.isTransactionalTable(
-                  tbl.getMetaStoreTable().getParameters());
               if (req.isSetPartition_spec()) {
+                boolean isTransactional = AcidUtils.isTransactionalTable(
+                    tbl.getMetaStoreTable().getParameters());
                 Preconditions.checkArgument(!isTransactional);
                 updatedThriftTable = catalog_.reloadPartition(tbl,
                     req.getPartition_spec(), cmdString);
               } else {
-                if (isTransactional) {
-                  org.apache.hadoop.hive.metastore.api.Table hmsTbl =
-                      getTableFromMetaStore(tblName);
-                  if (hmsTbl == null) {
-                      throw new TableNotFoundException("Table not found: " +
-                          tblName.toString());
-                  }
-                  HdfsTable hdfsTable = (HdfsTable)tbl;
-                  if (!hdfsTable.isPartitioned() &&
-                      MetastoreShim.getWriteIdFromMSTable(tbl.getMetaStoreTable()) ==
-                      MetastoreShim.getWriteIdFromMSTable(hmsTbl)) {
-                    // No need to refresh the table if the local writeId equals to the
-                    // latest writeId from HMS and the table is not partitioned.
-                    LOG.debug("Skip reloading table " + tblName.toString() +
-                        " because it has the latest writeId locally");
-                    resp.getResult().setStatus(new TStatus(TErrorCode.OK,
-                        new ArrayList<String>()));
-                    return resp;
-                  }
-                  // TODO IMPALA-8809: Optimisation for partitioned tables:
-                  //   1: Reload the whole table if schema change happened. Identify
-                  //     such scenario by checking Table.TBL_PROP_LAST_DDL_TIME property.
-                  //     Note, table level writeId is not updated by HMS for partitioned
-                  //     ACID tables, there is a Jira to cover this: HIVE-22062.
-                  //   2: If no need for a full table reload then fetch partition level
-                  //     writeIds and reload only the ones that changed.
-                }
+                // TODO IMPALA-8809: Optimisation for partitioned tables:
+                //   1: Reload the whole table if schema change happened. Identify
+                //     such scenario by checking Table.TBL_PROP_LAST_DDL_TIME property.
+                //     Note, table level writeId is not updated by HMS for partitioned
+                //     ACID tables, there is a Jira to cover this: HIVE-22062.
+                //   2: If no need for a full table reload then fetch partition level
+                //     writeIds and reload only the ones that changed.
                 updatedThriftTable = catalog_.reloadTable(tbl, cmdString);
               }
             } else {
