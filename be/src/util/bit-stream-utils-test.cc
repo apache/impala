@@ -66,7 +66,9 @@ TEST(BitArray, TestBool) {
 
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
-    bool batch_vals[16];
+    // We use uint8_t instead of bool because unpacking is only supported for unsigned
+    // integers.
+    uint8_t batch_vals[16];
     EXPECT_EQ(16, reader.UnpackBatch(1, 16, batch_vals));
     for (int i = 0; i < 8; ++i)  EXPECT_EQ(batch_vals[i], i % 2);
 
@@ -127,12 +129,14 @@ TEST(BitArray, TestBoolSkip) {
   for (int i = 0; i < 8; ++i) ASSERT_TRUE(writer.PutValue(0, 1));
   writer.Flush();
 
-  TestSkipping<bool>(buffer, len, 1, 0, 8);
-  TestSkipping<bool>(buffer, len, 1, 0, 16);
-  TestSkipping<bool>(buffer, len, 1, 8, 8);
-  TestSkipping<bool>(buffer, len, 1, 8, 16);
-  TestSkipping<bool>(buffer, len, 1, 16, 8);
-  TestSkipping<bool>(buffer, len, 1, 16, 16);
+  // We use uint8_t instead of bool because unpacking is only supported for unsigned
+  // integers.
+  TestSkipping<uint8_t>(buffer, len, 1, 0, 8);
+  TestSkipping<uint8_t>(buffer, len, 1, 0, 16);
+  TestSkipping<uint8_t>(buffer, len, 1, 8, 8);
+  TestSkipping<uint8_t>(buffer, len, 1, 8, 16);
+  TestSkipping<uint8_t>(buffer, len, 1, 16, 8);
+  TestSkipping<uint8_t>(buffer, len, 1, 16, 16);
 }
 
 TEST(BitArray, TestIntSkip) {
@@ -145,10 +149,10 @@ TEST(BitArray, TestIntSkip) {
     ASSERT_TRUE(writer.PutValue(i, bit_width));
   }
   int bytes_written = writer.bytes_written();
-  TestSkipping<int>(buffer, bytes_written, bit_width, 0, 4);
-  TestSkipping<int>(buffer, bytes_written, bit_width, 4, 4);
-  TestSkipping<int>(buffer, bytes_written, bit_width, 4, 8);
-  TestSkipping<int>(buffer, bytes_written, bit_width, 8, 56);
+  TestSkipping<uint32_t>(buffer, bytes_written, bit_width, 0, 4);
+  TestSkipping<uint32_t>(buffer, bytes_written, bit_width, 4, 4);
+  TestSkipping<uint32_t>(buffer, bytes_written, bit_width, 4, 8);
+  TestSkipping<uint32_t>(buffer, bytes_written, bit_width, 8, 56);
 }
 
 // Writes 'num_vals' values with width 'bit_width' starting from 'start' and increasing
@@ -172,9 +176,9 @@ void TestBitArrayValues(int bit_width, uint64_t start, uint64_t num_vals) {
   for (int trial = 0; trial < 2; ++trial) {
     // Unpack all values at once with one batched reader and in small batches with the
     // other batched reader.
-    vector<int64_t> batch_vals(num_vals);
+    vector<uint64_t> batch_vals(num_vals);
     const uint64_t BATCH_SIZE = 32;
-    vector<int64_t> batch_vals2(BATCH_SIZE);
+    vector<uint64_t> batch_vals2(BATCH_SIZE);
     EXPECT_EQ(num_vals,
         reader.UnpackBatch(bit_width, num_vals, batch_vals.data()));
     for (uint64_t i = 0; i < num_vals; ++i) {

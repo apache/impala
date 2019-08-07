@@ -48,10 +48,21 @@ inline int64_t BitPacking::NumValuesToUnpack(
   }
 }
 
+template <typename T>
+constexpr bool IsSupportedUnpackingType () {
+  return std::is_same<T, uint8_t>::value
+      || std::is_same<T, uint16_t>::value
+      || std::is_same<T, uint32_t>::value
+      || std::is_same<T, uint64_t>::value;
+}
+
 template <typename OutType>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackValues(int bit_width,
     const uint8_t* __restrict__ in, int64_t in_bytes, int64_t num_values,
     OutType* __restrict__ out) {
+  static_assert(IsSupportedUnpackingType<OutType>(),
+      "Only unsigned integers are supported.");
+
 #pragma push_macro("UNPACK_VALUES_CASE")
 #define UNPACK_VALUES_CASE(ignore1, i, ignore2) \
   case i:                                       \
@@ -71,6 +82,9 @@ template <typename OutType, int BIT_WIDTH>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackValues(
     const uint8_t* __restrict__ in, int64_t in_bytes, int64_t num_values,
     OutType* __restrict__ out) {
+  static_assert(IsSupportedUnpackingType<OutType>(),
+      "Only unsigned integers are supported.");
+
   constexpr int BATCH_SIZE = 32;
   const int64_t values_to_read = NumValuesToUnpack(BIT_WIDTH, in_bytes, num_values);
   const int64_t batches_to_read = values_to_read / BATCH_SIZE;

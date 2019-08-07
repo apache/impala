@@ -30,7 +30,6 @@ namespace impala {
       int bit_width, const uint8_t* __restrict__ in, int64_t in_bytes,            \
       int64_t num_values, OUT_TYPE* __restrict__ out);
 
-INSTANTIATE_UNPACK_VALUES(bool);
 INSTANTIATE_UNPACK_VALUES(uint8_t);
 INSTANTIATE_UNPACK_VALUES(uint16_t);
 INSTANTIATE_UNPACK_VALUES(uint32_t);

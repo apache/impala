@@ -52,9 +52,11 @@ class ParquetBoolDecoder {
   parquet::Encoding::type encoding_;
 
   /// A buffer to store unpacked values. Must be a multiple of 32 size to use the
-  /// batch-oriented interface of BatchedBitReader.
+  /// batch-oriented interface of BatchedBitReader. We use uint8_t instead of bool because
+  /// bit unpacking is only supported for unsigned integers. The values are converted to
+  /// bool when returned to the user.
   static const int UNPACKED_BUFFER_LEN = 128;
-  bool unpacked_values_[UNPACKED_BUFFER_LEN];
+  uint8_t unpacked_values_[UNPACKED_BUFFER_LEN];
 
   /// The number of valid values in 'unpacked_values_'.
   int num_unpacked_values_ = 0;
@@ -66,7 +68,7 @@ class ParquetBoolDecoder {
   BatchedBitReader bool_values_;
 
   /// RLE decoder, used if 'encoding_' is RLE.
-  RleBatchDecoder<bool> rle_decoder_;
+  RleBatchDecoder<uint8_t> rle_decoder_;
 };
 
 template <parquet::Encoding::type ENCODING>

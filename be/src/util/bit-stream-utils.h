@@ -54,7 +54,7 @@ class BitWriter {
   int buffer_len() const { return max_bytes_; }
 
   /// Writes a value to buffered_values_, flushing to buffer_ if necessary.  This is bit
-  /// packed.  Returns false if there was not enough space. num_bits must be <= 32.
+  /// packed.  Returns false if there was not enough space. num_bits must be <= 64.
   bool PutValue(uint64_t v, int num_bits);
 
   /// Writes v to the next aligned byte using num_bytes. If T is larger than num_bytes, the
@@ -130,7 +130,7 @@ class BatchedBitReader {
   }
 
   /// Gets up to 'num_values' bit-packed values, starting from the current byte in the
-  /// buffer and advance the read position. 'bit_width' must be <= 32.
+  /// buffer and advance the read position. 'bit_width' must be <= 64.
   /// If 'bit_width' * 'num_values' is not a multiple of 8, the trailing bytes are
   /// skipped and the next UnpackBatch() call will start reading from the next byte.
   ///
@@ -138,6 +138,8 @@ class BatchedBitReader {
   /// total number of values the caller wants to read from a run of bit-packed values, or
   /// 'bit_width' * 'num_values' must be a multiple of 8. This condition is always
   /// satisfied if 'num_values' is a multiple of 32.
+  ///
+  /// The output type 'T' must be an unsigned integer.
   ///
   /// Returns the number of values read.
   template<typename T>
