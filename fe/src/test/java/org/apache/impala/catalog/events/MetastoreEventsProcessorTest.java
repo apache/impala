@@ -78,6 +78,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
+import org.apache.impala.catalog.events.MetastoreEvents.TableInvalidatingEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -596,6 +597,23 @@ public class MetastoreEventsProcessorTest {
     FeFsPartition singlePartition =
         Iterables.getOnlyElement(parts);
     assertTrue(newLocation.equals(singlePartition.getLocation()));
+
+    // Test if trivial partition inserts are skipped. Verify that changing parameters
+    // from TableInvalidatingEvent.parametersToIgnore doesn't trigger a refresh.
+    List partitionValue = Arrays.asList("4");
+    alterPartitionsTrivial(testTblName, partitionValue );
+    eventsProcessor_.processEvents();
+
+    Collection<? extends FeFsPartition> partsAfterTrivialAlter =
+        FeCatalogUtils.loadAllPartitions((HdfsTable)
+            catalog_.getTable(TEST_DB_NAME, testTblName));
+    FeFsPartition singlePartitionAfterTrivialAlter =
+        Iterables.getOnlyElement(partsAfterTrivialAlter);
+    for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+      assertEquals("Unexpected parameter value after trivial alter partition "
+          + "event", singlePartition.getParameters().get(parameter),
+          singlePartitionAfterTrivialAlter.getParameters().get(parameter));
+    }
   }
 
   /**
@@ -814,6 +832,14 @@ public class MetastoreEventsProcessorTest {
         .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
     assertEquals("Unexpected number of table invalidates",
         numberOfInvalidatesBefore + 4, numberOfInvalidatesAfter);
+    // Check if trivial alters are ignored.
+    loadTable(testTblName);
+    alterTableChangeTrivialProperties(testTblName);
+    // The above alter should not cause an invalidate.
+    long numberOfInvalidatesAfterTrivialAlter = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
+    assertEquals("Unexpected number of table invalidates after trivial alter",
+        numberOfInvalidatesBefore + 4, numberOfInvalidatesAfterTrivialAlter);
   }
 
   /**
@@ -2519,6 +2545,22 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  /**
+   * Alters trivial table properties which must be ignored by the event processor
+   */
+  private void alterTableChangeTrivialProperties(String tblName)
+      throws TException {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          msClient.getHiveClient().getTable(TEST_DB_NAME, tblName);
+      for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+        msTable.getParameters().put(parameter, "1234567");
+      }
+      msClient.getHiveClient().alter_table_with_environmentContext(
+          TEST_DB_NAME, tblName, msTable, null);
+    }
+  }
+
   private void alterTableAddCol(
       String tblName, String colName, String colType, String comment) throws TException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -2595,6 +2637,23 @@ public class MetastoreEventsProcessorTest {
             tblName,
             partVal);
         partition.getSd().setLocation(location);
+        partitions.add(partition);
+      }
+      metaStoreClient.getHiveClient().alter_partitions(TEST_DB_NAME, tblName, partitions);
+    }
+  }
+
+  /**
+   * Alters trivial partition properties which must be ignored by the event processor
+   */
+  private void alterPartitionsTrivial(String tblName, List<String> partVal)
+      throws TException {
+    List<Partition> partitions = new ArrayList<>();
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      Partition partition = metaStoreClient.getHiveClient().getPartition(TEST_DB_NAME,
+          tblName, partVal);
+      for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+        partition.getParameters().put(parameter, "12334567");
         partitions.add(partition);
       }
       metaStoreClient.getHiveClient().alter_partitions(TEST_DB_NAME, tblName, partitions);

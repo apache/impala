@@ -19,6 +19,7 @@ package org.apache.impala.catalog.events;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
@@ -857,6 +858,7 @@ public class MetastoreEvents {
    * MetastoreEvent for ALTER_TABLE event type
    */
   public static class AlterTableEvent extends TableInvalidatingEvent {
+    protected org.apache.hadoop.hive.metastore.api.Table tableBefore_;
     // the table object after alter operation, as parsed from the NotificationEvent
     protected org.apache.hadoop.hive.metastore.api.Table tableAfter_;
     // true if this alter event was due to a rename operation
@@ -882,6 +884,7 @@ public class MetastoreEvents {
       try {
         msTbl_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
         tableAfter_ = Preconditions.checkNotNull(alterTableMessage.getTableObjAfter());
+        tableBefore_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter table message"), e);
@@ -933,6 +936,13 @@ public class MetastoreEvents {
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event or "
             + "update is already present in catalog.");
+        return;
+      }
+      // Ignore the event if this is a trivial event. See javadoc for
+      // canBeSkipped() for examples.
+      if (canBeSkipped()) {
+        infoLog("Not processing this event as it only modifies some table parameters "
+            + "which can be ignored.");
         return;
       }
       // in case of table level alters from external systems it is better to do a full
@@ -1002,6 +1012,20 @@ public class MetastoreEvents {
         return true;
       }
       return false;
+    }
+
+    @Override
+    protected boolean canBeSkipped() {
+      // Certain alter events just modify some parameters such as
+      // "transient_lastDdlTime" in Hive. For eg: the alter table event generated
+      // along with insert events. Check if the alter table event is such a trivial
+      // event by setting those parameters equal before and after the event and
+      // comparing the objects.
+
+      // Avoid modifying the object from event.
+      org.apache.hadoop.hive.metastore.api.Table tblAfter = tableAfter_.deepCopy();
+      setTrivialParameters(tableBefore_.getParameters(), tblAfter.getParameters());
+      return tblAfter.equals(tableBefore_);
     }
 
     private String qualify(TTableName tTableName) {
@@ -1315,6 +1339,13 @@ public class MetastoreEvents {
         return;
       }
 
+      // Skip if it's only a change in parameters by Hive, which can be ignored.
+      if (canBeSkipped()) {
+        infoLog("Not processing this event as it only modifies some "
+            + "parameters which can be ignored.");
+        return;
+      }
+
       if (invalidateCatalogTable()) {
         infoLog("Table {} is invalidated", getFullyQualifiedTblName());
       } else {
@@ -1328,6 +1359,36 @@ public class MetastoreEvents {
       if (params == null) return defaultVal;
       return params.getOrDefault(key, defaultVal);
     }
+
+    /**
+     * Returns a list of parameters that are set by Hive for tables/partitions that can be
+     * ignored to determine if the alter table/partition event is a trivial one.
+     */
+    static final List<String> parametersToIgnore = new ImmutableList.Builder<String>()
+        .add("transient_lastDdlTime")
+        .add("totalSize")
+        .add("numFilesErasureCoded")
+        .add("numFiles")
+        .build();
+
+    /**
+     * Util method that sets the parameters that can be ignored equal before and after
+     * event.
+     */
+     static void setTrivialParameters(Map<String, String> parametersBefore,
+        Map<String, String> parametersAfter) {
+      for (String parameter: parametersToIgnore) {
+        parametersAfter.put(parameter,
+            parametersBefore.get(parameter));
+      }
+    }
+
+    /**
+     * Hive generates certain trivial alter events for eg: change only
+     * "transient_lastDdlTime". This method returns true if the alter partition event is
+     * such a trivial event.
+     */
+    protected abstract boolean canBeSkipped();
   }
 
   public static class AddPartitionEvent extends TableInvalidatingEvent {
@@ -1436,6 +1497,9 @@ public class MetastoreEvents {
             e.getMessage());
       }
     }
+
+    @Override
+    protected boolean canBeSkipped() { return false; }
   }
 
   public static class AlterPartitionEvent extends TableInvalidatingEvent {
@@ -1474,6 +1538,15 @@ public class MetastoreEvents {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
+
+      // Ignore the event if this is a trivial event. See javadoc for
+      // isTrivialAlterPartitionEvent() for examples.
+      if (canBeSkipped()) {
+        infoLog("Not processing this event as it only modifies some partition "
+            + "parameters which can be ignored.");
+        return;
+      }
+
       // Reload the whole table if it's a transactional table.
       if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
         reloadTableFromCatalog("ALTER_PARTITION");
@@ -1508,6 +1581,21 @@ public class MetastoreEvents {
               constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
         }
       }
+    }
+
+    @Override
+    protected boolean canBeSkipped() {
+      // Certain alter events just modify some parameters such as
+      // "transient_lastDdlTime" in Hive. For eg: the alter table event generated
+      // along with insert events. Check if the alter table event is such a trivial
+      // event by setting those parameters equal before and after the event and
+      // comparing the objects.
+
+      // Avoid modifying the object from event.
+      Partition afterPartition = partitionAfter_.deepCopy();
+      setTrivialParameters(partitionBefore_.getParameters(),
+          afterPartition.getParameters());
+      return afterPartition.equals(partitionBefore_);
     }
 
     @Override
@@ -1611,6 +1699,9 @@ public class MetastoreEvents {
     protected void initSelfEventIdentifiersFromEvent() {
       // no-op
     }
+
+    @Override
+    protected boolean canBeSkipped() { return false; }
   }
 
   /**
