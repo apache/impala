@@ -39,7 +39,12 @@ under the License.
       <tbody>
         {{#large_tables}}
         <tr>
-          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          <!-- The /catalog_object endpoint is disabled if local_catalog_mode is used
+            since metadata is partially fetched on demand. -->
+          {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
+          {{^use_local_catalog}}
+           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          {{/use_local_catalog}}
           </td>
           <td>{{mem_estimate}}</td>
           <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
@@ -80,7 +85,11 @@ under the License.
       <tbody>
         {{#frequent_tables}}
         <tr>
-          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          <td>
+          {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
+          {{^use_local_catalog}}
+           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          {{/use_local_catalog}}
           </td>
           <td>{{num_metadata_ops}}</td>
           <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
@@ -120,7 +129,11 @@ under the License.
       <tbody>
         {{#high_file_count_tables}}
         <tr>
-          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          <td>
+          {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
+          {{^use_local_catalog}}
+           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          {{/use_local_catalog}}
           </td>
           <td>{{num_files}}</td>
           <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
@@ -152,10 +165,14 @@ under the License.
 
 <div class="panel panel-info">
   <div class="panel-heading">
+  {{^use_local_catalog}}
     <a href='catalog_object?object_type=DATABASE&object_name={{name}}' id='{{name}}'>
+  {{/use_local_catalog}}
       <h2 class="panel-title">{{name}}
       <span class="pull-right">{{num_tables}} table(s)</span></h2>
+  {{^use_local_catalog}}
     </a>
+  {{/use_local_catalog}}
   </div>
   <div class="panel-body">
     <table id="{{name}}-tables" class='table table-hover table-bordered'>
@@ -170,7 +187,11 @@ under the License.
       <tbody>
         {{#tables}}
         <tr>
-          <td><a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          <td>
+          {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
+          {{^use_local_catalog}}
+           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          {{/use_local_catalog}}
           </td>
           {{?has_metrics}}
           <td><a href="table_metrics?name={{fqtn}}">{{name}}-metrics</a></td>

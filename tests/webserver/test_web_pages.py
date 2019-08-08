@@ -314,22 +314,44 @@ class TestWebPage(ImpalaTestSuite):
   def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs
     against an unloaded as well as a loaded table."""
+    obj_url = self.CATALOG_OBJECT_URL + \
+              "?object_type=TABLE&object_name={0}.{1}".format(db_name, tbl_name)
+
     if cluster_properties.is_catalog_v2_cluster():
       impalad_expected_str = \
-          "UnsupportedOperationException: LocalCatalog.getTCatalogObject"
+          "No URI handler for &apos;/catalog_object&apos;"
+      self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
+      self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+      # Catalog object endpoint is disabled in local catalog mode.
+      self.check_endpoint_is_disabled(obj_url, impalad_expected_str,
+                                      ports_to_test=self.IMPALAD_TEST_PORT)
+      self.client.execute("select count(*) from %s.%s" % (db_name, tbl_name))
+      self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+      self.check_endpoint_is_disabled(obj_url, impalad_expected_str,
+                                      ports_to_test=self.IMPALAD_TEST_PORT)
     else:
       impalad_expected_str = tbl_name
-    obj_url = self.CATALOG_OBJECT_URL + \
-        "?object_type=TABLE&object_name={0}.{1}".format(db_name, tbl_name)
-    self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
-    self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
-    self.get_and_check_status(obj_url, impalad_expected_str,
-        ports_to_test=self.IMPALAD_TEST_PORT)
-    self.client.execute("select count(*) from %s.%s" % (db_name, tbl_name))
+      self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
+      self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+      self.get_and_check_status(obj_url, impalad_expected_str,
+          ports_to_test=self.IMPALAD_TEST_PORT)
+      self.client.execute("select count(*) from %s.%s" % (db_name, tbl_name))
 
-    self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
-    self.get_and_check_status(obj_url, impalad_expected_str,
-        ports_to_test=self.IMPALAD_TEST_PORT)
+      self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
+      self.get_and_check_status(obj_url, impalad_expected_str,
+          ports_to_test=self.IMPALAD_TEST_PORT)
+
+  def check_endpoint_is_disabled(self, url, string_to_search="", ports_to_test=None):
+    """Helper method that verifies the given url does not exist."""
+    if ports_to_test is None:
+      ports_to_test = self.TEST_PORTS_WITH_SS
+    for port in ports_to_test:
+      input_url = url.format(port)
+      response = requests.get(input_url)
+      assert response.status_code == requests.codes.not_found, "URL: {0} Str:'{" \
+        "1}'\nResp:{2}".format(input_url, string_to_search, response.text)
+      assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
+        input_url, string_to_search, response.text)
 
   def __test_table_metrics(self, db_name, tbl_name, metric):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))

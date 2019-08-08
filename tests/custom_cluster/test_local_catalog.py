@@ -381,6 +381,9 @@ class TestObservability(CustomClusterTestSuite):
       impalad = self.cluster.impalads[0]
       # Make sure local catalog mode is enabled and visible on web UI.
       assert '(Local Catalog Mode)' in impalad.service.read_debug_webpage('/')
+      # Make sure /catalog_object endpoint is disabled on web UI.
+      assert 'No URI handler for &apos;/catalog_object&apos;' \
+        in impalad.service.read_debug_webpage('/catalog_object')
       client = impalad.service.create_beeswax_client()
       cache_hit_rate_metric_key = "catalog.cache.hit-rate"
       cache_miss_rate_metric_key = "catalog.cache.miss-rate"
