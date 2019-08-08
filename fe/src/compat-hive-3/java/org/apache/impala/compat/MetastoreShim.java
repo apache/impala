@@ -30,11 +30,14 @@ import com.google.common.collect.ImmutableMap;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -52,6 +55,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
@@ -83,7 +87,7 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
-
+import com.google.common.collect.Lists;
 /**
  * A wrapper around some of Hive's Metastore API's to abstract away differences
  * between major versions of Hive. This implements the shimmed methods for Hive 3.
@@ -119,6 +123,21 @@ public class MetastoreShim {
   }
 
   /**
+   * Wrapper around IMetaStoreClient.alter_table with validWriteIds as a param.
+   */
+  public static void alterTableWithTransaction(IMetaStoreClient client,
+     Table tbl, long txnId)
+     throws InvalidOperationException, MetaException, TException {
+    // Get ValidWriteIdList to pass Hive verify when set table property
+    // COLUMN_STATS_ACCURATE
+    String validWriteIds = getValidWriteIdListInTxn(client, tbl.getDbName(),
+        tbl.getTableName(), txnId);
+    client.alter_table(null, tbl.getDbName(), tbl.getTableName(),
+        tbl, null, validWriteIds);
+  }
+
+
+  /**
    * Wrapper around IMetaStoreClient.alter_partition() to deal with added
    * arguments.
    */
@@ -138,6 +157,19 @@ public class MetastoreShim {
     client.alter_partitions(dbName, tableName, partitions, null);
   }
 
+  /**
+   * Wrapper around IMetaStoreClient.alter_partitions with transaction information
+   */
+  public static void alterPartitionsWithTransaction(IMetaStoreClient client,
+    String dbName, String tblName, List<Partition> partitions, long tblWriteId,
+    long txnId) throws InvalidOperationException, MetaException, TException {
+    // Get ValidWriteIdList to pass Hive verify  when set
+    // property(COLUMN_STATS_ACCURATE). Correct validWriteIdList is also needed
+    // to commit the alter partitions operation in hms side.
+    String validWriteIds = getValidWriteIdListInTxn(client, dbName, tblName, txnId);
+    client.alter_partitions(dbName, tblName, partitions, null,
+         validWriteIds, tblWriteId);
+  }
   /**
    * Wrapper around MetaStoreUtils.updatePartitionStatsFast() to deal with added
    * arguments.
@@ -445,6 +477,28 @@ public class MetastoreShim {
     return new ValidReaderWriteIdList(validWriteIds);
   }
 
+
+  /**
+   * Get validWriteIds in string with txnId and table name
+   * arguments.
+   */
+  private static String getValidWriteIdListInTxn(IMetaStoreClient client, String dbName,
+      String tblName, long txnId)
+      throws InvalidOperationException, MetaException, TException {
+    ValidTxnList txns = client.getValidTxns(txnId);
+    String tableFullName = dbName + "." + tblName;
+    List<TableValidWriteIds> writeIdsObj = client.getValidWriteIds(
+        Lists.newArrayList(tableFullName), txns.toString());
+    ValidTxnWriteIdList validTxnWriteIdList = new ValidTxnWriteIdList(txnId);
+    for (TableValidWriteIds tableWriteIds : writeIdsObj) {
+      validTxnWriteIdList.addTableValidWriteIdList(
+          createValidReaderWriteIdList(tableWriteIds));
+    }
+    String validWriteIds =
+        validTxnWriteIdList.getTableValidWriteIdList(tableFullName).writeToString();
+    return validWriteIds;
+  }
+
   /**
    * Wrapper around HMS Partition object to get writeID
    * WriteID is introduced in ACID 2
@@ -453,6 +507,14 @@ public class MetastoreShim {
   public static long getWriteIdFromMSPartition(Partition partition) {
     Preconditions.checkNotNull(partition);
     return partition.getWriteId();
+  }
+
+  /**
+   * Set write ID to HMS partition.
+   */
+  public static void setWriteIdForMSPartition(Partition partition, long writeId) {
+    Preconditions.checkNotNull(partition);
+    partition.setWriteId(writeId);
   }
 
   /**
@@ -720,4 +782,32 @@ public class MetastoreShim {
   public static long getMajorVersion() {
     return MAJOR_VERSION;
   }
+
+    /**
+     * Borrowed code from hive.
+     * This assumes that the caller intends to
+     * read the files, and thus treats both open and aborted write ids as invalid.
+     * @param tableWriteIds valid write ids for the given table from the metastore
+     * @return a valid write IDs list for the input table
+     */
+  private static ValidReaderWriteIdList createValidReaderWriteIdList(
+      TableValidWriteIds tableWriteIds) {
+     String fullTableName = tableWriteIds.getFullTableName();
+     long highWater = tableWriteIds.getWriteIdHighWaterMark();
+     List<Long> invalids = tableWriteIds.getInvalidWriteIds();
+     BitSet abortedBits = BitSet.valueOf(tableWriteIds.getAbortedBits());
+     long[] exceptions = new long[invalids.size()];
+     int i = 0;
+     for (long writeId : invalids) {
+       exceptions[i++] = writeId;
+     }
+     if (tableWriteIds.isSetMinOpenWriteId()) {
+       return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
+         highWater, tableWriteIds.getMinOpenWriteId());
+     } else {
+       return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
+         highWater);
+     }
+  }
+
 }

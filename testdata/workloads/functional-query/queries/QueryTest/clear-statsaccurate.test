@@ -1,0 +1,45 @@
+====
+---- HIVE_QUERY
+use $DATABASE;
+create external table ext_nopart_colstats (x int);
+insert into ext_nopart_colstats values (1);
+analyze table ext_nopart_colstats compute statistics for columns;
+create external table ext_nopart_colstatschg (x int);
+insert into ext_nopart_colstatschg values (1);
+analyze table ext_nopart_colstatschg compute statistics for columns;
+create external table ext_part_colstats (x int) partitioned by (ds string);
+alter table ext_part_colstats add partition (ds='2010-01-01');
+alter table ext_part_colstats add partition (ds='2010-01-02');
+insert into ext_part_colstats partition (ds='2010-01-01') values (1);
+analyze table ext_part_colstats partition(ds='2010-01-01')
+    compute statistics for columns;
+====
+---- QUERY
+invalidate metadata ext_nopart_colstats;
+show create table ext_nopart_colstats;
+---- RESULTS
+row_regex: .*COLUMN_STATS_ACCURATE.*
+====
+---- QUERY
+invalidate metadata ext_nopart_colstatschg;
+insert into ext_nopart_colstatschg values (2);
+show create table ext_nopart_colstatschg;
+---- RESULTS
+row_regex: (?!.*COLUMN_STATS_ACCURATE)
+====
+---- QUERY
+select x from ext_nopart_colstatschg;
+---- RESULTS
+1
+2
+====
+---- QUERY
+invalidate metadata ext_part_colstats;
+insert into ext_part_colstats partition (ds='2010-01-01') values (2);
+select x from ext_part_colstats where ds='2010-01-01';
+---- RESULTS
+1
+2
+---- TYPES
+int
+====

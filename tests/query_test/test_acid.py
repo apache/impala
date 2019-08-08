@@ -24,8 +24,6 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
                                SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
-
-
 class TestAcid(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -84,7 +82,42 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfLocal.hive
   def test_acid_profile(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-profile', vector, use_db=unique_database)
-# TODO(todd): further tests to write:
+
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_acid_insert_statschg(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-clear-statsaccurate',
+        vector, use_db=unique_database)
+    result = self.run_stmt_in_hive("select count(*) from {0}.{1}".format(unique_database,
+        "insertonly_nopart_colstatschg"))
+    # The return from hive should look like '_c0\n2\n'
+    assert "2" in result
+    result = self.run_stmt_in_hive("select count(*) from {0}.{1} where ds='2010-01-01'"
+        .format(unique_database, "insertonly_part_colstats"))
+    assert "2" in result
+
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_ext_statschg(self, vector, unique_database):
+    self.run_test_case('QueryTest/clear-statsaccurate',
+        vector, use_db=unique_database)
+    result = self.run_stmt_in_hive("select count(*) from {0}.{1}".format(unique_database,
+        "ext_nopart_colstatschg"))
+    # Hive should return correct row count after Impala insert.
+    # The return from hive should look like '_c0\n2\n'
+    assert "2" in result
+    result = self.run_stmt_in_hive("select count(*) from {0}.{1} where ds='2010-01-01'"
+        .format(unique_database, "ext_part_colstats"))
+    assert "2" in result
+
+#  TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.
 #  Negative test for LOAD DATA INPATH and all other SQL that we don't support.

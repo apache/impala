@@ -74,6 +74,14 @@ public class MetastoreShim {
   }
 
   /**
+   * Hive-3 only function
+   */
+  public static void alterTableWithTransaction(IMetaStoreClient client,
+      Table tbl, long txnId) {
+    throw new UnsupportedOperationException("alterTableWithTransaction");
+  }
+
+  /**
    * Wrapper around IMetaStoreClient.alter_partition() to deal with added
    * arguments.
    */
@@ -91,6 +99,16 @@ public class MetastoreShim {
       String tableName, List<Partition> partitions)
       throws InvalidOperationException, MetaException, TException {
     client.alter_partitions(dbName, tableName, partitions, null);
+  }
+
+
+ /**
+  * Hive-3 only function
+  */
+  public static void alterPartitionsWithTransaction(IMetaStoreClient client,
+      String dbName, String tblName, List<Partition> partitions,
+      long tblWriteId, long txnId) {
+    throw new UnsupportedOperationException("alterTableWithTransaction");
   }
 
   /**
@@ -276,6 +294,12 @@ public class MetastoreShim {
    */
   public static long getWriteIdFromMSPartition(Partition partition) {
     return -1L;
+  }
+
+  /**
+   *  Hive-3 only function
+   */
+  public static void setWriteIdForMSPartition(Partition partition, long writeId) {
   }
 
   /**

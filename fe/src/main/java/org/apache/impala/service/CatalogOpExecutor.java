@@ -3738,6 +3738,12 @@ public class CatalogOpExecutor {
     }
     final Timer.Context context
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
+
+    long transactionId = -1;
+    if (update.isSetTransaction_id()) transactionId = update.getTransaction_id();
+    long tableWriteId = -1;
+    boolean isAcid = false;
+
     try {
       // Get new catalog version for table in insert.
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -3760,6 +3766,8 @@ public class CatalogOpExecutor {
       Collection<? extends FeFsPartition> parts =
           FeCatalogUtils.loadAllPartitions((HdfsTable) table);
       List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
+      List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset =
+          Lists.newArrayList();
       if (table.getNumClusteringCols() > 0) {
         // Set of all partition names targeted by the insert that need to be created
         // in the Metastore (partitions that do not currently exist in the catalog).
@@ -3769,16 +3777,35 @@ public class CatalogOpExecutor {
         HashSet<String> partsToCreate =
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
+        if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+          isAcid = true;
+          try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+            tableWriteId = MetastoreShim.allocateTableWriteId(
+                msClient.getHiveClient(), transactionId,
+                table.getDb().getName(), table.getName());
+          }
+        }
         for (FeFsPartition partition: parts) {
           // TODO: In the BE we build partition names without a trailing char. In FE
           // we build partition name with a trailing char. We should make this
           // consistent.
           String partName = partition.getPartitionName() + "/";
-
           // Attempt to remove this partition name from partsToCreate. If remove
           // returns true, it indicates the partition already exists.
           if (partsToCreate.remove(partName)) {
             affectedExistingPartitions.add(partition);
+            // For existing partitions, we need to unset column_stats_accurate to
+            // tell hive the statistics is not accurate any longer.
+            if (partition.getParameters() != null &&  partition.getParameters()
+                .containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
+              org.apache.hadoop.hive.metastore.api.Partition hmsPartition =
+                  ((HdfsPartition) partition).toHmsPartition();
+              hmsPartition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+              if (isAcid) {
+                MetastoreShim.setWriteIdForMSPartition(hmsPartition, tableWriteId);
+              }
+              hmsPartitionsStatsUnset.add(hmsPartition);
+            }
             if (partition.isMarkedCached()) {
               // The partition was targeted by the insert and is also cached. Since
               // data was written to the partition, a watch needs to be placed on the
@@ -3832,6 +3859,7 @@ public class CatalogOpExecutor {
                   try {
                     cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
                         part, cachePoolName, cacheReplication));
+                    StatsSetupConst.setBasicStatsState(part.getParameters(), "false");
                     cachedHmsParts.add(part);
                   } catch (ImpalaRuntimeException e) {
                     String msg = String.format("Partition %s.%s(%s): State: Not " +
@@ -3872,11 +3900,19 @@ public class CatalogOpExecutor {
             throw new InternalException("Error adding partitions", e);
           }
         }
+
+        // Unset COLUMN_STATS_ACCURATE by calling alter partition to hms.
+        if (!hmsPartitionsStatsUnset.isEmpty()) {
+          unsetPartitionsColStats(table.getMetaStoreTable(), hmsPartitionsStatsUnset,
+              tableWriteId, transactionId);
+        }
       } else {
         // For non-partitioned table, only single part exists
         FeFsPartition singlePart = Iterables.getOnlyElement((List<FeFsPartition>) parts);
         affectedExistingPartitions.add(singlePart);
+
       }
+      unsetTableColStats(table.getMetaStoreTable(), transactionId);
       // Submit the watch request for the given cache directives.
       if (!cacheDirIds.isEmpty()) {
         catalog_.watchCacheDirs(cacheDirIds, tblName.toThrift(),
@@ -3894,6 +3930,7 @@ public class CatalogOpExecutor {
         response.getResult().setStatus(
             new TStatus(TErrorCode.OK, new ArrayList<String>()));
       }
+
       // Commit transactional inserts on success. We don't abort the transaction
       // here in case of failures, because the client, i.e. query coordinator, is
       // always responsible for aborting transactions when queries hit errors.
@@ -4262,4 +4299,59 @@ public class CatalogOpExecutor {
       MetastoreShim.commitTransaction(msClient.getHiveClient(), transactionId);
     }
   }
+
+  /**
+   * Update table properties to remove the COLUMN_STATS_ACCURATE entry if it exists.
+   */
+  private void unsetTableColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
+      long txnId) throws ImpalaRuntimeException{
+    Map<String, String> params = msTable.getParameters();
+    if (params != null && params.containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
+      params.remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+      // In Hive 2, some alter table can drop stats, see HIVE-15653, set following
+      // property to true to avoid this happen.
+      // TODO: More research, and remove this property if Hive 3 fixed the problem.
+      msTable.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE);
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        try {
+          if (AcidUtils.isTransactionalTable(params)) {
+            MetastoreShim.alterTableWithTransaction(msClient.getHiveClient(),
+                msTable, txnId);
+          } else {
+            msClient.getHiveClient().alter_table(msTable.getDbName(),
+                msTable.getTableName(), msTable);
+          }
+        } catch (TException te) {
+          new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), te);
+        }
+      }
+    }
+  }
+
+  /**
+   * Update partitions properties to remove the COLUMN_STATS_ACCURATE entry from HMS.
+   * This method assumes the partitions in the input hmsPartitionsStatsUnset already
+   * had the COLUMN_STATS_ACCURATE removed from their properties.
+   */
+  private void unsetPartitionsColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
+      List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset,
+      long writeId, long txnId) throws ImpalaRuntimeException{
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      try {
+        if (AcidUtils.isTransactionalTable( msTable.getParameters())) {
+          MetastoreShim.alterPartitionsWithTransaction(
+              msClient.getHiveClient(), msTable.getDbName(), msTable.getTableName(),
+              hmsPartitionsStatsUnset,  writeId, txnId);
+        } else {
+          MetastoreShim.alterPartitions(msClient.getHiveClient(), msTable.getDbName(),
+              msTable.getTableName(), hmsPartitionsStatsUnset);
+        }
+      } catch (TException te) {
+        new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), te);
+      }
+    }
+  }
+
 }
