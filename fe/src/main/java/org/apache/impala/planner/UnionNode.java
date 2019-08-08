@@ -110,14 +110,23 @@ public class UnionNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality_ = constExprLists_.size();
+    long totalChildCardinality = 0;
+    boolean haveChildWithCardinality = false;
     for (PlanNode child: children_) {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
-      if (child.cardinality_ > 0) {
-        cardinality_ = checkedAdd(cardinality_, child.cardinality_);
+      if (child.cardinality_ >= 0) {
+        totalChildCardinality = checkedAdd(totalChildCardinality, child.cardinality_);
+        haveChildWithCardinality = true;
       }
       numNodes_ = Math.max(child.getNumNodes(), numNodes_);
+    }
+    // Consider estimate valid if we have at least one child with known cardinality, or
+    // only constant values.
+    if (haveChildWithCardinality || children_.size() == 0) {
+      cardinality_ = checkedAdd(totalChildCardinality, constExprLists_.size());
+    } else {
+      cardinality_ = -1;
     }
     // The number of nodes of a union node is -1 (invalid) if all the referenced tables
     // are inline views (e.g. select 1 FROM (VALUES(1 x, 1 y)) a FULL OUTER JOIN

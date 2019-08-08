@@ -712,8 +712,22 @@ public class CardinalityTest extends PlannerTestBase {
     // There is no available statistics in functional.tinytable.
     // True cardinality of functional.tinytable is 3.
     String subQuery = "SELECT * FROM functional.tinytable";
-    verifyApproxCardinality(subQuery + " UNION ALL " + subQuery, 0, true,
+    verifyApproxCardinality(subQuery + " UNION ALL " + subQuery, -1, true,
         ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, UnionNode.class);
+
+    // Same test, except with some constant expressions added to the union.
+    // The output cardinality still cannot be estimated.
+    verifyApproxCardinality(
+        subQuery + " UNION ALL " + subQuery + " UNION ALL SELECT 'a', 'b'", -1, true,
+        ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        path, UnionNode.class);
+
+    // If one branch of the union has known cardinality, that value is used.
+    // alltypestiny has 8 rows and computed stats.
+    verifyApproxCardinality(subQuery + " UNION ALL " +
+        "SELECT string_col, date_string_col from functional.alltypestiny",
+        8, true, ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
         path, UnionNode.class);
   }
 
