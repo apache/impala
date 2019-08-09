@@ -157,9 +157,10 @@ class TestWebPage(ImpalaTestSuite):
     for port in ports_to_test:
       input_url = url.format(port)
       response = requests.get(input_url)
-      assert (response.status_code == requests.codes.ok
-          and string_to_search in response.text), "URL: {0} Str:'{1}'\nResp:{2}".format(
-              input_url, string_to_search, response.text)
+      assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
+        .format(input_url, string_to_search, response.text)
+      assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
+        input_url, string_to_search, response.text)
       responses.append(response)
     return responses
 
@@ -270,19 +271,45 @@ class TestWebPage(ImpalaTestSuite):
     # Reset log level.
     self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
 
-  def test_catalog(self, cluster_properties):
+  def test_catalog(self, cluster_properties, unique_database):
     """Tests the /catalog and /catalog_object endpoints."""
-    self.get_and_check_status_jvm(self.CATALOG_URL, "functional")
-    self.get_and_check_status_jvm(self.CATALOG_URL, "alltypes")
+    # Non-partitioned table
+    query = "create table {0}.foo (id int, val int)".format(unique_database)
+    self.execute_query(query)
+    insert_query = "insert into {0}.foo values (1, 200)".format(unique_database)
+    self.execute_query(insert_query)
+    # Partitioned table
+    partitioned_query = "create table {0}.foo_part (id int, val int) partitioned by (" \
+      "year int)".format(unique_database)
+    self.execute_query(partitioned_query)
+    partition_insert_query = "insert into {0}.foo_part partition (year=2010) values "\
+      "(1, 200)".format(unique_database)
+    self.execute_query(partition_insert_query)
+    # Kudu table
+    kudu_query = "create table {0}.foo_kudu (id int, val int, primary key (id))  " \
+      "stored as kudu".format(unique_database)
+    self.execute_query(kudu_query)
+    kudu_insert_query = "insert into {0}.foo_kudu values (1, 200)".format(unique_database)
+    self.execute_query(kudu_insert_query)
+    # Partitioned parquet table
+    parquet_query = "create table {0}.foo_part_parquet (id int, val int) partitioned " \
+      "by (year int) stored as parquet".format(unique_database)
+    self.execute_query(parquet_query)
+    parquet_insert_query = "insert into {0}.foo_part_parquet partition (year=2010) " \
+      "values (1, 200)".format(unique_database)
+    self.execute_query(parquet_insert_query)
+
+    self.get_and_check_status_jvm(self.CATALOG_URL, unique_database)
+    self.get_and_check_status_jvm(self.CATALOG_URL, "foo_part")
     # IMPALA-5028: Test toThrift() of a partitioned table via the WebUI code path.
-    self.__test_catalog_object("functional", "alltypes", cluster_properties)
-    self.__test_catalog_object("functional_parquet", "alltypes", cluster_properties)
-    self.__test_catalog_object("functional", "alltypesnopart", cluster_properties)
-    self.__test_catalog_object("functional_kudu", "alltypes", cluster_properties)
-    self.__test_table_metrics("functional", "alltypes", "total-file-size-bytes")
-    self.__test_table_metrics("functional", "alltypes", "num-files")
-    self.__test_table_metrics("functional_kudu", "alltypes", "alter-duration")
-    self.__test_catalog_tablesfilesusage("functional", "alltypes", "24")
+    self.__test_catalog_object(unique_database, "foo_part", cluster_properties)
+    self.__test_catalog_object(unique_database, "foo_kudu", cluster_properties)
+    self.__test_catalog_object(unique_database, "foo_part_parquet", cluster_properties)
+    self.__test_catalog_object(unique_database, "foo", cluster_properties)
+    self.__test_table_metrics(unique_database, "foo_part", "total-file-size-bytes")
+    self.__test_table_metrics(unique_database, "foo_part", "num-files")
+    self.__test_table_metrics(unique_database, "foo_part", "alter-duration")
+    self.__test_catalog_tablesfilesusage(unique_database, "foo_part", "1")
 
   def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs
