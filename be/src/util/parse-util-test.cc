@@ -37,54 +37,69 @@ TEST(ParseMemSpecs, Basic) {
   int64_t gigabytes = 1024 * megabytes;
   int64_t terabytes = 1024 * gigabytes;
 
+  // Initialize 'is_percent' to the opposite of the expected value, to confirm that
+  // ParseMemSpec() is actually setting the output parameter.
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("1", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(1, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("100b", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(100, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("100kb", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(100 * 1024, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("5KB", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(5 * 1024, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("4MB", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(4 * megabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("4m", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(4 * megabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("8gb", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(8 * gigabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("8G", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(8 * gigabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("12Gb", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(12 * gigabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("8T", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(8 * terabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("12tb", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(12 * terabytes, bytes);
   ASSERT_FALSE(is_percent);
 
+  is_percent = false;
   bytes = ParseUtil::ParseMemSpec("13%", &is_percent, MemInfo::physical_mem());
   ASSERT_GT(bytes, 0);
   ASSERT_TRUE(is_percent);
 
+  is_percent = false;
   ASSERT_GT(ParseUtil::ParseMemSpec("17%", &is_percent, MemInfo::physical_mem()), bytes);
   ASSERT_EQ(ParseUtil::ParseMemSpec("17%", &is_percent, 100), 17);
   ASSERT_TRUE(is_percent);
@@ -111,17 +126,25 @@ TEST(ParseMemSpecs, Basic) {
     ASSERT_EQ(-1, bytes);
   }
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(0, bytes);
+  ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("-1", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(0, bytes);
+  ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("-2", &is_percent, MemInfo::physical_mem());
   ASSERT_LT(bytes, 0);
+  ASSERT_FALSE(is_percent);
 
+  is_percent = true;
   bytes = ParseUtil::ParseMemSpec("-2%", &is_percent, MemInfo::physical_mem());
   ASSERT_LT(bytes, 0);
+  ASSERT_TRUE(is_percent);
 }
 
 }
