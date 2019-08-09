@@ -1331,7 +1331,7 @@ public class MetastoreEvents {
   }
 
   public static class AddPartitionEvent extends TableInvalidatingEvent {
-    private final Partition lastAddedPartition_;
+    private Partition lastAddedPartition_;
     private final List<Partition> addedPartitions_;
 
     /**
@@ -1350,12 +1350,16 @@ public class MetastoreEvents {
                 .getAddPartitionMessage(event.getMessage());
         addedPartitions_ =
             Lists.newArrayList(addPartitionMessage_.getPartitionObjs());
-        Preconditions.checkState(addedPartitions_.size() > 0);
-        // when multiple partitions are added in HMS they are all added as one transaction
-        // Hence all the partitions which are present in the message must have the same
-        // serviceId and version if it is set. hence it is fine to just look at the
-        // last added partition in the list and use it for the self-event ids
-        lastAddedPartition_ = addedPartitions_.get(addedPartitions_.size() - 1);
+        // it is possible that the added partitions is empty in certain cases. See
+        // IMPALA-8847 for example
+        if (!addedPartitions_.isEmpty()) {
+          // when multiple partitions are added in HMS they are all added as one
+          // transaction Hence all the partitions which are present in the message must
+          // have the same serviceId and version if it is set. hence it is fine to just
+          // look at the last added partition in the list and use it for the self-event
+          // ids
+          lastAddedPartition_ = addedPartitions_.get(addedPartitions_.size() - 1);
+        }
         msTbl_ = addPartitionMessage_.getTableObj();
       } catch (Exception ex) {
         throw new MetastoreNotificationException(ex);
@@ -1364,12 +1368,15 @@ public class MetastoreEvents {
 
     @Override
     public void process() throws MetastoreNotificationException, CatalogException {
+      // bail out early if there are not partitions to process
+      if (addedPartitions_.isEmpty()) {
+        infoLog("Partition list is empty. Ignoring this event.");
+        return;
+      }
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
-      // Notification is created for newly created partitions only. We need not worry
-      // about "IF NOT EXISTS".
       try {
         // Reload the whole table if it's a transactional table.
         if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
@@ -1541,7 +1548,6 @@ public class MetastoreEvents {
         msTbl_ = Preconditions.checkNotNull(dropPartitionMessage.getTableObj());
         droppedPartitions_ = dropPartitionMessage.getPartitions();
         Preconditions.checkNotNull(droppedPartitions_);
-        Preconditions.checkState(droppedPartitions_.size() > 0);
       } catch (Exception ex) {
         throw new MetastoreNotificationException(
             debugString("Could not parse event message. "
@@ -1553,6 +1559,12 @@ public class MetastoreEvents {
 
     @Override
     public void process() throws MetastoreNotificationException {
+      // we have seen cases where a add_partition event is generated with empty
+      // partition list (see IMPALA-8547 for details. Make sure that droppedPartitions
+      // list is not empty
+      if (droppedPartitions_.isEmpty()) {
+        infoLog("Partition list is empty. Ignoring this event.");
+      }
       // We do not need self event as dropPartition() call is a no-op if the directory
       // doesn't exist.
       try {
