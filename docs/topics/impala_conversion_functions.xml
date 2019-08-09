@@ -43,21 +43,14 @@ under the License.
   <conbody>
 
     <p>
-      Conversion functions are usually used in combination with other functions, to explicitly
+      Conversion functions are typically used in combination with other functions to explicitly
       pass the expected data types. Impala has strict rules regarding data types for function
       parameters. For example, Impala does not automatically convert a <codeph>DOUBLE</codeph>
       value to <codeph>FLOAT</codeph>, a <codeph>BIGINT</codeph> value to <codeph>INT</codeph>,
       or other conversion where precision could be lost or overflow could occur. Also, for
-      reporting or dealing with loosely defined schemas in big data contexts, you might
-      frequently need to convert values to or from the <codeph>STRING</codeph> type.
+      reporting or dealing with loosely defined schemas in big data contexts, you might need to
+      convert values to or from the <codeph>STRING</codeph> type.
     </p>
-
-    <note>
-      Although in <keyword keyref="impala23_full"/>, the <codeph>SHOW FUNCTIONS</codeph> output
-      for database <codeph>_IMPALA_BUILTINS</codeph> contains some function signatures matching
-      the pattern <codeph>castto*</codeph>, these functions are not intended for public use and
-      are expected to be hidden in future.
-    </note>
 
     <p>
       <b>Function reference:</b>
@@ -81,51 +74,50 @@ under the License.
       <dlentry id="cast">
 
         <dt>
-          CAST(expr AS type)
+          CAST(expression AS type)
         </dt>
 
         <dd>
-          <b>Purpose:</b> Converts the value of an expression to any other type. If the
-          expression value is of a type that cannot be converted to the target type, the result
-          is <codeph>NULL</codeph>.
+          <b>Purpose:</b> Returns <varname>expression</varname> converted to the
+          <varname>type</varname> data type.
           <p>
-            <b>Usage notes:</b> Use <codeph>CAST</codeph> when passing a column value or literal
-            to a function that expects a parameter with a different type. Frequently used in SQL
-            operations such as <codeph>CREATE TABLE AS SELECT</codeph> and <codeph>INSERT ...
-            VALUES</codeph> to ensure that values from various sources are of the appropriate
-            type for the destination columns. Where practical, do a one-time
-            <codeph>CAST()</codeph> operation during the ingestion process to make each column
-            into the appropriate type, rather than using many <codeph>CAST()</codeph> operations
-            in each query; doing type conversions for each row during each query can be
-            expensive for tables with millions or billions of rows.
+            If the <varname>expression</varname> value is of a type that cannot be converted to
+            the target <varname>type</varname>:
+            <ul>
+              <li>
+                Of <codeph>DECIMAL</codeph>, <codeph>DATE</codeph>, and
+                <codeph>BOOLEAN</codeph>, the function returns an error.
+              </li>
+
+              <li>
+                Of all other types, the function returns <codeph>NULL</codeph>.
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            <b>Usage notes:</b>
+          </p>
+
+          <p>
+            Use <codeph>CAST</codeph> when passing a column value or literal to a function that
+            expects a parameter with a different type. Frequently used in SQL operations such as
+            <codeph>CREATE TABLE AS SELECT</codeph> and <codeph>INSERT ... VALUES</codeph> to
+            ensure that values from various sources are of the appropriate type for the
+            destination columns.
+          </p>
+
+          <p>
+            Where practical, do a one-time <codeph>CAST()</codeph> operation during the
+            ingestion process to make each column into the appropriate type, rather than using
+            many <codeph>CAST()</codeph> operations in each query; doing type conversions for
+            each row during each query can be expensive for tables with millions or billions of
+            rows.
           </p>
 
           <p
             conref="../shared/impala_common.xml#common/timezone_conversion_caveat"/>
 
-          <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>SELECT CONCAT('Here are the first ',10,' results.'); -- Fails
-SELECT CONCAT('Here are the first ',CAST(10 AS STRING),' results.'); -- Succeeds
-</codeblock>
-          <p>
-            The following example starts with a text table where every column has a type of
-            <codeph>STRING</codeph>, which might be how you ingest data of unknown schema until
-            you can verify the cleanliness of the underlying values. Then it uses
-            <codeph>CAST()</codeph> to create a new Parquet table with the same data, but using
-            specific numeric data types for the columns with numeric data. Using numeric types
-            of appropriate sizes can result in substantial space savings on disk and in memory,
-            and performance improvements in queries, over using strings or larger-than-necessary
-            numeric types.
-          </p>
-<codeblock>CREATE TABLE t1 (name STRING, x STRING, y STRING, z STRING);
-
-CREATE TABLE t2 STORED AS PARQUET
-AS SELECT
-  name,
-  CAST(x AS BIGINT) x,
-  CAST(y AS TIMESTAMP) y,
-  CAST(z AS SMALLINT) z
-FROM t1;</codeblock>
           <p conref="../shared/impala_common.xml#common/related_info"/>
 
           <p>
@@ -142,13 +134,13 @@ FROM t1;</codeblock>
             <xref
               href="impala_double.xml#double"/>,
             <xref
-              href="impala_decimal.xml#decimal"/>,
+              href="impala_decimal.xml#decimal">DECIMAL Data Type</xref>,
             <xref
               href="impala_string.xml#string"/>,
             <xref
-              href="impala_char.xml#char"/>,
+              href="impala_char.xml#char">CHAR Data Type</xref>,
             <xref
-              href="impala_varchar.xml#varchar"/>,
+              href="impala_varchar.xml#varchar">VARCHAR Data Type</xref>,
             <xref
               href="impala_timestamp.xml#timestamp"/>,
             <xref
@@ -158,18 +150,678 @@ FROM t1;</codeblock>
 
       </dlentry>
 
-      <dlentry rev="2.3.0" id="typeof">
+      <dlentry id="cast_format">
 
         <dt>
-          TYPEOF(type value)
+          CAST(expression AS type FORMAT pattern)
         </dt>
 
         <dd>
-          <b>Purpose:</b> Returns the name of the data type corresponding to an expression. For
-          types with extra attributes, such as length for <codeph>CHAR</codeph> and
-          <codeph>VARCHAR</codeph>, or precision and scale for <codeph>DECIMAL</codeph>,
-          includes the full specification of the type.
-<!-- To do: How about for columns of complex types? Or fields within complex types? -->
+          <b>Purpose:</b> Returns <varname>expression</varname> converted to the
+          <varname>type</varname> data type based on the <varname>pattern</varname> format
+          string. This signature of <codeph>CAST()</codeph> with the <codeph>FORMAT</codeph>
+          clause is supported only for casts between <codeph>STRING</codeph> /
+          <codeph>CHAR</codeph> / <codeph>VARCHAR</codeph> types and <codeph>TIMESTAMP</codeph>
+          / <codeph>DATE</codeph> types.
+          <note>
+            The patterns allowed in the <codeph>FORMAT</codeph> clause support ISO SQL:2016
+            standard patterns. Those patterns are not the same format patterns used with the
+            other Impala conversion functions, e.g. <codeph>TO_TIMESTAMP()</codeph> and
+            <codeph>FROM_TIMESTAMP()</codeph>.
+          </note>
+
+          <p>
+            The following rules apply to <varname>pattern</varname>. Any exceptions to these
+            rules are noted in the Details column of the table below.
+            <ul>
+              <li>
+                <varname>pattern</varname> is a case-insensitive <codeph>STRING</codeph>.
+              </li>
+
+              <li>
+                If <varname>pattern</varname> is <codeph>NULL</codeph>, an empty string, or a
+                number, an error returns.
+              </li>
+
+              <li>
+                A fewer digits in <varname>expression</varname> than specified in the
+                <varname>pattern</varname> is accepted if a separator is correctly specified in
+                the <varname>pattern</varname>. For example, <codeph>CAST('5-01-2017' AS DATE
+                FORMAT 'MM-dd-yyyy')</codeph> returns <codeph>DATE'2017-05-01'</codeph>.
+              </li>
+
+              <li>
+                If fewer number of digits are in <varname>expression</varname> than specified in
+                the <varname>pattern</varname>, the current date is used to complete the year
+                pattern. For example, <codeph>CAST('19/05' AS DATE FORMAT 'YYYY/MM')</codeph>
+                will return <codeph>DATE'2019-05-01'</codeph> when executed on August 8, 2019.
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            The following format patterns are supported in the <codeph>FORMAT</codeph> clause.
+            <table frame="all" rowsep="1"
+              colsep="1" id="table_gbt_5ym_r3b">
+              <tgroup cols="3" align="left">
+                <colspec colname="c1" colnum="1" colwidth="1*"/>
+                <colspec colname="c2" colnum="2" colwidth="1.75*"/>
+                <colspec colname="newCol3" colnum="3" colwidth="6.6*"/>
+                <thead>
+                  <row>
+                    <entry>
+                      Pattern
+                    </entry>
+                    <entry>
+                      Description
+                    </entry>
+                    <entry>
+                      Details
+                    </entry>
+                  </row>
+                </thead>
+                <tbody>
+                  <row>
+                    <entry>
+                      <codeph>YYYY</codeph>
+                    </entry>
+                    <entry>
+                      4-digit year.
+                    </entry>
+                    <entry/>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>YYY</codeph>
+                    </entry>
+                    <entry>
+                      Last 3 digits of a year.
+                    </entry>
+                    <entry/>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>YY</codeph>
+                    </entry>
+                    <entry>
+                      Last 2 digits of a year.
+                    </entry>
+                    <entry/>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>Y</codeph>
+                    </entry>
+                    <entry>
+                      Last digit of a year
+                    </entry>
+                    <entry/>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>RRRR</codeph>
+                    </entry>
+                    <entry>
+                      4-digit round year
+                    </entry>
+                    <entry>
+                      <p>
+                        If 1,3 or 4-digit year values are provided in
+                        <varname>expression</varname>, treated as <codeph>YYYY</codeph>.
+                      </p>
+
+
+
+                      <p>
+                        If 2-digit years are provided in <varname>expression</varname>, treated
+                        as <codeph>RR</codeph>.
+                      </p>
+
+
+
+                      <p>
+                        For datetime to string conversions, treated as <codeph>YYYY</codeph>.
+                      </p>
+
+
+
+                      <p>
+                        If <codeph>YYYY</codeph>, <codeph>YYY</codeph>, <codeph>YY</codeph>,
+                        <codeph>Y</codeph>, or <codeph>RR</codeph> is given in the same
+                        <varname>pattern</varname> for a string to datetime conversion, an error
+                        returns.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>RR</codeph>
+                    </entry>
+                    <entry>
+                      2-digit round year.
+                    </entry>
+                    <entry>
+                      <p>
+                        <ul>
+                          <li>
+                            For datetime to string conversion, same as <codeph>YY</codeph>.
+                          </li>
+
+                          <li>
+                            For string to datetime conversions, the first 2 digits of the year
+                            in the return value depends on the specified two-digit year and the
+                            last two digits of the current year as follows:
+                            <ul>
+                              <li>
+                                <p>
+                                  If the specified 2-digit year is 00 to 49:
+                                </p>
+                                <ul>
+                                  <li>
+                                    <p>
+                                      If the last 2 digits of the current year are 00 to 49, the
+                                      returned year has the same first 2 digits as the current
+                                      year.
+                                    </p>
+                                  </li>
+
+                                  <li>
+                                    <p>
+                                      If the last 2 digits of the current year are 50 to 99, the
+                                      first 2 digits of the returned year are 1 greater than the
+                                      first 2 digits of the current year.
+                                    </p>
+                                  </li>
+                                </ul>
+                              </li>
+
+                              <li>
+                                <p>
+                                  If the specified 2-digit year is 50 to 99:
+                                </p>
+                                <ul>
+                                  <li>
+                                    <p>
+                                      If the last 2 digits of the current year are 00 to 49, the
+                                      first 2 digits of the returned year are 1 less than the
+                                      first 2 digits of the current year.
+                                    </p>
+                                  </li>
+
+                                  <li>
+                                    <p>
+                                      If the last 2 digits of the current year are 50 to 99, the
+                                      returned year has the same first 2 digits as the current
+                                      year.
+                                    </p>
+                                  </li>
+                                </ul>
+                              </li>
+                            </ul>
+                          </li>
+                        </ul>
+                      </p>
+
+
+
+                      <p>
+                        If <codeph>YYYY</codeph>, <codeph>YYY</codeph>, <codeph>YY</codeph>,
+                        <codeph>Y</codeph>, or <codeph>RR</codeph> is given in the same
+                        <varname>pattern</varname> for a string to datetime conversion, an error
+                        returns.
+                      </p>
+
+
+
+                      <p>
+                        If 1-digit year values are provided in <varname>expression</varname>, it
+                        is treated as <codeph>YYYY</codeph>.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>MM</codeph>
+                    </entry>
+                    <entry>
+                      Month
+                    </entry>
+                    <entry>
+                      <p>
+                        In datetime to string conversions, 1-digit month is prefixed with a
+                        zero.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>DD</codeph>
+                    </entry>
+                    <entry>
+                      Day of month (1-31)
+                    </entry>
+                    <entry>
+                      <p>
+                        In datetime to string conversions, one digit day is prefixed with a
+                        zero.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>DDD</codeph>
+                    </entry>
+                    <entry>
+                      Day of year (1-366)
+                    </entry>
+                    <entry>
+                      <p>
+                        In string to datetime conversions, providing <codeph>MM</codeph> and
+                        <codeph>DD</codeph> along with <codeph>DDD</codeph> results an error,
+                        e.g. <codeph>YYYY-MM-DDD</codeph>.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>HH</codeph>
+
+                      <p>
+                        <codeph>HH12</codeph>
+                      </p>
+                    </entry>
+                    <entry>
+                      Hour of day (1-12)
+                    </entry>
+                    <entry>
+                      <p>
+                        In datetime to string conversions, 1-digit hours are prefixed with a
+                        zero.
+                      </p>
+
+
+
+                      <p>
+                        If provided hour in <varname>expression</varname> is not between 1 and
+                        12, returns an error.
+                      </p>
+
+
+
+                      <p>
+                        If no AM/PM is provided in <varname>expression</varname>, the default is
+                        <codeph>AM</codeph>.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>HH24</codeph>
+                    </entry>
+                    <entry>
+                      Hour of day (0-23)
+                    </entry>
+                    <entry>
+                      <p>
+                        In string to datetime conversions, if <codeph>HH12</codeph>,
+                        <codeph>AM</codeph>, <codeph>PM</codeph> are given in the same
+                        <varname>pattern</varname>, an error returns.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>MI</codeph>
+                    </entry>
+                    <entry>
+                      Minute of hour (0-59)
+                    </entry>
+                    <entry>
+                      <p>
+                        In datetime to string conversions, 1-digit minutes are prefixed with a
+                        zero.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>SS</codeph>
+                    </entry>
+                    <entry>
+                      Second of minute (0-59)
+                    </entry>
+                    <entry>
+                      <p>
+                        In datetime to string conversions, 1-digit seconds are prefixed with a
+                        zero.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>SSSSS</codeph>
+                    </entry>
+                    <entry>
+                      Second of Day (0-86399)
+                    </entry>
+                    <entry>
+                      In string to timestamp conversions, if <codeph>SS</codeph>,
+                      <codeph>HH</codeph>, <codeph>HH12</codeph>, <codeph>HH24</codeph>,
+                      <codeph>MI</codeph>, <codeph>AM</codeph>/<codeph>PM</codeph> are given in
+                      the same <varname>pattern</varname>, an error returns.
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>FF</codeph>
+
+                      <p>
+                        <codeph>FF1</codeph>, ..., <codeph>FF9</codeph>
+                      </p>
+                    </entry>
+                    <entry>
+                      Fractional second
+                    </entry>
+                    <entry>
+                      <p>
+                        A number, 1 to 9, can be used to indicate the number of digits.
+                      </p>
+
+
+
+                      <p>
+                        <codeph>FF</codeph> specifies a 9 digits fractional second.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>AM</codeph>
+
+                      <p>
+                        <codeph>PM</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>A.M.</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>P.M.</codeph>
+                      </p>
+                    </entry>
+                    <entry>
+                      Meridiem indicator
+                    </entry>
+                    <entry>
+                      <p>
+                        For datetime to string conversions, <codeph>AM</codeph> and
+                        <codeph>PM</codeph> are treated as synonyms. For example, casting
+                        <codeph>'2019-01-01 11:00 am'</codeph> to <codeph>TIMESTAMP</codeph>
+                        with the <codeph>'YYYY-MM-DD HH12:MI PM'</codeph> pattern returns
+                        <codeph>01-JAN-19 11.00.00.000000 AM</codeph>.
+                      </p>
+
+
+
+                      <p>
+                        For string to datetime conversion, <codeph>HH24</codeph> in the same
+                        <varname>pattern</varname> returns an error.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>TZH</codeph>
+                    </entry>
+                    <entry>
+                      Timezone offset hour
+                    </entry>
+                    <entry>
+                      <p>
+                        An optional sign, + or -, and 2 digits for the value of signed numbers
+                        are allowed for the source <varname>expression</varname>, e.g.
+                        <codeph>“+10”</codeph>, <codeph>“-05”</codeph>,
+                        <codeph>"04"</codeph>.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>TZM</codeph>
+                    </entry>
+                    <entry>
+                      Timezone offset minute
+                    </entry>
+                    <entry>
+                      <p>
+                        Unsigned numbers are allowed for the source
+                        <varname>expression</varname>.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>-</codeph>
+
+                      <p>
+                        <codeph>.</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>/</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>,</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>'</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>;</codeph>
+                      </p>
+
+
+
+                      <p>
+                        <codeph>:</codeph>
+                      </p>
+
+
+
+                      <p>
+                        &lt;space>
+                      </p>
+                    </entry>
+                    <entry>
+                      Separator
+                    </entry>
+                    <entry>
+                      <p>
+                        For string to datetime conversions, any separator character in the
+                        <varname>pattern</varname> string would match any separator character in
+                        the input <varname>expression</varname>.
+                      </p>
+
+
+
+                      <p>
+                        For example, <codeph>CAST(“20191010” AS DATE FORMAT
+                        “YYYY-MM-DD”)</codeph> returns an error, but <codeph>CAST("2019-.;10
+                        10" AS DATE FORMAT "YYYY-MM-DD")</codeph> succeeds.
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>T</codeph>
+                    </entry>
+                    <entry>
+                      Separates the date from the time.
+                    </entry>
+                    <entry>
+                      This pattern is used for accepting ISO 8601 datetime formats.
+
+                      <p>
+                        Example: <codeph>YYYY-MM-DD<b>T</b>HH24:MI:SS.FF9Z</codeph>
+                      </p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <codeph>Z</codeph>
+                    </entry>
+                    <entry>
+                      Indicates the zero hour offset from UTC.
+                    </entry>
+                    <entry>
+                      This pattern is used for accepting ISO 8601 datetime formats.
+                    </entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </table>
+          </p>
+
+          <p>
+            <b>Examples:</b>
+          </p>
+          <table frame="all" rowsep="1" colsep="1" id="table_qqg_txn_r3b">
+            <tgroup cols="2" align="left">
+              <colspec colname="c1" colnum="1" colwidth="1*"/>
+              <colspec colname="c2" colnum="2" colwidth="1*"/>
+              <thead>
+                <row>
+                  <entry>
+                    Input
+                  </entry>
+                  <entry>
+                    Output
+                  </entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry>
+                    <codeph>CAST("02-11-2014" AS DATE FORMAT 'dd-mm-yyyy')</codeph>
+                  </entry>
+                  <entry>
+                    2014-11-02
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST("365 2014" AS DATE FORMAT 'DDD-YYYY')</codeph>
+                  </entry>
+                  <entry>
+                    2014-12-31
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST("5-01-26" AS DATE FORMAT 'YY-MM-DD')</codeph>
+                  </entry>
+                  <entry>
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p>
+                      2015-01-26
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST('2018-11-10T15:11:04Z' AS TIMESTAMP</codeph>
+
+                    <p>
+                      <codeph>FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')</codeph>
+                    </p>
+                  </entry>
+                  <entry>
+                    2018-11-10 15:11:04
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST("95-01-28" AS DATE FORMAT 'YYY-MM-DD')</codeph>
+                  </entry>
+                  <entry>
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p>
+                      2095-01-28
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST("49-01-15" AS DATE FORMAT 'RR-MM-DD')</codeph>
+                  </entry>
+                  <entry>
+                    Round year when last 2 digits of current year is greater than 49.
+
+                    <p>
+                      Executed at 2099-01-01 11:11:11:
+                    </p>
+
+
+
+                    <p>
+                      2149-01-15
+                    </p>
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>CAST('2019.10.10 13:30:40.123456 +01:30' </codeph>
+
+                    <p>
+                      <codeph>AS TIMESTAMP</codeph>
+                    </p>
+
+
+
+                    <p>
+                      <codeph>FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM')</codeph>
+                    </p>
+                  </entry>
+                  <entry>
+                    2019-10-10 13:30:40.123456000
+                  </entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.3.0" id="typeof">
+
+        <dt>
+          TYPEOF(expression)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the name of the data type corresponding to
+          <varname>expression</varname>. For types with extra attributes, such as length for
+          <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>, or precision and scale for
+          <codeph>DECIMAL</codeph>, includes the full specification of the type.
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
@@ -184,16 +836,17 @@ FROM t1;</codeblock>
             result is can be different than that of the operands.
           </p>
 
-          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p
+            conref="../shared/impala_common.xml#common/example_blurb"
+              />
 
-          <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>SELECT TYPEOF(2), TYPEOF(2+2);
-+-----------+---------------+
-| typeof(2) | typeof(2 + 2) |
-+-----------+---------------+
-| TINYINT   | SMALLINT      |
-+-----------+---------------+
-</codeblock>
+          <p>
+            <codeph>TYPEOF(2)</codeph> returns <codeph>TINYINT</codeph>.
+          </p>
+
+          <p>
+            <codeph>TYPEOF(NOW())</codeph> returns <codeph>TIMESTAMP</codeph>.
+          </p>
         </dd>
 
       </dlentry>
