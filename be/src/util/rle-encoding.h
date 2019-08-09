@@ -344,7 +344,7 @@ inline bool RleEncoder::Put(uint64_t value) {
   if (UNLIKELY(buffer_full_)) return false;
 
   if (LIKELY(current_value_ == value
-      && repeat_count_ <= std::numeric_limits<int32_t>::max())) {
+      && repeat_count_ < std::numeric_limits<int32_t>::max())) {
     ++repeat_count_;
     if (repeat_count_ > 8) {
       // This is just a continuation of the current run, no need to buffer the
