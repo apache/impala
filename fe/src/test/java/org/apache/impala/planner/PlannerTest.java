@@ -54,7 +54,8 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testScanCardinality() {
-    runPlannerTestFile("card-scan");
+    runPlannerTestFile("card-scan",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   /**
@@ -62,7 +63,8 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testInnerJoinCardinality() {
-    runPlannerTestFile("card-inner-join");
+    runPlannerTestFile("card-inner-join",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   /**
@@ -70,7 +72,8 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testOuterJoinCardinality() {
-    runPlannerTestFile("card-outer-join");
+    runPlannerTestFile("card-outer-join",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   /**
@@ -78,7 +81,8 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testMultiJoinCardinality() {
-    runPlannerTestFile("card-multi-join");
+    runPlannerTestFile("card-multi-join",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -870,16 +874,16 @@ public class PlannerTest extends PlannerTestBase {
     // Single key string column with max length stat.
     HBaseColumn stringColwithSmallMaxSize = new HBaseColumn("",
         FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "", false, Type.STRING, "", 1);
-    stringColwithSmallMaxSize.getStats().update(ColumnStats.StatsKey.MAX_SIZE,
-        Long.valueOf(50));
+    stringColwithSmallMaxSize.getStats().update(
+        Type.STRING, ColumnStats.StatsKey.MAX_SIZE, Long.valueOf(50));
     assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists
         .newArrayList(stringColwithSmallMaxSize)), 128);
 
     // Case that triggers the upper bound if some columns have stats are missing.
     HBaseColumn stringColwithLargeMaxSize = new HBaseColumn("",
         FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "", false, Type.STRING, "", 1);
-    stringColwithLargeMaxSize.getStats().update(ColumnStats.StatsKey.MAX_SIZE,
-        Long.valueOf(128 * 1024 * 1024));
+    stringColwithLargeMaxSize.getStats().update(
+        Type.STRING, ColumnStats.StatsKey.MAX_SIZE, Long.valueOf(128 * 1024 * 1024));
     assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists.newArrayList(
         stringColwithLargeMaxSize, stringColWithoutStats)), 128 * 1024 * 1024);
 
