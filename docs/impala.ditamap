@@ -93,8 +93,8 @@ under the License.
       <topicref href="topics/impala_bigint.xml"/>
       <topicref href="topics/impala_boolean.xml"/>
       <topicref href="topics/impala_char.xml"/>
-      <topicref href="topics/impala_decimal.xml"/>
       <topicref href="topics/impala_date.xml"/>
+      <topicref href="topics/impala_decimal.xml"/>
       <topicref href="topics/impala_double.xml"/>
       <topicref href="topics/impala_float.xml"/>
       <topicref href="topics/impala_int.xml"/>
