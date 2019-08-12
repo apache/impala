@@ -34,6 +34,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.thrift.TSortNode;
 import org.apache.impala.thrift.TSortType;
+import org.apache.impala.thrift.TSortingOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,7 +191,7 @@ public class SortNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SORT_NODE;
     TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
-        info_.getIsAscOrder(), info_.getNullsFirst());
+        info_.getIsAscOrder(), info_.getNullsFirst(), info_.getSortingOrder());
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
     sort_info.setSort_tuple_slot_exprs(Expr.treesToThrift(resolvedTupleExprs_));
@@ -207,17 +208,8 @@ public class SortNode extends PlanNode {
         displayName_, getNodeExplainDetail(detailLevel)));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       output.append(detailPrefix + "order by: ");
-      for (int i = 0; i < info_.getSortExprs().size(); ++i) {
-        if (i > 0) output.append(", ");
-        output.append(info_.getSortExprs().get(i).toSql() + " ");
-        output.append(info_.getIsAscOrder().get(i) ? "ASC" : "DESC");
-
-        Boolean nullsFirstParam = info_.getNullsFirstParams().get(i);
-        if (nullsFirstParam != null) {
-          output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
-        }
-      }
-      output.append("\n");
+      output.append(getSortingOrderExplainString(info_.getSortExprs(),
+          info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder()));
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

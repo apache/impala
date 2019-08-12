@@ -471,6 +471,9 @@ struct TCreateTableLikeParams {
   // The server name for security privileges when authorization is enabled.
   // TODO: Need to cleanup:IMPALA-7553
   10: optional string server_name
+
+  // The sorting order used in SORT BY clauses.
+  11: required Types.TSortingOrder sorting_order
 }
 
 // Parameters of CREATE TABLE commands
@@ -529,6 +532,9 @@ struct TCreateTableParams {
   // The server name for security privileges when authorization is enabled.
   // TODO: Need to cleanup:IMPALA-7553
   17: optional string server_name
+
+  // The sorting order used in SORT BY clauses.
+  18: required Types.TSortingOrder sorting_order
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

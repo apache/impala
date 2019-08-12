@@ -416,6 +416,8 @@ struct TSortInfo {
   // Expressions evaluated over the input row that materialize the tuple to be sorted.
   // Contains one expr per slot in the materialized tuple.
   4: optional list<Exprs.TExpr> sort_tuple_slot_exprs
+  // The sorting order used in SORT BY clauses.
+  5: required Types.TSortingOrder sorting_order
 }
 
 enum TSortType {

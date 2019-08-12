@@ -165,6 +165,7 @@ import org.apache.impala.thrift.TResetMetadataResponse;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
@@ -2098,6 +2099,10 @@ public class CatalogOpExecutor {
     if (params.isSetSort_columns() && !params.sort_columns.isEmpty()) {
       tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
           Joiner.on(",").join(params.sort_columns));
+      TSortingOrder sortingOrder = params.isSetSorting_order() ?
+          params.sorting_order : TSortingOrder.LEXICAL;
+      tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_ORDER,
+          sortingOrder.toString());
     }
     if (params.getComment() != null) {
       tbl.getParameters().put("comment", params.getComment());
@@ -2366,6 +2371,10 @@ public class CatalogOpExecutor {
     if (params.isSetSort_columns() && !params.sort_columns.isEmpty()) {
       tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
           Joiner.on(",").join(params.sort_columns));
+      TSortingOrder sortingOrder = params.isSetSorting_order() ?
+          params.sorting_order : TSortingOrder.LEXICAL;
+      tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_ORDER,
+          sortingOrder.toString());
     }
     if (comment != null) {
       tbl.getParameters().put("comment", comment);

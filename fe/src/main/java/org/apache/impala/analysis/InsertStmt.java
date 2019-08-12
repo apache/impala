@@ -35,9 +35,11 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -154,6 +156,9 @@ public class InsertStmt extends StatementBase {
   // sent to the backend to populate the RowGroup::sorting_columns list in parquet files.
   private List<Integer> sortColumns_ = new ArrayList<>();
 
+  // The order used in SORT BY queries.
+  private TSortingOrder sortingOrder_ = TSortingOrder.LEXICAL;
+
   // Output expressions that produce the final results to write to the target table. May
   // include casts. Set in prepareExpressions().
   // If this is an INSERT on a non-Kudu table, it will contain one Expr for all
@@ -253,6 +258,7 @@ public class InsertStmt extends StatementBase {
     hasNoClusteredHint_ = false;
     sortExprs_.clear();
     sortColumns_.clear();
+    sortingOrder_ = TSortingOrder.LEXICAL;
     resultExprs_.clear();
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
@@ -387,7 +393,8 @@ public class InsertStmt extends StatementBase {
     // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
     prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
 
-    // Analyze 'sort.columns' table property and populate sortColumns_ and sortExprs_.
+    // Analyze 'sort.columns' and 'sort.order' table properties and populate
+    // sortColumns_, sortExprs_, and sortingOrder_.
     analyzeSortColumns();
 
     // Analyze plan hints at the end to prefer reporting other error messages first
@@ -832,8 +839,11 @@ public class InsertStmt extends StatementBase {
   private void analyzeSortColumns() throws AnalysisException {
     if (!(table_ instanceof FeFsTable)) return;
 
-    sortColumns_ = AlterTableSetTblProperties.analyzeSortColumns(table_,
+    Pair<List<Integer>, TSortingOrder> sortProperties =
+        AlterTableSetTblProperties.analyzeSortColumns(table_,
         table_.getMetaStoreTable().getParameters());
+    sortColumns_ = sortProperties.first;
+    sortingOrder_ = sortProperties.second;
 
     // Assign sortExprs_ based on sortColumns_.
     for (Integer colIdx: sortColumns_) sortExprs_.add(resultExprs_.get(colIdx));
@@ -907,6 +917,7 @@ public class InsertStmt extends StatementBase {
   public void setTargetTable(FeTable table) { this.table_ = table; }
   public void setWriteId(long writeId) { this.writeId_ = writeId; }
   public boolean isOverwrite() { return overwrite_; }
+  public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
   /**
    * Only valid after analysis
@@ -941,7 +952,7 @@ public class InsertStmt extends StatementBase {
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
         partitionKeyExprs_, resultExprs_, mentionedColumns_, overwrite_,
-        requiresClustering(), sortColumns_, writeId_);
+        requiresClustering(), new Pair<>(sortColumns_, sortingOrder_), writeId_);
   }
 
   /**

@@ -272,6 +272,9 @@ DEFINE_bool_hidden(unlock_mt_dop, false,
 DEFINE_bool_hidden(recursively_list_partitions, true,
     "If true, recursively list the content of partition directories.");
 
+DEFINE_bool(unlock_zorder_sort, false,
+    "(Experimental) If true, enables using ZORDER option for SORT BY.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

@@ -134,17 +134,9 @@ public class ExchangeNode extends PlanNode {
 
     if (isMergingExchange() && detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
       output.append(detailPrefix + "order by: ");
-      for (int i = 0; i < mergeInfo_.getSortExprs().size(); ++i) {
-        if (i > 0) output.append(", ");
-        output.append(mergeInfo_.getSortExprs().get(i).toSql() + " ");
-        output.append(mergeInfo_.getIsAscOrder().get(i) ? "ASC" : "DESC");
-
-        Boolean nullsFirstParam = mergeInfo_.getNullsFirstParams().get(i);
-        if (nullsFirstParam != null) {
-          output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
-        }
-      }
-      output.append("\n");
+      output.append(getSortingOrderExplainString(mergeInfo_.getSortExprs(),
+          mergeInfo_.getIsAscOrder(), mergeInfo_.getNullsFirstParams(),
+          mergeInfo_.getSortingOrder()));
     }
     return output.toString();
   }
@@ -267,7 +259,7 @@ public class ExchangeNode extends PlanNode {
     if (isMergingExchange()) {
       TSortInfo sortInfo = new TSortInfo(
           Expr.treesToThrift(mergeInfo_.getSortExprs()), mergeInfo_.getIsAscOrder(),
-          mergeInfo_.getNullsFirst());
+          mergeInfo_.getNullsFirst(), mergeInfo_.getSortingOrder());
       msg.exchange_node.setSort_info(sortInfo);
       msg.exchange_node.setOffset(offset_);
     }

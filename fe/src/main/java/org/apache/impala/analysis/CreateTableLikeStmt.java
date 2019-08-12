@@ -24,10 +24,12 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 
 import com.google.common.base.Joiner;
@@ -40,6 +42,7 @@ import com.google.common.base.Preconditions;
 public class CreateTableLikeStmt extends StatementBase {
   private final TableName tableName_;
   private final List<String> sortColumns_;
+  private final TSortingOrder sortingOrder_;
   private final TableName srcTableName_;
   private final boolean isExternal_;
   private final String comment_;
@@ -58,7 +61,8 @@ public class CreateTableLikeStmt extends StatementBase {
   /**
    * Builds a CREATE TABLE LIKE statement
    * @param tableName - Name of the new table
-   * @param sortColumns - List of columns to sort by during inserts
+   * @param sortProperties - A pair, containing the list of columns to sort by during
+   *                         inserts and the order used in SORT BY queries.
    * @param srcTableName - Name of the source table (table to copy)
    * @param isExternal - If true, the table's data will be preserved if dropped.
    * @param comment - Comment to attach to the table
@@ -66,13 +70,15 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param location - The HDFS location of where the table data will stored.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
-  public CreateTableLikeStmt(TableName tableName, List<String> sortColumns,
-      TableName srcTableName, boolean isExternal, String comment,
-      THdfsFileFormat fileFormat, HdfsUri location, boolean ifNotExists) {
+  public CreateTableLikeStmt(TableName tableName,
+      Pair<List<String>, TSortingOrder> sortProperties, TableName srcTableName,
+      boolean isExternal, String comment, THdfsFileFormat fileFormat, HdfsUri location,
+      boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
     this.tableName_ = tableName;
-    this.sortColumns_ = sortColumns;
+    this.sortColumns_ = sortProperties.first;
+    this.sortingOrder_ = sortProperties.second;
     this.srcTableName_ = srcTableName;
     this.isExternal_ = isExternal;
     this.comment_ = comment;
@@ -87,6 +93,7 @@ public class CreateTableLikeStmt extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
   public THdfsFileFormat getFileFormat() { return fileFormat_; }
   public HdfsUri getLocation() { return location_; }
+  public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
   /**
    * Can only be called after analysis, returns the name of the database the table will
@@ -120,7 +127,8 @@ public class CreateTableLikeStmt extends StatementBase {
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl() + " ");
     if (sortColumns_ != null && !sortColumns_.isEmpty()) {
-      sb.append("SORT BY (" + Joiner.on(",").join(sortColumns_) + ") ");
+      sb.append(String.format("SORT BY %s (%s) ", sortingOrder_.toString(),
+          Joiner.on(",").join(sortColumns_)));
     }
     sb.append("LIKE ");
     if (srcTableName_.getDb() != null) sb.append(srcTableName_.getDb() + ".");
@@ -143,6 +151,7 @@ public class CreateTableLikeStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setSort_columns(sortColumns_);
     params.setServer_name(serverName_);
+    params.setSorting_order(sortingOrder_);
     return params;
   }
 
@@ -193,7 +202,7 @@ public class CreateTableLikeStmt extends StatementBase {
     }
 
     if (sortColumns_ != null) {
-      TableDef.analyzeSortColumns(sortColumns_, srcTable);
+      TableDef.analyzeSortColumns(sortColumns_, srcTable, sortingOrder_);
     }
   }
 }

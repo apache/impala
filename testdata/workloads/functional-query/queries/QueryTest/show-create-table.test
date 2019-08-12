@@ -355,7 +355,7 @@ SORT BY (id)
 STORED AS TEXTFILE
 ---- RESULTS
 CREATE TABLE show_create_table_test_db.test1 (id INT)
-SORT BY (id)
+SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====
@@ -368,7 +368,7 @@ STORED AS TEXTFILE
 ---- RESULTS
 CREATE TABLE show_create_table_test_db.test1 (id INT)
 PARTITIONED BY (x INT, y INT)
-SORT BY (id)
+SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====

@@ -45,6 +45,8 @@ import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.KuduUtil;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -62,11 +64,13 @@ import com.google.common.collect.Maps;
  */
 public class ToSqlUtils {
   // Table properties to hide when generating the toSql() statement
-  // EXTERNAL, SORT BY, and comment are hidden because they are part of the toSql result,
-  // e.g., "CREATE EXTERNAL TABLE <name> ... SORT BY (...) ... COMMENT <comment> ..."
+  // EXTERNAL, SORT BY [order], and comment are hidden because they are part of the
+  // toSql result, e.g.,
+  // "CREATE EXTERNAL TABLE <name> ... SORT BY ZORDER (...) ... COMMENT <comment> ..."
   @VisibleForTesting
   protected static final ImmutableSet<String> HIDDEN_TABLE_PROPERTIES = ImmutableSet.of(
-      "EXTERNAL", "comment", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS);
+      "EXTERNAL", "comment", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
+      AlterTableSortByStmt.TBL_PROP_SORT_ORDER);
 
   /**
    * Removes all hidden properties from the given 'tblProperties' map.
@@ -95,6 +99,17 @@ public class ToSqlUtils {
     if (!properties.containsKey(sortByKey)) return null;
     return Lists.newArrayList(Splitter.on(",").trimResults().omitEmptyStrings().split(
         properties.get(sortByKey)));
+  }
+
+  /**
+   * Returns the sorting order from 'properties' or the default value (lexicographic
+   * ordering), if 'properties' doesn't contain 'sort.order'.
+   */
+  @VisibleForTesting
+  protected static String getSortingOrder(Map<String, String> properties) {
+    String sortOrderKey = AlterTableSortByStmt.TBL_PROP_SORT_ORDER;
+    if (!properties.containsKey(sortOrderKey)) return TSortingOrder.LEXICAL.toString();
+    return properties.get(sortOrderKey);
   }
 
   /**
@@ -238,10 +253,10 @@ public class ToSqlUtils {
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
         partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), kuduParamsSql,
-        stmt.getSortColumns(), properties, stmt.getSerdeProperties(),
-        stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
-        HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
-        stmt.getLocation());
+        new Pair<>(stmt.getSortColumns(), stmt.getSortingOrder()), properties,
+        stmt.getSerdeProperties(), stmt.isExternal(), stmt.getIfNotExists(),
+        stmt.getRowFormat(), HdfsFileFormat.fromThrift(stmt.getFileFormat()),
+        HdfsCompression.NONE, null, stmt.getLocation());
   }
 
   /**
@@ -273,8 +288,9 @@ public class ToSqlUtils {
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
         innerStmt.getComment(), null, partitionColsSql,
         innerStmt.getTblPrimaryKeyColumnNames(), kuduParamsSql,
-        innerStmt.getSortColumns(), properties, innerStmt.getSerdeProperties(),
-        innerStmt.isExternal(), innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
+        new Pair<>(innerStmt.getSortColumns(), innerStmt.getSortingOrder()),
+        properties, innerStmt.getSerdeProperties(), innerStmt.isExternal(),
+        innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
         innerStmt.getLocation());
     return createTableSql + " AS " + stmt.getQueryStmt().toSql(options);
@@ -296,6 +312,7 @@ public class ToSqlUtils {
     boolean isExternal = msTable.getTableType() != null &&
         msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());
     List<String> sortColsSql = getSortColumns(properties);
+    TSortingOrder sortingOrder = TSortingOrder.valueOf(getSortingOrder(properties));
     String comment = properties.get("comment");
     removeHiddenTableProperties(properties);
     List<String> colsSql = new ArrayList<>();
@@ -356,9 +373,10 @@ public class ToSqlUtils {
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
-        partitionColsSql, primaryKeySql, kuduPartitionByParams, sortColsSql, properties,
-        serdeParameters, isExternal, false, rowFormat, format, compression,
-        storageHandlerClassName, tableLocation);
+        partitionColsSql, primaryKeySql, kuduPartitionByParams,
+        new Pair<>(sortColsSql, sortingOrder), properties, serdeParameters,
+        isExternal, false, rowFormat, format, compression, storageHandlerClassName,
+        tableLocation);
   }
 
   /**
@@ -369,9 +387,10 @@ public class ToSqlUtils {
   public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
       List<String> primaryKeysSql, String kuduPartitionByParams,
-      List<String> sortColsSql, Map<String, String> tblProperties,
-      Map<String, String> serdeParameters, boolean isExternal, boolean ifNotExists,
-      RowFormat rowFormat, HdfsFileFormat fileFormat, HdfsCompression compression,
+      Pair<List<String>, TSortingOrder> sortProperties,
+      Map<String, String> tblProperties, Map<String, String> serdeParameters,
+      boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
+      HdfsFileFormat fileFormat, HdfsCompression compression,
       String storageHandlerClass, HdfsUri location) {
     Preconditions.checkNotNull(tableName);
     StringBuilder sb = new StringBuilder("CREATE ");
@@ -405,10 +424,9 @@ public class ToSqlUtils {
     if (kuduPartitionByParams != null && !kuduPartitionByParams.equals("")) {
       sb.append("PARTITION BY " + kuduPartitionByParams + "\n");
     }
-
-    if (sortColsSql != null) {
-      sb.append(String.format("SORT BY (\n  %s\n)\n",
-          Joiner.on(", \n  ").join(sortColsSql)));
+    if (sortProperties.first != null) {
+      sb.append(String.format("SORT BY %s (\n  %s\n)\n", sortProperties.second.toString(),
+          Joiner.on(", \n  ").join(sortProperties.first)));
     }
 
     if (tableComment != null) sb.append(" COMMENT '" + tableComment + "'\n");

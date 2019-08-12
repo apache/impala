@@ -699,7 +699,8 @@ public class Planner {
     // Build sortinfo to sort by the ordering exprs.
     List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
-    SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
+    SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams,
+        insertStmt.getSortingOrder());
     sortInfo.createSortTupleInfo(insertStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
     insertStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);

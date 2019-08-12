@@ -23,6 +23,7 @@ import static org.junit.Assert.fail;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
@@ -319,16 +320,39 @@ public class ToSqlTest extends FrontendTestBase {
 
   @Test
   public void TestCreateTable() throws AnalysisException {
+    // Table with SORT BY clause.
     testToSql("create table p (a int) partitioned by (day string) sort by (a) " +
         "comment 'This is a test'",
         "default",
         "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
-    // Table with SORT BY clause.
+        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
     testToSql("create table p (a int, b int) partitioned by (day string) sort by (a ,b) ",
         "default",
         "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY ( a, b ) STORED AS TEXTFILE" , true);
+        "SORT BY LEXICAL ( a, b ) STORED AS TEXTFILE" , true);
+
+    // Table with SORT BY LEXICAL clause.
+    testToSql("create table p (a int) partitioned by (day string) sort by lexical (a) " +
+        "comment 'This is a test'",
+        "default",
+        "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
+        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
+    testToSql("create table p (a int, b int) partitioned by (day string) sort by " +
+        "lexical (a, b)",
+        "default",
+        "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
+        "SORT BY LEXICAL ( a, b ) STORED AS TEXTFILE" , true);
+
+    // Table with SORT BY ZORDER clause.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    testToSql("create table p (a int, b int) partitioned by (day string) sort by zorder" +
+        "(a ,b) ", "default",
+        "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
+        "SORT BY ZORDER ( a, b ) STORED AS TEXTFILE" , true);
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
+
     // Kudu table with a TIMESTAMP column default value
     String kuduMasters = catalog_.getDefaultKuduMasterHosts();
     testToSql(String.format("create table p (a bigint primary key, " +
@@ -360,9 +384,24 @@ public class ToSqlTest extends FrontendTestBase {
     // Table with SORT BY clause.
     testToSql("create table p partitioned by (int_col) sort by (string_col) as " +
         "select double_col, string_col, int_col from functional.alltypes", "default",
-        "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY ( string_col ) " +
-        "STORED AS TEXTFILE AS SELECT double_col, string_col, int_col FROM " +
-        "functional.alltypes", true);
+        "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY LEXICAL " +
+        "( string_col ) STORED AS TEXTFILE AS SELECT double_col, string_col, int_col " +
+        "FROM functional.alltypes", true);
+    // Table with SORT BY LEXICAL clause.
+    testToSql("create table p partitioned by (int_col) sort by lexical (string_col) as " +
+        "select double_col, string_col, int_col from functional.alltypes", "default",
+        "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY LEXICAL " +
+        "( string_col ) STORED AS TEXTFILE AS SELECT double_col, string_col, int_col " +
+        "FROM functional.alltypes", true);
+    // Table with SORT BY ZORDER clause.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+    testToSql("create table p partitioned by (string_col) sort by zorder (int_col, " +
+        "bool_col) as select int_col, bool_col, string_col from functional.alltypes",
+        "default",
+        "CREATE TABLE default.p PARTITIONED BY ( string_col ) SORT BY ZORDER " +
+        "( int_col, bool_col ) STORED AS TEXTFILE AS SELECT " +
+        "int_col, bool_col, string_col FROM functional.alltypes", true);
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
     // Kudu table with multiple partition params
     String kuduMasters = catalog_.getDefaultKuduMasterHosts();
     testToSql(String.format("create table p primary key (a,b) " +
@@ -383,7 +422,16 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE p LIKE functional.alltypes");
     // Table with sort columns.
     testToSql("create table p sort by (id) like functional.alltypes", "default",
-        "CREATE TABLE p SORT BY (id) LIKE functional.alltypes");
+        "CREATE TABLE p SORT BY LEXICAL (id) LIKE functional.alltypes");
+    // Table with LEXICAL sort columns.
+    testToSql("create table p sort by LEXICAL (id) like functional.alltypes", "default",
+        "CREATE TABLE p SORT BY LEXICAL (id) LIKE functional.alltypes");
+    // Table with ZORDER sort columns.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+    testToSql("create table p sort by zorder (bool_col, int_col) like " +
+        "functional.alltypes",  "default",
+        "CREATE TABLE p SORT BY ZORDER (bool_col,int_col) LIKE functional.alltypes");
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -398,7 +446,22 @@ public class ToSqlTest extends FrontendTestBase {
         "'/test-warehouse/schemas/alltypestiny.parquet' sort by (int_col, id)", "default",
         "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
         "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
-        "SORT BY ( int_col, id ) STORED AS TEXTFILE", true);
+        "SORT BY LEXICAL ( int_col, id ) STORED AS TEXTFILE", true);
+    // Table with sort LEXICAL columns.
+    testToSql("create table if not exists p like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet' sort by lexical (int_col, id)",
+        "default",
+        "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
+        "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
+        "SORT BY LEXICAL ( int_col, id ) STORED AS TEXTFILE", true);
+    // Table with ZORDER sort columns.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+    testToSql("create table if not exists p like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet' sort by zorder (int_col, id)",
+        "default", "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
+        "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
+        "SORT BY ZORDER ( int_col, id ) STORED AS TEXTFILE", true);
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test

@@ -26,11 +26,13 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THdfsTableSink;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 
@@ -66,21 +68,24 @@ public class HdfsTableSink extends TableSink {
   // Stores the indices into the list of non-clustering columns of the target table that
   // are stored in the 'sort.columns' table property. This is sent to the backend to
   // populate the RowGroup::sorting_columns list in parquet files.
+  // If sortingOrder_ is not lexicographical, the backend will skip this process.
   private List<Integer> sortColumns_ = new ArrayList<>();
+  private TSortingOrder sortingOrder_;
 
   // Stores the allocated write id if the target table is transactional, otherwise -1.
   private long writeId_;
 
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       List<Expr> outputExprs,
-      boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns,
-      long writeId) {
+      boolean overwrite, boolean inputIsClustered,
+      Pair<List<Integer>, TSortingOrder> sortProperties, long writeId) {
     super(targetTable, Op.INSERT, outputExprs);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
     inputIsClustered_ = inputIsClustered;
-    sortColumns_ = sortColumns;
+    sortColumns_ = sortProperties.first;
+    sortingOrder_ = sortProperties.second;
     writeId_ = writeId;
   }
 
@@ -192,7 +197,8 @@ public class HdfsTableSink extends TableSink {
   @Override
   protected void toThriftImpl(TDataSink tsink) {
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
-        Expr.treesToThrift(partitionKeyExprs_), overwrite_, inputIsClustered_);
+        Expr.treesToThrift(partitionKeyExprs_), overwrite_, inputIsClustered_,
+        sortingOrder_);
     FeFsTable table = (FeFsTable) targetTable_;
     StringBuilder error = new StringBuilder();
     int skipHeaderLineCount = table.parseSkipHeaderLineCount(error);
@@ -202,8 +208,8 @@ public class HdfsTableSink extends TableSink {
       hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
     }
     hdfsTableSink.setSort_columns(sortColumns_);
+    hdfsTableSink.setSorting_order(sortingOrder_);
     if (writeId_ != -1) hdfsTableSink.setWrite_id(writeId_);
-
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;

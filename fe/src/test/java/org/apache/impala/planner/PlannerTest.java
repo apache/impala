@@ -30,6 +30,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
@@ -282,6 +283,23 @@ public class PlannerTest extends PlannerTestBase {
     addTestTable("create table test_sort_by.t_nopart (id int, int_col int, " +
         "bool_col boolean) sort by (int_col, bool_col) location '/'");
     runPlannerTestFile("insert-sort-by", "test_sort_by");
+  }
+
+  @Test
+  public void testInsertSortByZorder() {
+    // Add a test table with a SORT BY ZORDER clause to test that the corresponding sort
+    // nodes are added by the insert statements in insert-sort-by.test.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    addTestDb("test_sort_by_zorder", "Test DB for SORT BY ZORDER clause.");
+    addTestTable("create table test_sort_by_zorder.t (id int, int_col int, " +
+        "bool_col boolean) partitioned by (year int, month int) " +
+        "sort by zorder (int_col, bool_col) location '/'");
+    addTestTable("create table test_sort_by_zorder.t_nopart (id int, int_col int, " +
+        "bool_col boolean) sort by zorder (int_col, bool_col) location '/'");
+    runPlannerTestFile("insert-sort-by-zorder", "test_sort_by_zorder");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test

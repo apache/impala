@@ -139,4 +139,6 @@ struct TBackendGflags {
   57: required string blacklisted_dbs
 
   58: required string blacklisted_tables
+
+  59: required bool unlock_zorder_sort
 }

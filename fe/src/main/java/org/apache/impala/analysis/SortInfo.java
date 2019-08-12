@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -59,9 +60,15 @@ public class SortInfo {
   private final List<Expr> materializedExprs_;
   // Maps from exprs materialized into the sort tuple to their corresponding SlotRefs.
   private final ExprSubstitutionMap outputSmap_;
+  private TSortingOrder sortingOrder_;
 
   public SortInfo(List<Expr> sortExprs, List<Boolean> isAscOrder,
       List<Boolean> nullsFirstParams) {
+    this(sortExprs, isAscOrder, nullsFirstParams, TSortingOrder.LEXICAL);
+  }
+
+  public SortInfo(List<Expr> sortExprs, List<Boolean> isAscOrder,
+      List<Boolean> nullsFirstParams, TSortingOrder sortingOrder) {
     Preconditions.checkArgument(sortExprs.size() == isAscOrder.size());
     Preconditions.checkArgument(sortExprs.size() == nullsFirstParams.size());
     sortExprs_ = sortExprs;
@@ -69,6 +76,7 @@ public class SortInfo {
     nullsFirstParams_ = nullsFirstParams;
     materializedExprs_ = new ArrayList<>();
     outputSmap_ = new ExprSubstitutionMap();
+    sortingOrder_ = sortingOrder;
   }
 
   /**
@@ -81,6 +89,7 @@ public class SortInfo {
     materializedExprs_ = Expr.cloneList(other.materializedExprs_);
     sortTupleDesc_ = other.sortTupleDesc_;
     outputSmap_ = other.outputSmap_.clone();
+    sortingOrder_ = other.sortingOrder_;
   }
 
   public List<Expr> getSortExprs() { return sortExprs_; }
@@ -89,6 +98,7 @@ public class SortInfo {
   public List<Expr> getMaterializedExprs() { return materializedExprs_; }
   public TupleDescriptor getSortTupleDescriptor() { return sortTupleDesc_; }
   public ExprSubstitutionMap getOutputSmap() { return outputSmap_; }
+  public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
   /**
    * Gets the list of booleans indicating whether nulls come first or last, independent

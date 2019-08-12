@@ -42,6 +42,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TSortingOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -276,9 +277,16 @@ public class AnalyticPlanner {
    * Create SortInfo, including sort tuple, to sort entire input row
    * on sortExprs.
    */
-  private SortInfo createSortInfo(
-      PlanNode input, List<Expr> sortExprs, List<Boolean> isAsc,
-      List<Boolean> nullsFirst) {
+  private SortInfo createSortInfo(PlanNode input, List<Expr> sortExprs,
+      List<Boolean> isAsc, List<Boolean> nullsFirst) {
+    return createSortInfo(input, sortExprs, isAsc, nullsFirst, TSortingOrder.LEXICAL);
+  }
+
+   /**
+   * Same as above, but with extra parameter, sorting order.
+   */
+  private SortInfo createSortInfo(PlanNode input, List<Expr> sortExprs,
+      List<Boolean> isAsc, List<Boolean> nullsFirst, TSortingOrder sortingOrder) {
     List<Expr> inputSlotRefs = new ArrayList<>();
     for (TupleId tid: input.getTupleIds()) {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
@@ -306,7 +314,8 @@ public class AnalyticPlanner {
     ExprSubstitutionMap inputSmap = input.getOutputSmap();
     List<Expr> resolvedSortExprs =
         Expr.substituteList(sortExprs, inputSmap, analyzer_, true);
-    SortInfo sortInfo = new SortInfo(resolvedSortExprs, isAsc, nullsFirst);
+    SortInfo sortInfo = new SortInfo(resolvedSortExprs, isAsc, nullsFirst,
+        sortingOrder);
     sortInfo.createSortTupleInfo(inputSlotRefs, analyzer_);
 
     // Lhs exprs to be substituted in ancestor plan nodes could have a rhs that contains
@@ -626,7 +635,7 @@ public class AnalyticPlanner {
     List<AnalyticExpr> analyticExprs = analyticInfo_.getAnalyticExprs();
     List<WindowGroup> groups = new ArrayList<>();
     for (int i = 0; i < analyticExprs.size(); ++i) {
-      AnalyticExpr analyticExpr = (AnalyticExpr) analyticExprs.get(i);
+      AnalyticExpr analyticExpr = analyticExprs.get(i);
       // Do not generate the plan for non-materialized analytic exprs.
       if (!analyticInfo_.getOutputTupleDesc().getSlots().get(i).isMaterialized()) {
         continue;
@@ -634,7 +643,7 @@ public class AnalyticPlanner {
       boolean match = false;
       for (WindowGroup group: groups) {
         if (group.isCompatible(analyticExpr)) {
-          group.add((AnalyticExpr) analyticInfo_.getAnalyticExprs().get(i),
+          group.add(analyticInfo_.getAnalyticExprs().get(i),
               analyticInfo_.getOutputTupleDesc().getSlots().get(i),
               analyticInfo_.getIntermediateTupleDesc().getSlots().get(i));
           match = true;
@@ -643,7 +652,7 @@ public class AnalyticPlanner {
       }
       if (!match) {
         groups.add(new WindowGroup(
-            (AnalyticExpr) analyticInfo_.getAnalyticExprs().get(i),
+            analyticInfo_.getAnalyticExprs().get(i),
             analyticInfo_.getOutputTupleDesc().getSlots().get(i),
             analyticInfo_.getIntermediateTupleDesc().getSlots().get(i)));
       }

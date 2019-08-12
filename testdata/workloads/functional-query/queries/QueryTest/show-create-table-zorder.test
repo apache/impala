@@ -1,0 +1,25 @@
+====
+---- CREATE_TABLE
+# Simple table with zsort columns.
+CREATE TABLE test1 (id INT, z INT)
+SORT BY ZORDER (id, z)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test1 (id INT, z INT)
+SORT BY ZORDER (id, z)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# Simple partitioned table with zsort columns.
+CREATE TABLE test1 (id INT, z INT)
+PARTITIONED BY (x INT, y INT)
+SORT BY ZORDER (id, z)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test1 (id INT, z INT)
+PARTITIONED BY (x INT, y INT)
+SORT BY ZORDER (id, z)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====

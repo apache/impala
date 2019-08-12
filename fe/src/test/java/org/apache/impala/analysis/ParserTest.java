@@ -29,6 +29,7 @@ import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -2466,6 +2467,18 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableZSortBy() {
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    ParsesOk("ALTER TABLE TEST SORT BY ZORDER (int_col, id)");
+    ParsesOk("ALTER TABLE TEST SORT BY ZORDER ()");
+    ParserError("ALTER TABLE TEST PARTITION (year=2009, month=4) SORT BY ZORDER " +
+        "(int_col, id)");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
+  }
+
+  @Test
   public void TestAlterTableOrViewRename() {
     for (String entity: Lists.newArrayList("TABLE", "VIEW")) {
       ParsesOk(String.format("ALTER %s TestDb.Foo RENAME TO TestDb.Foo2", entity));
@@ -2592,6 +2605,51 @@ public class ParserTest extends FrontendTestBase {
     // Create table like file with sort columns
     ParsesOk("CREATE TABLE Foo LIKE PARQUET '/user/foo' SORT BY (id)");
     ParserError("CREATE TABLE Foo SORT BY (id) LIKE PARQUET '/user/foo'");
+
+    // SORT BY ZORDER clause
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    ParsesOk("CREATE TABLE Foo (i int, j int) SORT BY ZORDER ()");
+    ParsesOk("CREATE TABLE Foo (i int) SORT BY ZORDER (i)");
+    ParsesOk("CREATE TABLE Foo (i int) SORT BY ZORDER (j)");
+    ParsesOk("CREATE TABLE Foo (i int, j int) SORT BY ZORDER (i,j)");
+    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) SORT BY ZORDER (s) " +
+        "LOCATION '/test-warehouse/'");
+    ParsesOk("CREATE TABLE Foo (i int, s string) SORT BY ZORDER (s) COMMENT 'hello' " +
+        "LOCATION '/a/b/' TBLPROPERTIES ('123'='1234')");
+
+
+    // SORT BY ZORDER must be the first table option
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' SORT BY ZORDER (s) " +
+        "LOCATION '/a/b/' TBLPROPERTIES ('123'='1234')");
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
+        "SORT BY ZORDER (s) TBLPROPERTIES ('123'='1234')");
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
+        "TBLPROPERTIES ('123'='1234') SORT BY ZORDER (s)");
+
+    // Malformed SORT BY ZORDER clauses
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY ZORDER");
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY ZORDER (i,)");
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY ZORDER (int)");
+
+    // Create table like other table with zsort columns
+    ParsesOk("CREATE TABLE Foo SORT BY ZORDER(bar) LIKE Baz STORED AS TEXTFILE " +
+        "LOCATION '/a/b'");
+    ParserError("CREATE TABLE SORT BY ZORDER(bar) Foo LIKE Baz STORED AS TEXTFILE " +
+        "LOCATION '/a/b'");
+    // SORT BY ZORDER must be the first table option
+    ParserError("CREATE TABLE Foo LIKE Baz STORED AS TEXTFILE LOCATION '/a/b' " +
+        "SORT BY ZORDER(bar)");
+
+    // CTAS with zsort columns
+    ParsesOk("CREATE TABLE Foo SORT BY ZORDER(bar) AS SELECT * FROM BAR");
+    ParserError("CREATE TABLE Foo AS SELECT * FROM BAR SORT BY ZORDER(bar)");
+
+    // Create table like file with zsort columns
+    ParsesOk("CREATE TABLE Foo LIKE PARQUET '/user/foo' SORT BY ZORDER (id)");
+    ParserError("CREATE TABLE Foo SORT BY ZORDER (id) LIKE PARQUET '/user/foo'");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
 
     // Column comments
     ParsesOk("CREATE TABLE Foo (i int COMMENT 'hello', s string)");

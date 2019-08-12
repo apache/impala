@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
+import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -66,7 +67,7 @@ public class UpdateStmt extends ModifyStmt {
     Preconditions.checkState(table_ != null);
     DataSink dataSink = TableSink.create(table_, TableSink.Op.UPDATE,
         ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
-        ImmutableList.<Integer>of());
+        new Pair<>(ImmutableList.<Integer> of(), TSortingOrder.LEXICAL));
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return dataSink;
   }

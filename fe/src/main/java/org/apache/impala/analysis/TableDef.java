@@ -18,12 +18,14 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
@@ -32,12 +34,15 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
 
@@ -126,11 +131,15 @@ class TableDef {
     // Key/values to persist with table metadata.
     final Map<String, String> tblProperties;
 
-    Options(List<String> sortCols, String comment, RowFormat rowFormat,
-        Map<String, String> serdeProperties, THdfsFileFormat fileFormat, HdfsUri location,
-        HdfsCachingOp cachingOp, Map<String, String> tblProperties,
-        TQueryOptions queryOptions) {
-      this.sortCols = sortCols;
+    // Sorting order for SORT BY queries.
+    final TSortingOrder sortingOrder;
+
+    Options(Pair<List<String>, TSortingOrder> sortProperties, String comment,
+        RowFormat rowFormat, Map<String, String> serdeProperties,
+        THdfsFileFormat fileFormat, HdfsUri location, HdfsCachingOp cachingOp,
+        Map<String, String> tblProperties, TQueryOptions queryOptions) {
+      this.sortCols = sortProperties.first;
+      this.sortingOrder = sortProperties.second;
       this.comment = comment;
       this.rowFormat = rowFormat;
       Preconditions.checkNotNull(serdeProperties);
@@ -148,9 +157,9 @@ class TableDef {
     public Options(String comment, TQueryOptions queryOptions) {
       // Passing null to file format so that it uses the file format from the query option
       // if specified, otherwise it will use the default file format, which is TEXT.
-      this(ImmutableList.of(), comment, RowFormat.DEFAULT_ROW_FORMAT,
-          new HashMap<>(), /*file format*/ null, null, null, new HashMap<>(),
-          queryOptions);
+      this(new Pair<>(ImmutableList.of(), TSortingOrder.LEXICAL), comment,
+          RowFormat.DEFAULT_ROW_FORMAT, new HashMap<>(), /* file format */null, null,
+          null, new HashMap<>(), queryOptions);
     }
   }
 
@@ -180,6 +189,10 @@ class TableDef {
   public boolean isAnalyzed() { return isAnalyzed_; }
   List<ColumnDef> getColumnDefs() { return columnDefs_; }
   List<String> getColumnNames() { return ColumnDef.toColumnNames(columnDefs_); }
+
+  List<Type> getColumnTypes() {
+    return columnDefs_.stream().map(col -> col.getType()).collect(Collectors.toList());
+  }
 
   List<String> getPartitionColumnNames() {
     return ColumnDef.toColumnNames(getPartitionColumnDefs());
@@ -214,6 +227,7 @@ class TableDef {
   Map<String, String> getSerdeProperties() { return options_.serdeProperties; }
   THdfsFileFormat getFileFormat() { return options_.fileFormat; }
   RowFormat getRowFormat() { return options_.rowFormat; }
+  TSortingOrder getSortingOrder() { return options_.sortingOrder; }
 
   /**
    * Analyzes the parameters of a CREATE TABLE statement.
@@ -310,16 +324,20 @@ class TableDef {
   }
 
   /**
-   * Analyzes the list of columns in 'sortCols' against the columns of 'table'. Each
-   * column of 'sortCols' must occur in 'table' as a non-partitioning column. 'table'
-   * must be an HDFS table. If there are errors during the analysis, this will throw an
-   * AnalysisException.
+   * Analyzes the list of columns in 'sortCols' against the columns of 'table' and
+   * returns their matching positions in the table's columns. Each column of 'sortCols'
+   * must occur in 'table' as a non-partitioning column. 'table' must be an HDFS table.
+   * If there are errors during the analysis, this will throw an AnalysisException.
    */
-  public static void analyzeSortColumns(List<String> sortCols, FeTable table)
-      throws AnalysisException {
+  public static List<Integer> analyzeSortColumns(List<String> sortCols, FeTable table,
+      TSortingOrder sortingOrder) throws AnalysisException {
     Preconditions.checkState(table instanceof FeFsTable);
-    analyzeSortColumns(sortCols, Column.toColumnNames(table.getNonClusteringColumns()),
-        Column.toColumnNames(table.getClusteringColumns()));
+
+    List<Type> columnTypes = table.getNonClusteringColumns().stream().map(
+        col -> col.getType()).collect(Collectors.toList());
+    return analyzeSortColumns(sortCols,
+        Column.toColumnNames(table.getNonClusteringColumns()),
+        Column.toColumnNames(table.getClusteringColumns()), columnTypes, sortingOrder);
   }
 
   /**
@@ -329,8 +347,8 @@ class TableDef {
    * AnalysisException.
    */
   public static List<Integer> analyzeSortColumns(List<String> sortCols,
-      List<String> tableCols, List<String> partitionCols)
-      throws AnalysisException {
+      List<String> tableCols, List<String> partitionCols, List<Type> columnTypes,
+      TSortingOrder sortingOrder) throws AnalysisException {
     // The index of each sort column in the list of table columns.
     Set<Integer> colIdxs = new LinkedHashSet<>();
 
@@ -357,10 +375,33 @@ class TableDef {
         }
       }
       if (!foundColumn) {
-        throw new AnalysisException(String.format("Could not find SORT BY column '%s' " +
-            "in table.", sortColName));
+        throw new AnalysisException(String.format("Could not find SORT BY column " +
+            "'%s' in table.", sortColName));
       }
     }
+
+    // Analyzing Z-Order specific constraints
+    if (sortingOrder == TSortingOrder.ZORDER) {
+      if (numColumns == 1) {
+        throw new AnalysisException(String.format("SORT BY ZORDER with 1 column is " +
+            "equivalent to SORT BY. Please, use the latter, if that was your " +
+            "intention."));
+      }
+
+      List<? extends Type> notSupportedTypes = Arrays.asList(Type.STRING, Type.VARCHAR,
+          Type.FLOAT, Type.DOUBLE);
+      for (Integer position : colIdxs) {
+        Type colType = columnTypes.get(position);
+
+        if (notSupportedTypes.stream().anyMatch(type -> colType.matchesType(type))) {
+          throw new AnalysisException(String.format("SORT BY ZORDER does not support "
+              + "column types: %s", String.join(", ",
+                  notSupportedTypes.stream().map(type -> type.toString())
+                  .collect(Collectors.toList()))));
+        }
+      }
+    }
+
     Preconditions.checkState(numColumns == colIdxs.size());
     return Lists.newArrayList(colIdxs);
   }
@@ -388,18 +429,27 @@ class TableDef {
     analyzeRowFormat(analyzer);
 
     String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+    String sortOrderKey = AlterTableSortByStmt.TBL_PROP_SORT_ORDER;
     if (options_.tblProperties.containsKey(sortByKey)) {
       throw new AnalysisException(String.format("Table definition must not contain the " +
           "%s table property. Use SORT BY (...) instead.", sortByKey));
     }
 
+    if (options_.tblProperties.containsKey(sortOrderKey)) {
+      throw new AnalysisException(String.format("Table definition must not contain the " +
+          "%s table property. Use SORT BY %s (...) instead.", sortOrderKey,
+          options_.sortingOrder.toString()));
+    }
+
     // Analyze sort columns.
     if (options_.sortCols == null) return;
     if (isKuduTable()) {
-      throw new AnalysisException("SORT BY is not supported for Kudu tables.");
+      throw new AnalysisException(String.format("SORT BY is not supported for Kudu "+
+          "tables."));
     }
-    analyzeSortColumns(options_.sortCols, getColumnNames(),
-        getPartitionColumnNames());
+
+    analyzeSortColumns(options_.sortCols, getColumnNames(), getPartitionColumnNames(),
+        getColumnTypes(), options_.sortingOrder);
   }
 
   private void analyzeRowFormat(Analyzer analyzer) throws AnalysisException {

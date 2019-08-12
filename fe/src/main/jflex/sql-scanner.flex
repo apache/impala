@@ -163,6 +163,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("kudu", SqlParserSymbols.KW_KUDU);
     keywordMap.put("last", SqlParserSymbols.KW_LAST);
     keywordMap.put("left", SqlParserSymbols.KW_LEFT);
+    keywordMap.put("lexical", SqlParserSymbols.KW_LEXICAL);
     keywordMap.put("like", SqlParserSymbols.KW_LIKE);
     keywordMap.put("limit", SqlParserSymbols.KW_LIMIT);
     keywordMap.put("lines", SqlParserSymbols.KW_LINES);
@@ -256,6 +257,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("when", SqlParserSymbols.KW_WHEN);
     keywordMap.put("where", SqlParserSymbols.KW_WHERE);
     keywordMap.put("with", SqlParserSymbols.KW_WITH);
+    keywordMap.put("zorder", SqlParserSymbols.KW_ZORDER);
 
     // Initilize tokenIdMap for error reporting
     tokenIdMap = new HashMap<>();

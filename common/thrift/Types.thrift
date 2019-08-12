@@ -264,3 +264,9 @@ struct TFunction {
   // NOTE: when adding fields to this struct, do not renumber the field IDs or
   // add new required fields. This struct is serialized into user metastores.
 }
+
+// The sorting order used in SORT BY queries.
+enum TSortingOrder {
+  LEXICAL = 0
+  ZORDER = 1
+}

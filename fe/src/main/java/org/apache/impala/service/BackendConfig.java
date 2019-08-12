@@ -181,6 +181,14 @@ public class BackendConfig {
     return backendCfg_.blacklisted_tables;
   }
 
+  public boolean isZOrderSortUnlocked() {
+    return backendCfg_.unlock_zorder_sort;
+  }
+
+  public void setZOrderSortUnlocked(boolean zOrdering) {
+    backendCfg_.setUnlock_zorder_sort(zOrdering);
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

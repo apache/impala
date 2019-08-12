@@ -34,9 +34,11 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
@@ -201,30 +203,42 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    * 'table'. The property must store a list of column names separated by commas, and each
    * column in the property must occur in 'table' as a non-partitioning column. If there
    * are errors during the analysis, this function will throw an AnalysisException.
-   * Returns a list of positions of the sort columns within the table's list of
-   * columns.
+   * Returns a pair of list of positions of the sort columns within the table's list of
+   * columns and the corresponding sorting order.
    */
-  public static List<Integer> analyzeSortColumns(FeTable table,
+  public static Pair<List<Integer>, TSortingOrder> analyzeSortColumns(FeTable table,
       Map<String, String> tblProperties) throws AnalysisException {
-    if (!tblProperties.containsKey(
-        AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)) {
-      return new ArrayList<>();
+
+    boolean containsOrderingProperties =
+        tblProperties.containsKey(AlterTableSortByStmt.TBL_PROP_SORT_ORDER);
+    boolean containsSortingColumnProperties = tblProperties
+        .containsKey(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS);
+
+    if ((containsOrderingProperties || containsSortingColumnProperties) &&
+        table instanceof FeKuduTable) {
+      throw new AnalysisException("'sort.*' table properties are not "
+          + "supported for Kudu tables.");
+    }
+
+    TSortingOrder sortingOrder = TSortingOrder.LEXICAL;
+    if (containsOrderingProperties) {
+      sortingOrder = TSortingOrder.valueOf(tblProperties.get(
+          AlterTableSortByStmt.TBL_PROP_SORT_ORDER));
+    }
+    if (!containsSortingColumnProperties) {
+      return new Pair<List<Integer>, TSortingOrder>(new ArrayList<Integer>(),
+          sortingOrder);
     }
 
     // ALTER TABLE SET is not supported on HBase tables at all, see
     // AlterTableSetStmt::analyze().
     Preconditions.checkState(!(table instanceof FeHBaseTable));
 
-    if (table instanceof FeKuduTable) {
-      throw new AnalysisException(String.format("'%s' table property is not supported " +
-          "for Kudu tables.", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS));
-    }
-
     List<String> sortCols = Lists.newArrayList(
         Splitter.on(",").trimResults().omitEmptyStrings().split(
         tblProperties.get(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)));
-    return TableDef.analyzeSortColumns(sortCols,
-        Column.toColumnNames(table.getNonClusteringColumns()),
-        Column.toColumnNames(table.getClusteringColumns()));
+
+    return new Pair<>(TableDef.analyzeSortColumns(sortCols, table, sortingOrder),
+        sortingOrder);
   }
 }

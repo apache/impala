@@ -54,7 +54,9 @@ import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.MetaStoreUtil;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -1291,6 +1293,30 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableSortByZOrder() {
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    AnalyzesOk("alter table functional.alltypes sort by zorder (int_col,id)");
+    AnalyzesOk("alter table functional.alltypes sort by zorder (bool_col,int_col,id)");
+    AnalyzesOk("alter table functional.alltypes sort by zorder ()");
+    AnalysisError("alter table functional.alltypes sort by zorder (id)",
+        "SORT BY ZORDER with 1 column is equivalent to SORT BY. Please, use the " +
+        "latter, if that was your intention.");
+    AnalysisError("alter table functional.alltypes sort by zorder (id,int_col,id)",
+        "Duplicate column in SORT BY list: id");
+    AnalysisError("alter table functional.alltypes sort by zorder (id, foo)", "Could " +
+        "not find SORT BY column 'foo' in table.");
+    AnalysisError("alter table functional_hbase.alltypes sort by zorder (id, foo)",
+        "ALTER TABLE SORT BY not supported on HBase tables.");
+    AnalysisError("alter table functional.alltypes sort by zorder (bool_col,string_col)",
+        "SORT BY ZORDER does not support column types: STRING, VARCHAR(*), FLOAT, " +
+        "DOUBLE");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
+  }
+
+  @Test
   public void TestAlterView() {
     // View-definition references a table.
     AnalyzesOk("alter view functional.alltypes_view as " +
@@ -1924,6 +1950,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
   @Test
   public void TestCreateTableLikeFile() throws AnalysisException {
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
     // check that we analyze all of the CREATE TABLE options
     AnalyzesOk("create table if not exists newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/alltypestiny.parquet'");
@@ -1936,8 +1965,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create external table newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet' sort by (id,zip) "
         + "stored as parquet");
+    AnalyzesOk("create external table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/decimal.parquet' sort by zorder (d32, d11) "
+        + "stored as parquet");
     AnalyzesOk("create table newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet' sort by (id,zip)");
+    AnalyzesOk("create table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/decimal.parquet' sort by zorder (d32, d11)");
+    AnalysisError("create table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' sort by  zorder (id,zip)",
+        "SORT BY ZORDER does not support column types: STRING, VARCHAR(*), FLOAT, " +
+        "DOUBLE");
     AnalyzesOk("create table if not exists functional.zipcode_incomes like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
     AnalyzesOk("create table if not exists newtbl_DNE like parquet "
@@ -1983,6 +2021,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table newtbl_kudu like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' stored as kudu",
         "CREATE TABLE LIKE FILE statement is not supported for Kudu tables.");
+
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -2264,6 +2305,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tbl sort by (int_col,id) like functional.alltypes");
     AnalysisError("create table tbl sort by (int_col,foo) like functional.alltypes",
         "Could not find SORT BY column 'foo' in table.");
+
+    // Test zsort columns.
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
+    AnalyzesOk("create table tbl sort by zorder (int_col,id) like functional.alltypes");
+    AnalysisError("create table tbl sort by zorder (int_col,foo) like " +
+        "functional.alltypes", "Could not find SORT BY column 'foo' in table.");
+    AnalysisError("create table tbl sort by zorder (string_col,id) like " +
+        "functional.alltypes", "SORT BY ZORDER does not support column types: STRING, " +
+        "VARCHAR(*), FLOAT, DOUBLE");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -2513,26 +2566,65 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           type.name());
     }
 
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
+
     // Tables with sort columns
     AnalyzesOk("create table functional.new_table (i int, j int) sort by (i)");
     AnalyzesOk("create table functional.new_table (i int, j int) sort by (i, j)");
     AnalyzesOk("create table functional.new_table (i int, j int) sort by (j, i)");
+
+    // Tables with sort columns, using Z-ordering
+    AnalysisError("create table functional.new_table (i int, j int) sort by zorder (i)",
+        "SORT BY ZORDER with 1 column is equivalent to SORT BY. Please, use the " +
+        "latter, if that was your intention.");
+    AnalyzesOk("create table functional.new_table (i int, j int) sort by zorder (i, j)");
+    AnalyzesOk("create table functional.new_table (i int, j int) sort by zorder (j, i)");
 
     // 'sort.columns' property not supported in table definition.
     AnalysisError("create table Foo (i int) sort by (i) " +
         "tblproperties ('sort.columns'='i')", "Table definition must not contain the " +
         "sort.columns table property. Use SORT BY (...) instead.");
 
+    // 'sort.order' property not supported in table definition.
+    AnalysisError("create table Foo (i int, j int) sort by zorder (i, j) " +
+        "tblproperties ('sort.order'='ZORDER')", "Table definition must not " +
+        "contain the sort.order table property. Use SORT BY ZORDER (...) instead.");
+
     // Column in sort by list must exist.
     AnalysisError("create table functional.new_table (i int) sort by (j)", "Could not " +
         "find SORT BY column 'j' in table.");
 
+    // Column in sort by zorder list must exist.
+    AnalysisError("create table functional.new_table (i int) sort by zorder (j)",
+        "Could not find SORT BY column 'j' in table.");
+
     // Partitioned HDFS table
     AnalyzesOk("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "SORT BY (i)");
+    AnalyzesOk("create table functional.new_table (i int, j int) PARTITIONED BY " +
+        "(d decimal) sort by zorder (i, j)");
     // Column in sort by list must not be a Hdfs partition column.
     AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "SORT BY (d)", "SORT BY column list must not contain partition column: 'd'");
+    // Column in sort by list must not be a Hdfs partition column.
+    AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
+        "sort by zorder (i, d)", "SORT BY column list must not contain partition " +
+        "column: 'd'");
+    // For Z-Order, string, varchar, float and double columns are not supported.
+    AnalysisError("create table functional.new_table (i int, s string) sort by zorder " +
+        "(i, s)", "SORT BY ZORDER does not support column types: STRING, VARCHAR(*), " +
+        "FLOAT, DOUBLE");
+    AnalysisError("create table functional.new_table (i int, s varchar(32)) sort by " +
+        "zorder (i, s)", "SORT BY ZORDER does not support column types: STRING, " +
+        "VARCHAR(*), FLOAT, DOUBLE");
+    AnalysisError("create table functional.new_table (i int, s double) sort by zorder " +
+        "(i, s)", "SORT BY ZORDER does not support column types: STRING, VARCHAR(*), " +
+        "FLOAT, DOUBLE");
+    AnalysisError("create table functional.new_table (i int, s float) sort by zorder " +
+        "(i, s)", "SORT BY ZORDER does not support column types: STRING, VARCHAR(*), " +
+        "FLOAT, DOUBLE");
+
+    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -3497,7 +3589,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Single element path can only be resolved as <table>.
     DescribeTableStmt describe = (DescribeTableStmt)AnalyzesOk("describe ambig",
         createAnalysisCtx("ambig"));
-    TDescribeTableParams tdesc = (TDescribeTableParams) describe.toThrift();
+    TDescribeTableParams tdesc = describe.toThrift();
     Assert.assertTrue(tdesc.isSetTable_name());
     Assert.assertEquals("ambig", tdesc.table_name.getDb_name());
     Assert.assertEquals("ambig", tdesc.table_name.getTable_name(), "ambig");
@@ -3512,7 +3604,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // 4 element path can only be resolved to nested array.
     describe = (DescribeTableStmt) AnalyzesOk(
         "describe ambig.ambig.ambig.ambig", createAnalysisCtx("ambig"));
-    tdesc = (TDescribeTableParams) describe.toThrift();
+    tdesc = describe.toThrift();
     Type expectedType =
         org.apache.impala.analysis.Path.getTypeAsStruct(new ArrayType(Type.INT));
     Assert.assertTrue(tdesc.isSetResult_struct());

@@ -21,11 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsAction;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.THdfsFileFormat;
 
 
@@ -53,9 +53,10 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
         schemaLocation_.toString());
     String s = ToSqlUtils.getCreateTableSql(getDb(),
         getTbl() + " __LIKE_FILEFORMAT__ ",  getComment(), colsSql, partitionColsSql,
-        null, null, getSortColumns(), getTblProperties(), getSerdeProperties(),
-        isExternal(), getIfNotExists(), getRowFormat(),
-        HdfsFileFormat.fromThrift(getFileFormat()), compression, null, getLocation());
+        null, null, new Pair<>(getSortColumns(), getSortingOrder()),
+        getTblProperties(), getSerdeProperties(), isExternal(), getIfNotExists(),
+        getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()), compression, null,
+        getLocation());
     s = s.replace("__LIKE_FILEFORMAT__", String.format("LIKE %s '%s'",
         schemaFileFormat_, schemaLocation_.toString()));
     return s;

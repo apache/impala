@@ -29,6 +29,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
@@ -41,6 +42,7 @@ import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.BitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -618,6 +620,50 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     StringBuilder output = new StringBuilder();
     output.append("preds=" + Expr.debugString(conjuncts_));
     output.append(" limit=" + Long.toString(limit_));
+    return output.toString();
+  }
+
+  protected String getExplainString(
+      List<? extends Expr> exprs, TExplainLevel detailLevel) {
+    if (exprs == null) return "";
+    ToSqlOptions toSqlOptions =
+        detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() ?
+        ToSqlOptions.SHOW_IMPLICIT_CASTS :
+        ToSqlOptions.DEFAULT;
+    StringBuilder output = new StringBuilder();
+    for (int i = 0; i < exprs.size(); ++i) {
+      if (i > 0) output.append(", ");
+      output.append(exprs.get(i).toSql(toSqlOptions));
+    }
+    return output.toString();
+  }
+
+  protected String getSortingOrderExplainString(List<? extends Expr> exprs,
+      List<Boolean> isAscOrder, List<Boolean> nullsFirstParams,
+      TSortingOrder sortingOrder) {
+    StringBuilder output = new StringBuilder();
+    switch (sortingOrder) {
+    case LEXICAL:
+      for (int i = 0; i < exprs.size(); ++i) {
+        if (i > 0) output.append(", ");
+        output.append(exprs.get(i).toSql() + " ");
+        output.append(isAscOrder.get(i) ? "ASC" : "DESC");
+
+        Boolean nullsFirstParam = nullsFirstParams.get(i);
+        if (nullsFirstParam != null) {
+          output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
+        }
+      }
+      break;
+    case ZORDER:
+      output.append("ZORDER: ");
+      for (int i = 0; i < exprs.size(); ++i) {
+        if (i > 0) output.append(", ");
+        output.append(exprs.get(i).toSql());
+      }
+      break;
+    }
+    output.append("\n");
     return output.toString();
   }
 

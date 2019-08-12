@@ -30,6 +30,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaParser;
@@ -108,6 +109,7 @@ public class CreateTableStmt extends StatementBase {
     return tableDef_.getKuduPartitionParams();
   }
   public List<String> getSortColumns() { return tableDef_.getSortColumns(); }
+  public TSortingOrder getSortingOrder() { return tableDef_.getSortingOrder(); }
   public String getComment() { return tableDef_.getComment(); }
   Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
   private HdfsCachingOp getCachingOp() { return tableDef_.getCachingOp(); }
@@ -170,6 +172,7 @@ public class CreateTableStmt extends StatementBase {
     params.setFile_format(getFileFormat());
     params.setIf_not_exists(getIfNotExists());
     params.setSort_columns(getSortColumns());
+    params.setSorting_order(getSortingOrder());
     params.setTable_properties(Maps.newHashMap(getTblProperties()));
     params.getTable_properties().putAll(Maps.newHashMap(getGeneratedKuduProperties()));
     params.setSerde_properties(getSerdeProperties());
