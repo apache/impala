@@ -2651,6 +2651,23 @@ public class Analyzer {
   }
 
   /**
+   * Checks if a table exists without registering privileges.
+   */
+  public boolean tableExists(TableName tblName) {
+    Preconditions.checkNotNull(tblName);
+    TableName fqTableName = getFqTableName(tblName);
+    return globalState_.stmtTableCache.tables.containsKey(fqTableName);
+  }
+
+  /**
+   * Checks if a database exists without registering privileges.
+   */
+  public boolean dbExists(String dbName) {
+    Preconditions.checkNotNull(dbName);
+    return getCatalog().getDb(dbName) != null;
+  }
+
+  /**
    * Returns the Table with the given name from the 'loadedTables' map in the global
    * analysis state. Throws an AnalysisException if the table or the db does not exist.
    * Throws a TableLoadingException if the registered table failed to load.

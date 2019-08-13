@@ -1904,9 +1904,12 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.OWNER))
           .ok(onServer(TPrivilegeLevel.DROP))
-          .error(dropError("nodb"))
-          .error(dropError("nodb"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)));
+          .ok(onServer(TPrivilegeLevel.CREATE))
+          .ok(onServer(TPrivilegeLevel.SELECT))
+          .ok(onServer(TPrivilegeLevel.INSERT))
+          .ok(onServer(TPrivilegeLevel.ALTER))
+          .ok(onServer(TPrivilegeLevel.REFRESH))
+          .error(accessError("nodb"));
     }
 
     // Dropping system database is not allowed even if with ALL/OWNER privilege on server.
@@ -1956,14 +1959,20 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
         .ok(onServer(TPrivilegeLevel.DROP))
+        .ok(onServer(TPrivilegeLevel.CREATE))
+        .ok(onServer(TPrivilegeLevel.SELECT))
+        .ok(onServer(TPrivilegeLevel.INSERT))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onServer(TPrivilegeLevel.REFRESH))
         .ok(onDatabase("functional", TPrivilegeLevel.ALL))
         .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
         .ok(onDatabase("functional", TPrivilegeLevel.DROP))
-        .error(dropError("functional.notbl"))
-        .error(dropError("functional.notbl"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)))
-        .error(dropError("functional.notbl"), onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)));
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.REFRESH))
+        .error(accessError("functional.notbl"));
 
     // Dropping any tables in the system database is not allowed even with ALL/OWNER
     // privilege on server.
@@ -2014,14 +2023,20 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
         .ok(onServer(TPrivilegeLevel.DROP))
+        .ok(onServer(TPrivilegeLevel.CREATE))
+        .ok(onServer(TPrivilegeLevel.SELECT))
+        .ok(onServer(TPrivilegeLevel.INSERT))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onServer(TPrivilegeLevel.REFRESH))
         .ok(onDatabase("functional", TPrivilegeLevel.ALL))
         .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
         .ok(onDatabase("functional", TPrivilegeLevel.DROP))
-        .error(dropError("functional.noview"))
-        .error(dropError("functional.noview"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)))
-        .error(dropError("functional.noview"), onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)));
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.REFRESH))
+        .error(accessError("functional.noview"));
 
     // Dropping any views in the system database is not allowed even with ALL/OWNER
     // privilege on server.
@@ -2742,9 +2757,23 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
       // Function does not exist but with if exists clause.
       authorize("drop function if exists functional.g()")
-          .error(dropFunctionError("functional.g()"))
-          .error(dropFunctionError("functional.g()"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.DROP)));
+          .ok(onServer(TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onServer(TPrivilegeLevel.DROP))
+          .ok(onServer(TPrivilegeLevel.CREATE))
+          .ok(onServer(TPrivilegeLevel.SELECT))
+          .ok(onServer(TPrivilegeLevel.INSERT))
+          .ok(onServer(TPrivilegeLevel.ALTER))
+          .ok(onServer(TPrivilegeLevel.REFRESH))
+          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+          .ok(onDatabase("functional", TPrivilegeLevel.DROP))
+          .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
+          .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+          .ok(onDatabase("functional", TPrivilegeLevel.INSERT))
+          .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+          .ok(onDatabase("functional", TPrivilegeLevel.REFRESH))
+          .error(accessFunctionError("functional.g()"));
     } finally {
       removeFunction(fn);
     }

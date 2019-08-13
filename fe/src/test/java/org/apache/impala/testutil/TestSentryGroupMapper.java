@@ -58,6 +58,7 @@ public class TestSentryGroupMapper implements GroupMappingService {
     // User to groups for test_owner_privilege tests.
     groupsMap_.put("oo_user1", Sets.newHashSet("oo_group1"));
     groupsMap_.put("oo_user2", Sets.newHashSet("oo_group2"));
+    groupsMap_.put("oo_user3", Sets.newHashSet("oo_group3"));
 
     groupsMap_.put("foobar", Sets.newHashSet("foobar"));
     groupsMap_.put("FOOBAR", Sets.newHashSet("FOOBAR"));

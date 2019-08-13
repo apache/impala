@@ -53,7 +53,7 @@ STRING, STRING
 # Dropping a non-existent databases is ok with IF EXISTS
 drop database if exists $DATABASE_2
 ---- RESULTS
-'Database has been dropped.'
+'Database does not exist.'
 ====
 ---- QUERY
 # Test DROP DATABASE ... CASCADE

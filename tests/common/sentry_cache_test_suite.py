@@ -99,6 +99,7 @@ class TestObject(object):
   DATABASE = "database"
   TABLE = "table"
   VIEW = "view"
+  FUNCTION = "function"
 
   def __init__(self, obj_type, obj_name="", grant=False):
     self.obj_name = obj_name
@@ -108,6 +109,7 @@ class TestObject(object):
     self.table_name = None
     self.table_def = ""
     self.view_select = ""
+    self.func_def = ""
     if len(parts) > 1:
       self.table_name = parts[1]
     if obj_type == TestObject.VIEW:
@@ -116,6 +118,10 @@ class TestObject(object):
     elif obj_type == TestObject.TABLE:
       self.grant_name = TestObject.TABLE
       self.table_def = "(col1 int)"
+    elif obj_type == TestObject.FUNCTION:
+      self.grant_name = TestObject.FUNCTION
+      self.func_def = "RETURNS INT LOCATION 'hdfs:///test-warehouse/libTestUdfs.so'\
+       SYMBOL='Fn'"
     else:
       self.grant_name = obj_type
     self.grant = grant

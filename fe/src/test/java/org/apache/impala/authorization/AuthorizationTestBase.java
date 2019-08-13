@@ -672,6 +672,10 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     return "User '%s' does not have privileges to DROP functions in: " + object;
   }
 
+  protected static String accessFunctionError(String object) {
+    return "User '%s' does not have privileges to ANY functions in: " + object;
+  }
+
   protected static String columnMaskError(String object) {
     return "Impala does not support column masking yet. Column masking is enabled on " +
         "column: " + object;

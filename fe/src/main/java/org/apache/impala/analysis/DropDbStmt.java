@@ -68,7 +68,19 @@ public class DropDbStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    FeDb db = analyzer.getDb(dbName_, Privilege.DROP, false);
+    // Set the servername here if authorization is enabled because analyzer_ is not
+    // available in the toThrift() method.
+    serverName_ = analyzer.getServerName();
+    if (ifExists_) {
+      // Start with ANY privilege in case of IF EXISTS, and register DROP privilege
+      // later only if the database exists. See IMPALA-8851 for more explanation.
+      analyzer.registerPrivReq(builder ->
+          builder.allOf(Privilege.ANY)
+              .onDb(dbName_)
+              .build());
+      if (!analyzer.dbExists(dbName_)) return;
+    }
+    FeDb db = analyzer.getDb(dbName_, Privilege.DROP, false, false);
     if (db == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName_);
     }
@@ -79,8 +91,5 @@ public class DropDbStmt extends StatementBase {
     if (db != null && db.numFunctions() > 0 && !cascade_) {
       throw new AnalysisException("Cannot drop non-empty database: " + dbName_);
     }
-    // Set the servername here if authorization is enabled because analyzer_ is not
-    // available in the toThrift() method.
-    serverName_ = analyzer.getServerName();
   }
 }

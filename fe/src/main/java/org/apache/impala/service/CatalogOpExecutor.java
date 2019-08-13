@@ -1509,12 +1509,22 @@ public class CatalogOpExecutor {
       // The Kudu tables in the HMS should have been dropped at this point
       // with the Hive Metastore integration enabled.
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        // HMS client does not have a way to identify if the database was dropped or
+        // not if the ignoreIfUnknown flag is true. Hence we always pass the
+        // ignoreIfUnknown as false and catch the NoSuchObjectFoundException and
+        // determine if we should throw or not
         msClient.getHiveClient().dropDatabase(
-            params.getDb(), true, params.if_exists, params.cascade);
+            params.getDb(), /* deleteData */true, /* ignoreIfUnknown */false,
+            params.cascade);
         addSummary(resp, "Database has been dropped.");
       } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
+        if (e instanceof NoSuchObjectException && params.if_exists) {
+          // if_exists param was set; we ignore the NoSuchObjectFoundException
+          addSummary(resp, "Database does not exist.");
+        } else {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
+        }
       }
       Db removedDb = catalog_.removeDb(params.getDb());
 
@@ -1538,6 +1548,9 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(removedObject);
     resp.result.setVersion(removedObject.getCatalog_version());
     resp.result.addToRemoved_catalog_objects(removedObject);
+    // it is possible that HMS database has been removed out of band externally. In
+    // such a case we still would want to add the summary of the operation as database
+    // has been dropped since we cleaned up state from CatalogServer
     addSummary(resp, "Database has been dropped.");
   }
 

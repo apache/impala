@@ -107,14 +107,27 @@ public class DropTableOrViewStmt extends StatementBase {
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();
     try {
+      if (ifExists_) {
+        // Start with ANY privilege in case of IF EXISTS, and register DROP privilege
+        // later only if the table exists. See IMPALA-8851 for more explanation.
+        analyzer.registerPrivReq(builder ->
+            builder.allOf(Privilege.ANY)
+                .onTable(dbName_, getTbl())
+                .build());
+        if (!analyzer.tableExists(tableName_)) return;
+      }
       FeTable table = analyzer.getTable(tableName_, /* add access event */ true,
           /* add column-level privilege */ false, Privilege.DROP);
       Preconditions.checkNotNull(table);
       if (table instanceof FeView && dropTable_) {
+        // DROP VIEW IF EXISTS 'table' succeeds, similarly to Hive, but unlike postgres.
+        if (ifExists_) return;
         throw new AnalysisException(String.format(
             "DROP TABLE not allowed on a view: %s.%s", dbName_, getTbl()));
       }
       if (!(table instanceof FeView) && !dropTable_) {
+        // DROP TABLE IF EXISTS 'view' succeeds, similarly to Hive, but unlike postgres.
+        if (ifExists_) return;
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
@@ -123,7 +136,6 @@ public class DropTableOrViewStmt extends StatementBase {
         analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
         analyzer.ensureTableNotFullAcid(table);
       }
-
     } catch (TableLoadingException e) {
       // We should still try to DROP tables that failed to load, so that tables that are
       // in a bad state, eg. deleted externally from Kudu, can be dropped.
@@ -134,9 +146,6 @@ public class DropTableOrViewStmt extends StatementBase {
           analyzer.getFqTableName(tableName_).toString(), TCatalogObjectType.TABLE,
           Privilege.DROP.toString()));
       LOG.info("Ignoring TableLoadingException for {}", tableName_);
-    } catch (AnalysisException e) {
-      if (!ifExists_) throw e;
-      LOG.info("Ignoring AnalysisException for {}", tableName_);
     }
   }
 
