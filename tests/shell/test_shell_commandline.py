@@ -489,8 +489,9 @@ class TestImpalaShell(ImpalaTestSuite):
     """Test global and user configuration files."""
     args = []
     # shell uses shell options in global config
-    env = {
-      ImpalaShellClass.GLOBAL_CONFIG_FILE: '{0}/good_impalarc2'.format(QUERY_FILE_PATH)}
+    env = dict(os.environ)
+    env[ImpalaShellClass.GLOBAL_CONFIG_FILE] = '{0}/good_impalarc2'.format(
+        QUERY_FILE_PATH)
     result = run_impala_shell_cmd(vector, args, env=env)
     assert 'WARNING:' not in result.stderr, \
       "A valid config file should not trigger any warning: {0}".format(result.stderr)
