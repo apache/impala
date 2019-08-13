@@ -18,6 +18,7 @@
 # Client tests for Impala's HiveServer2 interface
 
 from getpass import getuser
+from contextlib import contextmanager
 import json
 import logging
 import pytest
@@ -37,33 +38,38 @@ LOG = logging.getLogger('test_hs2')
 
 SQLSTATE_GENERAL_ERROR = "HY000"
 
+
+# Context manager that wraps a session. This is used over 'needs_session' to allow more
+# direct access to the TOpenSessionReq parameters.
+@contextmanager
+def ScopedSession(hs2_client, *args, **kwargs):
+  try:
+    open_session_req = TCLIService.TOpenSessionReq(*args, **kwargs)
+    session = hs2_client.OpenSession(open_session_req)
+    yield session
+  finally:
+    if session.status.statusCode != TCLIService.TStatusCode.SUCCESS_STATUS:
+      return
+    close_session_req = TCLIService.TCloseSessionReq()
+    close_session_req.sessionHandle = session.sessionHandle
+    HS2TestSuite.check_response(hs2_client.CloseSession(close_session_req))
+
+
 class TestHS2(HS2TestSuite):
-  def setup_method(self, method):
-    # Keep track of extra session handles opened by _open_extra_session.
-    self.__extra_sessions = []
-
-  def teardown_method(self, method):
-    for session in self.__extra_sessions:
-      try:
-        close_session_req = TCLIService.TCloseSessionReq(session)
-        self.hs2_client.CloseSession(close_session_req)
-      except Exception:
-        LOG.log_exception("Error closing session.")
-
   def test_open_session(self):
     """Check that a session can be opened"""
     open_session_req = TCLIService.TOpenSessionReq()
-    TestHS2.check_response(self.hs2_client.OpenSession(open_session_req))
+    with ScopedSession(self.hs2_client) as session:
+      TestHS2.check_response(session)
 
   def test_open_session_query_options(self):
     """Check that OpenSession sets query options"""
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.configuration = {'MAX_ERRORS': '45678',
-        'NUM_NODES': '1234', 'MAX_NUM_RUNTIME_FILTERS': '333'}
-    open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(open_session_resp)
-    for k, v in open_session_req.configuration.items():
-      assert open_session_resp.configuration[k] == v
+    configuration = {'MAX_ERRORS': '45678', 'NUM_NODES': '1234',
+                     'MAX_NUM_RUNTIME_FILTERS': '333'}
+    with ScopedSession(self.hs2_client, configuration=configuration) as session:
+      TestHS2.check_response(session)
+      for k, v in configuration.items():
+        assert session.configuration[k] == v
 
   def get_session_options(self, setCmd):
     """Returns dictionary of query options."""
@@ -139,43 +145,39 @@ class TestHS2(HS2TestSuite):
   @SkipIfDockerizedCluster.internal_hostname
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(open_session_resp)
-    http_addr = open_session_resp.configuration['http_addr']
-    resp = urlopen("http://%s/queries?json" % http_addr)
-    assert resp.msg == 'OK'
-    queries_json = json.loads(resp.read())
-    assert 'completed_queries' in queries_json
-    assert 'in_flight_queries' in queries_json
+    with ScopedSession(self.hs2_client) as session:
+      TestHS2.check_response(session)
+      http_addr = session.configuration['http_addr']
+      resp = urlopen("http://%s/queries?json" % http_addr)
+      assert resp.msg == 'OK'
+      queries_json = json.loads(resp.read())
+      assert 'completed_queries' in queries_json
+      assert 'in_flight_queries' in queries_json
 
   def test_open_session_unsupported_protocol(self):
     """Test that we get the right protocol version back if we ask for one larger than the
     server supports. This test will fail as we support newer version of HS2, and should be
     updated."""
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.protocol_version = \
-        TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7
-    open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(open_session_resp)
-    assert open_session_resp.serverProtocolVersion == \
-        TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
+    client_protocol = TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7
+    with ScopedSession(self.hs2_client, client_protocol=client_protocol) as session:
+      TestHS2.check_response(session)
+      assert session.serverProtocolVersion == \
+          TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   def test_open_session_empty_user(self):
     """Test that we get the expected errors back if either impala.doas.user is set but
     username is empty, or username is set but impala.doas.user is empty."""
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.username = ""
-    open_session_req.configuration = {"impala.doas.user": "do_as_user"}
-    open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(open_session_resp, TCLIService.TStatusCode.ERROR_STATUS, \
-        "Unable to delegate using empty proxy username.")
+    configuration = {"impala.doas.user": "do_as_user"}
+    with ScopedSession(self.hs2_client, configuration=configuration) as session:
+      TestHS2.check_response(session, TCLIService.TStatusCode.ERROR_STATUS,
+          "Unable to delegate using empty proxy username.")
 
-    open_session_req.username = "user"
-    open_session_req.configuration = {"impala.doas.user": ""}
-    open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(open_session_resp, TCLIService.TStatusCode.ERROR_STATUS, \
-        "Unable to delegate using empty doAs username.")
+    username = "user"
+    configuration = {"impala.doas.user": ""}
+    with ScopedSession(
+        self.hs2_client, username=username, configuration=configuration) as session:
+      TestHS2.check_response(session, TCLIService.TStatusCode.ERROR_STATUS,
+          "Unable to delegate using empty doAs username.")
 
   def test_close_session(self):
     """Test that an open session can be closed"""
@@ -707,21 +709,22 @@ class TestHS2(HS2TestSuite):
 
     # Attempt to access query with different user should fail.
     evil_user = getuser() + "_evil_twin"
-    session_handle2 = self._open_extra_session(evil_user)
-    TestHS2.check_profile_access_denied(self.hs2_client.GetExecSummary(
-      ImpalaHiveServer2Service.TGetExecSummaryReq(execute_statement_resp.operationHandle,
-        session_handle2)), user=evil_user)
+    with ScopedSession(self.hs2_client, username=evil_user) as session:
+      session_handle2 = session.sessionHandle
+      TestHS2.check_profile_access_denied(self.hs2_client.GetExecSummary(
+        ImpalaHiveServer2Service.TGetExecSummaryReq(
+          execute_statement_resp.operationHandle, session_handle2)), user=evil_user)
 
-    # Now close the query and verify the exec summary is available.
-    close_operation_req = TCLIService.TCloseOperationReq()
-    close_operation_req.operationHandle = execute_statement_resp.operationHandle
-    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+      # Now close the query and verify the exec summary is available.
+      close_operation_req = TCLIService.TCloseOperationReq()
+      close_operation_req.operationHandle = execute_statement_resp.operationHandle
+      TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
 
-    # Attempt to access query with different user from log should fail.
-    TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
-      ImpalaHiveServer2Service.TGetRuntimeProfileReq(
-        execute_statement_resp.operationHandle, session_handle2)),
-      user=evil_user)
+      # Attempt to access query with different user from log should fail.
+      TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
+        ImpalaHiveServer2Service.TGetRuntimeProfileReq(
+          execute_statement_resp.operationHandle, session_handle2)),
+        user=evil_user)
 
     exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
     TestHS2.check_response(exec_summary_resp)
@@ -765,21 +768,22 @@ class TestHS2(HS2TestSuite):
 
     # Attempt to access query with different user should fail.
     evil_user = getuser() + "_evil_twin"
-    session_handle2 = self._open_extra_session(evil_user)
-    TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
-      ImpalaHiveServer2Service.TGetRuntimeProfileReq(
-        execute_statement_resp.operationHandle, session_handle2)),
-        user=evil_user)
+    with ScopedSession(self.hs2_client, username=evil_user) as session:
+      session_handle2 = session.sessionHandle
+      TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
+        ImpalaHiveServer2Service.TGetRuntimeProfileReq(
+          execute_statement_resp.operationHandle, session_handle2)),
+          user=evil_user)
 
-    close_operation_req = TCLIService.TCloseOperationReq()
-    close_operation_req.operationHandle = execute_statement_resp.operationHandle
-    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+      close_operation_req = TCLIService.TCloseOperationReq()
+      close_operation_req.operationHandle = execute_statement_resp.operationHandle
+      TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
 
-    # Attempt to access query with different user from log should fail.
-    TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
-      ImpalaHiveServer2Service.TGetRuntimeProfileReq(
-        execute_statement_resp.operationHandle, session_handle2)),
-        user=evil_user)
+      # Attempt to access query with different user from log should fail.
+      TestHS2.check_profile_access_denied(self.hs2_client.GetRuntimeProfile(
+        ImpalaHiveServer2Service.TGetRuntimeProfileReq(
+          execute_statement_resp.operationHandle, session_handle2)),
+          user=evil_user)
 
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
@@ -867,20 +871,13 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(fetch_results_resp)
     return fetch_results_resp
 
-  def _open_extra_session(self, user_name):
-    """Open an extra session with the provided username that will be automatically
-    closed at the end of the test. Returns the session handle."""
-    resp = self.hs2_client.OpenSession(TCLIService.TOpenSessionReq(username=user_name))
-    TestHS2.check_response(resp)
-    return resp.sessionHandle
-
   def test_close_connection(self):
     """Tests that an hs2 session remains valid even after the connection is dropped."""
     open_session_req = TCLIService.TOpenSessionReq()
     open_session_resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(open_session_resp)
     self.session_handle = open_session_resp.sessionHandle
-    # Ren a query, which should succeed.
+    # Run a query, which should succeed.
     self.execute_statement("select 1")
 
     # Reset the connection.

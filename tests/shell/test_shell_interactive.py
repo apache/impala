@@ -18,6 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import logging
 import os
 import pexpect
 import pytest
@@ -37,7 +38,7 @@ from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.common.test_dimensions import create_beeswax_hs2_hs2http_dimension
+from tests.common.test_dimensions import create_client_protocol_dimension
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
                   get_open_sessions_metric)
 
@@ -47,6 +48,7 @@ QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 # Examples: hostname:21000, hostname:21050, hostname:28000
 PROMPT_REGEX = r'\[[^:]+:2(1|8)0[0-9][0-9]\]'
 
+LOG = logging.getLogger('test_shell_interactive')
 
 @pytest.fixture
 def tmp_history_file(request):
@@ -78,7 +80,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_hs2http_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -89,10 +91,15 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     for e in expectations:
       assert e in proc.before
 
-  def _wait_for_num_open_sessions(self, vector, impala_service, num, err):
-    """Helper method to wait for the number of open sessions to reach 'num'."""
+  def _wait_for_num_open_sessions(self, vector, impala_service, expected, err):
+    """Helper method to wait for the number of open sessions to reach 'expected'."""
     metric_name = get_open_sessions_metric(vector)
-    assert impala_service.wait_for_metric_value(metric_name, num) == num, err
+    try:
+      actual = impala_service.wait_for_metric_value(metric_name, expected)
+    except AssertionError:
+      LOG.exception("Error: " % err)
+      raise
+    assert actual == expected, err
 
   def test_local_shell_options(self, vector):
     """Test that setting the local shell options works"""
@@ -266,45 +273,48 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
     Verifies that a connect command by the user is honoured.
     """
-    # Disconnect existing clients so there are no open sessions.
-    self.client.close()
-    self.hs2_client.close()
+    try:
+      # Disconnect existing clients so there are no open sessions.
+      self.close_impala_clients()
 
-    hostname = socket.getfqdn()
-    initial_impala_service = ImpaladService(hostname)
-    target_impala_service = ImpaladService(hostname, webserver_port=25001,
-        beeswax_port=21001, be_port=22001, hs2_port=21051, hs2_http_port=28001)
-    protocol = vector.get_value("protocol").lower()
-    if protocol == "hs2":
-      target_port = 21051
-    elif protocol == "hs2-http":
-      target_port = 28001
-    else:
-      assert protocol == "beeswax"
-      target_port = 21001
-    # This test is running serially, so there shouldn't be any open sessions, but wait
-    # here in case a session from a previous test hasn't been fully closed yet.
-    self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
-        "first impalad should not have any remaining open sessions.")
-    self._wait_for_num_open_sessions(vector, target_impala_service, 0,
-        "second impalad should not have any remaining open sessions.")
-    # Connect to the first impalad
-    p = ImpalaShell(vector)
+      hostname = socket.getfqdn()
+      initial_impala_service = ImpaladService(hostname)
+      target_impala_service = ImpaladService(hostname, webserver_port=25001,
+          beeswax_port=21001, be_port=22001, hs2_port=21051, hs2_http_port=28001)
+      protocol = vector.get_value("protocol").lower()
+      if protocol == "hs2":
+        target_port = 21051
+      elif protocol == "hs2-http":
+        target_port = 28001
+      else:
+        assert protocol == "beeswax"
+        target_port = 21001
+      # This test is running serially, so there shouldn't be any open sessions, but wait
+      # here in case a session from a previous test hasn't been fully closed yet.
+      self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
+          "first impalad should not have any remaining open sessions.")
+      self._wait_for_num_open_sessions(vector, target_impala_service, 0,
+          "second impalad should not have any remaining open sessions.")
+      # Connect to the first impalad
+      p = ImpalaShell(vector)
 
-    # Make sure we're connected <hostname>:<port>
-    self._wait_for_num_open_sessions(vector, initial_impala_service, 1,
-        "Not connected to %s:%d" % (hostname, get_impalad_port(vector)))
-    p.send_cmd("connect %s:%d" % (hostname, target_port))
+      # Make sure we're connected <hostname>:<port>
+      self._wait_for_num_open_sessions(vector, initial_impala_service, 1,
+          "Not connected to %s:%d" % (hostname, get_impalad_port(vector)))
+      p.send_cmd("connect %s:%d" % (hostname, target_port))
 
-    # The number of sessions on the target impalad should have been incremented.
-    self._wait_for_num_open_sessions(vector,
-        target_impala_service, 1, "Not connected to %s:%d" % (hostname, target_port))
-    assert "[%s:%d] default>" % (hostname, target_port) in p.get_result().stdout
+      # The number of sessions on the target impalad should have been incremented.
+      self._wait_for_num_open_sessions(vector,
+          target_impala_service, 1, "Not connected to %s:%d" % (hostname, target_port))
+      assert "[%s:%d] default>" % (hostname, target_port) in p.get_result().stdout
 
-    # The number of sessions on the initial impalad should have been decremented.
-    self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
-        "Connection to %s:%d should have been closed" % (
-          hostname, get_impalad_port(vector)))
+      # The number of sessions on the initial impalad should have been decremented.
+      self._wait_for_num_open_sessions(vector, initial_impala_service, 0,
+          "Connection to %s:%d should have been closed" % (
+            hostname, get_impalad_port(vector)))
+
+    finally:
+      self.create_impala_clients()
 
   @pytest.mark.execute_serially
   def test_ddl_queries_are_closed(self, vector):
@@ -315,6 +325,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     webpage to confirm that they've been closed.
     TODO: Add every statement type.
     """
+    # Disconnect existing clients so there are no open sessions.
+    self.close_impala_clients()
 
     TMP_DB = 'inflight_test_db'
     TMP_TBL = 'tmp_tbl'
@@ -322,6 +334,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     NUM_QUERIES = 'impala-server.num-queries'
 
     impalad = ImpaladService(socket.getfqdn())
+    self._wait_for_num_open_sessions(vector, impalad, 0,
+        "Open sessions found after closing all clients.")
     p = ImpalaShell(vector)
     try:
       start_num_queries = impalad.get_metric_value(NUM_QUERIES)
@@ -344,6 +358,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       run_impala_shell_interactive(vector, "drop table if exists %s.%s;" % (
           TMP_DB, TMP_TBL))
       run_impala_shell_interactive(vector, "drop database if exists foo;")
+      self.create_impala_clients()
 
   def test_multiline_queries_in_history(self, vector, tmp_history_file):
     """Test to ensure that multiline queries with comments are preserved in history

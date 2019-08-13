@@ -935,13 +935,14 @@ class ImpalaServer : public ImpalaServiceIf,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
 
-  /// Executes the fetch logic for HiveServer2 FetchResults. If fetch_first is true, then
-  /// the query's state should be reset to fetch from the beginning of the result set.
-  /// Doesn't clean up 'request_state' if an error occurs.
+  /// Executes the fetch logic for HiveServer2 FetchResults and stores result size in
+  /// 'num_results'. If fetch_first is true, then the query's state should be reset to
+  /// fetch from the beginning of the result set. Doesn't clean up 'request_state' if an
+  /// error occurs.
   Status FetchInternal(ClientRequestState* request_state, SessionState* session,
       int32_t fetch_size, bool fetch_first,
-      apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results)
-      WARN_UNUSED_RESULT;
+      apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results,
+      int32_t* num_results) WARN_UNUSED_RESULT;
 
   /// Helper functions to translate between HiveServer2 and Impala structs
 

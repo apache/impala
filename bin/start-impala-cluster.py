@@ -149,6 +149,10 @@ KILL_TIMEOUT_IN_SECONDS = 240
 # For build types like ASAN, modify the default Kudu rpc timeout.
 KUDU_RPC_TIMEOUT = build_flavor_timeout(0, slow_build_timeout=60000)
 
+# HTTP connections don't keep alive their associated sessions. We increase the timeout
+# during builds to make spurious session expiration less likely.
+DISCONNECTED_SESSION_TIMEOUT = 3600
+
 def check_process_exists(binary, attempts=1):
   """Checks if a process exists given the binary name. The `attempts` count allows us to
   control the time a process needs to settle until it becomes available. After each try
@@ -334,6 +338,11 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if "kudu_client_rpc_timeout" not in args:
       args = "-kudu_client_rpc_timeout_ms {kudu_rpc_timeout} {args}".format(
           kudu_rpc_timeout=KUDU_RPC_TIMEOUT,
+          args=args)
+
+    if "disconnected_session_timeout" not in args:
+      args = "-disconnected_session_timeout {timeout} {args}".format(
+          timeout=DISCONNECTED_SESSION_TIMEOUT,
           args=args)
 
     if i >= num_coordinators:

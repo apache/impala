@@ -32,7 +32,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
       "--idle_client_poll_period_s=0")
   def test_session_expiration(self, vector):
     impalad = self.cluster.get_any_impalad()
-    self.__close_default_clients()
+    self.close_impala_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
     num_connections = impalad.service.get_metric_value(
         "impala.thrift-server.beeswax-frontend.connections-in-use")
@@ -54,7 +54,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
       "--idle_client_poll_period_s=0")
   def test_session_expiration_with_set(self, vector):
     impalad = self.cluster.get_any_impalad()
-    self.__close_default_clients()
+    self.close_impala_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test if we can set a shorter timeout than the process-wide option
@@ -77,7 +77,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
        "--idle_client_poll_period_s=0")
   def test_unsetting_session_expiration(self, vector):
     impalad = self.cluster.get_any_impalad()
-    self.__close_default_clients()
+    self.close_impala_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test unsetting IDLE_SESSION_TIMEOUT
@@ -123,7 +123,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
     """ IMPALA-7802: verifies that connections of idle sessions are closed
     after the sessions have expired."""
     impalad = self.cluster.get_any_impalad()
-    self.__close_default_clients()
+    self.close_impala_clients()
 
     for protocol in ['beeswax', 'hiveserver2']:
       num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
@@ -162,10 +162,3 @@ class TestSessionExpiration(CustomClusterTestSuite):
     assert num_hs2_connections + 1 == impalad.service.get_metric_value(
         "impala.thrift-server.hiveserver2-frontend.connections-in-use")
     sock.close()
-
-  def __close_default_clients(self):
-    """Close the clients that were automatically created by setup_class(). These clients
-    can expire during test, which results in metrics that tests depend on changing. Each
-    test should create its own clients as needed."""
-    self.client.close()
-    self.hs2_client.close()

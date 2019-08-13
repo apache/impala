@@ -260,8 +260,11 @@ class ImpylaHS2Connection(ImpalaConnection):
   plus Impala-specific extensions, e.g. for fetching runtime profiles.
   TODO: implement support for kerberos, SSL, etc.
   """
-  def __init__(self, host_port, use_kerberos=False, is_hive=False):
+  def __init__(self, host_port, use_kerberos=False, is_hive=False,
+               use_http_transport=False, http_path=""):
     self.__host_port = host_port
+    self.__use_http_transport = use_http_transport
+    self.__http_path = http_path
     if use_kerberos:
       raise NotImplementedError("Kerberos support not yet implemented")
     # Impyla connection and cursor is initialised in connect(). We need to reuse the same
@@ -291,7 +294,9 @@ class ImpylaHS2Connection(ImpalaConnection):
     conn_kwargs = {}
     if self._is_hive:
       conn_kwargs['auth_mechanism'] = 'PLAIN'
-    self.__impyla_conn = impyla.connect(host=host, port=int(port), **conn_kwargs)
+    self.__impyla_conn = impyla.connect(host=host, port=int(port),
+                                        use_http_transport=self.__use_http_transport,
+                                        http_path=self.__http_path, **conn_kwargs)
     # Get the default query options for the session before any modifications are made.
     self.__cursor = self.__impyla_conn.cursor()
     self.__default_query_options = {}
@@ -307,10 +312,16 @@ class ImpylaHS2Connection(ImpalaConnection):
     try:
       # Explicitly close the cursor so that it will close the session.
       self.__cursor.close()
-    except Exception, e:
+    except Exception as e:
       # The session may no longer be valid if the impalad was restarted during the test.
       pass
-    self.__impyla_conn.close()
+    try:
+      self.__impyla_conn.close()
+    except AttributeError as e:
+      # When the HTTP endpoint restarts, Thrift HTTP will close the endpoint and calling
+      # close() will result in an exception.
+      if not (self.__use_http_transport and 'NoneType' in str(e)):
+        raise
 
   def close_query(self, operation_handle):
     LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
@@ -482,8 +493,8 @@ def create_connection(host_port, use_kerberos=False, protocol='beeswax',
         is_hive=is_hive)
   else:
     assert protocol == 'hs2-http'
-    raise NotImplementedError("Impyla does not support 'hs2-http' protocol")
-
+    c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
+        is_hive=is_hive, use_http_transport=True, http_path='cliservice')
 
   # A hook in conftest sets tests.common.current_node.
   if hasattr(tests.common, "current_node"):

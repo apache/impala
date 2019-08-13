@@ -20,6 +20,8 @@ package org.apache.impala.customcluster;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.Lists;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Arrays;
@@ -31,33 +33,36 @@ import org.apache.directory.server.annotations.CreateLdapServer;
 import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
-import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.junit.After;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
-import org.apache.impala.service.JdbcTestBase;
 
 /**
- * Impala shell connectivity tests with LDAP authentication.
+ * Impyla HTTP connectivity tests with LDAP authentication.
  */
 @CreateDS(name = "myDS",
     partitions = { @CreatePartition(name = "test", suffix = "dc=myorg,dc=com") })
 @CreateLdapServer(
     transports = { @CreateTransport(protocol = "LDAP", address = "localhost") })
 @ApplyLdifFiles({"users.ldif"})
-public class LdapImpalaShellTest {
+public class LdapImpylaHttpTest {
 
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
+
+  // Query used by all tests
+  private static String query_ = "select logged_in_user()";
 
   // These correspond to the values in fe/src/test/resources/users.ldif
   private static final String testUser_ = "Test1Ldap";
   private static final String testPassword_ = "12345";
   private static final String testUser2_ = "Test2Ldap";
   private static final String testPassword2_ = "abcde";
+
+  private static final String helper_ = System.getenv("IMPALA_HOME") +
+      "/tests/util/run_impyla_http_query.py";
 
   // The cluster will be set up to allow testUser_ to act as a proxy for delegateUser_.
   // Includes a special character to test HTTP path encoding.
@@ -82,67 +87,26 @@ public class LdapImpalaShellTest {
   }
 
   /**
-
-  /**
-   * Checks if the local python supports SSLContext needed by shell http
-   * transport tests. Python version shipped with CentOS6 is known to
-   * have an older version of python resulting in test failures.
-   */
-  private boolean pythonSupportsSSLContext() throws Exception {
-    // Runs the following command:
-    // python -c "import ssl; print hasattr(ssl, 'create_default_context')"
-    String[] cmd =
-        {"python", "-c", "import ssl; print hasattr(ssl, 'create_default_context')"};
-    return Boolean.parseBoolean(RunShellCommand.Run(cmd, true, "", "").replace("\n", ""));
-  }
-
-  /**
    * Tests ldap authentication using impala-shell.
    */
   @Test
-  public void testShellLdapAuth() throws Exception {
-    String query = "select logged_in_user()";
-    // Templated shell commands to test a simple 'show tables' command.
+  public void testImpylaHttpLdapAuth() throws Exception {
     // 1. Valid username and password. Should succeed.
-    String[] validCommand = {"impala-shell.sh", "", "--ldap",
-        "--auth_creds_ok_in_clear", String.format("--user=%s", testUser_),
-        String.format("--ldap_password_cmd=printf %s", testPassword_),
-        String.format("--query=%s", query)};
+    String[] validCmd = buildCommand(testUser_, testPassword_, null);
+    RunShellCommand.Run(validCmd, /*shouldSucceed*/ true, testUser_, "");
     // 2. Invalid username password combination. Should fail.
-    String[] invalidCommand = {"impala-shell.sh", "", "--ldap",
-        "--auth_creds_ok_in_clear", "--user=foo", "--ldap_password_cmd=printf bar",
-        String.format("--query=%s", query)};
+    String[] invalidCmd = buildCommand("foo", "bar", null);
+    RunShellCommand.Run(invalidCmd, /*shouldSucceed*/ false, "", "EOFError");
     // 3. Without username and password. Should fail.
-    String[] commandWithoutAuth =
-        {"impala-shell.sh", "", String.format("--query=%s", query)};
-    String protocolTemplate = "--protocol=%s";
-    List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
-    if (pythonSupportsSSLContext()) {
-      // http transport tests will fail with older python versions (IMPALA-8873)
-      protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
-    }
-
-    for (String protocol: protocolsToTest) {
-      protocol = String.format(protocolTemplate, protocol);
-      validCommand[1] = protocol;
-      RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, testUser_,
-          "Starting Impala Shell using LDAP-based authentication");
-      invalidCommand[1] = protocol;
-      RunShellCommand.Run(
-          invalidCommand, /*shouldSucceed*/ false, "", "Not connected to Impala");
-      commandWithoutAuth[1] = protocol;
-      RunShellCommand.Run(
-          commandWithoutAuth, /*shouldSucceed*/ false, "", "Not connected to Impala");
-    }
+    String[] noAuthCmd = {"impala-python", helper_, "--query", query_};
+    RunShellCommand.Run(noAuthCmd, /*shouldSucceed*/ false, "", "EOFError");
   }
 
-  private String[] buildCommand(
-      String query, String protocol, String user, String password, String httpPath) {
-    String[] command = {"impala-shell.sh", "--protocol=" + protocol, "--ldap",
-        "--auth_creds_ok_in_clear", "--user=" + user,
-        "--ldap_password_cmd=printf " + password, "--query=" + query,
-        "--http_path=" + httpPath};
-    return command;
+  private String[] buildCommand(String user, String password, String httpPath) {
+    List<String> command = Lists.newArrayList(Arrays.asList("impala-python", helper_,
+        "--user", user, "--password", password, "--query", query_));
+    if (httpPath != null) command.addAll(Arrays.asList("--http_path", httpPath));
+    return command.toArray(new String[0]);
   }
 
   /**
@@ -150,34 +114,29 @@ public class LdapImpalaShellTest {
    * 'doAs' parameter.
    */
   @Test
-  public void testHttpImpersonation() throws Exception {
-    // Ignore the test if python SSLContext support is not available.
-    Assume.assumeTrue(pythonSupportsSSLContext());
+  public void testImpylaHttpImpersonation() throws Exception {
     String invalidDelegateUser = "invalid-delegate-user";
     String query = "select logged_in_user()";
     String errTemplate = "User '%s' is not authorized to delegate to '%s'";
 
     // Run with an invalid proxy user.
-    String[] command = buildCommand(
-        query, "hs2-http", testUser2_, testPassword2_, "/?doAs=" + delegateUser_);
-    RunShellCommand.Run(command, /* shouldSucceed */ false, "",
+    //String[] command = {"impala-python", helper_, "--user", testUser2_, "--password",
+    //    testPassword2_, "--http_path=/?doAs=" + delegateUser_, "--query", query};
+    String[] cmd = buildCommand(testUser2_, testPassword2_, "/?doAs=" + delegateUser_);
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ false, "",
         String.format(errTemplate, testUser2_, delegateUser_));
 
     // Run with a valid proxy user but invalid delegate user.
-    command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + invalidDelegateUser);
-    RunShellCommand.Run(command, /* shouldSucceed */ false, "",
+    cmd = buildCommand(testUser_, testPassword_, "/?doAs=" + invalidDelegateUser);
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ false, "",
         String.format(errTemplate, testUser_, invalidDelegateUser));
 
     // 'doAs' parameter that cannot be decoded.
-    command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=%");
-    RunShellCommand.Run(command, /* shouldSucceed */ false, "",
-        "Not connected to Impala");
+    cmd = buildCommand(testUser_, testPassword_, "/?doAs=%");
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ false, "", "httplib.BadStatusLine");
 
     // Successfully delegate.
-    command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + delegateUser_);
-    RunShellCommand.Run(command, /* shouldSucceed */ true, delegateUser_, "");
+    cmd = buildCommand(testUser_, testPassword_, "/?doAs=" + delegateUser_);
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ true, delegateUser_, "");
   }
 }

@@ -97,16 +97,17 @@ class TableFormatInfo(object):
       return '_%s_%s' % (self.file_format, self.compression_codec)
 
 
-
 def create_uncompressed_text_dimension(workload):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'text/none'))
 
+
 def create_parquet_dimension(workload):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'parquet/none'))
+
 
 def create_avro_snappy_dimension(workload):
   dataset = get_dataset_from_workload(workload)
@@ -114,25 +115,14 @@ def create_avro_snappy_dimension(workload):
       TableFormatInfo.create_from_string(dataset, 'avro/snap/block'))
 
 
-def create_beeswax_hs2_dimension():
-  return ImpalaTestDimension('protocol', 'beeswax', 'hs2')
-
-
-# TODO: Get rid of this once Impyla supports http transport. Until then,
-# 'hs2-http' dimension is only covered for shell based tests, since they
-# do not rely on Impyla for connections.
-def create_beeswax_hs2_hs2http_dimension():
-  # Older python versions do not support SSLContext object that the thrift
-  # http client implementation depends on. Falls back to a dimension without
-  # http transport. More context in IMPALA-8864.
+def create_client_protocol_dimension():
+  # IMPALA-8864: Older python versions do not support SSLContext object that the thrift
+  # http client implementation depends on. Falls back to a dimension without http
+  # transport.
   import ssl
   if not hasattr(ssl, "create_default_context"):
-    return create_beeswax_hs2_dimension()
+    return ImpalaTestDimension('protocol', 'beeswax', 'hs2')
   return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
-
-
-def create_beeswax_dimension():
-  return ImpalaTestDimension('protocol', 'beeswax')
 
 
 def hs2_parquet_constraint(v):

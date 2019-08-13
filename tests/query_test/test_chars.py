@@ -19,7 +19,7 @@ import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (create_exec_option_dimension,
-    create_beeswax_hs2_dimension, hs2_parquet_constraint, hs2_text_constraint)
+    create_client_protocol_dimension, hs2_parquet_constraint, hs2_text_constraint)
 from tests.util.filesystem_utils import get_fs_path
 
 class TestStringQueries(ImpalaTestSuite):
@@ -37,14 +37,14 @@ class TestStringQueries(ImpalaTestSuite):
         v.get_value('table_format').compression_codec in ['none'])
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(hs2_text_constraint)
 
   def test_chars(self, vector):
     self.run_test_case('QueryTest/chars', vector)
 
   def test_chars_tmp_tables(self, vector, unique_database):
-    if vector.get_value('protocol') == 'hs2':
+    if vector.get_value('protocol') in ['hs2', 'hs2-http']:
       pytest.skip("HS2 does not return row counts for inserts")
     # Tests that create temporary tables and require a unique database.
     self.run_test_case('QueryTest/chars-tmp-tables', vector, unique_database)
@@ -68,7 +68,7 @@ class TestCharFormats(ImpalaTestSuite):
         v.get_value('table_format').compression_codec in ['none']))
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
 
   def test_char_format(self, vector):

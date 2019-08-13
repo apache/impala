@@ -22,7 +22,7 @@ from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
-    create_beeswax_hs2_dimension, hs2_parquet_constraint)
+    create_client_protocol_dimension, hs2_parquet_constraint)
 from tests.shell.util import ImpalaShell
 
 
@@ -47,7 +47,7 @@ class TestDateQueries(ImpalaTestSuite):
 
     # Run these queries through both beeswax and HS2 to get coverage of date returned
     # via both protocols.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
 
   def test_queries(self, vector):

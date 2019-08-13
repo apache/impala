@@ -98,3 +98,10 @@ class TestJsonEndpoints(HS2TestSuite):
     assert queries_json["num_in_flight_queries"] == 0
     assert queries_json["num_executing_queries"] == 0
     assert queries_json["num_waiting_queries"] == 0
+
+    # Close the session so that subsequent tests that rely on an empty session list don't
+    # fail.
+    close_session_req = TCLIService.TCloseSessionReq()
+    close_session_req.sessionHandle = open_session_resp.sessionHandle
+    close_session_resp = self.hs2_client.CloseSession(close_session_req)
+    TestJsonEndpoints.check_response(close_session_resp)

@@ -31,7 +31,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
-from tests.common.test_dimensions import create_beeswax_hs2_hs2http_dimension
+from tests.common.test_dimensions import create_client_protocol_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE)
@@ -120,7 +120,7 @@ class TestImpalaShell(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_hs2http_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
 
   def test_no_args(self, vector):
     args = ['-q', DEFAULT_QUERY]

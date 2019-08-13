@@ -144,6 +144,7 @@ Status BlockingPlanRootSink::GetNext(RuntimeState* state, QueryResultSet* result
           timeout_us - static_cast<int64_t>(
                            round(wait_timeout_timer.ElapsedTime() / NANOS_PER_MICRO)));
       if (!consumer_cv_.WaitFor(l, wait_duration_us)) {
+        VLOG_QUERY << "Fetch timed out";
         timed_out = true;
 
         // If the consumer timed out, make sure results_ is set to nullptr because the

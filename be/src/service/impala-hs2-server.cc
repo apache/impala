@@ -181,7 +181,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
 Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
     SessionState* session, int32_t fetch_size, bool fetch_first,
-    TFetchResultsResp* fetch_results) {
+    TFetchResultsResp* fetch_results, int32_t* num_results) {
   // Make sure ClientRequestState::Wait() has completed before fetching rows. Wait()
   // ensures that rows are ready to be fetched (e.g., Wait() opens
   // ClientRequestState::output_exprs_, which are evaluated in
@@ -218,6 +218,7 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
       version, *(request_state->result_metadata()), &(fetch_results->results)));
   RETURN_IF_ERROR(
       request_state->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
+  *num_results = result_set->size();
   fetch_results->__isset.results = true;
   fetch_results->__set_hasMoreRows(!request_state->eos());
   return Status::OK();
@@ -355,7 +356,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         if (status.ok() && iequals(v.first, "idle_session_timeout")) {
           state->session_timeout = state->set_query_options.idle_session_timeout;
           VLOG_QUERY << "OpenSession(): session: " << PrintId(session_id)
-                     <<" idle_session_timeout="
+                     << " idle_session_timeout="
                      << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
         }
       }
@@ -880,9 +881,12 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
           session_id, SecretArg::Operation(op_secret, query_id), &session),
       SQLSTATE_GENERAL_ERROR);
 
-  Status status = FetchInternal(
-      request_state.get(), session.get(), request.maxRows, fetch_first, &return_val);
-  VLOG_ROW << "FetchResults(): #results=" << return_val.results.rows.size()
+  int32_t num_results = 0;
+  Status status = FetchInternal(request_state.get(), session.get(), request.maxRows,
+      fetch_first, &return_val, &num_results);
+
+  VLOG_ROW << "FetchResults(): query_id=" << PrintId(query_id)
+           << " #results=" << num_results
            << " has_more=" << (return_val.hasMoreRows ? "true" : "false");
   if (!status.ok()) {
     // Only unregister the query if the underlying error is unrecoverable.

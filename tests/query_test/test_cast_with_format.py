@@ -16,7 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_beeswax_hs2_dimension
+from tests.common.test_dimensions import create_client_protocol_dimension
 
 
 class TestCastWithFormat(ImpalaTestSuite):
@@ -32,7 +32,7 @@ class TestCastWithFormat(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
 
   def test_basic_inputs_from_table(self, vector):
     self.run_test_case('QueryTest/cast_format_from_table', vector)

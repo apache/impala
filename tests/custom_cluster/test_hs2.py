@@ -83,8 +83,7 @@ class TestHS2(CustomClusterTestSuite):
     disconnected_session_timeout"""
     # Close the default test clients so that they don't expire while the test is running
     # and affect the metric values.
-    self.client.close()
-    self.hs2_client.close()
+    self.close_impala_clients()
     impalad = self.cluster.get_first_impalad()
 
     conn = HS2TestSuite()

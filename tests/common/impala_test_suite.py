@@ -152,7 +152,10 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def setup_class(cls):
     """Setup section that runs before each test suite"""
-    cls.hive_client, cls.client, cls.hs2_client = [None, None, None]
+    cls.client = None
+    cls.hive_client = None
+    cls.hs2_client = None
+    cls.hs2_http_client = None
     # Create a Hive Metastore Client (used for executing some test SETUP steps
     metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
     trans_type = 'buffered'
@@ -167,14 +170,7 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
 
-    # Create a connection to Impala, self.client is Beeswax so that existing tests that
-    # assume beeswax do not need modification (yet).
-    cls.client = cls.create_impala_client(protocol='beeswax')
-    try:
-      cls.hs2_client = cls.create_impala_client(protocol='hs2')
-    except Exception, e:
-      # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
-      LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
+    cls.create_impala_clients()
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
@@ -246,6 +242,7 @@ class ImpalaTestSuite(BaseTestSuite):
     return client
 
   @classmethod
+
   def get_impalad_cluster_size(cls):
     return len(cls.__get_cluster_host_ports('beeswax'))
 
@@ -257,12 +254,37 @@ class ImpalaTestSuite(BaseTestSuite):
     return ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
 
   @classmethod
+  def create_impala_clients(cls):
+    """Creates Impala clients for all supported protocols."""
+    # The default connection (self.client) is Beeswax so that existing tests, which assume
+    # Beeswax do not need modification (yet).
+    cls.client = cls.create_impala_client(protocol='beeswax')
+    cls.hs2_client = None
+    try:
+      cls.hs2_client = cls.create_impala_client(protocol='hs2')
+    except Exception, e:
+      # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
+      LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
+    cls.hs2_http_client = None
+    try:
+      cls.hs2_http_client = cls.create_impala_client(protocol='hs2-http')
+    except Exception, e:
+      # HS2 HTTP connection can fail for benign reasons, e.g. running with unsupported
+      # auth.
+      LOG.info("HS2 HTTP connection setup failed, continuing...: {0}".format(e))
+
+  @classmethod
   def close_impala_clients(cls):
-    """Close Impala clients created by setup_class()."""
+    """Closes Impala clients created by create_impala_clients()."""
     if cls.client:
       cls.client.close()
+      cls.client = None
     if cls.hs2_client:
       cls.hs2_client.close()
+      cls.hs2_client = None
+    if cls.hs2_http_client:
+      cls.hs2_http_client.close()
+      cls.hs2_http_client = None
 
   @classmethod
   def __get_default_host_port(cls, protocol):
@@ -480,7 +502,8 @@ class ImpalaTestSuite(BaseTestSuite):
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
-    if vector.get_value('protocol') == 'hs2':
+    if vector.get_value('protocol').startswith('hs2'):
+      # hs2 or hs2-http
       if 'DBAPI_RESULTS' in test_section:
         assert 'RESULTS' in test_section,\
             "Base RESULTS section must always be included alongside DBAPI_RESULTS"
@@ -529,6 +552,8 @@ class ImpalaTestSuite(BaseTestSuite):
     else:
       if protocol == 'beeswax':
         target_impalad_clients = [self.client]
+      elif protocol == 'hs2-http':
+        target_impalad_clients = [self.hs2_http_client]
       else:
         assert protocol == 'hs2'
         target_impalad_clients = [self.hs2_client]
