@@ -482,9 +482,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Helper for Exec(). Checks for errors encountered when starting backend execution,
   /// using any non-OK status, if any, as the overall status. Returns the overall
-  /// status. Also updates query_profile_ with the startup latency histogram and the
-  /// backend_exec_complete_barrier_ if there is any backend which is already done (only
-  /// possible at this point if no fragment instances were assigned to it).
+  /// status. Also updates query_profile_ with the startup latency histogram.
   Status FinishBackendStartup() WARN_UNUSED_RESULT;
 
   /// Build the filter routing table by iterating over all plan nodes and collecting the

@@ -4,8 +4,8 @@
 create table test as select id from functional.alltypes where id > 1
 ---- RUNTIME_PROFILE
 row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
-row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
-row_regex: .*Cluster Memory Admitted: 132.00 MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=116MB.*
+row_regex: .*Cluster Memory Admitted: 32.00 MB.*
 ====
 ---- QUERY
 # Truncate table to run the following inserts.
@@ -24,8 +24,8 @@ row_regex: .*Cluster Memory Admitted: 10.00 MB.*
 insert into test select id from functional.alltypes where id > 3
 ---- RUNTIME_PROFILE
 row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
-row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
-row_regex: .*Cluster Memory Admitted: 132.00 MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=116MB.*
+row_regex: .*Cluster Memory Admitted: 32.00 MB.*
 ====
 ---- QUERY
 # SELECT with merging exchange (i.e. order by).

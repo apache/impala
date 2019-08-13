@@ -343,9 +343,8 @@ class Scheduler {
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
       FragmentScanRangeAssignment* assignment);
 
-  /// Computes BackendExecParams for all backends assigned in the query and always one for
-  /// the coordinator backend since it participates in execution regardless. Must be
-  /// called after ComputeFragmentExecParams().
+  /// Computes BackendExecParams for all backends assigned in the query. Must be called
+  /// after ComputeFragmentExecParams().
   void ComputeBackendExecParams(
       const ExecutorConfig& executor_config, QuerySchedule* schedule);
 
