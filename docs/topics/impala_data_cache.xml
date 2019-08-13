@@ -79,11 +79,11 @@ under the License.
     </p>
 
     <p>
-      For example, with the following setting, the data cache may use up to 2 TB, with 1 TB max
-      in <codeph>/data/0</codeph> and <codeph>/data/1</codeph> respectively.
+      For example, with the following setting, the data cache may use up to 1 TB, with 500 GB
+      max in <codeph>/data/0</codeph> and <codeph>/data/1</codeph> respectively.
     </p>
 
-<codeblock>--data_cache=/data/0,/data/1:1TB</codeblock>
+<codeblock>--data_cache=/data/0,/data/1:500GB</codeblock>
 
   </conbody>
 

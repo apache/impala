@@ -852,6 +852,21 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </p>
 
     </conbody>
+    <concept id="IMPALA-8829">
+      <title>Unable to Correctly Parse the Terabyte Unit</title>
+      <conbody>
+        <p>Impala does not support parsing strings that contain "TB" when used
+          as a unit for terabytes. The flags related to memory limits may be
+          affected, such as the flags for scratch space and data cache.</p>
+        <p><b>Workaround:</b> Use other supported units to specify values, e.g.
+          GB or MB.</p>
+        <p><b>Affected Versions:</b> All versions</p>
+        <p>
+          <b>Apache Issue:</b>
+          <xref keyref="IMPALA-8829">IMPALA-8829</xref>
+        </p>
+      </conbody>
+    </concept>
 
     <concept id="IMPALA-4551">
 
