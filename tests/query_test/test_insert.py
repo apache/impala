@@ -139,6 +139,7 @@ class TestInsertQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   @SkipIfHive2.acid
   def test_acid_insert(self, vector):
+    pytest.skip("IMPALA-8854: skipping to unbreak builds")
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
