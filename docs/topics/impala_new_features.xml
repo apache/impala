@@ -45,7 +45,205 @@ under the License.
     <p outputclass="toc inpage"/>
 
   </conbody>
-  <!-- All 3.2.x new features go under here -->
+  <concept rev="3.2.0" id="new_features_33">
+    <title>New Features in <keyword keyref="impala33"/></title>
+    <conbody>
+      <p> The following sections describe the noteworthy improvements made in
+          <keyword keyref="impala33"/>. </p>
+      <p> For the full list of issues closed in this release, see the <xref
+          keyref="changelog_33">changelog for <keyword keyref="impala32"
+          /></xref>. </p>
+      <section id="section_ezf_tnq_s3b">
+        <title>Increased Compatibility with Apache Projects</title>
+        <p>Impala is integrate with the following components:<ul>
+            <li dir="ltr">
+              <p dir="ltr">Apache Ranger: Use Apache Ranger to manage
+                authorization in Impala. See <xref
+                  href="https://impala.apache.org/docs/build/html/topics/impala_authorization.html"
+                  format="html" scope="external"><u>Impala
+                  Authorization</u></xref> for details.</p>
+            </li>
+            <li dir="ltr">
+              <p dir="ltr">Apache Atlas: Use Apache Atlas to manage data
+                governance in Impala.</p>
+            </li>
+            <li dir="ltr">
+              <p dir="ltr">Hive 3</p>
+            </li>
+          </ul></p>
+      </section>
+      <section id="section_ys5_k4n_t3b">
+        <title>Parquet Page Index </title>
+        <p>To improve performance when using Parquet files, Impala can now write
+          page indexes in Parquet files and use those indexes to skip pages for
+          the faster scan.</p>
+        <p>See <xref href="impala_parquet.xml#parquet_performance"/> for
+          details.</p>
+      </section>
+      <section id="section_zs5_k4n_t3b">
+        <title>The Remote File Handle Cache Supports S3</title>
+        <p>Impala can now cache remote HDFS file handles when the tables that
+          store their data in Amazon S3 cloud storage.</p>
+        <p>See <xref href="impala_scalability.xml#scalability_file_handle_cache"
+          /> for the information on remote file handle cache.</p>
+      </section>
+      <section id="section_jls_hxj_s3b">
+        <title>Support for Kudu Integrated with Hive Metastore</title>
+        <p>In Impala 3.3 and Kudu 1.10, Kudu is integrated with Hive Metastore
+          (HMS), and from Impala, you can create, update, delete, and query the
+          tables in the Kudu services integrated with HMS.</p>
+        <p>See <xref
+            href="https://impala.apache.org/docs/build/html/topics/impala_kudu.html"
+            format="html" scope="external">Using Kudu with Impala</xref> for
+          information on using Kudu tables in Impala.</p>
+      </section>
+      <section id="section_dp4_mxj_s3b">
+        <title>Zstd Compression for Parquet files</title>
+        <p>Zstandard (Zstd) is a real-time compression algorithm offering a
+          tradeoff between speed and ratio of compression. Compression levels
+          from 1 up to 22 are supported. The lower the level, the faster the
+          speed at the cost of compression ratio.</p>
+      </section>
+      <section id="section_drv_nxj_s3b">
+        <title>Data Cache for Remote Reads</title>
+        <p>To improve performance on multi-cluster HDFS environments as well as
+          on object store environments, Impala now caches data for non-local
+          reads (e.g. S3, ABFS, ADLS) on local storage.</p>
+        <p>The data cache is enabled with the <codeph>--data_cache
+            startup</codeph> flag.</p>
+        <p>See <xref
+            href="https://impala.apache.org/docs/build/html/topics/impala_data_cache.html"
+            format="html" scope="external">Impala Remote Data Cache</xref> for
+          the information and steps to enable remote data cache.</p>
+      </section>
+      <section id="section_xp4_b1f_t3b">
+        <title>Metadata Performance Improvements </title>
+        <p>The following features to improve metadata performance are enabled by
+          default in this release:</p>
+        <ul>
+          <li>
+            <p>Incremental stats are now compressed in memory in
+                <codeph>catalogd</codeph>, reducing memory footprint in
+                <codeph>catalogd</codeph>.</p>
+          </li>
+          <li>
+            <p><codeph>impalad</codeph>coordinators fetch incremental stats from
+                <codeph>catalogd</codeph> on-demand, reducing the memory
+              footprint and the network requirements for broadcasting
+              metadata.</p>
+          </li>
+          <li>
+            <p>Time-based and memory-based automatic invalidation of metadata to
+              keep the size of metadata bounded and to reduce the chances of
+                <codeph>catalogd</codeph>cache running out of memory.</p>
+          </li>
+          <li>
+            <p>Automatic invalidation of metadata</p>
+            <p>With automatic metadata management enabled, you no longer have to
+              issue <codeph>INVALIDATE</codeph> / <codeph>REFRESH</codeph> in a
+              number of conditions.</p>
+            <p>In Impala 3.3, the following additional event in Hive Metastore
+              can trigger automatic INVALIDATE / REFRESH of Metadata:</p>
+            <ul>
+              <li>
+                <p>INSERT into tables and partitions from Impala or from Spark
+                  on the same or multiple cluster configuration</p>
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <p>See <xref href="impala_metadata.xml#impala_metadata"/> for the
+          information on the above features.</p>
+      </section>
+      <section id="section_ztf_c4q_s3b">
+        <title>Scalable Pool Configuration in Admission Controller</title>
+        <p>To offer more dynamic and flexible resource management, Impala
+          supports the new configuration parameters that scale with the number
+          of hosts in the resource pool. You can use the parameters to control
+          the number of running queries, queued queries, and maximum amount of
+          memory allocated for Impala resource pools. See <xref
+            href="impala_admission.xml#admission_control"/> for the information
+          about the new parameters and using them for admission control.</p>
+      </section>
+      <section id="section_b55_gxj_s3b">
+        <title>Query Profile</title>
+        <p>The following information was added to the Query Profile output for
+          better monitoring and troubleshooting of query performance.</p>
+        <ul>
+          <li>
+            <p>Network I/O throughput</p>
+          </li>
+          <li>
+            <p>System disk I/O throughput</p>
+          </li>
+        </ul>
+        <p>See <xref
+            href="https://impala.apache.org/docs/build/html/topics/impala_explain_plan.html"
+            format="html" scope="external">Impala Query Profile</xref> for
+          generating and reading query profile.</p>
+      </section>
+      <section id="section_lbh_kzj_s3b">
+        <title>DATE Data Type and Functions</title>
+        <p>You can use the new the DATE type to describe a particular
+          year/month/day, in the form YYYY-­MM-­DD.</p>
+        <p>This initial DATE type support the TEXT, Parquet, and HBASE file
+          formats.</p>
+        <p>The support of DATE data type includes the following features:</p>
+        <ul>
+          <li><codeph>DATE</codeph> type column as a partitioning key
+            column</li>
+          <li><codeph>DATE</codeph> literal</li>
+          <li>Implicit casting between <codeph>DATE</codeph> and other types:
+              <codeph>STRING</codeph> and <codeph>TIMESTAMP</codeph></li>
+          <li>Most of the built-in functions for <codeph>TIMESTAMP</codeph> now
+            allow the <codeph>DATE</codeph> type arguments, as well.</li>
+        </ul>
+        <p>See <xref href="impala_date.xml#date"/> and <xref
+            href="impala_datetime_functions.xml#datetime_functions"/> for using
+          the DATE type.</p>
+      </section>
+      <section id="section_wpm_zzj_s3b">
+        <title>Support Hive Insert-Only Transactional Tables</title>
+        <p>Impala added the support to create, drop, query, and insert into the
+          insert-only type of transactional tables. </p>
+      </section>
+      <section>
+        <p>See <xref
+            href="https://impala.apache.org/docs/build/html/topics/impala_transactions.html"
+            format="html" scope="external">Impala Transactions</xref> for
+          details.</p>
+      </section>
+      <section id="section_ab2_41k_s3b">
+        <title>HiveServer2 HTTP Connection for Clients</title>
+        <p>Now client applications can connect to Impala over HTTP via
+          HiveServer2 with the option to use the Kerberos SPNEGO and LDAP for
+          authentication. See <xref
+            href="https://impala.apache.org/docs/build/html/topics/impala_client.html"
+            format="html" scope="external">Impala Clients</xref> for
+          details.</p>
+      </section>
+      <section id="section_xxt_44q_s3b">
+        <title>Default File Format Changed to Parquet</title>
+        <p>When you create a table, the default format for that table data is
+          now Parquet.</p>
+        <p>For backward compatibility, you can use the DEFAULT_FILE_FORMAT query
+          option to set the default file format to the previous default, text,
+          or other formats.</p>
+      </section>
+      <section id="section_m1h_mnf_t3b">
+        <title>Built-in Function to Process JSON Objects</title>
+        <p>The <codeph>GET_JSON_OBJECT()</codeph> function extracts JSON object
+          from a string based on the path specified and returns the extracted
+          JSON object.</p>
+        <p>See <xref href="impala_misc_functions.xml#misc_functions">Impala
+            Miscellaneous Functions</xref>. for details.</p>
+      </section>
+      <section id="section_acs_wck_s3b">
+        <title>Ubuntu 18.04</title>
+        <p>This version of Impala is certified to run on Ubuntu 18.04.</p>
+      </section>
+    </conbody>
+  </concept>
   <concept rev="3.2.0" id="new_features_32">
     <title>New Features in <keyword keyref="impala32"/></title>
     <conbody>
