@@ -21,13 +21,13 @@ under the License.
 <h2>Catalog</h2>
 
 {{?has_large_tables}}
-<div class="panel panel-info">
-  <div class="panel-heading">
-      <h2 class="panel-title">
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
       Top-{{num_large_tables}} Tables with Highest Memory Requirements
-      </h2>
+      </h5>
   </div>
-  <div class="panel-body">
+  <div class="card-body">
     <table id="large-tables" class='table table-hover table-bordered'>
       <thead>
         <tr>
@@ -67,13 +67,13 @@ under the License.
 {{/has_large_tables}}
 
 {{?has_frequent_tables}}
-<div class="panel panel-info">
-  <div class="panel-heading">
-      <h2 class="panel-title">
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
       Top-{{num_frequent_tables}} Tables with Highest Number of Metadata Operations
-      </h2>
+      </h5>
   </div>
-  <div class="panel-body">
+  <div class="card-body">
     <table id="frequent-tables" class='table table-hover table-bordered'>
       <thead>
         <tr>
@@ -111,13 +111,13 @@ under the License.
 {{/has_frequent_tables}}
 
 {{?has_high_file_count_tables}}
-<div class="panel panel-info">
-  <div class="panel-heading">
-      <h2 class="panel-title">
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
       Top-{{num_high_file_count_tables}} Tables with Most Number of Files
-      </h2>
+      </h5>
   </div>
-  <div class="panel-body">
+  <div class="card-body">
     <table id="high-file-count-tables" class='table table-hover table-bordered'>
       <thead>
         <tr>
@@ -157,24 +157,24 @@ under the License.
 <h3>Databases</h3>
 <ol class="breadcrumb">
 {{#databases}}
-<li><a href='#{{name}}'>{{name}}</a></li>
+<li class="breadcrumb-item"><a href='#{{name}}'>{{name}}</a></li>
 {{/databases}}
 </ol>
 
 {{#databases}}
 
-<div class="panel panel-info">
-  <div class="panel-heading">
+<div class="card">
+  <div class="card-header">
   {{^use_local_catalog}}
     <a href='{{ __common__.host-url }}/catalog_object?object_type=DATABASE&object_name={{name}}'>
   {{/use_local_catalog}}
-      <h2 class="panel-title" id='{{name}}'>{{name}}
-      <span class="pull-right">{{num_tables}} table(s)</span></h2>
+      <h5 class="card-title">{{name}}
+      <span class="float-right">{{num_tables}} table(s)</span></h5>
   {{^use_local_catalog}}
     </a>
   {{/use_local_catalog}}
   </div>
-  <div class="panel-body">
+  <div class="card-body">
     <table id="{{name}}-tables" class='table table-hover table-bordered'>
       <thead>
         <tr>

@@ -22,21 +22,36 @@ common-footer.tmpl) }}
 <html>
   <head><title>Apache Impala</title>
     <script src='{{ __common__.host-url }}/www/jquery/jquery-3.4.1.min.js'></script>
-    <script src='{{ __common__.host-url }}/www/bootstrap/js/bootstrap.min.js'></script>
+    <script src='{{ __common__.host-url }}/www/bootstrap/js/bootstrap-4.3.1.min.js'></script>
     <script src='{{ __common__.host-url }}/www/scripts/util.js'></script>
-    <link rel="stylesheet" type="text/css" href="{{ __common__.host-url }}/www/datatables.min.css"/>
-    <script type="text/javascript" src="{{ __common__.host-url }}/www/datatables.min.js"></script>
-    <link href='{{ __common__.host-url }}/www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>
+    <link rel="stylesheet" type="text/css" href="{{ __common__.host-url }}/www/datatables-1.10.18.min.css"/>
+    <script type="text/javascript" src="{{ __common__.host-url }}/www/datatables-1.10.18.min.js"></script>
+    <link href='{{ __common__.host-url }}/www/bootstrap/css/bootstrap-4.3.1.min.css' rel='stylesheet' media='screen'>
     <style>
       @media (min-width: 1300px) {
         #nav-options {
             width: 1280px;
         }
       }
+
+      body {
+        font-size: 14px;
+      }
+
+      pre {
+        padding: 10px;
+        font-size: 12px;
+        border: 1px solid #ccc;
+      }
+
+      /* Avoid unsightly padding around code element */
+      pre.code {
+        padding: 0;
+      }
     </style>
   </head>
   <body>
-    <header class="navbar navbar-default navbar-static-top" id="top" role="banner">
+    <header class="navbar navbar-default navbar-expand bg-light navbar-static-top" id="top" role="banner">
       <div id="nav-options" class="container">
         <div class="navbar-header">
           <a class='navbar-brand' href='{{ __common__.host-url }}/'>{{ __common__.process-name }}</a>
@@ -44,13 +59,13 @@ common-footer.tmpl) }}
         <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
           <ul class="nav navbar-nav">
             {{#__common__.navbar}}
-            <li><a href="{{ __common__.host-url }}{{link}}">{{title}}</a></li>
+            <li class="navbar-item"><a class="nav-link" href="{{ __common__.host-url }}{{link}}">{{title}}</a></li>
             {{/__common__.navbar}}
           </ul>
         </nav>
       </div>
     </header>
-<div class='container' style='width:80%'>
+<div class='container-fluid' style='width:80%'>
 {{#error}}
 <div class="alert alert-danger">
   <strong>Error:</strong>

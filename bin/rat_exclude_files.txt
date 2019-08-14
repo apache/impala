@@ -31,9 +31,8 @@ be/src/thirdparty/mpfit/*
 be/src/kudu/gutil
 www/highlight/*
 www/DataTables*/*
-www/datatables.*
+www/datatables-1.10.18.*
 www/bootstrap/css/bootstrap*
-www/bootstrap/fonts/glyphicons-halflings*
 www/bootstrap/js/bootstrap*
 tests/comparison/leopard/static/css/bootstrap*
 tests/comparison/leopard/static/fonts/glyphicons-halflings*
