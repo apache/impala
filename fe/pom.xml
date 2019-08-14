@@ -58,6 +58,12 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -73,6 +79,10 @@ under the License.
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -100,6 +110,12 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-azure</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -198,6 +214,14 @@ under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>ant-contrib</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -216,6 +240,10 @@ under the License.
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>ant-contrib</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -345,12 +373,6 @@ under the License.
       <groupId>commons-cli</groupId>
       <artifactId>commons-cli</artifactId>
       <version>1.2</version>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <version>1.9</version>
     </dependency>
 
     <dependency>
@@ -639,6 +661,12 @@ under the License.
               <rules>
                 <bannedDependencies>
                   <excludes>
+                    <!-- We shouldn't have a runtime dependency on Ant or the
+                         Jetty server -->
+                    <exclude>ant:*</exclude>
+                    <exclude>ant-contrib:*</exclude>
+                    <exclude>org.apache.ant:*</exclude>
+                    <exclude>org.eclipse.jetty:*</exclude>
                     <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                     <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
                     <!-- Assert that we only use artifacts from only the specified
@@ -651,6 +679,9 @@ under the License.
                     <exclude>org.apache.parquet:*</exclude>
                   </excludes>
                   <includes>
+                    <!-- hadoop-yarn-common depends on some Jetty utilities. -->
+                    <include>org.eclipse.jetty:jetty-util</include>
+                    <!-- Include the allowed versions specifically -->
                     <include>org.apache.hadoop:*:${hadoop.version}</include>
                     <include>org.apache.hbase:*:${hbase.version}</include>
                     <include>org.apache.hive:*:${hive.version}</include>
@@ -814,6 +845,14 @@ under the License.
               <groupId>org.apache.calcite.avatica</groupId>
               <artifactId>avatica</artifactId>
             </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ant</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
           </exclusions>
         </dependency>
 
@@ -826,6 +865,10 @@ under the License.
             <exclusion>
               <groupId>net.minidev</groupId>
               <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
@@ -854,6 +897,14 @@ under the License.
               <groupId>org.apache.calcite.avatica</groupId>
               <artifactId>avatica</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 
@@ -877,6 +928,14 @@ under the License.
               <groupId>net.minidev</groupId>
               <artifactId>json-smart</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 
@@ -894,6 +953,14 @@ under the License.
             <exclusion>
               <groupId>net.minidev</groupId>
               <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
@@ -916,6 +983,10 @@ under the License.
             <exclusion>
               <groupId>org.apache.calcite.avatica</groupId>
               <artifactId>avatica</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
@@ -1002,6 +1073,14 @@ under the License.
             <exclusion>
               <groupId>org.apache.hive.shims</groupId>
               <artifactId>hive-shims-0.20</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
