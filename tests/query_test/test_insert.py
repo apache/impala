@@ -136,27 +136,16 @@ class TestInsertQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
-  @pytest.mark.execute_serially
   @SkipIfHive2.acid
-  def test_acid_insert(self, vector):
-    pytest.skip("IMPALA-8854: skipping to unbreak builds")
-    if (vector.get_value('table_format').file_format == 'parquet'):
-      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
-          vector.get_value('compression_codec')
-    # We need to turn off capability checks. Otherwise we get an error from HMS because
-    # this python client doesn't have the capability for handling ACID tables. But we only
-    # need to drop and create such tables, and table properties are preserved during
-    # those operations and this is enough for the tests (A table is ACID if it has the
-    # relevant table properties).
-    CAPABILITY_CHECK_CONF = "hive.metastore.client.capability.check"
-    capability_check = self.hive_client.getMetaConf(CAPABILITY_CHECK_CONF)
-    try:
-      self.hive_client.setMetaConf(CAPABILITY_CHECK_CONF, "false")
-      self.run_test_case('QueryTest/acid-insert', vector,
-          multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
-    finally:
-      # Reset original state.
-      self.hive_client.setMetaConf(CAPABILITY_CHECK_CONF, capability_check)
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_acid_insert(self, vector, unique_database):
+    exec_options = vector.get_value('exec_option')
+    file_format = vector.get_value('table_format').file_format
+    if (file_format == 'parquet'):
+      exec_options['COMPRESSION_CODEC'] = vector.get_value('compression_codec')
+    exec_options['DEFAULT_FILE_FORMAT'] = file_format
+    self.run_test_case('QueryTest/acid-insert', vector, unique_database,
+        multiple_impalad=exec_options['sync_ddl'] == 1)
 
   @SkipIfHive2.acid
   @UniqueDatabase.parametrize(sync_ddl=True)
