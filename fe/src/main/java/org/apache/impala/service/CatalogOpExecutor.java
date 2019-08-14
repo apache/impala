@@ -883,7 +883,7 @@ public class CatalogOpExecutor {
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Altering view %s", tableName));
       }
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         tbl.load(true, msClient.getHiveClient(), msTbl, "ALTER VIEW");
       }
@@ -940,25 +940,61 @@ public class CatalogOpExecutor {
           tableName, params.isSetTable_stats(), numPartitions, numColumns));
     }
 
+    // Deep copy the msTbl to avoid updating our cache before successfully persisting
+    // the results to the metastore.
+    org.apache.hadoop.hive.metastore.api.Table msTbl =
+        table.getMetaStoreTable().deepCopy();
+
+    // TODO: Transaction committing / aborting seems weird for stat update, but I don't
+    //       see other ways to get a new write id (which is needed to update
+    //       transactional tables). Hive seems to use internal API for this.
+    //       See IMPALA-8865 about plans to improve this.
+    MetastoreShim.TblTransaction tblTxn = null;
+    try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      try {
+        if (AcidUtils.isTransactionalTable(msTbl.getParameters())) {
+          tblTxn = MetastoreShim.createTblTransaction(
+              msClient.getHiveClient(), msTbl, -1 /* opens new transaction */);
+        }
+        alterTableUpdateStatsInner(table, msTbl, params,
+            numUpdatedPartitions, numUpdatedColumns, msClient, tblTxn);
+        if (tblTxn != null) {
+          MetastoreShim.commitTblTransactionIfNeeded(msClient.getHiveClient(), tblTxn);
+        }
+      } catch (Exception ex) {
+        if (tblTxn != null) {
+          MetastoreShim.abortTblTransactionIfNeeded(msClient.getHiveClient(), tblTxn);
+        }
+        throw ex;
+      }
+    }
+  }
+
+  private void alterTableUpdateStatsInner(Table table,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      TAlterTableUpdateStatsParams params,
+      Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns,
+      MetaStoreClient msClient, MetastoreShim.TblTransaction tblTxn)
+      throws ImpalaException {
     // Update column stats.
     numUpdatedColumns.setRef(0L);
     if (params.isSetColumn_stats()) {
       ColumnStatistics colStats = createHiveColStats(params, table);
       if (colStats.getStatsObjSize() > 0) {
-        try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-          msClient.getHiveClient().updateTableColumnStatistics(colStats);
-        } catch (Exception e) {
-          throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-              "updateTableColumnStatistics"), e);
+        if (tblTxn != null) {
+          MetastoreShim.setTableColumnStatsTransactional(
+              msClient.getHiveClient(), msTbl, colStats, tblTxn);
+        } else {
+          try {
+            msClient.getHiveClient().updateTableColumnStatistics(colStats);
+          } catch (Exception e) {
+            throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+                "updateTableColumnStatistics"), e);
+          }
         }
       }
       numUpdatedColumns.setRef((long) colStats.getStatsObjSize());
     }
-
-    // Deep copy the msTbl to avoid updating our cache before successfully persisting
-    // the results to the metastore.
-    org.apache.hadoop.hive.metastore.api.Table msTbl =
-        table.getMetaStoreTable().deepCopy();
 
     // Update partition-level row counts and incremental column stats for
     // partitioned Hdfs tables.
@@ -966,7 +1002,7 @@ public class CatalogOpExecutor {
     if (params.isSetPartition_stats() && table.getNumClusteringCols() > 0) {
       Preconditions.checkState(table instanceof HdfsTable);
       modifiedParts = updatePartitionStats(params, (HdfsTable) table);
-      bulkAlterPartitions(table, modifiedParts);
+      bulkAlterPartitions(table, modifiedParts, tblTxn);
     }
 
     if (params.isSetTable_stats()) {
@@ -977,7 +1013,9 @@ public class CatalogOpExecutor {
       Table.updateTimestampProperty(msTbl, HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME);
     }
 
-    applyAlterTable(msTbl, false);
+    // Apply property changes like numRows.
+    msTbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+    applyAlterTable(msTbl, false, tblTxn);
     numUpdatedPartitions.setRef(0L);
     if (modifiedParts != null) {
       numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -1037,6 +1075,7 @@ public class CatalogOpExecutor {
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
       // HMS requires this param for stats changes to take effect.
       partition.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
+      partition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
       modifiedParts.add(partition);
     }
     return modifiedParts;
@@ -1309,6 +1348,10 @@ public class CatalogOpExecutor {
     Table table = getExistingTable(params.getTable_name().getDb_name(),
         params.getTable_name().getTable_name(), "Load for DROP STATS");
     Preconditions.checkNotNull(table);
+    // There is no transactional HMS API to drop stats at the moment (HIVE-22104).
+    Preconditions.checkState(!AcidUtils.isTransactionalTable(
+        table.getMetaStoreTable().getParameters()));
+
     if (!catalog_.tryLockTable(table)) {
       throw new InternalException(String.format("Error dropping stats for table %s " +
           "due to lock contention", table.getFullName()));
@@ -1395,8 +1438,9 @@ public class CatalogOpExecutor {
         msTbl.getParameters().remove(StatsSetupConst.ROW_COUNT) != null;
     boolean droppedTotalSize =
         msTbl.getParameters().remove(StatsSetupConst.TOTAL_SIZE) != null;
+
     if (droppedRowCount || droppedTotalSize) {
-      applyAlterTable(msTbl, false);
+      applyAlterTable(msTbl, false, null);
       ++numTargetedPartitions;
     }
 
@@ -1431,7 +1475,7 @@ public class CatalogOpExecutor {
       if (isModified) modifiedParts.add(part);
     }
 
-    bulkAlterPartitions(table, modifiedParts);
+    bulkAlterPartitions(table, modifiedParts, null);
     return modifiedParts.size();
   }
 
@@ -2071,7 +2115,7 @@ public class CatalogOpExecutor {
         catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
             new TTableName(newTable.getDbName(), newTable.getTableName()),
                 "CREATE TABLE CACHED");
-        applyAlterTable(newTable, true);
+        applyAlterTable(newTable);
       }
       Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
       addTableToCatalogUpdate(newTbl, response.result);
@@ -2311,7 +2355,7 @@ public class CatalogOpExecutor {
     if (!colsToAdd.isEmpty()) {
       // Append the new column to the existing list of columns.
       msTbl.getSd().getCols().addAll(buildFieldSchemaList(colsToAdd));
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
       return true;
     }
     return false;
@@ -2333,7 +2377,7 @@ public class CatalogOpExecutor {
           columns);
       msTbl.getParameters().put(sortByKey, alteredColumns);
     }
-    applyAlterTable(msTbl, true);
+    applyAlterTable(msTbl);
   }
 
   /**
@@ -2370,7 +2414,7 @@ public class CatalogOpExecutor {
             "Column name %s not found in table %s.", colName, tbl.getFullName()));
       }
     }
-    applyAlterTable(msTbl, true);
+    applyAlterTable(msTbl);
   }
 
   /**
@@ -2638,7 +2682,7 @@ public class CatalogOpExecutor {
       String alteredColumns = MetaStoreUtil.removeValueFromCsvList(oldColumns, colName);
       msTbl.getParameters().put(sortByKey, alteredColumns);
     }
-    applyAlterTable(msTbl, true);
+    applyAlterTable(msTbl);
   }
 
   /**
@@ -2741,7 +2785,7 @@ public class CatalogOpExecutor {
       // The prototype partition must be updated if the file format is changed so that new
       // partitions are created with the new file format.
       if (tbl instanceof HdfsTable) ((HdfsTable) tbl).setPrototypePartition(msTbl.getSd());
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
       reloadFileMetadata = true;
     } else {
       Preconditions.checkArgument(tbl instanceof HdfsTable);
@@ -2752,7 +2796,7 @@ public class CatalogOpExecutor {
         partition.setFileFormat(HdfsFileFormat.fromThrift(fileFormat));
         modifiedParts.add(partition);
       }
-      bulkAlterPartitions(tbl, modifiedParts);
+      bulkAlterPartitions(tbl, modifiedParts, null);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
     }
     return reloadFileMetadata;
@@ -2779,7 +2823,7 @@ public class CatalogOpExecutor {
       // The prototype partition must be updated if the row format is changed so that new
       // partitions are created with the new file format.
       ((HdfsTable) tbl).setPrototypePartition(msTbl.getSd());
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
       reloadFileMetadata = true;
     } else {
       List<HdfsPartition> partitions =
@@ -2789,7 +2833,7 @@ public class CatalogOpExecutor {
         HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, partition.getSerdeInfo());
         modifiedParts.add(partition);
       }
-      bulkAlterPartitions(tbl, modifiedParts);
+      bulkAlterPartitions(tbl, modifiedParts, null);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
     }
     return reloadFileMetadata;
@@ -2820,7 +2864,7 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       if (msTbl.getPartitionKeysSize() == 0) reloadFileMetadata = true;
       msTbl.getSd().setLocation(location);
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
     } else {
       TableName tableName = tbl.getTableName();
       HdfsPartition partition = catalog_.getHdfsPartition(
@@ -2866,7 +2910,7 @@ public class CatalogOpExecutor {
         modifiedParts.add(partition);
       }
       try {
-        bulkAlterPartitions(tbl, modifiedParts);
+        bulkAlterPartitions(tbl, modifiedParts, null);
       } finally {
         for (HdfsPartition modifiedPart : modifiedParts) {
           modifiedPart.markDirty();
@@ -2905,7 +2949,7 @@ public class CatalogOpExecutor {
           throw new UnsupportedOperationException(
               "Unknown target TTablePropertyType: " + params.getTarget());
       }
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
     }
   }
 
@@ -3033,7 +3077,7 @@ public class CatalogOpExecutor {
     }
 
     // Update the table metadata.
-    applyAlterTable(msTbl, true);
+    applyAlterTable(msTbl);
     return loadFileMetadata;
   }
 
@@ -3094,7 +3138,7 @@ public class CatalogOpExecutor {
       }
     }
     try {
-      bulkAlterPartitions(tbl, modifiedParts);
+      bulkAlterPartitions(tbl, modifiedParts, null);
     } finally {
       for (HdfsPartition modifiedPart : modifiedParts) {
         modifiedPart.markDirty();
@@ -3176,7 +3220,7 @@ public class CatalogOpExecutor {
     PrincipalType oldOwnerType = msTbl.getOwnerType();
     msTbl.setOwner(params.owner_name);
     msTbl.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
-    applyAlterTable(msTbl, true);
+    applyAlterTable(msTbl);
     if (authzConfig_.isEnabled()) {
       authzManager_.updateTableOwnerPrivilege(params.server_name, msTbl.getDbName(),
           msTbl.getTableName(), oldOwner, oldOwnerType, msTbl.getOwner(),
@@ -3311,6 +3355,14 @@ public class CatalogOpExecutor {
   }
 
   /**
+   * Conveniance function to call applyAlterTable(3) with default arguments.
+   */
+  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
+      throws ImpalaRuntimeException {
+    applyAlterTable(msTbl, true, null);
+  }
+
+  /**
    * Applies an ALTER TABLE command to the metastore table.
    * Note: The metastore interface is not very safe because it only accepts
    * an entire metastore.api.Table object rather than a delta of what to change. This
@@ -3323,7 +3375,8 @@ public class CatalogOpExecutor {
    * call.
    */
   private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean overwriteLastDdlTime) throws ImpalaRuntimeException {
+      boolean overwriteLastDdlTime, MetastoreShim.TblTransaction tblTxn)
+      throws ImpalaRuntimeException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       if (overwriteLastDdlTime) {
         // It would be enough to remove this table property, as HMS would fill it, but
@@ -3331,16 +3384,25 @@ public class CatalogOpExecutor {
         // remain consistent with HMS.
         Table.updateTimestampProperty(msTbl, Table.TBL_PROP_LAST_DDL_TIME);
       }
+
       // Avoid computing/setting stats on the HMS side because that may reset the
       // 'numRows' table property (see HIVE-15653). The DO_NOT_UPDATE_STATS flag
       // tells the HMS not to recompute/reset any statistics on its own. Any
       // stats-related alterations passed in the RPC will still be applied.
       msTbl.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE);
-      msClient.getHiveClient().alter_table(
-          msTbl.getDbName(), msTbl.getTableName(), msTbl);
-    } catch (TException e) {
-      throw new ImpalaRuntimeException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
+
+      if (tblTxn != null) {
+        MetastoreShim.alterTableWithTransaction(msClient.getHiveClient(), msTbl, tblTxn);
+      } else {
+        try {
+          msClient.getHiveClient().alter_table(
+              msTbl.getDbName(), msTbl.getTableName(), msTbl);
+        }
+        catch (TException e) {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
+        }
+      }
     }
   }
 
@@ -3487,7 +3549,8 @@ public class CatalogOpExecutor {
    * reduces the time spent in a single update and helps avoid metastore client
    * timeouts.
    */
-  private void bulkAlterPartitions(Table tbl, List<HdfsPartition> modifiedParts)
+  private void bulkAlterPartitions(Table tbl, List<HdfsPartition> modifiedParts,
+      MetastoreShim.TblTransaction tblTxn)
       throws ImpalaException {
     List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
         Lists.newArrayList();
@@ -3508,8 +3571,14 @@ public class CatalogOpExecutor {
         Lists.partition(hmsPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
         try {
           // Alter partitions in bulk.
-          MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
-              hmsPartitionsSubList);
+          if (tblTxn != null) {
+            MetastoreShim.alterPartitionsWithTransaction(msClient.getHiveClient(), dbName,
+                tableName, hmsPartitionsSubList, tblTxn);
+          }
+          else {
+            MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
+                hmsPartitionsSubList);
+          }
           // Mark the corresponding HdfsPartition objects as dirty
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
               hmsPartitionsSubList) {
@@ -3739,9 +3808,18 @@ public class CatalogOpExecutor {
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
 
     long transactionId = -1;
-    if (update.isSetTransaction_id()) transactionId = update.getTransaction_id();
-    long tableWriteId = -1;
-    boolean isAcid = false;
+    MetastoreShim.TblTransaction tblTxn = null;
+    if (update.isSetTransaction_id()) {
+      transactionId = update.getTransaction_id();
+      Preconditions.checkState(transactionId > 0);
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+         // Setup transactional parameters needed to do alter table/partitions later.
+         // TODO: Could be optimized to possibly save some RPCs, as these parameters are
+         //       not always needed + the writeId of the INSERT could be probably reused.
+         tblTxn = MetastoreShim.createTblTransaction(
+             msClient.getHiveClient(), table.getMetaStoreTable(), transactionId);
+      }
+    }
 
     try {
       // Get new catalog version for table in insert.
@@ -3776,14 +3854,6 @@ public class CatalogOpExecutor {
         HashSet<String> partsToCreate =
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
-        if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
-          isAcid = true;
-          try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-            tableWriteId = MetastoreShim.allocateTableWriteId(
-                msClient.getHiveClient(), transactionId,
-                table.getDb().getName(), table.getName());
-          }
-        }
         for (FeFsPartition partition: parts) {
           // TODO: In the BE we build partition names without a trailing char. In FE
           // we build partition name with a trailing char. We should make this
@@ -3800,9 +3870,6 @@ public class CatalogOpExecutor {
               org.apache.hadoop.hive.metastore.api.Partition hmsPartition =
                   ((HdfsPartition) partition).toHmsPartition();
               hmsPartition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-              if (isAcid) {
-                MetastoreShim.setWriteIdForMSPartition(hmsPartition, tableWriteId);
-              }
               hmsPartitionsStatsUnset.add(hmsPartition);
             }
             if (partition.isMarkedCached()) {
@@ -3903,7 +3970,7 @@ public class CatalogOpExecutor {
         // Unset COLUMN_STATS_ACCURATE by calling alter partition to hms.
         if (!hmsPartitionsStatsUnset.isEmpty()) {
           unsetPartitionsColStats(table.getMetaStoreTable(), hmsPartitionsStatsUnset,
-              tableWriteId, transactionId);
+              tblTxn);
         }
       } else {
         // For non-partitioned table, only single part exists
@@ -3911,7 +3978,7 @@ public class CatalogOpExecutor {
         affectedExistingPartitions.add(singlePart);
 
       }
-      unsetTableColStats(table.getMetaStoreTable(), transactionId);
+      unsetTableColStats(table.getMetaStoreTable(), tblTxn);
       // Submit the watch request for the given cache directives.
       if (!cacheDirIds.isEmpty()) {
         catalog_.watchCacheDirs(cacheDirIds, tblName.toThrift(),
@@ -4216,7 +4283,7 @@ public class CatalogOpExecutor {
       } else {
         msTbl.getParameters().put("comment", comment);
       }
-      applyAlterTable(msTbl, true);
+      applyAlterTable(msTbl);
       loadTableMetadata(tbl, newCatalogVersion, false, false, null, "ALTER COMMENT");
       addTableToCatalogUpdate(tbl, response.result);
       addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
@@ -4249,7 +4316,7 @@ public class CatalogOpExecutor {
                 "Column name %s not found in table %s.", columnName, tbl.getFullName()));
           }
         }
-        applyAlterTable(msTbl, true);
+        applyAlterTable(msTbl);
       }
       loadTableMetadata(tbl, newCatalogVersion, false, true, null,
           "ALTER COLUMN COMMENT");
@@ -4303,28 +4370,11 @@ public class CatalogOpExecutor {
    * Update table properties to remove the COLUMN_STATS_ACCURATE entry if it exists.
    */
   private void unsetTableColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
-      long txnId) throws ImpalaRuntimeException{
+      MetastoreShim.TblTransaction tblTxn) throws ImpalaRuntimeException{
     Map<String, String> params = msTable.getParameters();
     if (params != null && params.containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
       params.remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-      // In Hive 2, some alter table can drop stats, see HIVE-15653, set following
-      // property to true to avoid this happen.
-      // TODO: More research, and remove this property if Hive 3 fixed the problem.
-      msTable.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE);
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        try {
-          if (AcidUtils.isTransactionalTable(params)) {
-            MetastoreShim.alterTableWithTransaction(msClient.getHiveClient(),
-                msTable, txnId);
-          } else {
-            msClient.getHiveClient().alter_table(msTable.getDbName(),
-                msTable.getTableName(), msTable);
-          }
-        } catch (TException te) {
-          new ImpalaRuntimeException(
-              String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), te);
-        }
-      }
+      applyAlterTable(msTable, false, tblTxn);
     }
   }
 
@@ -4335,13 +4385,13 @@ public class CatalogOpExecutor {
    */
   private void unsetPartitionsColStats(org.apache.hadoop.hive.metastore.api.Table msTable,
       List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset,
-      long writeId, long txnId) throws ImpalaRuntimeException{
+      MetastoreShim.TblTransaction tblTxn) throws ImpalaRuntimeException{
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       try {
-        if (AcidUtils.isTransactionalTable( msTable.getParameters())) {
+        if (tblTxn != null) {
           MetastoreShim.alterPartitionsWithTransaction(
               msClient.getHiveClient(), msTable.getDbName(), msTable.getTableName(),
-              hmsPartitionsStatsUnset,  writeId, txnId);
+              hmsPartitionsStatsUnset,  tblTxn);
         } else {
           MetastoreShim.alterPartitions(msClient.getHiveClient(), msTable.getDbName(),
               msTable.getTableName(), hmsPartitionsStatsUnset);

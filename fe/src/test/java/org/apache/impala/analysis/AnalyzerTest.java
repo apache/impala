@@ -571,9 +571,7 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(
         "compute stats functional_orc_def.full_transactional_table",
         errorMsg);
-    AnalysisError(
-        "compute stats functional.insert_only_transactional_table",
-        insertOnlyErrorMsg);
+    AnalyzesOk("compute stats functional.insert_only_transactional_table");
 
     AnalysisError(
         "select * from functional_orc_def.full_transactional_table",
@@ -603,7 +601,8 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(
         "drop stats functional_orc_def.full_transactional_table",
         errorMsg);
-    AnalyzesOk("drop stats functional.insert_only_transactional_table");
+    AnalysisError("drop stats functional.insert_only_transactional_table",
+        insertOnlyErrorMsg);
 
     AnalyzesOk("describe functional.insert_only_transactional_table");
     AnalyzesOk("describe functional_orc_def.full_transactional_table");

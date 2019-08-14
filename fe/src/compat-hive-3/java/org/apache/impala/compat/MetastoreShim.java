@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumSet;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
@@ -79,6 +81,7 @@ import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
@@ -98,7 +101,8 @@ import com.google.common.collect.Lists;
  * between major versions of Hive. This implements the shimmed methods for Hive 3.
  */
 public class MetastoreShim {
-  public static final Logger LOG = Logger.getLogger(MetastoreShim.class);
+  private static final Logger LOG = Logger.getLogger(MetastoreShim.class);
+
   private static final String EXTWRITE = "EXTWRITE";
   private static final String EXTREAD = "EXTREAD";
   private static final String HIVEBUCKET2 = "HIVEBUCKET2";
@@ -120,6 +124,60 @@ public class MetastoreShim {
   // Time interval between retries of acquiring an HMS ACID lock
   private static final int LOCK_RETRY_WAIT_SECONDS = 3;
 
+  private final static String HMS_RPC_ERROR_FORMAT_STR =
+      "Error making '%s' RPC to Hive Metastore: ";
+
+  // Id used to register transactions / locks.
+  // Not final, as it makes sense to set it based on role + instance, see IMPALA-8853.
+  public static String TRANSACTION_USER_ID = "Impala";
+
+  /**
+   * Transaction parameters needed for single table operations.
+   */
+  public static class TblTransaction {
+    public long txnId;
+    public boolean ownsTxn;
+    public long writeId;
+    public String validWriteIds;
+  }
+
+  /**
+   * Initializes and returns a TblTransaction object for table 'tbl'.
+   * Opens a new transaction if txnId is not valid.
+   */
+  public static TblTransaction createTblTransaction(
+     IMetaStoreClient client, Table tbl, long txnId)
+     throws TransactionException {
+    TblTransaction tblTxn = new TblTransaction();
+    try {
+      if (txnId <= 0) {
+        txnId = openTransaction(client);
+        tblTxn.ownsTxn = true;
+      }
+      tblTxn.txnId = txnId;
+      tblTxn.writeId =
+          allocateTableWriteId(client, txnId, tbl.getDbName(), tbl.getTableName());
+      tblTxn.validWriteIds =
+          getValidWriteIdListInTxn(client, tbl.getDbName(), tbl.getTableName(), txnId);
+      return tblTxn;
+    }
+    catch (TException e) {
+      if (tblTxn.ownsTxn) abortTransactionNoThrow(client, tblTxn.txnId);
+      throw new TransactionException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTblTransaction"), e);
+    }
+  }
+
+  static public void commitTblTransactionIfNeeded(IMetaStoreClient client,
+      TblTransaction tblTxn) throws TransactionException {
+    if (tblTxn.ownsTxn) commitTransaction(client, tblTxn.txnId);
+  }
+
+  static public void abortTblTransactionIfNeeded(IMetaStoreClient client,
+      TblTransaction tblTxn) {
+    if (tblTxn.ownsTxn) abortTransactionNoThrow(client, tblTxn.txnId);
+  }
+
   /**
    * Constant variable that stores engine value needed to store / access
    * Impala column statistics.
@@ -137,14 +195,17 @@ public class MetastoreShim {
    * Wrapper around IMetaStoreClient.alter_table with validWriteIds as a param.
    */
   public static void alterTableWithTransaction(IMetaStoreClient client,
-     Table tbl, long txnId)
-     throws InvalidOperationException, MetaException, TException {
-    // Get ValidWriteIdList to pass Hive verify when set table property
-    // COLUMN_STATS_ACCURATE
-    String validWriteIds = getValidWriteIdListInTxn(client, tbl.getDbName(),
-        tbl.getTableName(), txnId);
-    client.alter_table(null, tbl.getDbName(), tbl.getTableName(),
-        tbl, null, validWriteIds);
+     Table tbl, TblTransaction tblTxn)
+     throws ImpalaRuntimeException {
+    tbl.setWriteId(tblTxn.writeId);
+    try {
+      client.alter_table(null, tbl.getDbName(), tbl.getTableName(),
+        tbl, null, tblTxn.validWriteIds);
+    }
+    catch (TException e) {
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
+    }
   }
 
 
@@ -172,14 +233,15 @@ public class MetastoreShim {
    * Wrapper around IMetaStoreClient.alter_partitions with transaction information
    */
   public static void alterPartitionsWithTransaction(IMetaStoreClient client,
-    String dbName, String tblName, List<Partition> partitions, long tblWriteId,
-    long txnId) throws InvalidOperationException, MetaException, TException {
-    // Get ValidWriteIdList to pass Hive verify  when set
-    // property(COLUMN_STATS_ACCURATE). Correct validWriteIdList is also needed
-    // to commit the alter partitions operation in hms side.
-    String validWriteIds = getValidWriteIdListInTxn(client, dbName, tblName, txnId);
-    client.alter_partitions(dbName, tblName, partitions, null,
-         validWriteIds, tblWriteId);
+      String dbName, String tblName, List<Partition> partitions, TblTransaction tblTxn
+      ) throws InvalidOperationException, MetaException, TException {
+    for (Partition part : partitions) {
+      part.setWriteId(tblTxn.writeId);
+      // Correct validWriteIdList is needed
+      // to commit the alter partitions operation in hms side.
+      client.alter_partitions(dbName, tblName, partitions, null,
+           tblTxn.validWriteIds, tblTxn.writeId);
+    }
   }
 
   /**
@@ -528,7 +590,7 @@ public class MetastoreShim {
    */
   private static String getValidWriteIdListInTxn(IMetaStoreClient client, String dbName,
       String tblName, long txnId)
-      throws InvalidOperationException, MetaException, TException {
+      throws TException {
     ValidTxnList txns = client.getValidTxns(txnId);
     String tableFullName = dbName + "." + tblName;
     List<TableValidWriteIds> writeIdsObj = client.getValidWriteIds(
@@ -554,14 +616,6 @@ public class MetastoreShim {
   }
 
   /**
-   * Set write ID to HMS partition.
-   */
-  public static void setWriteIdForMSPartition(Partition partition, long writeId) {
-    Preconditions.checkNotNull(partition);
-    partition.setWriteId(writeId);
-  }
-
-  /**
    * Wrapper around HMS Table object to get writeID
    * Per table writeId is introduced in ACID 2
    * It is used to detect changes of the table
@@ -573,15 +627,16 @@ public class MetastoreShim {
 
   /**
    * Opens a new transaction.
+   * Sets userId to TRANSACTION_USER_ID.
    * @param client is the HMS client to be used.
    * @param userId of user who is opening this transaction.
    * @return the new transaction id.
    * @throws TransactionException
    */
-  public static long openTransaction(IMetaStoreClient client, String userId)
+  public static long openTransaction(IMetaStoreClient client)
       throws TransactionException {
     try {
-      return client.openTxn(userId);
+      return client.openTxn(TRANSACTION_USER_ID);
     } catch (Exception e) {
       throw new TransactionException(e.getMessage());
     }
@@ -662,7 +717,7 @@ public class MetastoreShim {
       List<LockComponent> lockComponents)
           throws TransactionException {
     LockRequestBuilder lockRequestBuilder = new LockRequestBuilder();
-    lockRequestBuilder.setUser("Impala");
+    lockRequestBuilder.setUser(TRANSACTION_USER_ID);
     if (txnId > 0) lockRequestBuilder.setTransactionId(txnId);
     for (LockComponent lockComponent : lockComponents) {
       lockRequestBuilder.addLockComponent(lockComponent);
@@ -711,6 +766,19 @@ public class MetastoreShim {
       client.unlock(lockId);
     } catch (Exception e) {
       throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Aborts a transaction and logs the error if there is an exception.
+   * @param client is the HMS client to be used.
+   * @param txnId is the transaction id.
+   */
+  public static void abortTransactionNoThrow(IMetaStoreClient client, long txnId) {
+    try {
+      client.abortTxns(Arrays.asList(txnId));
+    } catch (Exception e) {
+      LOG.error("Error in abortTxns.", e);
     }
   }
 
@@ -818,6 +886,25 @@ public class MetastoreShim {
   public static void setTableAccessType(Table msTbl, byte accessType) {
     Preconditions.checkNotNull(msTbl);
     msTbl.setAccessType(accessType);
+  }
+
+  public static void setTableColumnStatsTransactional(IMetaStoreClient client,
+      Table msTbl, ColumnStatistics colStats, TblTransaction tblTxn)
+      throws ImpalaRuntimeException {
+    List<ColumnStatistics> colStatsList = new ArrayList<>();
+    colStatsList.add(colStats);
+    SetPartitionsStatsRequest request = new SetPartitionsStatsRequest(colStatsList);
+    request.setWriteId(tblTxn.writeId);
+    request.setValidWriteIdList(tblTxn.validWriteIds);
+    try {
+      // Despite its name, the function below can and (and currently must) be used
+      // to set table level column statistics in transactional tables.
+      client.setPartitionColumnStatistics(request);
+    }
+    catch (TException e) {
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "setPartitionColumnStatistics"), e);
+    }
   }
 
   /**

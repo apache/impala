@@ -1670,7 +1670,7 @@ public class Frontend {
   private long openTransaction(TQueryCtx queryCtx) throws TransactionException {
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
-      long transactionId = MetastoreShim.openTransaction(hmsClient, "Impala");
+      long transactionId = MetastoreShim.openTransaction(hmsClient);
       HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
       transactionKeepalive_.addTransaction(transactionId, ctx);
       return transactionId;

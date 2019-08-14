@@ -102,6 +102,8 @@ public class DropStatsStmt extends StatementBase {
           String.format("DROP STATS not allowed on a nested collection: %s", tableName_));
     }
     tableRef_.analyze(analyzer);
+    // There is no transactional HMS API to drop stats at the moment (HIVE-22104).
+    analyzer.ensureTableNotTransactional(tableRef_.getTable());
     if (partitionSet_ != null) {
       partitionSet_.setTableName(tableRef_.getTable().getTableName());
       partitionSet_.setPrivilegeRequirement(Privilege.ALTER);

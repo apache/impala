@@ -58,6 +58,7 @@ import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.service.Frontend;
@@ -71,6 +72,31 @@ import org.apache.thrift.TException;
  * between major versions of Hive. This implements the shimmed methods for Hive 2.
  */
 public class MetastoreShim {
+
+  /**
+   * Empty class, should not be instantiated.
+   */
+  public static class TblTransaction {
+    public TblTransaction() {
+      throw new UnsupportedOperationException("new TblTransaction");
+    }
+  }
+
+  public static TblTransaction createTblTransaction(
+     IMetaStoreClient client, Table tbl, long txnId) {
+    throw new UnsupportedOperationException("createTblTransaction");
+  }
+
+  public static void commitTblTransactionIfNeeded(IMetaStoreClient client,
+      TblTransaction tblTxn) throws TransactionException {
+    throw new UnsupportedOperationException("commitTblTransactionIfNeeded");
+  }
+
+  public static void abortTblTransactionIfNeeded(IMetaStoreClient client,
+      TblTransaction tblTxn) {
+    throw new UnsupportedOperationException("abortTblTransactionIfNeeded");
+  }
+
   /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
    */
@@ -82,7 +108,7 @@ public class MetastoreShim {
    * Hive-3 only function
    */
   public static void alterTableWithTransaction(IMetaStoreClient client,
-      Table tbl, long txnId) {
+      Table tbl, TblTransaction tblTxn) {
     throw new UnsupportedOperationException("alterTableWithTransaction");
   }
 
@@ -111,8 +137,7 @@ public class MetastoreShim {
   * Hive-3 only function
   */
   public static void alterPartitionsWithTransaction(IMetaStoreClient client,
-      String dbName, String tblName, List<Partition> partitions,
-      long tblWriteId, long txnId) {
+      String dbName, String tblName, List<Partition> partitions, TblTransaction tblTxn) {
     throw new UnsupportedOperationException("alterTableWithTransaction");
   }
 
@@ -362,7 +387,7 @@ public class MetastoreShim {
   /**
    * Hive-3 only function
    */
-  public static long openTransaction(IMetaStoreClient client, String userId)
+  public static long openTransaction(IMetaStoreClient client)
       throws TransactionException {
     throw new UnsupportedOperationException("openTransaction is not supported.");
   }
@@ -414,6 +439,16 @@ public class MetastoreShim {
   public static long allocateTableWriteId(IMetaStoreClient client, long txnId,
       String dbName, String tableName) throws TransactionException {
     throw new UnsupportedOperationException("allocateTableWriteId is not supported.");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static void setTableColumnStatsTransactional(IMetaStoreClient client,
+      Table msTbl, ColumnStatistics colStats, TblTransaction tblTxn)
+      throws ImpalaRuntimeException {
+    throw new UnsupportedOperationException(
+        "setTableColumnStatsTransactional is not supported.");
   }
 
   /**

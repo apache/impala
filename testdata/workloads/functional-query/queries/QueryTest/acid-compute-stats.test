@@ -1,0 +1,105 @@
+====
+---- QUERY
+# Test unpartitioned table.
+set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
+create table tt (i int);
+insert into tt values (1);
+compute stats tt;
+====
+---- QUERY
+show table stats tt;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats tt;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'i','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+# Test partitioned table with non-incremental stats.
+set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
+create table pt (x int) partitioned by (p int);
+insert into pt partition (p=1) values (1);
+compute stats pt;
+====
+---- QUERY
+show table stats pt;
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','NOT CACHED',regex:.*,'false',regex:.*
+'Total',1,1,'2B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats pt;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'x','INT',1,0,4,4
+'p','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+show partitions pt
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','NOT CACHED',regex:.*,'false',regex:.*
+'Total',1,1,'2B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test partitioned table with incremental stats.
+# DROP STATS is currently not supported for ACID tables, so the tables is dropped and
+# recreated instead.
+set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
+drop table pt;
+create table pt (x int) partitioned by (p int);
+insert into pt partition (p=1) values (1);
+compute incremental stats pt;
+====
+---- QUERY
+show table stats pt;
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','NOT CACHED',regex:.*,'true',regex:.*
+'Total',1,1,'2B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats pt;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'x','INT',1,0,4,4
+'p','INT',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+show partitions pt
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','NOT CACHED',regex:.*,'true',regex:.*
+'Total',1,1,'2B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+
+

@@ -117,6 +117,15 @@ class TestAcid(ImpalaTestSuite):
         .format(unique_database, "ext_part_colstats"))
     assert "2" in result
 
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_acid_compute_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-compute-stats', vector, use_db=unique_database)
+
 #  TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.
 #  INSERT OVERWRITE with empty result set, once HIVE-21750 is fixed.
