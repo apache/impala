@@ -140,9 +140,12 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_create_managed_kudu_tables(self, vector, unique_database):
     """Tests the Create table operation when using a kudu table with Kudu's integration
-       with the Hive Metastore for managed tables."""
+       with the Hive Metastore for managed tables. Increase timeout of individual Kudu
+       client rpcs to avoid requests fail due to operation delay in the Hive Metastore
+       for managed tables (IMPALA-8856)."""
     vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
 
@@ -174,9 +177,12 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfHive3.kudu_hms_notifications_not_supported
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_implicit_managed_table_props(self, cursor, kudu_client, unique_database):
     """Check that table properties added internally for managed table during table
-       creation are as expected.
+       creation are as expected. Increase timeout of individual Kudu client rpcs to
+       avoid requests fail due to operation delay in the Hive Metastore for managed
+       tables (IMPALA-8856).
     """
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
@@ -197,9 +203,12 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfHive3.kudu_hms_notifications_not_supported
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_non_empty_db(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database will fail if Kudu tables are present
-       and that the tables remain.
+       and that the tables remain. Increase timeout of individual Kudu client rpcs
+       to avoid requests fail due to operation delay in the Hive Metastore for managed
+       tables (IMPALA-8856).
     """
     db_name = unique_cursor.conn.db_name
     with self.temp_kudu_table(kudu_client, [INT32], db_name=db_name) as kudu_table:
@@ -221,10 +230,12 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfHive3.kudu_hms_notifications_not_supported
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_db_cascade(self, unique_cursor, kudu_client):
     """Check that an attempt to drop a database cascade will succeed even if Kudu
        tables are present. Make sure the corresponding managed tables are removed
-       from Kudu.
+       from Kudu. Increase timeout of individual Kudu client rpcs to avoid requests
+       fail due to operation delay in the Hive Metastore for managed tables (IMPALA-8856).
     """
     db_name = unique_cursor.conn.db_name
     with self.temp_kudu_table(kudu_client, [INT32], db_name=db_name) as kudu_table:
@@ -244,9 +255,12 @@ class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfHive3.kudu_hms_notifications_not_supported
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_drop_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table should fail if the underlying
-       Kudu table has been dropped externally.
+       Kudu table has been dropped externally. Increase timeout of individual
+       Kudu client rpcs to avoid requests fail due to operation delay in the
+       Hive Metastore for managed tables (IMPALA-8856).
     """
     impala_tbl_name = "foo"
     cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
