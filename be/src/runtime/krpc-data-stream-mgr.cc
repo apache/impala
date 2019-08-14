@@ -326,7 +326,8 @@ Status KrpcDataStreamMgr::DeregisterRecvr(
 }
 
 void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
-  VLOG_QUERY << "cancelling all streams for fragment_instance_id=" << PrintId(finst_id);
+  VLOG_QUERY << "cancelling active streams for fragment_instance_id="
+             << PrintId(finst_id);
   lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator iter =
       fragment_recvr_set_.lower_bound(make_pair(finst_id, 0));

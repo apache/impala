@@ -115,6 +115,10 @@ class KrpcDataStreamRecvr {
   /// queue to the specified batch. Called from fragment instance execution threads only.
   void TransferAllResources(RowBatch* transfer_batch);
 
+  /// Marks all sender queues as cancelled and notifies all waiting consumers of
+  /// the cancellation.
+  void CancelStream();
+
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
   PlanNodeId dest_node_id() const { return dest_node_id_; }
   const RowDescriptor* row_desc() const { return row_desc_; }
@@ -155,10 +159,6 @@ class KrpcDataStreamRecvr {
   /// Indicate that a particular sender is done. Delegated to the appropriate
   /// sender queue. Called from KrpcDataStreamMgr.
   void RemoveSender(int sender_id);
-
-  /// Marks all sender queues as cancelled and notifies all waiting consumers of
-  /// cancellation.
-  void CancelStream();
 
   /// Return true if the addition of a new batch of size 'batch_size' would exceed the
   /// total buffer limit.

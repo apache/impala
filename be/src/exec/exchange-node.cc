@@ -157,12 +157,17 @@ Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
   return ret_status;
 }
 
+void ExchangeNode::ReleaseRecvrResources(RowBatch* output_batch) {
+  stream_recvr_->TransferAllResources(output_batch);
+  stream_recvr_->CancelStream();
+}
+
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   if (ReachedLimit()) {
-    stream_recvr_->TransferAllResources(output_batch);
+    ReleaseRecvrResources(output_batch);
     *eos = true;
     return Status::OK();
   } else {
@@ -195,7 +200,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
       COUNTER_SET(rows_returned_counter_, rows_returned());
 
       if (ReachedLimit()) {
-        stream_recvr_->TransferAllResources(output_batch);
+        ReleaseRecvrResources(output_batch);
         *eos = true;
         return Status::OK();
       }
@@ -205,7 +210,9 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     // we need more rows
     stream_recvr_->TransferAllResources(output_batch);
     RETURN_IF_ERROR(FillInputRowBatch(state));
-    *eos = (input_batch_ == NULL);
+    *eos = (input_batch_ == nullptr);
+    // No need to call CancelStream() on the receiver here as all incoming row batches
+    // have been consumed so we should have replied to all senders already.
     if (*eos) return Status::OK();
     next_row_idx_ = 0;
     DCHECK(input_batch_->row_desc()->LayoutIsPrefixOf(*output_batch->row_desc()));
@@ -238,8 +245,9 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   CheckLimitAndTruncateRowBatchIfNeeded(output_batch, eos);
 
   // On eos, transfer all remaining resources from the input batches maintained
-  // by the merger to the output batch.
-  if (*eos) stream_recvr_->TransferAllResources(output_batch);
+  // by the merger to the output batch. Also cancel the underlying receiver so
+  // the senders' fragments can exit early.
+  if (*eos) ReleaseRecvrResources(output_batch);
 
   COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();

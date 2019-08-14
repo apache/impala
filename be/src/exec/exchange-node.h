@@ -71,6 +71,14 @@ class ExchangeNode : public ExecNode {
   /// Only used when is_merging_ is false.
   Status FillInputRowBatch(RuntimeState* state);
 
+  /// Releases resources of the receiver by transferring the resource ownership of
+  /// the most recently dequeued row batch to 'output_batch'. Also cancels the underlying
+  /// receiver so all senders will get unblocked. This function is called after the
+  /// exchange node hits end-of-stream due to reaching the node's row count limit.
+  /// Please note that no more rows will be returned from the receiver once this function
+  /// is called.
+  void ReleaseRecvrResources(RowBatch* output_batch);
+
   int num_senders_;  // needed for stream_recvr_ construction
 
   /// The underlying DataStreamRecvrBase instance. Ownership is shared between this

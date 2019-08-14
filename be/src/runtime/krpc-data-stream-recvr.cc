@@ -453,7 +453,9 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
     // responded to if we reach here.
     DCHECK_GT(num_remaining_senders_, 0);
     if (UNLIKELY(is_cancelled_)) {
-      DataStreamService::RespondRpc(Status::OK(), response, rpc_context);
+      Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
+          PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
+      DataStreamService::RespondRpc(cancel_status, response, rpc_context);
       return;
     }
 
@@ -557,7 +559,9 @@ void KrpcDataStreamRecvr::SenderQueue::TakeOverEarlySender(
   {
     unique_lock<SpinLock> l(lock_);
     if (UNLIKELY(is_cancelled_)) {
-      DataStreamService::RespondRpc(Status::OK(), ctx->response, ctx->rpc_context);
+      Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
+          PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
+      DataStreamService::RespondRpc(cancel_status, ctx->response, ctx->rpc_context);
       return;
     }
     // Only enqueue a deferred RPC if the sender queue is not yet cancelled.
@@ -589,7 +593,9 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
     // Respond to deferred RPCs.
     while (!deferred_rpcs_.empty()) {
       const unique_ptr<TransmitDataCtx>& ctx = deferred_rpcs_.front();
-      DataStreamService::RespondAndReleaseRpc(Status::OK(), ctx->response,
+      Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
+          PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
+      DataStreamService::RespondAndReleaseRpc(cancel_status, ctx->response,
           ctx->rpc_context, recvr_->deferred_rpc_tracker());
       DequeueDeferredRpc(l);
     }
