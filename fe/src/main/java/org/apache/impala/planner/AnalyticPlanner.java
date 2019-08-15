@@ -209,6 +209,13 @@ public class AnalyticPlanner {
       analyzer_.exprIntersect(pg.partitionByExprs, groupingExprs, l1, l2);
       // TODO: also look at l2 and take the max?
       long ndv = Expr.getNumDistinctValues(l1);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Partition group: %s, intersection: %s. " +
+                "GroupingExprs: %s, intersection: %s. ndv: %d, numNodes: %d, maxNdv: %d.",
+            Expr.debugString(pg.partitionByExprs), Expr.debugString(l1),
+            Expr.debugString(groupingExprs), Expr.debugString(l2),
+            ndv, numNodes, maxNdv));
+      }
       if (ndv < 0 || ndv < numNodes || ndv < maxNdv) continue;
       // found a better partition group
       maxPg = pg;
@@ -224,6 +231,9 @@ public class AnalyticPlanner {
       partitionGroups.remove(maxPg);
       partitionGroups.add(0, maxPg);
       inputPartitionExprs.addAll(maxGroupingExprs);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Optimized partition exprs: " + Expr.debugString(inputPartitionExprs));
+      }
     }
   }
 

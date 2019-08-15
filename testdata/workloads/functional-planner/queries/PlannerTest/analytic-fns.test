@@ -2921,3 +2921,93 @@ PLAN-ROOT SINK
    partitions=4/4 files=4 size=460B
    row-size=0B cardinality=8
 ====
+# Regression test for IMPALA-8790
+# Query block contains analytic functions and aggregations together. The GroupBy clause
+# references to inline view columns.
+select string_col, int_col,
+  rank() over(partition by int_col order by count(bigint_col))
+from (select string_col, int_col, bigint_col from functional.alltypes) w
+group by string_col, int_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: count(bigint_col) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=100
+|
+02:SORT
+|  order by: int_col ASC NULLS FIRST, count(bigint_col) ASC
+|  row-size=25B cardinality=100
+|
+05:AGGREGATE [FINALIZE]
+|  output: count:merge(bigint_col)
+|  group by: string_col, int_col
+|  row-size=25B cardinality=100
+|
+04:EXCHANGE [HASH(int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(bigint_col)
+|  group by: string_col, int_col
+|  row-size=25B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=25B cardinality=7.30K
+====
+# Regression test for IMPALA-8790
+# Query block contains analytic functions and aggregations together. The GroupBy clause
+# references to inline view columns. Coverage for distinct aggregation.
+select string_col, int_col,
+  rank() over(partition by int_col order by count(distinct bigint_col))
+from (select string_col, int_col, bigint_col from functional.alltypes) w
+group by string_col, int_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: count(bigint_col) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=100
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, count(bigint_col) ASC
+|  row-size=25B cardinality=100
+|
+09:EXCHANGE [HASH(int_col)]
+|
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(bigint_col)
+|  group by: string_col, int_col
+|  row-size=25B cardinality=100
+|
+07:EXCHANGE [HASH(string_col,int_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(bigint_col)
+|  group by: string_col, int_col
+|  row-size=25B cardinality=100
+|
+06:AGGREGATE
+|  group by: string_col, int_col, bigint_col
+|  row-size=25B cardinality=1.00K
+|
+05:EXCHANGE [HASH(int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: string_col, int_col, bigint_col
+|  row-size=25B cardinality=1.00K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=25B cardinality=7.30K
+====

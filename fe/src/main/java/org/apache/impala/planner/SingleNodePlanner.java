@@ -266,9 +266,13 @@ public class SingleNodePlanner {
         AnalyticPlanner analyticPlanner =
             new AnalyticPlanner(analyticInfo, analyzer, ctx_);
         MultiAggregateInfo multiAggInfo = selectStmt.getMultiAggInfo();
-        List<Expr> groupingExprs = multiAggInfo != null ?
-            multiAggInfo.getGroupingExprs() :
-            Collections.<Expr>emptyList();
+        List<Expr> groupingExprs;
+        if (multiAggInfo != null) {
+          groupingExprs = multiAggInfo.getSubstGroupingExprs();
+          Preconditions.checkState(groupingExprs != null);
+        } else {
+          groupingExprs = Collections.emptyList();
+        }
         List<Expr> inputPartitionExprs = new ArrayList<>();
         root = analyticPlanner.createSingleNodePlan(
             root, groupingExprs, inputPartitionExprs);

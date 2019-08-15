@@ -640,6 +640,8 @@ public class Planner {
     int threshold = ctx_.getQueryOptions().exec_single_node_rows_threshold;
     if (maxRowsProcessed < threshold) {
       // Execute on a single node and disable codegen for small results
+      LOG.trace("Query is small enough to execute on a single node: maxRowsProcessed = "
+          + maxRowsProcessed);
       ctx_.getQueryOptions().setNum_nodes(1);
       ctx_.getQueryCtx().disable_codegen_hint = true;
       if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
