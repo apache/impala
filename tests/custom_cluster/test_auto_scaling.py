@@ -99,12 +99,23 @@ class TestAutoScaling(CustomClusterTestSuite):
       assert self.impalad_test_service.get_metric_value(
         "cluster-membership.executor-groups.total-healthy") >= 2
 
-      # Wait for query rate to surpass the maximum for a single executor group plus 20%
+      # Wait for query rate to reach the maximum for a single executor group plus 20%
       min_query_rate = 1.2 * EXECUTOR_SLOTS
-      assert any(workload.get_query_rate() > min_query_rate or sleep(1)
-                 for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
-                     "Query rate did not surpass %s within %s s" % (
-                     cluster_size, self.STATE_CHANGE_TIMEOUT_S)
+      max_query_rate = 0
+      # This barrier has been flaky in the past so we wait 2x as long as for the other
+      # checks.
+      end = time() + 2 * self.STATE_CHANGE_TIMEOUT_S
+      while time() < end:
+        current_rate = workload.get_query_rate()
+        LOG.info("Current rate: %s" % current_rate)
+        max_query_rate = max(max_query_rate, current_rate)
+        if max_query_rate >= min_query_rate:
+          break
+        sleep(1)
+
+      assert max_query_rate >= min_query_rate, "Query rate did not reach %s within %s " \
+          "s. Maximum was %s. Cluster size is %s." % (min_query_rate,
+          self.STATE_CHANGE_TIMEOUT_S, max_query_rate, cluster_size)
 
       LOG.info("Stopping workload")
       workload.stop()
