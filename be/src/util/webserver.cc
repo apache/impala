@@ -386,6 +386,9 @@ Status Webserver::Start() {
   options.push_back("enable_directory_listing");
   options.push_back("no");
 
+  options.push_back("enable_keep_alive");
+  options.push_back("yes");
+
   // Options must be a NULL-terminated list
   options.push_back(nullptr);
 

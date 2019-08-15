@@ -269,7 +269,8 @@ std::string THttpServer::getTimeRFC1123() {
 
 void THttpServer::returnUnauthorized() {
   std::ostringstream h;
-  h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << getTimeRFC1123() << CRLF;
+  h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << getTimeRFC1123() << CRLF
+    << "Connection: close" << CRLF;
   vector<string> return_headers = callbacks_.return_headers_fn();
   for (const string& header : return_headers) {
     h << header << CRLF;
