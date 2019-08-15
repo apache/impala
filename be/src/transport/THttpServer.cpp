@@ -170,11 +170,15 @@ void THttpServer::headersDone() {
 
   // Determine what type of auth header we got.
   StripWhiteSpace(&auth_value_);
-  string basic_auth_token;
-  bool got_basic_auth = TryStripPrefixString(auth_value_, "Basic ", &basic_auth_token);
-  string negotiate_auth_token;
+  string stripped_basic_auth_token;
+  bool got_basic_auth =
+      TryStripPrefixString(auth_value_, "Basic ", &stripped_basic_auth_token);
+  string basic_auth_token = got_basic_auth ? move(stripped_basic_auth_token) : "";
+  string stripped_negotiate_auth_token;
   bool got_negotiate_auth =
-      TryStripPrefixString(auth_value_, "Negotiate ", &negotiate_auth_token);
+      TryStripPrefixString(auth_value_, "Negotiate ", &stripped_negotiate_auth_token);
+  string negotiate_auth_token =
+      got_negotiate_auth ? move(stripped_negotiate_auth_token) : "";
   // We can only have gotten one type of auth header.
   DCHECK(!got_basic_auth || !got_negotiate_auth);
 
@@ -192,7 +196,8 @@ void THttpServer::headersDone() {
     } else {
       if (got_basic_auth && metrics_enabled_) total_basic_auth_failure_->Increment(1);
     }
-  } else if (has_kerberos_ && (!got_basic_auth || !has_ldap_)) {
+  }
+  if (has_kerberos_ && (!got_basic_auth || !has_ldap_)) {
     bool is_complete;
     if (callbacks_.negotiate_auth_fn(negotiate_auth_token, &is_complete)) {
       // If 'is_complete' is false we want to return a 401.
