@@ -360,6 +360,12 @@ class ImpalaClient(object):
 
   def _get_http_transport(self, connect_timeout_ms):
     """Creates a transport with HTTP as the base."""
+    # Older python versions do not support SSLContext needed by THttpClient. More
+    # context in IMPALA-8864. CentOs 6 ships such an incompatible python version
+    # out of the box.
+    if not hasattr(ssl, "create_default_context"):
+      print_to_stderr("Python version too old. SSLContext not supported.")
+      raise NotImplementedError()
     # Current implementation of THttpClient does a close() and open() of the underlying
     # http connection on every flush() (THRIFT-4600). Due to this, setting a connect
     # timeout does not achieve the desirable result as the subsequent open() could block

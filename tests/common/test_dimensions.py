@@ -122,6 +122,12 @@ def create_beeswax_hs2_dimension():
 # 'hs2-http' dimension is only covered for shell based tests, since they
 # do not rely on Impyla for connections.
 def create_beeswax_hs2_hs2http_dimension():
+  # Older python versions do not support SSLContext object that the thrift
+  # http client implementation depends on. Falls back to a dimension without
+  # http transport. More context in IMPALA-8864.
+  import ssl
+  if not hasattr(ssl, "create_default_context"):
+    return create_beeswax_hs2_dimension()
   return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
 
 
