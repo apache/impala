@@ -150,7 +150,7 @@ class TestEventProcessing(CustomClusterTestSuite):
            "'transactional_properties'='insert_only')"
     test_tbl = unique_database + ".test_events"
     self.run_stmt_in_hive("create table {0} (key string, value string) \
-      partitioned by (year int) {1} stored as parquet".format(test_tbl, TBLPROPERTIES))
+      partitioned by (year int) stored as parquet {1}".format(test_tbl, TBLPROPERTIES))
     EventProcessorUtils.wait_for_event_processing(self.hive_client)
     self.client.execute("describe {0}".format(test_tbl))
 
