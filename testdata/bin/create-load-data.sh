@@ -51,6 +51,7 @@ SNAPSHOT_FILE=""
 LOAD_DATA_ARGS=""
 EXPLORATION_STRATEGY="exhaustive"
 export JDBC_URL="jdbc:hive2://${HS2_HOST_PORT}/default;"
+HIVE_CMD="beeline -n $USER -u $JDBC_URL"
 
 # For logging when using run-step.
 LOG_DIR=${IMPALA_DATA_LOADING_LOGS_DIR}
@@ -588,6 +589,15 @@ function check-hdfs-health {
   done
 }
 
+function warm-up-hive {
+  echo "Running warm up Hive statements"
+  $HIVE_CMD -e "create database if not exists functional;"
+  $HIVE_CMD -e "create table if not exists hive_warm_up_tbl (i int);"
+  # The insert below starts a Tez session (if Hive uses Tez) and initializes
+  # .hiveJars directory in HDFS, see IMPALA-8841.
+  $HIVE_CMD -e "insert overwrite table hive_warm_up_tbl values (1);"
+}
+
 # For kerberized clusters, use kerberos
 if ${CLUSTER_DIR}/admin is_kerberized; then
   LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
@@ -607,6 +617,11 @@ if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
 fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
+  # Using Hive in non-parallel mode before starting parallel execution may help with some
+  # flakiness during data load, see IMPALA-8841. The problem only occurs in Hive 3
+  # environment, but always doing the warm up shouldn't hurt much and may make it easier
+  # to investigate future issues where Hive doesn't work at all.
+  warm-up-hive
   run-step "Loading custom schemas" load-custom-schemas.log load-custom-schemas
   # Run some steps in parallel, with run-step-backgroundable / run-step-wait-all.
   # This is effective on steps that take a long time and don't depend on each

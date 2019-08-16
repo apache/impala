@@ -68,6 +68,10 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-0.20</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
