@@ -154,6 +154,27 @@ const static string DEFAULT_FS = "fs.defaultFS";
 // and the absolute value can be overridden by the '--max_concurrent_queries' flag.
 const static int COORDINATOR_CONCURRENCY_MULTIPLIER = 8;
 
+namespace {
+using namespace impala;
+// Helper method to hand off cluster membership update to the frontend instance.
+void SendClusterMembershipToFrontend(
+    ClusterMembershipMgr::SnapshotPtr& snapshot, Frontend* frontend) {
+  TUpdateExecutorMembershipRequest update_req;
+  for (const auto& it : snapshot->current_backends) {
+    const TBackendDescriptor& backend = it.second;
+    if (backend.is_executor) {
+      update_req.hostnames.insert(backend.address.hostname);
+      update_req.ip_addresses.insert(backend.ip_address);
+      update_req.num_executors++;
+    }
+  }
+  Status status = frontend->UpdateExecutorMembership(update_req);
+  if (!status.ok()) {
+    LOG(WARNING) << "Error updating frontend membership snapshot: " << status.GetDetail();
+  }
+}
+}
+
 namespace impala {
 
 struct ExecEnv::KuduClientPtr {
@@ -365,10 +386,10 @@ Status ExecEnv::Init() {
   }
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
-  cluster_membership_mgr_->SetUpdateFrontendFn(
-      [this](const TUpdateExecutorMembershipRequest& update_req) {
-        return this->frontend()->UpdateExecutorMembership(update_req);
-  });
+  cluster_membership_mgr_->RegisterUpdateCallbackFn(
+      [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        SendClusterMembershipToFrontend(snapshot, this->frontend());
+      });
 
   RETURN_IF_ERROR(admission_controller_->Init());
 
@@ -481,10 +502,14 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   cluster_membership_mgr_->SetLocalBeDescFn([server]() {
     return server->GetLocalBackendDescriptor();
   });
-  cluster_membership_mgr_->SetUpdateLocalServerFn(
-      [server](const ClusterMembershipMgr::BackendAddressSet& current_backends) {
-        server->CancelQueriesOnFailedBackends(current_backends);
-  });
+  cluster_membership_mgr_->RegisterUpdateCallbackFn(
+      [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        std::unordered_set<TNetworkAddress> current_backend_set;
+        for (const auto& it : snapshot->current_backends) {
+          current_backend_set.insert(it.second.address);
+        }
+        server->CancelQueriesOnFailedBackends(current_backend_set);
+      });
 }
 
 void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,

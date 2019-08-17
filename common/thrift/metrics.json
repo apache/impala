@@ -2510,5 +2510,15 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "cluster-membership.backends.total"
+  },
+  {
+  "description": "Total number of queries running on executor group: $0",
+  "contexts": [
+    "IMPALAD"
+  ],
+  "label": "Total number of queries running on executor group: $0",
+  "units": "UNIT",
+  "kind": "GAUGE",
+  "key": "admission-controller.executor-group.num-queries-executing.$0"
   }
 ]

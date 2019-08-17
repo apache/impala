@@ -27,6 +27,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "scheduling/cluster-membership-mgr.h"
+#include "scheduling/executor-group.h"
 #include "scheduling/query-schedule.h"
 #include "scheduling/scheduler.h"
 #include "service/impala-server.h"
@@ -77,6 +78,9 @@ const char TOPIC_KEY_DELIMITER = '!';
 // queries in "resource-pool-A", an executor group name must start with
 // "resource-pool-A-".
 const char POOL_GROUP_DELIMITER = '-';
+
+const string EXEC_GROUP_QUERY_LOAD_KEY_FORMAT =
+  "admission-controller.executor-group.num-queries-executing.$0";
 
 // Define metric key format strings for metrics in PoolMetrics
 // '$0' is replaced with the pool name by strings::Substitute
@@ -293,7 +297,12 @@ AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membershi
     metrics_group_(metrics->GetOrCreateChildGroup("admission-controller")),
     host_id_(TNetworkAddressToString(host_addr)),
     thrift_serializer_(false),
-    done_(false) {}
+    done_(false) {
+  cluster_membership_mgr_->RegisterUpdateCallbackFn(
+      [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        this->UpdateExecGroupMetricMap(snapshot);
+      });
+}
 
 AdmissionController::~AdmissionController() {
   // If the dequeue thread is not running (e.g. if Init() fails), then there is
@@ -328,7 +337,7 @@ Status AdmissionController::Init() {
   return status;
 }
 
-void AdmissionController::PoolStats::Admit(const QuerySchedule& schedule) {
+void AdmissionController::PoolStats::AdmitQueryAndMemory(const QuerySchedule& schedule) {
   int64_t cluster_mem_admitted = schedule.GetClusterMemoryToAdmit();
   DCHECK_GT(cluster_mem_admitted, 0);
   local_mem_admitted_ += cluster_mem_admitted;
@@ -343,8 +352,7 @@ void AdmissionController::PoolStats::Admit(const QuerySchedule& schedule) {
   metrics_.total_admitted->Increment(1L);
 }
 
-void AdmissionController::PoolStats::ReleaseQuery(
-    const QuerySchedule& schedule, int64_t peak_mem_consumption) {
+void AdmissionController::PoolStats::ReleaseQuery(int64_t peak_mem_consumption) {
   // Update stats tracking the number of running and admitted queries.
   agg_num_running_ -= 1;
   metrics_.agg_num_running->Increment(-1L);
@@ -398,7 +406,7 @@ void AdmissionController::PoolStats::Dequeue(bool timed_out) {
   }
 }
 
-int64_t AdmissionController::UpdateHostStatsForQueryBackends(
+void AdmissionController::UpdateStatsOnReleaseForBackends(
     const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addrs) {
   int64_t total_mem_to_release = 0;
   for (auto host_addr : host_addrs) {
@@ -415,18 +423,20 @@ int64_t AdmissionController::UpdateHostStatsForQueryBackends(
     UpdateHostStats(host_addr, -mem_to_release, -1);
     total_mem_to_release += mem_to_release;
   }
-  return total_mem_to_release;
+  PoolStats* pool_stats = GetPoolStats(schedule);
+  pool_stats->ReleaseMem(total_mem_to_release);
+  pools_for_updates_.insert(schedule.request_pool());
 }
 
-void AdmissionController::UpdateHostStats(
-    const QuerySchedule& schedule, bool is_admitting) {
+void AdmissionController::UpdateStatsOnAdmission(const QuerySchedule& schedule) {
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host_addr = entry.first;
     int64_t mem_to_admit = GetMemToAdmit(schedule, entry.second);
-    if (!is_admitting) mem_to_admit *= -1;
-    int num_queries = is_admitting ? 1 : -1;
-    UpdateHostStats(host_addr, mem_to_admit, num_queries);
+    UpdateHostStats(host_addr, mem_to_admit, 1);
   }
+  PoolStats* pool_stats = GetPoolStats(schedule);
+  pool_stats->AdmitQueryAndMemory(schedule);
+  pools_for_updates_.insert(schedule.request_pool());
 }
 
 void AdmissionController::UpdateHostStats(
@@ -790,7 +800,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
   DCHECK(schedule_result->get() == nullptr);
 
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
-      ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot();
+      cluster_membership_mgr_->GetSnapshot();
   DCHECK(membership_snapshot.get() != nullptr);
   string blacklist_str = membership_snapshot->executor_blacklist.BlacklistToString();
   if (!blacklist_str.empty()) {
@@ -955,10 +965,11 @@ void AdmissionController::ReleaseQuery(
     DCHECK_EQ(num_released_backends_.at(schedule.query_id()), 0);
     num_released_backends_.erase(num_released_backends_.find(schedule.query_id()));
     PoolStats* stats = GetPoolStats(schedule);
-    stats->ReleaseQuery(schedule, peak_mem_consumption);
+    stats->ReleaseQuery(peak_mem_consumption);
     // No need to update the Host Stats as they should have been updated in
     // ReleaseQueryBackends.
     pools_for_updates_.insert(pool_name);
+    UpdateExecGroupMetric(schedule.executor_group(), -1);
     VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
              << stats->DebugString();
   }
@@ -967,13 +978,9 @@ void AdmissionController::ReleaseQuery(
 
 void AdmissionController::ReleaseQueryBackends(
     const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addrs) {
-  const string& pool_name = schedule.request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    PoolStats* stats = GetPoolStats(schedule);
-    int64_t mem_to_release = UpdateHostStatsForQueryBackends(schedule, host_addrs);
-    stats->ReleaseMem(mem_to_release);
-    pools_for_updates_.insert(pool_name);
+    UpdateStatsOnReleaseForBackends(schedule, host_addrs);
 
     // Update num_released_backends_.
     auto released_backends = num_released_backends_.find(schedule.query_id());
@@ -991,7 +998,7 @@ void AdmissionController::ReleaseQueryBackends(
       ss << "Released query backend(s) ";
       for (auto host_addr : host_addrs) ss << PrintThrift(host_addr) << " ";
       ss << "for query id=" << PrintId(schedule.query_id()) << " "
-         << stats->DebugString();
+         << GetPoolStats(schedule)->DebugString();
       VLOG(2) << ss.str();
     }
   }
@@ -1347,7 +1354,7 @@ void AdmissionController::DequeueLoop() {
     if (done_) break;
     dequeue_cv_.Wait(lock);
     ClusterMembershipMgr::SnapshotPtr membership_snapshot =
-        ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot();
+        cluster_membership_mgr_->GetSnapshot();
 
     // If a query was queued while the cluster is still starting up but the client facing
     // services have already started to accept connections, the whole membership can still
@@ -1499,7 +1506,6 @@ AdmissionController::PoolStats* AdmissionController::GetPoolStats(
 }
 
 void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
-  PoolStats* pool_stats = GetPoolStats(*schedule);
   VLOG_RPC << "For Query " << PrintId(schedule->query_id())
            << " per_backend_mem_limit set to: "
            << PrintBytes(schedule->per_backend_mem_limit())
@@ -1510,8 +1516,8 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
            << " coord_backend_mem_to_admit set to: "
            << PrintBytes(schedule->coord_backend_mem_to_admit());;
   // Update memory and number of queries.
-  pool_stats->Admit(*schedule);
-  UpdateHostStats(*schedule, /* is_admitting=*/true);
+  UpdateStatsOnAdmission(*schedule);
+  UpdateExecGroupMetric(schedule->executor_group(), 1);
   // Update summary profile.
   const string& admission_result =
       was_queued ? PROFILE_INFO_VAL_ADMIT_QUEUED : PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
@@ -1909,4 +1915,49 @@ int64_t AdmissionController::GetMemToAdmit(
   return backend_exec_params.is_coord_backend ? schedule.coord_backend_mem_to_admit() :
                                                 schedule.per_backend_mem_to_admit();
 }
+
+void AdmissionController::UpdateExecGroupMetricMap(
+    ClusterMembershipMgr::SnapshotPtr snapshot) {
+  std::unordered_set<string> grp_names;
+  for (const auto& group : snapshot->executor_groups) {
+    if (group.second.NumHosts() > 0) grp_names.insert(group.first);
+  }
+  lock_guard<mutex> l(admission_ctrl_lock_);
+  auto it = exec_group_query_load_map_.begin();
+  while (it != exec_group_query_load_map_.end()) {
+    // Erase existing groups from the set so that only new ones are left.
+    if (grp_names.erase(it->first) == 0) {
+      // Existing group not in the set means it no longer exists.
+      string group_name = it->first;
+      it = exec_group_query_load_map_.erase(it);
+      metrics_group_->RemoveMetric(EXEC_GROUP_QUERY_LOAD_KEY_FORMAT, group_name);
+    } else {
+      ++it;
+    }
+  }
+  // Now only the new groups are remaining in the set, add a metric for them.
+  for (const string& new_grp : grp_names) {
+    // There might be lingering queries from when this group was active.
+    int64_t currently_running = 0;
+    auto new_grp_it = snapshot->executor_groups.find(new_grp);
+    DCHECK(new_grp_it != snapshot->executor_groups.end());
+    ExecutorGroup group = new_grp_it->second;
+    for (const TBackendDescriptor& be_desc : group.GetAllExecutorDescriptors()) {
+      const string& host = TNetworkAddressToString(be_desc.address);
+      auto stats = host_stats_.find(host);
+      if (stats != host_stats_.end()) {
+        currently_running = std::max(currently_running, stats->second.num_admitted);
+      }
+    }
+    exec_group_query_load_map_[new_grp] = metrics_group_->AddGauge(
+        EXEC_GROUP_QUERY_LOAD_KEY_FORMAT, currently_running, new_grp);
+  }
+}
+
+void AdmissionController::UpdateExecGroupMetric(
+    const string& grp_name, int64_t delta) {
+  auto entry = exec_group_query_load_map_.find(grp_name);
+  if (entry != exec_group_query_load_map_.end()) entry->second->Increment(delta);
+}
+
 } // namespace impala

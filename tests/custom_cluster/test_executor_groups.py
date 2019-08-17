@@ -83,14 +83,41 @@ class TestExecutorGroups(CustomClusterTestSuite):
     pool."""
     return self.impalad_test_service.get_num_running_queries("default-pool")
 
+  def _wait_for_num_executor_groups(self, num_exec_grps, only_healthy=False):
+    """Waits for the number of executor groups to reach 'num_exec_grps'. If 'only_healthy'
+    is True, only the healthy executor groups are accounted for, otherwise all groups
+    with at least one executor are accounted for."""
+    if only_healthy:
+      return self.coordinator.service.wait_for_metric_value(
+        "cluster-membership.executor-groups.total-healthy", num_exec_grps, timeout=30)
+    else:
+      return self.coordinator.service.wait_for_metric_value(
+        "cluster-membership.executor-groups.total", num_exec_grps, timeout=30)
+
+  def _get_num_executor_groups(self, only_healthy=False):
+    """Returns the number of executor groups with at least one executor. If
+    'only_healthy' is True, only the number of healthy executor groups is returned."""
+    if only_healthy:
+      return self.coordinator.service.get_metric_value(
+        "cluster-membership.executor-groups.total-healthy")
+    else:
+      return self.coordinator.service.get_metric_value(
+        "cluster-membership.executor-groups.total")
+
+  def _get_num_queries_executing_for_exec_group(self, group_name_suffix):
+    """Returns the number of queries running on the executor group 'group_name_suffix'.
+    None is returned if the group has no executors or does not exist."""
+    METRIC_PREFIX = "admission-controller.executor-group.num-queries-executing.{0}"
+    return self.coordinator.service.get_metric_value(
+      METRIC_PREFIX.format(self._group_name(group_name_suffix)))
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-queue_wait_timeout_ms=2000")
   def test_no_group_timeout(self):
     """Tests that a query submitted to a coordinator with no executor group times out."""
     result = self.execute_query_expect_failure(self.client, "select sleep(2)")
     assert "Admission for query exceeded timeout" in str(result)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
 
   @pytest.mark.execute_serially
   def test_single_group(self):
@@ -98,8 +125,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     QUERY = "select count(*) from functional.alltypestiny"
     self._add_executor_group("group1", 2)
     self.execute_query_expect_success(self.client, QUERY)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 1
 
   @pytest.mark.execute_serially
   def test_executor_group_starts_while_qeueud(self):
@@ -110,12 +136,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     handle = client.execute_async(QUERY)
     profile = client.get_runtime_profile(handle)
     assert "Waiting for executors to start" in profile
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
     self._add_executor_group("group1", 2)
     client.wait_for_finished_timeout(handle, 20)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 1
 
   @pytest.mark.execute_serially
   def test_executor_group_health(self):
@@ -123,8 +147,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     QUERY = "select count(*) from functional.alltypestiny"
     # Start cluster and group
     self._add_executor_group("group1", 2)
-    self.coordinator.service.wait_for_metric_value(
-      "cluster-membership.executor-groups.total-healthy", 1)
+    self._wait_for_num_executor_groups(1, only_healthy=True)
     client = self.client
     # Run query to validate
     self.execute_query_expect_success(client, QUERY)
@@ -133,8 +156,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     executor.kill()
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2,
                                                    timeout=20)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
     # Run query and observe timeout
     handle = client.execute_async(QUERY)
     profile = client.get_runtime_profile(handle)
@@ -145,8 +167,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.wait_for_finished_timeout(handle, 20)
     # Run query and observe success
     self.execute_query_expect_success(client, QUERY)
-    assert self.coordinator.service.wait_for_metric_value(
-      "cluster-membership.executor-groups.total-healthy", 1)
+    self._wait_for_num_executor_groups(1, only_healthy=True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-default_pool_max_requests=1")
@@ -169,14 +190,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Check that q2 still hasn't run
     profile = client.get_runtime_profile(q2)
     assert "Admission result: Queued" in profile, profile
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
     # Restore executor group health
     executor.start()
     # Query should now finish
     client.wait_for_finished_timeout(q2, 20)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 1
 
   @pytest.mark.execute_serially
   def test_max_concurrent_queries(self):
@@ -202,8 +221,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
              where month < 3 and id + random() < sleep(500);"
     self._add_executor_group("group1", 2, max_concurrent_queries=1)
     self._add_executor_group("group2", 2, max_concurrent_queries=1)
-    self.coordinator.service.wait_for_metric_value(
-      "cluster-membership.executor-groups.total-healthy", 2)
+    self._wait_for_num_executor_groups(2, only_healthy=True)
     client = self.client
     q1 = client.execute_async(QUERY)
     client.wait_for_admission_control(q1)
@@ -278,10 +296,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Start first executor
     self._add_executor_group("group1", 3, num_executors=1)
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total") == 1
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups() == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 0
     # Run query and observe that it gets queued
     client = self.client
     handle = client.execute_async(QUERY)
@@ -291,15 +307,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Start another executor and observe that the query stays queued
     self._add_executor_group("group1", 3, num_executors=1)
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 3)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
     profile = client.get_runtime_profile(handle)
     assert client.get_state(handle) == initial_state
     # Start the remaining executor and observe that the query finishes
     self._add_executor_group("group1", 3, num_executors=1)
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 4)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 1
     client.wait_for_finished_timeout(handle, 20)
 
   @pytest.mark.execute_serially
@@ -313,8 +327,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Run query to make sure things work
     QUERY = "select count(*) from functional.alltypestiny"
     self.execute_query_expect_success(self.client, QUERY)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 1
+    assert self._get_num_executor_groups(only_healthy=True) == 1
     # Kill executors to make group empty
     impalads = self.cluster.impalads
     impalads[1].kill()
@@ -326,5 +339,78 @@ class TestExecutorGroups(CustomClusterTestSuite):
                      "pool default-pool. Queued reason: Waiting for executors to " \
                      "start. Only DDL queries can currently run."
     assert expected_error in str(result)
-    assert self.coordinator.service.get_metric_value(
-      "cluster-membership.executor-groups.total-healthy") == 0
+    assert self._get_num_executor_groups(only_healthy=True) == 0
+
+  @pytest.mark.execute_serially
+  def test_executor_group_num_queries_executing_metric(self):
+    """Tests the functionality of the metric keeping track of the query load of executor
+    groups."""
+    # Query that runs on every executor
+    QUERY = "select * from functional_parquet.alltypestiny \
+             where month < 3 and id + random() < sleep(500);"
+    group_names = ["group1", "group2"]
+    self._add_executor_group(group_names[0], min_size=1, num_executors=1,
+                             max_concurrent_queries=1)
+    # Create an exec group of min size 2 to exercise the case where a group becomes
+    # unhealthy.
+    self._add_executor_group(group_names[1], min_size=2, num_executors=2,
+                             max_concurrent_queries=1)
+    self._wait_for_num_executor_groups(2, only_healthy=True)
+    # Verify metrics for both groups appear.
+    assert all(
+      self._get_num_queries_executing_for_exec_group(name) == 0 for name in group_names)
+
+    # First query will run on the first group. Verify the metric updates accordingly.
+    client = self.client
+    q1 = client.execute_async(QUERY)
+    client.wait_for_admission_control(q1)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) == 1
+    assert self._get_num_queries_executing_for_exec_group(group_names[1]) == 0
+
+    # Similarly verify the metric updates accordingly when a query runs on the next group.
+    q2 = client.execute_async(QUERY)
+    client.wait_for_admission_control(q2)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) == 1
+    assert self._get_num_queries_executing_for_exec_group(group_names[1]) == 1
+
+    # Close both queries and verify metrics are updated accordingly.
+    client.close_query(q1)
+    client.close_query(q2)
+    assert all(
+      self._get_num_queries_executing_for_exec_group(name) == 0 for name in group_names)
+
+    # Kill an executor from group2 to make that group unhealthy, then verify that the
+    # metric is still there.
+    self.cluster.impalads[-1].kill()
+    self._wait_for_num_executor_groups(1, only_healthy=True)
+    assert self._get_num_executor_groups() == 2
+    assert all(
+      self._get_num_queries_executing_for_exec_group(name) == 0 for name in group_names)
+
+    # Kill the last executor from group2 so that it is removed from the exec group list,
+    # then verify that the metric disappears.
+    self.cluster.impalads[-2].kill()
+    self._wait_for_num_executor_groups(1)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) == 0
+    assert self._get_num_queries_executing_for_exec_group(group_names[1]) is None
+
+    # Now make sure the metric accounts for already running queries that linger around
+    # from when the group was healthy.
+    # Block the query cancellation thread to allow the query to linger between exec group
+    # going down and coming back up.
+    client.set_configuration({"debug_action": "QUERY_CANCELLATION_THREAD:SLEEP@10000"})
+    q3 = client.execute_async(QUERY)
+    client.wait_for_admission_control(q3)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) == 1
+    impalad_grp1 = self.cluster.impalads[-3]
+    impalad_grp1.kill()
+    self._wait_for_num_executor_groups(0)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) is None
+    impalad_grp1.start()
+    self._wait_for_num_executor_groups(1, only_healthy=True)
+    assert self._get_num_queries_executing_for_exec_group(group_names[0]) == 1, \
+      "The lingering query should be accounted for when the group comes back up."
+    client.cancel(q3)
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.executor-group.num-queries-executing.{0}".format(
+        self._group_name(group_names[0])), 0, timeout=30)

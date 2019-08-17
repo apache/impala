@@ -335,8 +335,8 @@ class NegatedGauge : public IntGauge {
 
 /// Container for a set of metrics. A MetricGroup owns the memory for every metric
 /// contained within it (see Add*() to create commonly used metric
-/// types). Metrics are 'registered' with a MetricGroup, once registered they cannot be
-/// deleted.
+/// types). Metrics are 'registered' with a MetricGroup and can be deleted/removed after
+/// being registered. Note: deletion invalidates any pointers to the deleted metric.
 //
 /// MetricGroups may be organised hierarchically as a tree.
 //
@@ -359,13 +359,23 @@ class MetricGroup {
   template <typename M>
   M* RegisterMetric(M* metric) {
     DCHECK(!metric->key_.empty());
-    M* mt = obj_pool_->Add(metric);
-
     boost::lock_guard<SpinLock> l(lock_);
     DCHECK(metric_map_.find(metric->key_) == metric_map_.end()) << metric->key_;
-    metric_map_[metric->key_] = mt;
-    return mt;
+    std::shared_ptr<M> metric_ptr(metric);
+    metric_map_[metric->key_] = metric_ptr;
+    return metric_ptr.get();
   }
+
+  /// Remove the metric from the metric group and release its memory. This invalidates any
+  /// pointers to the deleted metric.
+  /// It is an error to call this with a non-existent or already removed metric.
+  void RemoveMetric(const std::string& key, const std::string& metric_def_arg = "") {
+    TMetricDef metric_def = MetricDefs::Get(key, metric_def_arg);
+    DCHECK(!metric_def.key.empty());
+    boost::lock_guard<SpinLock> l(lock_);
+    DCHECK(metric_map_.find(metric_def.key) != metric_map_.end()) << metric_def.key;
+    metric_map_.erase(metric_def.key);
+    }
 
   /// Create a gauge metric object with given key and initial value (owned by this object)
   IntGauge* AddGauge(const std::string& key, const int64_t value,
@@ -434,7 +444,7 @@ class MetricGroup {
 
  private:
   FRIEND_TEST(MetricsTest, PrometheusMetricNames);
-  /// Pool containing all metric objects
+  /// Pool containing all child metric groups.
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   /// Name of this metric group.
@@ -443,12 +453,14 @@ class MetricGroup {
   /// Guards metric_map_ and children_
   SpinLock lock_;
 
-  /// Contains all Metric objects, indexed by key
-  typedef std::map<std::string, Metric*> MetricMap;
+  /// Contains all metric objects, indexed by key. The shared_ptr enclosing the metric
+  /// pointer owns the memory and only a single instance of this shared pointer exists
+  /// which ensures that it is release when the entry is removed from the map.
+  typedef std::unordered_map<std::string, std::shared_ptr<Metric>> MetricMap;
   MetricMap metric_map_;
 
   /// All child metric groups
-  typedef std::map<std::string, MetricGroup*> ChildGroupMap;
+  typedef std::unordered_map<std::string, MetricGroup*> ChildGroupMap;
   ChildGroupMap children_;
 
   /// Webserver callback for /metrics. Produces a tree of JSON values, each representing a
@@ -484,7 +496,6 @@ class MetricGroup {
   /// * "memory.rss" becomes "impala_memory_rss"
   static std::string ImpalaToPrometheusName(const std::string& impala_metric_name);
 };
-
 
 /// Convenience method to instantiate a TMetricDef with a subset of its fields defined.
 /// Most externally-visible metrics should be defined in metrics.json and retrieved via

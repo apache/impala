@@ -1417,6 +1417,7 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     return;
   }
 
+  DebugActionNoFail(request_state->query_options(), "QUERY_CANCELLATION_THREAD");
   Status error;
   switch (cancellation_work.cause()) {
     case CancellationWorkCause::TERMINATED_BY_SERVER:
@@ -1732,18 +1733,11 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
     QueryLocations::const_iterator loc_entry = query_locations_.begin();
     while (loc_entry != query_locations_.end()) {
       if (current_membership.find(loc_entry->first) == current_membership.end()) {
-        unordered_set<TUniqueId>::const_iterator query_id = loc_entry->second.begin();
         // Add failed backend locations to all queries that ran on that backend.
-        for(; query_id != loc_entry->second.end(); ++query_id) {
-          vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
-          failed_hosts.push_back(loc_entry->first);
+        for (const auto& query_id : loc_entry->second) {
+          queries_to_cancel[query_id].push_back(loc_entry->first);
         }
-        // We can remove the location wholesale once we know backend's failed. To do so
-        // safely during iteration, we have to be careful not in invalidate the current
-        // iterator, so copy the iterator to do the erase(..) and advance the original.
-        QueryLocations::const_iterator failed_backend = loc_entry;
-        ++loc_entry;
-        query_locations_.erase(failed_backend);
+        loc_entry = query_locations_.erase(loc_entry);
       } else {
         ++loc_entry;
       }
@@ -1759,20 +1753,16 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
     // Since we are the only producer for this pool, we know that this cannot block
     // indefinitely since the queue is large enough to accept all new cancellation
     // requests.
-    map<TUniqueId, vector<TNetworkAddress>>::iterator cancellation_entry;
-    for (cancellation_entry = queries_to_cancel.begin();
-        cancellation_entry != queries_to_cancel.end();
-        ++cancellation_entry) {
+    for (const auto& cancellation_entry : queries_to_cancel) {
       stringstream backends_ss;
-      for (int i = 0; i < cancellation_entry->second.size(); ++i) {
-        backends_ss << TNetworkAddressToString(cancellation_entry->second[i]);
-        if (i + 1 != cancellation_entry->second.size()) backends_ss << ", ";
+      for (int i = 0; i < cancellation_entry.second.size(); ++i) {
+        backends_ss << TNetworkAddressToString(cancellation_entry.second[i]);
+        if (i + 1 != cancellation_entry.second.size()) backends_ss << ", ";
       }
-      VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry->first)
-                 << ", adding to queue to check for cancellation: "
-                 << backends_ss.str();
+      VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry.first)
+                 << ", adding to queue to check for cancellation: " << backends_ss.str();
       cancellation_thread_pool_->Offer(CancellationWork::BackendFailure(
-          cancellation_entry->first, cancellation_entry->second));
+          cancellation_entry.first, cancellation_entry.second));
     }
   }
 }

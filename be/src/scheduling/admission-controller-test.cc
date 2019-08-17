@@ -244,8 +244,10 @@ class AdmissionControllerTest : public testing::Test {
     TNetworkAddress* addr = pool_.Add(new TNetworkAddress());
     addr->__set_hostname("host0");
     addr->__set_port(25000);
+    ClusterMembershipMgr* cmm =
+        pool_.Add(new ClusterMembershipMgr("", nullptr, metric_group));
     return pool_.Add(new AdmissionController(
-        nullptr, nullptr, request_pool_service, metric_group, *addr));
+        cmm, nullptr, request_pool_service, metric_group, *addr));
   }
 
   static void checkPoolDisabled(bool expected_result, int64_t max_requests,
@@ -686,7 +688,7 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   CheckPoolStatsEmpty(pool_stats);
 
   // Show that Admit and Release leave stats at zero.
-  pool_stats->Admit(*query_schedule);
+  pool_stats->AdmitQueryAndMemory(*query_schedule);
   ASSERT_EQ(1, pool_stats->agg_num_running());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_running->GetValue());
   int64_t mem_to_release = 0;
@@ -697,7 +699,7 @@ TEST_F(AdmissionControllerTest, PoolStats) {
         admission_controller->GetMemToAdmit(*query_schedule, backend_state.second);
   }
   pool_stats->ReleaseMem(mem_to_release);
-  pool_stats->ReleaseQuery(*query_schedule, 0);
+  pool_stats->ReleaseQuery(0);
   CheckPoolStatsEmpty(pool_stats);
 }
 

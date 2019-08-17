@@ -342,7 +342,7 @@ Metric* MetricGroup::FindMetricForTestingInternal(const string& key) {
     MetricGroup* group = groups.top();
     groups.pop();
     auto it = group->metric_map_.find(key);
-    if (it != group->metric_map_.end()) return it->second;
+    if (it != group->metric_map_.end()) return it->second.get();
     for (const auto& child : group->children_) {
       groups.push(child.second);
     }

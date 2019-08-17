@@ -1258,7 +1258,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// A map from backend to the list of queries currently running or expected to run
   /// there.
-  typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId>>
+  typedef std::unordered_map<TNetworkAddress, std::unordered_set<TUniqueId>>
       QueryLocations;
   QueryLocations query_locations_;
 

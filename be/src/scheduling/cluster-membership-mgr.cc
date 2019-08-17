@@ -61,6 +61,9 @@ ClusterMembershipMgr::ClusterMembershipMgr(
   total_live_executor_groups_ = metric_grp->AddCounter(LIVE_EXEC_GROUP_KEY, 0);
   total_healthy_executor_groups_ = metric_grp->AddCounter(HEALTHY_EXEC_GROUP_KEY, 0);
   total_backends_ = metric_grp->AddCounter(TOTAL_BACKENDS_KEY, 0);
+  // Register the metric update function as a callback.
+  RegisterUpdateCallbackFn([this](
+      ClusterMembershipMgr::SnapshotPtr snapshot) { this->UpdateMetrics(snapshot); });
 }
 
 Status ClusterMembershipMgr::Init() {
@@ -90,18 +93,10 @@ void ClusterMembershipMgr::SetLocalBeDescFn(BackendDescriptorPtrFn fn) {
   local_be_desc_fn_ = std::move(fn);
 }
 
-void ClusterMembershipMgr::SetUpdateLocalServerFn(UpdateLocalServerFn fn) {
+void ClusterMembershipMgr::RegisterUpdateCallbackFn(UpdateCallbackFn fn) {
   lock_guard<mutex> l(callback_fn_lock_);
   DCHECK(fn);
-  DCHECK(!update_local_server_fn_);
-  update_local_server_fn_ = std::move(fn);
-}
-
-void ClusterMembershipMgr::SetUpdateFrontendFn(UpdateFrontendFn fn) {
-  lock_guard<mutex> l(callback_fn_lock_);
-  DCHECK(fn);
-  DCHECK(!update_frontend_fn_);
-  update_frontend_fn_ = std::move(fn);
+  update_callback_fns_.push_back(std::move(fn));
 }
 
 ClusterMembershipMgr::SnapshotPtr ClusterMembershipMgr::GetSnapshot() const {
@@ -171,9 +166,6 @@ void ClusterMembershipMgr::UpdateMembership(
     VLOG(1) << "Received full membership update";
     // Full topic transmit, create fresh state.
     new_state = std::make_shared<Snapshot>();
-    // A full update could remove backends and therefore we need to send an update to the
-    // local server.
-    update_local_server = true;
   } else {
     VLOG(1) << "Received delta membership update";
     if (recovering_membership_.get() != nullptr) {
@@ -212,7 +204,6 @@ void ClusterMembershipMgr::UpdateMembership(
           }
         }
         new_backend_map->erase(item.key);
-        update_local_server = true;
       }
       continue;
     }
@@ -322,8 +313,6 @@ void ClusterMembershipMgr::UpdateMembership(
     DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
   }
 
-  UpdateMetrics(*new_backend_map, *new_executor_groups);
-
   // Don't send updates or update the current membership if the statestore is in its
   // post-recovery grace period.
   if (ss_is_recovering) {
@@ -331,12 +320,10 @@ void ClusterMembershipMgr::UpdateMembership(
     return;
   }
 
-  // Send notifications to local ImpalaServer and Frontend through registered callbacks.
-  if (update_local_server) NotifyLocalServerForDeletedBackend(*new_backend_map);
-  UpdateFrontendExecutorMembership(*new_backend_map, *new_executor_groups);
-
-  // Atomically update the respective membership snapshot.
+  // Atomically update the respective membership snapshot and update metrics.
   SetState(new_state);
+  // Send notifications to all callbacks registered to receive updates.
+  NotifyListeners(new_state);
   recovering_membership_.reset();
 }
 
@@ -399,19 +386,24 @@ void ClusterMembershipMgr::BlacklistExecutor(const TBackendDescriptor& be_desc) 
   // in recovery.
   if (recovering) return;
 
-  // Note that we don't call the update functions here:
-  // - The backend update function is used to cancel queries on backends that are no
-  //   longer present in 'current_backends', but we don't remove the executor from
+  // Note that we don't call the update functions here but only update metrics:
+  // - The update sent to the impala server is used to cancel queries on backends that
+  //   are no longer present in 'current_backends', but we don't remove the executor from
   //   'current_backends' here, since it always reflects the full statestore membership.
   //   This avoids cancelling queries that may still be running successfully, eg. if the
   //   backend is still up but got blacklisted due to a flaky network. If the backend
   //   really is down, we'll still cancel the queries when the statestore removes it from
   //   the membership.
-  // - The frontend update function is used to notify the planner, but the executors the
+  // - The update sent to the admission controller is used to maintain a metric for each
+  //   group having at least 1 executor that keeps track of the queries running on it. We
+  //   can defer that to the statestore update and avoid unnecessary metric deletions due
+  //   to flaky backends being blacklisted.
+  // - The update sent to frontend is used to notify the planner, but the executors the
   //   planner schedules things on is just a hint and the Scheduler will still see the
   //   updated membership and choose non-blacklisted executors regardless of what the
   //   planner says, so its fine to wait until the next topic update to notify the fe.
   SetState(new_state);
+  UpdateMetrics(new_state);
 }
 
 void ClusterMembershipMgr::AddLocalBackendToStatestore(
@@ -443,33 +435,9 @@ ClusterMembershipMgr::BeDescSharedPtr ClusterMembershipMgr::GetLocalBackendDescr
   return local_be_desc_fn_ ? local_be_desc_fn_() : nullptr;
 }
 
-void ClusterMembershipMgr::NotifyLocalServerForDeletedBackend(
-    const BackendIdMap& current_backends) {
-  VLOG(3) << "Notifying local server of membership changes";
+void ClusterMembershipMgr::NotifyListeners(SnapshotPtr snapshot) {
   lock_guard<mutex> l(callback_fn_lock_);
-  if (!update_local_server_fn_) return;
-  BackendAddressSet current_backend_set;
-  for (const auto& it : current_backends) current_backend_set.insert(it.second.address);
-  update_local_server_fn_(current_backend_set);
-}
-
-void ClusterMembershipMgr::UpdateFrontendExecutorMembership(
-    const BackendIdMap& current_backends, const ExecutorGroups executor_groups) {
-  lock_guard<mutex> l(callback_fn_lock_);
-  if (!update_frontend_fn_) return;
-  TUpdateExecutorMembershipRequest update_req;
-  for (const auto& it : current_backends) {
-    const TBackendDescriptor& backend = it.second;
-    if (backend.is_executor) {
-      update_req.hostnames.insert(backend.address.hostname);
-      update_req.ip_addresses.insert(backend.ip_address);
-      update_req.num_executors++;
-    }
-  }
-  Status status = update_frontend_fn_(update_req);
-  if (!status.ok()) {
-    LOG(WARNING) << "Error updating frontend membership snapshot: " << status.GetDetail();
-  }
+  for (auto fn : update_callback_fns_) fn(snapshot);
 }
 
 void ClusterMembershipMgr::SetState(const SnapshotPtr& new_state) {
@@ -540,23 +508,22 @@ bool ClusterMembershipMgr::CheckConsistency(const BackendIdMap& current_backends
   return true;
 }
 
-void ClusterMembershipMgr::UpdateMetrics(
-    const BackendIdMap& current_backends, const ExecutorGroups& executor_groups) {
-  int total_live_executor_groups = 0;
-  int total_healthy_executor_groups = 0;
-  for (const auto& group_it : executor_groups) {
+void ClusterMembershipMgr::UpdateMetrics(const SnapshotPtr& new_state){
+  int64_t total_live_executor_groups = 0;
+  int64_t healthy_executor_groups = 0;
+  for (const auto& group_it : new_state->executor_groups) {
     const ExecutorGroup& group = group_it.second;
     if (group.IsHealthy()) {
-      total_live_executor_groups++;
-      total_healthy_executor_groups++;
+      ++healthy_executor_groups;
+      ++total_live_executor_groups;
     } else if (group.NumHosts() > 0) {
-      total_live_executor_groups++;
+      ++total_live_executor_groups;
     }
   }
-  DCHECK_GE(total_live_executor_groups, total_healthy_executor_groups);
+  DCHECK_GE(total_live_executor_groups, healthy_executor_groups);
   total_live_executor_groups_->SetValue(total_live_executor_groups);
-  total_healthy_executor_groups_->SetValue(total_healthy_executor_groups);
-  total_backends_->SetValue(current_backends.size());
+  total_healthy_executor_groups_->SetValue(healthy_executor_groups);
+  total_backends_->SetValue(new_state->current_backends.size());
 }
 
 } // end namespace impala

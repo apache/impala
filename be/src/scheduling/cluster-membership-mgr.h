@@ -61,8 +61,13 @@ class SchedulerWrapper;
 /// only one executor group named "default" exists. All backends are part of that group
 /// and it's the only group available for scheduling.
 ///
-/// The class also allows the local backend (ImpalaServer) and the local Frontend to
-/// register callbacks to receive notifications of changes to the cluster membership.
+/// The class also allows the local backend (ImpalaServer), the local Frontend and the
+/// AdmissionController to register callbacks to receive notifications of changes to the
+/// cluster membership. Note: The notifications for blacklisted executors are not sent
+/// immediately, but deferred to when statestore updates are processed (see detailed
+/// comment in the BlacklistExecutor method in the cc file). These callbacks are
+/// registered before the statestore subscriber is started by the impala server which
+/// ensures that the very first update to the cluster membership is sent to all callbacks.
 ///
 /// TODO: Replace the usage of shared_ptr with atomic_shared_ptr once compilers support
 ///       it. Alternatively consider using Kudu's rw locks.
@@ -116,17 +121,9 @@ class ClusterMembershipMgr {
   /// when calling this callback.
   typedef std::function<BeDescSharedPtr()> BackendDescriptorPtrFn;
 
-  /// A set of backend addresses.
-  typedef std::unordered_set<TNetworkAddress> BackendAddressSet;
-
-  /// A callback to notify the local ImpalaServer of changes to the cluster membership.
-  /// Only called when backends are deleted from the current membership. No locks are held
-  /// when calling this callback.
-  typedef std::function<void(const BackendAddressSet&)> UpdateLocalServerFn;
-
-  /// A callback to notify the local Frontend of changes to the cluster membership. No
-  /// locks are held when calling this callback.
-  typedef std::function<Status(const TUpdateExecutorMembershipRequest&)> UpdateFrontendFn;
+  /// A callback to provide the latest snapshot of cluster membership whenever there are
+  /// any changes to the membership.
+  typedef std::function<void(SnapshotPtr)> UpdateCallbackFn;
 
   ClusterMembershipMgr(std::string local_backend_id, StatestoreSubscriber* subscriber,
       MetricGroup* metrics);
@@ -144,14 +141,9 @@ class ClusterMembershipMgr {
   /// Registers a callback to provide the local backend descriptor.
   void SetLocalBeDescFn(BackendDescriptorPtrFn fn);
 
-  /// Registers a callback to notify the local ImpalaServer of changes in the cluster
-  /// membership. This callback will only be called when backends are deleted from the
-  /// membership.
-  void SetUpdateLocalServerFn(UpdateLocalServerFn fn);
-
-  /// Registers a callback to notify the local Frontend of changes in the cluster
-  /// membership.
-  void SetUpdateFrontendFn(UpdateFrontendFn fn);
+  /// Registers a callback to be notified with the latest snapshot of cluster membership
+  /// whenever there are any changes to the membership.
+  void RegisterUpdateCallbackFn(UpdateCallbackFn fn);
 
   /// Returns a read only snapshot of the current cluster membership state. May be called
   /// before or after calling Init(). The returned shared pointer will always be non-null,
@@ -183,14 +175,9 @@ class ClusterMembershipMgr {
   /// registered.
   BeDescSharedPtr GetLocalBackendDescriptor();
 
-  /// Notifies the ImpalaServer of a deleted backend through the registered callback for
-  /// cluster membership changes if the callback is non-empty.
-  void NotifyLocalServerForDeletedBackend(const BackendIdMap& current_backends);
-
-  /// Notifies the Frontend through the registered callback for cluster membership changes
-  /// if the callback is non-empty.
-  void UpdateFrontendExecutorMembership(const BackendIdMap& current_backends,
-      const ExecutorGroups executor_groups);
+  /// Notifies all registered callbacks of the latest changes to the membership by sending
+  /// them the latest cluster membership snapshot.
+  void NotifyListeners(SnapshotPtr snapshot);
 
   /// Atomically replaces a membership snapshot with a new copy.
   void SetState(const SnapshotPtr& new_state);
@@ -207,9 +194,11 @@ class ClusterMembershipMgr {
   bool CheckConsistency(const BackendIdMap& current_backends,
       const ExecutorGroups& executor_groups, const ExecutorBlacklist& executor_blacklist);
 
-  /// Updates the membership metrics.
-  void UpdateMetrics(const BackendIdMap& current_backends,
-      const ExecutorGroups& executor_groups);
+  /// Updates the membership metrics. Is registered as an updated callback function to
+  /// receive any membership updates. The only exception is that this is called directly
+  /// in BlacklistExecutor() where updates are not required to be sent to external
+  /// listeners.
+  void UpdateMetrics(const SnapshotPtr& new_state);
 
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
@@ -252,8 +241,7 @@ class ClusterMembershipMgr {
 
   /// Callbacks that provide external dependencies.
   BackendDescriptorPtrFn local_be_desc_fn_;
-  UpdateLocalServerFn update_local_server_fn_;
-  UpdateFrontendFn update_frontend_fn_;
+  std::vector<UpdateCallbackFn> update_callback_fns_;
 
   /// Protects the callbacks. Cannot be held at the same time as
   /// 'current_membership_lock_'.

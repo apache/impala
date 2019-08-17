@@ -449,10 +449,15 @@ TEST_F(MetricsTest, MetricGroupJson) {
   EXPECT_EQ(val["name"].GetString(), string("JsonTest"));
 
   EXPECT_EQ(val["child_groups"].Size(), 2);
-  EXPECT_EQ(val["child_groups"][0u]["name"].GetString(), string("child1"));
-  EXPECT_EQ(val["child_groups"][0u]["metrics"].Size(), 0);
-  EXPECT_EQ(val["child_groups"][1]["name"].GetString(), string("child2"));
-  EXPECT_EQ(val["child_groups"][1]["metrics"].Size(), 1);
+  std::unordered_map<string, int64_t> group_to_num_metrics_map = {
+      {val["child_groups"][0u]["name"].GetString(),
+          val["child_groups"][0u]["metrics"].Size()},
+      {val["child_groups"][1]["name"].GetString(),
+          val["child_groups"][1]["metrics"].Size()}};
+  EXPECT_TRUE(group_to_num_metrics_map.find("child1") != group_to_num_metrics_map.end());
+  EXPECT_EQ(group_to_num_metrics_map["child1"], 0);
+  EXPECT_TRUE(group_to_num_metrics_map.find("child2") != group_to_num_metrics_map.end());
+  EXPECT_EQ(group_to_num_metrics_map["child2"], 1);
 
   find_result = metrics.FindChildGroup("child1");
   ASSERT_NE(find_result, reinterpret_cast<MetricGroup*>(NULL));
@@ -461,6 +466,21 @@ TEST_F(MetricsTest, MetricGroupJson) {
 
   EXPECT_EQ(val2["metrics"].Size(), 0);
   EXPECT_EQ(val2["name"].GetString(), string("child1"));
+}
+
+TEST_F(MetricsTest, RegisterAndRemoveMetric) {
+  MetricGroup metrics("Metrics");
+
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
+  IntGauge* int_gauge = metrics.AddGauge("gauge", 0);
+  AssertValue(int_gauge, 0, "0");
+  int_gauge->Increment(-1);
+  AssertValue(int_gauge, -1, "-1");
+
+  // Now try removing the metric from the metric group.
+  int_gauge = nullptr;
+  metrics.RemoveMetric("gauge");
+  EXPECT_EQ(metrics.FindMetricForTesting<IntGauge*>("gauge"), nullptr);
 }
 
 // Test the mapping of Impala's metric names into prometheus names.
@@ -855,16 +875,16 @@ TEST_F(MetricsTest, HistogramUnitPrometheus) {
 }
 
 TEST_F(MetricsTest, MetricGroupPrometheus) {
-  std::stringstream exp_val;
-  exp_val << "# HELP impala_counter1 description\n"
-             "# TYPE impala_counter1 counter\n"
-             "impala_counter1 2048\n"
-             "# HELP impala_counter2 description\n"
-             "# TYPE impala_counter2 counter\n"
-             "impala_counter2 2048\n"
-             "# HELP impala_child_counter description\n"
-             "# TYPE impala_child_counter counter\n"
-             "impala_child_counter 0\n";
+  std::stringstream exp_val_counter1, exp_val_counter2, exp_val_child_counter;
+  exp_val_counter1 << "# HELP impala_counter1 description\n"
+                      "# TYPE impala_counter1 counter\n"
+                      "impala_counter1 2048\n";
+  exp_val_counter2 << "# HELP impala_counter2 description\n"
+                      "# TYPE impala_counter2 counter\n"
+                      "impala_counter2 2048\n";
+  exp_val_child_counter << "# HELP impala_child_counter description\n"
+                           "# TYPE impala_child_counter counter\n"
+                           "impala_child_counter 0\n";
   MetricGroup metrics("PrometheusTest");
   AddMetricDef("counter1", TMetricKind::COUNTER, TUnit::BYTES, "description");
   AddMetricDef("counter2", TMetricKind::COUNTER, TUnit::BYTES, "description");
@@ -883,7 +903,9 @@ TEST_F(MetricsTest, MetricGroupPrometheus) {
 
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
-  EXPECT_EQ(val.str(), exp_val.str());
+  EXPECT_STR_CONTAINS(val.str(), exp_val_counter1.str());
+  EXPECT_STR_CONTAINS(val.str(), exp_val_counter2.str());
+  EXPECT_STR_CONTAINS(val.str(), exp_val_child_counter.str());
 }
 
 // test with null metrics

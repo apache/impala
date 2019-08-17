@@ -356,7 +356,9 @@ class AdmissionController {
   void ReleaseQueryBackends(
       const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addr);
 
-  /// Registers the request queue topic with the statestore.
+  /// Registers the request queue topic with the statestore, starts up the dequeue thread
+  /// and registers a callback with the cluster membership manager to receive updates for
+  /// membership changes.
   Status Init();
 
   /// Serializes relevant stats, configurations and information associated with queued
@@ -422,6 +424,9 @@ class AdmissionController {
 
   /// Metrics subsystem access
   MetricGroup* metrics_group_;
+
+  /// Maps names of executor groups to their respective query load metric.
+  std::unordered_map<std::string, IntGauge*> exec_group_query_load_map_;
 
   /// Thread dequeuing and admitting queries.
   std::unique_ptr<Thread> dequeue_thread_;
@@ -500,9 +505,9 @@ class AdmissionController {
 
     // ADMISSION LIFECYCLE METHODS
     /// Updates the pool stats when the request represented by 'schedule' is admitted.
-    void Admit(const QuerySchedule& schedule);
-    /// Updates the pool stats when the request represented by 'schedule' is released.
-    void ReleaseQuery(const QuerySchedule& schedule, int64_t peak_mem_consumption);
+    void AdmitQueryAndMemory(const QuerySchedule& schedule);
+    /// Updates the pool stats except the memory admitted stat.
+    void ReleaseQuery(int64_t peak_mem_consumption);
     /// Releases the specified memory from the pool stats.
     void ReleaseMem(int64_t mem_to_release);
     /// Updates the pool stats when the request represented by 'schedule' is queued.
@@ -831,20 +836,16 @@ class AdmissionController {
   bool HasAvailableSlot(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
       string* unavailable_reason);
 
-  /// Updates the memory admitted and the num of queries running for each host in
-  /// 'schedule'. If 'is_admitting' is true, the memory admitted and the num of queries is
-  /// increased, otherwise it is decreased. This method updates the host stats for every
-  /// Backend running the query.
-  void UpdateHostStats(const QuerySchedule& schedule, bool is_admitting);
+  /// Updates the memory admitted and the num of queries running for each backend in
+  /// 'schedule'. Also updates the stats of its associated resource pool. Used only when
+  /// the 'schedule' is admitted.
+  void UpdateStatsOnAdmission(const QuerySchedule& schedule);
 
-  /// Updates the memory admitted and the num of queries running for each host in
-  /// 'schedule' based on the completed Backends. 'host_addrs' is a vector of completed
-  /// Backends each represented by a TNetworkAddress. Unlike UpdateHostStats, this method
-  /// only updates the host stats for the Backends specified in the 'host_addrs' vector.
-  /// Moreover, it is only used to release queries, and thus always decrements the amount
-  /// of memory admitted and the number of queries running per host. Returns the total
-  /// amount of memory to release for all the Backends.
-  int64_t UpdateHostStatsForQueryBackends(
+  /// Updates the memory admitted and the num of queries running for each backend in
+  /// 'schedule' which have been release/completed. The list of completed backends is
+  /// specified in 'host_addrs'. Also updates the stats related to the admitted memory of
+  /// its associated resource pool.
+  void UpdateStatsOnReleaseForBackends(
       const QuerySchedule& schedule, const std::vector<TNetworkAddress>& host_addrs);
 
   /// Updates the memory admitted and the num of queries running on the specified host by
@@ -983,6 +984,17 @@ class AdmissionController {
   /// or a Coordinator.
   static int64_t GetMemToAdmit(
       const QuerySchedule& schedule, const BackendExecParams& backend_exec_params);
+
+  /// Updates the list of executor groups for which we maintain the query load metrics.
+  /// Removes the metrics of the groups that no longer exist from the metric group and
+  /// adds new ones for the newly added groups.
+  void UpdateExecGroupMetricMap(ClusterMembershipMgr::SnapshotPtr snapshot);
+
+  /// Updates the num queries executing metric of the 'grp_name' executor group by
+  /// 'delta'. Only updates it if the metric exists ('grp_name' has non-zero executors).
+  /// Caller must hold 'admission_ctrl_lock_'. Must be called whenever a query is
+  /// admitted or released.
+  void UpdateExecGroupMetric(const string& grp_name, int64_t delta);
 
   FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, PoolStats);
