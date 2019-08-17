@@ -348,6 +348,22 @@ under the License.
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
       <version>${thrift.version}</version>
+      <!-- httpcore overriden below -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Override httpcore from libthrift to a later maintenance version. Noticed
+        certain SPNEGO auth errors when connecting to kerberized HTTP endpoints
+        using v4.4.1 pulled by libthrift. -->
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore</artifactId>
+      <version>${httpcomponents.core.version}</version>
     </dependency>
 
     <dependency>
