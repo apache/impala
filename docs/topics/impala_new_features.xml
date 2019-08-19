@@ -104,6 +104,11 @@ under the License.
           from 1 up to 22 are supported. The lower the level, the faster the
           speed at the cost of compression ratio.</p>
       </section>
+      <section id="section_parquet_lz4_notes">
+        <title>Lz4 Compression for Parquet files</title>
+        <p>Lz4 is a lossless compression algorithm providing extremely fast
+            and scalable compression and decompression.</p>
+      </section>
       <section id="section_drv_nxj_s3b">
         <title>Data Cache for Remote Reads</title>
         <p>To improve performance on multi-cluster HDFS environments as well as
