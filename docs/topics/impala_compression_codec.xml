@@ -32,6 +32,7 @@ under the License.
       <data name="Category" value="Snappy"/>
       <data name="Category" value="Gzip"/>
       <data name="Category" value="Zstd"/>
+      <data name="Category" value="Lz4"/>
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
     </metadata>
@@ -63,7 +64,7 @@ SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</
 
     <p>
       The allowed values for this query option are <codeph>SNAPPY</codeph> (the default), <codeph>GZIP</codeph>,
-      <codeph>ZSTD</codeph>, and <codeph>NONE</codeph>.
+      <codeph>ZSTD</codeph>, <codeph>LZ4</codeph>, and <codeph>NONE</codeph>.
     </p>
 
     <p>
@@ -103,6 +104,9 @@ SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
 <codeblock>
+set compression_codec=lz4;
+insert into parquet_table_lz4_compressed select * from t1;
+
 set compression_codec=zstd; // Default compression level 3.
 insert into parquet_table_zstd_default_compressed select * from t1;
 
