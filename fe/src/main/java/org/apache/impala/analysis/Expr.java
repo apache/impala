@@ -44,6 +44,7 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TFunction;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -785,7 +786,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Returns the product of the given exprs' number of distinct values or -1 if any of
-   * the exprs have an invalid number of distinct values.
+   * the exprs have an invalid number of distinct values. Uses saturating arithmetic,
+   * so that if the product would overflow, return Long.MAX_VALUE.
    */
   public static long getNumDistinctValues(List<Expr> exprs) {
     if (exprs == null || exprs.isEmpty()) return 0;
@@ -795,7 +797,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         numDistinctValues = -1;
         break;
       }
-      numDistinctValues *= expr.getNumDistinctValues();
+      numDistinctValues = MathUtil.saturatingMultiply(
+          numDistinctValues, expr.getNumDistinctValues());
     }
     return numDistinctValues;
   }

@@ -42,7 +42,7 @@ PLAN-ROOT SINK
 |  row-size=72B cardinality=3.04K
 |
 |--00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_moy = 12
 |     row-size=12B cardinality=6.09K
 |
@@ -52,12 +52,12 @@ PLAN-ROOT SINK
 |  row-size=60B cardinality=3.04K
 |
 |--02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manufact_id = 436
 |     row-size=44B cardinality=19
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -93,7 +93,7 @@ PLAN-ROOT SINK
 |--09:EXCHANGE [HASH(dt.d_date_sk)]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_moy = 12
 |     row-size=12B cardinality=6.09K
 |
@@ -107,12 +107,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manufact_id = 436
 |     row-size=44B cardinality=19
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
@@ -152,7 +152,7 @@ PLAN-ROOT SINK
 |  09:EXCHANGE [HASH(dt.d_date_sk)]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_moy = 12
 |     row-size=12B cardinality=6.09K
 |
@@ -170,12 +170,12 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manufact_id = 436
 |     row-size=44B cardinality=19
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ====
@@ -228,7 +228,7 @@ PLAN-ROOT SINK
 |  row-size=162B cardinality=261.60K
 |
 |--03:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN]
@@ -237,7 +237,7 @@ PLAN-ROOT SINK
 |  row-size=126B cardinality=261.60K
 |
 |--04:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
 |     row-size=30B cardinality=300
 |
@@ -247,7 +247,7 @@ PLAN-ROOT SINK
 |  row-size=96B cardinality=263.34K
 |
 |--01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -257,12 +257,12 @@ PLAN-ROOT SINK
 |  row-size=44B cardinality=589.03K
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -298,7 +298,7 @@ PLAN-ROOT SINK
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -309,7 +309,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
 |     row-size=30B cardinality=300
 |
@@ -321,7 +321,7 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -333,12 +333,12 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
@@ -378,7 +378,7 @@ PLAN-ROOT SINK
 |  14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
 |     row-size=30B cardinality=300
 |
@@ -409,7 +409,7 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -425,12 +425,12 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ====
@@ -539,17 +539,17 @@ PLAN-ROOT SINK
 |  |  |  row-size=38B cardinality=51.30K
 |  |  |
 |  |  |--03:SCAN HDFS [tpcds.customer]
-|  |  |     partitions=1/1 files=1 size=12.60MB
+|  |  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |  |     predicates: c_preferred_cust_flag = 'Y'
 |  |  |     row-size=17B cardinality=50.00K
 |  |  |
 |  |  02:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     runtime filters: RF006 -> customer_address.ca_address_sk
 |  |     row-size=21B cardinality=50.00K
 |  |
 |  06:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 |     runtime filters: RF004 -> substr(ca_zip, 1, 5)
 |     row-size=17B cardinality=5.00K
@@ -560,13 +560,13 @@ PLAN-ROOT SINK
 |  row-size=45B cardinality=84.40K
 |
 |--01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |     row-size=37B cardinality=12
 |
 00:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2452276, ss_sold_date_sk <= 2452366
-   partitions=90/1824 files=90 size=10.32MB
+   HDFS partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ---- DISTRIBUTEDPLAN
@@ -627,19 +627,19 @@ PLAN-ROOT SINK
 |  |  |--13:EXCHANGE [BROADCAST]
 |  |  |  |
 |  |  |  03:SCAN HDFS [tpcds.customer]
-|  |  |     partitions=1/1 files=1 size=12.60MB
+|  |  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |  |     predicates: c_preferred_cust_flag = 'Y'
 |  |  |     row-size=17B cardinality=50.00K
 |  |  |
 |  |  02:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     runtime filters: RF006 -> customer_address.ca_address_sk
 |  |     row-size=21B cardinality=50.00K
 |  |
 |  16:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |
 |  06:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 |     runtime filters: RF004 -> substr(ca_zip, 1, 5)
 |     row-size=17B cardinality=5.00K
@@ -652,13 +652,13 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |     row-size=37B cardinality=12
 |
 00:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2452276, ss_sold_date_sk <= 2452366
-   partitions=90/1824 files=90 size=10.32MB
+   HDFS partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ---- PARALLELPLANS
@@ -731,19 +731,19 @@ PLAN-ROOT SINK
 |  |  |  13:EXCHANGE [BROADCAST]
 |  |  |  |
 |  |  |  03:SCAN HDFS [tpcds.customer]
-|  |  |     partitions=1/1 files=1 size=12.60MB
+|  |  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |  |     predicates: c_preferred_cust_flag = 'Y'
 |  |  |     row-size=17B cardinality=50.00K
 |  |  |
 |  |  02:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     runtime filters: RF006 -> customer_address.ca_address_sk
 |  |     row-size=21B cardinality=50.00K
 |  |
 |  16:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |
 |  06:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 |     runtime filters: RF004 -> substr(ca_zip, 1, 5)
 |     row-size=17B cardinality=5.00K
@@ -760,13 +760,13 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |     row-size=37B cardinality=12
 |
 00:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2452276, ss_sold_date_sk <= 2452366
-   partitions=90/1824 files=90 size=10.32MB
+   HDFS partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ====
@@ -828,7 +828,7 @@ PLAN-ROOT SINK
 |  row-size=158B cardinality=24
 |
 |--05:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=21B cardinality=12
 |
 09:HASH JOIN [INNER JOIN]
@@ -847,7 +847,7 @@ PLAN-ROOT SINK
 |  |  |  row-size=108B cardinality=24
 |  |  |
 |  |  |--00:SCAN HDFS [tpcds.date_dim]
-|  |  |     partitions=1/1 files=1 size=9.84MB
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |  |     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |  |  |     row-size=12B cardinality=50
 |  |  |
@@ -857,23 +857,23 @@ PLAN-ROOT SINK
 |  |  |  row-size=96B cardinality=873
 |  |  |
 |  |  |--02:SCAN HDFS [tpcds.item]
-|  |  |     partitions=1/1 files=1 size=4.82MB
+|  |  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |  |     predicates: i_manager_id = 7
 |  |  |     row-size=72B cardinality=182
 |  |  |
 |  |  01:SCAN HDFS [tpcds.store_sales]
 |  |     partition predicates: ss_sold_date_sk >= 2451484, ss_sold_date_sk <= 2451513
-|  |     partitions=30/1824 files=30 size=10.55MB
+|  |     HDFS partitions=30/1824 files=30 size=10.55MB
 |  |     runtime filters: RF000 -> ss_store_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
 |  |     row-size=24B cardinality=86.28K
 |  |
 |  03:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF004 -> c_customer_sk
 |     row-size=8B cardinality=100.00K
 |
 04:SCAN HDFS [tpcds.customer_address]
-   partitions=1/1 files=1 size=5.25MB
+   HDFS partitions=1/1 files=1 size=5.25MB
    runtime filters: RF002 -> ca_address_sk
    row-size=21B cardinality=50.00K
 ---- DISTRIBUTEDPLAN
@@ -910,7 +910,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=21B cardinality=12
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -921,7 +921,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [HASH(ca_address_sk)]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=21B cardinality=50.00K
 |
 17:EXCHANGE [HASH(c_current_addr_sk)]
@@ -934,7 +934,7 @@ PLAN-ROOT SINK
 |--16:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  03:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF002 -> c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
@@ -948,7 +948,7 @@ PLAN-ROOT SINK
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |     row-size=12B cardinality=50
 |
@@ -960,13 +960,13 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_manager_id = 7
 |     row-size=72B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451484, ss_sold_date_sk <= 2451513
-   partitions=30/1824 files=30 size=10.55MB
+   HDFS partitions=30/1824 files=30 size=10.55MB
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
    row-size=24B cardinality=86.28K
 ---- PARALLELPLANS
@@ -1007,7 +1007,7 @@ PLAN-ROOT SINK
 |  19:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=21B cardinality=12
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1022,7 +1022,7 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [HASH(ca_address_sk)]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=21B cardinality=50.00K
 |
 17:EXCHANGE [HASH(c_current_addr_sk)]
@@ -1039,7 +1039,7 @@ PLAN-ROOT SINK
 |  16:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  03:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF002 -> c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
@@ -1057,7 +1057,7 @@ PLAN-ROOT SINK
 |  14:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |     row-size=12B cardinality=50
 |
@@ -1073,13 +1073,13 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_manager_id = 7
 |     row-size=72B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451484, ss_sold_date_sk <= 2451513
-   partitions=30/1824 files=30 size=10.55MB
+   HDFS partitions=30/1824 files=30 size=10.55MB
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
    row-size=24B cardinality=86.28K
 ====
@@ -1134,7 +1134,7 @@ PLAN-ROOT SINK
 |  row-size=150B cardinality=263.34K
 |
 |--04:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN]
@@ -1143,7 +1143,7 @@ PLAN-ROOT SINK
 |  row-size=114B cardinality=263.34K
 |
 |--03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_state IN ('WI', 'CA', 'TX', 'FL', 'WA', 'TN')
 |     row-size=18B cardinality=12
 |
@@ -1153,7 +1153,7 @@ PLAN-ROOT SINK
 |  row-size=96B cardinality=263.34K
 |
 |--01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -1163,12 +1163,12 @@ PLAN-ROOT SINK
 |  row-size=44B cardinality=589.03K
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -1204,7 +1204,7 @@ PLAN-ROOT SINK
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1215,7 +1215,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_state IN ('WI', 'CA', 'TX', 'FL', 'WA', 'TN')
 |     row-size=18B cardinality=12
 |
@@ -1227,7 +1227,7 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -1239,12 +1239,12 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
@@ -1284,7 +1284,7 @@ PLAN-ROOT SINK
 |  14:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=36B cardinality=18.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1299,7 +1299,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_state IN ('WI', 'CA', 'TX', 'FL', 'WA', 'TN')
 |     row-size=18B cardinality=12
 |
@@ -1315,7 +1315,7 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 files=1 size=76.92MB
+|     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
 |
@@ -1331,12 +1331,12 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=8B cardinality=373
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ====
@@ -1391,18 +1391,18 @@ PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-|  row-size=80B cardinality=31.53K
+|  row-size=80B cardinality=3.15K
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: c_customer_sk = ss_customer_sk
 |  runtime filters: RF000 <- ss_customer_sk
-|  row-size=88B cardinality=31.53K
+|  row-size=88B cardinality=3.15K
 |
 |--07:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |  having: count(*) <= 20, count(*) >= 15
-|  |  row-size=20B cardinality=31.53K
+|  |  row-size=20B cardinality=3.15K
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
@@ -1410,7 +1410,7 @@ PLAN-ROOT SINK
 |  |  row-size=101B cardinality=31.53K
 |  |
 |  |--02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
 |  |     row-size=33B cardinality=12
 |  |
@@ -1420,7 +1420,7 @@ PLAN-ROOT SINK
 |  |  row-size=68B cardinality=31.53K
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |     row-size=12B cardinality=354
 |  |
@@ -1430,22 +1430,22 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=162.45K
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |  |     row-size=32B cardinality=416
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 |     row-size=24B cardinality=2.88M
 |
 08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
+   HDFS partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
    row-size=68B cardinality=100.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=47.51MB Threads=13
-Per-Host Resource Estimates: Memory=337MB
+Per-Host Resource Estimates: Memory=335MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1454,17 +1454,17 @@ PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-|  row-size=80B cardinality=31.53K
+|  row-size=80B cardinality=3.15K
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000 <- c_customer_sk
-|  row-size=88B cardinality=31.53K
+|  row-size=88B cardinality=3.15K
 |
 |--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=68B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -1473,7 +1473,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*)
 |  group by: ss_ticket_number, ss_customer_sk
 |  having: count(*) <= 20, count(*) >= 15
-|  row-size=20B cardinality=31.53K
+|  row-size=20B cardinality=3.15K
 |
 14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |
@@ -1490,7 +1490,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
 |     row-size=33B cardinality=12
 |
@@ -1502,7 +1502,7 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |     row-size=12B cardinality=354
 |
@@ -1514,17 +1514,17 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |     row-size=32B cardinality=416
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=87.52MB Threads=15
-Per-Host Resource Estimates: Memory=280MB
+Per-Host Resource Estimates: Memory=278MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1533,12 +1533,12 @@ PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-|  row-size=80B cardinality=31.53K
+|  row-size=80B cardinality=3.15K
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000 <- c_customer_sk
-|  row-size=88B cardinality=31.53K
+|  row-size=88B cardinality=3.15K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
@@ -1547,7 +1547,7 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=68B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -1556,7 +1556,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*)
 |  group by: ss_ticket_number, ss_customer_sk
 |  having: count(*) <= 20, count(*) >= 15
-|  row-size=20B cardinality=31.53K
+|  row-size=20B cardinality=3.15K
 |
 14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |
@@ -1577,7 +1577,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
 |     row-size=33B cardinality=12
 |
@@ -1593,7 +1593,7 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |     row-size=12B cardinality=354
 |
@@ -1609,12 +1609,12 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |     row-size=32B cardinality=416
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ====
@@ -1664,7 +1664,7 @@ PLAN-ROOT SINK
 |  row-size=62B cardinality=1.73K
 |
 |--00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -1674,12 +1674,12 @@ PLAN-ROOT SINK
 |  row-size=50B cardinality=29.12K
 |
 |--02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=34B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -1715,7 +1715,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -1727,12 +1727,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=34B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
@@ -1772,7 +1772,7 @@ PLAN-ROOT SINK
 |  08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -1788,12 +1788,12 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=34B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ====
@@ -1851,7 +1851,7 @@ PLAN-ROOT SINK
 |  row-size=91B cardinality=589.03K
 |
 |--02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=52B cardinality=12
 |
@@ -1861,12 +1861,12 @@ PLAN-ROOT SINK
 |  row-size=39B cardinality=589.03K
 |
 |--00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=27B cardinality=373
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -1902,7 +1902,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=52B cardinality=12
 |
@@ -1914,12 +1914,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=27B cardinality=373
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
@@ -1959,7 +1959,7 @@ PLAN-ROOT SINK
 |  08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=52B cardinality=12
 |
@@ -1975,12 +1975,12 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1998
 |     row-size=27B cardinality=373
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ====
@@ -2051,7 +2051,7 @@ PLAN-ROOT SINK
 |  row-size=138B cardinality=230.45K
 |
 |--11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN]
@@ -2060,7 +2060,7 @@ PLAN-ROOT SINK
 |  row-size=113B cardinality=230.45K
 |
 |--10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -2075,7 +2075,7 @@ PLAN-ROOT SINK
 |  row-size=107B cardinality=230.45K
 |
 |--04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN]
@@ -2084,7 +2084,7 @@ PLAN-ROOT SINK
 |  row-size=83B cardinality=230.45K
 |
 |--02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Concord', 'Spring Hill', 'Brownsville', 'Greenville')
 |     row-size=23B cardinality=12
 |
@@ -2094,7 +2094,7 @@ PLAN-ROOT SINK
 |  row-size=60B cardinality=230.45K
 |
 |--01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: date_dim.d_dow IN (6, 0), date_dim.d_year IN (1999, 2000, 2001)
 |     row-size=12B cardinality=598
 |
@@ -2104,12 +2104,12 @@ PLAN-ROOT SINK
 |  row-size=48B cardinality=702.92K
 |
 |--03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -2134,7 +2134,7 @@ PLAN-ROOT SINK
 |--23:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -2145,7 +2145,7 @@ PLAN-ROOT SINK
 |--22:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -2171,7 +2171,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2182,7 +2182,7 @@ PLAN-ROOT SINK
 |--17:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Concord', 'Spring Hill', 'Brownsville', 'Greenville')
 |     row-size=23B cardinality=12
 |
@@ -2194,7 +2194,7 @@ PLAN-ROOT SINK
 |--16:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: date_dim.d_dow IN (6, 0), date_dim.d_year IN (1999, 2000, 2001)
 |     row-size=12B cardinality=598
 |
@@ -2206,12 +2206,12 @@ PLAN-ROOT SINK
 |--15:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
@@ -2240,7 +2240,7 @@ PLAN-ROOT SINK
 |  23:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -2255,7 +2255,7 @@ PLAN-ROOT SINK
 |  22:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -2285,7 +2285,7 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2300,7 +2300,7 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Concord', 'Spring Hill', 'Brownsville', 'Greenville')
 |     row-size=23B cardinality=12
 |
@@ -2316,7 +2316,7 @@ PLAN-ROOT SINK
 |  16:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: date_dim.d_dow IN (6, 0), date_dim.d_year IN (1999, 2000, 2001)
 |     row-size=12B cardinality=598
 |
@@ -2332,12 +2332,12 @@ PLAN-ROOT SINK
 |  15:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ====
@@ -2386,7 +2386,7 @@ PLAN-ROOT SINK
 |  row-size=72B cardinality=1.73K
 |
 |--00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2396,12 +2396,12 @@ PLAN-ROOT SINK
 |  row-size=60B cardinality=29.12K
 |
 |--02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -2437,7 +2437,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2449,12 +2449,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
@@ -2494,7 +2494,7 @@ PLAN-ROOT SINK
 |  08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim dt]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: dt.d_year = 1998, dt.d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2510,12 +2510,12 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: item.i_manager_id = 1
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ====
@@ -2570,7 +2570,7 @@ PLAN-ROOT SINK
 |  row-size=114B cardinality=96
 |
 |--03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN]
@@ -2579,7 +2579,7 @@ PLAN-ROOT SINK
 |  row-size=110B cardinality=96
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=362
 |
@@ -2589,12 +2589,12 @@ PLAN-ROOT SINK
 |  row-size=98B cardinality=481
 |
 |--00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -2630,7 +2630,7 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2641,7 +2641,7 @@ PLAN-ROOT SINK
 |--10:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=362
 |
@@ -2653,12 +2653,12 @@ PLAN-ROOT SINK
 |--09:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
@@ -2698,7 +2698,7 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2713,7 +2713,7 @@ PLAN-ROOT SINK
 |  10:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=362
 |
@@ -2729,12 +2729,12 @@ PLAN-ROOT SINK
 |  09:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ====
@@ -2780,7 +2780,7 @@ PLAN-ROOT SINK
 |  row-size=72B cardinality=1.73K
 |
 |--00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2001, d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2790,12 +2790,12 @@ PLAN-ROOT SINK
 |  row-size=60B cardinality=29.12K
 |
 |--02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_manager_id = 36
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -2831,7 +2831,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2001, d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2843,12 +2843,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_manager_id = 36
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
@@ -2888,7 +2888,7 @@ PLAN-ROOT SINK
 |  08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2001, d_moy = 12
 |     row-size=12B cardinality=108
 |
@@ -2904,12 +2904,12 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_manager_id = 36
 |     row-size=44B cardinality=182
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=2.88M
 ====
@@ -3015,7 +3015,7 @@ PLAN-ROOT SINK
 |  |  row-size=160B cardinality=50.14K
 |  |
 |  |--12:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=32B cardinality=12
 |  |
 |  14:HASH JOIN [INNER JOIN]
@@ -3024,7 +3024,7 @@ PLAN-ROOT SINK
 |  |  row-size=128B cardinality=50.14K
 |  |
 |  |--13:SCAN HDFS [tpcds.date_dim d]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |     row-size=8B cardinality=7.30K
 |  |
@@ -3039,12 +3039,12 @@ PLAN-ROOT SINK
 |  |  row-size=39B cardinality=2.88M
 |  |
 |  |--09:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |     row-size=27B cardinality=73.05K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -3054,7 +3054,7 @@ PLAN-ROOT SINK
 |  row-size=176B cardinality=50.14K
 |
 |--04:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF001 -> s_store_id
 |     row-size=48B cardinality=12
 |
@@ -3064,7 +3064,7 @@ PLAN-ROOT SINK
 |  row-size=128B cardinality=50.14K
 |
 |--05:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |     row-size=8B cardinality=7.30K
@@ -3080,12 +3080,12 @@ PLAN-ROOT SINK
 |  row-size=39B cardinality=2.88M
 |
 |--01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |     row-size=27B cardinality=73.05K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -3116,7 +3116,7 @@ PLAN-ROOT SINK
 |  |--27:EXCHANGE [BROADCAST]
 |  |  |
 |  |  12:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=32B cardinality=12
 |  |
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3127,7 +3127,7 @@ PLAN-ROOT SINK
 |  |--26:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |     row-size=8B cardinality=7.30K
 |  |
@@ -3151,12 +3151,12 @@ PLAN-ROOT SINK
 |  |--23:EXCHANGE [BROADCAST]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |     row-size=27B cardinality=73.05K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -3170,7 +3170,7 @@ PLAN-ROOT SINK
 |--22:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF001 -> s_store_id
 |     row-size=48B cardinality=12
 |
@@ -3182,7 +3182,7 @@ PLAN-ROOT SINK
 |--21:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |     row-size=8B cardinality=7.30K
@@ -3207,12 +3207,12 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |     row-size=27B cardinality=73.05K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
@@ -3251,7 +3251,7 @@ PLAN-ROOT SINK
 |  |  27:EXCHANGE [BROADCAST]
 |  |  |
 |  |  12:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=32B cardinality=12
 |  |
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3266,7 +3266,7 @@ PLAN-ROOT SINK
 |  |  26:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |     row-size=8B cardinality=7.30K
 |  |
@@ -3294,12 +3294,12 @@ PLAN-ROOT SINK
 |  |  23:EXCHANGE [BROADCAST]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |     row-size=27B cardinality=73.05K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -3317,7 +3317,7 @@ PLAN-ROOT SINK
 |  22:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF001 -> s_store_id
 |     row-size=48B cardinality=12
 |
@@ -3333,7 +3333,7 @@ PLAN-ROOT SINK
 |  21:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |     row-size=8B cardinality=7.30K
@@ -3362,12 +3362,12 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |     row-size=27B cardinality=73.05K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ====
@@ -3440,7 +3440,7 @@ PLAN-ROOT SINK
 |  row-size=114B cardinality=6
 |
 |--03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN]
@@ -3449,7 +3449,7 @@ PLAN-ROOT SINK
 |  row-size=110B cardinality=6
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=114
 |
@@ -3459,13 +3459,13 @@ PLAN-ROOT SINK
 |  row-size=98B cardinality=92
 |
 |--00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2452275
-   partitions=364/1824 files=364 size=66.85MB
+   HDFS partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ---- DISTRIBUTEDPLAN
@@ -3514,7 +3514,7 @@ PLAN-ROOT SINK
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3525,7 +3525,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=114
 |
@@ -3537,13 +3537,13 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2452275
-   partitions=364/1824 files=364 size=66.85MB
+   HDFS partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ---- PARALLELPLANS
@@ -3596,7 +3596,7 @@ PLAN-ROOT SINK
 |  14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3611,7 +3611,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=114
 |
@@ -3627,13 +3627,13 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     row-size=78B cardinality=3
 |
 01:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2452275
-   partitions=364/1824 files=364 size=66.85MB
+   HDFS partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ====
@@ -3723,12 +3723,12 @@ PLAN-ROOT SINK
 |  |  row-size=28B cardinality=2.88M
 |  |
 |  |--03:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |     row-size=8B cardinality=7.30K
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -3738,7 +3738,7 @@ PLAN-ROOT SINK
 |  row-size=205B cardinality=107.85K
 |
 |--01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=157B cardinality=18.00K
 |
 11:HASH JOIN [INNER JOIN]
@@ -3747,7 +3747,7 @@ PLAN-ROOT SINK
 |  row-size=48B cardinality=107.85K
 |
 |--00:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> tpcds.store.s_store_sk
 |     row-size=20B cardinality=12
 |
@@ -3762,12 +3762,12 @@ PLAN-ROOT SINK
 |  row-size=28B cardinality=2.88M
 |
 |--08:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |     row-size=8B cardinality=7.30K
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -3823,12 +3823,12 @@ PLAN-ROOT SINK
 |  |--21:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |     row-size=8B cardinality=7.30K
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -3840,7 +3840,7 @@ PLAN-ROOT SINK
 |--20:EXCHANGE [HASH(i_item_sk)]
 |  |
 |  01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=157B cardinality=18.00K
 |
 19:EXCHANGE [HASH(ss_item_sk)]
@@ -3853,7 +3853,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> tpcds.store.s_store_sk
 |     row-size=20B cardinality=12
 |
@@ -3877,12 +3877,12 @@ PLAN-ROOT SINK
 |--15:EXCHANGE [BROADCAST]
 |  |
 |  08:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |     row-size=8B cardinality=7.30K
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
@@ -3946,12 +3946,12 @@ PLAN-ROOT SINK
 |  |  21:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |     row-size=8B cardinality=7.30K
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -3967,7 +3967,7 @@ PLAN-ROOT SINK
 |  20:EXCHANGE [HASH(i_item_sk)]
 |  |
 |  01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=157B cardinality=18.00K
 |
 19:EXCHANGE [HASH(ss_item_sk)]
@@ -3984,7 +3984,7 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     runtime filters: RF000 -> tpcds.store.s_store_sk
 |     row-size=20B cardinality=12
 |
@@ -4012,12 +4012,12 @@ PLAN-ROOT SINK
 |  15:EXCHANGE [BROADCAST]
 |  |
 |  08:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |     row-size=8B cardinality=7.30K
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ====
@@ -4086,7 +4086,7 @@ PLAN-ROOT SINK
 |  row-size=154B cardinality=702.92K
 |
 |--11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN]
@@ -4095,7 +4095,7 @@ PLAN-ROOT SINK
 |  row-size=129B cardinality=702.92K
 |
 |--10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -4110,7 +4110,7 @@ PLAN-ROOT SINK
 |  row-size=125B cardinality=702.92K
 |
 |--04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN]
@@ -4119,7 +4119,7 @@ PLAN-ROOT SINK
 |  row-size=101B cardinality=702.92K
 |
 |--02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Fairview')
 |     row-size=23B cardinality=12
 |
@@ -4129,7 +4129,7 @@ PLAN-ROOT SINK
 |  row-size=78B cardinality=702.92K
 |
 |--01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -4139,12 +4139,12 @@ PLAN-ROOT SINK
 |  row-size=52B cardinality=702.92K
 |
 |--03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -4169,7 +4169,7 @@ PLAN-ROOT SINK
 |--22:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4180,7 +4180,7 @@ PLAN-ROOT SINK
 |--21:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -4204,7 +4204,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4215,7 +4215,7 @@ PLAN-ROOT SINK
 |--17:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Fairview')
 |     row-size=23B cardinality=12
 |
@@ -4227,7 +4227,7 @@ PLAN-ROOT SINK
 |--16:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -4239,12 +4239,12 @@ PLAN-ROOT SINK
 |--15:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ---- PARALLELPLANS
@@ -4273,7 +4273,7 @@ PLAN-ROOT SINK
 |  22:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpcds.customer_address current_addr]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4288,7 +4288,7 @@ PLAN-ROOT SINK
 |  21:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> customer.c_current_addr_sk
 |     row-size=44B cardinality=100.00K
 |
@@ -4316,7 +4316,7 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=25B cardinality=50.00K
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4331,7 +4331,7 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_city IN ('Midway', 'Fairview')
 |     row-size=23B cardinality=12
 |
@@ -4347,7 +4347,7 @@ PLAN-ROOT SINK
 |  16:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -4363,12 +4363,12 @@ PLAN-ROOT SINK
 |  15:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |     row-size=12B cardinality=1.80K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ====
@@ -4422,13 +4422,13 @@ PLAN-ROOT SINK
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: c_customer_sk = ss_customer_sk
 |  runtime filters: RF000 <- ss_customer_sk
-|  row-size=88B cardinality=162.45K
+|  row-size=88B cardinality=16.25K
 |
 |--07:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |  having: count(*) <= 5, count(*) >= 1
-|  |  row-size=20B cardinality=162.45K
+|  |  row-size=20B cardinality=16.25K
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
@@ -4436,7 +4436,7 @@ PLAN-ROOT SINK
 |  |  row-size=93B cardinality=162.45K
 |  |
 |  |--02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
 |  |     row-size=33B cardinality=12
 |  |
@@ -4446,7 +4446,7 @@ PLAN-ROOT SINK
 |  |  row-size=60B cardinality=162.45K
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     row-size=4B cardinality=73.05K
 |  |
 |  04:HASH JOIN [INNER JOIN]
@@ -4455,22 +4455,22 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=162.45K
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |     row-size=32B cardinality=416
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 |     row-size=24B cardinality=2.88M
 |
 08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
+   HDFS partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
    row-size=68B cardinality=100.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=49.45MB Threads=13
-Per-Host Resource Estimates: Memory=337MB
+Per-Host Resource Estimates: Memory=336MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4484,12 +4484,12 @@ PLAN-ROOT SINK
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000 <- c_customer_sk
-|  row-size=88B cardinality=162.45K
+|  row-size=88B cardinality=16.25K
 |
 |--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=68B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -4498,7 +4498,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*)
 |  group by: ss_ticket_number, ss_customer_sk
 |  having: count(*) <= 5, count(*) >= 1
-|  row-size=20B cardinality=162.45K
+|  row-size=20B cardinality=16.25K
 |
 14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |
@@ -4515,7 +4515,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
 |     row-size=33B cardinality=12
 |
@@ -4527,7 +4527,7 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     row-size=4B cardinality=73.05K
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4538,12 +4538,12 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |     row-size=32B cardinality=416
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
@@ -4562,7 +4562,7 @@ PLAN-ROOT SINK
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000 <- c_customer_sk
-|  row-size=88B cardinality=162.45K
+|  row-size=88B cardinality=16.25K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
@@ -4571,7 +4571,7 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=68B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -4580,7 +4580,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*)
 |  group by: ss_ticket_number, ss_customer_sk
 |  having: count(*) <= 5, count(*) >= 1
-|  row-size=20B cardinality=162.45K
+|  row-size=20B cardinality=16.25K
 |
 14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |
@@ -4601,7 +4601,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
 |     row-size=33B cardinality=12
 |
@@ -4617,7 +4617,7 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     row-size=4B cardinality=73.05K
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4632,12 +4632,12 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |     row-size=32B cardinality=416
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ====
@@ -4709,7 +4709,7 @@ PLAN-ROOT SINK
 |  |  row-size=101B cardinality=46.86K
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |     row-size=26B cardinality=7.30K
 |  |
@@ -4719,7 +4719,7 @@ PLAN-ROOT SINK
 |  |  row-size=75B cardinality=46.86K
 |  |
 |  |--02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |  |     row-size=27B cardinality=1
 |  |
@@ -4729,17 +4729,17 @@ PLAN-ROOT SINK
 |  |  row-size=48B cardinality=281.17K
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |  |     row-size=12B cardinality=720
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
 |     row-size=36B cardinality=2.88M
 |
 08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
+   HDFS partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
    row-size=40B cardinality=100.00K
 ---- DISTRIBUTEDPLAN
@@ -4763,7 +4763,7 @@ PLAN-ROOT SINK
 |--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=40B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -4788,7 +4788,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -4800,7 +4800,7 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |     row-size=27B cardinality=1
 |
@@ -4812,12 +4812,12 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |     row-size=12B cardinality=720
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
@@ -4845,7 +4845,7 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     row-size=40B cardinality=100.00K
 |
 16:EXCHANGE [HASH(ss_customer_sk)]
@@ -4874,7 +4874,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -4890,7 +4890,7 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |     row-size=27B cardinality=1
 |
@@ -4906,12 +4906,12 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |     row-size=12B cardinality=720
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ====
@@ -4974,7 +4974,7 @@ PLAN-ROOT SINK
 |  row-size=145B cardinality=10.67K
 |
 |--03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 05:HASH JOIN [INNER JOIN]
@@ -4983,7 +4983,7 @@ PLAN-ROOT SINK
 |  row-size=106B cardinality=10.67K
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year IN (2000)
 |     row-size=12B cardinality=373
 |
@@ -4993,12 +4993,12 @@ PLAN-ROOT SINK
 |  row-size=94B cardinality=52.17K
 |
 |--00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |     row-size=74B cardinality=326
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -5047,7 +5047,7 @@ PLAN-ROOT SINK
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -5058,7 +5058,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year IN (2000)
 |     row-size=12B cardinality=373
 |
@@ -5070,12 +5070,12 @@ PLAN-ROOT SINK
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |     row-size=74B cardinality=326
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
@@ -5128,7 +5128,7 @@ PLAN-ROOT SINK
 |  14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -5143,7 +5143,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year IN (2000)
 |     row-size=12B cardinality=373
 |
@@ -5159,12 +5159,12 @@ PLAN-ROOT SINK
 |  12:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |     row-size=74B cardinality=326
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ====
@@ -5198,7 +5198,7 @@ PLAN-ROOT SINK
 |  row-size=52B cardinality=2.27K
 |
 |--03:SCAN HDFS [tpcds.store s]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -5208,7 +5208,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=6.82K
 |
 |--02:SCAN HDFS [tpcds.household_demographics hd]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: hd.hd_dep_count = 5
 |     row-size=8B cardinality=720
 |
@@ -5218,12 +5218,12 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=69.82K
 |
 |--01:SCAN HDFS [tpcds.time_dim td]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
    row-size=12B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -5249,7 +5249,7 @@ PLAN-ROOT SINK
 |--10:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store s]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -5261,7 +5261,7 @@ PLAN-ROOT SINK
 |--09:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.household_demographics hd]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: hd.hd_dep_count = 5
 |     row-size=8B cardinality=720
 |
@@ -5273,12 +5273,12 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.time_dim td]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
@@ -5308,7 +5308,7 @@ PLAN-ROOT SINK
 |  10:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store s]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -5324,7 +5324,7 @@ PLAN-ROOT SINK
 |  09:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.household_demographics hd]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: hd.hd_dep_count = 5
 |     row-size=8B cardinality=720
 |
@@ -5340,12 +5340,12 @@ PLAN-ROOT SINK
 |  08:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.time_dim td]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
    row-size=12B cardinality=2.88M
 ====
@@ -5409,7 +5409,7 @@ PLAN-ROOT SINK
 |  row-size=232B cardinality=29.80K
 |
 |--02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -5420,12 +5420,12 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [tpcds.store_sales]
 |     partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2451941
-|     partitions=31/1824 files=31 size=3.64MB
+|     HDFS partitions=31/1824 files=31 size=3.64MB
 |     runtime filters: RF000 -> ss_sold_date_sk
 |     row-size=16B cardinality=29.76K
 |
 01:SCAN HDFS [tpcds.item]
-   partitions=1/1 files=1 size=4.82MB
+   HDFS partitions=1/1 files=1 size=4.82MB
    predicates: i_category IN ('Jewelry', 'Sports', 'Books')
    runtime filters: RF002 -> i_item_sk
    row-size=190B cardinality=5.40K
@@ -5471,7 +5471,7 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -5483,7 +5483,7 @@ PLAN-ROOT SINK
 |--10:EXCHANGE [HASH(i_item_sk)]
 |  |
 |  01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 |     row-size=190B cardinality=5.40K
 |
@@ -5491,7 +5491,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2451941
-   partitions=31/1824 files=31 size=3.64MB
+   HDFS partitions=31/1824 files=31 size=3.64MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=29.76K
 ---- PARALLELPLANS
@@ -5540,7 +5540,7 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
 |     row-size=26B cardinality=7.30K
 |
@@ -5556,7 +5556,7 @@ PLAN-ROOT SINK
 |  10:EXCHANGE [HASH(i_item_sk)]
 |  |
 |  01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 |     row-size=190B cardinality=5.40K
 |
@@ -5564,7 +5564,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partition predicates: ss_sold_date_sk >= 2451911, ss_sold_date_sk <= 2451941
-   partitions=31/1824 files=31 size=3.64MB
+   HDFS partitions=31/1824 files=31 size=3.64MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=29.76K
 ====
@@ -5621,7 +5621,7 @@ PLAN-ROOT SINK
 |  |  row-size=26B cardinality=10
 |  |
 |  07:SCAN HDFS [tpcds.item j]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=22B cardinality=18.00K
 |
 13:HASH JOIN [LEFT SEMI JOIN]
@@ -5635,7 +5635,7 @@ PLAN-ROOT SINK
 |  |  row-size=4B cardinality=1
 |  |
 |  05:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1999, d_moy = 1
 |     row-size=12B cardinality=108
 |
@@ -5645,7 +5645,7 @@ PLAN-ROOT SINK
 |  row-size=80B cardinality=2.88M
 |
 |--04:SCAN HDFS [tpcds.item i]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     runtime filters: RF000 -> i.i_category
 |     row-size=30B cardinality=18.00K
 |
@@ -5655,7 +5655,7 @@ PLAN-ROOT SINK
 |  row-size=50B cardinality=2.88M
 |
 |--03:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF002 -> d.d_month_seq
 |     row-size=8B cardinality=73.05K
 |
@@ -5665,7 +5665,7 @@ PLAN-ROOT SINK
 |  row-size=42B cardinality=2.88M
 |
 |--00:SCAN HDFS [tpcds.customer_address a]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=18B cardinality=50.00K
 |
 09:HASH JOIN [INNER JOIN]
@@ -5674,12 +5674,12 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=2.88M
 |
 |--01:SCAN HDFS [tpcds.customer c]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -5729,7 +5729,7 @@ PLAN-ROOT SINK
 |  |  row-size=26B cardinality=10
 |  |
 |  07:SCAN HDFS [tpcds.item j]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=22B cardinality=18.00K
 |
 13:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -5754,7 +5754,7 @@ PLAN-ROOT SINK
 |  |  row-size=4B cardinality=108
 |  |
 |  05:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1999, d_moy = 1
 |     row-size=12B cardinality=108
 |
@@ -5766,7 +5766,7 @@ PLAN-ROOT SINK
 |--20:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.item i]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     runtime filters: RF000 -> i.i_category
 |     row-size=30B cardinality=18.00K
 |
@@ -5778,7 +5778,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF002 -> d.d_month_seq
 |     row-size=8B cardinality=73.05K
 |
@@ -5790,7 +5790,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.customer_address a]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=18B cardinality=50.00K
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -5801,12 +5801,12 @@ PLAN-ROOT SINK
 |--17:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer c]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
@@ -5860,7 +5860,7 @@ PLAN-ROOT SINK
 |  |  row-size=26B cardinality=10
 |  |
 |  07:SCAN HDFS [tpcds.item j]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=22B cardinality=18.00K
 |
 13:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -5889,7 +5889,7 @@ PLAN-ROOT SINK
 |  |  row-size=4B cardinality=108
 |  |
 |  05:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 1999, d_moy = 1
 |     row-size=12B cardinality=108
 |
@@ -5905,7 +5905,7 @@ PLAN-ROOT SINK
 |  20:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.item i]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     runtime filters: RF000 -> i.i_category
 |     row-size=30B cardinality=18.00K
 |
@@ -5921,7 +5921,7 @@ PLAN-ROOT SINK
 |  19:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.date_dim d]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     runtime filters: RF002 -> d.d_month_seq
 |     row-size=8B cardinality=73.05K
 |
@@ -5937,7 +5937,7 @@ PLAN-ROOT SINK
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.customer_address a]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     row-size=18B cardinality=50.00K
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -5952,12 +5952,12 @@ PLAN-ROOT SINK
 |  17:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer c]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ====
@@ -6046,7 +6046,7 @@ PLAN-ROOT SINK
 |  |  row-size=125B cardinality=685.36K
 |  |
 |  |--26:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  28:HASH JOIN [INNER JOIN]
@@ -6055,7 +6055,7 @@ PLAN-ROOT SINK
 |  |  row-size=86B cardinality=685.36K
 |  |
 |  |--23:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  27:HASH JOIN [INNER JOIN]
@@ -6064,12 +6064,12 @@ PLAN-ROOT SINK
 |  |  row-size=32B cardinality=685.36K
 |  |
 |  |--25:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6112,7 +6112,7 @@ PLAN-ROOT SINK
 |  |  row-size=125B cardinality=685.36K
 |  |
 |  |--03:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  05:HASH JOIN [INNER JOIN]
@@ -6121,7 +6121,7 @@ PLAN-ROOT SINK
 |  |  row-size=86B cardinality=685.36K
 |  |
 |  |--00:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  04:HASH JOIN [INNER JOIN]
@@ -6130,12 +6130,12 @@ PLAN-ROOT SINK
 |  |  row-size=32B cardinality=685.36K
 |  |
 |  |--02:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6161,7 +6161,7 @@ PLAN-ROOT SINK
 |  row-size=125B cardinality=685.36K
 |
 |--16:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 18:HASH JOIN [INNER JOIN]
@@ -6170,7 +6170,7 @@ PLAN-ROOT SINK
 |  row-size=86B cardinality=685.36K
 |
 |--13:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=54B cardinality=18.00K
 |
 17:HASH JOIN [INNER JOIN]
@@ -6179,12 +6179,12 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=685.36K
 |
 |--15:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |     row-size=12B cardinality=434
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -6237,7 +6237,7 @@ PLAN-ROOT SINK
 |  |--49:EXCHANGE [BROADCAST]
 |  |  |
 |  |  26:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6248,7 +6248,7 @@ PLAN-ROOT SINK
 |  |--48:EXCHANGE [BROADCAST]
 |  |  |
 |  |  23:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6259,12 +6259,12 @@ PLAN-ROOT SINK
 |  |--47:EXCHANGE [BROADCAST]
 |  |  |
 |  |  25:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6320,7 +6320,7 @@ PLAN-ROOT SINK
 |  |--43:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6331,7 +6331,7 @@ PLAN-ROOT SINK
 |  |--42:EXCHANGE [BROADCAST]
 |  |  |
 |  |  00:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6342,12 +6342,12 @@ PLAN-ROOT SINK
 |  |--41:EXCHANGE [BROADCAST]
 |  |  |
 |  |  02:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6382,7 +6382,7 @@ PLAN-ROOT SINK
 |--38:EXCHANGE [BROADCAST]
 |  |
 |  16:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 18:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6393,7 +6393,7 @@ PLAN-ROOT SINK
 |--37:EXCHANGE [BROADCAST]
 |  |
 |  13:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=54B cardinality=18.00K
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6404,12 +6404,12 @@ PLAN-ROOT SINK
 |--36:EXCHANGE [BROADCAST]
 |  |
 |  15:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |     row-size=12B cardinality=434
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
@@ -6470,7 +6470,7 @@ PLAN-ROOT SINK
 |  |  49:EXCHANGE [BROADCAST]
 |  |  |
 |  |  26:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6485,7 +6485,7 @@ PLAN-ROOT SINK
 |  |  48:EXCHANGE [BROADCAST]
 |  |  |
 |  |  23:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6500,12 +6500,12 @@ PLAN-ROOT SINK
 |  |  47:EXCHANGE [BROADCAST]
 |  |  |
 |  |  25:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6569,7 +6569,7 @@ PLAN-ROOT SINK
 |  |  43:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     row-size=39B cardinality=12
 |  |
 |  05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6584,7 +6584,7 @@ PLAN-ROOT SINK
 |  |  42:EXCHANGE [BROADCAST]
 |  |  |
 |  |  00:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     row-size=54B cardinality=18.00K
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6599,12 +6599,12 @@ PLAN-ROOT SINK
 |  |  41:EXCHANGE [BROADCAST]
 |  |  |
 |  |  02:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |     row-size=12B cardinality=434
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |     row-size=20B cardinality=2.88M
 |
@@ -6643,7 +6643,7 @@ PLAN-ROOT SINK
 |  38:EXCHANGE [BROADCAST]
 |  |
 |  16:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=39B cardinality=12
 |
 18:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6658,7 +6658,7 @@ PLAN-ROOT SINK
 |  37:EXCHANGE [BROADCAST]
 |  |
 |  13:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     row-size=54B cardinality=18.00K
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -6673,12 +6673,12 @@ PLAN-ROOT SINK
 |  36:EXCHANGE [BROADCAST]
 |  |
 |  15:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |     row-size=12B cardinality=434
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ====
@@ -6745,7 +6745,7 @@ PLAN-ROOT SINK
 |  |  row-size=86B cardinality=3.30K
 |  |
 |  |--18:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     predicates: ca_gmt_offset = -5
 |  |     row-size=8B cardinality=8.33K
 |  |
@@ -6755,7 +6755,7 @@ PLAN-ROOT SINK
 |  |  row-size=78B cardinality=17.06K
 |  |
 |  |--17:SCAN HDFS [tpcds.customer]
-|  |     partitions=1/1 files=1 size=12.60MB
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |     runtime filters: RF012 -> c_current_addr_sk
 |  |     row-size=8B cardinality=100.00K
 |  |
@@ -6764,7 +6764,7 @@ PLAN-ROOT SINK
 |  |  row-size=70B cardinality=17.06K
 |  |
 |  |--15:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: s_gmt_offset = -5
 |  |     row-size=8B cardinality=12
 |  |
@@ -6774,7 +6774,7 @@ PLAN-ROOT SINK
 |  |  row-size=62B cardinality=17.06K
 |  |
 |  |--19:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     predicates: i_category = 'Books'
 |  |     row-size=26B cardinality=1.80K
 |  |
@@ -6784,12 +6784,12 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=170.55K
 |  |
 |  |--16:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |     row-size=12B cardinality=108
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |     row-size=24B cardinality=2.88M
 |
@@ -6803,7 +6803,7 @@ PLAN-ROOT SINK
 |  row-size=133B cardinality=3.28K
 |
 |--05:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: ca_gmt_offset = -5
 |     row-size=8B cardinality=8.33K
 |
@@ -6813,7 +6813,7 @@ PLAN-ROOT SINK
 |  row-size=125B cardinality=16.94K
 |
 |--04:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
@@ -6823,7 +6823,7 @@ PLAN-ROOT SINK
 |  row-size=117B cardinality=16.94K
 |
 |--01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=8B cardinality=12
 |
@@ -6833,7 +6833,7 @@ PLAN-ROOT SINK
 |  row-size=109B cardinality=16.94K
 |
 |--02:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_dmail = 'Y' OR p_channel_email = 'Y' OR p_channel_tv = 'Y')
 |     row-size=43B cardinality=300
 |
@@ -6843,7 +6843,7 @@ PLAN-ROOT SINK
 |  row-size=66B cardinality=17.06K
 |
 |--06:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_category = 'Books'
 |     row-size=26B cardinality=1.80K
 |
@@ -6853,12 +6853,12 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=170.55K
 |
 |--03:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2000, d_moy = 11
 |     row-size=12B cardinality=108
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -6893,7 +6893,7 @@ PLAN-ROOT SINK
 |  |--42:EXCHANGE [BROADCAST]
 |  |  |
 |  |  18:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     predicates: ca_gmt_offset = -5
 |  |     row-size=8B cardinality=8.33K
 |  |
@@ -6905,7 +6905,7 @@ PLAN-ROOT SINK
 |  |--41:EXCHANGE [HASH(c_customer_sk)]
 |  |  |
 |  |  17:SCAN HDFS [tpcds.customer]
-|  |     partitions=1/1 files=1 size=12.60MB
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |     runtime filters: RF012 -> c_current_addr_sk
 |  |     row-size=8B cardinality=100.00K
 |  |
@@ -6918,7 +6918,7 @@ PLAN-ROOT SINK
 |  |--39:EXCHANGE [BROADCAST]
 |  |  |
 |  |  15:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: s_gmt_offset = -5
 |  |     row-size=8B cardinality=12
 |  |
@@ -6930,7 +6930,7 @@ PLAN-ROOT SINK
 |  |--38:EXCHANGE [BROADCAST]
 |  |  |
 |  |  19:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     predicates: i_category = 'Books'
 |  |     row-size=26B cardinality=1.80K
 |  |
@@ -6942,12 +6942,12 @@ PLAN-ROOT SINK
 |  |--37:EXCHANGE [BROADCAST]
 |  |  |
 |  |  16:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |     row-size=12B cardinality=108
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |     row-size=24B cardinality=2.88M
 |
@@ -6969,7 +6969,7 @@ PLAN-ROOT SINK
 |--34:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: ca_gmt_offset = -5
 |     row-size=8B cardinality=8.33K
 |
@@ -6981,7 +6981,7 @@ PLAN-ROOT SINK
 |--33:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  04:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
@@ -6995,7 +6995,7 @@ PLAN-ROOT SINK
 |--31:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=8B cardinality=12
 |
@@ -7007,7 +7007,7 @@ PLAN-ROOT SINK
 |--30:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_dmail = 'Y' OR p_channel_email = 'Y' OR p_channel_tv = 'Y')
 |     row-size=43B cardinality=300
 |
@@ -7019,7 +7019,7 @@ PLAN-ROOT SINK
 |--29:EXCHANGE [BROADCAST]
 |  |
 |  06:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_category = 'Books'
 |     row-size=26B cardinality=1.80K
 |
@@ -7031,12 +7031,12 @@ PLAN-ROOT SINK
 |--28:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2000, d_moy = 11
 |     row-size=12B cardinality=108
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ---- PARALLELPLANS
@@ -7079,7 +7079,7 @@ PLAN-ROOT SINK
 |  |  42:EXCHANGE [BROADCAST]
 |  |  |
 |  |  18:SCAN HDFS [tpcds.customer_address]
-|  |     partitions=1/1 files=1 size=5.25MB
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     predicates: ca_gmt_offset = -5
 |  |     row-size=8B cardinality=8.33K
 |  |
@@ -7095,7 +7095,7 @@ PLAN-ROOT SINK
 |  |  41:EXCHANGE [HASH(c_customer_sk)]
 |  |  |
 |  |  17:SCAN HDFS [tpcds.customer]
-|  |     partitions=1/1 files=1 size=12.60MB
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |     runtime filters: RF012 -> c_current_addr_sk
 |  |     row-size=8B cardinality=100.00K
 |  |
@@ -7112,7 +7112,7 @@ PLAN-ROOT SINK
 |  |  39:EXCHANGE [BROADCAST]
 |  |  |
 |  |  15:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: s_gmt_offset = -5
 |  |     row-size=8B cardinality=12
 |  |
@@ -7128,7 +7128,7 @@ PLAN-ROOT SINK
 |  |  38:EXCHANGE [BROADCAST]
 |  |  |
 |  |  19:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
 |  |     predicates: i_category = 'Books'
 |  |     row-size=26B cardinality=1.80K
 |  |
@@ -7144,12 +7144,12 @@ PLAN-ROOT SINK
 |  |  37:EXCHANGE [BROADCAST]
 |  |  |
 |  |  16:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |     row-size=12B cardinality=108
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |     row-size=24B cardinality=2.88M
 |
@@ -7175,7 +7175,7 @@ PLAN-ROOT SINK
 |  34:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.customer_address]
-|     partitions=1/1 files=1 size=5.25MB
+|     HDFS partitions=1/1 files=1 size=5.25MB
 |     predicates: ca_gmt_offset = -5
 |     row-size=8B cardinality=8.33K
 |
@@ -7191,7 +7191,7 @@ PLAN-ROOT SINK
 |  33:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  04:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     runtime filters: RF000 -> c_current_addr_sk
 |     row-size=8B cardinality=100.00K
 |
@@ -7209,7 +7209,7 @@ PLAN-ROOT SINK
 |  31:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_gmt_offset = -5
 |     row-size=8B cardinality=12
 |
@@ -7225,7 +7225,7 @@ PLAN-ROOT SINK
 |  30:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.promotion]
-|     partitions=1/1 files=1 size=36.36KB
+|     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_dmail = 'Y' OR p_channel_email = 'Y' OR p_channel_tv = 'Y')
 |     row-size=43B cardinality=300
 |
@@ -7241,7 +7241,7 @@ PLAN-ROOT SINK
 |  29:EXCHANGE [BROADCAST]
 |  |
 |  06:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
+|     HDFS partitions=1/1 files=1 size=4.82MB
 |     predicates: i_category = 'Books'
 |     row-size=26B cardinality=1.80K
 |
@@ -7257,12 +7257,12 @@ PLAN-ROOT SINK
 |  28:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.date_dim]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_year = 2000, d_moy = 11
 |     row-size=12B cardinality=108
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ====
@@ -7374,7 +7374,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--59:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7383,7 +7383,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--57:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7393,12 +7393,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--58:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7414,7 +7414,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--51:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7423,7 +7423,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--49:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7433,12 +7433,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--50:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7454,7 +7454,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--43:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7463,7 +7463,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--41:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7473,12 +7473,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--42:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7494,7 +7494,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--35:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7503,7 +7503,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--33:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7513,12 +7513,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--34:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7534,7 +7534,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--27:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7543,7 +7543,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--25:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7553,12 +7553,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--26:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7574,7 +7574,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--19:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7583,7 +7583,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--17:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7593,12 +7593,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--18:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7614,7 +7614,7 @@ PLAN-ROOT SINK
 |  |  row-size=56B cardinality=2.27K
 |  |
 |  |--11:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7624,7 +7624,7 @@ PLAN-ROOT SINK
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--09:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7634,12 +7634,12 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--10:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7652,7 +7652,7 @@ PLAN-ROOT SINK
 |  row-size=56B cardinality=2.27K
 |
 |--03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -7662,7 +7662,7 @@ PLAN-ROOT SINK
 |  row-size=36B cardinality=6.82K
 |
 |--01:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |     row-size=12B cardinality=720
 |
@@ -7672,12 +7672,12 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=69.82K
 |
 |--02:SCAN HDFS [tpcds.time_dim]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
@@ -7707,7 +7707,7 @@ PLAN-ROOT SINK
 |  |--114:EXCHANGE [BROADCAST]
 |  |  |
 |  |  59:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7718,7 +7718,7 @@ PLAN-ROOT SINK
 |  |--113:EXCHANGE [BROADCAST]
 |  |  |
 |  |  57:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7730,12 +7730,12 @@ PLAN-ROOT SINK
 |  |--112:EXCHANGE [BROADCAST]
 |  |  |
 |  |  58:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7761,7 +7761,7 @@ PLAN-ROOT SINK
 |  |--108:EXCHANGE [BROADCAST]
 |  |  |
 |  |  51:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7772,7 +7772,7 @@ PLAN-ROOT SINK
 |  |--107:EXCHANGE [BROADCAST]
 |  |  |
 |  |  49:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7784,12 +7784,12 @@ PLAN-ROOT SINK
 |  |--106:EXCHANGE [BROADCAST]
 |  |  |
 |  |  50:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7815,7 +7815,7 @@ PLAN-ROOT SINK
 |  |--102:EXCHANGE [BROADCAST]
 |  |  |
 |  |  43:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7826,7 +7826,7 @@ PLAN-ROOT SINK
 |  |--101:EXCHANGE [BROADCAST]
 |  |  |
 |  |  41:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7838,12 +7838,12 @@ PLAN-ROOT SINK
 |  |--100:EXCHANGE [BROADCAST]
 |  |  |
 |  |  42:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7869,7 +7869,7 @@ PLAN-ROOT SINK
 |  |--96:EXCHANGE [BROADCAST]
 |  |  |
 |  |  35:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7880,7 +7880,7 @@ PLAN-ROOT SINK
 |  |--95:EXCHANGE [BROADCAST]
 |  |  |
 |  |  33:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7892,12 +7892,12 @@ PLAN-ROOT SINK
 |  |--94:EXCHANGE [BROADCAST]
 |  |  |
 |  |  34:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7923,7 +7923,7 @@ PLAN-ROOT SINK
 |  |--90:EXCHANGE [BROADCAST]
 |  |  |
 |  |  27:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7934,7 +7934,7 @@ PLAN-ROOT SINK
 |  |--89:EXCHANGE [BROADCAST]
 |  |  |
 |  |  25:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -7946,12 +7946,12 @@ PLAN-ROOT SINK
 |  |--88:EXCHANGE [BROADCAST]
 |  |  |
 |  |  26:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -7977,7 +7977,7 @@ PLAN-ROOT SINK
 |  |--84:EXCHANGE [BROADCAST]
 |  |  |
 |  |  19:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -7988,7 +7988,7 @@ PLAN-ROOT SINK
 |  |--83:EXCHANGE [BROADCAST]
 |  |  |
 |  |  17:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8000,12 +8000,12 @@ PLAN-ROOT SINK
 |  |--82:EXCHANGE [BROADCAST]
 |  |  |
 |  |  18:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8031,7 +8031,7 @@ PLAN-ROOT SINK
 |  |--78:EXCHANGE [BROADCAST]
 |  |  |
 |  |  11:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8043,7 +8043,7 @@ PLAN-ROOT SINK
 |  |--77:EXCHANGE [BROADCAST]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8055,12 +8055,12 @@ PLAN-ROOT SINK
 |  |--76:EXCHANGE [BROADCAST]
 |  |  |
 |  |  10:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8081,7 +8081,7 @@ PLAN-ROOT SINK
 |--73:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -8093,7 +8093,7 @@ PLAN-ROOT SINK
 |--72:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |     row-size=12B cardinality=720
 |
@@ -8105,12 +8105,12 @@ PLAN-ROOT SINK
 |--71:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.time_dim]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
@@ -8148,7 +8148,7 @@ PLAN-ROOT SINK
 |  |  114:EXCHANGE [BROADCAST]
 |  |  |
 |  |  59:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8163,7 +8163,7 @@ PLAN-ROOT SINK
 |  |  113:EXCHANGE [BROADCAST]
 |  |  |
 |  |  57:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8179,12 +8179,12 @@ PLAN-ROOT SINK
 |  |  112:EXCHANGE [BROADCAST]
 |  |  |
 |  |  58:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8218,7 +8218,7 @@ PLAN-ROOT SINK
 |  |  108:EXCHANGE [BROADCAST]
 |  |  |
 |  |  51:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8233,7 +8233,7 @@ PLAN-ROOT SINK
 |  |  107:EXCHANGE [BROADCAST]
 |  |  |
 |  |  49:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8249,12 +8249,12 @@ PLAN-ROOT SINK
 |  |  106:EXCHANGE [BROADCAST]
 |  |  |
 |  |  50:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8288,7 +8288,7 @@ PLAN-ROOT SINK
 |  |  102:EXCHANGE [BROADCAST]
 |  |  |
 |  |  43:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8303,7 +8303,7 @@ PLAN-ROOT SINK
 |  |  101:EXCHANGE [BROADCAST]
 |  |  |
 |  |  41:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8319,12 +8319,12 @@ PLAN-ROOT SINK
 |  |  100:EXCHANGE [BROADCAST]
 |  |  |
 |  |  42:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8358,7 +8358,7 @@ PLAN-ROOT SINK
 |  |  96:EXCHANGE [BROADCAST]
 |  |  |
 |  |  35:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8373,7 +8373,7 @@ PLAN-ROOT SINK
 |  |  95:EXCHANGE [BROADCAST]
 |  |  |
 |  |  33:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8389,12 +8389,12 @@ PLAN-ROOT SINK
 |  |  94:EXCHANGE [BROADCAST]
 |  |  |
 |  |  34:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8428,7 +8428,7 @@ PLAN-ROOT SINK
 |  |  90:EXCHANGE [BROADCAST]
 |  |  |
 |  |  27:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8443,7 +8443,7 @@ PLAN-ROOT SINK
 |  |  89:EXCHANGE [BROADCAST]
 |  |  |
 |  |  25:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8459,12 +8459,12 @@ PLAN-ROOT SINK
 |  |  88:EXCHANGE [BROADCAST]
 |  |  |
 |  |  26:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8498,7 +8498,7 @@ PLAN-ROOT SINK
 |  |  84:EXCHANGE [BROADCAST]
 |  |  |
 |  |  19:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8513,7 +8513,7 @@ PLAN-ROOT SINK
 |  |  83:EXCHANGE [BROADCAST]
 |  |  |
 |  |  17:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8529,12 +8529,12 @@ PLAN-ROOT SINK
 |  |  82:EXCHANGE [BROADCAST]
 |  |  |
 |  |  18:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8568,7 +8568,7 @@ PLAN-ROOT SINK
 |  |  78:EXCHANGE [BROADCAST]
 |  |  |
 |  |  11:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_store_name = 'ese'
 |  |     row-size=20B cardinality=2
 |  |
@@ -8584,7 +8584,7 @@ PLAN-ROOT SINK
 |  |  77:EXCHANGE [BROADCAST]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
+|  |     HDFS partitions=1/1 files=1 size=148.10KB
 |  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |     row-size=12B cardinality=720
 |  |
@@ -8600,12 +8600,12 @@ PLAN-ROOT SINK
 |  |  76:EXCHANGE [BROADCAST]
 |  |  |
 |  |  10:SCAN HDFS [tpcds.time_dim]
-|  |     partitions=1/1 files=1 size=4.87MB
+|  |     HDFS partitions=1/1 files=1 size=4.87MB
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |     row-size=12B cardinality=1.14K
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |     row-size=12B cardinality=2.88M
 |
@@ -8630,7 +8630,7 @@ PLAN-ROOT SINK
 |  73:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
-|     partitions=1/1 files=1 size=3.08KB
+|     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: store.s_store_name = 'ese'
 |     row-size=20B cardinality=2
 |
@@ -8646,7 +8646,7 @@ PLAN-ROOT SINK
 |  72:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.household_demographics]
-|     partitions=1/1 files=1 size=148.10KB
+|     HDFS partitions=1/1 files=1 size=148.10KB
 |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |     row-size=12B cardinality=720
 |
@@ -8662,12 +8662,12 @@ PLAN-ROOT SINK
 |  71:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.time_dim]
-|     partitions=1/1 files=1 size=4.87MB
+|     HDFS partitions=1/1 files=1 size=4.87MB
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |     row-size=12B cardinality=1.14K
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ====

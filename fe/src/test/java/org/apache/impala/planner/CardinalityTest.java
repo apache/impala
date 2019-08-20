@@ -20,7 +20,6 @@ package org.apache.impala.planner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -340,6 +339,47 @@ public class CardinalityTest extends PlannerTestBase {
     verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
         + "GROUP BY a", -1, true,
         ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToSecondAggregationNode, AggregationNode.class);
+  }
+
+  /**
+   * Test that agg nodes correctly gap output cardinality based on input
+   * cardinality with and without stats.
+   */
+  @Test
+  public void testAggregationNodeGroupByCardinalityCapping() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan involving GROUP BY.
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList(0);
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0, 0);
+
+    // With table and column stats available.
+    verifyCardinality("select distinct id, int_col from functional.alltypes",
+        7300, true, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyCardinality("select distinct id, int_col from functional.alltypes",
+        7300, true, ImmutableSet.of(),
+        pathToSecondAggregationNode, AggregationNode.class);
+
+    // No column stats available but number of rows inferred from file size.
+    // The estimated number of rows caps the output cardinality.
+    verifyApproxCardinality(
+        "select distinct id, int_col from functional_parquet.alltypes",
+        12760, true, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxCardinality(
+        "select distinct id, int_col from functional_parquet.alltypes",
+        12760, true, ImmutableSet.of(),
+        pathToSecondAggregationNode, AggregationNode.class);
+    // No column stats available and row estimation disabled - no estimate is possible.
+    verifyCardinality(
+        "select distinct id, int_col from functional_parquet.alltypes",
+        -1, true, ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyCardinality(
+        "select distinct id, int_col from functional_parquet.alltypes",
+        -1, true, ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
         pathToSecondAggregationNode, AggregationNode.class);
   }
 
@@ -776,6 +816,38 @@ public class CardinalityTest extends PlannerTestBase {
     PlanNode planRoot = plan.get(0).getPlanRoot();
     assertEquals("Cardinality error for: " + query, expected,
         planRoot.getCardinality());
+  }
+
+
+  /* This method allows us to inspect the cardinality of a PlanNode located by
+  * path with respect to the root of the retrieved query plan. The class of
+  * the located PlanNode by path will also be checked against cl, the class of
+  * the PlanNode of interest.
+  *
+  * @param query query to test
+  * @param expected expected cardinality at the PlanNode of interest
+  * @param isDistributedPlan set to true if we would like to generate
+  * a distributed plan
+  * @param testOptions specified test options
+  * @param path path to the PlanNode of interest
+  * @param cl class of the PlanNode of interest
+  */
+  protected void verifyCardinality(String query, long expected,
+      boolean isDistributedPlan, Set<PlannerTestOption> testOptions,
+      List<Integer> path, Class<?> cl) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan, testOptions);
+    // We use the last element on the List of PlanFragment
+    // because this PlanFragment encloses all the PlanNode's
+    // in the query plan (either the single node plan or
+    // the distributed plan).
+    PlanNode currentNode = plan.get(plan.size() - 1).getPlanRoot();
+    for (Integer currentChildIndex: path) {
+      currentNode = currentNode.getChild(currentChildIndex);
+    }
+    assertEquals("PlanNode class not matched: ", cl.getName(),
+        currentNode.getClass().getName());
+    assertEquals("Cardinality error for: " + query,
+        expected, currentNode.getCardinality());
   }
 
   /**

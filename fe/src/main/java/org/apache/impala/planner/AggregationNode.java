@@ -41,6 +41,8 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -50,6 +52,8 @@ import com.google.common.collect.Lists;
  *
  */
 public class AggregationNode extends PlanNode {
+  private static final Logger LOG = LoggerFactory.getLogger(AggregationNode.class);
+
   // Default per-instance memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic.
   private final static long DEFAULT_PER_INSTANCE_MEM = 128L * 1024L * 1024L;
@@ -207,49 +211,84 @@ public class AggregationNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    // This is prone to overflow, because we keep multiplying cardinalities,
-    // even if the grouping exprs are functionally dependent (example:
-    // group by the primary key of a table plus a number of other columns from that
-    // same table)
-    // TODO: try to recognize functional dependencies
-    // TODO: as a shortcut, instead of recognizing functional dependencies,
-    // limit the contribution of a single table to the number of rows
-    // of that table (so that when we're grouping by the primary key col plus
-    // some others, the estimate doesn't overshoot dramatically)
-    // cardinality: product of # of distinct values produced by grouping exprs
-
+    // TODO: IMPALA-2945: this doesn't correctly take into account duplicate keys on
+    // multiple nodes in a pre-aggregation.
     cardinality_ = 0;
     for (AggregateInfo aggInfo : aggInfos_) {
-      List<Expr> groupingExprs = aggInfo.getGroupingExprs();
-      if (groupingExprs.isEmpty()) {
-        // Non-grouping aggregation class.
-        cardinality_ += 1;
-      } else {
-        long ndvs = Expr.getNumDistinctValues(groupingExprs);
-        // if we ended up with an overflow, the estimate is certain to be wrong
-        if (ndvs < 0) {
-          cardinality_ = -1;
-          break;
-        }
-        cardinality_ += checkedAdd(cardinality_, ndvs);
+      // Compute the cardinality for this set of grouping exprs.
+      long numGroups = estimateNumGroups(aggInfo);
+      Preconditions.checkState(numGroups >= -1, numGroups);
+      if (numGroups == -1) {
+        // No estimate of the number of groups is possible, can't even make a
+        // conservative estimate.
+        cardinality_ = -1;
+        break;
       }
+      cardinality_ = checkedAdd(cardinality_, numGroups);
     }
 
     // Take conjuncts into account.
     if (cardinality_ > 0) {
       cardinality_ = (long) Math.round((double) cardinality_ * computeSelectivity());
     }
-    // Sanity check the cardinality_ based on the input cardinality_.
-    if (getChild(0).getCardinality() != -1) {
-      if (cardinality_ == -1) {
-        // A worst-case cardinality_ is better than an unknown cardinality_.
-        cardinality_ = getChild(0).getCardinality();
-      } else {
-        // An AggregationNode cannot increase the cardinality_.
-        cardinality_ = Math.min(getChild(0).getCardinality(), cardinality_);
-      }
-    }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+  }
+
+  /**
+   * Estimate the number of groups that will be present for the aggregation class
+   * described by 'aggInfo'.
+   * Returns -1 if a reasonable cardinality estimate cannot be produced.
+   */
+  private long estimateNumGroups(AggregateInfo aggInfo) {
+    // This is prone to overestimation, because we keep multiplying cardinalities,
+    // even if the grouping exprs are functionally dependent (example:
+    // group by the primary key of a table plus a number of other columns from that
+    // same table). We limit the estimate to the estimated number of input row to
+    // limit the potential overestimation. We could, in future, improve this further
+    // by recognizing functional dependencies.
+    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+    if (groupingExprs.isEmpty()) {
+      // Non-grouping aggregation class - always results in one group even if there are
+      // zero input rows.
+      return 1;
+    }
+    long numGroups = Expr.getNumDistinctValues(groupingExprs);
+    // Sanity check the cardinality_ based on the input cardinality_.
+    long aggInputCardinality = getAggInputCardinality();
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Node " + id_ + " numGroups= " + numGroups + " aggInputCardinality=" +
+          aggInputCardinality + " for agg class " + aggInfo.debugString());
+    }
+    if (numGroups == -1) {
+      // A worst-case cardinality_ is better than an unknown cardinality_.
+      // Note that this will still be -1 if the child's cardinality is unknown.
+      return aggInputCardinality;
+    }
+    // We have a valid estimate of the number of groups. Cap it at number of input
+    // rows because an aggregation cannot increase the cardinality_.
+    if (aggInputCardinality >= 0) {
+      numGroups = Math.min(aggInputCardinality, numGroups);
+    }
+    return numGroups;
+  }
+
+  /**
+   * Compute the input cardinality to the distributed aggregation. If this is a
+   * merge aggregation, we need to find the cardinality of the input to the
+   * preaggregation.
+   * Return -1 if unknown.
+   */
+  private long getAggInputCardinality() {
+    PlanNode child = getChild(0);
+    if (!aggPhase_.isMerge()) return child.getCardinality();
+    PlanNode preAgg;
+    if (child instanceof ExchangeNode) {
+      preAgg = child.getChild(0);
+    } else {
+      preAgg = child;
+    }
+    Preconditions.checkState(preAgg instanceof AggregationNode);
+    return preAgg.getChild(0).getCardinality();
   }
 
   /**

@@ -47,7 +47,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(int_col), avg(double_col), count(*)
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -62,7 +62,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -313,7 +313,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(1)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 01:EMPTYSET
 ====
@@ -371,7 +371,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id), count(int_col)
-|  row-size=16B cardinality=0
+|  row-size=16B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -387,7 +387,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id + int_col)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -403,7 +403,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(T1.int_col)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 01:AGGREGATE
 |  group by: int_col
@@ -551,12 +551,12 @@ PLAN-ROOT SINK
 |  |
 |  04:AGGREGATE [FINALIZE]
 |  |  output: count(*)
-|  |  row-size=8B cardinality=0
+|  |  row-size=8B cardinality=1
 |  |
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.98MB
+   HDFS partitions=1/1 files=4 size=289.01MB
    predicates: c_custkey < 10
    row-size=56B cardinality=15.00K
 ====
@@ -598,7 +598,7 @@ PLAN-ROOT SINK
 |     row-size=8B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.98MB
+   HDFS partitions=1/1 files=4 size=289.01MB
    predicates: c_custkey = 1
    row-size=44B cardinality=1
 ====
@@ -624,7 +624,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
 |  row-size=1B cardinality=0
